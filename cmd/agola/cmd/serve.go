@@ -20,6 +20,7 @@ import (
 
 	"github.com/sorintlab/agola/cmd"
 	"github.com/sorintlab/agola/internal/services/config"
+	"github.com/sorintlab/agola/internal/services/configstore"
 	"github.com/sorintlab/agola/internal/services/runservice/executor"
 	rsscheduler "github.com/sorintlab/agola/internal/services/runservice/scheduler"
 	"github.com/sorintlab/agola/internal/services/scheduler"
@@ -116,6 +117,11 @@ func serve(cmd *cobra.Command, args []string) error {
 		return errors.Wrapf(err, "failed to start run service executor")
 	}
 
+	cs, err := configstore.NewConfigStore(ctx, &c.ConfigStore)
+	if err != nil {
+		return errors.Wrapf(err, "failed to start config store")
+	}
+
 	sched1, err := scheduler.NewScheduler(&c.Scheduler)
 	if err != nil {
 		return errors.Wrapf(err, "failed to start scheduler")
@@ -125,6 +131,7 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	go func() { errCh <- rsex1.Run(ctx) }()
 	go func() { errCh <- rssched1.Run(ctx) }()
+	go func() { errCh <- cs.Run(ctx) }()
 	go func() { errCh <- sched1.Run(ctx) }()
 
 	return <-errCh
