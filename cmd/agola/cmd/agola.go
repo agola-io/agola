@@ -33,6 +33,8 @@ var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
 var logger = slog.New(level)
 var log = logger.Sugar()
 
+var token string
+
 var cmdAgola = &cobra.Command{
 	Use:     "agola",
 	Short:   "agola",
@@ -71,6 +73,7 @@ func init() {
 	flags := cmdAgola.PersistentFlags()
 
 	flags.StringVarP(&agolaOpts.gatewayURL, "gateway-url", "u", gatewayURL, "agola gateway exposed url")
+	flags.StringVar(&token, "token", token, "api token")
 	flags.BoolVarP(&agolaOpts.debug, "debug", "d", false, "debug")
 }
 
