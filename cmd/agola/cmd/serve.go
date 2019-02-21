@@ -22,6 +22,7 @@ import (
 	"github.com/sorintlab/agola/internal/services/config"
 	"github.com/sorintlab/agola/internal/services/runservice/executor"
 	rsscheduler "github.com/sorintlab/agola/internal/services/runservice/scheduler"
+	"github.com/sorintlab/agola/internal/services/scheduler"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -33,7 +34,7 @@ var (
 	gatewayURL = fmt.Sprintf("http://%s:%d", "localhost", 8000)
 )
 
-var CmdServe = &cobra.Command{
+var cmdServe = &cobra.Command{
 	Use:     "serve",
 	Short:   "serve",
 	Version: cmd.Version,
@@ -53,15 +54,15 @@ type serveOptions struct {
 var serveOpts serveOptions
 
 func init() {
-	flags := CmdServe.PersistentFlags()
+	flags := cmdServe.PersistentFlags()
 
 	flags.StringVar(&serveOpts.config, "config", "", "config file path")
 	flags.BoolVar(&serveOpts.embeddedEtcd, "embedded-etcd", false, "start and use an embedded etcd, only for testing purpose")
 	flags.StringVar(&serveOpts.embeddedEtcdDataDir, "embedded-etcd-data-dir", "/tmp/agola/etcd", "embedded etcd data dir, only for testing purpose")
 
-	cmdAgola.MarkFlagRequired("config")
+	cmdServe.MarkFlagRequired("config")
 
-	cmdAgola.AddCommand(CmdServe)
+	cmdAgola.AddCommand(cmdServe)
 }
 
 func embeddedEtcd(ctx context.Context) error {
@@ -115,10 +116,16 @@ func serve(cmd *cobra.Command, args []string) error {
 		return errors.Wrapf(err, "failed to start run service executor")
 	}
 
+	sched1, err := scheduler.NewScheduler(&c.Scheduler)
+	if err != nil {
+		return errors.Wrapf(err, "failed to start scheduler")
+	}
+
 	errCh := make(chan error)
 
 	go func() { errCh <- rsex1.Run(ctx) }()
 	go func() { errCh <- rssched1.Run(ctx) }()
+	go func() { errCh <- sched1.Run(ctx) }()
 
 	return <-errCh
 }
