@@ -21,6 +21,7 @@ import (
 	"github.com/sorintlab/agola/cmd"
 	"github.com/sorintlab/agola/internal/services/config"
 	"github.com/sorintlab/agola/internal/services/configstore"
+	"github.com/sorintlab/agola/internal/services/gateway"
 	"github.com/sorintlab/agola/internal/services/runservice/executor"
 	rsscheduler "github.com/sorintlab/agola/internal/services/runservice/scheduler"
 	"github.com/sorintlab/agola/internal/services/scheduler"
@@ -127,11 +128,17 @@ func serve(cmd *cobra.Command, args []string) error {
 		return errors.Wrapf(err, "failed to start scheduler")
 	}
 
+	gateway, err := gateway.NewGateway(&c.Gateway)
+	if err != nil {
+		return errors.Wrapf(err, "failed to start gateway")
+	}
+
 	errCh := make(chan error)
 
 	go func() { errCh <- rsex1.Run(ctx) }()
 	go func() { errCh <- rssched1.Run(ctx) }()
 	go func() { errCh <- cs.Run(ctx) }()
+	go func() { errCh <- gateway.Run(ctx) }()
 	go func() { errCh <- sched1.Run(ctx) }()
 
 	return <-errCh

@@ -18,57 +18,13 @@ import (
 	"time"
 )
 
-type WebhookEvent string
-
-const (
-	WebhookEventPush        WebhookEvent = "push"
-	WebhookEventTag         WebhookEvent = "tag"
-	WebhookEventPullRequest WebhookEvent = "pull_request"
-)
-
-type RunType string
-
-const (
-	RunTypeProject RunType = "project"
-	RunTypeUser    RunType = "user"
-)
-
-type WebhookData struct {
-	Event     WebhookEvent `json:"event,omitempty"`
-	ProjectID string       `json:"project_id,omitempty"`
-
-	CompareLink  string `json:"compare_link,omitempty"`   // Pimray link to source. It can be the commit
-	CommitLink   string `json:"commit_link,omitempty"`    // Pimray link to source. It can be the commit
-	CommitSHA    string `json:"commit_sha,omitempty"`     // commit SHA (SHA1 but also future SHA like SHA256)
-	OldCommitSHA string `json:"old_commit_sha,omitempty"` // commit SHA of the head before this push
-	Ref          string `json:"ref,omitempty"`            // Ref containing the commit SHA
-	Message      string `json:"message,omitempty"`        // Message to use (Push last commit message summary, PR title, Tag message etc...)
-	Sender       string `json:"sender,omitempty"`
-	Avatar       string `json:"avatar,omitempty"`
-
-	Branch     string `json:"branch,omitempty"`
-	BranchLink string `json:"branch_link,omitempty"`
-
-	Tag     string `json:"tag,omitempty"`
-	TagLink string `json:"tag_link,omitempty"`
-
-	// use a string if on some platform (current or future) some PRs id will not be numbers
-	PullRequestID   string `json:"pull_request_id,omitempty"`
-	PullRequestLink string `json:"link,omitempty"` // Link to pull request
-
-	Repo WebhookDataRepo `json:"repo,omitempty"`
-}
-
-type WebhookDataRepo struct {
-	Name     string `json:"name,omitempty"`
-	Owner    string `json:"owner,omitempty"`
-	FullName string `json:"full_name,omitempty"`
-	RepoURL  string `json:"repo_url,omitempty"`
-}
-
 // Configstore types
 
 type User struct {
+	// The type version. Increase when a breaking change is done. Usually not
+	// needed when adding fields.
+	Version string `json:"version,omitempty"`
+
 	ID string `json:"id,omitempty"`
 
 	UserName string `json:"user_name,omitempty"`
@@ -97,6 +53,10 @@ const (
 )
 
 type RemoteSource struct {
+	// The type version. Increase when a breaking change is done. Usually not
+	// needed when adding fields.
+	Version string `json:"version,omitempty"`
+
 	ID string `json:"id,omitempty"`
 
 	Name   string `json:"name,omitempty"`
@@ -113,6 +73,10 @@ type RemoteSource struct {
 }
 
 type LinkedAccount struct {
+	// The type version. Increase when a breaking change is done. Usually not
+	// needed when adding fields.
+	Version string `json:"version,omitempty"`
+
 	ID string `json:"id,omitempty"`
 
 	RemoteUserID   string `json:"remote_user_id,omitempty"`
@@ -128,6 +92,10 @@ type LinkedAccount struct {
 }
 
 type Project struct {
+	// The type version. Increase when a breaking change is done. Usually not
+	// needed when adding fields.
+	Version string `json:"version,omitempty"`
+
 	ID   string `json:"id,omitempty"`
 	Name string `json:"name,omitempty"`
 
