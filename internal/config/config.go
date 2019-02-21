@@ -134,7 +134,6 @@ func (t *Task) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	if err := unmarshal(&tt); err != nil {
 		return err
 	}
-	log.Debugf("tt: %s", util.Dump(tt))
 
 	var st tasksteps
 	if err := unmarshal(&st); err != nil {
@@ -147,12 +146,10 @@ func (t *Task) UnmarshalYAML(unmarshal func(interface{}) error) error {
 			return errors.Errorf("wrong steps description at index %d: more than one step name per list entry", i)
 		}
 		for stepType, stepSpec := range stepEntry {
-			log.Debugf("s: %s", util.Dump(stepSpec))
 			o, err := yaml.Marshal(stepSpec)
 			if err != nil {
 				return err
 			}
-			log.Debugf("o: %s", o)
 			switch stepType {
 			case "clone":
 				var cs CloneStep
@@ -190,14 +187,11 @@ func (t *Task) UnmarshalYAML(unmarshal func(interface{}) error) error {
 			default:
 				return errors.Errorf("unknown step type: %s", stepType)
 			}
-			log.Debugf("s: %s", util.Dump(steps[i]))
 		}
 	}
-	log.Debugf("steps: %s", util.Dump(steps))
 
 	t.Steps = steps
 
-	log.Debugf("t: %s", util.Dump(t))
 	return nil
 }
 
@@ -213,7 +207,6 @@ func (e *Element) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	if err := unmarshal(&te); err != nil {
 		return err
 	}
-	log.Debugf("te: %s", util.Dump(te))
 
 	e.Name = te.Name
 	e.Task = te.Task
@@ -222,7 +215,6 @@ func (e *Element) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	depends := make([]*Depend, len(te.Depends))
 	for i, dependEntry := range te.Depends {
 		var depend *Depend
-		log.Debugf("dependEntry: %v", util.Dump(dependEntry))
 		switch dependEntry.(type) {
 		case string:
 			depend = &Depend{
@@ -238,7 +230,6 @@ func (e *Element) UnmarshalYAML(unmarshal func(interface{}) error) error {
 			if err := yaml.Unmarshal(o, &dl); err != nil {
 				return err
 			}
-			log.Debugf("dl: %v", util.Dump(dl))
 			if len(dl) != 1 {
 				return errors.Errorf("unsupported depend format. Must be a string or a list")
 			}
@@ -254,11 +245,9 @@ func (e *Element) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		}
 		depends[i] = depend
 	}
-	log.Debugf("depends: %s", util.Dump(depends))
 
 	e.Depends = depends
 
-	log.Debugf("e: %s", util.Dump(e))
 	return nil
 }
 
@@ -336,8 +325,6 @@ func ParseConfig(configData []byte) (*Config, error) {
 }
 
 func checkConfig(config *Config) error {
-	log.Debugf("config: %s", util.Dump(config))
-
 	// check broken dependencies
 	for _, pipeline := range config.Pipelines {
 		// collect all task names
@@ -419,7 +406,6 @@ func checkConfig(config *Config) error {
 			return errors.Errorf("runtime %q needed by task %q doesn't exist", t.Runtime, t.Name)
 		}
 		for i, s := range t.Steps {
-			log.Debugf("s: %s", util.Dump(s))
 			switch step := s.(type) {
 			// TODO(sgotti) we could use the run step command as step name but when the
 			// command is very long or multi line it doesn't makes sense and will
