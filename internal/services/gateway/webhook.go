@@ -23,6 +23,7 @@ import (
 
 	"github.com/sorintlab/agola/internal/config"
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
+	"github.com/sorintlab/agola/internal/gitsources/agolagit"
 	"github.com/sorintlab/agola/internal/runconfig"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/gateway/common"
@@ -107,49 +108,80 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 	ctx := r.Context()
 
 	projectID := r.URL.Query().Get("projectid")
+	isUserBuild := false
+	if projectID == "" {
+		isUserBuild = true
+	}
 
 	defer r.Body.Close()
 
+	var webhookData *types.WebhookData
+	var sshPrivKey string
+	var cloneURL string
+	var skipSSHHostKeyCheck bool
+	var runType types.RunType
+	var userID string
+
 	var gitSource gitsource.GitSource
-	project, _, err := h.configstoreClient.GetProject(ctx, projectID)
-	if err != nil {
-		return http.StatusBadRequest, "", errors.Wrapf(err, "failed to get project %s", projectID)
-	}
-	h.log.Debugf("project: %s", util.Dump(project))
+	if !isUserBuild {
+		project, _, err := h.configstoreClient.GetProject(ctx, projectID)
+		if err != nil {
+			return http.StatusBadRequest, "", errors.Wrapf(err, "failed to get project %s", projectID)
+		}
+		h.log.Debugf("project: %s", util.Dump(project))
 
-	user, _, err := h.configstoreClient.GetUserByLinkedAccount(ctx, project.LinkedAccountID)
-	if err != nil {
-		return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to get user by linked account %q", project.LinkedAccountID)
-	}
-	la := user.LinkedAccounts[project.LinkedAccountID]
-	h.log.Infof("la: %s", util.Dump(la))
-	if la == nil {
-		return http.StatusInternalServerError, "", errors.Errorf("linked account %q in user %q doesn't exist", project.LinkedAccountID, user.UserName)
-	}
-	rs, _, err := h.configstoreClient.GetRemoteSource(ctx, la.RemoteSourceID)
-	if err != nil {
-		return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to get remote source %q", la.RemoteSourceID)
-	}
+		user, _, err := h.configstoreClient.GetUserByLinkedAccount(ctx, project.LinkedAccountID)
+		if err != nil {
+			return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to get user by linked account %q", project.LinkedAccountID)
+		}
+		la := user.LinkedAccounts[project.LinkedAccountID]
+		h.log.Infof("la: %s", util.Dump(la))
+		if la == nil {
+			return http.StatusInternalServerError, "", errors.Errorf("linked account %q in user %q doesn't exist", project.LinkedAccountID, user.UserName)
+		}
+		rs, _, err := h.configstoreClient.GetRemoteSource(ctx, la.RemoteSourceID)
+		if err != nil {
+			return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to get remote source %q", la.RemoteSourceID)
+		}
 
-	gitSource, err = common.GetGitSource(rs, la)
-	if err != nil {
-		return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to create gitea client")
-	}
+		gitSource, err = common.GetGitSource(rs, la)
+		if err != nil {
+			return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to create gitea client")
+		}
 
-	sshPrivKey := project.SSHPrivateKey
-	cloneURL := project.CloneURL
-	skipSSHHostKeyCheck := project.SkipSSHHostKeyCheck
-	runType := types.RunTypeProject
-	webhookData, err := gitSource.ParseWebhook(r)
-	if err != nil {
-		return http.StatusBadRequest, "", errors.Wrapf(err, "failed to parse webhook")
+		sshPrivKey = project.SSHPrivateKey
+		cloneURL = project.CloneURL
+		skipSSHHostKeyCheck = project.SkipSSHHostKeyCheck
+		runType = types.RunTypeProject
+		webhookData, err = gitSource.ParseWebhook(r)
+		if err != nil {
+			return http.StatusBadRequest, "", errors.Wrapf(err, "failed to parse webhook")
+		}
+		webhookData.ProjectID = projectID
+
+	} else {
+		gitSource = agolagit.New(h.apiExposedURL + "/repos")
+		var err error
+		webhookData, err = gitSource.ParseWebhook(r)
+		if err != nil {
+			return http.StatusBadRequest, "", errors.Wrapf(err, "failed to parse webhook")
+		}
+
+		user, _, err := h.configstoreClient.GetUserByName(ctx, webhookData.Repo.Owner)
+		if err != nil {
+			return http.StatusBadRequest, "", errors.Wrapf(err, "failed to get project %s", projectID)
+		}
+		h.log.Debugf("user: %s", util.Dump(user))
+		userID = user.ID
+
+		cloneURL = fmt.Sprintf("%s/%s/%s", h.apiExposedURL+"/repos", webhookData.Repo.Owner, webhookData.Repo.Name)
+		runType = types.RunTypeUser
 	}
-	webhookData.ProjectID = projectID
 
 	h.log.Infof("webhookData: %s", util.Dump(webhookData))
 
 	var data []byte
-	err = util.ExponentialBackoff(util.FetchFileBackoff, func() (bool, error) {
+	err := util.ExponentialBackoff(util.FetchFileBackoff, func() (bool, error) {
 		var err error
 		data, err = gitSource.GetFile(webhookData.Repo.Owner, webhookData.Repo.Name, webhookData.CommitSHA, agolaDefaultConfigPath)
 		if err == nil {
@@ -169,7 +201,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 	}
 
 	env := map[string]string{
-		"CI":                     "true",
+		"CI":                   "true",
 		"AGOLA_SSHPRIVKEY":     sshPrivKey,
 		"AGOLA_REPOSITORY_URL": cloneURL,
 		"AGOLA_GIT_HOST":       gitURL.Host,
@@ -182,7 +214,6 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 	}
 
 	annotations := map[string]string{
-		AnnotationProjectID:     webhookData.ProjectID,
 		AnnotationRunType:       string(runType),
 		AnnotationEventType:     string(webhookData.Event),
 		AnnotationVirtualBranch: genAnnotationVirtualBranch(webhookData),
@@ -192,6 +223,12 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		AnnotationMessage:       webhookData.Message,
 		AnnotationCommitLink:    webhookData.CommitLink,
 		AnnotationCompareLink:   webhookData.CompareLink,
+	}
+
+	if !isUserBuild {
+		annotations[AnnotationProjectID] = webhookData.ProjectID
+	} else {
+		annotations[AnnotationUserID] = userID
 	}
 
 	if webhookData.Event == types.WebhookEventPush {
@@ -207,7 +244,12 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		annotations[AnnotationPullRequestLink] = webhookData.PullRequestLink
 	}
 
-	group := genGroup(webhookData.ProjectID, webhookData)
+	var group string
+	if !isUserBuild {
+		group = genGroup(webhookData.ProjectID, webhookData)
+	} else {
+		group = genGroup(userID, webhookData)
+	}
 
 	if err := h.createRuns(ctx, data, group, annotations, env); err != nil {
 		return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to create run")

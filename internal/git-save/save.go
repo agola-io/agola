@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 
+	uuid "github.com/satori/go.uuid"
 	"github.com/sorintlab/agola/internal/util"
 
 	"github.com/pkg/errors"
@@ -112,6 +113,12 @@ func gitUpdateRef(message, ref, commitSHA string) error {
 	return err
 }
 
+func gitUpdateFiles(indexPath string) error {
+	git := &util.Git{Env: []string{"GIT_INDEX_FILE=" + indexPath}}
+	_, err := git.Output(context.Background(), nil, "add", "-u")
+	return err
+}
+
 func gitAddUntrackedFiles(indexPath string) error {
 	git := &util.Git{Env: []string{"GIT_INDEX_FILE=" + indexPath}}
 	_, err := git.Output(context.Background(), nil, "add", ".")
@@ -153,11 +160,14 @@ func NewGitSave(logger *zap.Logger, conf *GitSaveConfig) *GitSave {
 // Save adds files to the provided index, creates a tree and a commit pointing to
 // that tree, finally it creates a branch poiting to that commit
 // Save will use the current worktree index if available to speed the index generation
-func (s *GitSave) Save(tmpIndexPath, message, branchName string) error {
+func (s *GitSave) Save(message, branchName string) error {
 	gitdir, err := GitDir()
 	if err != nil {
 		return err
 	}
+
+	tmpIndexPath := filepath.Join(gitdir, "gitsave-index-"+uuid.NewV4().String())
+	defer os.Remove(tmpIndexPath)
 
 	indexPath := filepath.Join(gitdir, gitIndexFile)
 
@@ -187,6 +197,11 @@ func (s *GitSave) Save(tmpIndexPath, message, branchName string) error {
 		s.log.Infof("index %s does not exist", indexPath)
 	}
 
+	s.log.Infof("updating files already in the index")
+	if err := gitUpdateFiles(tmpIndexPath); err != nil {
+		return err
+	}
+
 	if s.conf.AddUntracked {
 		s.log.Infof("adding untracked files")
 		if err := gitAddUntrackedFiles(tmpIndexPath); err != nil {
@@ -209,7 +224,7 @@ func (s *GitSave) Save(tmpIndexPath, message, branchName string) error {
 	s.log.Infof("tree: %s", treeSHA)
 
 	s.log.Infof("committing tree")
-	commitSHA, err := gitCommitTree("git-save", treeSHA)
+	commitSHA, err := gitCommitTree(message, treeSHA)
 	if err != nil {
 		return err
 	}
