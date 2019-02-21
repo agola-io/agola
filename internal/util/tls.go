@@ -1,4 +1,4 @@
-// This file is part of Endless
+// This file is part of Agola
 //
 // Copyright (C) 2019 Sorint.lab
 //
