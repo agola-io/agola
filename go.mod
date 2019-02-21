@@ -11,8 +11,7 @@ require (
 	github.com/docker/docker v1.13.1
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.3.3 // indirect
-	github.com/dsnet/compress v0.0.0-20171208185109-cc9eb1d7ad76 // indirect
-	github.com/go-bindata/go-bindata v1.0.0 // indirect
+	github.com/go-bindata/go-bindata v1.0.0
 	github.com/go-ini/ini v1.42.0 // indirect
 	github.com/go-sql-driver/mysql v1.4.1 // indirect
 	github.com/google/go-cmp v0.3.0
@@ -41,7 +40,7 @@ require (
 	github.com/spf13/cobra v0.0.3
 	go.etcd.io/etcd v0.0.0-20181128220305-dedae6eb7c25
 	go.uber.org/zap v1.9.1
-	golang.org/x/crypto v0.0.0-20181203042331-505ab145d0a9
+	golang.org/x/crypto v0.0.0-20181203042331-505ab145d0a9 // indirect
 	golang.org/x/net v0.0.0-20190108225652-1e06a53dbb7e // indirect
 	golang.org/x/sync v0.0.0-20181221193216-37e7f081c4d4 // indirect
 	google.golang.org/appengine v1.4.0 // indirect
