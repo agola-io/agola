@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/sorintlab/endless/internal/util"
+	"github.com/sorintlab/agola/internal/util"
 )
 
 const (
@@ -102,7 +102,7 @@ func genHook(oldCommit, newCommit, ref string) (*Hook, error) {
 	}
 
 	git := &util.Git{}
-	repo, _ := git.ConfigGet(context.Background(), "endless.repo")
+	repo, _ := git.ConfigGet(context.Background(), "agola.repo")
 	log.Printf("repo: %s", repo)
 	parts := strings.Split(string(repo), "/")
 
@@ -132,8 +132,8 @@ func main() {
 	log.Printf("oldcommit: %s, newcommit: %s, ref: %s", oldCommit, newCommit, ref)
 
 	git := &util.Git{}
-	repo, _ := git.ConfigGet(context.Background(), "endless.repo")
-	webhookURL, _ := git.ConfigGet(context.Background(), "endless.webhookURL")
+	repo, _ := git.ConfigGet(context.Background(), "agola.repo")
+	webhookURL, _ := git.ConfigGet(context.Background(), "agola.webhookURL")
 	log.Printf("repo: %s", repo)
 	log.Printf("webhookURL: %s", webhookURL)
 
