@@ -171,6 +171,8 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	logsHandler := api.NewLogsHandler(logger, g.runserviceClient)
 
+	reposHandler := api.NewReposHandler(logger, g.configstoreClient)
+
 	loginUserHandler := api.NewLoginUserHandler(logger, g.ch, g.configstoreClient)
 	oauth2callbackHandler := api.NewOAuth2CallbackHandler(logger, g.ch, g.configstoreClient)
 
@@ -213,6 +215,8 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	router.Handle("/login", loginUserHandler).Methods("POST")
 	router.Handle("/oauth2/callback", oauth2callbackHandler).Methods("GET")
+
+	router.Handle("/repos/{rest:.*}", reposHandler).Methods("GET", "POST")
 
 	router.Handle("/webhooks", webhooksHandler).Methods("POST")
 	router.PathPrefix("/").HandlerFunc(handlers.NewWebBundleHandlerFunc(g.c.APIExposedURL))
