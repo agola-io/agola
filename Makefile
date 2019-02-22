@@ -33,7 +33,7 @@ endif
 all: build
 
 .PHONY: build
-build: bin/agola bin/agola-toolbox
+build: bin/agola bin/agola-toolbox bin/agola-git-hook
 
 .PHONY: test
 test: tools/bin/gocovmerge
@@ -53,6 +53,10 @@ bin/agola-toolbox:
 .PHONY: tools/bin/go-bindata
 tools/bin/go-bindata:
 	GOBIN=$(PROJDIR)/tools/bin go install github.com/go-bindata/go-bindata/go-bindata
+
+.PHONY: bin/agola-git-hook
+bin/agola-git-hook:
+	CGO_ENABLED=0 GO111MODULE=on go build $(if $(AGOLA_TAGS),-tags "$(AGOLA_TAGS)") -ldflags $(LD_FLAGS) -o $(PROJDIR)/bin/agola-git-hook $(REPO_PATH)/cmd/agola-git-hook
 
 .PHONY: tools/bin/gocovmerge
 tools/bin/gocovmerge:
