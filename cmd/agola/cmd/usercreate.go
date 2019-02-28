@@ -48,8 +48,6 @@ func init() {
 	flags.StringVarP(&userCreateOpts.username, "username", "n", "", "user name")
 
 	cmdUserCreate.MarkFlagRequired("username")
-	cmdUserCreate.MarkFlagRequired("repo-url")
-	cmdUserCreate.MarkFlagRequired("token")
 
 	cmdUser.AddCommand(cmdUserCreate)
 }
