@@ -26,48 +26,45 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var cmdProjectDelete = &cobra.Command{
-	Use:   "delete",
-	Short: "delete a project",
+var cmdOrgCreate = &cobra.Command{
+	Use:   "create",
+	Short: "create an organization",
 	Run: func(cmd *cobra.Command, args []string) {
-		if err := projectDelete(cmd, args); err != nil {
+		if err := orgCreate(cmd, args); err != nil {
 			log.Fatalf("err: %v", err)
 		}
 	},
 }
 
-type projectDeleteOptions struct {
-	name             string
-	organizationName string
+type orgCreateOptions struct {
+	name string
 }
 
-var projectDeleteOpts projectDeleteOptions
+var orgCreateOpts orgCreateOptions
 
 func init() {
-	flags := cmdProjectDelete.Flags()
+	flags := cmdOrgCreate.Flags()
 
-	flags.StringVarP(&projectDeleteOpts.name, "name", "n", "", "project name")
-	flags.StringVar(&projectDeleteOpts.organizationName, "orgname", "", "organization name where the project should be deleted")
+	flags.StringVarP(&orgCreateOpts.name, "name", "n", "", "organization name")
 
-	cmdProjectDelete.MarkFlagRequired("name")
+	cmdOrgCreate.MarkFlagRequired("name")
 
-	cmdProject.AddCommand(cmdProjectDelete)
+	cmdOrg.AddCommand(cmdOrgCreate)
 }
 
-func projectDelete(cmd *cobra.Command, args []string) error {
+func orgCreate(cmd *cobra.Command, args []string) error {
 	gwclient := api.NewClient(gatewayURL, token)
 
-	log.Infof("deleting project")
+	req := &api.CreateOrgRequest{
+		Name: orgCreateOpts.name,
+	}
 
-	var err error
-	if projectDeleteOpts.organizationName != "" {
-		_, err = gwclient.DeleteOrgProject(context.TODO(), projectDeleteOpts.organizationName, projectDeleteOpts.name)
-	} else {
-		_, err = gwclient.DeleteCurrentUserProject(context.TODO(), projectDeleteOpts.name)
-	}
+	log.Infof("creating org")
+	org, _, err := gwclient.CreateOrg(context.TODO(), req)
 	if err != nil {
-		return errors.Wrapf(err, "failed to delete project")
+		return errors.Wrapf(err, "failed to create org")
 	}
+	log.Infof("org %q created, ID: %q", org.Name, org.ID)
 
 	return nil
 }

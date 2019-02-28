@@ -31,126 +31,130 @@ import (
 	"go.uber.org/zap"
 )
 
-type ProjectHandler struct {
+type OrgHandler struct {
 	log    *zap.SugaredLogger
 	readDB *readdb.ReadDB
 }
 
-func NewProjectHandler(logger *zap.Logger, readDB *readdb.ReadDB) *ProjectHandler {
-	return &ProjectHandler{log: logger.Sugar(), readDB: readDB}
+func NewOrgHandler(logger *zap.Logger, readDB *readdb.ReadDB) *OrgHandler {
+	return &OrgHandler{log: logger.Sugar(), readDB: readDB}
 }
 
-func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *OrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	projectID := vars["projectid"]
+	orgID := vars["orgid"]
 
-	var project *types.Project
+	var org *types.Organization
 	err := h.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		project, err = h.readDB.GetProject(tx, projectID)
+		org, err = h.readDB.GetOrg(tx, orgID)
 		return err
 	})
 	if err != nil {
+		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if project == nil {
+	if org == nil {
 		http.Error(w, "", http.StatusNotFound)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(project); err != nil {
+	if err := json.NewEncoder(w).Encode(org); err != nil {
+		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }
 
-type ProjectByNameHandler struct {
+type OrgByNameHandler struct {
 	log    *zap.SugaredLogger
 	readDB *readdb.ReadDB
 }
 
-func NewProjectByNameHandler(logger *zap.Logger, readDB *readdb.ReadDB) *ProjectByNameHandler {
-	return &ProjectByNameHandler{log: logger.Sugar(), readDB: readDB}
+func NewOrgByNameHandler(logger *zap.Logger, readDB *readdb.ReadDB) *OrgByNameHandler {
+	return &OrgByNameHandler{log: logger.Sugar(), readDB: readDB}
 }
 
-func (h *ProjectByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *OrgByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	ownerID := vars["ownerid"]
-	projectName := vars["projectname"]
+	orgName := vars["orgname"]
 
-	var project *types.Project
+	var org *types.Organization
 	err := h.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		project, err = h.readDB.GetOwnerProjectByName(tx, ownerID, projectName)
+		org, err = h.readDB.GetOrgByName(tx, orgName)
 		return err
 	})
 	if err != nil {
+		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if project == nil {
+	if org == nil {
 		http.Error(w, "", http.StatusNotFound)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(project); err != nil {
+	if err := json.NewEncoder(w).Encode(org); err != nil {
+		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }
 
-type CreateProjectHandler struct {
-	log    *zap.SugaredLogger
-	ch     *command.CommandHandler
-	readDB *readdb.ReadDB
+type CreateOrgHandler struct {
+	log *zap.SugaredLogger
+	ch  *command.CommandHandler
 }
 
-func NewCreateProjectHandler(logger *zap.Logger, ch *command.CommandHandler) *CreateProjectHandler {
-	return &CreateProjectHandler{log: logger.Sugar(), ch: ch}
+func NewCreateOrgHandler(logger *zap.Logger, ch *command.CommandHandler) *CreateOrgHandler {
+	return &CreateOrgHandler{log: logger.Sugar(), ch: ch}
 }
 
-func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var req types.Project
+	var req types.Organization
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	project, err := h.ch.CreateProject(ctx, &req)
+	org, err := h.ch.CreateOrg(ctx, &req)
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(project); err != nil {
+	if err := json.NewEncoder(w).Encode(org); err != nil {
+		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }
 
-type DeleteProjectHandler struct {
+type DeleteOrgHandler struct {
 	log *zap.SugaredLogger
 	ch  *command.CommandHandler
 }
 
-func NewDeleteProjectHandler(logger *zap.Logger, ch *command.CommandHandler) *DeleteProjectHandler {
-	return &DeleteProjectHandler{log: logger.Sugar(), ch: ch}
+func NewDeleteOrgHandler(logger *zap.Logger, ch *command.CommandHandler) *DeleteOrgHandler {
+	return &DeleteOrgHandler{log: logger.Sugar(), ch: ch}
 }
 
-func (h *DeleteProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *DeleteOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	h.log.Infof("deleteorghandler")
 	ctx := r.Context()
 
 	vars := mux.Vars(r)
-	projectID := vars["projectid"]
+	orgName := vars["orgname"]
 
-	if err := h.ch.DeleteProject(ctx, projectID); err != nil {
+	if err := h.ch.DeleteOrg(ctx, orgName); err != nil {
 		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -158,27 +162,24 @@ func (h *DeleteProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 }
 
 const (
-	DefaultProjectsLimit = 10
-	MaxProjectsLimit     = 20
+	DefaultOrgsLimit = 10
+	MaxOrgsLimit     = 20
 )
 
-type ProjectsHandler struct {
+type OrgsHandler struct {
 	log    *zap.SugaredLogger
 	readDB *readdb.ReadDB
 }
 
-func NewProjectsHandler(logger *zap.Logger, readDB *readdb.ReadDB) *ProjectsHandler {
-	return &ProjectsHandler{log: logger.Sugar(), readDB: readDB}
+func NewOrgsHandler(logger *zap.Logger, readDB *readdb.ReadDB) *OrgsHandler {
+	return &OrgsHandler{log: logger.Sugar(), readDB: readDB}
 }
 
-func (h *ProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	ownerID := vars["ownerid"]
-
+func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 
 	limitS := query.Get("limit")
-	limit := DefaultProjectsLimit
+	limit := DefaultOrgsLimit
 	if limitS != "" {
 		var err error
 		limit, err = strconv.Atoi(limitS)
@@ -191,8 +192,8 @@ func (h *ProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "limit must be greater or equal than 0", http.StatusBadRequest)
 		return
 	}
-	if limit > MaxProjectsLimit {
-		limit = MaxProjectsLimit
+	if limit > MaxOrgsLimit {
+		limit = MaxOrgsLimit
 	}
 	asc := false
 	if _, ok := query["asc"]; ok {
@@ -201,18 +202,20 @@ func (h *ProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	start := query.Get("start")
 
-	var projects []*types.Project
+	var orgs []*types.Organization
 	err := h.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		projects, err = h.readDB.GetOwnerProjects(tx, ownerID, start, limit, asc)
+		orgs, err = h.readDB.GetOrgs(tx, start, limit, asc)
 		return err
 	})
 	if err != nil {
+		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(projects); err != nil {
+	if err := json.NewEncoder(w).Encode(orgs); err != nil {
+		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

@@ -31,16 +31,16 @@ import (
 	"go.uber.org/zap"
 )
 
-type GetRemoteSourceHandler struct {
+type RemoteSourceHandler struct {
 	log    *zap.SugaredLogger
 	readDB *readdb.ReadDB
 }
 
-func NewGetRemoteSourceHandler(logger *zap.Logger, readDB *readdb.ReadDB) *GetRemoteSourceHandler {
-	return &GetRemoteSourceHandler{log: logger.Sugar(), readDB: readDB}
+func NewRemoteSourceHandler(logger *zap.Logger, readDB *readdb.ReadDB) *RemoteSourceHandler {
+	return &RemoteSourceHandler{log: logger.Sugar(), readDB: readDB}
 }
 
-func (h *GetRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	remoteSourceID := vars["id"]
 
@@ -66,16 +66,16 @@ func (h *GetRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-type GetRemoteSourceByNameHandler struct {
+type RemoteSourceByNameHandler struct {
 	log    *zap.SugaredLogger
 	readDB *readdb.ReadDB
 }
 
-func NewGetRemoteSourceByNameHandler(logger *zap.Logger, readDB *readdb.ReadDB) *GetRemoteSourceByNameHandler {
-	return &GetRemoteSourceByNameHandler{log: logger.Sugar(), readDB: readDB}
+func NewRemoteSourceByNameHandler(logger *zap.Logger, readDB *readdb.ReadDB) *RemoteSourceByNameHandler {
+	return &RemoteSourceByNameHandler{log: logger.Sugar(), readDB: readDB}
 }
 
-func (h *GetRemoteSourceByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *RemoteSourceByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	remoteSourceName := vars["name"]
 
