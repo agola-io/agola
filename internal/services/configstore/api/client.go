@@ -114,9 +114,9 @@ func (c *Client) GetProject(ctx context.Context, projectID string) (*types.Proje
 	return project, resp, err
 }
 
-func (c *Client) GetProjectByName(ctx context.Context, projectName string) (*types.Project, *http.Response, error) {
+func (c *Client) GetProjectByName(ctx context.Context, ownerid, projectName string) (*types.Project, *http.Response, error) {
 	project := new(types.Project)
-	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s", projectName), nil, jsonContent, nil, project)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s/%s", ownerid, projectName), nil, jsonContent, nil, project)
 	return project, resp, err
 }
 
@@ -131,11 +131,11 @@ func (c *Client) CreateProject(ctx context.Context, project *types.Project) (*ty
 	return project, resp, err
 }
 
-func (c *Client) DeleteProject(ctx context.Context, projectName string) (*http.Response, error) {
-	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/projects/%s", projectName), nil, jsonContent, nil)
+func (c *Client) DeleteProject(ctx context.Context, projectID string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/projects/%s", projectID), nil, jsonContent, nil)
 }
 
-func (c *Client) GetProjects(ctx context.Context, start string, limit int, asc bool) ([]*types.Project, *http.Response, error) {
+func (c *Client) GetOwnerProjects(ctx context.Context, ownerid, start string, limit int, asc bool) ([]*types.Project, *http.Response, error) {
 	q := url.Values{}
 	if start != "" {
 		q.Add("start", start)
@@ -148,7 +148,7 @@ func (c *Client) GetProjects(ctx context.Context, start string, limit int, asc b
 	}
 
 	projects := []*types.Project{}
-	resp, err := c.getParsedResponse(ctx, "GET", "/projects", q, jsonContent, nil, &projects)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/owner/%s/projects", ownerid), q, jsonContent, nil, &projects)
 	return projects, resp, err
 }
 
@@ -315,4 +315,48 @@ func (c *Client) CreateRemoteSource(ctx context.Context, rs *types.RemoteSource)
 
 func (c *Client) DeleteRemoteSource(ctx context.Context, name string) (*http.Response, error) {
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/remotesources/%s", name), nil, jsonContent, nil)
+}
+
+func (c *Client) CreateOrg(ctx context.Context, org *types.Organization) (*types.Organization, *http.Response, error) {
+	oj, err := json.Marshal(org)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	org = new(types.Organization)
+	resp, err := c.getParsedResponse(ctx, "PUT", "/orgs", nil, jsonContent, bytes.NewReader(oj), org)
+	return org, resp, err
+}
+
+func (c *Client) DeleteOrg(ctx context.Context, orgname string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/orgs/%s", orgname), nil, jsonContent, nil)
+}
+
+func (c *Client) GetOrgs(ctx context.Context, start string, limit int, asc bool) ([]*types.Organization, *http.Response, error) {
+	q := url.Values{}
+	if start != "" {
+		q.Add("start", start)
+	}
+	if limit > 0 {
+		q.Add("limit", strconv.Itoa(limit))
+	}
+	if asc {
+		q.Add("asc", "")
+	}
+
+	orgs := []*types.Organization{}
+	resp, err := c.getParsedResponse(ctx, "GET", "/orgs", q, jsonContent, nil, &orgs)
+	return orgs, resp, err
+}
+
+func (c *Client) GetOrg(ctx context.Context, orgID string) (*types.Organization, *http.Response, error) {
+	org := new(types.Organization)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/org/%s", orgID), nil, jsonContent, nil, org)
+	return org, resp, err
+}
+
+func (c *Client) GetOrgByName(ctx context.Context, orgname string) (*types.Organization, *http.Response, error) {
+	org := new(types.Organization)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s", orgname), nil, jsonContent, nil, org)
+	return org, resp, err
 }

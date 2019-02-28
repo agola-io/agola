@@ -28,125 +28,130 @@ import (
 	"go.uber.org/zap"
 )
 
-type RemoteSourceHandler struct {
+type OrgHandler struct {
 	log    *zap.SugaredLogger
 	readDB *readdb.ReadDB
 }
 
-func NewRemoteSourceHandler(logger *zap.Logger, readDB *readdb.ReadDB) *RemoteSourceHandler {
-	return &RemoteSourceHandler{log: logger.Sugar(), readDB: readDB}
+func NewOrgHandler(logger *zap.Logger, readDB *readdb.ReadDB) *OrgHandler {
+	return &OrgHandler{log: logger.Sugar(), readDB: readDB}
 }
 
-func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *OrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	remoteSourceID := vars["id"]
+	orgID := vars["orgid"]
 
-	var remoteSource *types.RemoteSource
+	var org *types.Organization
 	err := h.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		remoteSource, err = h.readDB.GetRemoteSource(tx, remoteSourceID)
+		org, err = h.readDB.GetOrg(tx, orgID)
 		return err
 	})
 	if err != nil {
+		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if remoteSource == nil {
+	if org == nil {
 		http.Error(w, "", http.StatusNotFound)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(remoteSource); err != nil {
+	if err := json.NewEncoder(w).Encode(org); err != nil {
+		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }
 
-type RemoteSourceByNameHandler struct {
+type OrgByNameHandler struct {
 	log    *zap.SugaredLogger
 	readDB *readdb.ReadDB
 }
 
-func NewRemoteSourceByNameHandler(logger *zap.Logger, readDB *readdb.ReadDB) *RemoteSourceByNameHandler {
-	return &RemoteSourceByNameHandler{log: logger.Sugar(), readDB: readDB}
+func NewOrgByNameHandler(logger *zap.Logger, readDB *readdb.ReadDB) *OrgByNameHandler {
+	return &OrgByNameHandler{log: logger.Sugar(), readDB: readDB}
 }
 
-func (h *RemoteSourceByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *OrgByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	remoteSourceName := vars["name"]
+	orgName := vars["orgname"]
 
-	var remoteSource *types.RemoteSource
+	var org *types.Organization
 	err := h.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		remoteSource, err = h.readDB.GetRemoteSourceByName(tx, remoteSourceName)
+		org, err = h.readDB.GetOrgByName(tx, orgName)
 		return err
 	})
 	if err != nil {
+		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if remoteSource == nil {
+	if org == nil {
 		http.Error(w, "", http.StatusNotFound)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(remoteSource); err != nil {
+	if err := json.NewEncoder(w).Encode(org); err != nil {
+		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }
 
-type CreateRemoteSourceHandler struct {
-	log    *zap.SugaredLogger
-	ch     *command.CommandHandler
-	readDB *readdb.ReadDB
+type CreateOrgHandler struct {
+	log *zap.SugaredLogger
+	ch  *command.CommandHandler
 }
 
-func NewCreateRemoteSourceHandler(logger *zap.Logger, ch *command.CommandHandler) *CreateRemoteSourceHandler {
-	return &CreateRemoteSourceHandler{log: logger.Sugar(), ch: ch}
+func NewCreateOrgHandler(logger *zap.Logger, ch *command.CommandHandler) *CreateOrgHandler {
+	return &CreateOrgHandler{log: logger.Sugar(), ch: ch}
 }
 
-func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var req types.RemoteSource
+	var req types.Organization
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	remoteSource, err := h.ch.CreateRemoteSource(ctx, &req)
+	org, err := h.ch.CreateOrg(ctx, &req)
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(remoteSource); err != nil {
+	if err := json.NewEncoder(w).Encode(org); err != nil {
+		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }
 
-type DeleteRemoteSourceHandler struct {
+type DeleteOrgHandler struct {
 	log *zap.SugaredLogger
 	ch  *command.CommandHandler
 }
 
-func NewDeleteRemoteSourceHandler(logger *zap.Logger, ch *command.CommandHandler) *DeleteRemoteSourceHandler {
-	return &DeleteRemoteSourceHandler{log: logger.Sugar(), ch: ch}
+func NewDeleteOrgHandler(logger *zap.Logger, ch *command.CommandHandler) *DeleteOrgHandler {
+	return &DeleteOrgHandler{log: logger.Sugar(), ch: ch}
 }
 
-func (h *DeleteRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *DeleteOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	h.log.Infof("deleteorghandler")
 	ctx := r.Context()
 
 	vars := mux.Vars(r)
-	remoteSourceName := vars["name"]
+	orgName := vars["orgname"]
 
-	if err := h.ch.DeleteRemoteSource(ctx, remoteSourceName); err != nil {
+	if err := h.ch.DeleteOrg(ctx, orgName); err != nil {
 		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -154,24 +159,24 @@ func (h *DeleteRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 }
 
 const (
-	DefaultRemoteSourcesLimit = 10
-	MaxRemoteSourcesLimit     = 20
+	DefaultOrgsLimit = 10
+	MaxOrgsLimit     = 20
 )
 
-type RemoteSourcesHandler struct {
+type OrgsHandler struct {
 	log    *zap.SugaredLogger
 	readDB *readdb.ReadDB
 }
 
-func NewRemoteSourcesHandler(logger *zap.Logger, readDB *readdb.ReadDB) *RemoteSourcesHandler {
-	return &RemoteSourcesHandler{log: logger.Sugar(), readDB: readDB}
+func NewOrgsHandler(logger *zap.Logger, readDB *readdb.ReadDB) *OrgsHandler {
+	return &OrgsHandler{log: logger.Sugar(), readDB: readDB}
 }
 
-func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 
 	limitS := query.Get("limit")
-	limit := DefaultRemoteSourcesLimit
+	limit := DefaultOrgsLimit
 	if limitS != "" {
 		var err error
 		limit, err = strconv.Atoi(limitS)
@@ -184,8 +189,8 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "limit must be greater or equal than 0", http.StatusBadRequest)
 		return
 	}
-	if limit > MaxRemoteSourcesLimit {
-		limit = MaxRemoteSourcesLimit
+	if limit > MaxOrgsLimit {
+		limit = MaxOrgsLimit
 	}
 	asc := false
 	if _, ok := query["asc"]; ok {
@@ -194,13 +199,20 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 
 	start := query.Get("start")
 
-	remoteSources, err := h.readDB.GetRemoteSources(start, limit, asc)
+	var orgs []*types.Organization
+	err := h.readDB.Do(func(tx *db.Tx) error {
+		var err error
+		orgs, err = h.readDB.GetOrgs(tx, start, limit, asc)
+		return err
+	})
 	if err != nil {
+		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(remoteSources); err != nil {
+	if err := json.NewEncoder(w).Encode(orgs); err != nil {
+		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

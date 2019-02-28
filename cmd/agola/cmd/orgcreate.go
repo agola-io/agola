@@ -23,45 +23,45 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var cmdUserCreate = &cobra.Command{
+var cmdOrgCreate = &cobra.Command{
 	Use:   "create",
-	Short: "create a user",
+	Short: "create an organization",
 	Run: func(cmd *cobra.Command, args []string) {
-		if err := userCreate(cmd, args); err != nil {
+		if err := orgCreate(cmd, args); err != nil {
 			log.Fatalf("err: %v", err)
 		}
 	},
 }
 
-type userCreateOptions struct {
-	username string
+type orgCreateOptions struct {
+	name string
 }
 
-var userCreateOpts userCreateOptions
+var orgCreateOpts orgCreateOptions
 
 func init() {
-	flags := cmdUserCreate.Flags()
+	flags := cmdOrgCreate.Flags()
 
-	flags.StringVarP(&userCreateOpts.username, "username", "n", "", "user name")
+	flags.StringVarP(&orgCreateOpts.name, "name", "n", "", "organization name")
 
-	cmdUserCreate.MarkFlagRequired("username")
+	cmdOrgCreate.MarkFlagRequired("name")
 
-	cmdUser.AddCommand(cmdUserCreate)
+	cmdOrg.AddCommand(cmdOrgCreate)
 }
 
-func userCreate(cmd *cobra.Command, args []string) error {
+func orgCreate(cmd *cobra.Command, args []string) error {
 	gwclient := api.NewClient(gatewayURL, token)
 
-	req := &api.CreateUserRequest{
-		UserName: userCreateOpts.username,
+	req := &api.CreateOrgRequest{
+		Name: orgCreateOpts.name,
 	}
 
-	log.Infof("creating user")
-	user, _, err := gwclient.CreateUser(context.TODO(), req)
+	log.Infof("creating org")
+	org, _, err := gwclient.CreateOrg(context.TODO(), req)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create user")
+		return errors.Wrapf(err, "failed to create org")
 	}
-	log.Infof("user %q created, ID: %q", user.UserName, user.ID)
+	log.Infof("org %q created, ID: %q", org.Name, org.ID)
 
 	return nil
 }

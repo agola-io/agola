@@ -57,7 +57,7 @@ func printProjects(projectsResponse *api.GetProjectsResponse) {
 func projectList(cmd *cobra.Command, args []string) error {
 	gwclient := api.NewClient(gatewayURL, token)
 
-	projectsResponse, _, err := gwclient.GetProjects(context.TODO(), projectListOpts.start, projectListOpts.limit, false)
+	projectsResponse, _, err := gwclient.GetCurrentUserProjects(context.TODO(), projectListOpts.start, projectListOpts.limit, false)
 	if err != nil {
 		return err
 	}

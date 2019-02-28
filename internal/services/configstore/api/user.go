@@ -29,16 +29,16 @@ import (
 	"go.uber.org/zap"
 )
 
-type GetUserHandler struct {
+type UserHandler struct {
 	log    *zap.SugaredLogger
 	readDB *readdb.ReadDB
 }
 
-func NewGetUserHandler(logger *zap.Logger, readDB *readdb.ReadDB) *GetUserHandler {
-	return &GetUserHandler{log: logger.Sugar(), readDB: readDB}
+func NewUserHandler(logger *zap.Logger, readDB *readdb.ReadDB) *UserHandler {
+	return &UserHandler{log: logger.Sugar(), readDB: readDB}
 }
 
-func (h *GetUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userID := vars["userid"]
 
@@ -66,16 +66,16 @@ func (h *GetUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type GetUserByNameHandler struct {
+type UserByNameHandler struct {
 	log    *zap.SugaredLogger
 	readDB *readdb.ReadDB
 }
 
-func NewGetUserByNameHandler(logger *zap.Logger, readDB *readdb.ReadDB) *GetUserByNameHandler {
-	return &GetUserByNameHandler{log: logger.Sugar(), readDB: readDB}
+func NewUserByNameHandler(logger *zap.Logger, readDB *readdb.ReadDB) *UserByNameHandler {
+	return &UserByNameHandler{log: logger.Sugar(), readDB: readDB}
 }
 
-func (h *GetUserByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *UserByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userName := vars["username"]
 

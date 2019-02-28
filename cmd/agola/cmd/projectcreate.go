@@ -19,6 +19,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/services/gateway/api"
+	"github.com/sorintlab/agola/internal/services/types"
 
 	"github.com/spf13/cobra"
 )
@@ -35,6 +36,7 @@ var cmdProjectCreate = &cobra.Command{
 
 type projectCreateOptions struct {
 	name                string
+	organizationName    string
 	repoURL             string
 	remoteSourceName    string
 	skipSSHHostKeyCheck bool
@@ -49,6 +51,7 @@ func init() {
 	flags.StringVar(&projectCreateOpts.repoURL, "repo-url", "", "repository url")
 	flags.StringVar(&projectCreateOpts.remoteSourceName, "remote-source", "", "remote source name")
 	flags.BoolVarP(&projectCreateOpts.skipSSHHostKeyCheck, "skip-ssh-host-key-check", "s", false, "skip ssh host key check")
+	flags.StringVar(&projectCreateOpts.organizationName, "orgname", "", "organization name where the project should be created")
 
 	cmdProjectCreate.MarkFlagRequired("name")
 	cmdProjectCreate.MarkFlagRequired("repo-url")
@@ -68,7 +71,14 @@ func projectCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	log.Infof("creating project")
-	project, _, err := gwclient.CreateProject(context.TODO(), req)
+
+	var project *types.Project
+	var err error
+	if projectCreateOpts.organizationName != "" {
+		project, _, err = gwclient.CreateOrgProject(context.TODO(), projectCreateOpts.organizationName, req)
+	} else {
+		project, _, err = gwclient.CreateCurrentUserProject(context.TODO(), req)
+	}
 	if err != nil {
 		return errors.Wrapf(err, "failed to create project")
 	}

@@ -28,7 +28,7 @@ import (
 
 var (
 	projectSelect = sb.Select("id", "data").From("project")
-	projectInsert = sb.Insert("project").Columns("id", "name", "data")
+	projectInsert = sb.Insert("project").Columns("id", "name", "ownerid", "data")
 )
 
 func (r *ReadDB) insertProject(tx *db.Tx, data []byte) error {
@@ -40,7 +40,7 @@ func (r *ReadDB) insertProject(tx *db.Tx, data []byte) error {
 	if err := r.deleteProject(tx, project.ID); err != nil {
 		return err
 	}
-	q, args, err := projectInsert.Values(project.ID, project.Name, data).ToSql()
+	q, args, err := projectInsert.Values(project.ID, project.Name, project.OwnerID, data).ToSql()
 	if err != nil {
 		return errors.Wrap(err, "failed to build query")
 	}
@@ -76,8 +76,8 @@ func (r *ReadDB) GetProject(tx *db.Tx, projectID string) (*types.Project, error)
 	return projects[0], nil
 }
 
-func (r *ReadDB) GetProjectByName(tx *db.Tx, name string) (*types.Project, error) {
-	q, args, err := projectSelect.Where(sq.Eq{"name": name}).ToSql()
+func (r *ReadDB) GetOwnerProjectByName(tx *db.Tx, ownerid, name string) (*types.Project, error) {
+	q, args, err := projectSelect.Where(sq.Eq{"ownerid": ownerid, "name": name}).ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to build query")
@@ -96,7 +96,7 @@ func (r *ReadDB) GetProjectByName(tx *db.Tx, name string) (*types.Project, error
 	return projects[0], nil
 }
 
-func getProjectsFilteredQuery(startProjectName string, limit int, asc bool) sq.SelectBuilder {
+func getProjectsFilteredQuery(ownerid, startProjectName string, limit int, asc bool) sq.SelectBuilder {
 	fields := []string{"id", "data"}
 
 	s := sb.Select(fields...).From("project as project")
@@ -104,6 +104,9 @@ func getProjectsFilteredQuery(startProjectName string, limit int, asc bool) sq.S
 		s = s.OrderBy("project.name asc")
 	} else {
 		s = s.OrderBy("project.name desc")
+	}
+	if ownerid != "" {
+		s = s.Where(sq.Eq{"project.ownerid": ownerid})
 	}
 	if startProjectName != "" {
 		if asc {
@@ -118,26 +121,43 @@ func getProjectsFilteredQuery(startProjectName string, limit int, asc bool) sq.S
 
 	return s
 }
-func (r *ReadDB) GetProjects(startProjectName string, limit int, asc bool) ([]*types.Project, error) {
+
+func (r *ReadDB) GetOwnerProjects(tx *db.Tx, ownerid, startProjectName string, limit int, asc bool) ([]*types.Project, error) {
 	var projects []*types.Project
 
-	s := getProjectsFilteredQuery(startProjectName, limit, asc)
+	s := getProjectsFilteredQuery(ownerid, startProjectName, limit, asc)
 	q, args, err := s.ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to build query")
 	}
 
-	err = r.rdb.Do(func(tx *db.Tx) error {
-		rows, err := tx.Query(q, args...)
-		if err != nil {
-			return err
-		}
+	rows, err := tx.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
 
-		projects, _, err = scanProjects(rows)
-		return err
-	})
-	return projects, errors.WithStack(err)
+	projects, _, err = scanProjects(rows)
+	return projects, err
+}
+
+func (r *ReadDB) GetProjects(tx *db.Tx, startProjectName string, limit int, asc bool) ([]*types.Project, error) {
+	var projects []*types.Project
+
+	s := getProjectsFilteredQuery("", startProjectName, limit, asc)
+	q, args, err := s.ToSql()
+	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to build query")
+	}
+
+	rows, err := tx.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	projects, _, err = scanProjects(rows)
+	return projects, err
 }
 
 func fetchProjects(tx *db.Tx, q string, args ...interface{}) ([]*types.Project, []string, error) {

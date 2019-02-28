@@ -23,45 +23,39 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var cmdUserCreate = &cobra.Command{
-	Use:   "create",
-	Short: "create a user",
+var cmdOrgDelete = &cobra.Command{
+	Use:   "delete",
+	Short: "delete an organization",
 	Run: func(cmd *cobra.Command, args []string) {
-		if err := userCreate(cmd, args); err != nil {
+		if err := orgDelete(cmd, args); err != nil {
 			log.Fatalf("err: %v", err)
 		}
 	},
 }
 
-type userCreateOptions struct {
-	username string
+type orgDeleteOptions struct {
+	name string
 }
 
-var userCreateOpts userCreateOptions
+var orgDeleteOpts orgDeleteOptions
 
 func init() {
-	flags := cmdUserCreate.Flags()
+	flags := cmdOrgDelete.Flags()
 
-	flags.StringVarP(&userCreateOpts.username, "username", "n", "", "user name")
+	flags.StringVarP(&orgDeleteOpts.name, "name", "n", "", "organization name")
 
-	cmdUserCreate.MarkFlagRequired("username")
+	cmdOrgDelete.MarkFlagRequired("name")
 
-	cmdUser.AddCommand(cmdUserCreate)
+	cmdOrg.AddCommand(cmdOrgDelete)
 }
 
-func userCreate(cmd *cobra.Command, args []string) error {
+func orgDelete(cmd *cobra.Command, args []string) error {
 	gwclient := api.NewClient(gatewayURL, token)
 
-	req := &api.CreateUserRequest{
-		UserName: userCreateOpts.username,
+	log.Infof("deleting organization %q", orgDeleteOpts.name)
+	if _, err := gwclient.DeleteOrg(context.TODO(), orgDeleteOpts.name); err != nil {
+		return errors.Wrapf(err, "failed to delete organization")
 	}
-
-	log.Infof("creating user")
-	user, _, err := gwclient.CreateUser(context.TODO(), req)
-	if err != nil {
-		return errors.Wrapf(err, "failed to create user")
-	}
-	log.Infof("user %q created, ID: %q", user.UserName, user.ID)
 
 	return nil
 }

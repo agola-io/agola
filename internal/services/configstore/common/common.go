@@ -24,6 +24,7 @@ var (
 	StorageDataDir          = "data"
 	StorageProjectsDir      = path.Join(StorageDataDir, "projects")
 	StorageUsersDir         = path.Join(StorageDataDir, "users")
+	StorageOrgsDir          = path.Join(StorageDataDir, "orgs")
 	StorageRemoteSourcesDir = path.Join(StorageDataDir, "remotesources")
 )
 
@@ -39,6 +40,10 @@ func StorageUserFile(userID string) string {
 	return path.Join(StorageUsersDir, userID)
 }
 
+func StorageOrgFile(orgID string) string {
+	return path.Join(StorageOrgsDir, orgID)
+}
+
 func StorageRemoteSourceFile(userID string) string {
 	return path.Join(StorageRemoteSourcesDir, userID)
 }
@@ -48,6 +53,7 @@ type ConfigType string
 const (
 	ConfigTypeProject      ConfigType = "project"
 	ConfigTypeUser         ConfigType = "user"
+	ConfigTypeOrg          ConfigType = "org"
 	ConfigTypeRemoteSource ConfigType = "remotesource"
 )
 
@@ -58,6 +64,8 @@ func PathToTypeID(p string) (ConfigType, string) {
 		configType = ConfigTypeProject
 	case StorageUsersDir:
 		configType = ConfigTypeUser
+	case StorageOrgsDir:
+		configType = ConfigTypeOrg
 	case StorageRemoteSourcesDir:
 		configType = ConfigTypeRemoteSource
 	default:

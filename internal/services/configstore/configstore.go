@@ -109,15 +109,15 @@ func (s *ConfigStore) Run(ctx context.Context) error {
 	corsAllowedOriginsOptions := ghandlers.AllowedOrigins([]string{"*"})
 	corsHandler = ghandlers.CORS(corsAllowedMethodsOptions, corsAllowedHeadersOptions, corsAllowedOriginsOptions)
 
-	getProjectHandler := api.NewGetProjectHandler(logger, s.readDB)
+	projectHandler := api.NewProjectHandler(logger, s.readDB)
 	projectsHandler := api.NewProjectsHandler(logger, s.readDB)
-	getProjectByNameHandler := api.NewGetProjectByNameHandler(logger, s.readDB)
+	projectByNameHandler := api.NewProjectByNameHandler(logger, s.readDB)
 	createProjectHandler := api.NewCreateProjectHandler(logger, s.ch)
 	deleteProjectHandler := api.NewDeleteProjectHandler(logger, s.ch)
 
-	getUserHandler := api.NewGetUserHandler(logger, s.readDB)
+	userHandler := api.NewUserHandler(logger, s.readDB)
 	usersHandler := api.NewUsersHandler(logger, s.readDB)
-	getUserByNameHandler := api.NewGetUserByNameHandler(logger, s.readDB)
+	userByNameHandler := api.NewUserByNameHandler(logger, s.readDB)
 	createUserHandler := api.NewCreateUserHandler(logger, s.ch)
 	deleteUserHandler := api.NewDeleteUserHandler(logger, s.ch)
 
@@ -127,25 +127,31 @@ func (s *ConfigStore) Run(ctx context.Context) error {
 
 	createUserTokenHandler := api.NewCreateUserTokenHandler(logger, s.ch)
 
-	getRemoteSourceHandler := api.NewGetRemoteSourceHandler(logger, s.readDB)
+	orgHandler := api.NewOrgHandler(logger, s.readDB)
+	orgsHandler := api.NewOrgsHandler(logger, s.readDB)
+	orgByNameHandler := api.NewOrgByNameHandler(logger, s.readDB)
+	createOrgHandler := api.NewCreateOrgHandler(logger, s.ch)
+	deleteOrgHandler := api.NewDeleteOrgHandler(logger, s.ch)
+
+	remoteSourceHandler := api.NewRemoteSourceHandler(logger, s.readDB)
 	remoteSourcesHandler := api.NewRemoteSourcesHandler(logger, s.readDB)
-	getRemoteSourceByNameHandler := api.NewGetRemoteSourceByNameHandler(logger, s.readDB)
+	remoteSourceByNameHandler := api.NewRemoteSourceByNameHandler(logger, s.readDB)
 	createRemoteSourceHandler := api.NewCreateRemoteSourceHandler(logger, s.ch)
 	deleteRemoteSourceHandler := api.NewDeleteRemoteSourceHandler(logger, s.ch)
 
 	router := mux.NewRouter()
 	apirouter := router.PathPrefix("/api/v1alpha").Subrouter()
 
-	apirouter.Handle("/project/{projectid}", getProjectHandler).Methods("GET")
-	apirouter.Handle("/projects", projectsHandler).Methods("GET")
+	apirouter.Handle("/project/{projectid}", projectHandler).Methods("GET")
+	apirouter.Handle("/owner/{ownerid}/projects", projectsHandler).Methods("GET")
+	apirouter.Handle("/projects/{ownerid}/{projectname}", projectByNameHandler).Methods("GET")
 	apirouter.Handle("/projects", createProjectHandler).Methods("PUT")
-	apirouter.Handle("/projects/{projectname}", getProjectByNameHandler).Methods("GET")
-	apirouter.Handle("/projects/{projectname}", deleteProjectHandler).Methods("DELETE")
+	apirouter.Handle("/projects/{projectid}", deleteProjectHandler).Methods("DELETE")
 
-	apirouter.Handle("/user/{userid}", getUserHandler).Methods("GET")
+	apirouter.Handle("/user/{userid}", userHandler).Methods("GET")
 	apirouter.Handle("/users", usersHandler).Methods("GET")
 	apirouter.Handle("/users", createUserHandler).Methods("PUT")
-	apirouter.Handle("/users/{username}", getUserByNameHandler).Methods("GET")
+	apirouter.Handle("/users/{username}", userByNameHandler).Methods("GET")
 	apirouter.Handle("/users/{username}", deleteUserHandler).Methods("DELETE")
 
 	apirouter.Handle("/users/{username}/linkedaccounts", createUserLAHandler).Methods("PUT")
@@ -153,10 +159,16 @@ func (s *ConfigStore) Run(ctx context.Context) error {
 	apirouter.Handle("/users/{username}/linkedaccounts/{laid}", updateUserLAHandler).Methods("PUT")
 	apirouter.Handle("/users/{username}/tokens", createUserTokenHandler).Methods("PUT")
 
-	apirouter.Handle("/remotesource/{id}", getRemoteSourceHandler).Methods("GET")
+	apirouter.Handle("/org/{orgid}", orgHandler).Methods("GET")
+	apirouter.Handle("/orgs", orgsHandler).Methods("GET")
+	apirouter.Handle("/orgs", createOrgHandler).Methods("PUT")
+	apirouter.Handle("/orgs/{orgname}", orgByNameHandler).Methods("GET")
+	apirouter.Handle("/orgs/{orgname}", deleteOrgHandler).Methods("DELETE")
+
+	apirouter.Handle("/remotesource/{id}", remoteSourceHandler).Methods("GET")
 	apirouter.Handle("/remotesources", remoteSourcesHandler).Methods("GET")
 	apirouter.Handle("/remotesources", createRemoteSourceHandler).Methods("PUT")
-	apirouter.Handle("/remotesources/{name}", getRemoteSourceByNameHandler).Methods("GET")
+	apirouter.Handle("/remotesources/{name}", remoteSourceByNameHandler).Methods("GET")
 	apirouter.Handle("/remotesources/{name}", deleteRemoteSourceHandler).Methods("DELETE")
 
 	mainrouter := mux.NewRouter()

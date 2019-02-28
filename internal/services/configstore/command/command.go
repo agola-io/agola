@@ -48,12 +48,20 @@ func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Proje
 	if project.Name == "" {
 		return nil, errors.Errorf("project name required")
 	}
+	if project.OwnerType == "" {
+		return nil, errors.Errorf("project ownertype required")
+	}
+	if project.OwnerID == "" {
+		return nil, errors.Errorf("project ownerid required")
+	}
+	if !types.IsValidOwnerType(project.OwnerType) {
+		return nil, errors.Errorf("invalid project ownertype %q", project.OwnerType)
+	}
 
 	var cgt *wal.ChangeGroupsUpdateToken
-	cgNames := []string{project.Name}
+	cgNames := []string{project.OwnerID}
 
 	// must do all the check in a single transaction to avoid concurrent changes
-	// since the use token is related to the transaction time
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
@@ -61,13 +69,32 @@ func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Proje
 			return err
 		}
 
+		// check owner exists
+		switch project.OwnerType {
+		case types.OwnerTypeUser:
+			user, err := s.readDB.GetUser(tx, project.OwnerID)
+			if err != nil {
+				return err
+			}
+			if user == nil {
+				return errors.Errorf("user id %q doesn't exist", project.OwnerID)
+			}
+		case types.OwnerTypeOrganization:
+			org, err := s.readDB.GetOrg(tx, project.OwnerID)
+			if err != nil {
+				return err
+			}
+			if org == nil {
+				return errors.Errorf("organization id %q doesn't exist", project.OwnerID)
+			}
+		}
 		// check duplicate project name
-		p, err := s.readDB.GetProjectByName(tx, project.Name)
+		p, err := s.readDB.GetOwnerProjectByName(tx, project.OwnerID, project.Name)
 		if err != nil {
 			return err
 		}
 		if p != nil {
-			return errors.Errorf("project %q already exists", p.Name)
+			return errors.Errorf("project with name %q for %s with id %q already exists", p.Name, project.OwnerType, project.OwnerID)
 		}
 		return nil
 	})
@@ -93,14 +120,13 @@ func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Proje
 	return project, err
 }
 
-func (s *CommandHandler) DeleteProject(ctx context.Context, projectName string) error {
+func (s *CommandHandler) DeleteProject(ctx context.Context, projectID string) error {
 	var project *types.Project
 
 	var cgt *wal.ChangeGroupsUpdateToken
-	cgNames := []string{project.Name}
+	cgNames := []string{project.OwnerID}
 
 	// must do all the check in a single transaction to avoid concurrent changes
-	// since the use token is related to the transaction time
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
@@ -109,12 +135,12 @@ func (s *CommandHandler) DeleteProject(ctx context.Context, projectName string) 
 		}
 
 		// check project existance
-		project, err = s.readDB.GetProjectByName(tx, projectName)
+		project, err = s.readDB.GetProject(tx, projectID)
 		if err != nil {
 			return err
 		}
 		if project == nil {
-			return errors.Errorf("project %q doesn't exist", projectName)
+			return errors.Errorf("project %q doesn't exist", projectID)
 		}
 		return nil
 	})
@@ -142,7 +168,6 @@ func (s *CommandHandler) CreateUser(ctx context.Context, user *types.User) (*typ
 	cgNames := []string{user.UserName}
 
 	// must do all the check in a single transaction to avoid concurrent changes
-	// since the use token is related to the transaction time
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
@@ -156,7 +181,7 @@ func (s *CommandHandler) CreateUser(ctx context.Context, user *types.User) (*typ
 			return err
 		}
 		if u != nil {
-			return errors.Errorf("user %q already exists", u.UserName)
+			return errors.Errorf("user with name %q already exists", u.UserName)
 		}
 		return nil
 	})
@@ -166,7 +191,7 @@ func (s *CommandHandler) CreateUser(ctx context.Context, user *types.User) (*typ
 
 	user.ID = uuid.NewV4().String()
 
-	pcj, err := json.Marshal(user)
+	userj, err := json.Marshal(user)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to marshal user")
 	}
@@ -174,7 +199,7 @@ func (s *CommandHandler) CreateUser(ctx context.Context, user *types.User) (*typ
 		{
 			ActionType: wal.ActionTypePut,
 			Path:       common.StorageUserFile(user.ID),
-			Data:       pcj,
+			Data:       userj,
 		},
 	}
 
@@ -189,7 +214,6 @@ func (s *CommandHandler) DeleteUser(ctx context.Context, userName string) error 
 	cgNames := []string{user.UserName}
 
 	// must do all the check in a single transaction to avoid concurrent changes
-	// since the use token is related to the transaction time
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
@@ -248,7 +272,6 @@ func (s *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequ
 	var cgt *wal.ChangeGroupsUpdateToken
 
 	// must do all the check in a single transaction to avoid concurrent changes
-	// since the use token is related to the transaction time
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		user, err = s.readDB.GetUserByName(tx, req.UserName)
@@ -294,7 +317,7 @@ func (s *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequ
 
 	user.LinkedAccounts[la.ID] = la
 
-	pcj, err := json.Marshal(user)
+	userj, err := json.Marshal(user)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to marshal user")
 	}
@@ -302,7 +325,7 @@ func (s *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequ
 		{
 			ActionType: wal.ActionTypePut,
 			Path:       common.StorageUserFile(user.ID),
-			Data:       pcj,
+			Data:       userj,
 		},
 	}
 
@@ -323,7 +346,6 @@ func (s *CommandHandler) DeleteUserLA(ctx context.Context, userName, laID string
 	var cgt *wal.ChangeGroupsUpdateToken
 
 	// must do all the check in a single transaction to avoid concurrent changes
-	// since the use token is related to the transaction time
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		user, err = s.readDB.GetUserByName(tx, userName)
@@ -353,7 +375,7 @@ func (s *CommandHandler) DeleteUserLA(ctx context.Context, userName, laID string
 
 	delete(user.LinkedAccounts, laID)
 
-	pcj, err := json.Marshal(user)
+	userj, err := json.Marshal(user)
 	if err != nil {
 		return errors.Wrapf(err, "failed to marshal user")
 	}
@@ -361,7 +383,7 @@ func (s *CommandHandler) DeleteUserLA(ctx context.Context, userName, laID string
 		{
 			ActionType: wal.ActionTypePut,
 			Path:       common.StorageUserFile(user.ID),
-			Data:       pcj,
+			Data:       userj,
 		},
 	}
 
@@ -390,7 +412,6 @@ func (s *CommandHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLARequ
 	var cgt *wal.ChangeGroupsUpdateToken
 
 	// must do all the check in a single transaction to avoid concurrent changes
-	// since the use token is related to the transaction time
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		user, err = s.readDB.GetUserByName(tx, req.UserName)
@@ -514,7 +535,6 @@ func (s *CommandHandler) CreateRemoteSource(ctx context.Context, remoteSource *t
 	cgNames := []string{remoteSource.Name}
 
 	// must do all the check in a single transaction to avoid concurrent changes
-	// since the use token is related to the transaction time
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
@@ -590,6 +610,106 @@ func (s *CommandHandler) DeleteRemoteSource(ctx context.Context, remoteSourceNam
 	}
 
 	// changegroup is all the remote sources
+	_, err = s.wal.WriteWal(ctx, actions, cgt)
+	return err
+}
+
+func (s *CommandHandler) CreateOrg(ctx context.Context, org *types.Organization) (*types.Organization, error) {
+	if org.Name == "" {
+		return nil, errors.Errorf("org name required")
+	}
+
+	var cgt *wal.ChangeGroupsUpdateToken
+	cgNames := []string{org.Name}
+
+	// must do all the check in a single transaction to avoid concurrent changes
+	err := s.readDB.Do(func(tx *db.Tx) error {
+		var err error
+		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		if err != nil {
+			return err
+		}
+
+		// check duplicate org name
+		u, err := s.readDB.GetOrgByName(tx, org.Name)
+		if err != nil {
+			return err
+		}
+		if u != nil {
+			return errors.Errorf("org %q already exists", u.Name)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	org.ID = uuid.NewV4().String()
+
+	orgj, err := json.Marshal(org)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to marshal org")
+	}
+	actions := []*wal.Action{
+		{
+			ActionType: wal.ActionTypePut,
+			Path:       common.StorageOrgFile(org.ID),
+			Data:       orgj,
+		},
+	}
+
+	_, err = s.wal.WriteWal(ctx, actions, cgt)
+	return org, err
+}
+
+func (s *CommandHandler) DeleteOrg(ctx context.Context, orgName string) error {
+	var org *types.Organization
+	var projects []*types.Project
+
+	var cgt *wal.ChangeGroupsUpdateToken
+	cgNames := []string{org.ID}
+
+	// must do all the check in a single transaction to avoid concurrent changes
+	err := s.readDB.Do(func(tx *db.Tx) error {
+		var err error
+		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		if err != nil {
+			return err
+		}
+
+		// check org existance
+		org, err = s.readDB.GetOrgByName(tx, orgName)
+		if err != nil {
+			return err
+		}
+		if org == nil {
+			return errors.Errorf("org %q doesn't exist", orgName)
+		}
+		// get org projects
+		projects, err = s.readDB.GetOwnerProjects(tx, org.ID, "", 0, false)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	actions := []*wal.Action{
+		{
+			ActionType: wal.ActionTypeDelete,
+			Path:       common.StorageOrgFile(org.ID),
+		},
+	}
+	// delete all org projects
+	for _, project := range projects {
+		actions = append(actions, &wal.Action{
+			ActionType: wal.ActionTypeDelete,
+			Path:       common.StorageProjectFile(project.ID),
+		})
+	}
+
 	_, err = s.wal.WriteWal(ctx, actions, cgt)
 	return err
 }

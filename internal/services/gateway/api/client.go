@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"path"
 	"strconv"
 	"strings"
 
@@ -118,7 +119,19 @@ func (c *Client) GetProject(ctx context.Context, projectID string) (*types.Proje
 	return project, resp, err
 }
 
-func (c *Client) GetProjects(ctx context.Context, start string, limit int, asc bool) (*GetProjectsResponse, *http.Response, error) {
+func (c *Client) GetCurrentUserProjects(ctx context.Context, start string, limit int, asc bool) (*GetProjectsResponse, *http.Response, error) {
+	return c.getProjects(ctx, "user", "", start, limit, asc)
+}
+
+func (c *Client) GetUserProjects(ctx context.Context, username, start string, limit int, asc bool) (*GetProjectsResponse, *http.Response, error) {
+	return c.getProjects(ctx, "user", username, start, limit, asc)
+}
+
+func (c *Client) GetOrgProjects(ctx context.Context, orgname, start string, limit int, asc bool) (*GetProjectsResponse, *http.Response, error) {
+	return c.getProjects(ctx, "org", orgname, start, limit, asc)
+}
+
+func (c *Client) getProjects(ctx context.Context, ownertype, ownername, start string, limit int, asc bool) (*GetProjectsResponse, *http.Response, error) {
 	q := url.Values{}
 	if start != "" {
 		q.Add("start", start)
@@ -131,23 +144,47 @@ func (c *Client) GetProjects(ctx context.Context, start string, limit int, asc b
 	}
 
 	projects := new(GetProjectsResponse)
-	resp, err := c.getParsedResponse(ctx, "GET", "/projects", q, jsonContent, nil, &projects)
+	resp, err := c.getParsedResponse(ctx, "GET", path.Join("/", ownertype, ownername, "projects"), q, jsonContent, nil, &projects)
 	return projects, resp, err
 }
 
-func (c *Client) CreateProject(ctx context.Context, req *CreateProjectRequest) (*types.Project, *http.Response, error) {
+func (c *Client) CreateCurrentUserProject(ctx context.Context, req *CreateProjectRequest) (*types.Project, *http.Response, error) {
+	return c.createProject(ctx, "user", "", req)
+}
+
+func (c *Client) CreateUserProject(ctx context.Context, username string, req *CreateProjectRequest) (*types.Project, *http.Response, error) {
+	return c.createProject(ctx, "user", username, req)
+}
+
+func (c *Client) CreateOrgProject(ctx context.Context, orgname string, req *CreateProjectRequest) (*types.Project, *http.Response, error) {
+	return c.createProject(ctx, "org", orgname, req)
+}
+
+func (c *Client) createProject(ctx context.Context, ownertype, ownername string, req *CreateProjectRequest) (*types.Project, *http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	project := new(types.Project)
-	resp, err := c.getParsedResponse(ctx, "PUT", "/projects", nil, jsonContent, bytes.NewReader(reqj), project)
+	resp, err := c.getParsedResponse(ctx, "PUT", path.Join("/", ownertype, ownername, "projects"), nil, jsonContent, bytes.NewReader(reqj), project)
 	return project, resp, err
 }
 
-func (c *Client) DeleteProject(ctx context.Context, projectName string) (*http.Response, error) {
-	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/projects/%s", projectName), nil, jsonContent, nil)
+func (c *Client) DeleteCurrentUserProject(ctx context.Context, projectName string) (*http.Response, error) {
+	return c.deleteProject(ctx, "user", "", projectName)
+}
+
+func (c *Client) DeleteUserProject(ctx context.Context, username, projectName string) (*http.Response, error) {
+	return c.deleteProject(ctx, "user", username, projectName)
+}
+
+func (c *Client) DeleteOrgProject(ctx context.Context, orgname, projectName string) (*http.Response, error) {
+	return c.deleteProject(ctx, "org", orgname, projectName)
+}
+
+func (c *Client) deleteProject(ctx context.Context, ownertype, ownername, projectName string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", path.Join("/projects", ownertype, ownername, projectName), nil, jsonContent, nil)
 }
 
 func (c *Client) ReconfigProject(ctx context.Context, projectName string) (*http.Response, error) {
@@ -286,4 +323,19 @@ func (c *Client) CreateRemoteSource(ctx context.Context, req *CreateRemoteSource
 
 func (c *Client) DeleteRemoteSource(ctx context.Context, name string) (*http.Response, error) {
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/remotesources/%s", name), nil, jsonContent, nil)
+}
+
+func (c *Client) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*OrgResponse, *http.Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	org := new(OrgResponse)
+	resp, err := c.getParsedResponse(ctx, "PUT", "/orgs", nil, jsonContent, bytes.NewReader(reqj), org)
+	return org, resp, err
+}
+
+func (c *Client) DeleteOrg(ctx context.Context, orgName string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/orgs/%s", orgName), nil, jsonContent, nil)
 }

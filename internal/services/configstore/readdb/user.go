@@ -277,6 +277,7 @@ func getUsersFilteredQuery(startUserName string, limit int, asc bool) sq.SelectB
 
 	return s
 }
+
 func (r *ReadDB) GetUsers(tx *db.Tx, startUserName string, limit int, asc bool) ([]*types.User, error) {
 	var users []*types.User
 

@@ -33,6 +33,8 @@ type CreateProjectRequest struct {
 	RemoteSourceName    string
 	RepoURL             string
 	UserID              string
+	OwnerType           types.OwnerType
+	OwnerID             string
 	SkipSSHHostKeyCheck bool
 }
 
@@ -86,11 +88,21 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 
 	p := &types.Project{
 		Name:                req.Name,
+		OwnerType:           types.OwnerTypeUser,
+		OwnerID:             user.ID,
 		LinkedAccountID:     la.ID,
 		Path:                fmt.Sprintf("%s/%s", repoOwner, repoName),
 		CloneURL:            cloneURL,
 		SkipSSHHostKeyCheck: req.SkipSSHHostKeyCheck,
 		SSHPrivateKey:       string(privateKey),
+	}
+
+	if req.OwnerType == types.OwnerTypeOrganization {
+		if req.OwnerID == "" {
+			return nil, errors.Errorf("ownerid must be specified when adding a project outside the current user")
+		}
+		p.OwnerType = req.OwnerType
+		p.OwnerID = req.OwnerID
 	}
 
 	c.log.Infof("creating project")
@@ -141,8 +153,8 @@ func (c *CommandHandler) SetupProject(ctx context.Context, rs *types.RemoteSourc
 	return nil
 }
 
-func (c *CommandHandler) ReconfigProject(ctx context.Context, projectName string) error {
-	p, _, err := c.configstoreClient.GetProjectByName(ctx, projectName)
+func (c *CommandHandler) ReconfigProject(ctx context.Context, ownerID, projectName string) error {
+	p, _, err := c.configstoreClient.GetProjectByName(ctx, ownerID, projectName)
 	if err != nil {
 		return err
 	}

@@ -28,16 +28,16 @@ import (
 	"go.uber.org/zap"
 )
 
-type GetProjectHandler struct {
+type ProjectHandler struct {
 	log    *zap.SugaredLogger
 	readDB *readdb.ReadDB
 }
 
-func NewGetProjectHandler(logger *zap.Logger, readDB *readdb.ReadDB) *GetProjectHandler {
-	return &GetProjectHandler{log: logger.Sugar(), readDB: readDB}
+func NewProjectHandler(logger *zap.Logger, readDB *readdb.ReadDB) *ProjectHandler {
+	return &ProjectHandler{log: logger.Sugar(), readDB: readDB}
 }
 
-func (h *GetProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	projectID := vars["projectid"]
 
@@ -63,23 +63,24 @@ func (h *GetProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type GetProjectByNameHandler struct {
+type ProjectByNameHandler struct {
 	log    *zap.SugaredLogger
 	readDB *readdb.ReadDB
 }
 
-func NewGetProjectByNameHandler(logger *zap.Logger, readDB *readdb.ReadDB) *GetProjectByNameHandler {
-	return &GetProjectByNameHandler{log: logger.Sugar(), readDB: readDB}
+func NewProjectByNameHandler(logger *zap.Logger, readDB *readdb.ReadDB) *ProjectByNameHandler {
+	return &ProjectByNameHandler{log: logger.Sugar(), readDB: readDB}
 }
 
-func (h *GetProjectByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *ProjectByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
+	ownerID := vars["ownerid"]
 	projectName := vars["projectname"]
 
 	var project *types.Project
 	err := h.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		project, err = h.readDB.GetProjectByName(tx, projectName)
+		project, err = h.readDB.GetOwnerProjectByName(tx, ownerID, projectName)
 		return err
 	})
 	if err != nil {
@@ -144,9 +145,9 @@ func (h *DeleteProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	ctx := r.Context()
 
 	vars := mux.Vars(r)
-	projectName := vars["projectname"]
+	projectID := vars["projectid"]
 
-	if err := h.ch.DeleteProject(ctx, projectName); err != nil {
+	if err := h.ch.DeleteProject(ctx, projectID); err != nil {
 		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -168,6 +169,9 @@ func NewProjectsHandler(logger *zap.Logger, readDB *readdb.ReadDB) *ProjectsHand
 }
 
 func (h *ProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	ownerID := vars["ownerid"]
+
 	query := r.URL.Query()
 
 	limitS := query.Get("limit")
@@ -194,7 +198,12 @@ func (h *ProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	start := query.Get("start")
 
-	projects, err := h.readDB.GetProjects(start, limit, asc)
+	var projects []*types.Project
+	err := h.readDB.Do(func(tx *db.Tx) error {
+		var err error
+		projects, err = h.readDB.GetOwnerProjects(tx, ownerID, start, limit, asc)
+		return err
+	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

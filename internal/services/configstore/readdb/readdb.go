@@ -627,6 +627,10 @@ func (r *ReadDB) applyAction(tx *db.Tx, action *wal.Action) error {
 			if err := r.insertUser(tx, action.Data); err != nil {
 				return err
 			}
+		case common.ConfigTypeOrg:
+			if err := r.insertOrg(tx, action.Data); err != nil {
+				return err
+			}
 		case common.ConfigTypeRemoteSource:
 			if err := r.insertRemoteSource(tx, action.Data); err != nil {
 				return err
@@ -643,6 +647,11 @@ func (r *ReadDB) applyAction(tx *db.Tx, action *wal.Action) error {
 		case common.ConfigTypeUser:
 			r.log.Debugf("deleting user with id: %s", ID)
 			if err := r.deleteUser(tx, ID); err != nil {
+				return err
+			}
+		case common.ConfigTypeOrg:
+			r.log.Debugf("deleting org with id: %s", ID)
+			if err := r.deleteOrg(tx, ID); err != nil {
 				return err
 			}
 		case common.ConfigTypeRemoteSource:

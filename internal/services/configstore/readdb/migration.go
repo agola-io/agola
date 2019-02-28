@@ -28,11 +28,13 @@ var Stmts = []string{
 	"create index project_name on project(name)",
 
 	"create table user (id uuid, name varchar, data bytea, PRIMARY KEY (id))",
+	"create index user_name on user(name)",
 	"create table user_token (tokenvalue varchar, userid uuid, PRIMARY KEY (tokenvalue, userid))",
 
-	"create table remotesource (id uuid, name varchar, data bytea, PRIMARY KEY (id))",
+	"create table org (id uuid, name varchar, data bytea, PRIMARY KEY (id))",
+	"create index org_name on org(name)",
 
-	"create table projectsource (id uuid, name varchar, data bytea, PRIMARY KEY (id))",
+	"create table remotesource (id uuid, name varchar, data bytea, PRIMARY KEY (id))",
 
 	"create table linkedaccount_user (id uuid, remotesourceid uuid, userid uuid, remoteuserid uuid, PRIMARY KEY (id), FOREIGN KEY(userid) REFERENCES user(id))",
 

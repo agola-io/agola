@@ -15,10 +15,13 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
+	"github.com/pkg/errors"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/gateway/command"
 	"github.com/sorintlab/agola/internal/services/types"
@@ -47,6 +50,8 @@ func NewCreateProjectHandler(logger *zap.Logger, ch *command.CommandHandler, con
 
 func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	vars := mux.Vars(r)
+	orgname := vars["orgname"]
 
 	var req CreateProjectRequest
 	d := json.NewDecoder(r.Body)
@@ -57,19 +62,32 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 
 	ctxUserID := ctx.Value("userid")
 	if ctxUserID == nil {
-		http.Error(w, "no userid specified", http.StatusBadRequest)
+		http.Error(w, "no authenticated user", http.StatusBadRequest)
 		return
 	}
 	userID := ctxUserID.(string)
 	h.log.Infof("userID: %q", userID)
 
-	project, err := h.ch.CreateProject(ctx, &command.CreateProjectRequest{
+	creq := &command.CreateProjectRequest{
 		Name:                req.Name,
 		RepoURL:             req.RepoURL,
 		RemoteSourceName:    req.RemoteSourceName,
 		UserID:              userID,
 		SkipSSHHostKeyCheck: req.SkipSSHHostKeyCheck,
-	})
+	}
+
+	ownerID, code, userErr, err := getOwnerID(ctx, h.configstoreClient, "", orgname, true)
+	if err != nil {
+		h.log.Errorf("err: %+v", err)
+		http.Error(w, userErr, code)
+		return
+	}
+	if orgname != "" {
+		creq.OwnerType = types.OwnerTypeOrganization
+		creq.OwnerID = ownerID
+	}
+
+	project, err := h.ch.CreateProject(ctx, creq)
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -81,7 +99,6 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
 }
 
 type ProjectReconfigHandler struct {
@@ -99,8 +116,17 @@ func (h *ProjectReconfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	ctx := r.Context()
 	vars := mux.Vars(r)
 	projectName := vars["projectname"]
+	username := vars["username"]
+	orgname := vars["orgname"]
 
-	if err := h.ch.ReconfigProject(ctx, projectName); err != nil {
+	ownerID, code, userErr, err := getOwnerID(ctx, h.configstoreClient, username, orgname, false)
+	if err != nil {
+		h.log.Errorf("err: %+v", err)
+		http.Error(w, userErr, code)
+		return
+	}
+
+	if err := h.ch.ReconfigProject(ctx, ownerID, projectName); err != nil {
 		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -120,8 +146,28 @@ func (h *DeleteProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	ctx := r.Context()
 	vars := mux.Vars(r)
 	projectName := vars["projectname"]
+	username := vars["username"]
+	orgname := vars["orgname"]
 
-	resp, err := h.configstoreClient.DeleteProject(ctx, projectName)
+	ownerID, code, userErr, err := getOwnerID(ctx, h.configstoreClient, username, orgname, true)
+	if err != nil {
+		h.log.Errorf("err: %+v", err)
+		http.Error(w, userErr, code)
+		return
+	}
+
+	project, resp, err := h.configstoreClient.GetProjectByName(ctx, ownerID, projectName)
+	if err != nil {
+		if resp != nil && resp.StatusCode == http.StatusNotFound {
+			http.Error(w, fmt.Sprintf("project with name %q doesn't exist", projectName), http.StatusNotFound)
+			return
+		}
+		h.log.Errorf("err: %+v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resp, err = h.configstoreClient.DeleteProject(ctx, project.ID)
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -179,8 +225,17 @@ func (h *ProjectByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	ctx := r.Context()
 	vars := mux.Vars(r)
 	projectName := vars["projectname"]
+	username := vars["username"]
+	orgname := vars["orgname"]
 
-	project, resp, err := h.configstoreClient.GetProjectByName(ctx, projectName)
+	ownerID, code, userErr, err := getOwnerID(ctx, h.configstoreClient, username, orgname, false)
+	if err != nil {
+		h.log.Errorf("err: %+v", err)
+		http.Error(w, userErr, code)
+		return
+	}
+
+	project, resp, err := h.configstoreClient.GetProjectByName(ctx, ownerID, projectName)
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -228,8 +283,18 @@ func NewProjectsHandler(logger *zap.Logger, configstoreClient *csapi.Client) *Pr
 
 func (h *ProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-
+	vars := mux.Vars(r)
 	query := r.URL.Query()
+
+	username := vars["username"]
+	orgname := vars["orgname"]
+
+	ownerID, code, userErr, err := getOwnerID(ctx, h.configstoreClient, username, orgname, true)
+	if err != nil {
+		h.log.Errorf("err: %+v", err)
+		http.Error(w, userErr, code)
+		return
+	}
 
 	limitS := query.Get("limit")
 	limit := DefaultRunsLimit
@@ -255,7 +320,7 @@ func (h *ProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	start := query.Get("start")
 
-	csprojects, resp, err := h.configstoreClient.GetProjects(ctx, start, limit, asc)
+	csprojects, resp, err := h.configstoreClient.GetOwnerProjects(ctx, ownerID, start, limit, asc)
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -279,4 +344,45 @@ func (h *ProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+func getOwnerID(ctx context.Context, configstoreClient *csapi.Client, username, orgname string, useAuthUser bool) (string, int, string, error) {
+	var ownerID string
+	switch {
+	case username != "":
+		user, resp, err := configstoreClient.GetUserByName(ctx, username)
+		if err != nil {
+			if resp != nil && resp.StatusCode == http.StatusNotFound {
+				err = errors.Errorf("user %q doens't exist", username)
+				return "", http.StatusNotFound, err.Error(), err
+			}
+			return "", http.StatusInternalServerError, "", err
+		}
+		ownerID = user.ID
+	case orgname != "":
+		org, resp, err := configstoreClient.GetOrgByName(ctx, orgname)
+		if err != nil {
+			if resp != nil && resp.StatusCode == http.StatusNotFound {
+				err = errors.Errorf("organization %q doens't exist", orgname)
+				return "", http.StatusNotFound, err.Error(), err
+			}
+			return "", http.StatusInternalServerError, "", err
+		}
+		ownerID = org.ID
+	default:
+		if useAuthUser {
+			// use the current authenticated user
+			ctxUserID := ctx.Value("userid")
+			if ctxUserID == nil {
+				err := errors.New("no authenticated user")
+				return "", http.StatusBadRequest, err.Error(), err
+			}
+			ownerID = ctxUserID.(string)
+		} else {
+			err := errors.New("no user or org name specified")
+			return "", http.StatusBadRequest, err.Error(), err
+		}
+	}
+
+	return ownerID, 0, "", nil
 }
