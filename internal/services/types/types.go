@@ -37,6 +37,16 @@ type User struct {
 	Tokens map[string]string `json:"tokens,omitempty"`
 }
 
+type Organization struct {
+	// The type version. Increase when a breaking change is done. Usually not
+	// needed when adding fields.
+	Version string `json:"version,omitempty"`
+
+	ID string `json:"id,omitempty"`
+
+	Name string `json:"name,omitempty"`
+}
+
 type RemoteSourceType string
 
 const (
@@ -91,6 +101,17 @@ type LinkedAccount struct {
 	Oauth2Expire       time.Duration `json:"oauth2_expire,omitempty"`
 }
 
+type OwnerType string
+
+const (
+	OwnerTypeUser         OwnerType = "user"
+	OwnerTypeOrganization OwnerType = "organization"
+)
+
+func IsValidOwnerType(ownerType OwnerType) bool {
+	return ownerType == OwnerTypeUser || ownerType == OwnerTypeOrganization
+}
+
 type Project struct {
 	// The type version. Increase when a breaking change is done. Usually not
 	// needed when adding fields.
@@ -98,6 +119,9 @@ type Project struct {
 
 	ID   string `json:"id,omitempty"`
 	Name string `json:"name,omitempty"`
+
+	OwnerType OwnerType `json:"owner_type,omitempty"`
+	OwnerID   string    `json:"owner_id,omitempty"`
 
 	// Project repository path. It may be different for every kind of git source.
 	// It's needed to get git source needed information like the repo owner and
