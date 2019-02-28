@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/url"
 	"path"
 	"strconv"
 	"time"
@@ -207,19 +206,15 @@ func (c *Client) CreateRepoWebhook(owner, repo, url, secret string) error {
 }
 
 func (c *Client) DeleteRepoWebhook(owner, repo, u string) error {
-	curURL, err := url.Parse(u)
-	if err != nil {
-		return errors.Wrapf(err, "failed to parse url")
-	}
-
 	hooks, _, err := c.client.Projects.ListProjectHooks(path.Join(owner, repo), nil)
 	if err != nil {
 		return errors.Wrapf(err, "error retrieving repository webhooks")
 	}
 
+	// match the full url so we can have multiple webhooks for different agola
+	// projects
 	for _, hook := range hooks {
-		u, err := url.Parse(hook.URL)
-		if err == nil && u.Host == curURL.Host {
+		if hook.URL == u {
 			if _, err := c.client.Projects.DeleteProjectHook(path.Join(owner, repo), hook.ID); err != nil {
 				return errors.Wrapf(err, "error deleting existing repository webhook")
 			}

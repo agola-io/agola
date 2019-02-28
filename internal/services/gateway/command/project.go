@@ -137,8 +137,12 @@ func (c *CommandHandler) SetupProject(ctx context.Context, rs *types.RemoteSourc
 
 	webhookURL := fmt.Sprintf("%s/webhooks?projectid=%s", c.apiExposedURL, conf.Project.ID)
 
+	// generate deploy keys and webhooks containing the agola project id so we
+	// can have multiple projects referencing the same remote repository and this
+	// will trigger multiple different runs
+	deployKeyName := fmt.Sprintf("agola deploy key - %s", conf.Project.ID)
 	c.log.Infof("creating/updating deploy key: %s", string(pubKey))
-	if err := gitsource.UpdateDeployKey(conf.RepoOwner, conf.RepoName, "agola deploy key", string(pubKey), true); err != nil {
+	if err := gitsource.UpdateDeployKey(conf.RepoOwner, conf.RepoName, deployKeyName, string(pubKey), true); err != nil {
 		return errors.Wrapf(err, "failed to create deploy key")
 	}
 	c.log.Infof("deleting existing webhooks")

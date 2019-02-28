@@ -17,7 +17,6 @@ package gitea
 import (
 	"crypto/tls"
 	"net/http"
-	"net/url"
 	"strconv"
 
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
@@ -130,7 +129,7 @@ func (c *Client) CreateDeployKey(owner, repo, title, pubKey string, readonly boo
 func (c *Client) UpdateDeployKey(owner, repo, title, pubKey string, readonly bool) error {
 	// NOTE(sgotti) gitea has a bug where if we delete and remove the same key with
 	// the same value it is correctly readded and the admin must force a
-	// authorizec_keys regeneration on the server. To avoid this we update it only
+	// authorized_keys regeneration on the server. To avoid this we update it only
 	// when the public key value has changed
 	keys, err := c.client.ListDeployKeys(owner, repo)
 	if err != nil {
@@ -193,23 +192,17 @@ func (c *Client) CreateRepoWebhook(owner, repo, url, secret string) error {
 }
 
 func (c *Client) DeleteRepoWebhook(owner, repo, u string) error {
-	curURL, err := url.Parse(u)
-	if err != nil {
-		return errors.Wrapf(err, "failed to parse url")
-	}
-
 	hooks, err := c.client.ListRepoHooks(owner, repo)
 	if err != nil {
 		return errors.Wrapf(err, "error retrieving repository webhooks")
 	}
 
+	// match the full url so we can have multiple webhooks for different agola
+	// projects
 	for _, hook := range hooks {
-		if hurl, ok := hook.Config["url"]; ok {
-			u, err := url.Parse(hurl)
-			if err == nil && u.Host == curURL.Host {
-				if err := c.client.DeleteRepoHook(owner, repo, hook.ID); err != nil {
-					return errors.Wrapf(err, "error deleting existing repository webhook")
-				}
+		if hook.Config["url"] == u {
+			if err := c.client.DeleteRepoHook(owner, repo, hook.ID); err != nil {
+				return errors.Wrapf(err, "error deleting existing repository webhook")
 			}
 		}
 	}
