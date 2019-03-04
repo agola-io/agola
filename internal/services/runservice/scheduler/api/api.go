@@ -414,7 +414,15 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type RunCreateRequest struct {
-	RunConfig               *types.RunConfig  `json:"run_config"`
+	// new run
+	RunConfig *types.RunConfig `json:"run_config"`
+
+	// existing run
+	RunID       string   `json:"run_id"`
+	RunConfigID string   `json:"run_config_id"`
+	FromStart   bool     `json:"from_start"`
+	ResetTasks  []string `json:"reset_tasks"`
+
 	Group                   string            `json:"group"`
 	Environment             map[string]string `json:"environment"`
 	Annotations             map[string]string `json:"annotations"`
@@ -445,13 +453,29 @@ func (h *RunCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	creq := &command.RunCreateRequest{
 		RunConfig:               req.RunConfig,
+		RunID:                   req.RunID,
+		RunConfigID:             req.RunConfigID,
+		FromStart:               req.FromStart,
+		ResetTasks:              req.ResetTasks,
 		Group:                   req.Group,
 		Environment:             req.Environment,
 		Annotations:             req.Annotations,
 		ChangeGroupsUpdateToken: req.ChangeGroupsUpdateToken,
 	}
-	if err := h.ch.CreateRun(ctx, creq); err != nil {
+	rb, err := h.ch.CreateRun(ctx, creq)
+	if err != nil {
+		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	res := &RunResponse{
+		Run:       rb.Run,
+		RunConfig: rb.Rc,
+	}
+
+	if err := json.NewEncoder(w).Encode(res); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }

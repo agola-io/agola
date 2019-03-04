@@ -22,6 +22,12 @@ import (
 	"github.com/sorintlab/agola/internal/util"
 )
 
+type RunBundle struct {
+	Run *Run
+	Rc  *RunConfig
+	Rd  *RunData
+}
+
 type SortOrder int
 
 const (
