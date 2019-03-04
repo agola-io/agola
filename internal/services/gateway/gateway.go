@@ -174,6 +174,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	runHandler := api.NewRunHandler(logger, g.runserviceClient)
 	runsHandler := api.NewRunsHandler(logger, g.runserviceClient)
 	runtaskHandler := api.NewRuntaskHandler(logger, g.runserviceClient)
+	runActionsHandler := api.NewRunActionsHandler(logger, g.runserviceClient)
 
 	logsHandler := api.NewLogsHandler(logger, g.runserviceClient)
 
@@ -229,6 +230,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/orgs/{orgname}", authForcedHandler(deleteOrgHandler)).Methods("DELETE")
 
 	apirouter.Handle("/run/{runid}", authForcedHandler(runHandler)).Methods("GET")
+	apirouter.Handle("/run/{runid}/actions", authForcedHandler(runActionsHandler)).Methods("POST")
 	apirouter.Handle("/run/{runid}/task/{taskid}", authForcedHandler(runtaskHandler)).Methods("GET")
 	apirouter.Handle("/runs", authForcedHandler(runsHandler)).Methods("GET")
 

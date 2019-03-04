@@ -332,6 +332,59 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type RunActionType string
+
+const (
+	RunActionTypeRestart RunActionType = "restart"
+)
+
+type RunActionsRequest struct {
+	ActionType RunActionType `json:"action_type"`
+
+	// Restart
+	FromStart bool `json:"from_start"`
+}
+
+type RunActionsHandler struct {
+	log              *zap.SugaredLogger
+	runserviceClient *rsapi.Client
+}
+
+func NewRunActionsHandler(logger *zap.Logger, runserviceClient *rsapi.Client) *RunActionsHandler {
+	return &RunActionsHandler{log: logger.Sugar(), runserviceClient: runserviceClient}
+}
+
+func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	runID := vars["runid"]
+
+	var req RunActionsRequest
+	d := json.NewDecoder(r.Body)
+	if err := d.Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	switch req.ActionType {
+	case RunActionTypeRestart:
+		req := &rsapi.RunCreateRequest{
+			RunID:     runID,
+			FromStart: req.FromStart,
+		}
+
+		resp, err := h.runserviceClient.CreateRun(ctx, req)
+		if err != nil {
+			if resp != nil && resp.StatusCode == http.StatusNotFound {
+				http.Error(w, err.Error(), http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+}
+
 type LogsHandler struct {
 	log              *zap.SugaredLogger
 	runserviceClient *rsapi.Client
