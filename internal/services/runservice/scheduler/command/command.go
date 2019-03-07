@@ -287,8 +287,12 @@ func (s *CommandHandler) genRunTask(ctx context.Context, rct *types.RunConfigTas
 	rt := &types.RunTask{
 		ID:                rct.ID,
 		Status:            types.RunTaskStatusNotStarted,
+		Skip:              rct.Skip,
 		Steps:             make([]*types.RunTaskStep, len(rct.Steps)),
 		WorkspaceArchives: []int{},
+	}
+	if rt.Skip {
+		rt.Status = types.RunTaskStatusSkipped
 	}
 	for i := range rt.Steps {
 		s := &types.RunTaskStep{

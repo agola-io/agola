@@ -16,9 +16,11 @@ package config
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/sorintlab/agola/internal/common"
+	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
 	"github.com/pkg/errors"
@@ -29,6 +31,10 @@ const (
 	maxPipelineNameLength = 100
 	maxTaskNameLength     = 100
 	maxStepNameLength     = 100
+)
+
+var (
+	regExpDelimiters = []string{"/", "#"}
 )
 
 type Config struct {
@@ -72,11 +78,12 @@ type Pipeline struct {
 }
 
 type Element struct {
-	Name          string    `yaml:"name"`
-	Task          string    `yaml:"task"`
-	Depends       []*Depend `yaml:"depends"`
-	IgnoreFailure bool      `yaml:"ignore_failure"`
-	Approval      bool      `yaml:"approval"`
+	Name          string      `yaml:"name"`
+	Task          string      `yaml:"task"`
+	Depends       []*Depend   `yaml:"depends"`
+	IgnoreFailure bool        `yaml:"ignore_failure"`
+	Approval      bool        `yaml:"approval"`
+	When          *types.When `yaml:"when"`
 }
 
 type DependCondition string
@@ -88,7 +95,7 @@ const (
 
 type Depend struct {
 	ElementName string            `yaml:"name"`
-	Conditions  []DependCondition `yaml: "conditions"`
+	Conditions  []DependCondition `yaml:"conditions"`
 }
 
 type Step struct {
@@ -196,12 +203,20 @@ func (t *Task) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 func (e *Element) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	type when struct {
+		Branch interface{} `yaml:"branch"`
+		Tag    interface{} `yaml:"tag"`
+		Ref    interface{} `yaml:"ref"`
+	}
+
 	type element struct {
 		Name          string        `yaml:"name"`
 		Task          string        `yaml:"task"`
 		Depends       []interface{} `yaml:"depends"`
 		IgnoreFailure bool          `yaml:"ignore_failure"`
+		When          *when         `yaml:"when"`
 	}
+
 	var te *element
 
 	if err := unmarshal(&te); err != nil {
@@ -248,7 +263,159 @@ func (e *Element) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 	e.Depends = depends
 
+	if te.When != nil {
+		w := &types.When{}
+
+		var err error
+
+		if te.When.Branch != nil {
+			w.Branch, err = parseWhenConditions(te.When.Branch)
+			if err != nil {
+				return err
+			}
+		}
+
+		if te.When.Tag != nil {
+			w.Tag, err = parseWhenConditions(te.When.Tag)
+			if err != nil {
+				return err
+			}
+		}
+
+		if te.When.Ref != nil {
+			w.Ref, err = parseWhenConditions(te.When.Ref)
+			if err != nil {
+				return err
+			}
+		}
+
+		e.When = w
+	}
+
 	return nil
+}
+
+func parseWhenConditions(wi interface{}) (*types.WhenConditions, error) {
+	w := &types.WhenConditions{}
+
+	var err error
+	include := []string{}
+	exclude := []string{}
+
+	switch c := wi.(type) {
+	case string:
+		include = []string{c}
+	case []interface{}:
+		ss, err := parseSliceString(c)
+		if err != nil {
+			return nil, err
+		}
+		include = ss
+	case map[interface{}]interface{}:
+		for k, v := range c {
+			ks, ok := k.(string)
+			if !ok {
+				return nil, errors.Errorf(`expected one of "include" or "exclude", got %s`, ks)
+			}
+			switch ks {
+			case "include":
+				include, err = parseStringOrSlice(v)
+				if err != nil {
+					return nil, err
+				}
+			case "exclude":
+				exclude, err = parseStringOrSlice(v)
+				if err != nil {
+					return nil, err
+				}
+			default:
+				return nil, errors.Errorf(`expected one of "include" or "exclude", got %s`, ks)
+			}
+		}
+	default:
+		return nil, errors.Errorf("wrong when format")
+	}
+
+	w.Include, err = parseWhenConditionSlice(include)
+	if err != nil {
+		return nil, err
+	}
+	w.Exclude, err = parseWhenConditionSlice(exclude)
+	if err != nil {
+		return nil, err
+	}
+
+	return w, nil
+}
+
+func parseWhenConditionSlice(conds []string) ([]types.WhenCondition, error) {
+	if len(conds) == 0 {
+		return nil, nil
+	}
+
+	wcs := []types.WhenCondition{}
+	for _, cond := range conds {
+		wc, err := parseWhenCondition(cond)
+		if err != nil {
+			return nil, err
+		}
+		wcs = append(wcs, *wc)
+	}
+
+	return wcs, nil
+}
+
+func parseWhenCondition(s string) (*types.WhenCondition, error) {
+	isRegExp := false
+	if len(s) > 2 {
+		for _, d := range regExpDelimiters {
+			if strings.HasPrefix(s, d) && strings.HasSuffix(s, d) {
+				isRegExp = true
+				s = s[1 : len(s)-1]
+				break
+			}
+		}
+	}
+
+	wc := &types.WhenCondition{Match: s}
+
+	if isRegExp {
+		if _, err := regexp.Compile(s); err != nil {
+			return nil, errors.Wrapf(err, "wrong regular expression")
+		}
+		wc.Type = types.WhenConditionTypeRegExp
+	} else {
+		wc.Type = types.WhenConditionTypeSimple
+	}
+	return wc, nil
+}
+
+func parseStringOrSlice(si interface{}) ([]string, error) {
+	ss := []string{}
+	switch c := si.(type) {
+	case string:
+		ss = []string{c}
+	case []interface{}:
+		var err error
+		ss, err = parseSliceString(c)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return ss, nil
+}
+
+func parseSliceString(si []interface{}) ([]string, error) {
+	ss := []string{}
+	for _, v := range si {
+		switch s := v.(type) {
+		case string:
+			ss = append(ss, s)
+		default:
+			return nil, errors.Errorf("expected string")
+		}
+	}
+	return ss, nil
 }
 
 func (c *Config) Runtime(runtimeName string) *Runtime {

@@ -251,7 +251,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		group = genGroup(userID, webhookData)
 	}
 
-	if err := h.createRuns(ctx, data, group, annotations, env); err != nil {
+	if err := h.createRuns(ctx, data, group, annotations, env, webhookData); err != nil {
 		return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to create run")
 	}
 	//if err := gitSource.CreateStatus(webhookData.Repo.Owner, webhookData.Repo.Name, webhookData.CommitSHA, gitsource.CommitStatusPending, "localhost:8080", "build %s", "agola"); err != nil {
@@ -261,7 +261,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 	return 0, "", nil
 }
 
-func (h *webhooksHandler) createRuns(ctx context.Context, configData []byte, group string, annotations, env map[string]string) error {
+func (h *webhooksHandler) createRuns(ctx context.Context, configData []byte, group string, annotations, env map[string]string, webhookData *types.WebhookData) error {
 	config, err := config.ParseConfig([]byte(configData))
 	if err != nil {
 		return err
@@ -270,7 +270,7 @@ func (h *webhooksHandler) createRuns(ctx context.Context, configData []byte, gro
 
 	//h.log.Debugf("pipeline: %s", createRunOpts.PipelineName)
 	for _, pipeline := range config.Pipelines {
-		rc := runconfig.GenRunConfig(config, pipeline.Name, env)
+		rc := runconfig.GenRunConfig(config, pipeline.Name, env, webhookData.Branch, webhookData.Tag, webhookData.Ref)
 
 		h.log.Debugf("rc: %s", util.Dump(rc))
 		h.log.Infof("group: %s", group)

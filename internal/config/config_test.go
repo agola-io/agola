@@ -18,8 +18,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/pkg/errors"
+	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/pkg/errors"
 )
 
 func TestParseConfig(t *testing.T) {
@@ -110,10 +113,126 @@ func TestParseConfig(t *testing.T) {
 						t.Fatalf("got error: %v, want error: %v", err, tt.err)
 					}
 				}
-				return
+			} else {
+				if tt.err != nil {
+					t.Fatalf("got nil error, want error: %v", tt.err)
+				}
 			}
-			if tt.err != nil {
-				t.Fatalf("got nil error, want error: %v", tt.err)
+		})
+	}
+}
+
+func TestParseOutput(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		out  *Config
+	}{
+		{
+			name: "test element when conditions",
+			in: `
+                runtimes:
+                  runtime01:
+                    type: pod
+                    containers:
+                      - image: image01
+
+                tasks:
+                  task01:
+                    runtime: runtime01
+                    environment:
+                      ENV01: ENV01
+
+                pipelines:
+                  pipeline01:
+                    elements:
+                      element01:
+                        task: task01
+                        when:
+                          branch: master
+                          tag:
+                            - v1.x
+                            - v2.x
+                          ref:
+                            include: master
+                            exclude: [ /branch01/ , branch02 ]
+          `,
+			out: &Config{
+				Runtimes: map[string]*Runtime{
+					"runtime01": &Runtime{
+						Name: "runtime01",
+						Type: "pod",
+						Arch: "",
+						Containers: []*Container{
+							&Container{
+								Image:       "image01",
+								Environment: nil,
+								User:        "",
+							},
+						},
+					},
+				},
+				Tasks: map[string]*Task{
+					"task01": &Task{
+						Name:    "task01",
+						Runtime: "runtime01",
+						Environment: map[string]string{
+							"ENV01": "ENV01",
+						},
+						WorkingDir: "",
+						Shell:      "",
+						User:       "",
+						Steps:      []interface{}{},
+					},
+				},
+				Pipelines: map[string]*Pipeline{
+					"pipeline01": &Pipeline{
+						Name: "pipeline01",
+						Elements: map[string]*Element{
+							"element01": &Element{
+								Name:          "element01",
+								Task:          "task01",
+								Depends:       []*Depend{},
+								IgnoreFailure: false,
+								Approval:      false,
+								When: &types.When{
+									Branch: &types.WhenConditions{
+										Include: []types.WhenCondition{
+											{Type: types.WhenConditionTypeSimple, Match: "master"},
+										},
+									},
+									Tag: &types.WhenConditions{
+										Include: []types.WhenCondition{
+											{Type: types.WhenConditionTypeSimple, Match: "v1.x"},
+											{Type: types.WhenConditionTypeSimple, Match: "v2.x"},
+										},
+									},
+									Ref: &types.WhenConditions{
+										Include: []types.WhenCondition{
+											{Type: types.WhenConditionTypeSimple, Match: "master"},
+										},
+										Exclude: []types.WhenCondition{
+											{Type: types.WhenConditionTypeRegExp, Match: "branch01"},
+											{Type: types.WhenConditionTypeSimple, Match: "branch02"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out, err := ParseConfig([]byte(tt.in))
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tt.out, out); diff != "" {
+				t.Error(diff)
 			}
 		})
 	}

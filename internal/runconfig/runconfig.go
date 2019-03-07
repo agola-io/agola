@@ -20,25 +20,26 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/config"
-	"github.com/sorintlab/agola/internal/services/runservice/types"
+	rstypes "github.com/sorintlab/agola/internal/services/runservice/types"
+	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
 	uuid "github.com/satori/go.uuid"
 )
 
-func genRuntime(c *config.Config, runtimeName string) *types.Runtime {
+func genRuntime(c *config.Config, runtimeName string) *rstypes.Runtime {
 	ce := c.Runtime(runtimeName)
 
-	containers := []*types.Container{}
+	containers := []*rstypes.Container{}
 	for _, cc := range ce.Containers {
-		containers = append(containers, &types.Container{
+		containers = append(containers, &rstypes.Container{
 			Image:       cc.Image,
 			Environment: cc.Environment,
 			User:        cc.User,
 		})
 	}
-	return &types.Runtime{
-		Type:       types.RuntimeType(ce.Type),
+	return &rstypes.Runtime{
+		Type:       rstypes.RuntimeType(ce.Type),
 		Containers: containers,
 	}
 }
@@ -89,7 +90,7 @@ fi
 		return rs
 
 	case *config.RunStep:
-		rs := &types.RunStep{}
+		rs := &rstypes.RunStep{}
 
 		rs.Type = cs.Type
 		rs.Name = cs.Name
@@ -101,14 +102,14 @@ fi
 		return rs
 
 	case *config.SaveToWorkspaceStep:
-		sws := &types.SaveToWorkspaceStep{}
+		sws := &rstypes.SaveToWorkspaceStep{}
 
 		sws.Type = cs.Type
 		sws.Name = cs.Name
 
-		sws.Contents = make([]types.SaveToWorkspaceContent, len(cs.Contents))
+		sws.Contents = make([]rstypes.SaveToWorkspaceContent, len(cs.Contents))
 		for i, csc := range cs.Contents {
-			sc := types.SaveToWorkspaceContent{}
+			sc := rstypes.SaveToWorkspaceContent{}
 			sc.SourceDir = csc.SourceDir
 			sc.DestDir = csc.DestDir
 			sc.Paths = csc.Paths
@@ -118,7 +119,7 @@ fi
 		return sws
 
 	case *config.RestoreWorkspaceStep:
-		rws := &types.RestoreWorkspaceStep{}
+		rws := &rstypes.RestoreWorkspaceStep{}
 		rws.Name = cs.Name
 		rws.Type = cs.Type
 		rws.DestDir = cs.DestDir
@@ -132,32 +133,27 @@ fi
 
 // GenRunConfig generates a run config from a pipeline in the config, expanding all the references to tasks
 // this functions assumes that the config is already checked for possible errors (i.e referenced task must exits)
-func GenRunConfig(c *config.Config, pipelineName string, env map[string]string) *types.RunConfig {
+func GenRunConfig(c *config.Config, pipelineName string, env map[string]string, branch, tag, ref string) *rstypes.RunConfig {
 	cp := c.Pipeline(pipelineName)
 
-	rc := &types.RunConfig{
+	rc := &rstypes.RunConfig{
 		Name:        cp.Name,
-		Tasks:       make(map[string]*types.RunConfigTask),
+		Tasks:       make(map[string]*rstypes.RunConfigTask),
 		Environment: env,
 	}
 
 	for _, cpe := range cp.Elements {
+		include := types.MatchWhen(cpe.When, branch, tag, ref)
+
 		// resolve referenced task
 		cpt := c.Task(cpe.Task)
 
-		//environment := map[string]string{}
-		//if ct.Environment != nil {
-		//	environment = ct.Environment
-		//}
-		//mergeEnv(environment, rd.DynamicEnvironment)
-		//// StaticEnvironment variables ovverride every other environment variable
-		//mergeEnv(environment, rd.Environment)
 		steps := make([]interface{}, len(cpt.Steps))
 		for i, cpts := range cpt.Steps {
 			steps[i] = stepFromConfigStep(cpts)
 		}
 
-		t := &types.RunConfigTask{
+		t := &rstypes.RunConfigTask{
 			ID: uuid.NewV4().String(),
 			// use the element name from the config as the task name
 			Name:          cpe.Name,
@@ -168,6 +164,7 @@ func GenRunConfig(c *config.Config, pipelineName string, env map[string]string) 
 			User:          cpt.User,
 			Steps:         steps,
 			IgnoreFailure: cpe.IgnoreFailure,
+			Skip:          !include,
 		}
 
 		rc.Tasks[t.ID] = t
@@ -177,27 +174,27 @@ func GenRunConfig(c *config.Config, pipelineName string, env map[string]string) 
 	for _, rct := range rc.Tasks {
 		cpe := cp.Elements[rct.Name]
 
-		depends := make([]*types.RunConfigTaskDepend, len(cpe.Depends))
+		depends := make([]*rstypes.RunConfigTaskDepend, len(cpe.Depends))
 		for id, d := range cpe.Depends {
-			conditions := make([]types.RunConfigTaskDependCondition, len(d.Conditions))
+			conditions := make([]rstypes.RunConfigTaskDependCondition, len(d.Conditions))
 			// when no conditions are defined default to on_success
 			if len(d.Conditions) == 0 {
-				conditions = append(conditions, types.RunConfigTaskDependConditionOnSuccess)
+				conditions = append(conditions, rstypes.RunConfigTaskDependConditionOnSuccess)
 			} else {
 				for ic, c := range d.Conditions {
-					var condition types.RunConfigTaskDependCondition
+					var condition rstypes.RunConfigTaskDependCondition
 					switch c {
 					case config.DependConditionOnSuccess:
-						condition = types.RunConfigTaskDependConditionOnSuccess
+						condition = rstypes.RunConfigTaskDependConditionOnSuccess
 					case config.DependConditionOnFailure:
-						condition = types.RunConfigTaskDependConditionOnFailure
+						condition = rstypes.RunConfigTaskDependConditionOnFailure
 					}
 					conditions[ic] = condition
 				}
 			}
 
 			drct := getRunConfigTaskByName(rc, d.ElementName)
-			depends[id] = &types.RunConfigTaskDepend{
+			depends[id] = &rstypes.RunConfigTaskDepend{
 				TaskID:     drct.ID,
 				Conditions: conditions,
 			}
@@ -209,7 +206,7 @@ func GenRunConfig(c *config.Config, pipelineName string, env map[string]string) 
 	return rc
 }
 
-func getRunConfigTaskByName(rc *types.RunConfig, name string) *types.RunConfigTask {
+func getRunConfigTaskByName(rc *rstypes.RunConfig, name string) *rstypes.RunConfigTask {
 	for _, rct := range rc.Tasks {
 		if rct.Name == name {
 			return rct
@@ -218,7 +215,7 @@ func getRunConfigTaskByName(rc *types.RunConfig, name string) *types.RunConfigTa
 	return nil
 }
 
-func CheckRunConfig(rc *types.RunConfig) error {
+func CheckRunConfig(rc *rstypes.RunConfig) error {
 	// check circular dependencies
 	cerrs := &util.Errors{}
 	for _, t := range rc.Tasks {
@@ -262,7 +259,7 @@ func CheckRunConfig(rc *types.RunConfig) error {
 	return nil
 }
 
-func GenTasksLevels(rc *types.RunConfig) error {
+func GenTasksLevels(rc *rstypes.RunConfig) error {
 	// reset all task level
 	for _, t := range rc.Tasks {
 		t.Level = -1
@@ -308,8 +305,8 @@ func GenTasksLevels(rc *types.RunConfig) error {
 }
 
 // GetParents returns direct parents of task.
-func GetParents(rc *types.RunConfig, task *types.RunConfigTask) []*types.RunConfigTask {
-	parents := []*types.RunConfigTask{}
+func GetParents(rc *rstypes.RunConfig, task *rstypes.RunConfigTask) []*rstypes.RunConfigTask {
+	parents := []*rstypes.RunConfigTask{}
 	for _, t := range rc.Tasks {
 		isParent := false
 		for _, d := range task.Depends {
@@ -327,13 +324,13 @@ func GetParents(rc *types.RunConfig, task *types.RunConfigTask) []*types.RunConf
 // GetAllParents returns all the parents (both direct and ancestors) of task.
 // In case of circular dependency it won't loop forever but will also return
 // task as parent of itself
-func GetAllParents(rc *types.RunConfig, task *types.RunConfigTask) []*types.RunConfigTask {
-	pMap := map[string]*types.RunConfigTask{}
+func GetAllParents(rc *rstypes.RunConfig, task *rstypes.RunConfigTask) []*rstypes.RunConfigTask {
+	pMap := map[string]*rstypes.RunConfigTask{}
 	nextParents := GetParents(rc, task)
 
 	for len(nextParents) > 0 {
 		parents := nextParents
-		nextParents = []*types.RunConfigTask{}
+		nextParents = []*rstypes.RunConfigTask{}
 		for _, parent := range parents {
 			if _, ok := pMap[parent.ID]; ok {
 				continue
@@ -343,7 +340,7 @@ func GetAllParents(rc *types.RunConfig, task *types.RunConfigTask) []*types.RunC
 		}
 	}
 
-	parents := make([]*types.RunConfigTask, 0, len(pMap))
+	parents := make([]*rstypes.RunConfigTask, 0, len(pMap))
 	for _, v := range pMap {
 		parents = append(parents, v)
 	}

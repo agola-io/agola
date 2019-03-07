@@ -95,6 +95,9 @@ func (s *Scheduler) advanceRunTasks(ctx context.Context, r *types.Run) error {
 	// get tasks that can be executed
 	for _, rt := range r.RunTasks {
 		log.Debugf("rt: %s", util.Dump(rt))
+		if rt.Skip {
+			continue
+		}
 		if rt.Status != types.RunTaskStatusNotStarted {
 			continue
 		}
@@ -105,6 +108,9 @@ func (s *Scheduler) advanceRunTasks(ctx context.Context, r *types.Run) error {
 		for _, p := range parents {
 			rp := r.RunTasks[p.ID]
 			canRun = rp.Status.IsFinished() && rp.ArchivesFetchFinished()
+			if rp.Status == types.RunTaskStatusSkipped {
+				rt.Status = types.RunTaskStatusSkipped
+			}
 		}
 
 		if canRun {
@@ -672,7 +678,9 @@ func (s *Scheduler) fetchLog(ctx context.Context, rt *types.RunTask, stepnum int
 		return err
 	}
 	if et == nil {
-		log.Errorf("executor task with id %q doesn't exist. This shouldn't happen. Skipping fetching", rt.ID)
+		if !rt.Skip {
+			log.Errorf("executor task with id %q doesn't exist. This shouldn't happen. Skipping fetching", rt.ID)
+		}
 		return nil
 	}
 	executor, err := store.GetExecutor(ctx, s.e, et.Status.ExecutorID)

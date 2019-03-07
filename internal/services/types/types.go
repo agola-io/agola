@@ -15,6 +15,7 @@
 package types
 
 import (
+	"regexp"
 	"time"
 )
 
@@ -135,4 +136,83 @@ type Project struct {
 	SSHPrivateKey string `json:"ssh_private_key,omitempty"` // PEM Encoded private key
 
 	SkipSSHHostKeyCheck bool `json:"skip_ssh_host_key_check,omitempty"`
+}
+
+type When struct {
+	Branch *WhenConditions `json:"branch,omitempty"`
+	Tag    *WhenConditions `json:"tag,omitempty"`
+	Ref    *WhenConditions `json:"ref,omitempty"`
+}
+
+type WhenConditions struct {
+	Include []WhenCondition `json:"include,omitempty"`
+	Exclude []WhenCondition `json:"exclude,omitempty"`
+}
+
+type WhenConditionType string
+
+const (
+	WhenConditionTypeSimple WhenConditionType = "simple"
+	WhenConditionTypeRegExp WhenConditionType = "regexp"
+)
+
+type WhenCondition struct {
+	Type  WhenConditionType
+	Match string
+}
+
+func MatchWhen(when *When, branch, tag, ref string) bool {
+	include := true
+	if when != nil {
+		include = false
+		if when.Branch != nil {
+			// first check includes and override with excludes
+			if matchCondition(when.Branch.Include, branch) {
+				include = true
+			}
+			if matchCondition(when.Branch.Exclude, branch) {
+				include = false
+			}
+		}
+		if when.Tag != nil {
+			// first check includes and override with excludes
+			if matchCondition(when.Tag.Include, tag) {
+				include = true
+			}
+			if matchCondition(when.Tag.Exclude, tag) {
+				include = false
+			}
+		}
+		if when.Ref != nil {
+			// first check includes and override with excludes
+			if matchCondition(when.Ref.Include, ref) {
+				include = true
+			}
+			if matchCondition(when.Ref.Exclude, ref) {
+				include = false
+			}
+		}
+	}
+
+	return include
+}
+
+func matchCondition(conds []WhenCondition, s string) bool {
+	for _, cond := range conds {
+		switch cond.Type {
+		case WhenConditionTypeSimple:
+			if cond.Match == s {
+				return true
+			}
+		case WhenConditionTypeRegExp:
+			re, err := regexp.Compile(cond.Match)
+			if err != nil {
+				panic(err)
+			}
+			if re.MatchString(s) {
+				return true
+			}
+		}
+	}
+	return false
 }
