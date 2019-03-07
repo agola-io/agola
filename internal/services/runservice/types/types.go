@@ -136,6 +136,7 @@ type RunTaskStatus string
 
 const (
 	RunTaskStatusNotStarted RunTaskStatus = "notstarted"
+	RunTaskStatusSkipped    RunTaskStatus = "skipped"
 	RunTaskStatusCancelled  RunTaskStatus = "cancelled"
 	RunTaskStatusRunning    RunTaskStatus = "running"
 	RunTaskStatusStopped    RunTaskStatus = "stopped"
@@ -144,7 +145,7 @@ const (
 )
 
 func (s RunTaskStatus) IsFinished() bool {
-	return s == RunTaskStatusCancelled || s == RunTaskStatusStopped || s == RunTaskStatusSuccess || s == RunTaskStatusFailed
+	return s == RunTaskStatusCancelled || s == RunTaskStatusSkipped || s == RunTaskStatusStopped || s == RunTaskStatusSuccess || s == RunTaskStatusFailed
 }
 
 type RunTaskFetchPhase string
@@ -163,6 +164,8 @@ type RunTask struct {
 	// So don't rely to know if a runtask is really not running but also check that
 	// there're no executor tasks scheduled
 	Status RunTaskStatus `json:"status,omitempty"`
+
+	Skip bool `json:"skip,omitempty"`
 
 	WaitingApproval bool `json:"waiting_approval,omitempty"`
 	Approved        bool `json:"approved,omitempty"`
@@ -254,6 +257,7 @@ type RunConfigTask struct {
 	Steps         []interface{}          `json:"steps,omitempty"`
 	IgnoreFailure bool                   `json:"ignore_failure,omitempty"`
 	NeedsApproval bool                   `json:"needs_approval,omitempty"`
+	Skip          bool                   `json:"skip,omitempty"`
 }
 
 type RunConfigTaskDependCondition string
