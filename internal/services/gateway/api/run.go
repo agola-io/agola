@@ -336,6 +336,7 @@ type RunActionType string
 
 const (
 	RunActionTypeRestart RunActionType = "restart"
+	RunActionTypeStop    RunActionType = "stop"
 )
 
 type RunActionsRequest struct {
@@ -374,6 +375,21 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		resp, err := h.runserviceClient.CreateRun(ctx, req)
+		if err != nil {
+			if resp != nil && resp.StatusCode == http.StatusNotFound {
+				http.Error(w, err.Error(), http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+	case RunActionTypeStop:
+		req := &rsapi.RunActionsRequest{
+			ActionType: rsapi.RunActionTypeStop,
+		}
+
+		resp, err := h.runserviceClient.RunActions(ctx, runID, req)
 		if err != nil {
 			if resp != nil && resp.StatusCode == http.StatusNotFound {
 				http.Error(w, err.Error(), http.StatusNotFound)

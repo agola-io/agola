@@ -484,6 +484,7 @@ type RunActionType string
 
 const (
 	RunActionTypeChangePhase RunActionType = "changephase"
+	RunActionTypeStop        RunActionType = "stop"
 )
 
 type RunActionsRequest struct {
@@ -511,7 +512,6 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	runID := vars["runid"]
 
-	// TODO(sgotti) Check authorized call from client
 	var req RunActionsRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
@@ -527,6 +527,15 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			ChangeGroupsUpdateToken: req.ChangeGroupsUpdateToken,
 		}
 		if err := h.ch.ChangeRunPhase(ctx, creq); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	case RunActionTypeStop:
+		creq := &command.RunStopRequest{
+			RunID:                   runID,
+			ChangeGroupsUpdateToken: req.ChangeGroupsUpdateToken,
+		}
+		if err := h.ch.StopRun(ctx, creq); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}

@@ -42,8 +42,6 @@ const (
 	RunPhaseCancelled RunPhase = "cancelled"
 	RunPhaseRunning   RunPhase = "running"
 	RunPhaseFinished  RunPhase = "finished"
-	//RunPhaseSuccess   RunPhase = "success"
-	//RunPhaseFailed    RunPhase = "failed"
 )
 
 type RunResult string
@@ -98,6 +96,9 @@ type Run struct {
 
 	// Result of a Run.
 	Result RunResult `json:"result,omitempty"`
+
+	// Stop is used to signal from the scheduler when the run must be stopped
+	Stop bool `json:"stop,omitempty"`
 
 	RunTasks    map[string]*RunTask `json:"run_tasks,omitempty"`
 	EnqueueTime *time.Time          `json:"enqueue_time,omitempty"`

@@ -352,6 +352,10 @@ func (s *Scheduler) advanceRun(ctx context.Context, runID string) error {
 			return nil
 		}
 
+		if r.Stop {
+			r.Result = types.RunResultStopped
+		}
+
 		if _, err := store.AtomicPutRun(ctx, s.e, r, "", nil); err != nil {
 			return err
 		}

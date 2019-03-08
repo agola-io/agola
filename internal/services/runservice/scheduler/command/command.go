@@ -72,6 +72,39 @@ func (s *CommandHandler) ChangeRunPhase(ctx context.Context, req *RunChangePhase
 			return errors.Errorf("run %s is not queued but in %q phase", r.ID, r.Phase)
 		}
 		r.ChangePhase(types.RunPhaseRunning)
+	case types.RunPhaseFinished:
+		if r.Phase != types.RunPhaseRunning {
+			return errors.Errorf("run %s is not running but in %q phase", r.ID, r.Phase)
+		}
+		r.Stop = true
+	}
+
+	_, err = store.AtomicPutRun(ctx, s.e, r, "", cgt)
+	return err
+}
+
+type RunStopRequest struct {
+	RunID                   string
+	ChangeGroupsUpdateToken string
+}
+
+func (s *CommandHandler) StopRun(ctx context.Context, req *RunStopRequest) error {
+	cgt, err := types.UnmarshalChangeGroupsUpdateToken(req.ChangeGroupsUpdateToken)
+	if err != nil {
+		return err
+	}
+
+	r, _, err := store.GetRun(ctx, s.e, req.RunID)
+	if err != nil {
+		return err
+	}
+
+	if r.Phase != types.RunPhaseRunning {
+		return errors.Errorf("run %s is not running but in %q phase", r.ID, r.Phase)
+	}
+	if !r.Result.IsSet() {
+		// stop only if the result is not setted yet
+		r.Stop = true
 	}
 
 	_, err = store.AtomicPutRun(ctx, s.e, r, "", cgt)
@@ -191,6 +224,7 @@ func (s *CommandHandler) recreateRun(ctx context.Context, req *RunCreateRequest)
 	run.Phase = types.RunPhaseQueued
 	run.Result = types.RunResultUnknown
 	run.Archived = false
+	run.Stop = false
 
 	// TODO(sgotti) handle reset tasks
 	// currently we only restart a run resetting al failed tasks
