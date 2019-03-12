@@ -15,9 +15,11 @@
 package util
 
 import (
+	"fmt"
 	"strings"
 )
 
+// Errors is an error that contains multiple errors
 type Errors struct {
 	Errs []error
 }
@@ -53,4 +55,23 @@ func (e *Errors) Equal(e2 error) bool {
 	}
 
 	return CompareStringSliceNoOrder(errs1, errs2)
+}
+
+// ErrBadRequest represent an error caused by a bad command request
+// it's used to differentiate an internal error from an user error
+type ErrBadRequest struct {
+	Err error
+}
+
+func (e *ErrBadRequest) Error() string {
+	return fmt.Sprintf("bad request: %s", e.Err.Error())
+}
+
+func NewErrBadRequest(err error) *ErrBadRequest {
+	return &ErrBadRequest{Err: err}
+}
+
+func IsErrBadRequest(err error) bool {
+	_, ok := err.(*ErrBadRequest)
+	return ok
 }

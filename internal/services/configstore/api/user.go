@@ -34,6 +34,19 @@ type UserHandler struct {
 	readDB *readdb.ReadDB
 }
 
+func httpError(w http.ResponseWriter, err error) bool {
+	if err != nil {
+		if util.IsErrBadRequest(err) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		} else {
+			http.Error(w, "", http.StatusInternalServerError)
+		}
+		return true
+	}
+
+	return false
+}
+
 func NewUserHandler(logger *zap.Logger, readDB *readdb.ReadDB) *UserHandler {
 	return &UserHandler{log: logger.Sugar(), readDB: readDB}
 }
@@ -123,9 +136,8 @@ func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user, err := h.ch.CreateUser(ctx, &req)
-	if err != nil {
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -152,10 +164,9 @@ func (h *DeleteUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userName := vars["username"]
 
-	if err := h.ch.DeleteUser(ctx, userName); err != nil {
+	err := h.ch.DeleteUser(ctx, userName)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
 	}
 }
 
@@ -325,9 +336,8 @@ func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		UserAccessToken:    req.UserAccessToken,
 	}
 	user, err := h.ch.CreateUserLA(ctx, creq)
-	if err != nil {
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -353,10 +363,9 @@ func (h *DeleteUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	userName := vars["username"]
 	laID := vars["laid"]
 
-	if err := h.ch.DeleteUserLA(ctx, userName, laID); err != nil {
+	err := h.ch.DeleteUserLA(ctx, userName, laID)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
 	}
 }
 
@@ -400,9 +409,8 @@ func (h *UpdateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		UserAccessToken:    req.UserAccessToken,
 	}
 	user, err := h.ch.UpdateUserLA(ctx, creq)
-	if err != nil {
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -443,9 +451,8 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	}
 
 	token, err := h.ch.CreateUserToken(ctx, userName, req.TokenName)
-	if err != nil {
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 

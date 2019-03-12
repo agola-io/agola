@@ -52,7 +52,7 @@ func shutdownEtcd(tetcd *testutil.TestEmbeddedEtcd) {
 	}
 }
 
-func setupConfigstore(t *testing.T, ctx context.Context, dir string) (*ConfigStore, *testutil.TestEtcd) {
+func setupConfigstore(t *testing.T, ctx context.Context, dir string) (*ConfigStore, *testutil.TestEmbeddedEtcd) {
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	tetcd := setupEtcd(t, etcdDir)
 
@@ -320,7 +320,7 @@ func TestUser(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	t.Run("create duplicated user", func(t *testing.T) {
-		expectedErr := fmt.Sprintf("user with name %q already exists", "user01")
+		expectedErr := fmt.Sprintf("bad request: user with name %q already exists", "user01")
 		_, err := cs.ch.CreateUser(ctx, &types.User{UserName: "user01"})
 		if err == nil {
 			t.Fatalf("expected error %v, got nil err", expectedErr)
@@ -403,42 +403,42 @@ func TestProject(t *testing.T) {
 		}
 	})
 	t.Run("create duplicated project for user", func(t *testing.T) {
-		expectedErr := fmt.Sprintf("project with name %q for user with id %q already exists", "project01", user.ID)
+		expectedErr := fmt.Sprintf("bad request: project with name %q for user with id %q already exists", "project01", user.ID)
 		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", OwnerType: "user", OwnerID: user.ID})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
 	})
 	t.Run("create duplicated project for org", func(t *testing.T) {
-		expectedErr := fmt.Sprintf("project with name %q for organization with id %q already exists", "project01", org.ID)
+		expectedErr := fmt.Sprintf("bad request: project with name %q for organization with id %q already exists", "project01", org.ID)
 		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", OwnerType: "organization", OwnerID: org.ID})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
 	})
 	t.Run("create project with owner as unexistent user", func(t *testing.T) {
-		expectedErr := `user id "unexistentid" doesn't exist`
+		expectedErr := `bad request: user id "unexistentid" doesn't exist`
 		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", OwnerType: "user", OwnerID: "unexistentid"})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
 	})
 	t.Run("create project with owner as unexistent org", func(t *testing.T) {
-		expectedErr := `organization id "unexistentid" doesn't exist`
+		expectedErr := `bad request: organization id "unexistentid" doesn't exist`
 		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", OwnerType: "organization", OwnerID: "unexistentid"})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
 	})
 	t.Run("create project without ownertype specified", func(t *testing.T) {
-		expectedErr := "project ownertype required"
+		expectedErr := "bad request: project ownertype required"
 		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01"})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
 	})
 	t.Run("create project without ownerid specified", func(t *testing.T) {
-		expectedErr := "project ownerid required"
+		expectedErr := "bad request: project ownerid required"
 		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", OwnerType: "organization"})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
