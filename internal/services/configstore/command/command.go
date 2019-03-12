@@ -49,16 +49,16 @@ func NewCommandHandler(logger *zap.Logger, readDB *readdb.ReadDB, wal *wal.WalMa
 
 func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Project) (*types.Project, error) {
 	if project.Name == "" {
-		return nil, errors.Errorf("project name required")
+		return nil, util.NewErrBadRequest(errors.Errorf("project name required"))
 	}
 	if project.OwnerType == "" {
-		return nil, errors.Errorf("project ownertype required")
+		return nil, util.NewErrBadRequest(errors.Errorf("project ownertype required"))
 	}
 	if project.OwnerID == "" {
-		return nil, errors.Errorf("project ownerid required")
+		return nil, util.NewErrBadRequest(errors.Errorf("project ownerid required"))
 	}
 	if !types.IsValidOwnerType(project.OwnerType) {
-		return nil, errors.Errorf("invalid project ownertype %q", project.OwnerType)
+		return nil, util.NewErrBadRequest(errors.Errorf("invalid project ownertype %q", project.OwnerType))
 	}
 
 	var cgt *wal.ChangeGroupsUpdateToken
@@ -80,7 +80,7 @@ func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Proje
 				return err
 			}
 			if user == nil {
-				return errors.Errorf("user id %q doesn't exist", project.OwnerID)
+				return util.NewErrBadRequest(errors.Errorf("user id %q doesn't exist", project.OwnerID))
 			}
 		case types.OwnerTypeOrganization:
 			org, err := s.readDB.GetOrg(tx, project.OwnerID)
@@ -88,7 +88,7 @@ func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Proje
 				return err
 			}
 			if org == nil {
-				return errors.Errorf("organization id %q doesn't exist", project.OwnerID)
+				return util.NewErrBadRequest(errors.Errorf("organization id %q doesn't exist", project.OwnerID))
 			}
 		}
 		// check duplicate project name
@@ -97,7 +97,7 @@ func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Proje
 			return err
 		}
 		if p != nil {
-			return errors.Errorf("project with name %q for %s with id %q already exists", p.Name, project.OwnerType, project.OwnerID)
+			return util.NewErrBadRequest(errors.Errorf("project with name %q for %s with id %q already exists", p.Name, project.OwnerType, project.OwnerID))
 		}
 		return nil
 	})
@@ -143,7 +143,7 @@ func (s *CommandHandler) DeleteProject(ctx context.Context, projectID string) er
 			return err
 		}
 		if project == nil {
-			return errors.Errorf("project %q doesn't exist", projectID)
+			return util.NewErrBadRequest(errors.Errorf("project %q doesn't exist", projectID))
 		}
 		return nil
 	})
@@ -164,7 +164,7 @@ func (s *CommandHandler) DeleteProject(ctx context.Context, projectID string) er
 
 func (s *CommandHandler) CreateUser(ctx context.Context, user *types.User) (*types.User, error) {
 	if user.UserName == "" {
-		return nil, errors.Errorf("user name required")
+		return nil, util.NewErrBadRequest(errors.Errorf("user name required"))
 	}
 
 	var cgt *wal.ChangeGroupsUpdateToken
@@ -184,7 +184,7 @@ func (s *CommandHandler) CreateUser(ctx context.Context, user *types.User) (*typ
 			return err
 		}
 		if u != nil {
-			return errors.Errorf("user with name %q already exists", u.UserName)
+			return util.NewErrBadRequest(errors.Errorf("user with name %q already exists", u.UserName))
 		}
 		return nil
 	})
@@ -230,7 +230,7 @@ func (s *CommandHandler) DeleteUser(ctx context.Context, userName string) error 
 			return err
 		}
 		if user == nil {
-			return errors.Errorf("user %q doesn't exist", userName)
+			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", userName))
 		}
 		return nil
 	})
@@ -263,10 +263,10 @@ type CreateUserLARequest struct {
 
 func (s *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequest) (*types.LinkedAccount, error) {
 	if req.UserName == "" {
-		return nil, errors.Errorf("user name required")
+		return nil, util.NewErrBadRequest(errors.Errorf("user name required"))
 	}
 	if req.RemoteSourceName == "" {
-		return nil, errors.Errorf("remote source name required")
+		return nil, util.NewErrBadRequest(errors.Errorf("remote source name required"))
 	}
 
 	var user *types.User
@@ -282,7 +282,7 @@ func (s *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequ
 			return err
 		}
 		if user == nil {
-			return errors.Errorf("user %q doesn't exist", req.UserName)
+			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", req.UserName))
 		}
 
 		cgNames := []string{user.ID}
@@ -296,7 +296,7 @@ func (s *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequ
 			return err
 		}
 		if rs == nil {
-			return errors.Errorf("remote source %q doesn't exist", req.RemoteSourceName)
+			return util.NewErrBadRequest(errors.Errorf("remote source %q doesn't exist", req.RemoteSourceName))
 		}
 		return nil
 	})
@@ -338,10 +338,10 @@ func (s *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequ
 
 func (s *CommandHandler) DeleteUserLA(ctx context.Context, userName, laID string) error {
 	if userName == "" {
-		return errors.Errorf("user name required")
+		return util.NewErrBadRequest(errors.Errorf("user name required"))
 	}
 	if laID == "" {
-		return errors.Errorf("user linked account id required")
+		return util.NewErrBadRequest(errors.Errorf("user linked account id required"))
 	}
 
 	var user *types.User
@@ -356,7 +356,7 @@ func (s *CommandHandler) DeleteUserLA(ctx context.Context, userName, laID string
 			return err
 		}
 		if user == nil {
-			return errors.Errorf("user %q doesn't exist", userName)
+			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", userName))
 		}
 
 		cgNames := []string{user.ID}
@@ -373,7 +373,7 @@ func (s *CommandHandler) DeleteUserLA(ctx context.Context, userName, laID string
 
 	_, ok := user.LinkedAccounts[laID]
 	if !ok {
-		return errors.Errorf("linked account id %q for user %q doesn't exist", laID, userName)
+		return util.NewErrBadRequest(errors.Errorf("linked account id %q for user %q doesn't exist", laID, userName))
 	}
 
 	delete(user.LinkedAccounts, laID)
@@ -406,7 +406,7 @@ type UpdateUserLARequest struct {
 
 func (s *CommandHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLARequest) (*types.LinkedAccount, error) {
 	if req.UserName == "" {
-		return nil, errors.Errorf("user name required")
+		return nil, util.NewErrBadRequest(errors.Errorf("user name required"))
 	}
 
 	var user *types.User
@@ -422,7 +422,7 @@ func (s *CommandHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLARequ
 			return err
 		}
 		if user == nil {
-			return errors.Errorf("user %q doesn't exist", req.UserName)
+			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", req.UserName))
 		}
 
 		cgNames := []string{user.ID}
@@ -433,7 +433,7 @@ func (s *CommandHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLARequ
 
 		la, ok := user.LinkedAccounts[req.LinkedAccountID]
 		if !ok {
-			return errors.Errorf("linked account id %q for user %q doesn't exist", req.LinkedAccountID, user.UserName)
+			return util.NewErrBadRequest(errors.Errorf("linked account id %q for user %q doesn't exist", req.LinkedAccountID, user.UserName))
 		}
 
 		rs, err = s.readDB.GetRemoteSource(tx, la.RemoteSourceID)
@@ -441,7 +441,7 @@ func (s *CommandHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLARequ
 			return err
 		}
 		if rs == nil {
-			return errors.Errorf("remote source with id %q doesn't exist", la.RemoteSourceID)
+			return util.NewErrBadRequest(errors.Errorf("remote source with id %q doesn't exist", la.RemoteSourceID))
 		}
 		return nil
 	})
@@ -475,7 +475,7 @@ func (s *CommandHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLARequ
 
 func (s *CommandHandler) CreateUserToken(ctx context.Context, userName, tokenName string) (string, error) {
 	if userName == "" {
-		return "", errors.Errorf("user name required")
+		return "", util.NewErrBadRequest(errors.Errorf("user name required"))
 	}
 
 	var user *types.User
@@ -490,7 +490,7 @@ func (s *CommandHandler) CreateUserToken(ctx context.Context, userName, tokenNam
 			return err
 		}
 		if user == nil {
-			return errors.Errorf("user %q doesn't exist", userName)
+			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", userName))
 		}
 
 		cgNames := []string{user.ID}
@@ -531,7 +531,7 @@ func (s *CommandHandler) CreateUserToken(ctx context.Context, userName, tokenNam
 
 func (s *CommandHandler) CreateRemoteSource(ctx context.Context, remoteSource *types.RemoteSource) (*types.RemoteSource, error) {
 	if remoteSource.Name == "" {
-		return nil, errors.Errorf("remotesource name required")
+		return nil, util.NewErrBadRequest(errors.Errorf("remotesource name required"))
 	}
 
 	var cgt *wal.ChangeGroupsUpdateToken
@@ -551,7 +551,7 @@ func (s *CommandHandler) CreateRemoteSource(ctx context.Context, remoteSource *t
 			return err
 		}
 		if u != nil {
-			return errors.Errorf("remoteSource %q already exists", u.Name)
+			return util.NewErrBadRequest(errors.Errorf("remoteSource %q already exists", u.Name))
 		}
 		return nil
 	})
@@ -597,7 +597,7 @@ func (s *CommandHandler) DeleteRemoteSource(ctx context.Context, remoteSourceNam
 			return err
 		}
 		if remoteSource == nil {
-			return errors.Errorf("remotesource %q doesn't exist", remoteSourceName)
+			return util.NewErrBadRequest(errors.Errorf("remotesource %q doesn't exist", remoteSourceName))
 		}
 		return nil
 	})
@@ -619,7 +619,7 @@ func (s *CommandHandler) DeleteRemoteSource(ctx context.Context, remoteSourceNam
 
 func (s *CommandHandler) CreateOrg(ctx context.Context, org *types.Organization) (*types.Organization, error) {
 	if org.Name == "" {
-		return nil, errors.Errorf("org name required")
+		return nil, util.NewErrBadRequest(errors.Errorf("org name required"))
 	}
 
 	var cgt *wal.ChangeGroupsUpdateToken
@@ -639,7 +639,7 @@ func (s *CommandHandler) CreateOrg(ctx context.Context, org *types.Organization)
 			return err
 		}
 		if u != nil {
-			return errors.Errorf("org %q already exists", u.Name)
+			return util.NewErrBadRequest(errors.Errorf("org %q already exists", u.Name))
 		}
 		return nil
 	})
@@ -686,7 +686,7 @@ func (s *CommandHandler) DeleteOrg(ctx context.Context, orgName string) error {
 			return err
 		}
 		if org == nil {
-			return errors.Errorf("org %q doesn't exist", orgName)
+			return util.NewErrBadRequest(errors.Errorf("org %q doesn't exist", orgName))
 		}
 		// get org projects
 		projects, err = s.readDB.GetOwnerProjects(tx, org.ID, "", 0, false)
