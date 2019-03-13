@@ -52,6 +52,8 @@ type RunServiceScheduler struct {
 	Web     Web    `yaml:"web"`
 	Etcd    Etcd   `yaml:"etcd"`
 	LTS     LTS    `yaml:"lts"`
+
+	AllowPrivilegedContainers string `yaml:"allowPrivilegedContainers"`
 }
 
 type RunServiceExecutor struct {
