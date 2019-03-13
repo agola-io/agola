@@ -425,6 +425,7 @@ type Container struct {
 	Environment map[string]string `json:"environment,omitempty"`
 	User        string            `json:"user,omitempty"`
 	Privileged  bool              `json:"privileged"`
+	Entrypoint  string            `json:"entrypoint"`
 }
 
 type Workspace []WorkspaceLevel

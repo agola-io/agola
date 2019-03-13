@@ -37,6 +37,7 @@ func genRuntime(c *config.Config, runtimeName string) *rstypes.Runtime {
 			Environment: cc.Environment,
 			User:        cc.User,
 			Privileged:  cc.Privileged,
+			Entrypoint:  cc.Entrypoint,
 		})
 	}
 	return &rstypes.Runtime{

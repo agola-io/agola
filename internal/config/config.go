@@ -71,6 +71,7 @@ type Container struct {
 	Environment map[string]string `yaml:"environment,omitempty"`
 	User        string            `yaml:"user"`
 	Privileged  bool              `yaml:"privileged"`
+	Entrypoint  string            `yaml:"entrypoint"`
 }
 
 type Pipeline struct {
