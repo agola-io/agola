@@ -79,6 +79,7 @@ type ContainerConfig struct {
 	WorkingDir   string
 	Image        string
 	User         string
+	Privileged   bool
 	RegistryAuth string
 }
 
