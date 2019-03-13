@@ -441,6 +441,12 @@ func (e *Executor) executeTask(ctx context.Context, et *types.ExecutorTask) {
 		return
 	}
 
+	cmd := []string{toolboxContainerPath, "sleeper"}
+	if et.Containers[0].Entrypoint != "" {
+		cmd = strings.Split(et.Containers[0].Entrypoint, " ")
+		log.Infof("cmd: %v", cmd)
+	}
+
 	log.Debugf("starting pod")
 	podConfig := &driver.PodConfig{
 		Labels:        createTaskLabels(et.ID),
@@ -448,7 +454,7 @@ func (e *Executor) executeTask(ctx context.Context, et *types.ExecutorTask) {
 		Containers: []*driver.ContainerConfig{
 			{
 				Image:      et.Containers[0].Image,
-				Cmd:        []string{toolboxContainerPath, "sleeper"},
+				Cmd:        cmd,
 				Env:        et.Containers[0].Environment,
 				WorkingDir: et.WorkingDir,
 				User:       et.Containers[0].User,
