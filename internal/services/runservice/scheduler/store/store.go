@@ -129,8 +129,16 @@ func LTSUpdateRunCounterAction(ctx context.Context, c uint64, group string) (*wa
 	return action, nil
 }
 
-func LTSRunLogPath(rtID string, step int) string {
-	return path.Join("logs", fmt.Sprintf("%s/%d.log", rtID, step))
+func LTSRunTaskLogsDir(rtID string) string {
+	return path.Join("logs", rtID)
+}
+
+func LTSRunTaskSetupLogPath(rtID string) string {
+	return path.Join(LTSRunTaskLogsDir(rtID), "setup.log")
+}
+
+func LTSRunTaskStepLogPath(rtID string, step int) string {
+	return path.Join(LTSRunTaskLogsDir(rtID), "steps", fmt.Sprintf("%d.log", step))
 }
 
 func LTSRunArchivePath(rtID string, step int) string {

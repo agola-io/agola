@@ -381,11 +381,12 @@ func (s *Scheduler) advanceRun(ctx context.Context, runID string) error {
 		}
 
 		// if the run is finished AND there're no executor tasks scheduled we can mark
-		// all not started runtasks' fetch phases (logs and archives) as finished
+		// all not started runtasks' fetch phases (setup step, logs and archives) as finished
 		if r.Phase.IsFinished() {
 			for _, rt := range r.RunTasks {
 				log.Debugf("rt: %s", util.Dump(rt))
 				if rt.Status == types.RunTaskStatusNotStarted {
+					rt.SetupStep.LogPhase = types.RunTaskFetchPhaseFinished
 					for _, s := range rt.Steps {
 						s.LogPhase = types.RunTaskFetchPhaseFinished
 					}
@@ -482,6 +483,10 @@ func (s *Scheduler) updateRunStatus(ctx context.Context, et *types.ExecutorTask)
 	case types.ExecutorTaskPhaseFailed:
 		rt.Status = types.RunTaskStatusFailed
 	}
+
+	rt.SetupStep.Phase = et.Status.SetupStep.Phase
+	rt.SetupStep.StartTime = et.Status.SetupStep.StartTime
+	rt.SetupStep.EndTime = et.Status.SetupStep.EndTime
 
 	for i, s := range et.Status.Steps {
 		rt.Steps[i].Phase = s.Phase
@@ -676,7 +681,7 @@ func (s *Scheduler) fileExists(path string) (bool, error) {
 	return !os.IsNotExist(err), nil
 }
 
-func (s *Scheduler) fetchLog(ctx context.Context, rt *types.RunTask, stepnum int) error {
+func (s *Scheduler) fetchLog(ctx context.Context, rt *types.RunTask, setup bool, stepnum int) error {
 	et, err := store.GetExecutorTask(ctx, s.e, rt.ID)
 	if err != nil && err != etcd.ErrKeyNotFound {
 		return err
@@ -696,8 +701,13 @@ func (s *Scheduler) fetchLog(ctx context.Context, rt *types.RunTask, stepnum int
 		return nil
 	}
 
-	path := store.LTSRunLogPath(rt.ID, stepnum)
-	ok, err := s.fileExists(path)
+	var logPath string
+	if setup {
+		logPath = store.LTSRunTaskSetupLogPath(rt.ID)
+	} else {
+		logPath = store.LTSRunTaskStepLogPath(rt.ID, stepnum)
+	}
+	ok, err := s.fileExists(logPath)
 	if err != nil {
 		return err
 	}
@@ -705,8 +715,12 @@ func (s *Scheduler) fetchLog(ctx context.Context, rt *types.RunTask, stepnum int
 		return nil
 	}
 
-	u := fmt.Sprintf(executor.ListenURL+"/api/v1alpha/executor/logs?taskid=%s&step=%d", rt.ID, stepnum)
-	log.Debugf("fetchLog: %s", u)
+	var u string
+	if setup {
+		u = fmt.Sprintf(executor.ListenURL+"/api/v1alpha/executor/logs?taskid=%s&setup", rt.ID)
+	} else {
+		u = fmt.Sprintf(executor.ListenURL+"/api/v1alpha/executor/logs?taskid=%s&step=%d", rt.ID, stepnum)
+	}
 	r, err := http.Get(u)
 	if err != nil {
 		return err
@@ -721,10 +735,27 @@ func (s *Scheduler) fetchLog(ctx context.Context, rt *types.RunTask, stepnum int
 		return errors.Errorf("received http status: %d", r.StatusCode)
 	}
 
-	return s.lts.WriteObject(path, r.Body)
+	return s.lts.WriteObject(logPath, r.Body)
 }
 
-func (s *Scheduler) finishLogPhase(ctx context.Context, runID, runTaskID string, stepnum int) error {
+func (s *Scheduler) finishSetupLogPhase(ctx context.Context, runID, runTaskID string) error {
+	r, _, err := store.GetRun(ctx, s.e, runID)
+	if err != nil {
+		return err
+	}
+	rt, ok := r.RunTasks[runTaskID]
+	if !ok {
+		return errors.Errorf("no such task with ID %s in run %s", runTaskID, runID)
+	}
+
+	rt.SetupStep.LogPhase = types.RunTaskFetchPhaseFinished
+	if _, err := store.AtomicPutRun(ctx, s.e, r, "", nil); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Scheduler) finishStepLogPhase(ctx context.Context, runID, runTaskID string, stepnum int) error {
 	r, _, err := store.GetRun(ctx, s.e, runID)
 	if err != nil {
 		return err
@@ -776,14 +807,26 @@ func (s *Scheduler) finishArchivePhase(ctx context.Context, runID, runTaskID str
 
 func (s *Scheduler) fetchTaskLogs(ctx context.Context, runID string, rt *types.RunTask) {
 	log.Debugf("fetchTaskLogs")
+
+	// fetch setup log
+	if rt.SetupStep.LogPhase == types.RunTaskFetchPhaseNotStarted {
+		if err := s.fetchLog(ctx, rt, true, 0); err != nil {
+			log.Errorf("err: %+v", err)
+		}
+		if err := s.finishSetupLogPhase(ctx, runID, rt.ID); err != nil {
+			log.Errorf("err: %+v", err)
+		}
+	}
+
+	// fetch steps logs
 	for i, rts := range rt.Steps {
 		lp := rts.LogPhase
 		if lp == types.RunTaskFetchPhaseNotStarted {
-			if err := s.fetchLog(ctx, rt, i); err != nil {
+			if err := s.fetchLog(ctx, rt, false, i); err != nil {
 				log.Errorf("err: %+v", err)
 				continue
 			}
-			if err := s.finishLogPhase(ctx, runID, rt.ID, i); err != nil {
+			if err := s.finishStepLogPhase(ctx, runID, rt.ID, i); err != nil {
 				log.Errorf("err: %+v", err)
 				continue
 			}
@@ -988,6 +1031,10 @@ func (s *Scheduler) finishedRunArchiver(ctx context.Context, r *types.Run) error
 	done := true
 	for _, rt := range r.RunTasks {
 		// check all logs are fetched
+		if rt.SetupStep.LogPhase != types.RunTaskFetchPhaseFinished {
+			done = false
+			break
+		}
 		for _, rts := range rt.Steps {
 			lp := rts.LogPhase
 			if lp != types.RunTaskFetchPhaseFinished {

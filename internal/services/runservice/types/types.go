@@ -173,7 +173,8 @@ type RunTask struct {
 	// This data is opaque to the run service
 	ApprovalAnnotations map[string]string `json:"approval_annotations,omitempty"`
 
-	Steps []*RunTaskStep `json:"steps,omitempty"`
+	SetupStep RunTaskStep    `json:"setup_step,omitempty"`
+	Steps     []*RunTaskStep `json:"steps,omitempty"`
 
 	// steps numbers of workspace archives,
 	WorkspaceArchives      []int               `json:"workspace_archives,omitempty"`
@@ -405,7 +406,8 @@ type ExecutorTaskStatus struct {
 	ExecutorID string            `json:"executor_id,omitempty"`
 	Phase      ExecutorTaskPhase `json:"phase,omitempty"`
 
-	Steps []*ExecutorTaskStepStatus `json:"steps,omitempty"`
+	SetupStep ExecutorTaskStepStatus    `json:"setup_step,omitempty"`
+	Steps     []*ExecutorTaskStepStatus `json:"steps,omitempty"`
 
 	StartTime *time.Time `json:"start_time,omitempty"`
 	EndTime   *time.Time `json:"end_time,omitempty"`

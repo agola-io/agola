@@ -61,44 +61,57 @@ func NewLogsHandler(logger *zap.Logger, e *Executor) *logsHandler {
 }
 
 func (h *logsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// TODO(sgotti) Check authorized call from scheduler
+	q := r.URL.Query()
 
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-
-	taskID := r.URL.Query().Get("taskid")
+	taskID := q.Get("taskid")
 	if taskID == "" {
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
-	s := r.URL.Query().Get("step")
-	if s == "" {
+
+	_, setup := q["setup"]
+	stepStr := q.Get("step")
+	if !setup && stepStr == "" {
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
-	step, err := strconv.Atoi(s)
-	if err != nil {
+	if setup && stepStr != "" {
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
+
+	var step int
+	if stepStr != "" {
+		var err error
+		step, err = strconv.Atoi(stepStr)
+		if err != nil {
+			http.Error(w, "", http.StatusBadRequest)
+			return
+		}
+	}
+
 	follow := false
-	_, ok := r.URL.Query()["follow"]
+	_, ok := q["follow"]
 	if ok {
 		follow = true
 	}
 
-	if err := h.readTaskLogs(taskID, step, w, follow); err != nil {
+	if err := h.readTaskLogs(taskID, setup, step, w, follow); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
 
-func (h *logsHandler) readTaskLogs(taskID string, step int, w http.ResponseWriter, follow bool) error {
-	logPath := h.e.logPath(taskID, step)
-	return h.readLogs(taskID, step, logPath, w, follow)
+func (h *logsHandler) readTaskLogs(taskID string, setup bool, step int, w http.ResponseWriter, follow bool) error {
+	var logPath string
+	if setup {
+		logPath = h.e.setupLogPath(taskID)
+	} else {
+		logPath = h.e.stepLogPath(taskID, step)
+	}
+	return h.readLogs(taskID, setup, step, logPath, w, follow)
 }
 
-func (h *logsHandler) readLogs(taskID string, step int, logPath string, w http.ResponseWriter, follow bool) error {
+func (h *logsHandler) readLogs(taskID string, setup bool, step int, logPath string, w http.ResponseWriter, follow bool) error {
 	f, err := os.Open(logPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -135,7 +148,7 @@ func (h *logsHandler) readLogs(taskID string, step int, logPath string, w http.R
 				if _, err := f.Seek(-int64(len(data)), io.SeekCurrent); err != nil {
 					return errors.Wrapf(err, "failed to seek in log file %q", logPath)
 				}
-				// check if the step is finished, is so flush until EOF and stop
+				// check if the step is finished, if so flush until EOF and stop
 				rt, ok := h.e.runningTasks.get(taskID)
 				if !ok {
 					flushstop = true
@@ -171,14 +184,15 @@ func NewArchivesHandler(e *Executor) *archivesHandler {
 }
 
 func (h *archivesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// TODO(sgotti) Check authorized call from scheduler
 
-	taskID := r.URL.Query().Get("taskid")
+	q := r.URL.Query()
+
+	taskID := q.Get("taskid")
 	if taskID == "" {
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
-	s := r.URL.Query().Get("step")
+	s := q.Get("step")
 	if s == "" {
 		http.Error(w, "", http.StatusBadRequest)
 		return

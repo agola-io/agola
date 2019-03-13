@@ -340,25 +340,20 @@ func (e *Executor) taskPath(taskID string) string {
 	return filepath.Join(e.tasksDir(), taskID)
 }
 
-func (e *Executor) logPath(taskID string, stepID int) string {
-	return filepath.Join(e.taskPath(taskID), "logs", fmt.Sprintf("%d.log", stepID))
+func (e *Executor) taskLogsPath(taskID string) string {
+	return filepath.Join(e.tasksDir(), taskID, "logs")
+}
+
+func (e *Executor) setupLogPath(taskID string) string {
+	return filepath.Join(e.taskLogsPath(taskID), "setup.log")
+}
+
+func (e *Executor) stepLogPath(taskID string, stepID int) string {
+	return filepath.Join(e.taskLogsPath(taskID), "steps", fmt.Sprintf("%d.log", stepID))
 }
 
 func (e *Executor) archivePath(taskID string, stepID int) string {
 	return filepath.Join(e.taskPath(taskID), "archives", fmt.Sprintf("%d.tar", stepID))
-}
-
-func mkdirAllAndReplace(path string, perm os.FileMode) error {
-	// if the dir already exists rename it.
-	_, err := os.Stat(path)
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	if os.IsNotExist(err) {
-		return os.MkdirAll(path, perm)
-	}
-	// TODO(sgotti) UnixNano should be enough but doesn't totally avoids name collisions.
-	return os.Rename(path, fmt.Sprintf("%s.%d", path, time.Now().UnixNano()))
 }
 
 func (e *Executor) sendExecutorStatus(ctx context.Context) error {
@@ -429,51 +424,35 @@ func (e *Executor) executeTask(ctx context.Context, et *types.ExecutorTask) {
 
 	defer e.runningTasks.delete(et.ID)
 
-	rt.et.Status.Phase = types.ExecutorTaskPhaseRunning
-	rt.et.Status.StartTime = util.TimePtr(time.Now())
-
+	et.Status.Phase = types.ExecutorTaskPhaseRunning
+	et.Status.StartTime = util.TimePtr(time.Now())
+	et.Status.SetupStep.Phase = types.ExecutorTaskPhaseRunning
+	et.Status.SetupStep.StartTime = util.TimePtr(time.Now())
 	if err := e.sendExecutorTaskStatus(ctx, et); err != nil {
 		log.Errorf("err: %+v", err)
+	}
+
+	if err := e.setupTask(ctx, rt); err != nil {
+		rt.et.Status.Phase = types.ExecutorTaskPhaseFailed
+		et.Status.SetupStep.EndTime = util.TimePtr(time.Now())
+		et.Status.SetupStep.Phase = types.ExecutorTaskPhaseFailed
+		et.Status.SetupStep.EndTime = util.TimePtr(time.Now())
+		if err := e.sendExecutorTaskStatus(ctx, et); err != nil {
+			log.Errorf("err: %+v", err)
+		}
 		rt.Unlock()
 		return
 	}
 
-	cmd := []string{toolboxContainerPath, "sleeper"}
-	if et.Containers[0].Entrypoint != "" {
-		cmd = strings.Split(et.Containers[0].Entrypoint, " ")
-		log.Infof("cmd: %v", cmd)
-	}
-
-	log.Debugf("starting pod")
-	podConfig := &driver.PodConfig{
-		Labels:        createTaskLabels(et.ID),
-		InitVolumeDir: toolboxContainerDir,
-		Containers: []*driver.ContainerConfig{
-			{
-				Image:      et.Containers[0].Image,
-				Cmd:        cmd,
-				Env:        et.Containers[0].Environment,
-				WorkingDir: et.WorkingDir,
-				User:       et.Containers[0].User,
-				Privileged: et.Containers[0].Privileged,
-			},
-		},
-	}
-	pod, err := e.driver.NewPod(ctx, podConfig)
-	if err != nil {
+	et.Status.SetupStep.Phase = types.ExecutorTaskPhaseSuccess
+	et.Status.SetupStep.EndTime = util.TimePtr(time.Now())
+	if err := e.sendExecutorTaskStatus(ctx, et); err != nil {
 		log.Errorf("err: %+v", err)
-		rt.Unlock()
-		return
 	}
-	rt.pod = pod
-	// ignore pod stop errors
-	defer pod.Stop(ctx)
-
-	log.Debugf("started pod")
 
 	rt.Unlock()
 
-	_, err = e.executeTaskInternal(ctx, et, pod)
+	_, err := e.executeTaskInternal(ctx, et, rt.pod)
 
 	rt.Lock()
 	if err != nil {
@@ -491,12 +470,62 @@ func (e *Executor) executeTask(ctx context.Context, et *types.ExecutorTask) {
 	rt.Unlock()
 }
 
+func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
+	et := rt.et
+	if err := os.RemoveAll(e.taskPath(et.ID)); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(e.taskPath(et.ID), 0770); err != nil {
+		return err
+	}
+
+	cmd := []string{toolboxContainerPath, "sleeper"}
+	if et.Containers[0].Entrypoint != "" {
+		cmd = strings.Split(et.Containers[0].Entrypoint, " ")
+		log.Infof("cmd: %v", cmd)
+	}
+
+	log.Debugf("starting pod")
+
+	podConfig := &driver.PodConfig{
+		Labels:        createTaskLabels(et.ID),
+		InitVolumeDir: toolboxContainerDir,
+		Containers: []*driver.ContainerConfig{
+			{
+				Image:      et.Containers[0].Image,
+				Cmd:        cmd,
+				Env:        et.Containers[0].Environment,
+				WorkingDir: et.WorkingDir,
+				User:       et.Containers[0].User,
+				Privileged: et.Containers[0].Privileged,
+			},
+		},
+	}
+
+	setupLogPath := e.setupLogPath(et.ID)
+	if err := os.MkdirAll(filepath.Dir(setupLogPath), 0770); err != nil {
+		return err
+	}
+	outf, err := os.Create(setupLogPath)
+	if err != nil {
+		return err
+	}
+	defer outf.Close()
+
+	outf.WriteString("Starting pod.\n")
+	pod, err := e.driver.NewPod(ctx, podConfig, outf)
+	if err != nil {
+		outf.WriteString("Pod failed to start.\n")
+		return err
+	}
+	outf.WriteString("Pod started.\n")
+
+	rt.pod = pod
+	return nil
+}
+
 func (e *Executor) executeTaskInternal(ctx context.Context, et *types.ExecutorTask, pod driver.Pod) (int, error) {
 	log.Debugf("task: %s", et.TaskName)
-
-	if err := mkdirAllAndReplace(e.taskPath(et.ID), 0770); err != nil {
-		return 0, err
-	}
 
 	for i, step := range et.Steps {
 		//log.Debugf("step: %v", util.Dump(step))
@@ -522,18 +551,18 @@ func (e *Executor) executeTaskInternal(ctx context.Context, et *types.ExecutorTa
 		case *types.RunStep:
 			log.Debugf("run step: %s", util.Dump(s))
 			stepName = s.Name
-			exitCode, err = e.doRunStep(ctx, s, et, pod, e.logPath(et.ID, i))
+			exitCode, err = e.doRunStep(ctx, s, et, pod, e.stepLogPath(et.ID, i))
 
 		case *types.SaveToWorkspaceStep:
 			log.Debugf("save to workspace step: %s", util.Dump(s))
 			stepName = s.Name
 			archivePath := e.archivePath(et.ID, i)
-			exitCode, err = e.doSaveToWorkspaceStep(ctx, s, et, pod, e.logPath(et.ID, i), archivePath)
+			exitCode, err = e.doSaveToWorkspaceStep(ctx, s, et, pod, e.stepLogPath(et.ID, i), archivePath)
 
 		case *types.RestoreWorkspaceStep:
 			log.Debugf("restore workspace step: %s", util.Dump(s))
 			stepName = s.Name
-			exitCode, err = e.doRestoreWorkspaceStep(ctx, s, et, pod, e.logPath(et.ID, i))
+			exitCode, err = e.doRestoreWorkspaceStep(ctx, s, et, pod, e.stepLogPath(et.ID, i))
 
 		default:
 			return i, errors.Errorf("unknown step type: %s", util.Dump(s))

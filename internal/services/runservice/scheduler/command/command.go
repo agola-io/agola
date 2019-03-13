@@ -328,6 +328,10 @@ func (s *CommandHandler) genRunTask(ctx context.Context, rct *types.RunConfigTas
 	if rt.Skip {
 		rt.Status = types.RunTaskStatusSkipped
 	}
+	rt.SetupStep = types.RunTaskStep{
+		Phase:    types.ExecutorTaskPhaseNotStarted,
+		LogPhase: types.RunTaskFetchPhaseNotStarted,
+	}
 	for i := range rt.Steps {
 		s := &types.RunTaskStep{
 			Phase:    types.ExecutorTaskPhaseNotStarted,

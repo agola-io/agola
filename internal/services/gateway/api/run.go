@@ -76,7 +76,16 @@ type RunTaskResponse struct {
 	Name   string                `json:"name"`
 	Status rstypes.RunTaskStatus `json:"status"`
 
-	Steps []*RunTaskResponseStep `json:"steps"`
+	SetupStep *RunTaskResponseSetupStep `json:"setup_step"`
+	Steps     []*RunTaskResponseStep    `json:"steps"`
+
+	StartTime *time.Time `json:"start_time"`
+	EndTime   *time.Time `json:"end_time"`
+}
+
+type RunTaskResponseSetupStep struct {
+	Phase rstypes.ExecutorTaskPhase `json:"phase"`
+	Name  string                    `json:"name"`
 
 	StartTime *time.Time `json:"start_time"`
 	EndTime   *time.Time `json:"end_time"`
@@ -142,13 +151,20 @@ func createRunTaskResponse(rt *rstypes.RunTask, rct *rstypes.RunConfigTask) *Run
 		EndTime:   rt.EndTime,
 	}
 
+	t.SetupStep = &RunTaskResponseSetupStep{
+		Name:      "Task setup",
+		Phase:     rt.SetupStep.Phase,
+		StartTime: rt.SetupStep.StartTime,
+		EndTime:   rt.SetupStep.EndTime,
+	}
+
 	for i := 0; i < len(t.Steps); i++ {
 		s := &RunTaskResponseStep{
+			Phase:     rt.Steps[i].Phase,
 			StartTime: rt.Steps[i].StartTime,
 			EndTime:   rt.Steps[i].EndTime,
 		}
 		rcts := rct.Steps[i]
-		s.Phase = rt.Steps[i].Phase
 		switch rcts := rcts.(type) {
 		case *rstypes.RunStep:
 			s.Name = rcts.Name
@@ -279,12 +295,13 @@ func NewRunsHandler(logger *zap.Logger, runserviceClient *rsapi.Client) *RunsHan
 func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	query := r.URL.Query()
-	phaseFilter := query["phase"]
-	groups := query["group"]
-	changeGroups := query["changegroup"]
+	q := r.URL.Query()
 
-	limitS := query.Get("limit")
+	phaseFilter := q["phase"]
+	groups := q["group"]
+	changeGroups := q["changegroup"]
+
+	limitS := q.Get("limit")
 	limit := DefaultRunsLimit
 	if limitS != "" {
 		var err error
@@ -302,11 +319,11 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		limit = MaxRunsLimit
 	}
 	asc := false
-	if _, ok := query["asc"]; ok {
+	if _, ok := q["asc"]; ok {
 		asc = true
 	}
 
-	start := query.Get("start")
+	start := q.Get("start")
 
 	runsResp, resp, err := h.runserviceClient.GetRuns(ctx, phaseFilter, groups, changeGroups, start, limit, asc)
 	if err != nil {
@@ -413,41 +430,53 @@ func NewLogsHandler(logger *zap.Logger, runserviceClient *rsapi.Client) *LogsHan
 func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// TODO(sgotti) Check authorized call from client
+	q := r.URL.Query()
 
-	runID := r.URL.Query().Get("runID")
+	runID := q.Get("runID")
 	if runID == "" {
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
-	taskID := r.URL.Query().Get("taskID")
+	taskID := q.Get("taskID")
 	if taskID == "" {
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
-	s := r.URL.Query().Get("step")
-	if s == "" {
+
+	_, setup := q["setup"]
+	stepStr := q.Get("step")
+	if !setup && stepStr == "" {
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
-	step, err := strconv.Atoi(s)
-	if err != nil {
+	if setup && stepStr != "" {
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
+
+	var step int
+	if stepStr != "" {
+		var err error
+		step, err = strconv.Atoi(stepStr)
+		if err != nil {
+			http.Error(w, "", http.StatusBadRequest)
+			return
+		}
+	}
+
 	follow := false
-	if _, ok := r.URL.Query()["follow"]; ok {
+	if _, ok := q["follow"]; ok {
 		follow = true
 	}
 	stream := false
-	if _, ok := r.URL.Query()["stream"]; ok {
+	if _, ok := q["stream"]; ok {
 		stream = true
 	}
 	if follow {
 		stream = true
 	}
 
-	resp, err := h.runserviceClient.GetLogs(ctx, runID, taskID, step, follow, stream)
+	resp, err := h.runserviceClient.GetLogs(ctx, runID, taskID, setup, step, follow, stream)
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			http.Error(w, err.Error(), http.StatusNotFound)

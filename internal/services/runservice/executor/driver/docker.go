@@ -109,7 +109,7 @@ func (d *DockerDriver) CopyToolbox(ctx context.Context, toolboxPath string) erro
 	return nil
 }
 
-func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig) (Pod, error) {
+func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Writer) (Pod, error) {
 	if len(podConfig.Containers) == 0 {
 		return nil, errors.Errorf("empty container config")
 	}
@@ -122,7 +122,7 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig) (Pod, e
 	if err != nil {
 		return nil, err
 	}
-	io.Copy(os.Stdout, reader)
+	io.Copy(out, reader)
 
 	podID := uuid.NewV4().String()
 

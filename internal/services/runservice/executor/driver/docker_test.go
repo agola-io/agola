@@ -99,7 +99,7 @@ func TestPod(t *testing.T) {
 				},
 			},
 			InitVolumeDir: "/tmp/agola",
-		})
+		}, ioutil.Discard)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -116,7 +116,7 @@ func TestPod(t *testing.T) {
 				},
 			},
 			InitVolumeDir: "/tmp/agola",
-		})
+		}, ioutil.Discard)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -155,7 +155,7 @@ func TestPod(t *testing.T) {
 				},
 			},
 			InitVolumeDir: "/tmp/agola",
-		})
+		}, ioutil.Discard)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -206,7 +206,7 @@ func TestPod(t *testing.T) {
 				},
 			},
 			InitVolumeDir: "/tmp/agola",
-		})
+		}, ioutil.Discard)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}

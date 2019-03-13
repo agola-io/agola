@@ -58,40 +58,53 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	// TODO(sgotti) Check authorized call from client
+	q := r.URL.Query()
 
-	runID := r.URL.Query().Get("runid")
+	runID := q.Get("runid")
 	if runID == "" {
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
-	taskID := r.URL.Query().Get("taskid")
+	taskID := q.Get("taskid")
 	if taskID == "" {
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
-	s := r.URL.Query().Get("step")
-	if s == "" {
+
+	_, setup := q["setup"]
+	stepStr := q.Get("step")
+	if !setup && stepStr == "" {
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
-	step, err := strconv.Atoi(s)
-	if err != nil {
+	if setup && stepStr != "" {
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
+
+	var step int
+	if stepStr != "" {
+		var err error
+		step, err = strconv.Atoi(stepStr)
+		if err != nil {
+			http.Error(w, "", http.StatusBadRequest)
+			return
+		}
+	}
+
 	follow := false
-	if _, ok := r.URL.Query()["follow"]; ok {
+	if _, ok := q["follow"]; ok {
 		follow = true
 	}
 	stream := false
-	if _, ok := r.URL.Query()["stream"]; ok {
+	if _, ok := q["stream"]; ok {
 		stream = true
 	}
 	if follow {
 		stream = true
 	}
 
-	if err, sendError := h.readTaskLogs(ctx, runID, taskID, step, w, follow, stream); err != nil {
+	if err, sendError := h.readTaskLogs(ctx, runID, taskID, setup, step, w, follow, stream); err != nil {
 		h.log.Errorf("err: %+v", err)
 		if sendError {
 			switch err.(type) {
@@ -104,7 +117,7 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, step int, w http.ResponseWriter, follow, stream bool) (error, bool) {
+func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, setup bool, step int, w http.ResponseWriter, follow, stream bool) (error, bool) {
 	r, err := store.GetRunEtcdOrLTS(ctx, h.e, h.wal, runID)
 	if err != nil {
 		return err, true
@@ -123,7 +136,12 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, st
 
 	// if the log has been already fetched use it, otherwise fetch it from the executor
 	if task.Steps[step].LogPhase == types.RunTaskFetchPhaseFinished {
-		logPath := store.LTSRunLogPath(task.ID, step)
+		var logPath string
+		if setup {
+			logPath = store.LTSRunTaskSetupLogPath(task.ID)
+		} else {
+			logPath = store.LTSRunTaskStepLogPath(task.ID, step)
+		}
 		f, err := h.lts.ReadObject(logPath)
 		if err != nil {
 			if err == objectstorage.ErrNotExist {
@@ -147,7 +165,12 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, st
 		return common.NewErrNotExist(errors.Errorf("executor with id %q doesn't exist", et.Status.ExecutorID)), true
 	}
 
-	url := fmt.Sprintf("%s/api/v1alpha/executor/logs?taskid=%s&step=%d", executor.ListenURL, taskID, step)
+	var url string
+	if setup {
+		url = fmt.Sprintf("%s/api/v1alpha/executor/logs?taskid=%s&setup", executor.ListenURL, taskID)
+	} else {
+		url = fmt.Sprintf("%s/api/v1alpha/executor/logs?taskid=%s&step=%d", executor.ListenURL, taskID, step)
+	}
 	if follow {
 		url += "&follow"
 	}

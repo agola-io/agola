@@ -236,11 +236,15 @@ func (c *Client) GetRun(ctx context.Context, runID string) (*RunResponse, *http.
 	return runResponse, resp, err
 }
 
-func (c *Client) GetLogs(ctx context.Context, runID, taskID string, step int, follow, stream bool) (*http.Response, error) {
+func (c *Client) GetLogs(ctx context.Context, runID, taskID string, setup bool, step int, follow, stream bool) (*http.Response, error) {
 	q := url.Values{}
 	q.Add("runid", runID)
 	q.Add("taskid", taskID)
-	q.Add("step", strconv.Itoa(step))
+	if setup {
+		q.Add("setup", "")
+	} else {
+		q.Add("step", strconv.Itoa(step))
+	}
 	if follow {
 		q.Add("follow", "")
 	}
