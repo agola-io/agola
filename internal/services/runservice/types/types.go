@@ -387,7 +387,9 @@ type ExecutorTask struct {
 	WorkingDir  string            `json:"working_dir,omitempty"`
 	Shell       string            `json:"shell,omitempty"`
 	User        string            `json:"user,omitempty"`
-	Steps       []interface{}     `json:"steps,omitempty"`
+	Privileged  bool              `yaml:"privileged"`
+
+	Steps []interface{} `json:"steps,omitempty"`
 
 	Status     ExecutorTaskStatus `json:"status,omitempty"`
 	SetupError string             `fail_reason:"setup_error,omitempty"`
@@ -422,6 +424,7 @@ type Container struct {
 	Image       string            `json:"image,omitempty"`
 	Environment map[string]string `json:"environment,omitempty"`
 	User        string            `json:"user,omitempty"`
+	Privileged  bool              `json:"privileged"`
 }
 
 type Workspace []WorkspaceLevel

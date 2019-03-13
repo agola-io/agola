@@ -150,6 +150,7 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig) (Pod, e
 	}, &container.HostConfig{
 		Binds:         []string{fmt.Sprintf("%s:%s", d.initVolumeHostDir, podConfig.InitVolumeDir)},
 		ReadonlyPaths: []string{fmt.Sprintf("%s:%s", d.initVolumeHostDir, podConfig.InitVolumeDir)},
+		Privileged:    containerConfig.Privileged,
 	}, nil, "")
 	if err != nil {
 		return nil, err

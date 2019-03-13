@@ -449,6 +449,7 @@ func (e *Executor) executeTask(ctx context.Context, et *types.ExecutorTask) {
 				Env:        et.Containers[0].Environment,
 				WorkingDir: et.WorkingDir,
 				User:       et.Containers[0].User,
+				Privileged: et.Containers[0].Privileged,
 			},
 		},
 	}
