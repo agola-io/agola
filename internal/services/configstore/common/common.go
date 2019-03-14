@@ -34,6 +34,8 @@ var (
 	StorageProjectsDir      = path.Join(StorageDataDir, "projects")
 	StorageProjectGroupsDir = path.Join(StorageDataDir, "projectgroups")
 	StorageRemoteSourcesDir = path.Join(StorageDataDir, "remotesources")
+	StorageSecretsDir       = path.Join(StorageDataDir, "secrets")
+	StorageVariablesDir     = path.Join(StorageDataDir, "variables")
 )
 
 const (
@@ -60,6 +62,14 @@ func StorageRemoteSourceFile(userID string) string {
 	return path.Join(StorageRemoteSourcesDir, userID)
 }
 
+func StorageSecretFile(secretID string) string {
+	return path.Join(StorageSecretsDir, secretID)
+}
+
+func StorageVariableFile(variableID string) string {
+	return path.Join(StorageVariablesDir, variableID)
+}
+
 func PathToTypeID(p string) (types.ConfigType, string) {
 	var configType types.ConfigType
 	switch path.Dir(p) {
@@ -73,6 +83,10 @@ func PathToTypeID(p string) (types.ConfigType, string) {
 		configType = types.ConfigTypeProject
 	case StorageRemoteSourcesDir:
 		configType = types.ConfigTypeRemoteSource
+	case StorageSecretsDir:
+		configType = types.ConfigTypeSecret
+	case StorageVariablesDir:
+		configType = types.ConfigTypeVariable
 	default:
 		panic(fmt.Errorf("cannot determine configtype for path: %q", p))
 	}
