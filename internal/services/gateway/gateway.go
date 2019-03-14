@@ -153,6 +153,14 @@ func (g *Gateway) Run(ctx context.Context) error {
 	deleteProjectHandler := api.NewDeleteProjectHandler(logger, g.configstoreClient)
 	projectReconfigHandler := api.NewProjectReconfigHandler(logger, g.ch, g.configstoreClient, g.c.APIExposedURL)
 
+	secretHandler := api.NewSecretHandler(logger, g.configstoreClient)
+	createSecretHandler := api.NewCreateSecretHandler(logger, g.configstoreClient)
+	deleteSecretHandler := api.NewDeleteSecretHandler(logger, g.configstoreClient)
+
+	variableHandler := api.NewVariableHandler(logger, g.configstoreClient)
+	createVariableHandler := api.NewCreateVariableHandler(logger, g.configstoreClient)
+	deleteVariableHandler := api.NewDeleteVariableHandler(logger, g.configstoreClient)
+
 	currentUserHandler := api.NewCurrentUserHandler(logger, g.configstoreClient)
 	userHandler := api.NewUserHandler(logger, g.configstoreClient)
 	userByNameHandler := api.NewUserByNameHandler(logger, g.configstoreClient)
@@ -208,6 +216,20 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/projects", authForcedHandler(createProjectHandler)).Methods("PUT")
 	apirouter.Handle("/projects/{projectid}", authForcedHandler(deleteProjectHandler)).Methods("DELETE")
 	apirouter.Handle("/projects/{projectid}/reconfig", authForcedHandler(projectReconfigHandler)).Methods("POST")
+
+	apirouter.Handle("/projectgroups/{projectgroupref}/secrets", authForcedHandler(secretHandler)).Methods("GET")
+	apirouter.Handle("/projects/{projectref}/secrets", authForcedHandler(secretHandler)).Methods("GET")
+	apirouter.Handle("/projectgroups/{projectgroupref}/secrets", authForcedHandler(createSecretHandler)).Methods("PUT")
+	apirouter.Handle("/projects/{projectref}/secrets", authForcedHandler(createSecretHandler)).Methods("PUT")
+	apirouter.Handle("/projectgroups/{projectgroupref}/secrets/{secretname}", authForcedHandler(deleteSecretHandler)).Methods("DELETE")
+	apirouter.Handle("/projects/{projectref}/secrets/{secretname}", authForcedHandler(deleteSecretHandler)).Methods("DELETE")
+
+	apirouter.Handle("/projectgroups/{projectgroupref}/variables", authForcedHandler(variableHandler)).Methods("GET")
+	apirouter.Handle("/projects/{projectref}/variables", authForcedHandler(variableHandler)).Methods("GET")
+	apirouter.Handle("/projectgroups/{projectgroupref}/variables", authForcedHandler(createVariableHandler)).Methods("PUT")
+	apirouter.Handle("/projects/{projectref}/variables", authForcedHandler(createVariableHandler)).Methods("PUT")
+	apirouter.Handle("/projectgroups/{projectgroupref}/variables/{variablename}", authForcedHandler(deleteVariableHandler)).Methods("DELETE")
+	apirouter.Handle("/projects/{projectref}/variables/{variablename}", authForcedHandler(deleteVariableHandler)).Methods("DELETE")
 
 	apirouter.Handle("/user", authForcedHandler(currentUserHandler)).Methods("GET")
 	apirouter.Handle("/user/{userid}", authForcedHandler(userHandler)).Methods("GET")

@@ -641,6 +641,14 @@ func (r *ReadDB) applyAction(tx *db.Tx, action *wal.Action) error {
 			if err := r.insertRemoteSource(tx, action.Data); err != nil {
 				return err
 			}
+		case types.ConfigTypeSecret:
+			if err := r.insertSecret(tx, action.Data); err != nil {
+				return err
+			}
+		case types.ConfigTypeVariable:
+			if err := r.insertVariable(tx, action.Data); err != nil {
+				return err
+			}
 		}
 
 	case wal.ActionTypeDelete:
@@ -668,6 +676,16 @@ func (r *ReadDB) applyAction(tx *db.Tx, action *wal.Action) error {
 		case types.ConfigTypeRemoteSource:
 			r.log.Debugf("deleting remote source with id: %s", ID)
 			if err := r.deleteRemoteSource(tx, ID); err != nil {
+				return err
+			}
+		case types.ConfigTypeSecret:
+			r.log.Debugf("deleting secret with id: %s", ID)
+			if err := r.deleteSecret(tx, ID); err != nil {
+				return err
+			}
+		case types.ConfigTypeVariable:
+			r.log.Debugf("deleting variable with id: %s", ID)
+			if err := r.deleteVariable(tx, ID); err != nil {
 				return err
 			}
 		}

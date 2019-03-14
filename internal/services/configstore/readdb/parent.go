@@ -47,3 +47,35 @@ func (r *ReadDB) ResolveConfigID(tx *db.Tx, configType types.ConfigType, ref str
 		return "", util.NewErrBadRequest(errors.Errorf("unknown config type %q", configType))
 	}
 }
+
+func (r *ReadDB) GetParentPath(tx *db.Tx, parentType types.ConfigType, parentID string) (string, error) {
+	var p string
+	switch parentType {
+	case types.ConfigTypeProjectGroup:
+		projectGroup, err := r.GetProjectGroup(tx, parentID)
+		if err != nil {
+			return "", err
+		}
+		if projectGroup == nil {
+			return "", errors.Errorf("projectgroup with id %q doesn't exist", parentID)
+		}
+		p, err = r.GetProjectGroupPath(tx, projectGroup)
+		if err != nil {
+			return "", err
+		}
+	case types.ConfigTypeProject:
+		project, err := r.GetProject(tx, parentID)
+		if err != nil {
+			return "", err
+		}
+		if project == nil {
+			return "", errors.Errorf("project with id %q doesn't exist", parentID)
+		}
+		p, err = r.GetProjectPath(tx, project)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	return p, nil
+}

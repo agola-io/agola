@@ -44,9 +44,9 @@ var Stmts = []string{
 
 	"create table linkedaccount_project (id uuid, projectid uuid, PRIMARY KEY (id), FOREIGN KEY(projectid) REFERENCES user(id))",
 
-	"create table secret (id uuid, name varchar, containerid varchar, data bytea, PRIMARY KEY (id))",
+	"create table secret (id uuid, name varchar, parentid varchar, data bytea, PRIMARY KEY (id))",
 	"create index secret_name on secret(name)",
 
-	"create table variable (id uuid, name varchar, containerid varchar, data bytea, PRIMARY KEY (id))",
+	"create table variable (id uuid, name varchar, parentid varchar, data bytea, PRIMARY KEY (id))",
 	"create index variable_name on variable(name)",
 }

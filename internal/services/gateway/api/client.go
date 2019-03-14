@@ -159,6 +159,47 @@ func (c *Client) CreateProject(ctx context.Context, req *CreateProjectRequest) (
 	return project, resp, err
 }
 
+func (c *Client) CreateProjectGroupSecret(ctx context.Context, projectGroupID string, req *CreateSecretRequest) (*SecretResponse, *http.Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	secret := new(SecretResponse)
+	resp, err := c.getParsedResponse(ctx, "PUT", path.Join("/projectgroups", projectGroupID, "secrets"), nil, jsonContent, bytes.NewReader(reqj), secret)
+	return secret, resp, err
+}
+
+func (c *Client) CreateProjectSecret(ctx context.Context, projectID string, req *CreateSecretRequest) (*SecretResponse, *http.Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	secret := new(SecretResponse)
+	resp, err := c.getParsedResponse(ctx, "PUT", path.Join("/projects", projectID, "secrets"), nil, jsonContent, bytes.NewReader(reqj), secret)
+	return secret, resp, err
+}
+
+func (c *Client) createSecret(ctx context.Context, containertype, containerid string, req *CreateSecretRequest) (*SecretResponse, *http.Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var basepath string
+	switch containertype {
+	case "project":
+		basepath = "projects"
+	default:
+		return nil, nil, fmt.Errorf("invalid container type")
+	}
+
+	secret := new(SecretResponse)
+	resp, err := c.getParsedResponse(ctx, "PUT", path.Join("/", basepath, containerid, "secrets"), nil, jsonContent, bytes.NewReader(reqj), secret)
+	return secret, resp, err
+}
+
 func (c *Client) DeleteCurrentUserProject(ctx context.Context, projectName string) (*http.Response, error) {
 	return c.deleteProject(ctx, "user", "", projectName)
 }

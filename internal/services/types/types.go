@@ -29,11 +29,16 @@ const (
 	ConfigTypeProjectGroup ConfigType = "projectgroup"
 	ConfigTypeProject      ConfigType = "project"
 	ConfigTypeRemoteSource ConfigType = "remotesource"
+	ConfigTypeSecret       ConfigType = "secret"
+	ConfigTypeVariable     ConfigType = "variable"
 )
 
 type Parent struct {
 	Type ConfigType `json:"type,omitempty"`
 	ID   string     `json:"id,omitempty"`
+
+	// fields the is only used in api response and shoukd be empty when saved in the store
+	Path string `json:"path,omitempty"`
 }
 
 type User struct {
@@ -151,6 +156,53 @@ type Project struct {
 	SkipSSHHostKeyCheck bool `json:"skip_ssh_host_key_check,omitempty"`
 }
 
+type SecretType string
+
+const (
+	SecretTypeInternal SecretType = "internal"
+	SecretTypeExternal SecretType = "external"
+)
+
+type SecretProviderType string
+
+const (
+	// TODO(sgotti) unimplemented
+	SecretProviderK8s   SecretProviderType = "k8s"
+	SecretProviderVault SecretProviderType = "vault"
+)
+
+type Secret struct {
+	ID   string `json:"id,omitempty"`
+	Name string `json:"name,omitempty"`
+
+	Parent Parent `json:"parent,omitempty"`
+
+	Type SecretType `json:"type,omitempty"`
+
+	// internal secret
+	Data map[string]string `json:"data,omitempty"`
+
+	// external secret
+	SecretProviderID string `json:"secret_provider_id,omitempty"`
+	Path             string `json:"path,omitempty"`
+}
+
+type Variable struct {
+	ID   string `json:"id,omitempty"`
+	Name string `json:"name,omitempty"`
+
+	Parent Parent `json:"parent,omitempty"`
+
+	Values []VariableValue `json:"values,omitempty"`
+}
+
+type VariableValue struct {
+	SecretName string `json:"secret_name,omitempty"`
+	SecretVar  string `json:"secret_var,omitempty"`
+
+	When *When `json:"when,omitempty"`
+}
+
 type When struct {
 	Branch *WhenConditions `json:"branch,omitempty"`
 	Tag    *WhenConditions `json:"tag,omitempty"`
@@ -170,8 +222,8 @@ const (
 )
 
 type WhenCondition struct {
-	Type  WhenConditionType
-	Match string
+	Type  WhenConditionType `json:"type,omitempty"`
+	Match string            `json:"match,omitempty"`
 }
 
 func MatchWhen(when *When, branch, tag, ref string) bool {

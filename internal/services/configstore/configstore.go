@@ -118,6 +118,14 @@ func (s *ConfigStore) Run(ctx context.Context) error {
 	createProjectHandler := api.NewCreateProjectHandler(logger, s.ch)
 	deleteProjectHandler := api.NewDeleteProjectHandler(logger, s.ch)
 
+	secretsHandler := api.NewSecretsHandler(logger, s.readDB)
+	createSecretHandler := api.NewCreateSecretHandler(logger, s.ch)
+	deleteSecretHandler := api.NewDeleteSecretHandler(logger, s.ch)
+
+	variablesHandler := api.NewVariablesHandler(logger, s.readDB)
+	createVariableHandler := api.NewCreateVariableHandler(logger, s.ch)
+	deleteVariableHandler := api.NewDeleteVariableHandler(logger, s.ch)
+
 	userHandler := api.NewUserHandler(logger, s.readDB)
 	usersHandler := api.NewUsersHandler(logger, s.readDB)
 	userByNameHandler := api.NewUserByNameHandler(logger, s.readDB)
@@ -152,7 +160,21 @@ func (s *ConfigStore) Run(ctx context.Context) error {
 
 	apirouter.Handle("/projects/{projectref}", projectHandler).Methods("GET")
 	apirouter.Handle("/projects", createProjectHandler).Methods("PUT")
-	apirouter.Handle("/projects/{projectid}", deleteProjectHandler).Methods("DELETE")
+	apirouter.Handle("/projects/{projectref}", deleteProjectHandler).Methods("DELETE")
+
+	apirouter.Handle("/projectgroups/{projectgroupref}/secrets", secretsHandler).Methods("GET")
+	apirouter.Handle("/projects/{projectref}/secrets", secretsHandler).Methods("GET")
+	apirouter.Handle("/projectgroups/{projectgroupref}/secrets", createSecretHandler).Methods("PUT")
+	apirouter.Handle("/projects/{projectref}/secrets", createSecretHandler).Methods("PUT")
+	apirouter.Handle("/projectgroups/{projectgroupref}/secrets/{secretname}", deleteSecretHandler).Methods("DELETE")
+	apirouter.Handle("/projects/{projectref}/secrets/{secretname}", deleteSecretHandler).Methods("DELETE")
+
+	apirouter.Handle("/projectgroups/{projectgroupref}/variables", variablesHandler).Methods("GET")
+	apirouter.Handle("/projects/{projectref}/variables", variablesHandler).Methods("GET")
+	apirouter.Handle("/projectgroups/{projectgroupref}/variables", createVariableHandler).Methods("PUT")
+	apirouter.Handle("/projects/{projectref}/variables", createVariableHandler).Methods("PUT")
+	apirouter.Handle("/projectgroups/{projectgroupref}/variables/{variablename}", deleteVariableHandler).Methods("DELETE")
+	apirouter.Handle("/projects/{projectref}/variables/{variablename}", deleteVariableHandler).Methods("DELETE")
 
 	apirouter.Handle("/user/{userid}", userHandler).Methods("GET")
 	apirouter.Handle("/users", usersHandler).Methods("GET")

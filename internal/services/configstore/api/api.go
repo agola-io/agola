@@ -16,7 +16,11 @@ package api
 
 import (
 	"net/http"
+	"net/url"
 
+	"github.com/gorilla/mux"
+	"github.com/pkg/errors"
+	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 )
 
@@ -31,4 +35,25 @@ func httpError(w http.ResponseWriter, err error) bool {
 	}
 
 	return false
+}
+
+func GetConfigTypeRef(r *http.Request) (types.ConfigType, string, error) {
+	vars := mux.Vars(r)
+	projectRef, err := url.PathUnescape(vars["projectref"])
+	if err != nil {
+		return "", "", util.NewErrBadRequest(errors.Wrapf(err, "wrong projectref %q", vars["projectref"]))
+	}
+	if projectRef != "" {
+		return types.ConfigTypeProject, projectRef, nil
+	}
+
+	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
+	if err != nil {
+		return "", "", util.NewErrBadRequest(errors.Wrapf(err, "wrong projectgroupref %q", vars["projectgroupref"]))
+	}
+	if projectGroupRef != "" {
+		return types.ConfigTypeProjectGroup, projectGroupRef, nil
+	}
+
+	return "", "", util.NewErrBadRequest(errors.Errorf("cannot get project or projectgroup ref"))
 }

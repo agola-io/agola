@@ -822,3 +822,220 @@ func (s *CommandHandler) DeleteOrg(ctx context.Context, orgName string) error {
 	_, err = s.wal.WriteWal(ctx, actions, cgt)
 	return err
 }
+
+func (s *CommandHandler) CreateSecret(ctx context.Context, secret *types.Secret) (*types.Secret, error) {
+	if secret.Name == "" {
+		return nil, util.NewErrBadRequest(errors.Errorf("secret name required"))
+	}
+	if secret.Parent.Type == "" {
+		return nil, util.NewErrBadRequest(errors.Errorf("secret parent type required"))
+	}
+	if secret.Parent.ID == "" {
+		return nil, util.NewErrBadRequest(errors.Errorf("secret parentid required"))
+	}
+	if secret.Parent.Type != types.ConfigTypeProject && secret.Parent.Type != types.ConfigTypeProjectGroup {
+		return nil, util.NewErrBadRequest(errors.Errorf("invalid secret parent type %q", secret.Parent.Type))
+	}
+
+	var cgt *wal.ChangeGroupsUpdateToken
+	cgNames := []string{secret.Name}
+
+	// must do all the check in a single transaction to avoid concurrent changes
+	err := s.readDB.Do(func(tx *db.Tx) error {
+		var err error
+		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		if err != nil {
+			return err
+		}
+
+		parentID, err := s.readDB.ResolveConfigID(tx, secret.Parent.Type, secret.Parent.ID)
+		if err != nil {
+			return err
+		}
+		secret.Parent.ID = parentID
+
+		// check duplicate secret name
+		s, err := s.readDB.GetSecretByName(tx, secret.Parent.ID, secret.Name)
+		if err != nil {
+			return err
+		}
+		if s != nil {
+			return util.NewErrBadRequest(errors.Errorf("secret with name %q for %s with id %q already exists", secret.Name, secret.Parent.Type, secret.Parent.ID))
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	secret.ID = uuid.NewV4().String()
+
+	secretj, err := json.Marshal(secret)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to marshal secret")
+	}
+	actions := []*wal.Action{
+		{
+			ActionType: wal.ActionTypePut,
+			Path:       common.StorageSecretFile(secret.ID),
+			Data:       secretj,
+		},
+	}
+
+	_, err = s.wal.WriteWal(ctx, actions, cgt)
+	return secret, err
+}
+
+func (s *CommandHandler) DeleteSecret(ctx context.Context, parentType types.ConfigType, parentRef, secretName string) error {
+	var secret *types.Secret
+
+	var cgt *wal.ChangeGroupsUpdateToken
+
+	// must do all the check in a single transaction to avoid concurrent changes
+	err := s.readDB.Do(func(tx *db.Tx) error {
+		var err error
+		parentID, err := s.readDB.ResolveConfigID(tx, parentType, parentRef)
+		if err != nil {
+			return err
+		}
+
+		// check secret existance
+		secret, err = s.readDB.GetSecretByName(tx, parentID, secretName)
+		if err != nil {
+			return err
+		}
+		if secret == nil {
+			return util.NewErrBadRequest(errors.Errorf("secret with name %q doesn't exist", secretName))
+		}
+
+		cgNames := []string{secretName}
+		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	actions := []*wal.Action{
+		{
+			ActionType: wal.ActionTypeDelete,
+			Path:       common.StorageSecretFile(secret.ID),
+		},
+	}
+
+	_, err = s.wal.WriteWal(ctx, actions, cgt)
+	return err
+}
+
+func (s *CommandHandler) CreateVariable(ctx context.Context, variable *types.Variable) (*types.Variable, error) {
+	if variable.Name == "" {
+		return nil, util.NewErrBadRequest(errors.Errorf("variable name required"))
+	}
+	if variable.Parent.Type == "" {
+		return nil, util.NewErrBadRequest(errors.Errorf("variable parent type required"))
+	}
+	if variable.Parent.ID == "" {
+		return nil, util.NewErrBadRequest(errors.Errorf("variable parent id required"))
+	}
+	if variable.Parent.Type != types.ConfigTypeProject && variable.Parent.Type != types.ConfigTypeProjectGroup {
+		return nil, util.NewErrBadRequest(errors.Errorf("invalid variable parent type %q", variable.Parent.Type))
+	}
+
+	var cgt *wal.ChangeGroupsUpdateToken
+	cgNames := []string{variable.Name}
+
+	// must do all the check in a single transaction to avoid concurrent changes
+	err := s.readDB.Do(func(tx *db.Tx) error {
+		var err error
+		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		if err != nil {
+			return err
+		}
+
+		parentID, err := s.readDB.ResolveConfigID(tx, variable.Parent.Type, variable.Parent.ID)
+		if err != nil {
+			return err
+		}
+		variable.Parent.ID = parentID
+
+		// check duplicate variable name
+		s, err := s.readDB.GetVariableByName(tx, variable.Parent.ID, variable.Name)
+		if err != nil {
+			return err
+		}
+		if s != nil {
+			return util.NewErrBadRequest(errors.Errorf("variable with name %q for %s with id %q already exists", variable.Name, variable.Parent.Type, variable.Parent.ID))
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	variable.ID = uuid.NewV4().String()
+
+	variablej, err := json.Marshal(variable)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to marshal variable")
+	}
+	actions := []*wal.Action{
+		{
+			ActionType: wal.ActionTypePut,
+			Path:       common.StorageVariableFile(variable.ID),
+			Data:       variablej,
+		},
+	}
+
+	_, err = s.wal.WriteWal(ctx, actions, cgt)
+	return variable, err
+}
+
+func (s *CommandHandler) DeleteVariable(ctx context.Context, parentType types.ConfigType, parentRef, variableName string) error {
+	var variable *types.Variable
+
+	var cgt *wal.ChangeGroupsUpdateToken
+
+	// must do all the check in a single transaction to avoid concurrent changes
+	err := s.readDB.Do(func(tx *db.Tx) error {
+		var err error
+		parentID, err := s.readDB.ResolveConfigID(tx, parentType, parentRef)
+		if err != nil {
+			return err
+		}
+
+		// check variable existance
+		variable, err = s.readDB.GetVariableByName(tx, parentID, variableName)
+		if err != nil {
+			return err
+		}
+		if variable == nil {
+			return util.NewErrBadRequest(errors.Errorf("variable with name %q doesn't exist", variableName))
+		}
+
+		cgNames := []string{variableName}
+		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	actions := []*wal.Action{
+		{
+			ActionType: wal.ActionTypeDelete,
+			Path:       common.StorageVariableFile(variable.ID),
+		},
+	}
+
+	_, err = s.wal.WriteWal(ctx, actions, cgt)
+	return err
+}
