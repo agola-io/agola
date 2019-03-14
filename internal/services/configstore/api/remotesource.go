@@ -119,9 +119,8 @@ func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	}
 
 	remoteSource, err := h.ch.CreateRemoteSource(ctx, &req)
-	if err != nil {
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -146,10 +145,9 @@ func (h *DeleteRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	vars := mux.Vars(r)
 	remoteSourceName := vars["name"]
 
-	if err := h.ch.DeleteRemoteSource(ctx, remoteSourceName); err != nil {
+	err := h.ch.DeleteRemoteSource(ctx, remoteSourceName)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
 	}
 }
 

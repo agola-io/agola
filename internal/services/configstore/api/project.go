@@ -120,9 +120,8 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	}
 
 	project, err := h.ch.CreateProject(ctx, &req)
-	if err != nil {
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -147,10 +146,9 @@ func (h *DeleteProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	vars := mux.Vars(r)
 	projectID := vars["projectid"]
 
-	if err := h.ch.DeleteProject(ctx, projectID); err != nil {
+	err := h.ch.DeleteProject(ctx, projectID)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
 	}
 }
 

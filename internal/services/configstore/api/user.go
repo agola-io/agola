@@ -34,19 +34,6 @@ type UserHandler struct {
 	readDB *readdb.ReadDB
 }
 
-func httpError(w http.ResponseWriter, err error) bool {
-	if err != nil {
-		if util.IsErrBadRequest(err) {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-		} else {
-			http.Error(w, "", http.StatusInternalServerError)
-		}
-		return true
-	}
-
-	return false
-}
-
 func NewUserHandler(logger *zap.Logger, readDB *readdb.ReadDB) *UserHandler {
 	return &UserHandler{log: logger.Sugar(), readDB: readDB}
 }
