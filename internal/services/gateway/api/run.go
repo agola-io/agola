@@ -263,10 +263,6 @@ const (
 	MaxRunsLimit     = 40
 )
 
-type GetRunsResponse struct {
-	Runs []*RunsResponse `json:"runs"`
-}
-
 func createRunsResponse(r *rstypes.Run) *RunsResponse {
 	run := &RunsResponse{
 		ID:          r.ID,
@@ -342,11 +338,8 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for i, r := range runsResp.Runs {
 		runs[i] = createRunsResponse(r)
 	}
-	getRunsResponse := &GetRunsResponse{
-		Runs: runs,
-	}
 
-	if err := json.NewEncoder(w).Encode(getRunsResponse); err != nil {
+	if err := json.NewEncoder(w).Encode(runs); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
