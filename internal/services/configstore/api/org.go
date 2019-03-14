@@ -125,9 +125,8 @@ func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	org, err := h.ch.CreateOrg(ctx, &req)
-	if err != nil {
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -154,10 +153,9 @@ func (h *DeleteOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	orgName := vars["orgname"]
 
-	if err := h.ch.DeleteOrg(ctx, orgName); err != nil {
+	err := h.ch.DeleteOrg(ctx, orgName)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
 	}
 }
 
