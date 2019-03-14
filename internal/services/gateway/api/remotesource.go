@@ -125,10 +125,6 @@ func (h *CreateRemoteSourceHandler) createRemoteSource(ctx context.Context, req 
 	return rs, nil
 }
 
-type RemoteSourcesResponse struct {
-	RemoteSources []*RemoteSourceResponse `json:"remote_sources"`
-}
-
 type RemoteSourceResponse struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
@@ -227,11 +223,8 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	for i, rs := range csRemoteSources {
 		remoteSources[i] = createRemoteSourceResponse(rs)
 	}
-	remoteSourcesResponse := &RemoteSourcesResponse{
-		RemoteSources: remoteSources,
-	}
 
-	if err := json.NewEncoder(w).Encode(remoteSourcesResponse); err != nil {
+	if err := json.NewEncoder(w).Encode(remoteSources); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
