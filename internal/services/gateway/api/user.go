@@ -36,11 +36,12 @@ type CreateUserRequest struct {
 
 type CreateUserHandler struct {
 	log               *zap.SugaredLogger
+	ch                *command.CommandHandler
 	configstoreClient *csapi.Client
 }
 
-func NewCreateUserHandler(logger *zap.Logger, configstoreClient *csapi.Client) *CreateUserHandler {
-	return &CreateUserHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewCreateUserHandler(logger *zap.Logger, ch *command.CommandHandler, configstoreClient *csapi.Client) *CreateUserHandler {
+	return &CreateUserHandler{log: logger.Sugar(), ch: ch, configstoreClient: configstoreClient}
 }
 
 func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -53,38 +54,22 @@ func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.createUser(ctx, &req)
-	if err != nil {
-		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	creq := &command.CreateUserRequest{
+		UserName: req.UserName,
+	}
+
+	u, err := h.ch.CreateUser(ctx, creq)
+	if httpError(w, err) {
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(user); err != nil {
+	res := createUserResponse(u)
+
+	if err := json.NewEncoder(w).Encode(res); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-}
-
-func (h *CreateUserHandler) createUser(ctx context.Context, req *CreateUserRequest) (*UserResponse, error) {
-	if !util.ValidateName(req.UserName) {
-		return nil, errors.Errorf("invalid user name %q", req.UserName)
-	}
-
-	u := &types.User{
-		UserName: req.UserName,
-	}
-
-	h.log.Infof("creating user")
-	u, _, err := h.configstoreClient.CreateUser(ctx, u)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create user")
-	}
-	h.log.Infof("user %s created, ID: %s", u.UserName, u.ID)
-
-	res := createUserResponse(u)
-	return res, nil
 }
 
 type DeleteUserHandler struct {
@@ -210,10 +195,6 @@ func (h *UserByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type UsersResponse struct {
-	Users []*UserResponse `json:"users"`
-}
-
 type UserResponse struct {
 	ID       string `json:"id"`
 	UserName string `json:"username"`
@@ -279,11 +260,8 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for i, p := range csusers {
 		users[i] = createUserResponse(p)
 	}
-	usersResponse := &UsersResponse{
-		Users: users,
-	}
 
-	if err := json.NewEncoder(w).Encode(usersResponse); err != nil {
+	if err := json.NewEncoder(w).Encode(users); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -440,6 +418,7 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	h.log.Infof("creating user %q token", userName)
 	cresp, _, err := h.configstoreClient.CreateUserToken(ctx, userName, creq)
 	if err != nil {
+		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

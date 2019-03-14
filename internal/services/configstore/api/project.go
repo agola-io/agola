@@ -17,10 +17,11 @@ package api
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
+	"net/url"
 
 	"github.com/sorintlab/agola/internal/db"
 	"github.com/sorintlab/agola/internal/services/configstore/command"
+	"github.com/sorintlab/agola/internal/services/configstore/common"
 	"github.com/sorintlab/agola/internal/services/configstore/readdb"
 	"github.com/sorintlab/agola/internal/services/types"
 
@@ -39,48 +40,27 @@ func NewProjectHandler(logger *zap.Logger, readDB *readdb.ReadDB) *ProjectHandle
 
 func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	projectID := vars["projectid"]
-
-	var project *types.Project
-	err := h.readDB.Do(func(tx *db.Tx) error {
-		var err error
-		project, err = h.readDB.GetProject(tx, projectID)
-		return err
-	})
+	projectRef, err := url.PathUnescape(vars["projectref"])
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if project == nil {
-		http.Error(w, "", http.StatusNotFound)
+	projectRefType, err := common.ParseRef(projectRef)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
-	if err := json.NewEncoder(w).Encode(project); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-}
-
-type ProjectByNameHandler struct {
-	log    *zap.SugaredLogger
-	readDB *readdb.ReadDB
-}
-
-func NewProjectByNameHandler(logger *zap.Logger, readDB *readdb.ReadDB) *ProjectByNameHandler {
-	return &ProjectByNameHandler{log: logger.Sugar(), readDB: readDB}
-}
-
-func (h *ProjectByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	ownerID := vars["ownerid"]
-	projectName := vars["projectname"]
 
 	var project *types.Project
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err = h.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		project, err = h.readDB.GetOwnerProjectByName(tx, ownerID, projectName)
+		switch projectRefType {
+		case common.RefTypeID:
+			project, err = h.readDB.GetProject(tx, projectRef)
+		case common.RefTypePath:
+			project, err = h.readDB.GetProjectByPath(tx, projectRef)
+		}
 		return err
 	})
 	if err != nil {
@@ -144,9 +124,13 @@ func (h *DeleteProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	ctx := r.Context()
 
 	vars := mux.Vars(r)
-	projectID := vars["projectid"]
+	projectRef, err := url.PathUnescape(vars["projectref"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
-	err := h.ch.DeleteProject(ctx, projectID)
+	err = h.ch.DeleteProject(ctx, projectRef)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 	}
@@ -156,59 +140,3 @@ const (
 	DefaultProjectsLimit = 10
 	MaxProjectsLimit     = 20
 )
-
-type ProjectsHandler struct {
-	log    *zap.SugaredLogger
-	readDB *readdb.ReadDB
-}
-
-func NewProjectsHandler(logger *zap.Logger, readDB *readdb.ReadDB) *ProjectsHandler {
-	return &ProjectsHandler{log: logger.Sugar(), readDB: readDB}
-}
-
-func (h *ProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	ownerID := vars["ownerid"]
-
-	query := r.URL.Query()
-
-	limitS := query.Get("limit")
-	limit := DefaultProjectsLimit
-	if limitS != "" {
-		var err error
-		limit, err = strconv.Atoi(limitS)
-		if err != nil {
-			http.Error(w, "", http.StatusBadRequest)
-			return
-		}
-	}
-	if limit < 0 {
-		http.Error(w, "limit must be greater or equal than 0", http.StatusBadRequest)
-		return
-	}
-	if limit > MaxProjectsLimit {
-		limit = MaxProjectsLimit
-	}
-	asc := false
-	if _, ok := query["asc"]; ok {
-		asc = true
-	}
-
-	start := query.Get("start")
-
-	var projects []*types.Project
-	err := h.readDB.Do(func(tx *db.Tx) error {
-		var err error
-		projects, err = h.readDB.GetOwnerProjects(tx, ownerID, start, limit, asc)
-		return err
-	})
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if err := json.NewEncoder(w).Encode(projects); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-}

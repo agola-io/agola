@@ -30,11 +30,10 @@ import (
 
 type CreateProjectRequest struct {
 	Name                string
+	ParentID            string
 	RemoteSourceName    string
 	RepoURL             string
-	UserID              string
-	OwnerType           types.OwnerType
-	OwnerID             string
+	CurrentUserID       string
 	SkipSSHHostKeyCheck bool
 }
 
@@ -65,9 +64,9 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 		return nil, errors.Wrapf(err, "failed to generate ssh key pair")
 	}
 
-	user, _, err := c.configstoreClient.GetUser(ctx, req.UserID)
+	user, _, err := c.configstoreClient.GetUser(ctx, req.CurrentUserID)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get user %q", req.UserID)
+		return nil, errors.Wrapf(err, "failed to get user %q", req.CurrentUserID)
 	}
 	rs, _, err := c.configstoreClient.GetRemoteSourceByName(ctx, req.RemoteSourceName)
 	if err != nil {
@@ -86,23 +85,23 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 		return nil, errors.Errorf("user doesn't have a linked account for remote source %q", rs.Name)
 	}
 
+	parentID := req.ParentID
+	if parentID == "" {
+		// create project in current user namespace
+		parentID = path.Join("user", user.UserName)
+	}
+
 	p := &types.Project{
-		Name:                req.Name,
-		OwnerType:           types.OwnerTypeUser,
-		OwnerID:             user.ID,
+		Name: req.Name,
+		Parent: types.Parent{
+			Type: types.ConfigTypeProjectGroup,
+			ID:   parentID,
+		},
 		LinkedAccountID:     la.ID,
-		Path:                fmt.Sprintf("%s/%s", repoOwner, repoName),
+		RepoPath:            fmt.Sprintf("%s/%s", repoOwner, repoName),
 		CloneURL:            cloneURL,
 		SkipSSHHostKeyCheck: req.SkipSSHHostKeyCheck,
 		SSHPrivateKey:       string(privateKey),
-	}
-
-	if req.OwnerType == types.OwnerTypeOrganization {
-		if req.OwnerID == "" {
-			return nil, errors.Errorf("ownerid must be specified when adding a project outside the current user")
-		}
-		p.OwnerType = req.OwnerType
-		p.OwnerID = req.OwnerID
 	}
 
 	c.log.Infof("creating project")
@@ -157,8 +156,8 @@ func (c *CommandHandler) SetupProject(ctx context.Context, rs *types.RemoteSourc
 	return nil
 }
 
-func (c *CommandHandler) ReconfigProject(ctx context.Context, ownerID, projectName string) error {
-	p, _, err := c.configstoreClient.GetProjectByName(ctx, ownerID, projectName)
+func (c *CommandHandler) ReconfigProject(ctx context.Context, projectID string) error {
+	p, _, err := c.configstoreClient.GetProject(ctx, projectID)
 	if err != nil {
 		return err
 	}
@@ -179,8 +178,8 @@ func (c *CommandHandler) ReconfigProject(ctx context.Context, ownerID, projectNa
 		return errors.Wrapf(err, "failed to get remote source %q", la.RemoteSourceID)
 	}
 
-	repoOwner := strings.TrimPrefix(path.Dir(p.Path), "/")
-	repoName := path.Base(p.Path)
+	repoOwner := strings.TrimPrefix(path.Dir(p.RepoPath), "/")
+	repoName := path.Base(p.RepoPath)
 
 	return c.SetupProject(ctx, rs, la, &SetupProjectRequest{
 		Project:   p,

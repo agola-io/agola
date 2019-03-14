@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"path"
 	"reflect"
 	"sync"
 	"testing"
@@ -90,7 +91,7 @@ func getProjects(cs *ConfigStore) ([]*types.Project, error) {
 	var projects []*types.Project
 	err := cs.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		projects, err = cs.readDB.GetProjects(tx, "", 0, true)
+		projects, err = cs.readDB.GetAllProjects(tx)
 		return err
 	})
 	return projects, err
@@ -356,7 +357,7 @@ func TestUser(t *testing.T) {
 	})
 }
 
-func TestProject(t *testing.T) {
+func TestProjectGroupsAndProjects(t *testing.T) {
 	dir, err := ioutil.TempDir("", "agola")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -390,56 +391,87 @@ func TestProject(t *testing.T) {
 	// TODO(sgotti) change the sleep with a real check that user is in readdb
 	time.Sleep(2 * time.Second)
 
-	t.Run("create project with owner type user", func(t *testing.T) {
-		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", OwnerType: "user", OwnerID: user.ID})
+	t.Run("create a project in user root project group", func(t *testing.T) {
+		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.UserName)}})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
 	})
-	t.Run("create project with owner type org", func(t *testing.T) {
-		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", OwnerType: "organization", OwnerID: org.ID})
+	t.Run("create a project in org root project group", func(t *testing.T) {
+		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
 	})
-	t.Run("create duplicated project for user", func(t *testing.T) {
-		expectedErr := fmt.Sprintf("bad request: project with name %q for user with id %q already exists", "project01", user.ID)
-		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", OwnerType: "user", OwnerID: user.ID})
+	t.Run("create a projectgroup in user root project group", func(t *testing.T) {
+		_, err := cs.ch.CreateProjectGroup(ctx, &types.ProjectGroup{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.UserName)}})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+	})
+	t.Run("create a projectgroup in org root project group", func(t *testing.T) {
+		_, err := cs.ch.CreateProjectGroup(ctx, &types.ProjectGroup{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+	})
+	t.Run("create a project in user non root project group with same name as a root project", func(t *testing.T) {
+		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.UserName, "projectgroup01")}})
+		if err != nil {
+			t.Fatalf("unexpected err: %+#v", err)
+		}
+	})
+	t.Run("create a project in org non root project group with same name as a root project", func(t *testing.T) {
+		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name, "projectgroup01")}})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+	})
+
+	t.Run("create duplicated project in user root project group", func(t *testing.T) {
+		projectName := "project01"
+		expectedErr := fmt.Sprintf("bad request: project with name %q, path %q already exists", projectName, path.Join("user", user.UserName, projectName))
+		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.UserName)}})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
 	})
-	t.Run("create duplicated project for org", func(t *testing.T) {
-		expectedErr := fmt.Sprintf("bad request: project with name %q for organization with id %q already exists", "project01", org.ID)
-		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", OwnerType: "organization", OwnerID: org.ID})
+	t.Run("create duplicated project in org root project group", func(t *testing.T) {
+		projectName := "project01"
+		expectedErr := fmt.Sprintf("bad request: project with name %q, path %q already exists", projectName, path.Join("org", org.Name, projectName))
+		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
 	})
-	t.Run("create project with owner as unexistent user", func(t *testing.T) {
-		expectedErr := `bad request: user id "unexistentid" doesn't exist`
-		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", OwnerType: "user", OwnerID: "unexistentid"})
+
+	t.Run("create duplicated project in user non root project group", func(t *testing.T) {
+		projectName := "project01"
+		expectedErr := fmt.Sprintf("bad request: project with name %q, path %q already exists", projectName, path.Join("user", user.UserName, "projectgroup01", projectName))
+		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.UserName, "projectgroup01")}})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
 	})
-	t.Run("create project with owner as unexistent org", func(t *testing.T) {
-		expectedErr := `bad request: organization id "unexistentid" doesn't exist`
-		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", OwnerType: "organization", OwnerID: "unexistentid"})
+	t.Run("create duplicated project in org non root project group", func(t *testing.T) {
+		projectName := "project01"
+		expectedErr := fmt.Sprintf("bad request: project with name %q, path %q already exists", projectName, path.Join("org", org.Name, "projectgroup01", projectName))
+		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name, "projectgroup01")}})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
 	})
-	t.Run("create project without ownertype specified", func(t *testing.T) {
-		expectedErr := "bad request: project ownertype required"
+
+	t.Run("create project in unexistent project group", func(t *testing.T) {
+		expectedErr := `bad request: project group with id "unexistentid" doesn't exist`
+		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: "unexistentid"}})
+		if err.Error() != expectedErr {
+			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+		}
+	})
+	t.Run("create project without parent id specified", func(t *testing.T) {
+		expectedErr := "bad request: project parent id required"
 		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01"})
-		if err.Error() != expectedErr {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
-	})
-	t.Run("create project without ownerid specified", func(t *testing.T) {
-		expectedErr := "bad request: project ownerid required"
-		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", OwnerType: "organization"})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
@@ -454,7 +486,7 @@ func TestProject(t *testing.T) {
 		wg := sync.WaitGroup{}
 		for i := 0; i < 10; i++ {
 			wg.Add(1)
-			go cs.ch.CreateProject(ctx, &types.Project{Name: "project02", OwnerType: "user", OwnerID: user.ID})
+			go cs.ch.CreateProject(ctx, &types.Project{Name: "project02", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.UserName)}})
 			wg.Done()
 		}
 		wg.Wait()

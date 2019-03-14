@@ -33,8 +33,7 @@ var cmdProjectList = &cobra.Command{
 }
 
 type projectListOptions struct {
-	limit int
-	start string
+	parentPath string
 }
 
 var projectListOpts projectListOptions
@@ -42,14 +41,15 @@ var projectListOpts projectListOptions
 func init() {
 	flags := cmdProjectList.PersistentFlags()
 
-	flags.IntVar(&projectListOpts.limit, "limit", 10, "max number of runs to show")
-	flags.StringVar(&projectListOpts.start, "start", "", "starting project name (excluded) to fetch")
+	flags.StringVar(&projectListOpts.parentPath, "parent", "", `project group path (i.e "org/org01" for root project group in org01, "/user/user01/group01/subgroub01") or project group id`)
+
+	cmdProjectList.MarkFlagRequired("parent")
 
 	cmdProject.AddCommand(cmdProjectList)
 }
 
-func printProjects(projectsResponse *api.GetProjectsResponse) {
-	for _, project := range projectsResponse.Projects {
+func printProjects(projects []*api.ProjectResponse) {
+	for _, project := range projects {
 		fmt.Printf("%s: Name: %s\n", project.ID, project.Name)
 	}
 }
@@ -57,12 +57,12 @@ func printProjects(projectsResponse *api.GetProjectsResponse) {
 func projectList(cmd *cobra.Command, args []string) error {
 	gwclient := api.NewClient(gatewayURL, token)
 
-	projectsResponse, _, err := gwclient.GetCurrentUserProjects(context.TODO(), projectListOpts.start, projectListOpts.limit, false)
+	projects, _, err := gwclient.GetProjectGroupProjects(context.TODO(), projectListOpts.parentPath)
 	if err != nil {
 		return err
 	}
 
-	printProjects(projectsResponse)
+	printProjects(projects)
 
 	return nil
 }

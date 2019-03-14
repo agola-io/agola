@@ -17,6 +17,7 @@ package command
 import (
 	"context"
 	"encoding/json"
+	"path"
 
 	"github.com/sorintlab/agola/internal/db"
 	"github.com/sorintlab/agola/internal/services/configstore/common"
@@ -44,57 +45,129 @@ func NewCommandHandler(logger *zap.Logger, readDB *readdb.ReadDB, wal *wal.WalMa
 	}
 }
 
-func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Project) (*types.Project, error) {
-	if project.Name == "" {
-		return nil, util.NewErrBadRequest(errors.Errorf("project name required"))
+func (s *CommandHandler) CreateProjectGroup(ctx context.Context, projectGroup *types.ProjectGroup) (*types.ProjectGroup, error) {
+	if projectGroup.Name == "" {
+		return nil, util.NewErrBadRequest(errors.Errorf("project group name required"))
 	}
-	if project.OwnerType == "" {
-		return nil, util.NewErrBadRequest(errors.Errorf("project ownertype required"))
-	}
-	if project.OwnerID == "" {
-		return nil, util.NewErrBadRequest(errors.Errorf("project ownerid required"))
-	}
-	if !types.IsValidOwnerType(project.OwnerType) {
-		return nil, util.NewErrBadRequest(errors.Errorf("invalid project ownertype %q", project.OwnerType))
+	if projectGroup.Parent.ID == "" {
+		return nil, util.NewErrBadRequest(errors.Errorf("project group parent id required"))
 	}
 
 	var cgt *wal.ChangeGroupsUpdateToken
-	cgNames := []string{project.OwnerID}
 
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
-		var err error
+		parentProjectGroup, err := s.readDB.GetProjectGroup(tx, projectGroup.Parent.ID)
+		if err != nil {
+			return err
+		}
+		if parentProjectGroup == nil {
+			return util.NewErrBadRequest(errors.Errorf("project group with id %q doesn't exist", projectGroup.Parent.ID))
+		}
+		projectGroup.Parent.ID = parentProjectGroup.ID
+
+		groupPath, err := s.readDB.GetProjectGroupPath(tx, parentProjectGroup)
+		if err != nil {
+			return err
+		}
+		pp := path.Join(groupPath, projectGroup.Name)
+
+		cgNames := []string{pp}
 		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
 			return err
 		}
 
-		// check owner exists
-		switch project.OwnerType {
-		case types.OwnerTypeUser:
-			user, err := s.readDB.GetUser(tx, project.OwnerID)
-			if err != nil {
-				return err
-			}
-			if user == nil {
-				return util.NewErrBadRequest(errors.Errorf("user id %q doesn't exist", project.OwnerID))
-			}
-		case types.OwnerTypeOrganization:
-			org, err := s.readDB.GetOrg(tx, project.OwnerID)
-			if err != nil {
-				return err
-			}
-			if org == nil {
-				return util.NewErrBadRequest(errors.Errorf("organization id %q doesn't exist", project.OwnerID))
-			}
-		}
 		// check duplicate project name
-		p, err := s.readDB.GetOwnerProjectByName(tx, project.OwnerID, project.Name)
+		p, err := s.readDB.GetProjectByName(tx, projectGroup.Parent.ID, projectGroup.Name)
 		if err != nil {
 			return err
 		}
 		if p != nil {
-			return util.NewErrBadRequest(errors.Errorf("project with name %q for %s with id %q already exists", p.Name, project.OwnerType, project.OwnerID))
+			return util.NewErrBadRequest(errors.Errorf("project with name %q, path %q already exists", p.Name, pp))
+		}
+		// check duplicate project group name
+		pg, err := s.readDB.GetProjectGroupByName(tx, projectGroup.Parent.ID, projectGroup.Name)
+		if err != nil {
+			return err
+		}
+		if pg != nil {
+			return util.NewErrBadRequest(errors.Errorf("project group with name %q, path %q already exists", pg.Name, pp))
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	projectGroup.ID = uuid.NewV4().String()
+	projectGroup.Parent.Type = types.ConfigTypeProjectGroup
+
+	pcj, err := json.Marshal(projectGroup)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to marshal projectGroup")
+	}
+	actions := []*wal.Action{
+		{
+			ActionType: wal.ActionTypePut,
+			Path:       common.StorageProjectGroupFile(projectGroup.ID),
+			Data:       pcj,
+		},
+	}
+
+	_, err = s.wal.WriteWal(ctx, actions, cgt)
+	return projectGroup, err
+}
+
+func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Project) (*types.Project, error) {
+	if project.Name == "" {
+		return nil, util.NewErrBadRequest(errors.Errorf("project name required"))
+	}
+	if project.Parent.ID == "" {
+		return nil, util.NewErrBadRequest(errors.Errorf("project parent id required"))
+	}
+
+	var cgt *wal.ChangeGroupsUpdateToken
+
+	// must do all the check in a single transaction to avoid concurrent changes
+	err := s.readDB.Do(func(tx *db.Tx) error {
+		var err error
+		group, err := s.readDB.GetProjectGroup(tx, project.Parent.ID)
+		if err != nil {
+			return err
+		}
+		if group == nil {
+			return util.NewErrBadRequest(errors.Errorf("project group with id %q doesn't exist", project.Parent.ID))
+		}
+		project.Parent.ID = group.ID
+
+		groupPath, err := s.readDB.GetProjectGroupPath(tx, group)
+		if err != nil {
+			return err
+		}
+		pp := path.Join(groupPath, project.Name)
+
+		cgNames := []string{pp}
+		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		if err != nil {
+			return err
+		}
+
+		// check duplicate project name
+		p, err := s.readDB.GetProjectByName(tx, project.Parent.ID, project.Name)
+		if err != nil {
+			return err
+		}
+		if p != nil {
+			return util.NewErrBadRequest(errors.Errorf("project with name %q, path %q already exists", p.Name, pp))
+		}
+		// check duplicate project group name
+		pg, err := s.readDB.GetProjectGroupByName(tx, project.Parent.ID, project.Name)
+		if err != nil {
+			return err
+		}
+		if pg != nil {
+			return util.NewErrBadRequest(errors.Errorf("project group with name %q, path %q already exists", pg.Name, pp))
 		}
 		return nil
 	})
@@ -103,6 +176,7 @@ func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Proje
 	}
 
 	project.ID = uuid.NewV4().String()
+	project.Parent.Type = types.ConfigTypeProjectGroup
 
 	pcj, err := json.Marshal(project)
 	if err != nil {
@@ -120,28 +194,34 @@ func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Proje
 	return project, err
 }
 
-func (s *CommandHandler) DeleteProject(ctx context.Context, projectID string) error {
+func (s *CommandHandler) DeleteProject(ctx context.Context, projectRef string) error {
 	var project *types.Project
 
 	var cgt *wal.ChangeGroupsUpdateToken
-	cgNames := []string{project.OwnerID}
 
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
+
+		// check project existance
+		project, err := s.readDB.GetProject(tx, projectRef)
+		if err != nil {
+			return err
+		}
+		if project == nil {
+			return util.NewErrBadRequest(errors.Errorf("project %q doesn't exist", projectRef))
+		}
+		group, err := s.readDB.GetProjectGroup(tx, project.Parent.ID)
+		if err != nil {
+			return err
+		}
+
+		cgNames := []string{group.ID}
 		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
 			return err
 		}
 
-		// check project existance
-		project, err = s.readDB.GetProject(tx, projectID)
-		if err != nil {
-			return err
-		}
-		if project == nil {
-			return util.NewErrBadRequest(errors.Errorf("project %q doesn't exist", projectID))
-		}
 		return nil
 	})
 	if err != nil {
@@ -190,16 +270,33 @@ func (s *CommandHandler) CreateUser(ctx context.Context, user *types.User) (*typ
 	}
 
 	user.ID = uuid.NewV4().String()
-
 	userj, err := json.Marshal(user)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to marshal user")
 	}
+
+	pg := &types.ProjectGroup{
+		ID: uuid.NewV4().String(),
+		Parent: types.Parent{
+			Type: types.ConfigTypeUser,
+			ID:   user.ID,
+		},
+	}
+	pgj, err := json.Marshal(pg)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to marshal project group")
+	}
+
 	actions := []*wal.Action{
 		{
 			ActionType: wal.ActionTypePut,
 			Path:       common.StorageUserFile(user.ID),
 			Data:       userj,
+		},
+		{
+			ActionType: wal.ActionTypePut,
+			Path:       common.StorageProjectGroupFile(pg.ID),
+			Data:       pgj,
 		},
 	}
 
@@ -645,16 +742,32 @@ func (s *CommandHandler) CreateOrg(ctx context.Context, org *types.Organization)
 	}
 
 	org.ID = uuid.NewV4().String()
-
 	orgj, err := json.Marshal(org)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to marshal org")
+	}
+
+	pg := &types.ProjectGroup{
+		ID: uuid.NewV4().String(),
+		Parent: types.Parent{
+			Type: types.ConfigTypeOrg,
+			ID:   org.ID,
+		},
+	}
+	pgj, err := json.Marshal(pg)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to marshal project group")
 	}
 	actions := []*wal.Action{
 		{
 			ActionType: wal.ActionTypePut,
 			Path:       common.StorageOrgFile(org.ID),
 			Data:       orgj,
+		},
+		{
+			ActionType: wal.ActionTypePut,
+			Path:       common.StorageProjectGroupFile(pg.ID),
+			Data:       pgj,
 		},
 	}
 
@@ -667,7 +780,7 @@ func (s *CommandHandler) DeleteOrg(ctx context.Context, orgName string) error {
 	var projects []*types.Project
 
 	var cgt *wal.ChangeGroupsUpdateToken
-	cgNames := []string{org.ID}
+	cgNames := []string{orgName}
 
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
@@ -685,11 +798,7 @@ func (s *CommandHandler) DeleteOrg(ctx context.Context, orgName string) error {
 		if org == nil {
 			return util.NewErrBadRequest(errors.Errorf("org %q doesn't exist", orgName))
 		}
-		// get org projects
-		projects, err = s.readDB.GetOwnerProjects(tx, org.ID, "", 0, false)
-		if err != nil {
-			return err
-		}
+		// TODO(sgotti) delete all project groups, projects etc...
 		return nil
 	})
 	if err != nil {

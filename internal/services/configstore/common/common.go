@@ -16,25 +16,26 @@ package common
 
 import (
 	"fmt"
+	"net/url"
 	"path"
+	"strings"
+
+	"github.com/sorintlab/agola/internal/services/types"
 )
 
 var (
 	// Storage paths. Always use path (not filepath) to use the "/" separator
 	StorageDataDir          = "data"
-	StorageProjectsDir      = path.Join(StorageDataDir, "projects")
 	StorageUsersDir         = path.Join(StorageDataDir, "users")
 	StorageOrgsDir          = path.Join(StorageDataDir, "orgs")
+	StorageProjectsDir      = path.Join(StorageDataDir, "projects")
+	StorageProjectGroupsDir = path.Join(StorageDataDir, "projectgroups")
 	StorageRemoteSourcesDir = path.Join(StorageDataDir, "remotesources")
 )
 
 const (
 	etcdWalsMinRevisionRange = 100
 )
-
-func StorageProjectFile(projectID string) string {
-	return path.Join(StorageProjectsDir, projectID)
-}
 
 func StorageUserFile(userID string) string {
 	return path.Join(StorageUsersDir, userID)
@@ -44,33 +45,54 @@ func StorageOrgFile(orgID string) string {
 	return path.Join(StorageOrgsDir, orgID)
 }
 
+func StorageProjectGroupFile(projectGroupID string) string {
+	return path.Join(StorageProjectGroupsDir, projectGroupID)
+}
+
+func StorageProjectFile(projectID string) string {
+	return path.Join(StorageProjectsDir, projectID)
+}
+
 func StorageRemoteSourceFile(userID string) string {
 	return path.Join(StorageRemoteSourcesDir, userID)
 }
 
-type ConfigType string
-
-const (
-	ConfigTypeProject      ConfigType = "project"
-	ConfigTypeUser         ConfigType = "user"
-	ConfigTypeOrg          ConfigType = "org"
-	ConfigTypeRemoteSource ConfigType = "remotesource"
-)
-
-func PathToTypeID(p string) (ConfigType, string) {
-	var configType ConfigType
+func PathToTypeID(p string) (types.ConfigType, string) {
+	var configType types.ConfigType
 	switch path.Dir(p) {
-	case StorageProjectsDir:
-		configType = ConfigTypeProject
 	case StorageUsersDir:
-		configType = ConfigTypeUser
+		configType = types.ConfigTypeUser
 	case StorageOrgsDir:
-		configType = ConfigTypeOrg
+		configType = types.ConfigTypeOrg
+	case StorageProjectGroupsDir:
+		configType = types.ConfigTypeProjectGroup
+	case StorageProjectsDir:
+		configType = types.ConfigTypeProject
 	case StorageRemoteSourcesDir:
-		configType = ConfigTypeRemoteSource
+		configType = types.ConfigTypeRemoteSource
 	default:
 		panic(fmt.Errorf("cannot determine configtype for path: %q", p))
 	}
 
 	return configType, path.Base(p)
+}
+
+type RefType int
+
+const (
+	RefTypeID RefType = iota
+	RefTypePath
+)
+
+// ParseRef parses the api call to determine if the provided ref is
+// an ID or a path
+func ParseRef(projectRef string) (RefType, error) {
+	projectRef, err := url.PathUnescape(projectRef)
+	if err != nil {
+		return -1, err
+	}
+	if strings.Contains(projectRef, "/") {
+		return RefTypePath, nil
+	}
+	return RefTypeID, nil
 }

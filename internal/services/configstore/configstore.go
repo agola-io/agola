@@ -109,9 +109,12 @@ func (s *ConfigStore) Run(ctx context.Context) error {
 	corsAllowedOriginsOptions := ghandlers.AllowedOrigins([]string{"*"})
 	corsHandler = ghandlers.CORS(corsAllowedMethodsOptions, corsAllowedHeadersOptions, corsAllowedOriginsOptions)
 
+	projectGroupHandler := api.NewProjectGroupHandler(logger, s.readDB)
+	projectGroupSubgroupsHandler := api.NewProjectGroupSubgroupsHandler(logger, s.readDB)
+	projectGroupProjectsHandler := api.NewProjectGroupProjectsHandler(logger, s.readDB)
+	createProjectGroupHandler := api.NewCreateProjectGroupHandler(logger, s.ch)
+
 	projectHandler := api.NewProjectHandler(logger, s.readDB)
-	projectsHandler := api.NewProjectsHandler(logger, s.readDB)
-	projectByNameHandler := api.NewProjectByNameHandler(logger, s.readDB)
 	createProjectHandler := api.NewCreateProjectHandler(logger, s.ch)
 	deleteProjectHandler := api.NewDeleteProjectHandler(logger, s.ch)
 
@@ -140,11 +143,14 @@ func (s *ConfigStore) Run(ctx context.Context) error {
 	deleteRemoteSourceHandler := api.NewDeleteRemoteSourceHandler(logger, s.ch)
 
 	router := mux.NewRouter()
-	apirouter := router.PathPrefix("/api/v1alpha").Subrouter()
+	apirouter := router.PathPrefix("/api/v1alpha").Subrouter().UseEncodedPath()
 
-	apirouter.Handle("/project/{projectid}", projectHandler).Methods("GET")
-	apirouter.Handle("/owner/{ownerid}/projects", projectsHandler).Methods("GET")
-	apirouter.Handle("/projects/{ownerid}/{projectname}", projectByNameHandler).Methods("GET")
+	apirouter.Handle("/projectgroups/{projectgroupref}", projectGroupHandler).Methods("GET")
+	apirouter.Handle("/projectgroups/{projectgroupref}/subgroups", projectGroupSubgroupsHandler).Methods("GET")
+	apirouter.Handle("/projectgroups/{projectgroupref}/projects", projectGroupProjectsHandler).Methods("GET")
+	apirouter.Handle("/projectgroups", createProjectGroupHandler).Methods("PUT")
+
+	apirouter.Handle("/projects/{projectref}", projectHandler).Methods("GET")
 	apirouter.Handle("/projects", createProjectHandler).Methods("PUT")
 	apirouter.Handle("/projects/{projectid}", deleteProjectHandler).Methods("DELETE")
 

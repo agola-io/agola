@@ -48,8 +48,8 @@ func init() {
 	cmdUser.AddCommand(cmdUserList)
 }
 
-func printUsers(usersResponse *api.UsersResponse) {
-	for _, user := range usersResponse.Users {
+func printUsers(users []*api.UserResponse) {
+	for _, user := range users {
 		fmt.Printf("%s: Name: %s\n", user.ID, user.UserName)
 	}
 }
@@ -57,12 +57,12 @@ func printUsers(usersResponse *api.UsersResponse) {
 func userList(cmd *cobra.Command, args []string) error {
 	gwclient := api.NewClient(gatewayURL, token)
 
-	usersResponse, _, err := gwclient.GetUsers(context.TODO(), userListOpts.start, userListOpts.limit, false)
+	users, _, err := gwclient.GetUsers(context.TODO(), userListOpts.start, userListOpts.limit, false)
 	if err != nil {
 		return err
 	}
 
-	printUsers(usersResponse)
+	printUsers(users)
 
 	return nil
 }

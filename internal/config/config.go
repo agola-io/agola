@@ -167,7 +167,6 @@ func (t *Task) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 			case "run":
 				var rs RunStep
-				rs.Type = stepType
 				switch stepSpec.(type) {
 				case string:
 					rs.Command = stepSpec.(string)
@@ -176,22 +175,23 @@ func (t *Task) UnmarshalYAML(unmarshal func(interface{}) error) error {
 						return err
 					}
 				}
+				rs.Type = stepType
 				steps[i] = &rs
 
 			case "save_to_workspace":
 				var sws SaveToWorkspaceStep
-				sws.Type = stepType
 				if err := yaml.Unmarshal(o, &sws); err != nil {
 					return err
 				}
+				sws.Type = stepType
 				steps[i] = &sws
 
 			case "restore_workspace":
 				var rws RestoreWorkspaceStep
-				rws.Type = stepType
 				if err := yaml.Unmarshal(o, &rws); err != nil {
 					return err
 				}
+				rws.Type = stepType
 				steps[i] = &rws
 			default:
 				return errors.Errorf("unknown step type: %s", stepType)
@@ -452,7 +452,7 @@ var DefaultConfig = Config{}
 func ParseConfig(configData []byte) (*Config, error) {
 	config := DefaultConfig
 	if err := yaml.Unmarshal(configData, &config); err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to unmarshal config")
 	}
 
 	if len(config.Pipelines) == 0 {

@@ -30,6 +30,7 @@ import (
 	"github.com/sorintlab/agola/internal/objectstorage"
 	"github.com/sorintlab/agola/internal/sequence"
 	"github.com/sorintlab/agola/internal/services/configstore/common"
+	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 	"github.com/sorintlab/agola/internal/wal"
 
@@ -440,6 +441,7 @@ func (r *ReadDB) Run(ctx context.Context) error {
 				break
 			}
 			r.log.Errorf("initialize err: %+v", err)
+
 			time.Sleep(1 * time.Second)
 		}
 	}
@@ -619,19 +621,23 @@ func (r *ReadDB) applyAction(tx *db.Tx, action *wal.Action) error {
 	switch action.ActionType {
 	case wal.ActionTypePut:
 		switch configType {
-		case common.ConfigTypeProject:
-			if err := r.insertProject(tx, action.Data); err != nil {
-				return err
-			}
-		case common.ConfigTypeUser:
+		case types.ConfigTypeUser:
 			if err := r.insertUser(tx, action.Data); err != nil {
 				return err
 			}
-		case common.ConfigTypeOrg:
+		case types.ConfigTypeOrg:
 			if err := r.insertOrg(tx, action.Data); err != nil {
 				return err
 			}
-		case common.ConfigTypeRemoteSource:
+		case types.ConfigTypeProjectGroup:
+			if err := r.insertProjectGroup(tx, action.Data); err != nil {
+				return err
+			}
+		case types.ConfigTypeProject:
+			if err := r.insertProject(tx, action.Data); err != nil {
+				return err
+			}
+		case types.ConfigTypeRemoteSource:
 			if err := r.insertRemoteSource(tx, action.Data); err != nil {
 				return err
 			}
@@ -639,22 +645,27 @@ func (r *ReadDB) applyAction(tx *db.Tx, action *wal.Action) error {
 
 	case wal.ActionTypeDelete:
 		switch configType {
-		case common.ConfigTypeProject:
-			r.log.Debugf("deleting project with id: %s", ID)
-			if err := r.deleteProject(tx, ID); err != nil {
-				return err
-			}
-		case common.ConfigTypeUser:
+		case types.ConfigTypeUser:
 			r.log.Debugf("deleting user with id: %s", ID)
 			if err := r.deleteUser(tx, ID); err != nil {
 				return err
 			}
-		case common.ConfigTypeOrg:
+		case types.ConfigTypeOrg:
 			r.log.Debugf("deleting org with id: %s", ID)
 			if err := r.deleteOrg(tx, ID); err != nil {
 				return err
 			}
-		case common.ConfigTypeRemoteSource:
+		case types.ConfigTypeProjectGroup:
+			r.log.Debugf("deleting project group with id: %s", ID)
+			if err := r.deleteProjectGroup(tx, ID); err != nil {
+				return err
+			}
+		case types.ConfigTypeProject:
+			r.log.Debugf("deleting project with id: %s", ID)
+			if err := r.deleteProject(tx, ID); err != nil {
+				return err
+			}
+		case types.ConfigTypeRemoteSource:
 			r.log.Debugf("deleting remote source with id: %s", ID)
 			if err := r.deleteRemoteSource(tx, ID); err != nil {
 				return err

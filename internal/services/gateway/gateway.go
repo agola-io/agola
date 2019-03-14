@@ -143,9 +143,12 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	webhooksHandler := &webhooksHandler{log: log, configstoreClient: g.configstoreClient, runserviceClient: g.runserviceClient, apiExposedURL: g.c.APIExposedURL}
 
+	projectGroupHandler := api.NewProjectGroupHandler(logger, g.configstoreClient)
+	projectGroupSubgroupsHandler := api.NewProjectGroupSubgroupsHandler(logger, g.configstoreClient)
+	projectGroupProjectsHandler := api.NewProjectGroupProjectsHandler(logger, g.configstoreClient)
+	createProjectGroupHandler := api.NewCreateProjectGroupHandler(logger, g.ch, g.configstoreClient, g.c.APIExposedURL)
+
 	projectHandler := api.NewProjectHandler(logger, g.configstoreClient)
-	projectByNameHandler := api.NewProjectByNameHandler(logger, g.configstoreClient)
-	projectsHandler := api.NewProjectsHandler(logger, g.configstoreClient)
 	createProjectHandler := api.NewCreateProjectHandler(logger, g.ch, g.configstoreClient, g.c.APIExposedURL)
 	deleteProjectHandler := api.NewDeleteProjectHandler(logger, g.configstoreClient)
 	projectReconfigHandler := api.NewProjectReconfigHandler(logger, g.ch, g.configstoreClient, g.c.APIExposedURL)
@@ -154,7 +157,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	userHandler := api.NewUserHandler(logger, g.configstoreClient)
 	userByNameHandler := api.NewUserByNameHandler(logger, g.configstoreClient)
 	usersHandler := api.NewUsersHandler(logger, g.configstoreClient)
-	createUserHandler := api.NewCreateUserHandler(logger, g.configstoreClient)
+	createUserHandler := api.NewCreateUserHandler(logger, g.ch, g.configstoreClient)
 	deleteUserHandler := api.NewDeleteUserHandler(logger, g.configstoreClient)
 
 	createUserLAHandler := api.NewCreateUserLAHandler(logger, g.ch, g.configstoreClient)
@@ -185,7 +188,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	router := mux.NewRouter()
 
-	apirouter := mux.NewRouter().PathPrefix("/api/v1alpha").Subrouter()
+	apirouter := mux.NewRouter().PathPrefix("/api/v1alpha").Subrouter().UseEncodedPath()
 
 	authForcedHandler := handlers.NewAuthHandler(logger, g.configstoreClient, g.c.AdminToken, g.sd, true)
 	authOptionalHandler := handlers.NewAuthHandler(logger, g.configstoreClient, g.c.AdminToken, g.sd, false)
@@ -194,19 +197,17 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	apirouter.Handle("/logs", logsHandler).Methods("GET")
 
-	apirouter.Handle("/project/{projectid}", authForcedHandler(projectHandler)).Methods("GET")
-	apirouter.Handle("/user/projects", authForcedHandler(projectsHandler)).Methods("GET")
-	apirouter.Handle("/user/{username}/projects", authForcedHandler(projectsHandler)).Methods("GET")
-	apirouter.Handle("/org/{orgname}/projects", authForcedHandler(projectsHandler)).Methods("GET")
-	apirouter.Handle("/user/projects", authForcedHandler(createProjectHandler)).Methods("PUT")
-	apirouter.Handle("/org/{orgname}/projects", authForcedHandler(createProjectHandler)).Methods("PUT")
-	apirouter.Handle("/projects/user/{username}/{projectname}", authForcedHandler(projectByNameHandler)).Methods("GET")
-	apirouter.Handle("/projects/org/{orgname}/{projectname}", authForcedHandler(projectByNameHandler)).Methods("GET")
-	apirouter.Handle("/projects/user/{projectname}", authForcedHandler(deleteProjectHandler)).Methods("DELETE")
-	apirouter.Handle("/projects/user/{username}/{projectname}", authForcedHandler(deleteProjectHandler)).Methods("DELETE")
-	apirouter.Handle("/projects/org/{orgname}/{projectname}", authForcedHandler(deleteProjectHandler)).Methods("DELETE")
-	apirouter.Handle("/projects/user/{username}/{projectname}/reconfig", authForcedHandler(projectReconfigHandler)).Methods("POST")
-	apirouter.Handle("/projects/org/{orgname}/{projectname}/reconfig", authForcedHandler(projectReconfigHandler)).Methods("POST")
+	//apirouter.Handle("/projectgroups", authForcedHandler(projectsHandler)).Methods("GET")
+	apirouter.Handle("/projectgroups/{projectgroupid}", authForcedHandler(projectGroupHandler)).Methods("GET")
+	apirouter.Handle("/projectgroups/{projectgroupid}/subgroups", authForcedHandler(projectGroupSubgroupsHandler)).Methods("GET")
+	apirouter.Handle("/projectgroups/{projectgroupid}/projects", authForcedHandler(projectGroupProjectsHandler)).Methods("GET")
+	apirouter.Handle("/projectgroups", authForcedHandler(createProjectGroupHandler)).Methods("PUT")
+	//apirouter.Handle("/projectgroups/{projectgroupid}", authForcedHandler(deleteProjectGroupHandler)).Methods("DELETE")
+
+	apirouter.Handle("/projects/{projectid}", authForcedHandler(projectHandler)).Methods("GET")
+	apirouter.Handle("/projects", authForcedHandler(createProjectHandler)).Methods("PUT")
+	apirouter.Handle("/projects/{projectid}", authForcedHandler(deleteProjectHandler)).Methods("DELETE")
+	apirouter.Handle("/projects/{projectid}/reconfig", authForcedHandler(projectReconfigHandler)).Methods("POST")
 
 	apirouter.Handle("/user", authForcedHandler(currentUserHandler)).Methods("GET")
 	apirouter.Handle("/user/{userid}", authForcedHandler(userHandler)).Methods("GET")

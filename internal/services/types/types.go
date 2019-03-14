@@ -21,6 +21,21 @@ import (
 
 // Configstore types
 
+type ConfigType string
+
+const (
+	ConfigTypeUser         ConfigType = "user"
+	ConfigTypeOrg          ConfigType = "org"
+	ConfigTypeProjectGroup ConfigType = "projectgroup"
+	ConfigTypeProject      ConfigType = "project"
+	ConfigTypeRemoteSource ConfigType = "remotesource"
+)
+
+type Parent struct {
+	Type ConfigType `json:"type,omitempty"`
+	ID   string     `json:"id,omitempty"`
+}
+
 type User struct {
 	// The type version. Increase when a breaking change is done. Usually not
 	// needed when adding fields.
@@ -46,6 +61,16 @@ type Organization struct {
 	ID string `json:"id,omitempty"`
 
 	Name string `json:"name,omitempty"`
+}
+
+type ProjectGroup struct {
+	Version string `json:"version,omitempty"`
+
+	ID string `json:"id,omitempty"`
+
+	Name string `json:"name,omitempty"`
+
+	Parent Parent `json:"parent,omitempty"`
 }
 
 type RemoteSourceType string
@@ -102,17 +127,6 @@ type LinkedAccount struct {
 	Oauth2Expire       time.Duration `json:"oauth2_expire,omitempty"`
 }
 
-type OwnerType string
-
-const (
-	OwnerTypeUser         OwnerType = "user"
-	OwnerTypeOrganization OwnerType = "organization"
-)
-
-func IsValidOwnerType(ownerType OwnerType) bool {
-	return ownerType == OwnerTypeUser || ownerType == OwnerTypeOrganization
-}
-
 type Project struct {
 	// The type version. Increase when a breaking change is done. Usually not
 	// needed when adding fields.
@@ -121,14 +135,13 @@ type Project struct {
 	ID   string `json:"id,omitempty"`
 	Name string `json:"name,omitempty"`
 
-	OwnerType OwnerType `json:"owner_type,omitempty"`
-	OwnerID   string    `json:"owner_id,omitempty"`
+	Parent Parent `json:"parent,omitempty"`
 
 	// Project repository path. It may be different for every kind of git source.
 	// It's needed to get git source needed information like the repo owner and
 	// repo user
 	// Examples: sgotti/agola (for github, gitea etc... sources)
-	Path string `json:"path,omitempty"`
+	RepoPath string `json:"repo_path,omitempty"`
 
 	LinkedAccountID string `json:"linked_account_id,omitempty"`
 

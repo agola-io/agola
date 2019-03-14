@@ -70,9 +70,9 @@ func runList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	runs := make([]*api.RunResponse, len(runsResp.Runs))
-	for i, runsResponse := range runsResp.Runs {
-		run, _, err := gwclient.GetRun(context.TODO(), runsResponse.ID)
+	runs := make([]*api.RunResponse, len(runsResp))
+	for i, runResponse := range runsResp {
+		run, _, err := gwclient.GetRun(context.TODO(), runResponse.ID)
 		if err != nil {
 			return err
 		}

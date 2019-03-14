@@ -17,8 +17,11 @@ package readdb
 import (
 	"database/sql"
 	"encoding/json"
+	"path"
+	"strings"
 
 	"github.com/sorintlab/agola/internal/db"
+	"github.com/sorintlab/agola/internal/services/configstore/common"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
@@ -28,11 +31,11 @@ import (
 
 var (
 	projectSelect = sb.Select("id", "data").From("project")
-	projectInsert = sb.Insert("project").Columns("id", "name", "ownerid", "data")
+	projectInsert = sb.Insert("project").Columns("id", "name", "parentid", "data")
 )
 
 func (r *ReadDB) insertProject(tx *db.Tx, data []byte) error {
-	project := types.Project{}
+	var project *types.Project
 	if err := json.Unmarshal(data, &project); err != nil {
 		return errors.Wrap(err, "failed to unmarshal project")
 	}
@@ -40,7 +43,7 @@ func (r *ReadDB) insertProject(tx *db.Tx, data []byte) error {
 	if err := r.deleteProject(tx, project.ID); err != nil {
 		return err
 	}
-	q, args, err := projectInsert.Values(project.ID, project.Name, project.OwnerID, data).ToSql()
+	q, args, err := projectInsert.Values(project.ID, project.Name, project.Parent.ID, data).ToSql()
 	if err != nil {
 		return errors.Wrap(err, "failed to build query")
 	}
@@ -56,7 +59,42 @@ func (r *ReadDB) deleteProject(tx *db.Tx, id string) error {
 	return nil
 }
 
-func (r *ReadDB) GetProject(tx *db.Tx, projectID string) (*types.Project, error) {
+func (r *ReadDB) GetProjectPath(tx *db.Tx, project *types.Project) (string, error) {
+	pgroup, err := r.GetProjectGroup(tx, project.Parent.ID)
+	if err != nil {
+		return "", err
+	}
+	if pgroup == nil {
+		return "", errors.Errorf("parent group %q for project %q doesn't exist", project.Parent.ID, project.ID)
+
+	}
+	p, err := r.GetProjectGroupPath(tx, pgroup)
+	if err != nil {
+		return "", err
+	}
+
+	p = path.Join(p, project.Name)
+
+	return p, nil
+}
+
+func (r *ReadDB) GetProject(tx *db.Tx, projectRef string) (*types.Project, error) {
+	projectRefType, err := common.ParseRef(projectRef)
+	if err != nil {
+		return nil, err
+	}
+
+	var project *types.Project
+	switch projectRefType {
+	case common.RefTypeID:
+		project, err = r.GetProjectByID(tx, projectRef)
+	case common.RefTypePath:
+		project, err = r.GetProjectByPath(tx, projectRef)
+	}
+	return project, err
+}
+
+func (r *ReadDB) GetProjectByID(tx *db.Tx, projectID string) (*types.Project, error) {
 	q, args, err := projectSelect.Where(sq.Eq{"id": projectID}).ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
@@ -76,8 +114,8 @@ func (r *ReadDB) GetProject(tx *db.Tx, projectID string) (*types.Project, error)
 	return projects[0], nil
 }
 
-func (r *ReadDB) GetOwnerProjectByName(tx *db.Tx, ownerid, name string) (*types.Project, error) {
-	q, args, err := projectSelect.Where(sq.Eq{"ownerid": ownerid, "name": name}).ToSql()
+func (r *ReadDB) GetProjectByName(tx *db.Tx, parentID, name string) (*types.Project, error) {
+	q, args, err := projectSelect.Where(sq.Eq{"parentid": parentID, "name": name}).ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to build query")
@@ -96,67 +134,38 @@ func (r *ReadDB) GetOwnerProjectByName(tx *db.Tx, ownerid, name string) (*types.
 	return projects[0], nil
 }
 
-func getProjectsFilteredQuery(ownerid, startProjectName string, limit int, asc bool) sq.SelectBuilder {
-	fields := []string{"id", "data"}
-
-	s := sb.Select(fields...).From("project as project")
-	if asc {
-		s = s.OrderBy("project.name asc")
-	} else {
-		s = s.OrderBy("project.name desc")
-	}
-	if ownerid != "" {
-		s = s.Where(sq.Eq{"project.ownerid": ownerid})
-	}
-	if startProjectName != "" {
-		if asc {
-			s = s.Where(sq.Gt{"project.name": startProjectName})
-		} else {
-			s = s.Where(sq.Lt{"project.name": startProjectName})
-		}
-	}
-	if limit > 0 {
-		s = s.Limit(uint64(limit))
+func (r *ReadDB) GetProjectByPath(tx *db.Tx, projectPath string) (*types.Project, error) {
+	if len(strings.Split(projectPath, "/")) < 3 {
+		return nil, errors.Errorf("wrong project path: %q", projectPath)
 	}
 
-	return s
+	projectGroupPath := path.Dir(projectPath)
+	projectName := path.Base(projectPath)
+	projectGroup, err := r.GetProjectGroupByPath(tx, projectGroupPath)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get project group %q", projectGroupPath)
+	}
+	if projectGroup == nil {
+		return nil, nil
+	}
+
+	project, err := r.GetProjectByName(tx, projectGroup.ID, projectName)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get project group %q", projectName)
+	}
+	return project, nil
 }
 
-func (r *ReadDB) GetOwnerProjects(tx *db.Tx, ownerid, startProjectName string, limit int, asc bool) ([]*types.Project, error) {
+func (r *ReadDB) GetProjectGroupProjects(tx *db.Tx, parentID string) ([]*types.Project, error) {
 	var projects []*types.Project
 
-	s := getProjectsFilteredQuery(ownerid, startProjectName, limit, asc)
-	q, args, err := s.ToSql()
+	q, args, err := projectSelect.Where(sq.Eq{"parentid": parentID}).ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to build query")
 	}
 
-	rows, err := tx.Query(q, args...)
-	if err != nil {
-		return nil, err
-	}
-
-	projects, _, err = scanProjects(rows)
-	return projects, err
-}
-
-func (r *ReadDB) GetProjects(tx *db.Tx, startProjectName string, limit int, asc bool) ([]*types.Project, error) {
-	var projects []*types.Project
-
-	s := getProjectsFilteredQuery("", startProjectName, limit, asc)
-	q, args, err := s.ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to build query")
-	}
-
-	rows, err := tx.Query(q, args...)
-	if err != nil {
-		return nil, err
-	}
-
-	projects, _, err = scanProjects(rows)
+	projects, _, err = fetchProjects(tx, q, args...)
 	return projects, err
 }
 
@@ -201,4 +210,19 @@ func scanProjects(rows *sql.Rows) ([]*types.Project, []string, error) {
 		return nil, nil, err
 	}
 	return projects, ids, nil
+}
+
+// Test only functions
+
+func (r *ReadDB) GetAllProjects(tx *db.Tx) ([]*types.Project, error) {
+	var projects []*types.Project
+
+	q, args, err := projectSelect.ToSql()
+	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to build query")
+	}
+
+	projects, _, err = fetchProjects(tx, q, args...)
+	return projects, err
 }

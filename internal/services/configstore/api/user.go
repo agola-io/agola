@@ -145,7 +145,6 @@ func NewDeleteUserHandler(logger *zap.Logger, ch *command.CommandHandler) *Delet
 }
 
 func (h *DeleteUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	h.log.Infof("deleteuserhandler")
 	ctx := r.Context()
 
 	vars := mux.Vars(r)

@@ -113,61 +113,49 @@ func (c *Client) getParsedResponse(ctx context.Context, method, path string, que
 	return resp, d.Decode(obj)
 }
 
-func (c *Client) GetProject(ctx context.Context, projectID string) (*types.Project, *http.Response, error) {
-	project := new(types.Project)
-	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/project/%s", projectID), nil, jsonContent, nil, project)
-	return project, resp, err
+func (c *Client) GetProjectGroup(ctx context.Context, projectGroupID string) (*ProjectGroupResponse, *http.Response, error) {
+	projectGroup := new(ProjectGroupResponse)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s", url.PathEscape(projectGroupID)), nil, jsonContent, nil, projectGroup)
+	return projectGroup, resp, err
 }
 
-func (c *Client) GetCurrentUserProjects(ctx context.Context, start string, limit int, asc bool) (*GetProjectsResponse, *http.Response, error) {
-	return c.getProjects(ctx, "user", "", start, limit, asc)
+func (c *Client) GetProjectGroupSubgroups(ctx context.Context, projectGroupID string) ([]*ProjectGroupResponse, *http.Response, error) {
+	projectGroups := []*ProjectGroupResponse{}
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s/subgroups", url.PathEscape(projectGroupID)), nil, jsonContent, nil, &projectGroups)
+	return projectGroups, resp, err
 }
 
-func (c *Client) GetUserProjects(ctx context.Context, username, start string, limit int, asc bool) (*GetProjectsResponse, *http.Response, error) {
-	return c.getProjects(ctx, "user", username, start, limit, asc)
-}
-
-func (c *Client) GetOrgProjects(ctx context.Context, orgname, start string, limit int, asc bool) (*GetProjectsResponse, *http.Response, error) {
-	return c.getProjects(ctx, "org", orgname, start, limit, asc)
-}
-
-func (c *Client) getProjects(ctx context.Context, ownertype, ownername, start string, limit int, asc bool) (*GetProjectsResponse, *http.Response, error) {
-	q := url.Values{}
-	if start != "" {
-		q.Add("start", start)
-	}
-	if limit > 0 {
-		q.Add("limit", strconv.Itoa(limit))
-	}
-	if asc {
-		q.Add("asc", "")
-	}
-
-	projects := new(GetProjectsResponse)
-	resp, err := c.getParsedResponse(ctx, "GET", path.Join("/", ownertype, ownername, "projects"), q, jsonContent, nil, &projects)
+func (c *Client) GetProjectGroupProjects(ctx context.Context, projectGroupID string) ([]*ProjectResponse, *http.Response, error) {
+	projects := []*ProjectResponse{}
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s/projects", url.PathEscape(projectGroupID)), nil, jsonContent, nil, &projects)
 	return projects, resp, err
 }
 
-func (c *Client) CreateCurrentUserProject(ctx context.Context, req *CreateProjectRequest) (*types.Project, *http.Response, error) {
-	return c.createProject(ctx, "user", "", req)
+func (c *Client) GetProject(ctx context.Context, projectID string) (*types.Project, *http.Response, error) {
+	project := new(types.Project)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s", url.PathEscape(projectID)), nil, jsonContent, nil, project)
+	return project, resp, err
 }
 
-func (c *Client) CreateUserProject(ctx context.Context, username string, req *CreateProjectRequest) (*types.Project, *http.Response, error) {
-	return c.createProject(ctx, "user", username, req)
-}
-
-func (c *Client) CreateOrgProject(ctx context.Context, orgname string, req *CreateProjectRequest) (*types.Project, *http.Response, error) {
-	return c.createProject(ctx, "org", orgname, req)
-}
-
-func (c *Client) createProject(ctx context.Context, ownertype, ownername string, req *CreateProjectRequest) (*types.Project, *http.Response, error) {
+func (c *Client) CreateProjectGroup(ctx context.Context, req *CreateProjectGroupRequest) (*types.Project, *http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	project := new(types.Project)
-	resp, err := c.getParsedResponse(ctx, "PUT", path.Join("/", ownertype, ownername, "projects"), nil, jsonContent, bytes.NewReader(reqj), project)
+	resp, err := c.getParsedResponse(ctx, "PUT", "/projectgroups", nil, jsonContent, bytes.NewReader(reqj), project)
+	return project, resp, err
+}
+
+func (c *Client) CreateProject(ctx context.Context, req *CreateProjectRequest) (*types.Project, *http.Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	project := new(types.Project)
+	resp, err := c.getParsedResponse(ctx, "PUT", "/projects", nil, jsonContent, bytes.NewReader(reqj), project)
 	return project, resp, err
 }
 
@@ -197,7 +185,7 @@ func (c *Client) GetUser(ctx context.Context, userID string) (*types.User, *http
 	return user, resp, err
 }
 
-func (c *Client) GetUsers(ctx context.Context, start string, limit int, asc bool) (*UsersResponse, *http.Response, error) {
+func (c *Client) GetUsers(ctx context.Context, start string, limit int, asc bool) ([]*UserResponse, *http.Response, error) {
 	q := url.Values{}
 	if start != "" {
 		q.Add("start", start)
@@ -209,7 +197,7 @@ func (c *Client) GetUsers(ctx context.Context, start string, limit int, asc bool
 		q.Add("asc", "")
 	}
 
-	users := new(UsersResponse)
+	users := []*UserResponse{}
 	resp, err := c.getParsedResponse(ctx, "GET", "/users", q, jsonContent, nil, &users)
 	return users, resp, err
 }
@@ -261,7 +249,7 @@ func (c *Client) GetRun(ctx context.Context, runID string) (*RunResponse, *http.
 	return run, resp, err
 }
 
-func (c *Client) GetRuns(ctx context.Context, phaseFilter, groups, runGroups []string, start string, limit int, asc bool) (*GetRunsResponse, *http.Response, error) {
+func (c *Client) GetRuns(ctx context.Context, phaseFilter, groups, runGroups []string, start string, limit int, asc bool) ([]*RunsResponse, *http.Response, error) {
 	q := url.Values{}
 	for _, phase := range phaseFilter {
 		q.Add("phase", phase)
@@ -282,7 +270,7 @@ func (c *Client) GetRuns(ctx context.Context, phaseFilter, groups, runGroups []s
 		q.Add("asc", "")
 	}
 
-	getRunsResponse := new(GetRunsResponse)
+	getRunsResponse := []*RunsResponse{}
 	resp, err := c.getParsedResponse(ctx, "GET", "/runs", q, jsonContent, nil, getRunsResponse)
 	return getRunsResponse, resp, err
 }
@@ -293,7 +281,7 @@ func (c *Client) GetRemoteSource(ctx context.Context, rsID string) (*RemoteSourc
 	return rs, resp, err
 }
 
-func (c *Client) GetRemoteSources(ctx context.Context, start string, limit int, asc bool) (*RemoteSourcesResponse, *http.Response, error) {
+func (c *Client) GetRemoteSources(ctx context.Context, start string, limit int, asc bool) ([]*RemoteSourceResponse, *http.Response, error) {
 	q := url.Values{}
 	if start != "" {
 		q.Add("start", start)
@@ -305,7 +293,7 @@ func (c *Client) GetRemoteSources(ctx context.Context, start string, limit int, 
 		q.Add("asc", "")
 	}
 
-	rss := new(RemoteSourcesResponse)
+	rss := []*RemoteSourceResponse{}
 	resp, err := c.getParsedResponse(ctx, "GET", "/remotesources", q, jsonContent, nil, &rss)
 	return rss, resp, err
 }

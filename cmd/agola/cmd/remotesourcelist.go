@@ -48,8 +48,8 @@ func init() {
 	cmdRemoteSource.AddCommand(cmdRemoteSourceList)
 }
 
-func printRemoteSources(rssResponse *api.RemoteSourcesResponse) {
-	for _, rs := range rssResponse.RemoteSources {
+func printRemoteSources(remoteSources []*api.RemoteSourceResponse) {
+	for _, rs := range remoteSources {
 		fmt.Printf("%s: Name: %s\n", rs.ID, rs.Name)
 	}
 }
@@ -57,12 +57,12 @@ func printRemoteSources(rssResponse *api.RemoteSourcesResponse) {
 func remoteSourceList(cmd *cobra.Command, args []string) error {
 	gwclient := api.NewClient(gatewayURL, token)
 
-	rssResponse, _, err := gwclient.GetRemoteSources(context.TODO(), remoteSourceListOpts.start, remoteSourceListOpts.limit, false)
+	remouteSources, _, err := gwclient.GetRemoteSources(context.TODO(), remoteSourceListOpts.start, remoteSourceListOpts.limit, false)
 	if err != nil {
 		return err
 	}
 
-	printRemoteSources(rssResponse)
+	printRemoteSources(remouteSources)
 
 	return nil
 }

@@ -27,6 +27,32 @@ import (
 	"github.com/pkg/errors"
 )
 
+type CreateUserRequest struct {
+	UserName string
+}
+
+func (c *CommandHandler) CreateUser(ctx context.Context, req *CreateUserRequest) (*types.User, error) {
+	if req.UserName == "" {
+		return nil, util.NewErrBadRequest(errors.Errorf("user name required"))
+	}
+	if !util.ValidateName(req.UserName) {
+		return nil, errors.Errorf("invalid user name %q", req.UserName)
+	}
+
+	u := &types.User{
+		UserName: req.UserName,
+	}
+
+	c.log.Infof("creating user")
+	u, _, err := c.configstoreClient.CreateUser(ctx, u)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create user")
+	}
+	c.log.Infof("user %s created, ID: %s", u.UserName, u.ID)
+
+	return u, nil
+}
+
 type CreateUserLARequest struct {
 	UserName                       string
 	RemoteSourceName               string
