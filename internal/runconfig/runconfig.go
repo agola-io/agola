@@ -23,22 +23,26 @@ import (
 	rstypes "github.com/sorintlab/agola/internal/services/runservice/types"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
-
-	uuid "github.com/satori/go.uuid"
 )
 
-func genRuntime(c *config.Config, runtimeName string) *rstypes.Runtime {
+func genRuntime(c *config.Config, runtimeName string, variables map[string]string) *rstypes.Runtime {
 	ce := c.Runtime(runtimeName)
 
 	containers := []*rstypes.Container{}
 	for _, cc := range ce.Containers {
-		containers = append(containers, &rstypes.Container{
+
+		env, err := genEnv(cc.Environment, variables)
+		if err != nil {
+			return nil
+		}
+		container := &rstypes.Container{
 			Image:       cc.Image,
-			Environment: cc.Environment,
+			Environment: env,
 			User:        cc.User,
 			Privileged:  cc.Privileged,
 			Entrypoint:  cc.Entrypoint,
-		})
+		}
+		containers = append(containers, container)
 	}
 	return &rstypes.Runtime{
 		Type:       rstypes.RuntimeType(ce.Type),
@@ -46,7 +50,7 @@ func genRuntime(c *config.Config, runtimeName string) *rstypes.Runtime {
 	}
 }
 
-func stepFromConfigStep(csi interface{}) interface{} {
+func stepFromConfigStep(csi interface{}, variables map[string]string) interface{} {
 	switch cs := csi.(type) {
 	case *config.CloneStep:
 		// transform a "clone" step in a "run" step command
@@ -94,10 +98,15 @@ fi
 	case *config.RunStep:
 		rs := &rstypes.RunStep{}
 
+		env, err := genEnv(cs.Environment, variables)
+		if err != nil {
+			return nil
+		}
+
 		rs.Type = cs.Type
 		rs.Name = cs.Name
 		rs.Command = cs.Command
-		rs.Environment = cs.Environment
+		rs.Environment = env
 		rs.WorkingDir = cs.WorkingDir
 		rs.Shell = cs.Shell
 		rs.User = cs.User
@@ -135,7 +144,7 @@ fi
 
 // GenRunConfig generates a run config from a pipeline in the config, expanding all the references to tasks
 // this functions assumes that the config is already checked for possible errors (i.e referenced task must exits)
-func GenRunConfig(c *config.Config, pipelineName string, env map[string]string, branch, tag, ref string) *rstypes.RunConfig {
+func GenRunConfig(uuid util.UUIDGenerator, c *config.Config, pipelineName string, env, variables map[string]string, branch, tag, ref string) *rstypes.RunConfig {
 	cp := c.Pipeline(pipelineName)
 
 	rc := &rstypes.RunConfig{
@@ -152,15 +161,20 @@ func GenRunConfig(c *config.Config, pipelineName string, env map[string]string, 
 
 		steps := make([]interface{}, len(cpt.Steps))
 		for i, cpts := range cpt.Steps {
-			steps[i] = stepFromConfigStep(cpts)
+			steps[i] = stepFromConfigStep(cpts, variables)
+		}
+
+		tEnv, err := genEnv(cpt.Environment, variables)
+		if err != nil {
+			return nil
 		}
 
 		t := &rstypes.RunConfigTask{
-			ID: uuid.NewV4().String(),
+			ID: uuid.New(cpe.Name).String(),
 			// use the element name from the config as the task name
 			Name:          cpe.Name,
-			Runtime:       genRuntime(c, cpt.Runtime),
-			Environment:   cpt.Environment,
+			Runtime:       genRuntime(c, cpt.Runtime, variables),
+			Environment:   tEnv,
 			WorkingDir:    cpt.WorkingDir,
 			Shell:         cpt.Shell,
 			User:          cpt.User,
@@ -347,4 +361,17 @@ func GetAllParents(rc *rstypes.RunConfig, task *rstypes.RunConfigTask) []*rstype
 		parents = append(parents, v)
 	}
 	return parents
+}
+
+func genEnv(cenv map[string]config.EnvVar, variables map[string]string) (map[string]string, error) {
+	env := map[string]string{}
+	for envName, envVar := range cenv {
+		switch envVar.Type {
+		case config.EnvVarTypeString:
+			env[envName] = envVar.Value
+		case config.EnvVarTypeFromVariable:
+			env[envName] = variables[envVar.Value]
+		}
+	}
+	return env, nil
 }

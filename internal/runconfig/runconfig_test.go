@@ -19,16 +19,21 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
-	"github.com/sorintlab/agola/internal/services/runservice/types"
+	"github.com/sorintlab/agola/internal/config"
+	rstypes "github.com/sorintlab/agola/internal/services/runservice/types"
+	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 )
+
+var uuid = &util.TestUUIDGenerator{}
 
 func TestGenTasksLevels(t *testing.T) {
 	type task struct {
 		ID      string
 		Level   int
-		Depends []*types.RunConfigTaskDepend
+		Depends []*rstypes.RunConfigTaskDepend
 	}
 	tests := []struct {
 		name string
@@ -84,8 +89,8 @@ func TestGenTasksLevels(t *testing.T) {
 				{
 					ID:    "2",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "1",
 						},
 					},
@@ -99,8 +104,8 @@ func TestGenTasksLevels(t *testing.T) {
 				{
 					ID:    "2",
 					Level: 1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "1",
 						},
 					},
@@ -113,8 +118,8 @@ func TestGenTasksLevels(t *testing.T) {
 				{
 					ID:    "1",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "2",
 						},
 					},
@@ -122,8 +127,8 @@ func TestGenTasksLevels(t *testing.T) {
 				{
 					ID:    "2",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "1",
 						},
 					},
@@ -137,8 +142,8 @@ func TestGenTasksLevels(t *testing.T) {
 				{
 					ID:    "1",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "2",
 						},
 					},
@@ -146,8 +151,8 @@ func TestGenTasksLevels(t *testing.T) {
 				{
 					ID:    "2",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "3",
 						},
 					},
@@ -155,8 +160,8 @@ func TestGenTasksLevels(t *testing.T) {
 				{
 					ID:    "3",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "1",
 						},
 					},
@@ -170,8 +175,8 @@ func TestGenTasksLevels(t *testing.T) {
 				{
 					ID:    "1",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "2",
 						},
 					},
@@ -179,8 +184,8 @@ func TestGenTasksLevels(t *testing.T) {
 				{
 					ID:    "2",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "3",
 						},
 					},
@@ -188,8 +193,8 @@ func TestGenTasksLevels(t *testing.T) {
 				{
 					ID:    "3",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "2",
 						},
 					},
@@ -200,18 +205,18 @@ func TestGenTasksLevels(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			inRunConfig := &types.RunConfig{Tasks: map[string]*types.RunConfigTask{}}
+			inRunConfig := &rstypes.RunConfig{Tasks: map[string]*rstypes.RunConfigTask{}}
 			for _, t := range tt.in {
-				inRunConfig.Tasks[t.ID] = &types.RunConfigTask{
+				inRunConfig.Tasks[t.ID] = &rstypes.RunConfigTask{
 					ID:      t.ID,
 					Level:   t.Level,
 					Depends: t.Depends,
 				}
 
 			}
-			outRunConfig := &types.RunConfig{Tasks: map[string]*types.RunConfigTask{}}
+			outRunConfig := &rstypes.RunConfig{Tasks: map[string]*rstypes.RunConfigTask{}}
 			for _, t := range tt.out {
-				outRunConfig.Tasks[t.ID] = &types.RunConfigTask{
+				outRunConfig.Tasks[t.ID] = &rstypes.RunConfigTask{
 					ID:      t.ID,
 					Level:   t.Level,
 					Depends: t.Depends,
@@ -238,7 +243,7 @@ func TestGetAllParents(t *testing.T) {
 	type task struct {
 		ID      string
 		Level   int
-		Depends []*types.RunConfigTaskDepend
+		Depends []*rstypes.RunConfigTaskDepend
 	}
 	tests := []struct {
 		name string
@@ -280,8 +285,8 @@ func TestGetAllParents(t *testing.T) {
 				{
 					ID:    "1",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "1",
 						},
 					},
@@ -301,8 +306,8 @@ func TestGetAllParents(t *testing.T) {
 				{
 					ID:    "2",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "1",
 						},
 					},
@@ -319,11 +324,11 @@ func TestGetAllParents(t *testing.T) {
 				{
 					ID:    "1",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "2",
 						},
-						&types.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "3",
 						},
 					},
@@ -331,8 +336,8 @@ func TestGetAllParents(t *testing.T) {
 				{
 					ID:    "2",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "4",
 						},
 					},
@@ -340,8 +345,8 @@ func TestGetAllParents(t *testing.T) {
 				{
 					ID:    "3",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "5",
 						},
 					},
@@ -369,8 +374,8 @@ func TestGetAllParents(t *testing.T) {
 				{
 					ID:    "1",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "2",
 						},
 					},
@@ -378,8 +383,8 @@ func TestGetAllParents(t *testing.T) {
 				{
 					ID:    "2",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "1",
 						},
 					},
@@ -396,8 +401,8 @@ func TestGetAllParents(t *testing.T) {
 				{
 					ID:    "1",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "2",
 						},
 					},
@@ -405,8 +410,8 @@ func TestGetAllParents(t *testing.T) {
 				{
 					ID:    "2",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "3",
 						},
 					},
@@ -414,8 +419,8 @@ func TestGetAllParents(t *testing.T) {
 				{
 					ID:    "3",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "1",
 						},
 					},
@@ -433,8 +438,8 @@ func TestGetAllParents(t *testing.T) {
 				{
 					ID:    "1",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "2",
 						},
 					},
@@ -442,8 +447,8 @@ func TestGetAllParents(t *testing.T) {
 				{
 					ID:    "2",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "3",
 						},
 					},
@@ -451,8 +456,8 @@ func TestGetAllParents(t *testing.T) {
 				{
 					ID:    "3",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "2",
 						},
 					},
@@ -468,9 +473,9 @@ func TestGetAllParents(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			inRunConfig := &types.RunConfig{Tasks: map[string]*types.RunConfigTask{}}
+			inRunConfig := &rstypes.RunConfig{Tasks: map[string]*rstypes.RunConfigTask{}}
 			for _, t := range tt.in {
-				inRunConfig.Tasks[t.ID] = &types.RunConfigTask{
+				inRunConfig.Tasks[t.ID] = &rstypes.RunConfigTask{
 					ID:      t.ID,
 					Level:   t.Level,
 					Depends: t.Depends,
@@ -497,7 +502,7 @@ func TestCheckRunConfig(t *testing.T) {
 	type task struct {
 		ID      string
 		Level   int
-		Depends []*types.RunConfigTaskDepend
+		Depends []*rstypes.RunConfigTaskDepend
 	}
 	tests := []struct {
 		name string
@@ -536,8 +541,8 @@ func TestCheckRunConfig(t *testing.T) {
 				{
 					ID:    "2",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "1",
 						},
 					},
@@ -550,8 +555,8 @@ func TestCheckRunConfig(t *testing.T) {
 				{
 					ID:    "1",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "2",
 						},
 					},
@@ -559,8 +564,8 @@ func TestCheckRunConfig(t *testing.T) {
 				{
 					ID:    "2",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "1",
 						},
 					},
@@ -579,8 +584,8 @@ func TestCheckRunConfig(t *testing.T) {
 				{
 					ID:    "1",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "2",
 						},
 					},
@@ -588,8 +593,8 @@ func TestCheckRunConfig(t *testing.T) {
 				{
 					ID:    "2",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "3",
 						},
 					},
@@ -597,8 +602,8 @@ func TestCheckRunConfig(t *testing.T) {
 				{
 					ID:    "3",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "1",
 						},
 					},
@@ -618,8 +623,8 @@ func TestCheckRunConfig(t *testing.T) {
 				{
 					ID:    "1",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "2",
 						},
 					},
@@ -627,8 +632,8 @@ func TestCheckRunConfig(t *testing.T) {
 				{
 					ID:    "2",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "3",
 						},
 					},
@@ -636,8 +641,8 @@ func TestCheckRunConfig(t *testing.T) {
 				{
 					ID:    "3",
 					Level: -1,
-					Depends: []*types.RunConfigTaskDepend{
-						&types.RunConfigTaskDepend{
+					Depends: []*rstypes.RunConfigTaskDepend{
+						&rstypes.RunConfigTaskDepend{
 							TaskID: "2",
 						},
 					},
@@ -653,9 +658,9 @@ func TestCheckRunConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			inRunConfig := &types.RunConfig{Tasks: map[string]*types.RunConfigTask{}}
+			inRunConfig := &rstypes.RunConfig{Tasks: map[string]*rstypes.RunConfigTask{}}
 			for _, t := range tt.in {
-				inRunConfig.Tasks[t.ID] = &types.RunConfigTask{
+				inRunConfig.Tasks[t.ID] = &rstypes.RunConfigTask{
 					Name:    fmt.Sprintf("task%s", t.ID),
 					ID:      t.ID,
 					Level:   t.Level,
@@ -678,6 +683,153 @@ func TestCheckRunConfig(t *testing.T) {
 			}
 			if tt.err != nil {
 				t.Fatalf("got nil error, want error: %v", tt.err)
+			}
+		})
+	}
+}
+
+func TestGenRunConfig(t *testing.T) {
+	tests := []struct {
+		name      string
+		in        *config.Config
+		env       map[string]string
+		variables map[string]string
+		out       *rstypes.RunConfig
+	}{
+		{
+			name: "test runconfig generation",
+			in: &config.Config{
+				Runtimes: map[string]*config.Runtime{
+					"runtime01": &config.Runtime{
+						Name: "runtime01",
+						Type: "pod",
+						Arch: "",
+						Containers: []*config.Container{
+							&config.Container{
+								Image: "image01",
+								Environment: map[string]config.EnvVar{
+									"ENV01":             config.EnvVar{Type: config.EnvVarTypeString, Value: "ENV01"},
+									"ENVFROMVARIABLE01": config.EnvVar{Type: config.EnvVarTypeFromVariable, Value: "variable01"},
+								},
+								User: "",
+							},
+						},
+					},
+				},
+				Tasks: map[string]*config.Task{
+					"task01": &config.Task{
+						Name:    "task01",
+						Runtime: "runtime01",
+						Environment: map[string]config.EnvVar{
+							"ENV01":             config.EnvVar{Type: config.EnvVarTypeString, Value: "ENV01"},
+							"ENVFROMVARIABLE01": config.EnvVar{Type: config.EnvVarTypeFromVariable, Value: "variable01"},
+						},
+						WorkingDir: "",
+						Shell:      "",
+						User:       "",
+						Steps: []interface{}{
+							&config.RunStep{
+								Step: config.Step{
+									Type: "run",
+									Name: "command01",
+								},
+								Command: "command01",
+							},
+							&config.RunStep{
+								Step: config.Step{
+									Type: "run",
+									Name: "name different than command",
+								},
+								Command: "command02",
+							},
+							&config.RunStep{
+								Step: config.Step{
+									Type: "run",
+									Name: "command03",
+								},
+								Command: "command03",
+								Environment: map[string]config.EnvVar{
+									"ENV01":             config.EnvVar{Type: config.EnvVarTypeString, Value: "ENV01"},
+									"ENVFROMVARIABLE01": config.EnvVar{Type: config.EnvVarTypeFromVariable, Value: "variable01"},
+								},
+							},
+						},
+					},
+				},
+				Pipelines: map[string]*config.Pipeline{
+					"pipeline01": &config.Pipeline{
+						Name: "pipeline01",
+						Elements: map[string]*config.Element{
+							"element01": &config.Element{
+								Name:          "element01",
+								Task:          "task01",
+								Depends:       []*config.Depend{},
+								IgnoreFailure: false,
+								Approval:      false,
+								When: &types.When{
+									Branch: &types.WhenConditions{Include: []types.WhenCondition{{Match: "master"}}},
+									Tag:    &types.WhenConditions{Include: []types.WhenCondition{{Match: "v1.x"}, {Match: "v2.x"}}},
+									Ref: &types.WhenConditions{
+										Include: []types.WhenCondition{{Match: "master"}},
+										Exclude: []types.WhenCondition{{Match: "/branch01/", Type: types.WhenConditionTypeRegExp}, {Match: "branch02"}},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			env: map[string]string{
+				"ENV01": "ENVVALUE01",
+			},
+			variables: map[string]string{
+				"variable01": "VARVALUE01",
+			},
+			out: &rstypes.RunConfig{
+				Name: "pipeline01",
+				Environment: map[string]string{
+					"ENV01": "ENVVALUE01",
+				},
+				Tasks: map[string]*rstypes.RunConfigTask{
+					uuid.New("element01").String(): &rstypes.RunConfigTask{
+						ID:   uuid.New("element01").String(),
+						Name: "element01", Depends: []*rstypes.RunConfigTaskDepend{},
+						Runtime: &rstypes.Runtime{Type: rstypes.RuntimeType("pod"),
+							Containers: []*rstypes.Container{
+								{
+									Image: "image01",
+									Environment: map[string]string{
+										"ENV01":             "ENV01",
+										"ENVFROMVARIABLE01": "VARVALUE01",
+									},
+								},
+							},
+						},
+						Environment: map[string]string{
+							"ENV01":             "ENV01",
+							"ENVFROMVARIABLE01": "VARVALUE01",
+						},
+						Steps: []interface{}{
+							&rstypes.RunStep{Step: rstypes.Step{Type: "run", Name: "command01"}, Command: "command01", Environment: map[string]string{}},
+							&rstypes.RunStep{Step: rstypes.Step{Type: "run", Name: "name different than command"}, Command: "command02", Environment: map[string]string{}},
+							&rstypes.RunStep{Step: rstypes.Step{Type: "run", Name: "command03"}, Command: "command03", Environment: map[string]string{"ENV01": "ENV01", "ENVFROMVARIABLE01": "VARVALUE01"}},
+						},
+						Skip: true,
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := GenRunConfig(uuid, tt.in, "pipeline01", tt.env, tt.variables, "", "", "")
+
+			//if err != nil {
+			//	t.Fatalf("unexpected error: %v", err)
+			//}
+			if diff := cmp.Diff(tt.out, out); diff != "" {
+				t.Error(diff)
 			}
 		})
 	}

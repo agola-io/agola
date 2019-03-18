@@ -121,6 +121,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 	var skipSSHHostKeyCheck bool
 	var runType types.RunType
 	var userID string
+	variables := map[string]string{}
 
 	var gitSource gitsource.GitSource
 	if !isUserBuild {
@@ -128,7 +129,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		if err != nil {
 			return http.StatusBadRequest, "", errors.Wrapf(err, "failed to get project %s", projectID)
 		}
-		h.log.Debugf("project: %s", util.Dump(project))
+		h.log.Infof("project: %s", util.Dump(project))
 
 		user, _, err := h.configstoreClient.GetUserByLinkedAccount(ctx, project.LinkedAccountID)
 		if err != nil {
@@ -158,6 +159,46 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 			return http.StatusBadRequest, "", errors.Wrapf(err, "failed to parse webhook")
 		}
 		webhookData.ProjectID = projectID
+
+		// get project variables
+		pvars, _, err := h.configstoreClient.GetProjectVariables(ctx, project.ID, true)
+		if err != nil {
+			return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to get project variables")
+		}
+		h.log.Infof("pvars: %v", util.Dump(pvars))
+
+		// remove overriden variables
+		pvars = common.FilterOverridenVariables(pvars)
+		h.log.Infof("pvars: %v", util.Dump(pvars))
+
+		// get project secrets
+		secrets, _, err := h.configstoreClient.GetProjectSecrets(ctx, project.ID, true)
+		if err != nil {
+			return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to get project secrets")
+		}
+		h.log.Infof("secrets: %v", util.Dump(secrets))
+		for _, pvar := range pvars {
+			// find the value match
+			var varval types.VariableValue
+			for _, varval = range pvar.Values {
+				h.log.Infof("varval: %v", util.Dump(varval))
+				match := types.MatchWhen(varval.When, webhookData.Branch, webhookData.Tag, webhookData.Ref)
+				if !match {
+					continue
+				}
+				// get the secret value referenced by the variable, it must be a secret at the same level or a lower level
+				secret := common.GetVarValueMatchingSecret(varval, pvar.Parent.Path, secrets)
+				h.log.Infof("secret: %v", util.Dump(secret))
+				if secret != nil {
+					varValue, ok := secret.Data[varval.SecretVar]
+					if ok {
+						variables[pvar.Name] = varValue
+					}
+				}
+				break
+			}
+		}
+		h.log.Infof("variables: %v", util.Dump(variables))
 
 	} else {
 		gitSource = agolagit.New(h.apiExposedURL + "/repos")
@@ -200,6 +241,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to parse clone url")
 	}
 
+	// this env vars ovverrides other env vars
 	env := map[string]string{
 		"CI":                   "true",
 		"AGOLA_SSHPRIVKEY":     sshPrivKey,
@@ -251,7 +293,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		group = genGroup(userID, webhookData)
 	}
 
-	if err := h.createRuns(ctx, data, group, annotations, env, webhookData); err != nil {
+	if err := h.createRuns(ctx, data, group, annotations, env, variables, webhookData); err != nil {
 		return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to create run")
 	}
 	//if err := gitSource.CreateStatus(webhookData.Repo.Owner, webhookData.Repo.Name, webhookData.CommitSHA, gitsource.CommitStatusPending, "localhost:8080", "build %s", "agola"); err != nil {
@@ -261,16 +303,16 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 	return 0, "", nil
 }
 
-func (h *webhooksHandler) createRuns(ctx context.Context, configData []byte, group string, annotations, env map[string]string, webhookData *types.WebhookData) error {
+func (h *webhooksHandler) createRuns(ctx context.Context, configData []byte, group string, annotations, env, variables map[string]string, webhookData *types.WebhookData) error {
 	config, err := config.ParseConfig([]byte(configData))
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to parse config")
 	}
 	//h.log.Debugf("config: %v", util.Dump(config))
 
 	//h.log.Debugf("pipeline: %s", createRunOpts.PipelineName)
 	for _, pipeline := range config.Pipelines {
-		rc := runconfig.GenRunConfig(config, pipeline.Name, env, webhookData.Branch, webhookData.Tag, webhookData.Ref)
+		rc := runconfig.GenRunConfig(util.DefaultUUIDGenerator{}, config, pipeline.Name, env, variables, webhookData.Branch, webhookData.Tag, webhookData.Ref)
 
 		h.log.Debugf("rc: %s", util.Dump(rc))
 		h.log.Infof("group: %s", group)

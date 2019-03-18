@@ -46,7 +46,7 @@ type Config struct {
 type Task struct {
 	Name        string            `yaml:"name"`
 	Runtime     string            `yaml:"runtime"`
-	Environment map[string]string `yaml:"environment"`
+	Environment map[string]EnvVar `yaml:"environment,omitempty"`
 	WorkingDir  string            `yaml:"working_dir"`
 	Shell       string            `yaml:"shell"`
 	User        string            `yaml:"user"`
@@ -68,7 +68,7 @@ type Runtime struct {
 
 type Container struct {
 	Image       string            `yaml:"image,omitempty"`
-	Environment map[string]string `yaml:"environment,omitempty"`
+	Environment map[string]EnvVar `yaml:"environment,omitempty"`
 	User        string            `yaml:"user"`
 	Privileged  bool              `yaml:"privileged"`
 	Entrypoint  string            `yaml:"entrypoint"`
@@ -112,10 +112,22 @@ type CloneStep struct {
 type RunStep struct {
 	Step        `yaml:",inline"`
 	Command     string            `yaml:"command"`
-	Environment map[string]string `yaml:"environment,omitempty"`
+	Environment map[string]EnvVar `yaml:"environment,omitempty"`
 	WorkingDir  string            `yaml:"working_dir"`
 	Shell       string            `yaml:"shell"`
 	User        string            `yaml:"user"`
+}
+
+type EnvVarType int
+
+const (
+	EnvVarTypeString EnvVarType = iota
+	EnvVarTypeFromVariable
+)
+
+type EnvVar struct {
+	Type  EnvVarType
+	Value string
 }
 
 type SaveToWorkspaceContent struct {
@@ -134,23 +146,92 @@ type RestoreWorkspaceStep struct {
 	DestDir string `yaml:"dest_dir"`
 }
 
-func (t *Task) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	type task Task
-	type tasksteps struct {
-		Steps []map[string]interface{} `yaml:"steps"`
-	}
-	tt := (*task)(t)
-	if err := unmarshal(&tt); err != nil {
-		return err
+func (s *RunStep) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	type runStep struct {
+		Step        `yaml:",inline"`
+		Command     string                 `yaml:"command"`
+		Environment map[string]interface{} `yaml:"environment,omitempty"`
+		WorkingDir  string                 `yaml:"working_dir"`
+		Shell       string                 `yaml:"shell"`
+		User        string                 `yaml:"user"`
 	}
 
-	var st tasksteps
+	var st *runStep
 	if err := unmarshal(&st); err != nil {
 		return err
 	}
 
+	s.Step = st.Step
+	s.Command = st.Command
+	s.WorkingDir = st.WorkingDir
+	s.Shell = st.Shell
+	s.User = st.User
+
+	if st.Environment != nil {
+		env, err := parseEnv(st.Environment)
+		if err != nil {
+			return err
+		}
+		s.Environment = env
+	}
+
+	return nil
+}
+
+func (c *Container) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	type container struct {
+		Image       string                 `yaml:"image,omitempty"`
+		Environment map[string]interface{} `yaml:"environment,omitempty"`
+		User        string                 `yaml:"user"`
+		Privileged  bool                   `yaml:"privileged"`
+		Entrypoint  string                 `yaml:"entrypoint"`
+	}
+
+	var ct *container
+	if err := unmarshal(&ct); err != nil {
+		return err
+	}
+
+	c.Image = ct.Image
+	c.User = ct.User
+	c.Privileged = ct.Privileged
+	c.Entrypoint = ct.Entrypoint
+
+	if ct.Environment != nil {
+		env, err := parseEnv(ct.Environment)
+		if err != nil {
+			return err
+		}
+		c.Environment = env
+	}
+
+	return nil
+}
+
+func (t *Task) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	type task struct {
+		Name        string                   `yaml:"name"`
+		Runtime     string                   `yaml:"runtime"`
+		Environment map[string]interface{}   `yaml:"environment,omitempty"`
+		WorkingDir  string                   `yaml:"working_dir"`
+		Shell       string                   `yaml:"shell"`
+		User        string                   `yaml:"user"`
+		Steps       []map[string]interface{} `yaml:"steps"`
+	}
+
+	var tt *task
+	if err := unmarshal(&tt); err != nil {
+		return err
+	}
+
+	t.Name = tt.Name
+	t.Runtime = tt.Runtime
+	t.WorkingDir = tt.WorkingDir
+	t.Shell = tt.Shell
+	t.User = tt.User
+
 	steps := make([]interface{}, len(tt.Steps))
-	for i, stepEntry := range st.Steps {
+	for i, stepEntry := range tt.Steps {
 		if len(stepEntry) > 1 {
 			return errors.Errorf("wrong steps description at index %d: more than one step name per list entry", i)
 		}
@@ -200,6 +281,14 @@ func (t *Task) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	}
 
 	t.Steps = steps
+
+	if tt.Environment != nil {
+		env, err := parseEnv(tt.Environment)
+		if err != nil {
+			return err
+		}
+		t.Environment = env
+	}
 
 	return nil
 }
@@ -295,6 +384,36 @@ func (e *Element) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	}
 
 	return nil
+}
+
+func parseEnv(ienv map[string]interface{}) (map[string]EnvVar, error) {
+	env := map[string]EnvVar{}
+	for envName, envEntry := range ienv {
+		switch envValue := envEntry.(type) {
+		case string:
+			env[envName] = EnvVar{
+				Type:  EnvVarTypeString,
+				Value: envValue,
+			}
+		case map[interface{}]interface{}:
+			for k, v := range envValue {
+				if k == "from_variable" {
+					switch v.(type) {
+					case string:
+					default:
+						return nil, errors.Errorf("unknown environment value: %v", v)
+					}
+					env[envName] = EnvVar{
+						Type:  EnvVarTypeFromVariable,
+						Value: v.(string),
+					}
+				}
+			}
+		default:
+			return nil, errors.Errorf("unknown environment value: %v", envValue)
+		}
+	}
+	return env, nil
 }
 
 func parseWhenConditions(wi interface{}) (*types.WhenConditions, error) {

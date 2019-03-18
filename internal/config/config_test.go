@@ -136,12 +136,29 @@ func TestParseOutput(t *testing.T) {
                     type: pod
                     containers:
                       - image: image01
+                        environment:
+                          ENV01: ENV01
+                          ENVFROMVARIABLE01:
+                            from_variable: variable01
 
                 tasks:
                   task01:
                     runtime: runtime01
                     environment:
                       ENV01: ENV01
+                      ENVFROMVARIABLE01:
+                        from_variable: variable01
+                    steps:
+                      - run: command01
+                      - run:
+                          name: name different than command
+                          command: command02
+                      - run:
+                          command: command03
+                          environment:
+                            ENV01: ENV01
+                            ENVFROMVARIABLE01:
+                              from_variable: variable01
 
                 pipelines:
                   pipeline01:
@@ -165,9 +182,12 @@ func TestParseOutput(t *testing.T) {
 						Arch: "",
 						Containers: []*Container{
 							&Container{
-								Image:       "image01",
-								Environment: nil,
-								User:        "",
+								Image: "image01",
+								Environment: map[string]EnvVar{
+									"ENV01":             EnvVar{Type: EnvVarTypeString, Value: "ENV01"},
+									"ENVFROMVARIABLE01": EnvVar{Type: EnvVarTypeFromVariable, Value: "variable01"},
+								},
+								User: "",
 							},
 						},
 					},
@@ -176,13 +196,40 @@ func TestParseOutput(t *testing.T) {
 					"task01": &Task{
 						Name:    "task01",
 						Runtime: "runtime01",
-						Environment: map[string]string{
-							"ENV01": "ENV01",
+						Environment: map[string]EnvVar{
+							"ENV01":             EnvVar{Type: EnvVarTypeString, Value: "ENV01"},
+							"ENVFROMVARIABLE01": EnvVar{Type: EnvVarTypeFromVariable, Value: "variable01"},
 						},
 						WorkingDir: "",
 						Shell:      "",
 						User:       "",
-						Steps:      []interface{}{},
+						Steps: []interface{}{
+							&RunStep{
+								Step: Step{
+									Type: "run",
+									Name: "command01",
+								},
+								Command: "command01",
+							},
+							&RunStep{
+								Step: Step{
+									Type: "run",
+									Name: "name different than command",
+								},
+								Command: "command02",
+							},
+							&RunStep{
+								Step: Step{
+									Type: "run",
+									Name: "command03",
+								},
+								Command: "command03",
+								Environment: map[string]EnvVar{
+									"ENV01":             EnvVar{Type: EnvVarTypeString, Value: "ENV01"},
+									"ENVFROMVARIABLE01": EnvVar{Type: EnvVarTypeFromVariable, Value: "variable01"},
+								},
+							},
+						},
 					},
 				},
 				Pipelines: map[string]*Pipeline{
