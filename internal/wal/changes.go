@@ -172,14 +172,6 @@ func (w *WalManager) applyWalChanges(ctx context.Context, walData *WalData, revi
 		}
 
 		w.applyWalChangesAction(ctx, action, walData.WalSequence, revision)
-
-		additionalActions, err := w.additionalActionsFunc(action)
-		if err != nil {
-			return err
-		}
-		for _, action := range additionalActions {
-			w.applyWalChangesAction(ctx, action, walData.WalSequence, revision)
-		}
 	}
 
 	w.changes.updatePathsOrdered()
