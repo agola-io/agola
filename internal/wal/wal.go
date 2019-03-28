@@ -155,6 +155,15 @@ type ChangeGroupsUpdateToken struct {
 
 type changeGroupsRevisions map[string]int64
 
+func (w *WalManager) ChangesCurrentRevision() (int64, error) {
+	w.changes.Lock()
+	defer w.changes.Unlock()
+	if !w.changes.initialized {
+		return 0, errors.Errorf("wal changes not ready")
+	}
+	return w.changes.revision, nil
+}
+
 func (w *WalManager) GetChangeGroupsUpdateToken(cgNames []string) (*ChangeGroupsUpdateToken, error) {
 	w.changes.Lock()
 	defer w.changes.Unlock()
