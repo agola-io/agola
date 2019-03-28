@@ -184,19 +184,22 @@ func TestConcurrentUpdate(t *testing.T) {
 	<-walReadyCh
 
 	cgNames := []string{"changegroup01", "changegroup02"}
-	cgt := wal.GetChangeGroupsUpdateToken(cgNames)
+	cgt, err := wal.GetChangeGroupsUpdateToken(cgNames)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 
 	// populate with a wal
 	cgt, err = wal.WriteWal(ctx, actions, cgt)
 	if err != nil {
-		t.Fatalf("err: %v", err)
+		t.Fatalf("unexpected err: %v", err)
 	}
 
 	// this must work successfully
 	oldcgt := cgt
 	cgt, err = wal.WriteWal(ctx, actions, cgt)
 	if err != nil {
-		t.Fatalf("err: %v", err)
+		t.Fatalf("unexpected err: %v", err)
 	}
 
 	// this must fail since we are using the old cgt
@@ -209,7 +212,7 @@ func TestConcurrentUpdate(t *testing.T) {
 	// this must work successfully
 	cgt, err = wal.WriteWal(ctx, actions, cgt)
 	if err != nil {
-		t.Fatalf("err: %v", err)
+		t.Fatalf("unexpected err: %v", err)
 	}
 
 	// this must fail since we are using the old cgt

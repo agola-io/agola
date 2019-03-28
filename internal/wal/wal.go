@@ -155,12 +155,15 @@ type ChangeGroupsUpdateToken struct {
 
 type changeGroupsRevisions map[string]int64
 
-func (w *WalManager) GetChangeGroupsUpdateToken(cgNames []string) *ChangeGroupsUpdateToken {
+func (w *WalManager) GetChangeGroupsUpdateToken(cgNames []string) (*ChangeGroupsUpdateToken, error) {
 	w.changes.Lock()
+	defer w.changes.Unlock()
+	if !w.changes.initialized {
+		return nil, errors.Errorf("wal changes not ready")
+	}
 	revision := w.changes.curRevision()
 	cgr := w.changes.getChangeGroups(cgNames)
-	w.changes.Unlock()
-	return &ChangeGroupsUpdateToken{CurRevision: revision, ChangeGroupsRevisions: cgr}
+	return &ChangeGroupsUpdateToken{CurRevision: revision, ChangeGroupsRevisions: cgr}, nil
 }
 
 func (w *WalManager) MergeChangeGroupsUpdateTokens(cgts []*ChangeGroupsUpdateToken) *ChangeGroupsUpdateToken {
@@ -187,6 +190,10 @@ func (w *WalManager) MergeChangeGroupsUpdateTokens(cgts []*ChangeGroupsUpdateTok
 
 func (w *WalManager) ReadObject(p string, cgNames []string) (io.ReadCloser, *ChangeGroupsUpdateToken, error) {
 	w.changes.Lock()
+	if !w.changes.initialized {
+		w.changes.Unlock()
+		return nil, nil, errors.Errorf("wal changes not ready")
+	}
 	walseq, ok := w.changes.getPut(p)
 	revision := w.changes.curRevision()
 	cgr := w.changes.getChangeGroups(cgNames)
@@ -234,6 +241,11 @@ func (w *WalManager) List(prefix, startWith string, recursive bool, doneCh <-cha
 	startWith = w.toStorageDataPath(startWith)
 
 	w.changes.Lock()
+	if !w.changes.initialized {
+		w.changes.Unlock()
+		objectCh <- objectstorage.ObjectInfo{Err: errors.Errorf("wal changes not ready")}
+		return objectCh
+	}
 	changesList := w.changesList(w.changes.pathsOrdered, prefix, startWith, recursive)
 	deletedChangesMap := w.changes.getDeletesMap()
 	w.changes.Unlock()
