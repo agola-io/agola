@@ -95,8 +95,13 @@ func NewConfigStore(ctx context.Context, c *config.ConfigStore) (*ConfigStore, e
 
 func (s *ConfigStore) Run(ctx context.Context) error {
 	errCh := make(chan error)
+	walReadyCh := make(chan struct{})
 
-	go func() { errCh <- s.wal.Run(ctx) }()
+	go func() { errCh <- s.wal.Run(ctx, walReadyCh) }()
+
+	// wait for wal to be ready
+	<-walReadyCh
+
 	go func() { errCh <- s.readDB.Run(ctx) }()
 
 	// noop coors handler

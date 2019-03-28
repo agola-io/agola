@@ -1193,8 +1193,14 @@ func NewScheduler(ctx context.Context, c *config.RunServiceScheduler) (*Schedule
 
 func (s *Scheduler) Run(ctx context.Context) error {
 	errCh := make(chan error)
+	walReadyCh := make(chan struct{})
 
-	go func() { errCh <- s.wal.Run(ctx) }()
+	go func() { errCh <- s.wal.Run(ctx, walReadyCh) }()
+
+	// wait for wal to be ready
+	<-walReadyCh
+
+
 	go s.readDB.Run(ctx)
 
 	ch := make(chan *types.ExecutorTask)

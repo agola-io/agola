@@ -89,8 +89,9 @@ func TestEtcdReset(t *testing.T) {
 		EtcdWalsKeepNum: 10,
 	}
 	wal, err := NewWalManager(ctx, logger, walConfig)
-	go wal.Run(ctx)
-	time.Sleep(1 * time.Second)
+	walReadyCh := make(chan struct{})
+	go wal.Run(ctx, walReadyCh)
+	<-walReadyCh
 
 	actions := []*Action{
 		{
@@ -123,8 +124,8 @@ func TestEtcdReset(t *testing.T) {
 
 	cancel()
 	ctx = context.Background()
-	go wal.Run(ctx)
-	time.Sleep(5 * time.Second)
+	go wal.Run(ctx, walReadyCh)
+	<-walReadyCh
 
 	curObjects := []string{}
 	doneCh := make(chan struct{})
@@ -178,8 +179,9 @@ func TestConcurrentUpdate(t *testing.T) {
 		},
 	}
 
-	go wal.Run(ctx)
-	time.Sleep(1 * time.Second)
+	walReadyCh := make(chan struct{})
+	go wal.Run(ctx, walReadyCh)
+	<-walReadyCh
 
 	cgNames := []string{"changegroup01", "changegroup02"}
 	cgt := wal.GetChangeGroupsUpdateToken(cgNames)
@@ -253,8 +255,9 @@ func TestWalCleaner(t *testing.T) {
 		},
 	}
 
-	go wal.Run(ctx)
-	time.Sleep(1 * time.Second)
+	walReadyCh := make(chan struct{})
+	go wal.Run(ctx, walReadyCh)
+	<-walReadyCh
 
 	for i := 0; i < 20; i++ {
 		if _, err := wal.WriteWal(ctx, actions, nil); err != nil {

@@ -1241,8 +1241,7 @@ func NewWalManager(ctx context.Context, logger *zap.Logger, conf *WalManagerConf
 	return w, nil
 }
 
-func (w *WalManager) Run(ctx context.Context) error {
-
+func (w *WalManager) Run(ctx context.Context, readyCh chan struct{}) error {
 	for {
 		err := w.InitEtcd(ctx)
 		if err == nil {
@@ -1251,6 +1250,8 @@ func (w *WalManager) Run(ctx context.Context) error {
 		w.log.Errorf("failed to initialize etcd: %+v", err)
 		time.Sleep(1 * time.Second)
 	}
+
+	readyCh <- struct{}{}
 
 	go w.watcherLoop(ctx)
 	go w.syncLoop(ctx)
