@@ -828,7 +828,6 @@ func (w *WalManager) checkpoint(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		defer walFile.Close()
 		dec := json.NewDecoder(walFile)
 		for {
 			var action *Action
@@ -839,13 +838,16 @@ func (w *WalManager) checkpoint(ctx context.Context) error {
 				break
 			}
 			if err != nil {
+				walFile.Close()
 				return err
 			}
 
 			if err := w.checkpointAction(ctx, action); err != nil {
+				walFile.Close()
 				return err
 			}
 		}
+		walFile.Close()
 
 		w.log.Debugf("updating wal to state %q", WalStatusCheckpointed)
 		walData.WalStatus = WalStatusCheckpointed
