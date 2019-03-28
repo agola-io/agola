@@ -344,12 +344,12 @@ func (w *WalManager) watcher(ctx context.Context) error {
 				switch ev.Type {
 				case mvccpb.PUT:
 					w.changes.Lock()
-					changeGroup := path.Base(string(ev.Kv.Key))
+					changeGroup := strings.TrimPrefix(string(ev.Kv.Key), etcdChangeGroupsDir+"/")
 					w.changes.putChangeGroup(changeGroup, ev.Kv.ModRevision)
 					w.changes.Unlock()
 				case mvccpb.DELETE:
 					w.changes.Lock()
-					changeGroup := path.Base(string(ev.Kv.Key))
+					changeGroup := strings.TrimPrefix(string(ev.Kv.Key), etcdChangeGroupsDir+"/")
 					w.changes.removeChangeGroup(changeGroup)
 					w.changes.Unlock()
 				}
