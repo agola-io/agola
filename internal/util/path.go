@@ -14,11 +14,16 @@
 
 package util
 
-import "path"
+import (
+	"path"
+)
 
 // PathHierarchy return a slice of paths from the base path (root included as . or / ).
 // I.E. for a path like "path/to/file" it'll return a slice of these elements:
 // ".", "path", "path/to", "path/to/file"
+// for a path like "/path/to/file" it'll return a slice of these elements:
+// "/", "/path", "/path/to", "/path/to/file"
+
 func PathHierarchy(p string) []string {
 	paths := []string{}
 	for {
@@ -26,6 +31,21 @@ func PathHierarchy(p string) []string {
 		prevp := p
 		p = path.Dir(p)
 		if p == prevp {
+			break
+		}
+	}
+	return paths
+}
+
+// PathList return a slice of paths from the base path (root exluded as . or / ).
+// I.E. for a path like "path/to/file" or "/path/to/file" it'll return a slice of these elements:
+// "path", "to", "file"
+func PathList(p string) []string {
+	paths := []string{}
+	for {
+		paths = append([]string{path.Base(p)}, paths...)
+		p = path.Dir(p)
+		if p == "." || p == "/" {
 			break
 		}
 	}
