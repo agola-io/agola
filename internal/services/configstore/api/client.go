@@ -314,14 +314,14 @@ func (c *Client) GetUserByLinkedAccount(ctx context.Context, linkedAccountID str
 	return users[0], resp, err
 }
 
-func (c *Client) CreateUser(ctx context.Context, user *types.User) (*types.User, *http.Response, error) {
-	uj, err := json.Marshal(user)
+func (c *Client) CreateUser(ctx context.Context, req *CreateUserRequest) (*types.User, *http.Response, error) {
+	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	user = new(types.User)
-	resp, err := c.getParsedResponse(ctx, "PUT", "/users", nil, jsonContent, bytes.NewReader(uj), user)
+	user := new(types.User)
+	resp, err := c.getParsedResponse(ctx, "PUT", "/users", nil, jsonContent, bytes.NewReader(reqj), user)
 	return user, resp, err
 }
 

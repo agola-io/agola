@@ -39,12 +39,12 @@ func (c *CommandHandler) CreateUser(ctx context.Context, req *CreateUserRequest)
 		return nil, errors.Errorf("invalid user name %q", req.UserName)
 	}
 
-	u := &types.User{
+	creq := &csapi.CreateUserRequest{
 		UserName: req.UserName,
 	}
 
 	c.log.Infof("creating user")
-	u, _, err := c.configstoreClient.CreateUser(ctx, u)
+	u, _, err := c.configstoreClient.CreateUser(ctx, creq)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create user")
 	}

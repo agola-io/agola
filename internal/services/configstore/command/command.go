@@ -239,13 +239,20 @@ func (s *CommandHandler) DeleteProject(ctx context.Context, projectRef string) e
 	return err
 }
 
-func (s *CommandHandler) CreateUser(ctx context.Context, user *types.User) (*types.User, error) {
-	if user.UserName == "" {
+type CreateUserRequest struct {
+	UserName string
+
+	CreateUserLARequest *CreateUserLARequest
+}
+
+func (s *CommandHandler) CreateUser(ctx context.Context, req *CreateUserRequest) (*types.User, error) {
+	if req.UserName == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("user name required"))
 	}
 
 	var cgt *wal.ChangeGroupsUpdateToken
-	cgNames := []string{user.UserName}
+	cgNames := []string{req.UserName}
+	var rs *types.RemoteSource
 
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
@@ -256,12 +263,29 @@ func (s *CommandHandler) CreateUser(ctx context.Context, user *types.User) (*typ
 		}
 
 		// check duplicate user name
-		u, err := s.readDB.GetUserByName(tx, user.UserName)
+		u, err := s.readDB.GetUserByName(tx, req.UserName)
 		if err != nil {
 			return err
 		}
 		if u != nil {
 			return util.NewErrBadRequest(errors.Errorf("user with name %q already exists", u.UserName))
+		}
+
+		if req.CreateUserLARequest != nil {
+			rs, err = s.readDB.GetRemoteSourceByName(tx, req.CreateUserLARequest.RemoteSourceName)
+			if err != nil {
+				return err
+			}
+			if rs == nil {
+				return util.NewErrBadRequest(errors.Errorf("remote source %q doesn't exist", req.CreateUserLARequest.RemoteSourceName))
+			}
+			user, err := s.readDB.GetUserByLinkedAccountRemoteUserIDandSource(tx, req.CreateUserLARequest.RemoteUserID, rs.ID)
+			if err != nil {
+				return errors.Wrapf(err, "failed to get user for remote user id %q and remote source %q", req.CreateUserLARequest.RemoteUserID, rs.ID)
+			}
+			if user != nil {
+				return util.NewErrBadRequest(errors.Errorf("user for remote user id %q for remote source %q already exists", req.CreateUserLARequest.RemoteUserID, req.CreateUserLARequest.RemoteSourceName))
+			}
 		}
 		return nil
 	})
@@ -269,7 +293,28 @@ func (s *CommandHandler) CreateUser(ctx context.Context, user *types.User) (*typ
 		return nil, err
 	}
 
-	user.ID = uuid.NewV4().String()
+	user := &types.User{
+		ID:       uuid.NewV4().String(),
+		UserName: req.UserName,
+	}
+	if req.CreateUserLARequest != nil {
+		if user.LinkedAccounts == nil {
+			user.LinkedAccounts = make(map[string]*types.LinkedAccount)
+		}
+
+		la := &types.LinkedAccount{
+			ID:                 uuid.NewV4().String(),
+			RemoteSourceID:     rs.ID,
+			RemoteUserID:       req.CreateUserLARequest.RemoteUserID,
+			RemoteUserName:     req.CreateUserLARequest.RemoteUserName,
+			UserAccessToken:    req.CreateUserLARequest.UserAccessToken,
+			Oauth2AccessToken:  req.CreateUserLARequest.Oauth2AccessToken,
+			Oauth2RefreshToken: req.CreateUserLARequest.Oauth2RefreshToken,
+		}
+
+		user.LinkedAccounts[la.ID] = la
+	}
+
 	userj, err := json.Marshal(user)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to marshal user")
@@ -391,6 +436,14 @@ func (s *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequ
 		}
 		if rs == nil {
 			return util.NewErrBadRequest(errors.Errorf("remote source %q doesn't exist", req.RemoteSourceName))
+		}
+
+		user, err := s.readDB.GetUserByLinkedAccountRemoteUserIDandSource(tx, req.RemoteUserID, rs.ID)
+		if err != nil {
+			return errors.Wrapf(err, "failed to get user for remote user id %q and remote source %q", req.RemoteUserID, rs.ID)
+		}
+		if user != nil {
+			return util.NewErrBadRequest(errors.Errorf("user for remote user id %q for remote source %q already exists", req.RemoteUserID, req.RemoteSourceName))
 		}
 		return nil
 	})

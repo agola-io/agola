@@ -103,6 +103,12 @@ func (h *UserByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type CreateUserRequest struct {
+	UserName string `json:"user_name"`
+
+	CreateUserLARequest *CreateUserLARequest `json:"create_user_la_request"`
+}
+
 type CreateUserHandler struct {
 	log *zap.SugaredLogger
 	ch  *command.CommandHandler
@@ -115,14 +121,28 @@ func NewCreateUserHandler(logger *zap.Logger, ch *command.CommandHandler) *Creat
 func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var req types.User
+	var req *CreateUserRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	user, err := h.ch.CreateUser(ctx, &req)
+	creq := &command.CreateUserRequest{
+		UserName: req.UserName,
+	}
+	if req.CreateUserLARequest != nil {
+		creq.CreateUserLARequest = &command.CreateUserLARequest{
+			RemoteSourceName:   req.CreateUserLARequest.RemoteSourceName,
+			RemoteUserID:       req.CreateUserLARequest.RemoteUserID,
+			RemoteUserName:     req.CreateUserLARequest.RemoteUserName,
+			Oauth2AccessToken:  req.CreateUserLARequest.Oauth2AccessToken,
+			Oauth2RefreshToken: req.CreateUserLARequest.Oauth2RefreshToken,
+			UserAccessToken:    req.CreateUserLARequest.UserAccessToken,
+		}
+	}
+
+	user, err := h.ch.CreateUser(ctx, creq)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
