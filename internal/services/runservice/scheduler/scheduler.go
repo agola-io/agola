@@ -22,10 +22,13 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	scommon "github.com/sorintlab/agola/internal/common"
+	"github.com/sorintlab/agola/internal/db"
 	"github.com/sorintlab/agola/internal/etcd"
 	slog "github.com/sorintlab/agola/internal/log"
 	"github.com/sorintlab/agola/internal/objectstorage"
@@ -1073,7 +1076,26 @@ func (s *Scheduler) runLTSArchiver(ctx context.Context, r *types.Run) error {
 	if err != nil {
 		return err
 	}
-	if _, err = s.wal.WriteWal(ctx, []*wal.Action{ra}, nil); err != nil {
+
+	resp, err := s.e.Get(ctx, common.EtcdLastIndexKey, 0)
+	// if lastIndexKey doesn't exist return an error
+	if err != nil {
+		return err
+	}
+	lastIndexRevision := resp.Kvs[0].ModRevision
+	lastIndexDir := string(resp.Kvs[0].Value)
+
+	indexActions, err := s.additionalActions(lastIndexDir, ra)
+	if err != nil {
+		return err
+	}
+
+	actions := append([]*wal.Action{ra}, indexActions...)
+
+	cmp := []etcdclientv3.Cmp{etcdclientv3.Compare(etcdclientv3.ModRevision(common.EtcdLastIndexKey), "=", lastIndexRevision)}
+	then := []etcdclientv3.Op{etcdclientv3.OpPut(common.EtcdLastIndexKey, lastIndexDir)}
+
+	if _, err = s.wal.WriteWalAdditionalOps(ctx, actions, nil, cmp, then); err != nil {
 		return err
 	}
 
@@ -1085,7 +1107,13 @@ func (s *Scheduler) runLTSArchiver(ctx context.Context, r *types.Run) error {
 	return nil
 }
 
-func (s *Scheduler) additionalActions(action *wal.Action) ([]*wal.Action, error) {
+func (s *Scheduler) additionalActions(indexDir string, action *wal.Action) ([]*wal.Action, error) {
+	type indexData struct {
+		ID    string
+		Group string
+		Phase types.RunPhase
+	}
+
 	configType, _ := common.PathToTypeID(action.Path)
 
 	var actionType wal.ActionType
@@ -1103,19 +1131,195 @@ func (s *Scheduler) additionalActions(action *wal.Action) ([]*wal.Action, error)
 		if err := json.Unmarshal(action.Data, &run); err != nil {
 			return nil, errors.Wrap(err, "failed to unmarshal run")
 		}
-		indexes := store.LTSGenIndexes(s.lts, run)
-		actions := make([]*wal.Action, len(indexes))
-		for i, index := range indexes {
-			actions[i] = &wal.Action{
+
+		data := []byte{}
+		index := path.Join(common.StorageRunsIndexesDir, indexDir, "added", run.ID)
+		id := &indexData{ID: run.ID, Group: run.Group, Phase: run.Phase}
+		idj, err := json.Marshal(id)
+		if err != nil {
+			return nil, err
+		}
+		data = append(data, idj...)
+
+		actions := []*wal.Action{
+			&wal.Action{
 				ActionType: actionType,
 				Path:       index,
-				Data:       []byte{},
-			}
+				Data:       data,
+			},
 		}
 		return actions, nil
 	}
 
 	return []*wal.Action{}, nil
+}
+
+func (s *Scheduler) dumpLTSLoop(ctx context.Context) {
+	for {
+		log.Debugf("lts dump loop")
+
+		// TODO(sgotti) create new dump only after N files
+		if err := s.dumpLTS(ctx); err != nil {
+			log.Errorf("err: %+v", err)
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		time.Sleep(10 * time.Second)
+	}
+}
+
+func (s *Scheduler) dumpLTS(ctx context.Context) error {
+	type indexData struct {
+		ID    string
+		Group string
+		Phase types.RunPhase
+	}
+
+	resp, err := s.e.Get(ctx, common.EtcdLastIndexKey, 0)
+	// if lastIndexKey doesn't exist return an error
+	if err != nil {
+		return err
+	}
+	lastIndexRevision := resp.Kvs[0].ModRevision
+	revision := resp.Header.Revision
+
+	indexDir := strconv.FormatInt(time.Now().UnixNano(), 10)
+
+	readdbRevision, err := s.readDB.GetRevision()
+	if err != nil {
+		return err
+	}
+	if readdbRevision < revision {
+		return errors.Errorf("readdb revision %d is lower than index revision %d", readdbRevision, revision)
+	}
+
+	runs := []*readdb.RunData{}
+	var lastRunID string
+	stop := false
+	for {
+		err := s.readDB.Do(func(tx *db.Tx) error {
+			var err error
+			lruns, err := s.readDB.GetRunsFilteredLTS(tx, nil, false, nil, lastRunID, 10000, types.SortOrderDesc)
+			if err != nil {
+				return err
+			}
+			if len(lruns) == 0 {
+				stop = true
+			} else {
+				lastRunID = lruns[len(lruns)-1].ID
+			}
+			runs = append(runs, lruns...)
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		if stop {
+			break
+		}
+	}
+
+	data := []byte{}
+	for _, run := range runs {
+		id := &indexData{ID: run.ID, Group: run.GroupPath, Phase: types.RunPhase(run.Phase)}
+		idj, err := json.Marshal(id)
+		if err != nil {
+			return err
+		}
+		data = append(data, idj...)
+	}
+
+	index := path.Join(common.StorageRunsIndexesDir, indexDir, "all")
+
+	cmp := []etcdclientv3.Cmp{etcdclientv3.Compare(etcdclientv3.ModRevision(common.EtcdLastIndexKey), "=", lastIndexRevision)}
+	then := []etcdclientv3.Op{etcdclientv3.OpPut(common.EtcdLastIndexKey, indexDir)}
+
+	actions := []*wal.Action{
+		&wal.Action{
+			ActionType: wal.ActionTypePut,
+			Path:       index,
+			Data:       data,
+		},
+	}
+
+	if _, err = s.wal.WriteWalAdditionalOps(ctx, actions, nil, cmp, then); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Scheduler) dumpLTSCleanerLoop(ctx context.Context) {
+	for {
+		log.Infof("lts dump cleaner loop")
+
+		if err := s.dumpLTSCleaner(ctx); err != nil {
+			log.Errorf("err: %+v", err)
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		time.Sleep(10 * time.Second)
+	}
+}
+
+func (s *Scheduler) dumpLTSCleaner(ctx context.Context) error {
+	type indexData struct {
+		ID    string
+		Group string
+		Phase types.RunPhase
+	}
+
+	resp, err := s.e.Get(ctx, common.EtcdLastIndexKey, 0)
+	// if lastIndexKey doesn't exist return an error
+	if err != nil {
+		return err
+	}
+	lastIndexDir := string(resp.Kvs[0].Value)
+
+	// collect all object that don't pertain to the lastIndexDir
+	objects := []string{}
+	doneCh := make(chan struct{})
+	defer close(doneCh)
+	for object := range s.wal.List(common.StorageRunsIndexesDir+"/", "", true, doneCh) {
+		if object.Err != nil {
+			return object.Err
+		}
+
+		h := util.PathList(object.Path)
+		if len(h) < 2 {
+			return errors.Errorf("wrong index dir path %q", object.Path)
+		}
+		indexDir := h[1]
+		if indexDir != lastIndexDir {
+			objects = append(objects, object.Path)
+		}
+	}
+
+	actions := make([]*wal.Action, len(objects))
+	for i, object := range objects {
+		actions[i] = &wal.Action{
+			ActionType: wal.ActionTypeDelete,
+			Path:       object,
+		}
+	}
+
+	if len(actions) > 0 {
+		if _, err = s.wal.WriteWal(ctx, actions, nil); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 type Scheduler struct {
@@ -1141,17 +1345,6 @@ func NewScheduler(ctx context.Context, c *config.RunServiceScheduler) (*Schedule
 		return nil, err
 	}
 
-	// Create changegroup min revision if it doesn't exists
-	cmp := []etcdclientv3.Cmp{}
-	then := []etcdclientv3.Op{}
-
-	cmp = append(cmp, etcdclientv3.Compare(etcdclientv3.CreateRevision(common.EtcdChangeGroupMinRevisionKey), "=", 0))
-	then = append(then, etcdclientv3.OpPut(common.EtcdChangeGroupMinRevisionKey, ""))
-	txn := e.Client().Txn(ctx).If(cmp...).Then(then...)
-	if _, err := txn.Commit(); err != nil {
-		return nil, etcd.FromEtcdError(err)
-	}
-
 	s := &Scheduler{
 		c:   c,
 		e:   e,
@@ -1159,9 +1352,8 @@ func NewScheduler(ctx context.Context, c *config.RunServiceScheduler) (*Schedule
 	}
 
 	walConf := &wal.WalManagerConfig{
-		E:                     e,
-		Lts:                   lts,
-		AdditionalActionsFunc: s.additionalActions,
+		E:   e,
+		Lts: lts,
 	}
 	wal, err := wal.NewWalManager(ctx, logger, walConf)
 	if err != nil {
@@ -1181,6 +1373,56 @@ func NewScheduler(ctx context.Context, c *config.RunServiceScheduler) (*Schedule
 	return s, nil
 }
 
+func (s *Scheduler) InitEtcd(ctx context.Context) error {
+	// Create changegroup min revision if it doesn't exists
+	cmp := []etcdclientv3.Cmp{}
+	then := []etcdclientv3.Op{}
+
+	cmp = append(cmp, etcdclientv3.Compare(etcdclientv3.CreateRevision(common.EtcdChangeGroupMinRevisionKey), "=", 0))
+	then = append(then, etcdclientv3.OpPut(common.EtcdChangeGroupMinRevisionKey, ""))
+	txn := s.e.Client().Txn(ctx).If(cmp...).Then(then...)
+	if _, err := txn.Commit(); err != nil {
+		return etcd.FromEtcdError(err)
+	}
+
+	// Populate lastIndexDir if empty
+	doneCh := make(chan struct{})
+	defer close(doneCh)
+
+	_, err := s.e.Get(ctx, common.EtcdLastIndexKey, 0)
+	if err != nil && err != etcd.ErrKeyNotFound {
+		return err
+	}
+	// EtcdLastIndexKey already exist
+	if err == nil {
+		return nil
+	}
+
+	var indexDir string
+	// take the last (greater) indexdir
+	for object := range s.wal.List(common.StorageRunsIndexesDir+"/", "", true, doneCh) {
+		if object.Err != nil {
+			return object.Err
+		}
+
+		h := util.PathList(object.Path)
+		if len(h) < 2 {
+			return errors.Errorf("wrong index dir path %q", object.Path)
+		}
+		indexDir = h[1]
+	}
+
+	// if an indexDir doesn't exist in lts then initialize
+	if indexDir == "" {
+		indexDir = strconv.FormatInt(time.Now().UnixNano(), 10)
+		if _, err := s.e.AtomicPut(ctx, common.EtcdLastIndexKey, []byte(indexDir), 0, nil); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (s *Scheduler) Run(ctx context.Context) error {
 	errCh := make(chan error)
 	walReadyCh := make(chan struct{})
@@ -1190,6 +1432,14 @@ func (s *Scheduler) Run(ctx context.Context) error {
 	// wait for wal to be ready
 	<-walReadyCh
 
+	for {
+		err := s.InitEtcd(ctx)
+		if err == nil {
+			break
+		}
+		log.Errorf("failed to initialize etcd: %+v", err)
+		time.Sleep(1 * time.Second)
+	}
 
 	go s.readDB.Run(ctx)
 
@@ -1256,6 +1506,8 @@ func (s *Scheduler) Run(ctx context.Context) error {
 	go s.runTasksUpdaterLoop(ctx)
 	go s.fetcherLoop(ctx)
 	go s.finishedRunsArchiverLoop(ctx)
+	go s.dumpLTSLoop(ctx)
+	go s.dumpLTSCleanerLoop(ctx)
 	go s.compactChangeGroupsLoop(ctx)
 
 	go s.runScheduler(ctx, ch)

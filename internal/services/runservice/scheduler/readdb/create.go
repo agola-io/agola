@@ -19,12 +19,9 @@ var Stmts = []string{
 	//"create table revision (clusterid varchar, revision bigint, PRIMARY KEY(revision))",
 	"create table revision (revision bigint, PRIMARY KEY(revision))",
 
-	"create table run (id varchar, data bytea, phase varchar, PRIMARY KEY (id))",
-	"create index run_phase on run(phase)",
+	"create table run (id varchar, grouppath varchar, phase varchar, PRIMARY KEY (id, grouppath, phase))",
 
-	// rungroup stores the groups associated to a run
-	"create table rungroup (runid varchar, grouppath varchar, PRIMARY KEY (runid, grouppath), FOREIGN KEY(runid) REFERENCES run(id) ON DELETE CASCADE)",
-	"create index rungroup_grouppath on rungroup(grouppath)",
+	"create table rundata (id varchar, data bytea, PRIMARY KEY (id))",
 
 	"create table runevent (sequence varchar, data bytea, PRIMARY KEY (sequence))",
 
@@ -32,10 +29,12 @@ var Stmts = []string{
 	"create table changegrouprevision (id varchar, revision varchar, PRIMARY KEY (id, revision))",
 
 	// LTS
-	"create table run_lts (id varchar, data bytea, phase varchar, PRIMARY KEY (id))",
-	"create index run_lts_phase on run_lts(phase)",
+	"create table revision_lts (revision bigint, PRIMARY KEY(revision))",
 
-	// rungroup stores the groups associated to a run
-	"create table rungroup_lts (runid varchar, grouppath varchar, PRIMARY KEY (runid, grouppath), FOREIGN KEY(runid) REFERENCES run_lts(id) ON DELETE CASCADE)",
-	"create index rungroup_lts_grouppath on rungroup_lts(grouppath)",
+	// committedwalsequence stores the last committed wal sequence
+	"create table committedwalsequence_lts (seq varchar, PRIMARY KEY (seq))",
+
+	"create table run_lts (id varchar, grouppath varchar, phase varchar, PRIMARY KEY (id, grouppath, phase))",
+
+	"create table rundata_lts (id varchar, data bytea, PRIMARY KEY (id))",
 }

@@ -23,7 +23,6 @@ import (
 
 	"github.com/sorintlab/agola/internal/etcd"
 	"github.com/sorintlab/agola/internal/objectstorage"
-	"github.com/sorintlab/agola/internal/sequence"
 	"github.com/sorintlab/agola/internal/services/runservice/scheduler/common"
 	"github.com/sorintlab/agola/internal/services/runservice/types"
 	"github.com/sorintlab/agola/internal/util"
@@ -33,49 +32,56 @@ import (
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
 )
 
+func LTSSubGroupsAndGroupTypes(group string) []string {
+	h := util.PathHierarchy(group)
+	if len(h)%2 != 1 {
+		panic(fmt.Errorf("wrong group path %q", group))
+	}
+
+	return h
+}
+
+func LTSRootGroup(group string) string {
+	h := util.PathHierarchy(group)
+	if len(h)%2 != 1 {
+		panic(fmt.Errorf("wrong group path %q", group))
+	}
+
+	return h[2]
+}
+
 func LTSSubGroups(group string) []string {
-	return util.PathHierarchy(group)
+	h := util.PathHierarchy(group)
+	if len(h)%2 != 1 {
+		panic(fmt.Errorf("wrong group path %q", group))
+	}
+
+	// remove group types
+	sg := []string{}
+	for i, g := range h {
+		if i%2 == 0 {
+			sg = append(sg, g)
+		}
+	}
+
+	return sg
 }
 
-func LTSIndexGroupDir(group string) string {
-	groupPath := util.EncodeSha256Hex(group)
-	if group == "." || group == "/" {
-		groupPath = "all"
-	}
-	return path.Join(common.StorageRunsIndexesDir, groupPath)
-}
-
-func LTSIndexRunIDOrderDir(group string, sortOrder types.SortOrder) string {
-	var dir string
-	switch sortOrder {
-	case types.SortOrderAsc:
-		dir = "runid/asc"
-	case types.SortOrderDesc:
-		dir = "runid/desc"
-	}
-	return path.Join(LTSIndexGroupDir(group), dir)
-}
-
-func LTSIndexRunIDOrderPath(group, runID string, sortOrder types.SortOrder) string {
-	s, err := sequence.Parse(runID)
-	if err != nil {
-		panic(err)
+func LTSSubGroupTypes(group string) []string {
+	h := util.PathHierarchy(group)
+	if len(h)%2 != 1 {
+		panic(fmt.Errorf("wrong group path %q", group))
 	}
 
-	order := runID
-	if sortOrder == types.SortOrderDesc {
-		order = s.Reverse().String()
+	// remove group names
+	sg := []string{}
+	for i, g := range h {
+		if i%2 == 1 {
+			sg = append(sg, g)
+		}
 	}
-	return path.Join(LTSIndexRunIDOrderDir(group, sortOrder), order, runID)
-}
 
-func LTSIndexRunIDOrderPaths(group, runID string, sortOrder types.SortOrder) []string {
-	paths := []string{}
-	subGroups := LTSSubGroups(group)
-	for _, subGroup := range subGroups {
-		paths = append(paths, LTSIndexRunIDOrderPath(subGroup, runID, sortOrder))
-	}
-	return paths
+	return sg
 }
 
 func LTSRunCounterPaths(group, runID string, sortOrder types.SortOrder) []string {
@@ -89,12 +95,12 @@ func LTSRunCounterPaths(group, runID string, sortOrder types.SortOrder) []string
 
 func LTSGetRunCounter(wal *wal.WalManager, group string) (uint64, *wal.ChangeGroupsUpdateToken, error) {
 	// use the first group dir after the root
-	ph := util.PathHierarchy(group)
-	if len(ph) < 2 {
+	pl := util.PathList(group)
+	if len(pl) < 2 {
 		return 0, nil, errors.Errorf("cannot determine group counter name, wrong group path %q", group)
 	}
-	runCounterPath := common.StorageCounterFile(ph[1])
-	rcf, cgt, err := wal.ReadObject(runCounterPath, []string{"counter-" + ph[1]})
+	runCounterPath := common.StorageCounterFile(pl[1])
+	rcf, cgt, err := wal.ReadObject(runCounterPath, []string{"counter-" + pl[1]})
 	if err != nil {
 		return 0, cgt, err
 	}
@@ -110,8 +116,8 @@ func LTSGetRunCounter(wal *wal.WalManager, group string) (uint64, *wal.ChangeGro
 
 func LTSUpdateRunCounterAction(ctx context.Context, c uint64, group string) (*wal.Action, error) {
 	// use the first group dir after the root
-	ph := util.PathHierarchy(group)
-	if len(ph) < 2 {
+	pl := util.PathList(group)
+	if len(pl) < 2 {
 		return nil, errors.Errorf("cannot determine group counter name, wrong group path %q", group)
 	}
 
@@ -122,7 +128,7 @@ func LTSUpdateRunCounterAction(ctx context.Context, c uint64, group string) (*wa
 
 	action := &wal.Action{
 		ActionType: wal.ActionTypePut,
-		Path:       common.StorageCounterFile(ph[1]),
+		Path:       common.StorageCounterFile(pl[1]),
 		Data:       cj,
 	}
 
@@ -237,15 +243,6 @@ func LTSSaveRunAction(r *types.Run) (*wal.Action, error) {
 	}
 
 	return action, nil
-}
-
-func LTSGenIndexes(lts *objectstorage.ObjStorage, r *types.Run) []string {
-	indexes := []string{}
-	for _, order := range []types.SortOrder{types.SortOrderAsc, types.SortOrderDesc} {
-		indexes = append(indexes, LTSIndexRunIDOrderPaths(r.Group, r.ID, order)...)
-		//indexes = append(indexes, LTSIndexRunArchiveOrderPaths(r.Group, r.LTSSequence, r.ID, order)...)
-	}
-	return indexes
 }
 
 func GetExecutor(ctx context.Context, e *etcd.Store, executorID string) (*types.Executor, error) {

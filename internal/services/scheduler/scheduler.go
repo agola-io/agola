@@ -66,7 +66,7 @@ func (s *Scheduler) schedule(ctx context.Context) error {
 		}
 	}
 
-	for groupID, _ := range groups {
+	for groupID := range groups {
 		if err := s.scheduleRun(ctx, groupID); err != nil {
 			log.Errorf("scheduler err: %v", err)
 		}

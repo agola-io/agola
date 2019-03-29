@@ -390,22 +390,7 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var runs []*types.Run
 	var cgt *types.ChangeGroupsUpdateToken
 
-	if len(groups) == 0 {
-		groups = []string{"."}
-	}
 	err := h.readDB.Do(func(tx *db.Tx) error {
-		if err := h.readDB.PrefetchRuns(tx, groups, phaseFilter, start, limit, sortOrder); err != nil {
-			h.log.Errorf("err: %+v", err)
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	err = h.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		runs, err = h.readDB.GetRuns(tx, groups, lastRun, phaseFilter, start, limit, sortOrder)
 		if err != nil {
