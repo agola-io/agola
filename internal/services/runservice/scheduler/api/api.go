@@ -364,6 +364,7 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	changeGroups := query["changegroup"]
 	groups := query["group"]
+	_, lastRun := query["lastrun"]
 
 	limitS := query.Get("limit")
 	limit := DefaultRunsLimit
@@ -409,7 +410,7 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	err = h.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		runs, err = h.readDB.GetRuns(tx, groups, phaseFilter, start, limit, sortOrder)
+		runs, err = h.readDB.GetRuns(tx, groups, lastRun, phaseFilter, start, limit, sortOrder)
 		if err != nil {
 			h.log.Errorf("err: %+v", err)
 			return err
