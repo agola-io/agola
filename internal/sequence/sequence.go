@@ -68,7 +68,7 @@ func (s *Sequence) EqualEpoch(s2 *Sequence) bool {
 }
 
 func CurSequence(ctx context.Context, e *etcd.Store, key string) (*Sequence, bool, error) {
-	resp, err := e.Get(ctx, key)
+	resp, err := e.Get(ctx, key, 0)
 	if err != nil && err != etcd.ErrKeyNotFound {
 		return nil, false, err
 	}
@@ -87,7 +87,7 @@ func CurSequence(ctx context.Context, e *etcd.Store, key string) (*Sequence, boo
 }
 
 func IncSequence(ctx context.Context, e *etcd.Store, key string) (*Sequence, error) {
-	resp, err := e.Get(ctx, key)
+	resp, err := e.Get(ctx, key, 0)
 	if err != nil && err != etcd.ErrKeyNotFound {
 		return nil, err
 	}

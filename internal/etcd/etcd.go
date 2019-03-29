@@ -161,9 +161,13 @@ func (s *Store) Put(ctx context.Context, key string, value []byte, options *Writ
 	return resp, FromEtcdError(err)
 }
 
-func (s *Store) Get(ctx context.Context, key string) (*etcdclientv3.GetResponse, error) {
-	resp, err := s.c.Get(ctx, key)
+func (s *Store) Get(ctx context.Context, key string, revision int64) (*etcdclientv3.GetResponse, error) {
+	opts := []etcdclientv3.OpOption{}
+	if revision != 0 {
+		opts = append(opts, etcdclientv3.WithRev(revision))
+	}
 
+	resp, err := s.c.Get(ctx, key, opts...)
 	if err != nil {
 		return resp, FromEtcdError(err)
 	}

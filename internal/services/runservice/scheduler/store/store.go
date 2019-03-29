@@ -249,7 +249,7 @@ func LTSGenIndexes(lts *objectstorage.ObjStorage, r *types.Run) []string {
 }
 
 func GetExecutor(ctx context.Context, e *etcd.Store, executorID string) (*types.Executor, error) {
-	resp, err := e.Get(ctx, common.EtcdExecutorKey(executorID))
+	resp, err := e.Get(ctx, common.EtcdExecutorKey(executorID), 0)
 	if err != nil {
 		return nil, err
 	}
@@ -304,7 +304,7 @@ func DeleteExecutor(ctx context.Context, e *etcd.Store, executorID string) error
 }
 
 func GetExecutorTask(ctx context.Context, e *etcd.Store, etID string) (*types.ExecutorTask, error) {
-	resp, err := e.Get(ctx, common.EtcdTaskKey(etID))
+	resp, err := e.Get(ctx, common.EtcdTaskKey(etID), 0)
 	if err != nil {
 		return nil, err
 	}
@@ -422,7 +422,7 @@ func GetExecutorTasksForRun(ctx context.Context, e *etcd.Store, runID string) ([
 }
 
 func GetRun(ctx context.Context, e *etcd.Store, runID string) (*types.Run, int64, error) {
-	resp, err := e.Get(ctx, common.EtcdRunKey(runID))
+	resp, err := e.Get(ctx, common.EtcdRunKey(runID), 0)
 	if err != nil {
 		return nil, 0, err
 	}

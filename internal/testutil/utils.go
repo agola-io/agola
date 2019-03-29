@@ -297,7 +297,7 @@ type TestEtcd struct {
 func (te *TestEtcd) Compact() error {
 	ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 	defer cancel()
-	resp, err := te.Get(ctx, "anykey")
+	resp, err := te.Get(ctx, "anykey", 0)
 	if err != nil && err != etcd.ErrKeyNotFound {
 		return err
 	}
@@ -311,7 +311,7 @@ func (te *TestEtcd) WaitUp(timeout time.Duration) error {
 	for time.Now().Add(-timeout).Before(start) {
 		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 		defer cancel()
-		_, err := te.Get(ctx, "anykey")
+		_, err := te.Get(ctx, "anykey", 0)
 		if err != nil && err == etcd.ErrKeyNotFound {
 			return nil
 		}
@@ -329,7 +329,7 @@ func (te *TestEtcd) WaitDown(timeout time.Duration) error {
 	for time.Now().Add(-timeout).Before(start) {
 		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 		defer cancel()
-		_, err := te.Get(ctx, "anykey")
+		_, err := te.Get(ctx, "anykey", 0)
 		if err != nil && err != etcd.ErrKeyNotFound {
 			return nil
 		}
