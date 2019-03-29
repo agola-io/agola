@@ -46,6 +46,8 @@ var (
 
 	EtcdExecutorsDir = "executors"
 	EtcdTasksDir     = "tasks"
+
+	EtcdLastIndexKey = "lastindex"
 )
 
 func EtcdRunKey(runID string) string       { return path.Join(EtcdRunsDir, runID) }
