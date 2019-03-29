@@ -184,9 +184,22 @@ type RunTask struct {
 	EndTime   *time.Time `json:"end_time,omitempty"`
 }
 
+func (rt *RunTask) LogsFetchFinished() bool {
+	if rt.SetupStep.LogPhase != RunTaskFetchPhaseFinished {
+		return false
+	}
+	for _, rts := range rt.Steps {
+		lp := rts.LogPhase
+		if lp != RunTaskFetchPhaseFinished {
+			return false
+		}
+	}
+	return true
+}
+
 func (rt *RunTask) ArchivesFetchFinished() bool {
 	for _, p := range rt.WorkspaceArchivesPhase {
-		if p == RunTaskFetchPhaseNotStarted {
+		if p != RunTaskFetchPhaseFinished {
 			return false
 		}
 	}

@@ -1030,25 +1030,15 @@ func (s *Scheduler) finishedRunArchiver(ctx context.Context, r *types.Run) error
 
 	done := true
 	for _, rt := range r.RunTasks {
-		// check all logs are fetched
-		if rt.SetupStep.LogPhase != types.RunTaskFetchPhaseFinished {
+		// check that all logs are fetched
+		if !rt.LogsFetchFinished() {
 			done = false
 			break
 		}
-		for _, rts := range rt.Steps {
-			lp := rts.LogPhase
-			if lp != types.RunTaskFetchPhaseFinished {
-				done = false
-				break
-			}
-		}
-
-		// check all archives are fetched
-		for _, lp := range rt.WorkspaceArchivesPhase {
-			if lp != types.RunTaskFetchPhaseFinished {
-				done = false
-				break
-			}
+		// check that all archives are fetched
+		if !rt.ArchivesFetchFinished() {
+			done = false
+			break
 		}
 	}
 	if !done {
