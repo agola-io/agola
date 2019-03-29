@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 
+	gitsource "github.com/sorintlab/agola/internal/gitsources"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/gateway/common"
 	"github.com/sorintlab/agola/internal/services/types"
@@ -120,12 +121,74 @@ func (c *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequ
 	return la, nil
 }
 
+type RegisterUserRequest struct {
+	UserName                       string
+	RemoteSourceName               string
+	RemoteSourceUserAccessToken    string
+	RemoteSourceOauth2AccessToken  string
+	RemoteSourceOauth2RefreshToken string
+}
+
+func (c *CommandHandler) RegisterUser(ctx context.Context, req *RegisterUserRequest) (*types.User, error) {
+	if req.UserName == "" {
+		return nil, util.NewErrBadRequest(errors.Errorf("user name required"))
+	}
+	if !util.ValidateName(req.UserName) {
+		return nil, errors.Errorf("invalid user name %q", req.UserName)
+	}
+
+	rs, _, err := c.configstoreClient.GetRemoteSourceByName(ctx, req.RemoteSourceName)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get remote source %q", req.RemoteSourceName)
+	}
+	c.log.Infof("rs: %s", util.Dump(rs))
+
+	accessToken, err := common.GetAccessToken(rs.AuthType, req.RemoteSourceUserAccessToken, req.RemoteSourceOauth2AccessToken)
+	if err != nil {
+		return nil, err
+	}
+	userSource, err := common.GetUserSource(rs, accessToken)
+	if err != nil {
+		return nil, err
+	}
+
+	remoteUserInfo, err := userSource.GetUserInfo()
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to retrieve remote user info for remote source %q", rs.ID)
+	}
+	if remoteUserInfo.ID == "" {
+		return nil, errors.Errorf("empty remote user id for remote source %q", rs.ID)
+	}
+
+	creq := &csapi.CreateUserRequest{
+		UserName: req.UserName,
+		CreateUserLARequest: &csapi.CreateUserLARequest{
+			RemoteSourceName:   req.RemoteSourceName,
+			RemoteUserID:       remoteUserInfo.ID,
+			RemoteUserName:     remoteUserInfo.LoginName,
+			Oauth2AccessToken:  req.RemoteSourceOauth2AccessToken,
+			Oauth2RefreshToken: req.RemoteSourceOauth2RefreshToken,
+			UserAccessToken:    req.RemoteSourceUserAccessToken,
+		},
+	}
+
+	c.log.Infof("creating user account")
+	u, _, err := c.configstoreClient.CreateUser(ctx, creq)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create linked account")
+	}
+	c.log.Infof("user %q created", req.UserName)
+
+	return u, nil
+}
+
 type LoginUserRequest struct {
 	RemoteSourceName               string
 	RemoteSourceUserAccessToken    string
 	RemoteSourceOauth2AccessToken  string
 	RemoteSourceOauth2RefreshToken string
 }
+
 type LoginUserResponse struct {
 	Token string
 	User  *types.User
@@ -208,12 +271,54 @@ func (c *CommandHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (
 	}, nil
 }
 
+type AuthorizeRequest struct {
+	RemoteSourceName               string
+	RemoteSourceUserAccessToken    string
+	RemoteSourceOauth2AccessToken  string
+	RemoteSourceOauth2RefreshToken string
+}
+
+type AuthorizeResponse struct {
+	RemoteUserInfo   *gitsource.UserInfo
+	RemoteSourceName string
+}
+
+func (c *CommandHandler) Authorize(ctx context.Context, req *AuthorizeRequest) (*AuthorizeResponse, error) {
+	rs, _, err := c.configstoreClient.GetRemoteSourceByName(ctx, req.RemoteSourceName)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get remote source %q", req.RemoteSourceName)
+	}
+	c.log.Infof("rs: %s", util.Dump(rs))
+
+	accessToken, err := common.GetAccessToken(rs.AuthType, req.RemoteSourceUserAccessToken, req.RemoteSourceOauth2AccessToken)
+	if err != nil {
+		return nil, err
+	}
+	userSource, err := common.GetUserSource(rs, accessToken)
+	if err != nil {
+		return nil, err
+	}
+
+	remoteUserInfo, err := userSource.GetUserInfo()
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to retrieve remote user info for remote source %q", rs.ID)
+	}
+	if remoteUserInfo.ID == "" {
+		return nil, errors.Errorf("empty remote user id for remote source %q", rs.ID)
+	}
+
+	return &AuthorizeResponse{
+		RemoteUserInfo:   remoteUserInfo,
+		RemoteSourceName: req.RemoteSourceName,
+	}, nil
+}
+
 type RemoteSourceAuthResponse struct {
 	Oauth2Redirect string
 	Response       interface{}
 }
 
-func (c *CommandHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSourceName, loginName, loginPassword, requestType string, req interface{}) (*RemoteSourceAuthResponse, error) {
+func (c *CommandHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSourceName, loginName, loginPassword string, requestType RemoteSourceRequestType, req interface{}) (*RemoteSourceAuthResponse, error) {
 	rs, _, err := c.configstoreClient.GetRemoteSourceByName(ctx, remoteSourceName)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get remote source %q", remoteSourceName)
@@ -221,7 +326,7 @@ func (c *CommandHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSourc
 	c.log.Infof("rs: %s", util.Dump(rs))
 
 	switch requestType {
-	case "createuserla":
+	case RemoteSourceRequestTypeCreateUserLA:
 		req := req.(*CreateUserLARequest)
 		user, _, err := c.configstoreClient.GetUserByName(ctx, req.UserName)
 		if err != nil {
@@ -239,7 +344,11 @@ func (c *CommandHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSourc
 			return nil, errors.Errorf("user %q already have a linked account for remote source %q", req.UserName, rs.Name)
 		}
 
-	case "loginuser":
+	case RemoteSourceRequestTypeLoginUser:
+
+	case RemoteSourceRequestTypeAuthorize:
+
+	case RemoteSourceRequestTypeRegisterUser:
 
 	default:
 		return nil, errors.Errorf("unknown request type: %q", requestType)
@@ -251,7 +360,7 @@ func (c *CommandHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSourc
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create git source")
 		}
-		token, err := common.GenerateJWTToken(c.sd, rs.Name, requestType, req)
+		token, err := common.GenerateJWTToken(c.sd, rs.Name, string(requestType), req)
 		if err != nil {
 			return nil, err
 		}
@@ -292,8 +401,17 @@ func (c *CommandHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSourc
 	}
 }
 
+type RemoteSourceRequestType string
+
+const (
+	RemoteSourceRequestTypeCreateUserLA RemoteSourceRequestType = "createuserla"
+	RemoteSourceRequestTypeLoginUser    RemoteSourceRequestType = "loginuser"
+	RemoteSourceRequestTypeAuthorize    RemoteSourceRequestType = "authorize"
+	RemoteSourceRequestTypeRegisterUser RemoteSourceRequestType = "registeruser"
+)
+
 type RemoteSourceAuthResult struct {
-	RequestType string
+	RequestType RemoteSourceRequestType
 	Response    interface{}
 }
 
@@ -301,9 +419,9 @@ type CreateUserLAResponse struct {
 	LinkedAccount *types.LinkedAccount
 }
 
-func (c *CommandHandler) HandleRemoteSourceAuthRequest(ctx context.Context, requestType, requestString string, userAccessToken, Oauth2AccessToken, Oauth2RefreshToken string) (*RemoteSourceAuthResult, error) {
+func (c *CommandHandler) HandleRemoteSourceAuthRequest(ctx context.Context, requestType RemoteSourceRequestType, requestString string, userAccessToken, Oauth2AccessToken, Oauth2RefreshToken string) (*RemoteSourceAuthResult, error) {
 	switch requestType {
-	case "createuserla":
+	case RemoteSourceRequestTypeCreateUserLA:
 		var req *CreateUserLARequest
 		if err := json.Unmarshal([]byte(requestString), &req); err != nil {
 			return nil, errors.Errorf("failed to unmarshal request")
@@ -327,7 +445,7 @@ func (c *CommandHandler) HandleRemoteSourceAuthRequest(ctx context.Context, requ
 			},
 		}, nil
 
-	case "loginuser":
+	case RemoteSourceRequestTypeLoginUser:
 		var req *LoginUserRequest
 		if err := json.Unmarshal([]byte(requestString), &req); err != nil {
 			return nil, errors.Errorf("failed to unmarshal request")
@@ -345,10 +463,50 @@ func (c *CommandHandler) HandleRemoteSourceAuthRequest(ctx context.Context, requ
 		}
 		return &RemoteSourceAuthResult{
 			RequestType: requestType,
-			Response: &LoginUserResponse{
-				Token: cresp.Token,
-				User:  cresp.User,
-			},
+			Response:    cresp,
+		}, nil
+
+	case RemoteSourceRequestTypeAuthorize:
+		var req *AuthorizeRequest
+		if err := json.Unmarshal([]byte(requestString), &req); err != nil {
+			return nil, errors.Errorf("failed to unmarshal request")
+		}
+
+		creq := &AuthorizeRequest{
+			RemoteSourceName:               req.RemoteSourceName,
+			RemoteSourceUserAccessToken:    userAccessToken,
+			RemoteSourceOauth2AccessToken:  Oauth2AccessToken,
+			RemoteSourceOauth2RefreshToken: Oauth2RefreshToken,
+		}
+		cresp, err := c.Authorize(ctx, creq)
+		if err != nil {
+			return nil, err
+		}
+		return &RemoteSourceAuthResult{
+			RequestType: requestType,
+			Response:    cresp,
+		}, nil
+
+	case RemoteSourceRequestTypeRegisterUser:
+		var req *RegisterUserRequest
+		if err := json.Unmarshal([]byte(requestString), &req); err != nil {
+			return nil, errors.Errorf("failed to unmarshal request")
+		}
+
+		creq := &RegisterUserRequest{
+			UserName:                       req.UserName,
+			RemoteSourceName:               req.RemoteSourceName,
+			RemoteSourceUserAccessToken:    userAccessToken,
+			RemoteSourceOauth2AccessToken:  Oauth2AccessToken,
+			RemoteSourceOauth2RefreshToken: Oauth2RefreshToken,
+		}
+		cresp, err := c.RegisterUser(ctx, creq)
+		if err != nil {
+			return nil, err
+		}
+		return &RemoteSourceAuthResult{
+			RequestType: requestType,
+			Response:    cresp,
 		}, nil
 
 	default:
@@ -381,7 +539,7 @@ func (c *CommandHandler) HandleOauth2Callback(ctx context.Context, code, state s
 
 	claims := token.Claims.(jwt.MapClaims)
 	remoteSourceName := claims["remote_source_name"].(string)
-	requestType := claims["request_type"].(string)
+	requestType := RemoteSourceRequestType(claims["request_type"].(string))
 	requestString := claims["request"].(string)
 
 	rs, _, err := c.configstoreClient.GetRemoteSourceByName(ctx, remoteSourceName)

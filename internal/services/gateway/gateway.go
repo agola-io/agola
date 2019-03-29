@@ -192,6 +192,8 @@ func (g *Gateway) Run(ctx context.Context) error {
 	reposHandler := api.NewReposHandler(logger, g.configstoreClient)
 
 	loginUserHandler := api.NewLoginUserHandler(logger, g.ch)
+	authorizeHandler := api.NewAuthorizeHandler(logger, g.ch)
+	registerHandler := api.NewRegisterUserHandler(logger, g.ch)
 	oauth2callbackHandler := api.NewOAuth2CallbackHandler(logger, g.ch, g.configstoreClient)
 
 	router := mux.NewRouter()
@@ -258,6 +260,8 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/runs", authForcedHandler(runsHandler)).Methods("GET")
 
 	router.Handle("/login", loginUserHandler).Methods("POST")
+	router.Handle("/authorize", authorizeHandler).Methods("POST")
+	router.Handle("/register", registerHandler).Methods("POST")
 	router.Handle("/oauth2/callback", oauth2callbackHandler).Methods("GET")
 
 	router.Handle("/repos/{rest:.*}", reposHandler).Methods("GET", "POST")

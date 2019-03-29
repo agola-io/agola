@@ -54,22 +54,32 @@ func (h *OAuth2CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 	var response interface{}
 	switch cresp.RequestType {
-	case "createuserla":
+	case command.RemoteSourceRequestTypeCreateUserLA:
 		authresp := cresp.Response.(*command.CreateUserLAResponse)
 		response = &CreateUserLAResponse{
 			LinkedAccount: authresp.LinkedAccount,
 		}
 
-	case "loginuser":
+	case command.RemoteSourceRequestTypeLoginUser:
 		authresp := cresp.Response.(*command.LoginUserResponse)
 		response = &LoginUserResponse{
 			Token: authresp.Token,
 			User:  createUserResponse(authresp.User),
 		}
+
+	case command.RemoteSourceRequestTypeAuthorize:
+		authresp := cresp.Response.(*command.AuthorizeResponse)
+		response = &AuthorizeResponse{
+			RemoteUserInfo:   authresp.RemoteUserInfo,
+			RemoteSourceName: authresp.RemoteSourceName,
+		}
+
+	case command.RemoteSourceRequestTypeRegisterUser:
+		response = &RegisterUserResponse{}
 	}
 
 	resp := RemoteSourceAuthResult{
-		RequestType: cresp.RequestType,
+		RequestType: string(cresp.RequestType),
 		Response:    response,
 	}
 	if err := json.NewEncoder(w).Encode(resp); err != nil {

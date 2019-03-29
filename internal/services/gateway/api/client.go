@@ -273,6 +273,17 @@ func (c *Client) DeleteUserLA(ctx context.Context, userName, laID string) (*http
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/users/%s/linkedaccounts/%s", userName, laID), nil, jsonContent, nil)
 }
 
+func (c *Client) RegisterUser(ctx context.Context, req *RegisterUserRequest) (*RegisterUserResponse, *http.Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	res := new(RegisterUserResponse)
+	resp, err := c.getParsedResponse(ctx, "PUT", "/register", nil, jsonContent, bytes.NewReader(reqj), res)
+	return res, resp, err
+}
+
 func (c *Client) CreateUserToken(ctx context.Context, userName string, req *CreateUserTokenRequest) (*CreateUserTokenResponse, *http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {

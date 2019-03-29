@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"strconv"
 
+	gitsource "github.com/sorintlab/agola/internal/gitsources"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/gateway/command"
 	"github.com/sorintlab/agola/internal/services/types"
@@ -266,8 +267,8 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 type CreateUserLARequest struct {
 	RemoteSourceName          string `json:"remote_source_name"`
-	RemoteSourceLoginName     string `json:"remote_login_name"`
-	RemoteSourceLoginPassword string `json:"remote_login_password"`
+	RemoteSourceLoginName     string `json:"remote_source_login_name"`
+	RemoteSourceLoginPassword string `json:"remote_source_login_password"`
 }
 
 type CreateUserLAResponse struct {
@@ -317,7 +318,7 @@ func (h *CreateUserLAHandler) createUserLA(ctx context.Context, userName string,
 	}
 
 	h.log.Infof("creating linked account")
-	cresp, err := h.ch.HandleRemoteSourceAuth(ctx, req.RemoteSourceName, req.RemoteSourceLoginName, req.RemoteSourceLoginPassword, "createuserla", creq)
+	cresp, err := h.ch.HandleRemoteSourceAuth(ctx, req.RemoteSourceName, req.RemoteSourceLoginName, req.RemoteSourceLoginPassword, command.RemoteSourceRequestTypeCreateUserLA, creq)
 	if err != nil {
 		return nil, err
 	}
@@ -407,6 +408,131 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	}
 }
 
+type RegisterUserRequest struct {
+	CreateUserRequest
+	CreateUserLARequest
+}
+
+type RegisterUserHandler struct {
+	log *zap.SugaredLogger
+	ch  *command.CommandHandler
+}
+
+type RegisterUserResponse struct {
+	Oauth2Redirect string `json:"oauth2_redirect"`
+}
+
+func NewRegisterUserHandler(logger *zap.Logger, ch *command.CommandHandler) *RegisterUserHandler {
+	return &RegisterUserHandler{log: logger.Sugar(), ch: ch}
+}
+
+func (h *RegisterUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var req *RegisterUserRequest
+	d := json.NewDecoder(r.Body)
+	if err := d.Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	resp, err := h.registerUser(ctx, req)
+	if err != nil {
+		h.log.Errorf("err: %+v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+}
+
+func (h *RegisterUserHandler) registerUser(ctx context.Context, req *RegisterUserRequest) (*RegisterUserResponse, error) {
+	creq := &command.RegisterUserRequest{
+		UserName:         req.CreateUserRequest.UserName,
+		RemoteSourceName: req.CreateUserLARequest.RemoteSourceName,
+	}
+
+	cresp, err := h.ch.HandleRemoteSourceAuth(ctx, req.CreateUserLARequest.RemoteSourceName, req.CreateUserLARequest.RemoteSourceLoginName, req.CreateUserLARequest.RemoteSourceLoginPassword, command.RemoteSourceRequestTypeRegisterUser, creq)
+	if err != nil {
+		return nil, err
+	}
+	if cresp.Oauth2Redirect != "" {
+		return &RegisterUserResponse{
+			Oauth2Redirect: cresp.Oauth2Redirect,
+		}, nil
+	}
+	//authresp := cresp.Response.(*command.RegisterUserResponse)
+
+	resp := &RegisterUserResponse{}
+	return resp, nil
+}
+
+type AuthorizeHandler struct {
+	log *zap.SugaredLogger
+	ch  *command.CommandHandler
+}
+
+type AuthorizeResponse struct {
+	Oauth2Redirect   string              `json:"oauth2_redirect"`
+	RemoteUserInfo   *gitsource.UserInfo `json:"remote_user_info"`
+	RemoteSourceName string              `json:"remote_source_name"`
+}
+
+func NewAuthorizeHandler(logger *zap.Logger, ch *command.CommandHandler) *AuthorizeHandler {
+	return &AuthorizeHandler{log: logger.Sugar(), ch: ch}
+}
+
+func (h *AuthorizeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var req *LoginUserRequest
+	d := json.NewDecoder(r.Body)
+	if err := d.Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	resp, err := h.authorize(ctx, req)
+	if err != nil {
+		h.log.Errorf("err: %+v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+}
+
+func (h *AuthorizeHandler) authorize(ctx context.Context, req *LoginUserRequest) (*AuthorizeResponse, error) {
+	creq := &command.LoginUserRequest{
+		RemoteSourceName: req.RemoteSourceName,
+	}
+
+	cresp, err := h.ch.HandleRemoteSourceAuth(ctx, req.RemoteSourceName, req.LoginName, req.LoginPassword, command.RemoteSourceRequestTypeAuthorize, creq)
+	if err != nil {
+		return nil, err
+	}
+	if cresp.Oauth2Redirect != "" {
+		return &AuthorizeResponse{
+			Oauth2Redirect: cresp.Oauth2Redirect,
+		}, nil
+	}
+	authresp := cresp.Response.(*command.AuthorizeResponse)
+
+	resp := &AuthorizeResponse{
+		RemoteUserInfo:   authresp.RemoteUserInfo,
+		RemoteSourceName: authresp.RemoteSourceName,
+	}
+	return resp, nil
+}
+
 type LoginUserRequest struct {
 	RemoteSourceName string `json:"remote_source_name"`
 	LoginName        string `json:"login_name"`
@@ -459,7 +585,7 @@ func (h *LoginUserHandler) loginUser(ctx context.Context, req *LoginUserRequest)
 	}
 
 	h.log.Infof("logging in user")
-	cresp, err := h.ch.HandleRemoteSourceAuth(ctx, req.RemoteSourceName, req.LoginName, req.LoginPassword, "loginuser", creq)
+	cresp, err := h.ch.HandleRemoteSourceAuth(ctx, req.RemoteSourceName, req.LoginName, req.LoginPassword, command.RemoteSourceRequestTypeLoginUser, creq)
 	if err != nil {
 		return nil, err
 	}
