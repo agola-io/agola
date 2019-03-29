@@ -17,6 +17,7 @@ package types
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/sorintlab/agola/internal/util"
@@ -129,6 +130,36 @@ func (r *Run) TasksWaitingApproval() []string {
 		}
 	}
 	return runTasksIDs
+}
+
+// CanRestartFromScratch reports if the run can be restarted from scratch
+func (r *Run) CanRestartFromScratch() (bool, string) {
+	// can restart only if the run phase is finished or cancelled
+	if !r.Phase.IsFinished() {
+		return false, fmt.Sprintf("run is not finished, phase: %q", r.Phase)
+	}
+	return true, ""
+}
+
+// CanRestartFromFailedTasks reports if the run can be restarted from failed tasks
+func (r *Run) CanRestartFromFailedTasks() (bool, string) {
+	// can restart only if the run phase is finished or cancelled
+	if !r.Phase.IsFinished() {
+		return false, fmt.Sprintf("run is not finished, phase: %q", r.Phase)
+	}
+	// can restart from failed tasks only if there're some failed tasks
+	if r.Result == RunResultSuccess {
+		return false, fmt.Sprintf("run %q has success result, cannot restart from failed tasks", r.ID)
+	}
+	// can restart only if the successful tasks are fully archived
+	for _, rt := range r.RunTasks {
+		if rt.Status == RunTaskStatusSuccess {
+			if !rt.LogsFetchFinished() || !rt.ArchivesFetchFinished() {
+				return false, fmt.Sprintf("run %q task %q not fully archived", r.ID, rt.ID)
+			}
+		}
+	}
+	return true, ""
 }
 
 type RunTaskStatus string

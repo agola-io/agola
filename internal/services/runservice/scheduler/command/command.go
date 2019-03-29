@@ -216,6 +216,16 @@ func (s *CommandHandler) recreateRun(ctx context.Context, req *RunCreateRequest)
 		return nil, errors.Wrapf(err, "run %q doens't exist", req.RunID)
 	}
 
+	if req.FromStart {
+		if canRestart, reason := run.CanRestartFromScratch(); !canRestart {
+			return nil, errors.Errorf("run cannot be restarted: %s", reason)
+		}
+	} else {
+		if canRestart, reason := run.CanRestartFromFailedTasks(); !canRestart {
+			return nil, errors.Errorf("run cannot be restarted: %s", reason)
+		}
+	}
+
 	// update the run ID
 	run.ID = id
 	// reset run revision
@@ -231,7 +241,6 @@ func (s *CommandHandler) recreateRun(ctx context.Context, req *RunCreateRequest)
 	tasksToAdd := []*types.RunTask{}
 	tasksToDelete := []string{}
 
-	s.log.Infof("fromStart: %t", req.FromStart)
 	for _, rt := range run.RunTasks {
 		if req.FromStart || rt.Status != types.RunTaskStatusSuccess {
 			rct := rc.Tasks[rt.ID]
