@@ -15,11 +15,7 @@
 package cmd
 
 import (
-	"bufio"
 	"context"
-	"fmt"
-	"os"
-	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/services/gateway/api"
@@ -75,24 +71,10 @@ func userLACreate(cmd *cobra.Command, args []string) error {
 		return errors.Wrapf(err, "failed to create linked account")
 	}
 	if resp.Oauth2Redirect != "" {
-		log.Infof("visit %s", resp.Oauth2Redirect)
-
-		reader := bufio.NewReader(os.Stdin)
-		fmt.Print("Enter code: ")
-		code, _ := reader.ReadString('\n')
-		code = strings.TrimSpace(code)
-		log.Infof("code: %s", code)
-
-		req := &api.CreateUserLARequest{
-			RemoteSourceName: userLACreateOpts.remoteSourceName,
-		}
-		resp, _, err = gwclient.CreateUserLA(context.TODO(), userLACreateOpts.username, req)
-		if err != nil {
-			return errors.Wrapf(err, "failed to create linked account")
-		}
+		log.Infof("visit %s to continue", resp.Oauth2Redirect)
+	} else {
+		log.Infof("linked account for user %q created, ID: %s", userLACreateOpts.username, resp.LinkedAccount.ID)
 	}
-
-	log.Infof("linked account for user %q created, ID: %s", userLACreateOpts.username, resp.LinkedAccount.ID)
 
 	return nil
 }

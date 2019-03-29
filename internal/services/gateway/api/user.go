@@ -23,11 +23,9 @@ import (
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/gateway/command"
 	"github.com/sorintlab/agola/internal/services/types"
-	"github.com/sorintlab/agola/internal/util"
 	"go.uber.org/zap"
 
 	"github.com/gorilla/mux"
-	"github.com/pkg/errors"
 )
 
 type CreateUserRequest struct {
@@ -35,13 +33,12 @@ type CreateUserRequest struct {
 }
 
 type CreateUserHandler struct {
-	log               *zap.SugaredLogger
-	ch                *command.CommandHandler
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ch  *command.CommandHandler
 }
 
-func NewCreateUserHandler(logger *zap.Logger, ch *command.CommandHandler, configstoreClient *csapi.Client) *CreateUserHandler {
-	return &CreateUserHandler{log: logger.Sugar(), ch: ch, configstoreClient: configstoreClient}
+func NewCreateUserHandler(logger *zap.Logger, ch *command.CommandHandler) *CreateUserHandler {
+	return &CreateUserHandler{log: logger.Sugar(), ch: ch}
 }
 
 func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -279,13 +276,12 @@ type CreateUserLAResponse struct {
 }
 
 type CreateUserLAHandler struct {
-	log               *zap.SugaredLogger
-	ch                *command.CommandHandler
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ch  *command.CommandHandler
 }
 
-func NewCreateUserLAHandler(logger *zap.Logger, ch *command.CommandHandler, configstoreClient *csapi.Client) *CreateUserLAHandler {
-	return &CreateUserLAHandler{log: logger.Sugar(), ch: ch, configstoreClient: configstoreClient}
+func NewCreateUserLAHandler(logger *zap.Logger, ch *command.CommandHandler) *CreateUserLAHandler {
+	return &CreateUserLAHandler{log: logger.Sugar(), ch: ch}
 }
 
 func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -315,35 +311,13 @@ func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *CreateUserLAHandler) createUserLA(ctx context.Context, userName string, req *CreateUserLARequest) (*CreateUserLAResponse, error) {
-	remoteSourceName := req.RemoteSourceName
-	user, _, err := h.configstoreClient.GetUserByName(ctx, userName)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get user %q", userName)
-	}
-	rs, _, err := h.configstoreClient.GetRemoteSourceByName(ctx, remoteSourceName)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get remote source %q", remoteSourceName)
-	}
-	h.log.Infof("rs: %s", util.Dump(rs))
-	var la *types.LinkedAccount
-	for _, v := range user.LinkedAccounts {
-		if v.RemoteSourceID == rs.ID {
-			la = v
-			break
-		}
-	}
-	h.log.Infof("la: %s", util.Dump(la))
-	if la != nil {
-		return nil, errors.Errorf("user %q already have a linked account for remote source %q", userName, rs.Name)
-	}
-
 	creq := &command.CreateUserLARequest{
 		UserName:         userName,
-		RemoteSourceName: rs.Name,
+		RemoteSourceName: req.RemoteSourceName,
 	}
 
 	h.log.Infof("creating linked account")
-	cresp, err := h.ch.HandleRemoteSourceAuth(ctx, rs, req.RemoteSourceLoginName, req.RemoteSourceLoginPassword, "createuserla", creq)
+	cresp, err := h.ch.HandleRemoteSourceAuth(ctx, req.RemoteSourceName, req.RemoteSourceLoginName, req.RemoteSourceLoginPassword, "createuserla", creq)
 	if err != nil {
 		return nil, err
 	}
@@ -446,13 +420,12 @@ type LoginUserResponse struct {
 }
 
 type LoginUserHandler struct {
-	log               *zap.SugaredLogger
-	ch                *command.CommandHandler
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ch  *command.CommandHandler
 }
 
-func NewLoginUserHandler(logger *zap.Logger, ch *command.CommandHandler, configstoreClient *csapi.Client) *LoginUserHandler {
-	return &LoginUserHandler{log: logger.Sugar(), ch: ch, configstoreClient: configstoreClient}
+func NewLoginUserHandler(logger *zap.Logger, ch *command.CommandHandler) *LoginUserHandler {
+	return &LoginUserHandler{log: logger.Sugar(), ch: ch}
 }
 
 func (h *LoginUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -480,19 +453,13 @@ func (h *LoginUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *LoginUserHandler) loginUser(ctx context.Context, req *LoginUserRequest) (*LoginUserResponse, error) {
-	remoteSourceName := req.RemoteSourceName
-	rs, _, err := h.configstoreClient.GetRemoteSourceByName(ctx, remoteSourceName)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get remote source %q", remoteSourceName)
-	}
-	h.log.Infof("rs: %s", util.Dump(rs))
 
 	creq := &command.LoginUserRequest{
-		RemoteSourceName: rs.Name,
+		RemoteSourceName: req.RemoteSourceName,
 	}
 
 	h.log.Infof("logging in user")
-	cresp, err := h.ch.HandleRemoteSourceAuth(ctx, rs, req.LoginName, req.LoginPassword, "loginuser", creq)
+	cresp, err := h.ch.HandleRemoteSourceAuth(ctx, req.RemoteSourceName, req.LoginName, req.LoginPassword, "loginuser", creq)
 	if err != nil {
 		return nil, err
 	}

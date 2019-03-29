@@ -213,7 +213,38 @@ type RemoteSourceAuthResponse struct {
 	Response       interface{}
 }
 
-func (c *CommandHandler) HandleRemoteSourceAuth(ctx context.Context, rs *types.RemoteSource, loginName, loginPassword, requestType string, req interface{}) (*RemoteSourceAuthResponse, error) {
+func (c *CommandHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSourceName, loginName, loginPassword, requestType string, req interface{}) (*RemoteSourceAuthResponse, error) {
+	rs, _, err := c.configstoreClient.GetRemoteSourceByName(ctx, remoteSourceName)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get remote source %q", remoteSourceName)
+	}
+	c.log.Infof("rs: %s", util.Dump(rs))
+
+	switch requestType {
+	case "createuserla":
+		req := req.(*CreateUserLARequest)
+		user, _, err := c.configstoreClient.GetUserByName(ctx, req.UserName)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get user %q", req.UserName)
+		}
+		var la *types.LinkedAccount
+		for _, v := range user.LinkedAccounts {
+			if v.RemoteSourceID == rs.ID {
+				la = v
+				break
+			}
+		}
+		c.log.Infof("la: %s", util.Dump(la))
+		if la != nil {
+			return nil, errors.Errorf("user %q already have a linked account for remote source %q", req.UserName, rs.Name)
+		}
+
+	case "loginuser":
+
+	default:
+		return nil, errors.Errorf("unknown request type: %q", requestType)
+	}
+
 	switch rs.AuthType {
 	case types.RemoteSourceAuthTypeOauth2:
 		oauth2Source, err := common.GetOauth2Source(rs, "")

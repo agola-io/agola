@@ -165,10 +165,10 @@ func (g *Gateway) Run(ctx context.Context) error {
 	userHandler := api.NewUserHandler(logger, g.configstoreClient)
 	userByNameHandler := api.NewUserByNameHandler(logger, g.configstoreClient)
 	usersHandler := api.NewUsersHandler(logger, g.configstoreClient)
-	createUserHandler := api.NewCreateUserHandler(logger, g.ch, g.configstoreClient)
+	createUserHandler := api.NewCreateUserHandler(logger, g.ch)
 	deleteUserHandler := api.NewDeleteUserHandler(logger, g.configstoreClient)
 
-	createUserLAHandler := api.NewCreateUserLAHandler(logger, g.ch, g.configstoreClient)
+	createUserLAHandler := api.NewCreateUserLAHandler(logger, g.ch)
 	deleteUserLAHandler := api.NewDeleteUserLAHandler(logger, g.configstoreClient)
 	createUserTokenHandler := api.NewCreateUserTokenHandler(logger, g.configstoreClient)
 
@@ -191,7 +191,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	reposHandler := api.NewReposHandler(logger, g.configstoreClient)
 
-	loginUserHandler := api.NewLoginUserHandler(logger, g.ch, g.configstoreClient)
+	loginUserHandler := api.NewLoginUserHandler(logger, g.ch)
 	oauth2callbackHandler := api.NewOAuth2CallbackHandler(logger, g.ch, g.configstoreClient)
 
 	router := mux.NewRouter()
