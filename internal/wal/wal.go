@@ -469,7 +469,7 @@ func (w *WalManager) FirstAvailableWalData(ctx context.Context) (*WalData, int64
 }
 
 func (w *WalManager) LastCommittedStorageWal(ctx context.Context) (string, int64, error) {
-	resp, err := w.e.Get(ctx, etcdLastCommittedStorageWalSeqKey)
+	resp, err := w.e.Get(ctx, etcdLastCommittedStorageWalSeqKey, 0)
 	if err != nil && err != etcd.ErrKeyNotFound {
 		return "", 0, err
 	}
@@ -590,7 +590,7 @@ func (w *WalManager) WriteWalAdditionalOps(ctx context.Context, actions []*Actio
 		return nil, err
 	}
 
-	resp, err := w.e.Get(ctx, etcdWalsDataKey)
+	resp, err := w.e.Get(ctx, etcdWalsDataKey, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -1124,7 +1124,7 @@ func (w *WalManager) InitEtcd(ctx context.Context) error {
 		return etcd.FromEtcdError(err)
 	}
 
-	_, err := w.e.Get(ctx, etcdWalsDataKey)
+	_, err := w.e.Get(ctx, etcdWalsDataKey, 0)
 	if err != nil && err != etcd.ErrKeyNotFound {
 		return err
 	}
