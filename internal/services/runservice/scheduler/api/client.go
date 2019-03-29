@@ -143,13 +143,16 @@ func (c *Client) GetArchive(ctx context.Context, taskID string, step int) (*http
 	return c.getResponse(ctx, "GET", "/executor/archives", q, nil, nil)
 }
 
-func (c *Client) GetRuns(ctx context.Context, phaseFilter, groups, changeGroups []string, start string, limit int, asc bool) (*GetRunsResponse, *http.Response, error) {
+func (c *Client) GetRuns(ctx context.Context, phaseFilter, groups []string, lastRun bool, changeGroups []string, start string, limit int, asc bool) (*GetRunsResponse, *http.Response, error) {
 	q := url.Values{}
 	for _, phase := range phaseFilter {
 		q.Add("phase", phase)
 	}
 	for _, group := range groups {
 		q.Add("group", group)
+	}
+	if lastRun {
+		q.Add("lastrun", "")
 	}
 	for _, changeGroup := range changeGroups {
 		q.Add("changegroup", changeGroup)
@@ -170,19 +173,19 @@ func (c *Client) GetRuns(ctx context.Context, phaseFilter, groups, changeGroups 
 }
 
 func (c *Client) GetQueuedRuns(ctx context.Context, start string, limit int) (*GetRunsResponse, *http.Response, error) {
-	return c.GetRuns(ctx, []string{"queued"}, []string{"."}, nil, start, limit, true)
+	return c.GetRuns(ctx, []string{"queued"}, []string{}, false, nil, start, limit, true)
 }
 
 func (c *Client) GetGroupQueuedRuns(ctx context.Context, group string, limit int, changeGroups []string) (*GetRunsResponse, *http.Response, error) {
-	return c.GetRuns(ctx, []string{"queued"}, []string{group}, changeGroups, "", limit, false)
+	return c.GetRuns(ctx, []string{"queued"}, []string{group}, false, changeGroups, "", limit, false)
 }
 
 func (c *Client) GetGroupRunningRuns(ctx context.Context, group string, limit int, changeGroups []string) (*GetRunsResponse, *http.Response, error) {
-	return c.GetRuns(ctx, []string{"running"}, []string{group}, changeGroups, "", limit, false)
+	return c.GetRuns(ctx, []string{"running"}, []string{group}, false, changeGroups, "", limit, false)
 }
 
 func (c *Client) GetGroupFirstQueuedRuns(ctx context.Context, group string, changeGroups []string) (*GetRunsResponse, *http.Response, error) {
-	return c.GetRuns(ctx, []string{"queued"}, []string{group}, changeGroups, "", 1, true)
+	return c.GetRuns(ctx, []string{"queued"}, []string{group}, false, changeGroups, "", 1, true)
 }
 
 func (c *Client) CreateRun(ctx context.Context, req *RunCreateRequest) (*http.Response, error) {

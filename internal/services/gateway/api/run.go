@@ -302,6 +302,7 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	phaseFilter := q["phase"]
 	groups := q["group"]
 	changeGroups := q["changegroup"]
+	_, lastRun := q["lastrun"]
 
 	limitS := q.Get("limit")
 	limit := DefaultRunsLimit
@@ -327,7 +328,7 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	start := q.Get("start")
 
-	runsResp, resp, err := h.runserviceClient.GetRuns(ctx, phaseFilter, groups, changeGroups, start, limit, asc)
+	runsResp, resp, err := h.runserviceClient.GetRuns(ctx, phaseFilter, groups, lastRun, changeGroups, start, limit, asc)
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			http.Error(w, err.Error(), http.StatusNotFound)
