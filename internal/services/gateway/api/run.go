@@ -58,6 +58,9 @@ type RunResponse struct {
 	EnqueueTime *time.Time `json:"enqueue_time"`
 	StartTime   *time.Time `json:"start_time"`
 	EndTime     *time.Time `json:"end_time"`
+
+	CanRestartFromScratch     bool `json:"can_restart_from_scratch"`
+	CanRestartFromFailedTasks bool `json:"can_restart_from_failed_tasks"`
 }
 
 type RunResponseTask struct {
@@ -115,6 +118,9 @@ func createRunResponse(r *rstypes.Run, rc *rstypes.RunConfig) *RunResponse {
 		StartTime:   r.StartTime,
 		EndTime:     r.EndTime,
 	}
+
+	run.CanRestartFromScratch, _ = r.CanRestartFromScratch()
+	run.CanRestartFromFailedTasks, _ = r.CanRestartFromFailedTasks()
 
 	for name, rt := range r.RunTasks {
 		rct := rc.Tasks[rt.ID]
