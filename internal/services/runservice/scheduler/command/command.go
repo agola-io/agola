@@ -16,6 +16,7 @@ package command
 
 import (
 	"context"
+	"path"
 	"time"
 
 	uuid "github.com/satori/go.uuid"
@@ -145,6 +146,13 @@ func (s *CommandHandler) CreateRun(ctx context.Context, req *RunCreateRequest) (
 func (s *CommandHandler) newRun(ctx context.Context, req *RunCreateRequest) (*types.RunBundle, error) {
 	rc := req.RunConfig
 	var run *types.Run
+
+	if req.Group == "" {
+		return nil, errors.Errorf("run group is empty")
+	}
+	if !path.IsAbs(req.Group) {
+		return nil, errors.Errorf("run group %q must be an absolute path", req.Group)
+	}
 
 	// generate a new run sequence that will be the same for the run, runconfig and rundata
 	seq, err := sequence.IncSequence(ctx, s.e, common.EtcdRunSequenceKey)

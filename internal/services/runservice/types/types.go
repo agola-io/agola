@@ -79,10 +79,9 @@ type Run struct {
 	Counter uint64 `json:"counter,omitempty"`
 
 	// Group is the run group of the run. Every run is assigned to a specific group
-	// i.e. project/$projectid/$branch
-	// i.e. user/$projectid/$branch (for a user run)
-	// this is the format that will be used to archive the runs in the lts. It's
-	// also needed to fetch them when they aren't indexed in the readdb.
+	// The format is /$grouptypes/groupname(/$grouptype/groupname ...)
+	// i.e. /project/$projectid/branch/$branchname
+	//      /project/$projectid/pr/$prid
 	Group string `json:"group,omitempty"`
 
 	// Annotations contain custom run properties
