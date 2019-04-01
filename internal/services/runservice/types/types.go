@@ -23,18 +23,23 @@ import (
 	"github.com/sorintlab/agola/internal/util"
 )
 
-type RunBundle struct {
-	Run *Run
-	Rc  *RunConfig
-	Rd  *RunData
-}
-
 type SortOrder int
 
 const (
 	SortOrderAsc SortOrder = iota
 	SortOrderDesc
 )
+
+type RunBundle struct {
+	Run *Run
+	Rc  *RunConfig
+	Rd  *RunData
+}
+
+type RunCounter struct {
+	Group   string
+	Counter uint64
+}
 
 type RunPhase string
 

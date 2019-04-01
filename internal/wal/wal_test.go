@@ -90,6 +90,8 @@ func TestEtcdReset(t *testing.T) {
 	}
 	wal, err := NewWalManager(ctx, logger, walConfig)
 	walReadyCh := make(chan struct{})
+
+	t.Logf("starting wal")
 	go wal.Run(ctx, walReadyCh)
 	<-walReadyCh
 
@@ -102,9 +104,9 @@ func TestEtcdReset(t *testing.T) {
 
 	expectedObjects := []string{}
 	for i := 0; i < 20; i++ {
-		objectPath := fmt.Sprintf("object%02d", i)
-		expectedObjects = append(expectedObjects, objectPath)
-		actions[0].Path = objectPath
+		objectID := fmt.Sprintf("object%02d", i)
+		expectedObjects = append(expectedObjects, objectID)
+		actions[0].ID = objectID
 		if _, err := wal.WriteWal(ctx, actions, nil); err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -113,19 +115,38 @@ func TestEtcdReset(t *testing.T) {
 	// wait for wal to be committed storage
 	time.Sleep(5 * time.Second)
 
+	t.Logf("stopping wal")
+	cancel()
+
+	t.Logf("stopping etcd")
 	// Reset etcd
 	shutdownEtcd(tetcd)
 	tetcd.WaitDown(10 * time.Second)
+	t.Logf("resetting etcd")
 	os.RemoveAll(etcdDir)
+	t.Logf("starting etcd")
+	tetcd = setupEtcd(t, etcdDir)
+	defer shutdownEtcd(tetcd)
 	if err := tetcd.Start(); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	defer shutdownEtcd(tetcd)
 
-	cancel()
-	ctx = context.Background()
+	ctx, cancel = context.WithCancel(context.Background())
+	walConfig = &WalManagerConfig{
+		BasePath:        "basepath",
+		E:               tetcd.TestEtcd.Store,
+		Lts:             objectstorage.NewObjStorage(lts, "/"),
+		EtcdWalsKeepNum: 10,
+	}
+	wal, err = NewWalManager(ctx, logger, walConfig)
+	walReadyCh = make(chan struct{})
+
+	t.Logf("starting wal")
 	go wal.Run(ctx, walReadyCh)
 	<-walReadyCh
+
+	time.Sleep(5 * time.Second)
 
 	curObjects := []string{}
 	doneCh := make(chan struct{})
@@ -174,7 +195,7 @@ func TestConcurrentUpdate(t *testing.T) {
 	actions := []*Action{
 		{
 			ActionType: ActionTypePut,
-			Path:       "/object01",
+			ID:         "/object01",
 			Data:       []byte("{}"),
 		},
 	}
@@ -182,6 +203,8 @@ func TestConcurrentUpdate(t *testing.T) {
 	walReadyCh := make(chan struct{})
 	go wal.Run(ctx, walReadyCh)
 	<-walReadyCh
+
+	time.Sleep(5 * time.Second)
 
 	cgNames := []string{"changegroup01", "changegroup02"}
 	cgt, err := wal.GetChangeGroupsUpdateToken(cgNames)
@@ -253,7 +276,7 @@ func TestWalCleaner(t *testing.T) {
 	actions := []*Action{
 		{
 			ActionType: ActionTypePut,
-			Path:       "/object01",
+			ID:         "/object01",
 			Data:       []byte("{}"),
 		},
 	}

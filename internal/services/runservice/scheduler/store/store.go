@@ -88,30 +88,9 @@ func LTSRunCounterPaths(group, runID string, sortOrder types.SortOrder) []string
 	paths := []string{}
 	subGroups := LTSSubGroups(group)
 	for _, subGroup := range subGroups {
-		paths = append(paths, common.StorageCounterFile(subGroup))
+		paths = append(paths, common.StorageRunCounterFile(subGroup))
 	}
 	return paths
-}
-
-func LTSGetRunCounter(wal *wal.WalManager, group string) (uint64, *wal.ChangeGroupsUpdateToken, error) {
-	// use the first group dir after the root
-	pl := util.PathList(group)
-	if len(pl) < 2 {
-		return 0, nil, errors.Errorf("cannot determine group counter name, wrong group path %q", group)
-	}
-	runCounterPath := common.StorageCounterFile(pl[1])
-	rcf, cgt, err := wal.ReadObject(runCounterPath, []string{"counter-" + pl[1]})
-	if err != nil {
-		return 0, cgt, err
-	}
-	defer rcf.Close()
-	d := json.NewDecoder(rcf)
-	var c uint64
-	if err := d.Decode(&c); err != nil {
-		return 0, nil, err
-	}
-
-	return c, cgt, nil
 }
 
 func LTSUpdateRunCounterAction(ctx context.Context, c uint64, group string) (*wal.Action, error) {
@@ -128,7 +107,8 @@ func LTSUpdateRunCounterAction(ctx context.Context, c uint64, group string) (*wa
 
 	action := &wal.Action{
 		ActionType: wal.ActionTypePut,
-		Path:       common.StorageCounterFile(pl[1]),
+		DataType:   string(common.DataTypeRunCounter),
+		ID:         pl[1],
 		Data:       cj,
 	}
 
@@ -175,7 +155,8 @@ func LTSSaveRunConfigAction(rc *types.RunConfig) (*wal.Action, error) {
 
 	action := &wal.Action{
 		ActionType: wal.ActionTypePut,
-		Path:       common.StorageRunConfigFile(rc.ID),
+		DataType:   string(common.DataTypeRunConfig),
+		ID:         rc.ID,
 		Data:       rcj,
 	}
 
@@ -206,7 +187,8 @@ func LTSSaveRunDataAction(rd *types.RunData) (*wal.Action, error) {
 
 	action := &wal.Action{
 		ActionType: wal.ActionTypePut,
-		Path:       common.StorageRunDataFile(rd.ID),
+		DataType:   string(common.DataTypeRunData),
+		ID:         rd.ID,
 		Data:       rdj,
 	}
 
@@ -238,7 +220,8 @@ func LTSSaveRunAction(r *types.Run) (*wal.Action, error) {
 
 	action := &wal.Action{
 		ActionType: wal.ActionTypePut,
-		Path:       common.StorageRunFile(r.ID),
+		DataType:   string(common.DataTypeRun),
+		ID:         r.ID,
 		Data:       rj,
 	}
 

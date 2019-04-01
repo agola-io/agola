@@ -34,7 +34,11 @@ var Stmts = []string{
 	// committedwalsequence stores the last committed wal sequence
 	"create table committedwalsequence_lts (seq varchar, PRIMARY KEY (seq))",
 
+	"create table changegrouprevision_lts (id varchar, revision varchar, PRIMARY KEY (id, revision))",
+
 	"create table run_lts (id varchar, grouppath varchar, phase varchar, PRIMARY KEY (id, grouppath, phase))",
 
 	"create table rundata_lts (id varchar, data bytea, PRIMARY KEY (id))",
+
+	"create table runcounter_lts (groupid varchar, counter bigint, PRIMARY KEY (groupid))",
 }

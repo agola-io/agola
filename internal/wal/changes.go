@@ -180,12 +180,16 @@ func (w *WalManager) applyWalChanges(ctx context.Context, walData *WalData, revi
 }
 
 func (w *WalManager) applyWalChangesAction(ctx context.Context, action *Action, walSequence string, revision int64) {
+	dataPath := w.dataToPathFunc(action.DataType, action.ID)
+	if dataPath == "" {
+		return
+	}
 	switch action.ActionType {
 	case ActionTypePut:
-		w.changes.addPut(action.Path, walSequence, revision)
+		w.changes.addPut(dataPath, walSequence, revision)
 
 	case ActionTypeDelete:
-		w.changes.addDelete(action.Path, walSequence, revision)
+		w.changes.addDelete(dataPath, walSequence, revision)
 	}
 	if w.changes.actions[walSequence] == nil {
 		w.changes.actions[walSequence] = []*Action{}

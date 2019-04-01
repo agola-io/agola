@@ -20,11 +20,13 @@ import (
 	"time"
 
 	uuid "github.com/satori/go.uuid"
+	"github.com/sorintlab/agola/internal/db"
 	"github.com/sorintlab/agola/internal/etcd"
 	"github.com/sorintlab/agola/internal/objectstorage"
 	"github.com/sorintlab/agola/internal/runconfig"
 	"github.com/sorintlab/agola/internal/sequence"
 	"github.com/sorintlab/agola/internal/services/runservice/scheduler/common"
+	"github.com/sorintlab/agola/internal/services/runservice/scheduler/readdb"
 	"github.com/sorintlab/agola/internal/services/runservice/scheduler/store"
 	"github.com/sorintlab/agola/internal/services/runservice/types"
 	"github.com/sorintlab/agola/internal/util"
@@ -35,18 +37,20 @@ import (
 )
 
 type CommandHandler struct {
-	log *zap.SugaredLogger
-	e   *etcd.Store
-	lts *objectstorage.ObjStorage
-	wal *wal.WalManager
+	log    *zap.SugaredLogger
+	e      *etcd.Store
+	readDB *readdb.ReadDB
+	lts    *objectstorage.ObjStorage
+	wal    *wal.WalManager
 }
 
-func NewCommandHandler(logger *zap.Logger, e *etcd.Store, lts *objectstorage.ObjStorage, wal *wal.WalManager) *CommandHandler {
+func NewCommandHandler(logger *zap.Logger, e *etcd.Store, readDB *readdb.ReadDB, lts *objectstorage.ObjStorage, wal *wal.WalManager) *CommandHandler {
 	return &CommandHandler{
-		log: logger.Sugar(),
-		e:   e,
-		lts: lts,
-		wal: wal,
+		log:    logger.Sugar(),
+		e:      e,
+		readDB: readDB,
+		lts:    lts,
+		wal:    wal,
 	}
 }
 
@@ -293,9 +297,9 @@ func (s *CommandHandler) saveRun(ctx context.Context, rb *types.RunBundle, runcg
 	rc := rb.Rc
 	rd := rb.Rd
 
-	c, cgt, err := store.LTSGetRunCounter(s.wal, run.Group)
+	c, cgt, err := s.getRunCounter(run.Group)
 	s.log.Infof("c: %d, cgt: %s", c, util.Dump(cgt))
-	if err != nil && err != objectstorage.ErrNotExist {
+	if err != nil {
 		return err
 	}
 	c++
@@ -449,4 +453,29 @@ func (s *CommandHandler) DeleteExecutor(ctx context.Context, executorID string) 
 	}
 
 	return nil
+}
+
+func (s *CommandHandler) getRunCounter(group string) (uint64, *wal.ChangeGroupsUpdateToken, error) {
+	// use the first group dir after the root
+	pl := util.PathList(group)
+	if len(pl) < 2 {
+		return 0, nil, errors.Errorf("cannot determine group counter name, wrong group path %q", group)
+	}
+
+	var c uint64
+	var cgt *wal.ChangeGroupsUpdateToken
+	err := s.readDB.Do(func(tx *db.Tx) error {
+		var err error
+		c, err = s.readDB.GetRunCounterLTS(tx, pl[1])
+		if err != nil {
+			return err
+		}
+		cgt, err = s.readDB.GetChangeGroupsUpdateTokensLTS(tx, []string{"counter-" + pl[1]})
+		return err
+	})
+	if err != nil {
+		return 0, nil, err
+	}
+
+	return c, cgt, nil
 }

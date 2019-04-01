@@ -178,9 +178,11 @@ func (r *ReadDB) SyncFromFiles() (string, error) {
 				}
 				f.Close()
 
+				configType, id := common.PathToTypeID(obj)
 				action := &wal.Action{
 					ActionType: wal.ActionTypePut,
-					Path:       obj,
+					DataType:   string(configType),
+					ID:         id,
 					Data:       data,
 				}
 				if err := r.applyAction(tx, action); err != nil {
@@ -616,11 +618,9 @@ func (r *ReadDB) applyWal(tx *db.Tx, walDataFileID string) error {
 }
 
 func (r *ReadDB) applyAction(tx *db.Tx, action *wal.Action) error {
-	configType, ID := common.PathToTypeID(action.Path)
-
 	switch action.ActionType {
 	case wal.ActionTypePut:
-		switch configType {
+		switch types.ConfigType(action.DataType) {
 		case types.ConfigTypeUser:
 			if err := r.insertUser(tx, action.Data); err != nil {
 				return err
@@ -652,40 +652,40 @@ func (r *ReadDB) applyAction(tx *db.Tx, action *wal.Action) error {
 		}
 
 	case wal.ActionTypeDelete:
-		switch configType {
+		switch types.ConfigType(action.DataType) {
 		case types.ConfigTypeUser:
-			r.log.Debugf("deleting user with id: %s", ID)
-			if err := r.deleteUser(tx, ID); err != nil {
+			r.log.Debugf("deleting user with id: %s", action.ID)
+			if err := r.deleteUser(tx, action.ID); err != nil {
 				return err
 			}
 		case types.ConfigTypeOrg:
-			r.log.Debugf("deleting org with id: %s", ID)
-			if err := r.deleteOrg(tx, ID); err != nil {
+			r.log.Debugf("deleting org with id: %s", action.ID)
+			if err := r.deleteOrg(tx, action.ID); err != nil {
 				return err
 			}
 		case types.ConfigTypeProjectGroup:
-			r.log.Debugf("deleting project group with id: %s", ID)
-			if err := r.deleteProjectGroup(tx, ID); err != nil {
+			r.log.Debugf("deleting project group with id: %s", action.ID)
+			if err := r.deleteProjectGroup(tx, action.ID); err != nil {
 				return err
 			}
 		case types.ConfigTypeProject:
-			r.log.Debugf("deleting project with id: %s", ID)
-			if err := r.deleteProject(tx, ID); err != nil {
+			r.log.Debugf("deleting project with id: %s", action.ID)
+			if err := r.deleteProject(tx, action.ID); err != nil {
 				return err
 			}
 		case types.ConfigTypeRemoteSource:
-			r.log.Debugf("deleting remote source with id: %s", ID)
-			if err := r.deleteRemoteSource(tx, ID); err != nil {
+			r.log.Debugf("deleting remote source with id: %s", action.ID)
+			if err := r.deleteRemoteSource(tx, action.ID); err != nil {
 				return err
 			}
 		case types.ConfigTypeSecret:
-			r.log.Debugf("deleting secret with id: %s", ID)
-			if err := r.deleteSecret(tx, ID); err != nil {
+			r.log.Debugf("deleting secret with id: %s", action.ID)
+			if err := r.deleteSecret(tx, action.ID); err != nil {
 				return err
 			}
 		case types.ConfigTypeVariable:
-			r.log.Debugf("deleting variable with id: %s", ID)
-			if err := r.deleteVariable(tx, ID); err != nil {
+			r.log.Debugf("deleting variable with id: %s", action.ID)
+			if err := r.deleteVariable(tx, action.ID); err != nil {
 				return err
 			}
 		}

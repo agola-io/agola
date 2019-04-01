@@ -17,7 +17,6 @@ package common
 import (
 	"fmt"
 	"path"
-	"strings"
 )
 
 type ErrNotExist struct {
@@ -43,8 +42,6 @@ var (
 
 	EtcdExecutorsDir = "executors"
 	EtcdTasksDir     = "tasks"
-
-	EtcdLastIndexKey = "lastindex"
 )
 
 func EtcdRunKey(runID string) string       { return path.Join(EtcdRunsDir, runID) }
@@ -80,37 +77,30 @@ func StorageRunConfigFile(runID string) string {
 	return path.Join(StorageRunsConfigDir, runID)
 }
 
-func StorageCounterFile(group string) string {
+func StorageRunCounterFile(group string) string {
 	return path.Join(StorageCountersDir, group)
 }
 
-type ConfigType int
+type DataType string
 
 const (
-	ConfigTypeRun ConfigType = iota + 1
-	ConfigTypeRunData
-	ConfigTypeRunConfig
-	ConfigTypeCounter
+	DataTypeRun        DataType = "run"
+	DataTypeRunData    DataType = "rundata"
+	DataTypeRunConfig  DataType = "runconfig"
+	DataTypeRunCounter DataType = "runcounter"
 )
 
-func PathToTypeID(p string) (ConfigType, string) {
-	var configType ConfigType
-	switch path.Dir(p) {
-	case StorageRunsDir:
-		configType = ConfigTypeRun
-	case StorageRunsDataDir:
-		configType = ConfigTypeRunData
-	case StorageRunsConfigDir:
-		configType = ConfigTypeRunConfig
+func DataToPathFunc(dataType string, id string) string {
+	switch DataType(dataType) {
+	case DataTypeRun:
+		return StorageRunFile(id)
+	case DataTypeRunData:
+		return StorageRunDataFile(id)
+	case DataTypeRunConfig:
+		return StorageRunConfigFile(id)
+	case DataTypeRunCounter:
+		return StorageRunCounterFile(id)
 	}
 
-	if strings.HasPrefix(p, StorageCountersDir+"/") {
-		configType = ConfigTypeCounter
-	}
-
-	if configType == 0 {
-		panic(fmt.Errorf("cannot determine configtype for path: %q", p))
-	}
-
-	return configType, path.Base(p)
+	panic(fmt.Errorf("unknown data type %q", dataType))
 }

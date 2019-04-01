@@ -114,7 +114,8 @@ const (
 
 type Action struct {
 	ActionType ActionType
-	Path       string
+	DataType   string
+	ID         string
 	Data       []byte
 }
 
@@ -213,9 +214,12 @@ func (w *WalManager) ReadObject(p string, cgNames []string) (io.ReadCloser, *Cha
 
 	if ok {
 		for _, action := range actions {
-			if action.ActionType == ActionTypePut && action.Path == p {
-				w.log.Debugf("reading file from wal: %q", action.Path)
-				return ioutil.NopCloser(bytes.NewReader(action.Data)), cgt, nil
+			if action.ActionType == ActionTypePut {
+				dataPath := w.dataToPathFunc(action.DataType, action.ID)
+				if dataPath == p {
+					w.log.Debugf("reading file from wal: %q", dataPath)
+					return ioutil.NopCloser(bytes.NewReader(action.Data)), cgt, nil
+				}
 			}
 		}
 		return nil, nil, errors.Errorf("no file %s in wal %s", p, walseq)
@@ -884,7 +888,11 @@ func (w *WalManager) checkpoint(ctx context.Context) error {
 }
 
 func (w *WalManager) checkpointAction(ctx context.Context, action *Action) error {
-	path := w.toStorageDataPath(action.Path)
+	dataPath := w.dataToPathFunc(action.DataType, action.ID)
+	if dataPath == "" {
+		return nil
+	}
+	path := w.toStorageDataPath(dataPath)
 	switch action.ActionType {
 	case ActionTypePut:
 		w.log.Debugf("writing file: %q", path)
@@ -1209,18 +1217,21 @@ func (w *WalManager) InitEtcd(ctx context.Context) error {
 	return nil
 }
 
-type AdditionalActionsFunc func(action *Action) ([]*Action, error)
+type CheckpointFunc func(action *Action) error
 
-func NoOpAdditionalActionFunc(action *Action) ([]*Action, error) {
-	return []*Action{}, nil
+type DataToPathFunc func(dataType string, id string) string
+
+func NoOpDataToPath(dataType string, id string) string {
+	return ""
 }
 
 type WalManagerConfig struct {
-	BasePath              string
-	E                     *etcd.Store
-	Lts                   *objectstorage.ObjStorage
-	AdditionalActionsFunc AdditionalActionsFunc
-	EtcdWalsKeepNum       int
+	BasePath        string
+	E               *etcd.Store
+	Lts             *objectstorage.ObjStorage
+	EtcdWalsKeepNum int
+	CheckpointFunc  CheckpointFunc
+	DataToPathFunc  DataToPathFunc
 }
 
 type WalManager struct {
@@ -1230,6 +1241,8 @@ type WalManager struct {
 	lts             *objectstorage.ObjStorage
 	changes         *WalChanges
 	etcdWalsKeepNum int
+	checkpointFunc  CheckpointFunc
+	dataToPathFunc  DataToPathFunc
 }
 
 func NewWalManager(ctx context.Context, logger *zap.Logger, conf *WalManagerConfig) (*WalManager, error) {
@@ -1240,9 +1253,9 @@ func NewWalManager(ctx context.Context, logger *zap.Logger, conf *WalManagerConf
 		return nil, errors.New("etcdWalsKeepNum must be greater than 0")
 	}
 
-	additionalActionsFunc := conf.AdditionalActionsFunc
-	if additionalActionsFunc == nil {
-		additionalActionsFunc = NoOpAdditionalActionFunc
+	dataToPathFunc := conf.DataToPathFunc
+	if dataToPathFunc == nil {
+		dataToPathFunc = NoOpDataToPath
 	}
 
 	w := &WalManager{
@@ -1252,6 +1265,8 @@ func NewWalManager(ctx context.Context, logger *zap.Logger, conf *WalManagerConf
 		lts:             conf.Lts,
 		etcdWalsKeepNum: conf.EtcdWalsKeepNum,
 		changes:         NewWalChanges(),
+		checkpointFunc:  conf.CheckpointFunc,
+		dataToPathFunc:  dataToPathFunc,
 	}
 
 	// add trailing slash the basepath

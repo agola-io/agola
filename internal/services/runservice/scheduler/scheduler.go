@@ -85,12 +85,12 @@ func (s *Scheduler) advanceRunTasks(ctx context.Context, r *types.Run) error {
 	log.Debugf("run: %s", util.Dump(r))
 	rc, err := store.LTSGetRunConfig(s.wal, r.ID)
 	if err != nil {
-		return errors.Wrapf(err, "cannot get run config %q from etcd", r.ID)
+		return errors.Wrapf(err, "cannot get run config %q", r.ID)
 	}
 	log.Debugf("rc: %s", util.Dump(rc))
 	rd, err := store.LTSGetRunData(s.wal, r.ID)
 	if err != nil {
-		return errors.Wrapf(err, "cannot get run data %q from etcd", r.ID)
+		return errors.Wrapf(err, "cannot get run data %q", r.ID)
 	}
 	log.Debugf("rd: %s", util.Dump(rd))
 
@@ -1077,25 +1077,9 @@ func (s *Scheduler) runLTSArchiver(ctx context.Context, r *types.Run) error {
 		return err
 	}
 
-	resp, err := s.e.Get(ctx, common.EtcdLastIndexKey, 0)
-	// if lastIndexKey doesn't exist return an error
-	if err != nil {
-		return err
-	}
-	lastIndexRevision := resp.Kvs[0].ModRevision
-	lastIndexDir := string(resp.Kvs[0].Value)
+	actions := append([]*wal.Action{ra})
 
-	indexActions, err := s.additionalActions(lastIndexDir, ra)
-	if err != nil {
-		return err
-	}
-
-	actions := append([]*wal.Action{ra}, indexActions...)
-
-	cmp := []etcdclientv3.Cmp{etcdclientv3.Compare(etcdclientv3.ModRevision(common.EtcdLastIndexKey), "=", lastIndexRevision)}
-	then := []etcdclientv3.Op{etcdclientv3.OpPut(common.EtcdLastIndexKey, lastIndexDir)}
-
-	if _, err = s.wal.WriteWalAdditionalOps(ctx, actions, nil, cmp, then); err != nil {
+	if _, err = s.wal.WriteWal(ctx, actions, nil); err != nil {
 		return err
 	}
 
@@ -1105,53 +1089,6 @@ func (s *Scheduler) runLTSArchiver(ctx context.Context, r *types.Run) error {
 	}
 
 	return nil
-}
-
-func (s *Scheduler) additionalActions(indexDir string, action *wal.Action) ([]*wal.Action, error) {
-	type indexData struct {
-		ID    string
-		Group string
-		Phase types.RunPhase
-	}
-
-	configType, _ := common.PathToTypeID(action.Path)
-
-	var actionType wal.ActionType
-
-	switch action.ActionType {
-	case wal.ActionTypePut:
-		actionType = wal.ActionTypePut
-	case wal.ActionTypeDelete:
-		actionType = wal.ActionTypeDelete
-	}
-
-	switch configType {
-	case common.ConfigTypeRun:
-		var run *types.Run
-		if err := json.Unmarshal(action.Data, &run); err != nil {
-			return nil, errors.Wrap(err, "failed to unmarshal run")
-		}
-
-		data := []byte{}
-		index := path.Join(common.StorageRunsIndexesDir, indexDir, "added", run.ID)
-		id := &indexData{ID: run.ID, Group: run.Group, Phase: run.Phase}
-		idj, err := json.Marshal(id)
-		if err != nil {
-			return nil, err
-		}
-		data = append(data, idj...)
-
-		actions := []*wal.Action{
-			&wal.Action{
-				ActionType: actionType,
-				Path:       index,
-				Data:       data,
-			},
-		}
-		return actions, nil
-	}
-
-	return []*wal.Action{}, nil
 }
 
 func (s *Scheduler) dumpLTSLoop(ctx context.Context) {
@@ -1174,37 +1111,50 @@ func (s *Scheduler) dumpLTSLoop(ctx context.Context) {
 }
 
 func (s *Scheduler) dumpLTS(ctx context.Context) error {
+	type indexHeader struct {
+		LastWalSequence string
+	}
 	type indexData struct {
+		DataType string
+		Data     interface{}
+	}
+
+	type indexDataRun struct {
 		ID    string
 		Group string
 		Phase types.RunPhase
 	}
-
-	resp, err := s.e.Get(ctx, common.EtcdLastIndexKey, 0)
-	// if lastIndexKey doesn't exist return an error
-	if err != nil {
-		return err
+	type indexDataRunCounter struct {
+		Group   string
+		Counter uint64
 	}
-	lastIndexRevision := resp.Kvs[0].ModRevision
-	revision := resp.Header.Revision
 
 	indexDir := strconv.FormatInt(time.Now().UnixNano(), 10)
 
-	readdbRevision, err := s.readDB.GetRevision()
+	var lastWalSequence string
+	err := s.readDB.Do(func(tx *db.Tx) error {
+		var err error
+		lastWalSequence, err = s.readDB.GetCommittedWalSequenceLTS(tx)
+		return err
+	})
 	if err != nil {
 		return err
 	}
-	if readdbRevision < revision {
-		return errors.Errorf("readdb revision %d is lower than index revision %d", readdbRevision, revision)
-	}
 
-	runs := []*readdb.RunData{}
+	data := []byte{}
+	iheader := &indexHeader{LastWalSequence: lastWalSequence}
+	ihj, err := json.Marshal(iheader)
+	if err != nil {
+		return err
+	}
+	data = append(data, ihj...)
+
 	var lastRunID string
 	stop := false
 	for {
 		err := s.readDB.Do(func(tx *db.Tx) error {
 			var err error
-			lruns, err := s.readDB.GetRunsFilteredLTS(tx, nil, false, nil, lastRunID, 10000, types.SortOrderDesc)
+			lruns, err := s.readDB.GetRunsFilteredLTS(tx, nil, false, nil, lastRunID, 1000, types.SortOrderDesc)
 			if err != nil {
 				return err
 			}
@@ -1213,7 +1163,14 @@ func (s *Scheduler) dumpLTS(ctx context.Context) error {
 			} else {
 				lastRunID = lruns[len(lruns)-1].ID
 			}
-			runs = append(runs, lruns...)
+			for _, run := range lruns {
+				id := &indexData{DataType: string(common.DataTypeRun), Data: indexDataRun{ID: run.ID, Group: run.GroupPath, Phase: types.RunPhase(run.Phase)}}
+				idj, err := json.Marshal(id)
+				if err != nil {
+					return err
+				}
+				data = append(data, idj...)
+			}
 			return nil
 		})
 		if err != nil {
@@ -1224,30 +1181,41 @@ func (s *Scheduler) dumpLTS(ctx context.Context) error {
 		}
 	}
 
-	data := []byte{}
-	for _, run := range runs {
-		id := &indexData{ID: run.ID, Group: run.GroupPath, Phase: types.RunPhase(run.Phase)}
-		idj, err := json.Marshal(id)
+	var lastGroup string
+	stop = false
+	for {
+		err := s.readDB.Do(func(tx *db.Tx) error {
+			var err error
+			counters, err := s.readDB.GetRunCountersLTS(tx, lastGroup, 1000)
+			if err != nil {
+				return err
+			}
+			if len(counters) == 0 {
+				stop = true
+			} else {
+				lastGroup = counters[len(counters)-1].Group
+			}
+			for _, counter := range counters {
+				id := &indexData{DataType: string(common.DataTypeRunCounter), Data: indexDataRunCounter{Group: counter.Group, Counter: counter.Counter}}
+				idj, err := json.Marshal(id)
+				if err != nil {
+					return err
+				}
+				data = append(data, idj...)
+			}
+			return nil
+		})
 		if err != nil {
 			return err
 		}
-		data = append(data, idj...)
+		if stop {
+			break
+		}
 	}
 
 	index := path.Join(common.StorageRunsIndexesDir, indexDir, "all")
 
-	cmp := []etcdclientv3.Cmp{etcdclientv3.Compare(etcdclientv3.ModRevision(common.EtcdLastIndexKey), "=", lastIndexRevision)}
-	then := []etcdclientv3.Op{etcdclientv3.OpPut(common.EtcdLastIndexKey, indexDir)}
-
-	actions := []*wal.Action{
-		&wal.Action{
-			ActionType: wal.ActionTypePut,
-			Path:       index,
-			Data:       data,
-		},
-	}
-
-	if _, err = s.wal.WriteWalAdditionalOps(ctx, actions, nil, cmp, then); err != nil {
+	if err = s.lts.WriteObject(index, bytes.NewReader(data)); err != nil {
 		return err
 	}
 
@@ -1279,18 +1247,12 @@ func (s *Scheduler) dumpLTSCleaner(ctx context.Context) error {
 		Phase types.RunPhase
 	}
 
-	resp, err := s.e.Get(ctx, common.EtcdLastIndexKey, 0)
-	// if lastIndexKey doesn't exist return an error
-	if err != nil {
-		return err
-	}
-	lastIndexDir := string(resp.Kvs[0].Value)
-
-	// collect all object that don't pertain to the lastIndexDir
+	// collect all old indexes
 	objects := []string{}
 	doneCh := make(chan struct{})
 	defer close(doneCh)
-	for object := range s.wal.List(common.StorageRunsIndexesDir+"/", "", true, doneCh) {
+	var indexPath string
+	for object := range s.lts.List(common.StorageRunsIndexesDir+"/", "", true, doneCh) {
 		if object.Err != nil {
 			return object.Err
 		}
@@ -1299,22 +1261,20 @@ func (s *Scheduler) dumpLTSCleaner(ctx context.Context) error {
 		if len(h) < 2 {
 			return errors.Errorf("wrong index dir path %q", object.Path)
 		}
-		indexDir := h[1]
-		if indexDir != lastIndexDir {
-			objects = append(objects, object.Path)
+		curIndexPath := object.Path
+		if curIndexPath > indexPath {
+			if indexPath != "" {
+				objects = append(objects, indexPath)
+			}
+			indexPath = curIndexPath
+		} else {
+			objects = append(objects, curIndexPath)
 		}
 	}
 
-	actions := make([]*wal.Action, len(objects))
-	for i, object := range objects {
-		actions[i] = &wal.Action{
-			ActionType: wal.ActionTypeDelete,
-			Path:       object,
-		}
-	}
-
-	if len(actions) > 0 {
-		if _, err = s.wal.WriteWal(ctx, actions, nil); err != nil {
+	for _, object := range objects {
+		if err := s.lts.DeleteObject(object); err != nil {
+			log.Errorf("object: %s, err: %v", object, err)
 			return err
 		}
 	}
@@ -1352,8 +1312,9 @@ func NewScheduler(ctx context.Context, c *config.RunServiceScheduler) (*Schedule
 	}
 
 	walConf := &wal.WalManagerConfig{
-		E:   e,
-		Lts: lts,
+		E:              e,
+		Lts:            lts,
+		DataToPathFunc: common.DataToPathFunc,
 	}
 	wal, err := wal.NewWalManager(ctx, logger, walConf)
 	if err != nil {
@@ -1361,13 +1322,13 @@ func NewScheduler(ctx context.Context, c *config.RunServiceScheduler) (*Schedule
 	}
 	s.wal = wal
 
-	readDB, err := readdb.NewReadDB(ctx, logger, filepath.Join(c.DataDir, "readdb"), e, wal)
+	readDB, err := readdb.NewReadDB(ctx, logger, filepath.Join(c.DataDir, "readdb"), e, lts, wal)
 	if err != nil {
 		return nil, err
 	}
 	s.readDB = readDB
 
-	ch := command.NewCommandHandler(logger, e, lts, wal)
+	ch := command.NewCommandHandler(logger, e, readDB, lts, wal)
 	s.ch = ch
 
 	return s, nil
@@ -1383,41 +1344,6 @@ func (s *Scheduler) InitEtcd(ctx context.Context) error {
 	txn := s.e.Client().Txn(ctx).If(cmp...).Then(then...)
 	if _, err := txn.Commit(); err != nil {
 		return etcd.FromEtcdError(err)
-	}
-
-	// Populate lastIndexDir if empty
-	doneCh := make(chan struct{})
-	defer close(doneCh)
-
-	_, err := s.e.Get(ctx, common.EtcdLastIndexKey, 0)
-	if err != nil && err != etcd.ErrKeyNotFound {
-		return err
-	}
-	// EtcdLastIndexKey already exist
-	if err == nil {
-		return nil
-	}
-
-	var indexDir string
-	// take the last (greater) indexdir
-	for object := range s.wal.List(common.StorageRunsIndexesDir+"/", "", true, doneCh) {
-		if object.Err != nil {
-			return object.Err
-		}
-
-		h := util.PathList(object.Path)
-		if len(h) < 2 {
-			return errors.Errorf("wrong index dir path %q", object.Path)
-		}
-		indexDir = h[1]
-	}
-
-	// if an indexDir doesn't exist in lts then initialize
-	if indexDir == "" {
-		indexDir = strconv.FormatInt(time.Now().UnixNano(), 10)
-		if _, err := s.e.AtomicPut(ctx, common.EtcdLastIndexKey, []byte(indexDir), 0, nil); err != nil {
-			return err
-		}
 	}
 
 	return nil

@@ -54,6 +54,7 @@ var (
 	// Use postgresql $ placeholder. It'll be converted to ? from the provided db functions
 	sb = sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
 
+	// readdb tables based on etcd data
 	revisionSelect = sb.Select("revision").From("revision")
 	revisionInsert = sb.Insert("revision").Columns("revision")
 
@@ -68,18 +69,23 @@ var (
 	changegrouprevisionSelect = sb.Select("id, revision").From("changegrouprevision")
 	changegrouprevisionInsert = sb.Insert("changegrouprevision").Columns("id", "revision")
 
-	// LTS
-
+	// readdb tables based on lts data
 	revisionLTSSelect = sb.Select("revision").From("revision_lts")
 	revisionLTSInsert = sb.Insert("revision_lts").Columns("revision")
-
-	committedwalsequenceLTSSelect = sb.Select("seq").From("committedwalsequence_lts")
-	committedwalsequenceLTSInsert = sb.Insert("committedwalsequence_lts").Columns("seq")
 
 	runLTSSelect = sb.Select("id", "grouppath", "phase").From("run_lts")
 	runLTSInsert = sb.Insert("run_lts").Columns("id", "grouppath", "phase")
 
 	rundataLTSInsert = sb.Insert("rundata_lts").Columns("id", "data")
+
+	committedwalsequenceLTSSelect = sb.Select("seq").From("committedwalsequence_lts")
+	committedwalsequenceLTSInsert = sb.Insert("committedwalsequence_lts").Columns("seq")
+
+	changegrouprevisionLTSSelect = sb.Select("id, revision").From("changegrouprevision_lts")
+	changegrouprevisionLTSInsert = sb.Insert("changegrouprevision_lts").Columns("id", "revision")
+
+	runcounterLTSSelect = sb.Select("groupid", "counter").From("runcounter_lts")
+	runcounterLTSInsert = sb.Insert("runcounter_lts").Columns("groupid", "counter")
 )
 
 type ReadDB struct {
@@ -87,13 +93,22 @@ type ReadDB struct {
 	dataDir string
 	e       *etcd.Store
 	rdb     *db.DB
+	lts     *objectstorage.ObjStorage
 	wal     *wal.WalManager
 
 	Initialized bool
-	m           sync.Mutex
+	initLock    sync.Mutex
+
+	// dbWriteLock is used to have only one concurrent write transaction or sqlite
+	// will return a deadlock error (since we are using the unlock/notify api) if
+	// two write transactions acquire a lock on each other (we cannot specificy
+	// that a transaction will be a write tx so it'll start as a read tx, can
+	// acquire a lock on another read tx, when both become write tx the deadlock
+	// detector will return an error)
+	dbWriteLock sync.Mutex
 }
 
-func NewReadDB(ctx context.Context, logger *zap.Logger, dataDir string, e *etcd.Store, wal *wal.WalManager) (*ReadDB, error) {
+func NewReadDB(ctx context.Context, logger *zap.Logger, dataDir string, e *etcd.Store, lts *objectstorage.ObjStorage, wal *wal.WalManager) (*ReadDB, error) {
 	if err := os.MkdirAll(dataDir, 0770); err != nil {
 		return nil, err
 	}
@@ -111,6 +126,7 @@ func NewReadDB(ctx context.Context, logger *zap.Logger, dataDir string, e *etcd.
 		log:     logger.Sugar(),
 		e:       e,
 		dataDir: dataDir,
+		lts:     lts,
 		wal:     wal,
 		rdb:     rdb,
 	}
@@ -119,14 +135,14 @@ func NewReadDB(ctx context.Context, logger *zap.Logger, dataDir string, e *etcd.
 }
 
 func (r *ReadDB) SetInitialized(initialized bool) {
-	r.m.Lock()
+	r.initLock.Lock()
 	r.Initialized = initialized
-	r.m.Unlock()
+	r.initLock.Unlock()
 }
 
 func (r *ReadDB) IsInitialized() bool {
-	r.m.Lock()
-	defer r.m.Unlock()
+	r.initLock.Lock()
+	defer r.initLock.Unlock()
 	return r.Initialized
 }
 
@@ -136,11 +152,10 @@ func (r *ReadDB) Initialize(ctx context.Context) error {
 	if err := r.ResetDB(); err != nil {
 		return errors.Wrapf(err, "failed to reset db")
 	}
-	revision, err := r.SyncLTS(ctx)
-	if err != nil {
+	if err := r.SyncLTS(ctx); err != nil {
 		return errors.Wrapf(err, "error syncing lts db")
 	}
-	if err := r.SyncRDB(ctx, revision); err != nil {
+	if err := r.SyncRDB(ctx); err != nil {
 		return errors.Wrapf(err, "error syncing run db")
 	}
 	return nil
@@ -170,9 +185,10 @@ func (r *ReadDB) ResetDB() error {
 	return nil
 }
 
-func (r *ReadDB) SyncRDB(ctx context.Context, revision int64) error {
+func (r *ReadDB) SyncRDB(ctx context.Context) error {
 	err := r.rdb.Do(func(tx *db.Tx) error {
 		// Do pagination to limit the number of keys per request
+		var revision int64
 		key := common.EtcdRunsDir
 
 		var continuation *etcd.ListPagedContinuation
@@ -240,114 +256,6 @@ func (r *ReadDB) SyncRDB(ctx context.Context, revision int64) error {
 	return err
 }
 
-func (r *ReadDB) SyncLTS(ctx context.Context) (int64, error) {
-	type indexData struct {
-		ID    string
-		Phase types.RunPhase
-		Group string
-	}
-
-	insertfunc := func(objs []string) error {
-		err := r.rdb.Do(func(tx *db.Tx) error {
-			for _, obj := range objs {
-				f, _, err := r.wal.ReadObject(obj, nil)
-				if err != nil {
-					if err == objectstorage.ErrNotExist {
-						r.log.Warnf("object %s disappeared, ignoring", obj)
-					}
-					return err
-				}
-
-				dec := json.NewDecoder(f)
-				for {
-					var id *indexData
-
-					err := dec.Decode(&id)
-					if err == io.EOF {
-						// all done
-						break
-					}
-					if err != nil {
-						f.Close()
-						return err
-					}
-
-					run := &types.Run{
-						ID:    id.ID,
-						Group: id.Group,
-						Phase: id.Phase,
-					}
-					if err := r.insertRunLTS(tx, run, []byte{}); err != nil {
-						f.Close()
-						return err
-					}
-				}
-				f.Close()
-			}
-			return nil
-		})
-		return err
-	}
-
-	resp, err := r.e.Get(ctx, common.EtcdLastIndexKey, 0)
-	if err != nil {
-		return 0, err
-	}
-	indexDir := string(resp.Kvs[0].Value)
-	indexRevision := resp.Kvs[0].ModRevision
-	revision := resp.Header.Revision
-
-	// TODO(sgotti) wait for wal changes to be at a revision >= revision
-	walChangesRevision, err := r.wal.ChangesCurrentRevision()
-	if err != nil {
-		return 0, err
-	}
-	if walChangesRevision < indexRevision {
-		return 0, errors.Errorf("wal changes revision %q is lower than index revision %q", walChangesRevision, revision)
-	}
-
-	r.log.Infof("indexDir: %s", indexDir)
-
-	objs := []string{}
-	count := 0
-
-	doneCh := make(chan struct{})
-	defer close(doneCh)
-	for object := range r.wal.List(path.Join(common.StorageRunsIndexesDir, indexDir)+"/", "", true, doneCh) {
-		if object.Err != nil {
-			return 0, object.Err
-		}
-		r.log.Infof("path: %s", object.Path)
-
-		objs = append(objs, object.Path)
-
-		if count > paginationSize {
-			if err := insertfunc(objs); err != nil {
-				return 0, err
-			}
-			count = 0
-			objs = []string{}
-		} else {
-			count++
-		}
-	}
-	if err := insertfunc(objs); err != nil {
-		return 0, err
-	}
-
-	resp, err = r.e.Get(ctx, common.EtcdLastIndexKey, 0)
-	if err != nil {
-		return 0, err
-	}
-	curIndexDir := string(resp.Kvs[0].Value)
-
-	if curIndexDir != indexDir {
-		return 0, errors.Errorf("index dir has changed, used %s, current: %s", indexDir, curIndexDir)
-	}
-
-	return revision, nil
-}
-
 func (r *ReadDB) Run(ctx context.Context) error {
 	revision, err := r.GetRevision()
 	if err != nil {
@@ -367,6 +275,7 @@ func (r *ReadDB) Run(ctx context.Context) error {
 	}
 	r.SetInitialized(true)
 
+	errCh := make(chan error)
 	for {
 		for {
 			initialized := r.IsInitialized()
@@ -383,16 +292,39 @@ func (r *ReadDB) Run(ctx context.Context) error {
 			time.Sleep(1 * time.Second)
 		}
 
-		r.log.Infof("starting HandleEvents")
-		if err := r.HandleEvents(ctx); err != nil {
-			r.log.Errorf("handleevents err: %+v", err)
-		}
+		ctx, cancel := context.WithCancel(ctx)
+		wg := &sync.WaitGroup{}
+
+		wg.Add(1)
+		go func() {
+			r.log.Infof("starting HandleEvents")
+			if err := r.HandleEvents(ctx); err != nil {
+				r.log.Errorf("handleevents err: %+v", err)
+				errCh <- err
+			}
+			wg.Done()
+		}()
+
+		wg.Add(1)
+		go func() {
+			r.log.Infof("starting HandleEventsLTS")
+			if err := r.HandleEventsLTS(ctx); err != nil {
+				r.log.Errorf("handleevents lts err: %+v", err)
+				errCh <- err
+			}
+			wg.Done()
+		}()
 
 		select {
 		case <-ctx.Done():
 			r.log.Infof("readdb exiting")
+			cancel()
 			r.rdb.Close()
 			return nil
+		case <-errCh:
+			// cancel context and wait for the all the goroutines to exit
+			cancel()
+			wg.Wait()
 		}
 
 		time.Sleep(1 * time.Second)
@@ -458,6 +390,7 @@ func (r *ReadDB) HandleEvents(ctx context.Context) error {
 
 		// a single transaction for every response (every response contains all the
 		// events happened in an etcd revision).
+		r.dbWriteLock.Lock()
 		err = r.rdb.Do(func(tx *db.Tx) error {
 			for _, ev := range wresp.Events {
 				if err := r.handleEvent(tx, ev, &wresp); err != nil {
@@ -470,6 +403,7 @@ func (r *ReadDB) HandleEvents(ctx context.Context) error {
 			}
 			return nil
 		})
+		r.dbWriteLock.Unlock()
 		if err != nil {
 			return err
 		}
@@ -514,6 +448,9 @@ func (r *ReadDB) handleRunEvent(tx *db.Tx, ev *etcdclientv3.Event, wresp *etcdcl
 		}
 
 		// Run has been deleted from etcd, this means that it was stored in the LTS
+		// TODO(sgotti) this is here just to avoid a window where the run is not in
+		// run table and in the run_lts table but should be changed/removed when we'll
+		// implement run removal
 		run, err := store.LTSGetRun(r.wal, runID)
 		if err != nil {
 			return err
@@ -564,6 +501,495 @@ func (r *ReadDB) handleChangeGroupEvent(tx *db.Tx, ev *etcdclientv3.Event, wresp
 	return nil
 }
 
+func (r *ReadDB) SyncLTS(ctx context.Context) error {
+	// get the last committed storage wal sequence saved in the rdb
+	curWalSeq := ""
+	err := r.rdb.Do(func(tx *db.Tx) error {
+		var err error
+		curWalSeq, err = r.GetCommittedWalSequenceLTS(tx)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	lastCommittedStorageWal, _, err := r.wal.LastCommittedStorageWal(ctx)
+	if err != nil {
+		return err
+	}
+
+	doFullSync := false
+	if curWalSeq == "" {
+		doFullSync = true
+		r.log.Warn("no startWalSeq in db, doing a full sync")
+	} else {
+		ok, err := r.wal.HasLtsWal(curWalSeq)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			r.log.Warnf("no wal with seq %q in lts, doing a full sync", curWalSeq)
+			doFullSync = true
+		}
+
+		// if the epoch of the wals has changed this means etcd has been reset. If so
+		// we should do a full resync since we are saving in the rdb also data that
+		// was not yet committed to lts so we should have the rdb ahead of the current
+		// lts data
+		// TODO(sgotti) improve this to avoid doing a full resync
+		curWalSequence, err := sequence.Parse(curWalSeq)
+		if err != nil {
+			return err
+		}
+		curWalEpoch := curWalSequence.Epoch
+
+		lastCommittedStorageWalSequence, err := sequence.Parse(lastCommittedStorageWal)
+		if err != nil {
+			return err
+		}
+		if curWalEpoch != lastCommittedStorageWalSequence.Epoch {
+			r.log.Warnf("current rdb wal sequence epoch %d different than new wal sequence epoch %d, doing a full sync", curWalEpoch, lastCommittedStorageWalSequence.Epoch)
+			doFullSync = true
+		}
+	}
+
+	if doFullSync {
+		r.log.Infof("doing a full sync from lts files")
+		if err := r.ResetDB(); err != nil {
+			return err
+		}
+
+		var err error
+		curWalSeq, err = r.SyncFromDump()
+		if err != nil {
+			return err
+		}
+	}
+
+	r.log.Infof("startWalSeq: %s", curWalSeq)
+
+	// Sync from wals
+	// sync from lts until the current known lastCommittedStorageWal in etcd
+	// since wals are first committed to lts and then in etcd we would like to
+	// avoid to store in rdb something that is not yet marked as committedstorage
+	// in etcd
+	curWalSeq, err = r.SyncFromWals(curWalSeq, lastCommittedStorageWal)
+	if err != nil {
+		return errors.Wrap(err, "failed to sync from wals")
+	}
+
+	// Get the first available wal from etcd and check that our current walseq
+	// from wals on lts is >=
+	// if not (this happens when syncFromWals takes some time and in the meantime
+	// many new wals are written, the next sync should be faster and able to continue
+	firstAvailableWalData, revision, err := r.wal.FirstAvailableWalData(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to get first available wal data")
+	}
+	r.log.Infof("firstAvailableWalData: %s", util.Dump(firstAvailableWalData))
+	r.log.Infof("revision: %d", revision)
+	if firstAvailableWalData == nil {
+		if curWalSeq != "" {
+			// this happens if etcd has been reset
+			return errors.Errorf("our curwalseq is %q but there's no wal data on etcd", curWalSeq)
+		}
+	}
+	if firstAvailableWalData != nil {
+		if curWalSeq < firstAvailableWalData.WalSequence {
+			return errors.Errorf("current applied wal seq %q is smaller than the first available wal on etcd %q", curWalSeq, firstAvailableWalData.WalSequence)
+		}
+	}
+
+	err = r.rdb.Do(func(tx *db.Tx) error {
+		if err := insertRevisionLTS(tx, revision); err != nil {
+			return err
+		}
+
+		// use the same revision as previous operation
+		for walElement := range r.wal.ListEtcdWals(ctx, revision) {
+			if walElement.Err != nil {
+				return err
+			}
+			if walElement.WalData.WalSequence <= curWalSeq {
+				continue
+			}
+
+			if err := r.insertCommittedWalSequenceLTS(tx, walElement.WalData.WalSequence); err != nil {
+				return err
+			}
+
+			r.log.Debugf("applying wal to db")
+			if err := r.applyWal(tx, walElement.WalData.WalDataFileID); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+
+	return err
+}
+
+func (r *ReadDB) SyncFromDump() (string, error) {
+	type indexHeader struct {
+		LastWalSequence string
+	}
+	type indexData struct {
+		DataType string
+		Data     json.RawMessage
+	}
+
+	type indexDataRun struct {
+		ID    string
+		Phase types.RunPhase
+		Group string
+	}
+
+	type indexDataRunCounter struct {
+		Group   string
+		Counter uint64
+	}
+
+	var iheader *indexHeader
+	insertfunc := func(ids []*indexData) error {
+		err := r.rdb.Do(func(tx *db.Tx) error {
+			for _, id := range ids {
+				switch common.DataType(id.DataType) {
+				case common.DataTypeRun:
+					var ir *indexDataRun
+					if err := json.Unmarshal(id.Data, &ir); err != nil {
+						return err
+					}
+					run := &types.Run{
+						ID:    ir.ID,
+						Group: ir.Group,
+						Phase: ir.Phase,
+					}
+					r.log.Infof("inserting run %q", run.ID)
+					if err := r.insertRunLTS(tx, run, []byte{}); err != nil {
+						return err
+					}
+				case common.DataTypeRunCounter:
+					var irc *indexDataRunCounter
+					if err := json.Unmarshal(id.Data, &irc); err != nil {
+						return err
+					}
+					r.log.Infof("inserting run counter %q, c: %d", irc.Group, irc.Counter)
+					if err := r.insertRunCounterLTS(tx, irc.Group, irc.Counter); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		})
+		return err
+	}
+
+	doneCh := make(chan struct{})
+	defer close(doneCh)
+
+	// get last dump
+	var dumpPath string
+	for object := range r.lts.List(path.Join(common.StorageRunsIndexesDir)+"/", "", true, doneCh) {
+		if object.Err != nil {
+			return "", object.Err
+		}
+		r.log.Infof("path: %s", object.Path)
+
+		dumpPath = object.Path
+	}
+	if dumpPath == "" {
+		return "", nil
+	}
+
+	f, err := r.lts.ReadObject(dumpPath)
+	if err != nil {
+		if err == objectstorage.ErrNotExist {
+			r.log.Warnf("object %s disappeared, ignoring", dumpPath)
+		}
+		return "", err
+	}
+	defer f.Close()
+
+	dec := json.NewDecoder(f)
+
+	if err := dec.Decode(&iheader); err != nil {
+		return "", err
+	}
+	count := 0
+	ids := make([]*indexData, 0, paginationSize)
+	for {
+		var id *indexData
+
+		err := dec.Decode(&id)
+		if err == io.EOF {
+			// all done
+			break
+		}
+		if err != nil {
+			f.Close()
+			return "", err
+		}
+		ids = append(ids, id)
+
+		if count > paginationSize {
+			if err := insertfunc(ids); err != nil {
+				return "", err
+			}
+			count = 0
+			ids = make([]*indexData, 0, paginationSize)
+		} else {
+			count++
+		}
+	}
+	if err := insertfunc(ids); err != nil {
+		return "", err
+	}
+
+	return iheader.LastWalSequence, nil
+}
+
+func (r *ReadDB) SyncFromWals(startWalSeq, endWalSeq string) (string, error) {
+	insertfunc := func(walFiles []*wal.WalFile) error {
+		err := r.rdb.Do(func(tx *db.Tx) error {
+			for _, walFile := range walFiles {
+				walFilef, err := r.wal.ReadWal(walFile.WalSequence)
+				if err != nil {
+					return err
+				}
+				dec := json.NewDecoder(walFilef)
+				var header *wal.WalHeader
+				if err = dec.Decode(&header); err != nil && err != io.EOF {
+					walFilef.Close()
+					return err
+				}
+				walFilef.Close()
+				if err := r.insertCommittedWalSequenceLTS(tx, walFile.WalSequence); err != nil {
+					return err
+				}
+				if err := r.applyWal(tx, header.WalDataFileID); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		return err
+	}
+
+	lastWalSeq := startWalSeq
+	walFiles := []*wal.WalFile{}
+	count := 0
+
+	doneCh := make(chan struct{})
+	defer close(doneCh)
+
+	for walFile := range r.wal.ListLtsWals(startWalSeq) {
+		if walFile.Err != nil {
+			return "", walFile.Err
+		}
+
+		walFiles = append(walFiles, walFile)
+		lastWalSeq = walFile.WalSequence
+
+		if count > 100 {
+			if err := insertfunc(walFiles); err != nil {
+				return "", err
+			}
+			count = 0
+			walFiles = []*wal.WalFile{}
+		} else {
+			count++
+		}
+	}
+	if err := insertfunc(walFiles); err != nil {
+		return "", err
+	}
+
+	return lastWalSeq, nil
+}
+
+func (r *ReadDB) HandleEventsLTS(ctx context.Context) error {
+	var revision int64
+	err := r.rdb.Do(func(tx *db.Tx) error {
+		err := tx.QueryRow("select revision from revision order by revision desc limit 1").Scan(&revision)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				revision = 0
+			} else {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	wctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	r.log.Infof("revision: %d", revision)
+	wch := r.wal.Watch(wctx, revision+1)
+	for we := range wch {
+		r.log.Debugf("we: %s", util.Dump(we))
+		if we.Err != nil {
+			err := we.Err
+			if err == wal.ErrCompacted {
+				r.log.Warnf("required events already compacted, reinitializing readdb")
+				r.Initialized = false
+				return nil
+			}
+			return errors.Wrapf(err, "watch error")
+		}
+
+		// a single transaction for every response (every response contains all the
+		// events happened in an etcd revision).
+		r.dbWriteLock.Lock()
+		err = r.rdb.Do(func(tx *db.Tx) error {
+
+			// if theres a wal seq epoch change something happened to etcd, usually (if
+			// the user hasn't messed up with etcd keys) this means etcd has been reset
+			// in such case we should resync from the lts state to ensure we apply all the
+			// wal marked as committedstorage (since they could have been lost from etcd)
+			curWalSeq, err := r.GetCommittedWalSequenceLTS(tx)
+			if err != nil {
+				return err
+			}
+			r.log.Debugf("curWalSeq: %q", curWalSeq)
+			if curWalSeq != "" && we.WalData != nil {
+				curWalSequence, err := sequence.Parse(curWalSeq)
+				if err != nil {
+					return err
+				}
+				curWalEpoch := curWalSequence.Epoch
+
+				weWalSequence, err := sequence.Parse(we.WalData.WalSequence)
+				if err != nil {
+					return err
+				}
+				r.log.Infof("we.WalData.WalSequence: %q", we.WalData.WalSequence)
+				weWalEpoch := weWalSequence.Epoch
+				if curWalEpoch != weWalEpoch {
+					r.Initialized = false
+					return errors.Errorf("current rdb wal sequence epoch %d different than new wal sequence epoch %d, resyncing from lts", curWalEpoch, weWalEpoch)
+				}
+			}
+
+			if err := r.handleEventLTS(tx, we); err != nil {
+				return err
+			}
+
+			if err := insertRevisionLTS(tx, we.Revision); err != nil {
+				return err
+			}
+			return nil
+		})
+		r.dbWriteLock.Unlock()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *ReadDB) applyWal(tx *db.Tx, walDataFileID string) error {
+	walFile, err := r.wal.ReadWalData(walDataFileID)
+	if err != nil {
+		return errors.Wrapf(err, "cannot read wal data file %q", walDataFileID)
+	}
+	defer walFile.Close()
+
+	dec := json.NewDecoder(walFile)
+	for {
+		var action *wal.Action
+
+		err := dec.Decode(&action)
+		if err == io.EOF {
+			// all done
+			break
+		}
+		if err != nil {
+			return errors.Wrapf(err, "failed to decode wal file")
+		}
+
+		if err := r.applyAction(tx, action); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *ReadDB) applyAction(tx *db.Tx, action *wal.Action) error {
+	r.log.Infof("action: dataType: %s, ID: %s", action.DataType, action.ID)
+	switch action.ActionType {
+	case wal.ActionTypePut:
+		switch action.DataType {
+		case string(common.DataTypeRun):
+			var run *types.Run
+			if err := json.Unmarshal(action.Data, &run); err != nil {
+				return err
+			}
+			if err := r.insertRunLTS(tx, run, action.Data); err != nil {
+				return err
+			}
+		case string(common.DataTypeRunCounter):
+			var runCounter uint64
+			if err := json.Unmarshal(action.Data, &runCounter); err != nil {
+				return err
+			}
+			r.log.Infof("inserting run counter %q, c: %d", action.ID, runCounter)
+			if err := r.insertRunCounterLTS(tx, action.ID, runCounter); err != nil {
+				return err
+			}
+		}
+
+	case wal.ActionTypeDelete:
+		switch action.DataType {
+		case string(common.DataTypeRun):
+		case string(common.DataTypeRunCounter):
+		}
+	}
+
+	return nil
+}
+
+func (r *ReadDB) handleEventLTS(tx *db.Tx, we *wal.WatchElement) error {
+	//r.log.Debugf("event: %s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
+	//key := string(ev.Kv.Key)
+
+	if err := r.handleWalEvent(tx, we); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *ReadDB) handleWalEvent(tx *db.Tx, we *wal.WatchElement) error {
+	for cgName, cgRev := range we.ChangeGroupsRevisions {
+		if err := r.insertChangeGroupRevisionLTS(tx, cgName, cgRev); err != nil {
+			return err
+		}
+	}
+
+	if we.WalData != nil {
+		// update readdb only when the wal has been committed to lts
+		if we.WalData.WalStatus != wal.WalStatusCommitted {
+			return nil
+		}
+
+		if err := r.insertCommittedWalSequenceLTS(tx, we.WalData.WalSequence); err != nil {
+			return err
+		}
+
+		r.log.Debugf("applying wal to db")
+		return r.applyWal(tx, we.WalData.WalDataFileID)
+	}
+	return nil
+}
+
 func (r *ReadDB) Do(f func(tx *db.Tx) error) error {
 	if !r.IsInitialized() {
 		return errors.Errorf("db not initialized")
@@ -579,6 +1005,23 @@ func insertRevision(tx *db.Tx, revision int64) error {
 	// TODO(sgotti) go database/sql and mattn/sqlite3 don't support uint64 types...
 	//q, args, err = revisionInsert.Values(int64(wresp.Header.ClusterId), run.Revision).ToSql()
 	q, args, err := revisionInsert.Values(revision).ToSql()
+	if err != nil {
+		return errors.Wrap(err, "failed to build query")
+	}
+	if _, err = tx.Exec(q, args...); err != nil {
+		return errors.WithStack(err)
+	}
+	return nil
+}
+
+func insertRevisionLTS(tx *db.Tx, revision int64) error {
+	// poor man insert or update that works because transaction isolation level is serializable
+	if _, err := tx.Exec("delete from revision_lts"); err != nil {
+		return errors.Wrap(err, "failed to delete revision")
+	}
+	// TODO(sgotti) go database/sql and mattn/sqlite3 don't support uint64 types...
+	//q, args, err = revisionInsert.Values(int64(wresp.Header.ClusterId), run.Revision).ToSql()
+	q, args, err := revisionLTSInsert.Values(revision).ToSql()
 	if err != nil {
 		return errors.Wrap(err, "failed to build query")
 	}
@@ -691,7 +1134,8 @@ func (r *ReadDB) getRevision(tx *db.Tx) (int64, error) {
 		return 0, errors.Wrap(err, "failed to build query")
 	}
 
-	if err := tx.QueryRow(q, args...).Scan(&revision); err == sql.ErrNoRows {
+	err = tx.QueryRow(q, args...).Scan(&revision)
+	if err == sql.ErrNoRows {
 		return 0, nil
 	}
 	return revision, err
@@ -999,4 +1443,193 @@ func scanChangeGroupsRevision(rows *sql.Rows) (types.ChangeGroupsRevisions, erro
 		return nil, err
 	}
 	return changegroups, nil
+}
+
+func (r *ReadDB) insertCommittedWalSequenceLTS(tx *db.Tx, seq string) error {
+	r.log.Infof("insert seq: %s", seq)
+	// poor man insert or update that works because transaction isolation level is serializable
+	if _, err := tx.Exec("delete from committedwalsequence_lts"); err != nil {
+		return errors.Wrap(err, "failed to delete committedwalsequence")
+	}
+	q, args, err := committedwalsequenceLTSInsert.Values(seq).ToSql()
+	if err != nil {
+		return errors.Wrap(err, "failed to build query")
+	}
+	if _, err = tx.Exec(q, args...); err != nil {
+		return errors.WithStack(err)
+	}
+	return nil
+}
+
+func (r *ReadDB) GetCommittedWalSequenceLTS(tx *db.Tx) (string, error) {
+	var seq string
+
+	q, args, err := committedwalsequenceLTSSelect.OrderBy("seq").Limit(1).ToSql()
+	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	if err != nil {
+		return "", errors.Wrap(err, "failed to build query")
+	}
+
+	err = tx.QueryRow(q, args...).Scan(&seq)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return seq, err
+}
+
+func (r *ReadDB) insertChangeGroupRevisionLTS(tx *db.Tx, changegroup string, revision int64) error {
+	r.log.Infof("insertChangeGroupRevision: %s %d", changegroup, revision)
+
+	// poor man insert or update that works because transaction isolation level is serializable
+	if _, err := tx.Exec("delete from changegrouprevision_lts where id = $1", changegroup); err != nil {
+		return errors.Wrap(err, "failed to delete run")
+	}
+	// insert only if revision > 0
+	if revision > 0 {
+		q, args, err := changegrouprevisionLTSInsert.Values(changegroup, revision).ToSql()
+		if err != nil {
+			return errors.Wrap(err, "failed to build query")
+		}
+		if _, err = tx.Exec(q, args...); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *ReadDB) GetChangeGroupsUpdateTokensLTS(tx *db.Tx, groups []string) (*wal.ChangeGroupsUpdateToken, error) {
+	s := changegrouprevisionLTSSelect.Where(sq.Eq{"id": groups})
+	q, args, err := s.ToSql()
+	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to build query")
+	}
+	cgr, err := fetchChangeGroupsRevisionLTS(tx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	revision, err := r.getRevision(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	// for non existing changegroups use a changegroup with revision = 0
+	for _, g := range groups {
+		if _, ok := cgr[g]; !ok {
+			cgr[g] = 0
+		}
+	}
+
+	return &wal.ChangeGroupsUpdateToken{CurRevision: revision, ChangeGroupsRevisions: cgr}, nil
+}
+
+func fetchChangeGroupsRevisionLTS(tx *db.Tx, q string, args ...interface{}) (map[string]int64, error) {
+	rows, err := tx.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanChangeGroupsRevision(rows)
+}
+
+func scanChangeGroupsRevisionLTS(rows *sql.Rows) (map[string]int64, error) {
+	changegroups := map[string]int64{}
+	for rows.Next() {
+		var (
+			id       string
+			revision int64
+		)
+		if err := rows.Scan(&id, &revision); err != nil {
+			return nil, errors.Wrap(err, "failed to scan rows")
+		}
+		changegroups[id] = revision
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return changegroups, nil
+}
+
+func (r *ReadDB) insertRunCounterLTS(tx *db.Tx, group string, counter uint64) error {
+	// poor man insert or update that works because transaction isolation level is serializable
+	if _, err := tx.Exec("delete from runcounter_lts where groupid = $1", group); err != nil {
+		return errors.Wrap(err, "failed to delete revision")
+	}
+	// TODO(sgotti) go database/sql and mattn/sqlite3 don't support uint64 types...
+	//q, args, err = revisionInsert.Values(int64(wresp.Header.ClusterId), run.Revision).ToSql()
+	q, args, err := runcounterLTSInsert.Values(group, counter).ToSql()
+	if err != nil {
+		return errors.Wrap(err, "failed to build query")
+	}
+	if _, err = tx.Exec(q, args...); err != nil {
+		return errors.WithStack(err)
+	}
+	return nil
+}
+
+func (r *ReadDB) GetRunCounterLTS(tx *db.Tx, group string) (uint64, error) {
+	var g string
+	var counter uint64
+
+	q, args, err := runcounterLTSSelect.Where(sq.Eq{"groupid": group}).ToSql()
+	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to build query")
+	}
+
+	err = tx.QueryRow(q, args...).Scan(&g, &counter)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	return counter, err
+}
+
+func (r *ReadDB) GetRunCountersLTS(tx *db.Tx, start string, limit int) ([]*types.RunCounter, error) {
+	s := runcounterLTSSelect.Where(sq.Gt{"groupid": start})
+	if limit > 0 {
+		s = s.Limit(uint64(limit))
+	}
+	s = s.OrderBy("groupid asc")
+
+	q, args, err := s.ToSql()
+	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to build query")
+	}
+
+	return fetchRunCounters(tx, q, args...)
+}
+
+func fetchRunCounters(tx *db.Tx, q string, args ...interface{}) ([]*types.RunCounter, error) {
+	rows, err := tx.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanRunCounters(rows)
+}
+
+func scanRunCounter(rows *sql.Rows) (*types.RunCounter, error) {
+	r := &types.RunCounter{}
+	if err := rows.Scan(&r.Group, &r.Counter); err != nil {
+		return nil, errors.Wrap(err, "failed to scan rows")
+	}
+
+	return r, nil
+}
+
+func scanRunCounters(rows *sql.Rows) ([]*types.RunCounter, error) {
+	runCounters := []*types.RunCounter{}
+	for rows.Next() {
+		r, err := scanRunCounter(rows)
+		if err != nil {
+			return nil, err
+		}
+		runCounters = append(runCounters, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return runCounters, nil
 }
