@@ -23,7 +23,6 @@ import (
 	"path"
 
 	"github.com/sorintlab/agola/internal/db"
-	"github.com/sorintlab/agola/internal/services/configstore/common"
 	"github.com/sorintlab/agola/internal/services/configstore/readdb"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
@@ -113,7 +112,8 @@ func (s *CommandHandler) CreateProjectGroup(ctx context.Context, projectGroup *t
 	actions := []*wal.Action{
 		{
 			ActionType: wal.ActionTypePut,
-			Path:       common.StorageProjectGroupFile(projectGroup.ID),
+			DataType:   string(types.ConfigTypeProjectGroup),
+			ID:         projectGroup.ID,
 			Data:       pcj,
 		},
 	}
@@ -188,7 +188,8 @@ func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Proje
 	actions := []*wal.Action{
 		{
 			ActionType: wal.ActionTypePut,
-			Path:       common.StorageProjectFile(project.ID),
+			DataType:   string(types.ConfigTypeProject),
+			ID:         project.ID,
 			Data:       pcj,
 		},
 	}
@@ -234,7 +235,8 @@ func (s *CommandHandler) DeleteProject(ctx context.Context, projectRef string) e
 	actions := []*wal.Action{
 		{
 			ActionType: wal.ActionTypeDelete,
-			Path:       common.StorageProjectFile(project.ID),
+			DataType:   string(types.ConfigTypeProject),
+			ID:         project.ID,
 		},
 	}
 
@@ -338,12 +340,14 @@ func (s *CommandHandler) CreateUser(ctx context.Context, req *CreateUserRequest)
 	actions := []*wal.Action{
 		{
 			ActionType: wal.ActionTypePut,
-			Path:       common.StorageUserFile(user.ID),
+			DataType:   string(types.ConfigTypeUser),
+			ID:         user.ID,
 			Data:       userj,
 		},
 		{
 			ActionType: wal.ActionTypePut,
-			Path:       common.StorageProjectGroupFile(pg.ID),
+			DataType:   string(types.ConfigTypeProjectGroup),
+			ID:         pg.ID,
 			Data:       pgj,
 		},
 	}
@@ -383,7 +387,8 @@ func (s *CommandHandler) DeleteUser(ctx context.Context, userName string) error 
 	actions := []*wal.Action{
 		{
 			ActionType: wal.ActionTypeDelete,
-			Path:       common.StorageUserFile(user.ID),
+			DataType:   string(types.ConfigTypeUser),
+			ID:         user.ID,
 		},
 	}
 
@@ -477,7 +482,8 @@ func (s *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequ
 	actions := []*wal.Action{
 		{
 			ActionType: wal.ActionTypePut,
-			Path:       common.StorageUserFile(user.ID),
+			DataType:   string(types.ConfigTypeUser),
+			ID:         user.ID,
 			Data:       userj,
 		},
 	}
@@ -535,7 +541,8 @@ func (s *CommandHandler) DeleteUserLA(ctx context.Context, userName, laID string
 	actions := []*wal.Action{
 		{
 			ActionType: wal.ActionTypePut,
-			Path:       common.StorageUserFile(user.ID),
+			DataType:   string(types.ConfigTypeUser),
+			ID:         user.ID,
 			Data:       userj,
 		},
 	}
@@ -614,7 +621,8 @@ func (s *CommandHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLARequ
 	actions := []*wal.Action{
 		{
 			ActionType: wal.ActionTypePut,
-			Path:       common.StorageUserFile(user.ID),
+			DataType:   string(types.ConfigTypeUser),
+			ID:         user.ID,
 			Data:       userj,
 		},
 	}
@@ -669,7 +677,8 @@ func (s *CommandHandler) CreateUserToken(ctx context.Context, userName, tokenNam
 	actions := []*wal.Action{
 		{
 			ActionType: wal.ActionTypePut,
-			Path:       common.StorageUserFile(user.ID),
+			DataType:   string(types.ConfigTypeUser),
+			ID:         user.ID,
 			Data:       userj,
 		},
 	}
@@ -718,7 +727,8 @@ func (s *CommandHandler) CreateRemoteSource(ctx context.Context, remoteSource *t
 	actions := []*wal.Action{
 		{
 			ActionType: wal.ActionTypePut,
-			Path:       common.StorageRemoteSourceFile(remoteSource.ID),
+			DataType:   string(types.ConfigTypeRemoteSource),
+			ID:         remoteSource.ID,
 			Data:       rsj,
 		},
 	}
@@ -758,7 +768,8 @@ func (s *CommandHandler) DeleteRemoteSource(ctx context.Context, remoteSourceNam
 	actions := []*wal.Action{
 		{
 			ActionType: wal.ActionTypeDelete,
-			Path:       common.StorageRemoteSourceFile(remoteSource.ID),
+			DataType:   string(types.ConfigTypeRemoteSource),
+			ID:         remoteSource.ID,
 		},
 	}
 
@@ -817,12 +828,14 @@ func (s *CommandHandler) CreateOrg(ctx context.Context, org *types.Organization)
 	actions := []*wal.Action{
 		{
 			ActionType: wal.ActionTypePut,
-			Path:       common.StorageOrgFile(org.ID),
+			DataType:   string(types.ConfigTypeOrg),
+			ID:         org.ID,
 			Data:       orgj,
 		},
 		{
 			ActionType: wal.ActionTypePut,
-			Path:       common.StorageProjectGroupFile(pg.ID),
+			DataType:   string(types.ConfigTypeProjectGroup),
+			ID:         pg.ID,
 			Data:       pgj,
 		},
 	}
@@ -864,14 +877,16 @@ func (s *CommandHandler) DeleteOrg(ctx context.Context, orgName string) error {
 	actions := []*wal.Action{
 		{
 			ActionType: wal.ActionTypeDelete,
-			Path:       common.StorageOrgFile(org.ID),
+			DataType:   string(types.ConfigTypeOrg),
+			ID:         org.ID,
 		},
 	}
 	// delete all org projects
 	for _, project := range projects {
 		actions = append(actions, &wal.Action{
 			ActionType: wal.ActionTypeDelete,
-			Path:       common.StorageProjectFile(project.ID),
+			DataType:   string(types.ConfigTypeProject),
+			ID:         project.ID,
 		})
 	}
 
@@ -934,7 +949,8 @@ func (s *CommandHandler) CreateSecret(ctx context.Context, secret *types.Secret)
 	actions := []*wal.Action{
 		{
 			ActionType: wal.ActionTypePut,
-			Path:       common.StorageSecretFile(secret.ID),
+			DataType:   string(types.ConfigTypeSecret),
+			ID:         secret.ID,
 			Data:       secretj,
 		},
 	}
@@ -980,7 +996,8 @@ func (s *CommandHandler) DeleteSecret(ctx context.Context, parentType types.Conf
 	actions := []*wal.Action{
 		{
 			ActionType: wal.ActionTypeDelete,
-			Path:       common.StorageSecretFile(secret.ID),
+			DataType:   string(types.ConfigTypeSecret),
+			ID:         secret.ID,
 		},
 	}
 
@@ -1043,7 +1060,8 @@ func (s *CommandHandler) CreateVariable(ctx context.Context, variable *types.Var
 	actions := []*wal.Action{
 		{
 			ActionType: wal.ActionTypePut,
-			Path:       common.StorageVariableFile(variable.ID),
+			DataType:   string(types.ConfigTypeVariable),
+			ID:         variable.ID,
 			Data:       variablej,
 		},
 	}
@@ -1088,7 +1106,8 @@ func (s *CommandHandler) DeleteVariable(ctx context.Context, parentType types.Co
 	actions := []*wal.Action{
 		{
 			ActionType: wal.ActionTypeDelete,
-			Path:       common.StorageVariableFile(variable.ID),
+			DataType:   string(types.ConfigTypeVariable),
+			ID:         variable.ID,
 		},
 	}
 
