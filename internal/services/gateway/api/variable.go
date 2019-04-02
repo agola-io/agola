@@ -141,10 +141,7 @@ func (h *VariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 type CreateVariableRequest struct {
 	Name string `json:"name,omitempty"`
 
-	SecretName string `json:"secret_name,omitempty"`
-	SecretVar  string `json:"secret_var,omitempty"`
-
-	When *types.When `json:"when,omitempty"`
+	Values []types.VariableValue `json:"values,omitempty"`
 }
 
 type CreateVariableHandler struct {
@@ -177,12 +174,19 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 
+	if len(req.Values) == 0 {
+		err := errors.Errorf("empty variable values")
+		h.log.Errorf("err: %+v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
 	v := &types.Variable{
 		Name: req.Name,
 		Parent: types.Parent{
 			Type: parentType,
 			ID:   parentRef,
 		},
+		Values: req.Values,
 	}
 
 	var cssecrets []*types.Secret

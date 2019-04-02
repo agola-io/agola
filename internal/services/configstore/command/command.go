@@ -1007,6 +1007,9 @@ func (s *CommandHandler) CreateVariable(ctx context.Context, variable *types.Var
 	if variable.Name == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("variable name required"))
 	}
+	if len(variable.Values) == 0 {
+		return nil, util.NewErrBadRequest(errors.Errorf("variable values required"))
+	}
 	if variable.Parent.Type == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("variable parent type required"))
 	}

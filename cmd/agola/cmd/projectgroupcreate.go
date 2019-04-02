@@ -25,7 +25,7 @@ import (
 
 var cmdProjectGroupCreate = &cobra.Command{
 	Use:   "create",
-	Short: "create a project",
+	Short: "create a project group",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := projectGroupCreate(cmd, args); err != nil {
 			log.Fatalf("err: %v", err)
@@ -43,8 +43,8 @@ var projectGroupCreateOpts projectGroupCreateOptions
 func init() {
 	flags := cmdProjectGroupCreate.Flags()
 
-	flags.StringVarP(&projectGroupCreateOpts.name, "name", "n", "", "project name")
-	flags.StringVar(&projectGroupCreateOpts.parentPath, "parent", "", `parent project group path (i.e "org/org01" for root project group in org01, "/user/user01/group01/subgroub01") or project group id where the project group should be created`)
+	flags.StringVarP(&projectGroupCreateOpts.name, "name", "n", "", "project group name")
+	flags.StringVar(&projectGroupCreateOpts.parentPath, "parent", "", `parent project group path (i.e "org/org01" for root project group in org01, "user/user01/group01/subgroub01") or project group id where the project group should be created`)
 
 	cmdProjectGroupCreate.MarkFlagRequired("name")
 	cmdProjectGroupCreate.MarkFlagRequired("parent")
@@ -64,9 +64,9 @@ func projectGroupCreate(cmd *cobra.Command, args []string) error {
 
 	project, _, err := gwclient.CreateProjectGroup(context.TODO(), req)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create project")
+		return errors.Wrapf(err, "failed to create project group")
 	}
-	log.Infof("project %s created, ID: %s", project.Name, project.ID)
+	log.Infof("project group %s created, ID: %s", project.Name, project.ID)
 
 	return nil
 }

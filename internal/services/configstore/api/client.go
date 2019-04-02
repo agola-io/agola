@@ -108,21 +108,21 @@ func (c *Client) getParsedResponse(ctx context.Context, method, path string, que
 	return resp, d.Decode(obj)
 }
 
-func (c *Client) GetProjectGroup(ctx context.Context, projectGroupID string) (*types.ProjectGroup, *http.Response, error) {
+func (c *Client) GetProjectGroup(ctx context.Context, projectGroupRef string) (*types.ProjectGroup, *http.Response, error) {
 	projectGroup := new(types.ProjectGroup)
-	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s", url.PathEscape(projectGroupID)), nil, jsonContent, nil, projectGroup)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s", url.PathEscape(projectGroupRef)), nil, jsonContent, nil, projectGroup)
 	return projectGroup, resp, err
 }
 
-func (c *Client) GetProjectGroupSubgroups(ctx context.Context, projectGroupID string) ([]*types.ProjectGroup, *http.Response, error) {
+func (c *Client) GetProjectGroupSubgroups(ctx context.Context, projectGroupRef string) ([]*types.ProjectGroup, *http.Response, error) {
 	projectGroups := []*types.ProjectGroup{}
-	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s/subgroups", url.PathEscape(projectGroupID)), nil, jsonContent, nil, &projectGroups)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s/subgroups", url.PathEscape(projectGroupRef)), nil, jsonContent, nil, &projectGroups)
 	return projectGroups, resp, err
 }
 
-func (c *Client) GetProjectGroupProjects(ctx context.Context, projectGroupID string) ([]*types.Project, *http.Response, error) {
+func (c *Client) GetProjectGroupProjects(ctx context.Context, projectGroupRef string) ([]*types.Project, *http.Response, error) {
 	projects := []*types.Project{}
-	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s/projects", url.PathEscape(projectGroupID)), nil, jsonContent, nil, &projects)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s/projects", url.PathEscape(projectGroupRef)), nil, jsonContent, nil, &projects)
 	return projects, resp, err
 }
 
@@ -137,9 +137,9 @@ func (c *Client) CreateProjectGroup(ctx context.Context, projectGroup *types.Pro
 	return projectGroup, resp, err
 }
 
-func (c *Client) GetProject(ctx context.Context, projectID string) (*types.Project, *http.Response, error) {
+func (c *Client) GetProject(ctx context.Context, projectRef string) (*types.Project, *http.Response, error) {
 	project := new(types.Project)
-	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s", url.PathEscape(projectID)), nil, jsonContent, nil, project)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s", url.PathEscape(projectRef)), nil, jsonContent, nil, project)
 	return project, resp, err
 }
 
@@ -154,8 +154,8 @@ func (c *Client) CreateProject(ctx context.Context, project *types.Project) (*ty
 	return project, resp, err
 }
 
-func (c *Client) DeleteProject(ctx context.Context, projectID string) (*http.Response, error) {
-	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/projects/%s", url.PathEscape(projectID)), nil, jsonContent, nil)
+func (c *Client) DeleteProject(ctx context.Context, projectRef string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/projects/%s", url.PathEscape(projectRef)), nil, jsonContent, nil)
 }
 
 func (c *Client) GetProjectGroupSecrets(ctx context.Context, projectGroupRef string, tree bool) ([]*types.Secret, *http.Response, error) {

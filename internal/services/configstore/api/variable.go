@@ -22,6 +22,7 @@ import (
 	"github.com/sorintlab/agola/internal/services/configstore/command"
 	"github.com/sorintlab/agola/internal/services/configstore/readdb"
 	"github.com/sorintlab/agola/internal/services/types"
+	"github.com/sorintlab/agola/internal/util"
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
@@ -106,6 +107,8 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 	variable.Parent.Type = parentType
 	variable.Parent.ID = parentRef
+
+	h.log.Infof("variable: %s", util.Dump(variable))
 
 	variable, err = h.ch.CreateVariable(ctx, variable)
 	if httpError(w, err) {

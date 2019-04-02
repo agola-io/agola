@@ -50,7 +50,7 @@ func init() {
 	flags.StringVar(&projectCreateOpts.repoURL, "repo-url", "", "repository url")
 	flags.StringVar(&projectCreateOpts.remoteSourceName, "remote-source", "", "remote source name")
 	flags.BoolVarP(&projectCreateOpts.skipSSHHostKeyCheck, "skip-ssh-host-key-check", "s", false, "skip ssh host key check")
-	flags.StringVar(&projectCreateOpts.parentPath, "parent", "", `parent project group path (i.e "org/org01" for root project group in org01, "/user/user01/group01/subgroub01") or project group id where the project should be created`)
+	flags.StringVar(&projectCreateOpts.parentPath, "parent", "", `parent project group path (i.e "org/org01" for root project group in org01, "user/user01/group01/subgroub01") or project group id where the project should be created`)
 
 	cmdProjectCreate.MarkFlagRequired("name")
 	cmdProjectCreate.MarkFlagRequired("parent")

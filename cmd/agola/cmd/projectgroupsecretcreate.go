@@ -18,11 +18,24 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var cmdProjectVariable = &cobra.Command{
-	Use:   "variable",
-	Short: "variable",
+var cmdProjectGroupSecretCreate = &cobra.Command{
+	Use:   "create",
+	Short: "create a project group secret",
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := secretCreate(cmd, "projectgroup", args); err != nil {
+			log.Fatalf("err: %v", err)
+		}
+	},
 }
 
 func init() {
-	cmdProject.AddCommand(cmdProjectVariable)
+	flags := cmdProjectGroupSecretCreate.Flags()
+
+	flags.StringVar(&secretCreateOpts.projectRef, "project", "", "project id or full path")
+	flags.StringVarP(&secretCreateOpts.name, "name", "n", "", "secret name")
+
+	cmdProjectGroupSecretCreate.MarkFlagRequired("project")
+	cmdProjectGroupSecretCreate.MarkFlagRequired("name")
+
+	cmdProjectGroupSecret.AddCommand(cmdProjectGroupSecretCreate)
 }

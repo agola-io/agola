@@ -18,11 +18,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var cmdProjectVariable = &cobra.Command{
+var cmdProjectGroupVariable = &cobra.Command{
 	Use:   "variable",
 	Short: "variable",
 }
 
 func init() {
-	cmdProject.AddCommand(cmdProjectVariable)
+	cmdProjectGroup.AddCommand(cmdProjectGroupVariable)
 }
