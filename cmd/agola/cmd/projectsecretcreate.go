@@ -19,7 +19,6 @@ package cmd
 
 import (
 	"context"
-	"net/url"
 
 	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/services/gateway/api"
@@ -30,24 +29,24 @@ var cmdProjectSecretCreate = &cobra.Command{
 	Use:   "create",
 	Short: "create a project secret",
 	Run: func(cmd *cobra.Command, args []string) {
-		if err := projectSecretCreate(cmd, args); err != nil {
+		if err := secretCreate(cmd, "project", args); err != nil {
 			log.Fatalf("err: %v", err)
 		}
 	},
 }
 
-type projectSecretCreateOptions struct {
-	projectID string
-	name      string
+type secretCreateOptions struct {
+	projectRef string
+	name       string
 }
 
-var projectSecretCreateOpts projectSecretCreateOptions
+var secretCreateOpts secretCreateOptions
 
 func init() {
 	flags := cmdProjectSecretCreate.Flags()
 
-	flags.StringVar(&projectSecretCreateOpts.projectID, "project", "", "project id or full path)")
-	flags.StringVarP(&projectSecretCreateOpts.name, "name", "n", "", "secret name")
+	flags.StringVar(&secretCreateOpts.projectRef, "project", "", "project id or full path)")
+	flags.StringVarP(&secretCreateOpts.name, "name", "n", "", "secret name")
 
 	cmdProjectSecretCreate.MarkFlagRequired("project")
 	cmdProjectSecretCreate.MarkFlagRequired("name")
@@ -55,19 +54,29 @@ func init() {
 	cmdProjectSecret.AddCommand(cmdProjectSecretCreate)
 }
 
-func projectSecretCreate(cmd *cobra.Command, args []string) error {
+func secretCreate(cmd *cobra.Command, ownertype string, args []string) error {
 	gwclient := api.NewClient(gatewayURL, token)
 
 	req := &api.CreateSecretRequest{
-		Name: projectSecretCreateOpts.name,
+		Name: secretCreateOpts.name,
 	}
 
-	log.Infof("creating project secret")
-	secret, _, err := gwclient.CreateProjectSecret(context.TODO(), url.PathEscape(projectSecretCreateOpts.projectID), req)
-	if err != nil {
-		return errors.Wrapf(err, "failed to create project secret")
+	switch ownertype {
+	case "project":
+		log.Infof("creating project secret")
+		secret, _, err := gwclient.CreateProjectSecret(context.TODO(), secretCreateOpts.projectRef, req)
+		if err != nil {
+			return errors.Wrapf(err, "failed to create project secret")
+		}
+		log.Infof("project secret %q created, ID: %q", secret.Name, secret.ID)
+	case "projectgroup":
+		log.Infof("creating project group secret")
+		secret, _, err := gwclient.CreateProjectGroupSecret(context.TODO(), secretCreateOpts.projectRef, req)
+		if err != nil {
+			return errors.Wrapf(err, "failed to create project group secret")
+		}
+		log.Infof("project group secret %q created, ID: %q", secret.Name, secret.ID)
 	}
-	log.Infof("project secret %q created, ID: %q", secret.Name, secret.ID)
 
 	return nil
 }
