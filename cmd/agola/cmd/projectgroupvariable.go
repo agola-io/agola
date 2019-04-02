@@ -1,4 +1,4 @@
-// This file is part of Agola
+// This file is part of Endless
 //
 // Copyright (C) 2019 Sorint.lab
 //
@@ -21,11 +21,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var cmdProjectVariable = &cobra.Command{
+var cmdProjectGroupVariable = &cobra.Command{
 	Use:   "variable",
 	Short: "variable",
 }
 
 func init() {
-	cmdProject.AddCommand(cmdProjectVariable)
+	cmdProjectGroup.AddCommand(cmdProjectGroupVariable)
 }
