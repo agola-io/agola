@@ -208,7 +208,7 @@ func (s *CommandHandler) DeleteProject(ctx context.Context, projectRef string) e
 		var err error
 
 		// check project existance
-		project, err := s.readDB.GetProject(tx, projectRef)
+		project, err = s.readDB.GetProject(tx, projectRef)
 		if err != nil {
 			return err
 		}
@@ -232,6 +232,7 @@ func (s *CommandHandler) DeleteProject(ctx context.Context, projectRef string) e
 		return err
 	}
 
+	// TODO(sgotti) delete project secrets/variables
 	actions := []*wal.Action{
 		{
 			ActionType: wal.ActionTypeDelete,
