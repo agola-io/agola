@@ -36,6 +36,8 @@ import (
 )
 
 const (
+	defaultSSHPort = "22"
+
 	agolaDefaultConfigPath = ".agola/config.yml"
 
 	// List of runs annotations
@@ -250,13 +252,19 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 	if err != nil {
 		return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to parse clone url")
 	}
+	gitHost := gitURL.Hostname()
+	gitPort := gitURL.Port()
+	if gitPort == "" {
+		gitPort = defaultSSHPort
+	}
 
 	// this env vars ovverrides other env vars
 	env := map[string]string{
 		"CI":                   "true",
 		"AGOLA_SSHPRIVKEY":     sshPrivKey,
 		"AGOLA_REPOSITORY_URL": cloneURL,
-		"AGOLA_GIT_HOST":       gitURL.Host,
+		"AGOLA_GIT_HOST":       gitHost,
+		"AGOLA_GIT_PORT":       gitPort,
 		"AGOLA_GIT_REF":        webhookData.Ref,
 		"AGOLA_GIT_COMMITSHA":  webhookData.CommitSHA,
 	}

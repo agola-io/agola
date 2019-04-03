@@ -77,6 +77,7 @@ if [ -n "$AGOLA_SKIPSSHHOSTKEYCHECK" ]; then
 	(cat <<EOF > ~/.ssh/config
 Host $AGOLA_GIT_HOST
 	HostName $AGOLA_GIT_HOST
+	Port $AGOLA_GIT_PORT
 	StrictHostKeyChecking no
 	UserKnownHostsFile /dev/null
 EOF
