@@ -58,13 +58,14 @@ func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	user, err := h.createRemoteSource(ctx, &req)
+	rs, err := h.createRemoteSource(ctx, &req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(user); err != nil {
+	res := createRemoteSourceResponse(rs)
+	if err := json.NewEncoder(w).Encode(res); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

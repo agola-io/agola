@@ -81,7 +81,8 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(project); err != nil {
+	res := createProjectResponse(project)
+	if err := json.NewEncoder(w).Encode(res); err != nil {
 		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

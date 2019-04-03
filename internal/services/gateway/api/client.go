@@ -27,8 +27,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sorintlab/agola/internal/services/types"
-
 	"github.com/pkg/errors"
 )
 
@@ -131,30 +129,30 @@ func (c *Client) GetProjectGroupProjects(ctx context.Context, projectGroupRef st
 	return projects, resp, err
 }
 
-func (c *Client) GetProject(ctx context.Context, projectRef string) (*types.Project, *http.Response, error) {
-	project := new(types.Project)
+func (c *Client) GetProject(ctx context.Context, projectRef string) (*ProjectResponse, *http.Response, error) {
+	project := new(ProjectResponse)
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s", url.PathEscape(projectRef)), nil, jsonContent, nil, project)
 	return project, resp, err
 }
 
-func (c *Client) CreateProjectGroup(ctx context.Context, req *CreateProjectGroupRequest) (*types.Project, *http.Response, error) {
+func (c *Client) CreateProjectGroup(ctx context.Context, req *CreateProjectGroupRequest) (*ProjectResponse, *http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	project := new(types.Project)
+	project := new(ProjectResponse)
 	resp, err := c.getParsedResponse(ctx, "PUT", "/projectgroups", nil, jsonContent, bytes.NewReader(reqj), project)
 	return project, resp, err
 }
 
-func (c *Client) CreateProject(ctx context.Context, req *CreateProjectRequest) (*types.Project, *http.Response, error) {
+func (c *Client) CreateProject(ctx context.Context, req *CreateProjectRequest) (*ProjectResponse, *http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	project := new(types.Project)
+	project := new(ProjectResponse)
 	resp, err := c.getParsedResponse(ctx, "PUT", "/projects", nil, jsonContent, bytes.NewReader(reqj), project)
 	return project, resp, err
 }
@@ -347,13 +345,13 @@ func (c *Client) GetRemoteSources(ctx context.Context, start string, limit int, 
 	return rss, resp, err
 }
 
-func (c *Client) CreateRemoteSource(ctx context.Context, req *CreateRemoteSourceRequest) (*types.RemoteSource, *http.Response, error) {
+func (c *Client) CreateRemoteSource(ctx context.Context, req *CreateRemoteSourceRequest) (*RemoteSourceResponse, *http.Response, error) {
 	uj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	rs := new(types.RemoteSource)
+	rs := new(RemoteSourceResponse)
 	resp, err := c.getParsedResponse(ctx, "PUT", "/remotesources", nil, jsonContent, bytes.NewReader(uj), rs)
 	return rs, resp, err
 }
