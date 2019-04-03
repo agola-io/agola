@@ -23,6 +23,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"path"
 	"strconv"
 	"strings"
 
@@ -114,10 +115,8 @@ func webhookDataFromPush(hook *pushHook) (*types.WebhookData, error) {
 		Sender:      sender,
 
 		Repo: types.WebhookDataRepo{
-			Name:     hook.Repo.Name,
-			Owner:    hook.Repo.Owner.Username,
-			FullName: hook.Repo.FullName,
-			RepoURL:  hook.Repo.URL,
+			Path:   path.Join(hook.Repo.Owner.Username, hook.Repo.Name),
+			WebURL: hook.Repo.URL,
 		},
 	}
 
@@ -136,7 +135,7 @@ func webhookDataFromPush(hook *pushHook) (*types.WebhookData, error) {
 		whd.Message = fmt.Sprintf("Tag %s", whd.Tag)
 	default:
 		// ignore received webhook since it doesn't have a ref we're interested in
-		return nil, fmt.Errorf("Unsupported webhook ref %q", hook.Ref)
+		return nil, fmt.Errorf("unsupported webhook ref %q", hook.Ref)
 	}
 
 	return whd, nil
@@ -161,10 +160,8 @@ func webhookDataFromPullRequest(hook *pullRequestHook) *types.WebhookData {
 		PullRequestLink: hook.PullRequest.URL,
 
 		Repo: types.WebhookDataRepo{
-			Name:     hook.Repo.Name,
-			Owner:    hook.Repo.Owner.Username,
-			FullName: hook.Repo.FullName,
-			RepoURL:  hook.Repo.URL,
+			Path:   path.Join(hook.Repo.Owner.Username, hook.Repo.Name),
+			WebURL: hook.Repo.URL,
 		},
 	}
 	return build
