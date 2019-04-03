@@ -127,12 +127,12 @@ func (c *Client) GetUserInfo() (*gitsource.UserInfo, error) {
 	return nil, nil
 }
 
-func (c *Client) GetRepoInfo(owner, reponame string) (*gitsource.RepoInfo, error) {
+func (c *Client) GetRepoInfo(repopath string) (*gitsource.RepoInfo, error) {
 	return nil, nil
 }
 
-func (c *Client) GetFile(owner, repo, commit, file string) ([]byte, error) {
-	resp, err := c.getResponse("GET", fmt.Sprintf("%s/%s/raw/%s/%s", owner, repo, commit, file), nil, nil, nil)
+func (c *Client) GetFile(repopath, commit, file string) ([]byte, error) {
+	resp, err := c.getResponse("GET", fmt.Sprintf("%s/raw/%s/%s", repopath, commit, file), nil, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -142,27 +142,27 @@ func (c *Client) GetFile(owner, repo, commit, file string) ([]byte, error) {
 	return data, err
 }
 
-func (c *Client) CreateDeployKey(owner, repo, title, pubKey string, readonly bool) error {
+func (c *Client) CreateDeployKey(repopath, title, pubKey string, readonly bool) error {
 	return nil
 }
 
-func (c *Client) DeleteDeployKey(owner, repo, title string) error {
+func (c *Client) DeleteDeployKey(repopath, title string) error {
 	return nil
 }
 
-func (c *Client) UpdateDeployKey(owner, repo, title, pubKey string, readonly bool) error {
+func (c *Client) UpdateDeployKey(repopath, title, pubKey string, readonly bool) error {
 	return nil
 }
 
-func (c *Client) CreateRepoWebhook(owner, repo, url, secret string) error {
+func (c *Client) CreateRepoWebhook(repopath, url, secret string) error {
 	return nil
 }
 
-func (c *Client) DeleteRepoWebhook(owner, repo, u string) error {
+func (c *Client) DeleteRepoWebhook(repopath, u string) error {
 	return nil
 }
 
-func (c *Client) CreateStatus(owner, repo, commitSHA string, status gitsource.CommitStatus, targetURL, description, context string) error {
+func (c *Client) CreateStatus(repopath, commitSHA string, status gitsource.CommitStatus, targetURL, description, context string) error {
 	return nil
 }
 

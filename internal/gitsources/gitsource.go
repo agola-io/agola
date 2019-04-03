@@ -30,13 +30,13 @@ const (
 )
 
 type GitSource interface {
-	GetRepoInfo(owner, repo string) (*RepoInfo, error)
-	GetFile(owner, repo, commit, file string) ([]byte, error)
-	DeleteDeployKey(owner, repo, title string) error
-	CreateDeployKey(owner, repo, title, pubKey string, readonly bool) error
-	UpdateDeployKey(owner, repo, title, pubKey string, readonly bool) error
-	DeleteRepoWebhook(owner, repo, url string) error
-	CreateRepoWebhook(owner, repo, url, secret string) error
+	GetRepoInfo(repopath string) (*RepoInfo, error)
+	GetFile(repopath, commit, file string) ([]byte, error)
+	DeleteDeployKey(repopath, title string) error
+	CreateDeployKey(repopath, title, pubKey string, readonly bool) error
+	UpdateDeployKey(repopath, title, pubKey string, readonly bool) error
+	DeleteRepoWebhook(repopath, url string) error
+	CreateRepoWebhook(repopath, url, secret string) error
 	ParseWebhook(r *http.Request) (*types.WebhookData, error)
 }
 

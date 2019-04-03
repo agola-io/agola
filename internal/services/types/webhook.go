@@ -33,14 +33,13 @@ type WebhookData struct {
 	Event     WebhookEvent `json:"event,omitempty"`
 	ProjectID string       `json:"project_id,omitempty"`
 
-	CompareLink  string `json:"compare_link,omitempty"`   // Pimray link to source. It can be the commit
-	CommitLink   string `json:"commit_link,omitempty"`    // Pimray link to source. It can be the commit
-	CommitSHA    string `json:"commit_sha,omitempty"`     // commit SHA (SHA1 but also future SHA like SHA256)
-	OldCommitSHA string `json:"old_commit_sha,omitempty"` // commit SHA of the head before this push
-	Ref          string `json:"ref,omitempty"`            // Ref containing the commit SHA
-	Message      string `json:"message,omitempty"`        // Message to use (Push last commit message summary, PR title, Tag message etc...)
-	Sender       string `json:"sender,omitempty"`
-	Avatar       string `json:"avatar,omitempty"`
+	CompareLink string `json:"compare_link,omitempty"` // Pimray link to source. It can be the commit
+	CommitLink  string `json:"commit_link,omitempty"`  // Pimray link to source. It can be the commit
+	CommitSHA   string `json:"commit_sha,omitempty"`   // commit SHA (SHA1 but also future SHA like SHA256)
+	Ref         string `json:"ref,omitempty"`          // Ref containing the commit SHA
+	Message     string `json:"message,omitempty"`      // Message to use (Push last commit message summary, PR title, Tag message etc...)
+	Sender      string `json:"sender,omitempty"`
+	Avatar      string `json:"avatar,omitempty"`
 
 	Branch     string `json:"branch,omitempty"`
 	BranchLink string `json:"branch_link,omitempty"`
@@ -56,8 +55,6 @@ type WebhookData struct {
 }
 
 type WebhookDataRepo struct {
-	Name     string `json:"name,omitempty"`
-	Owner    string `json:"owner,omitempty"`
-	FullName string `json:"full_name,omitempty"`
-	RepoURL  string `json:"repo_url,omitempty"`
+	WebURL string `json:"web_url,omitempty"`
+	Path   string `json:"path,omitempty"`
 }

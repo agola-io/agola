@@ -231,7 +231,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		h.log.Debugf("user: %s", util.Dump(user))
 		userID = user.ID
 
-		cloneURL = fmt.Sprintf("%s/%s/%s", h.apiExposedURL+"/repos", webhookData.Repo.Owner, webhookData.Repo.Name)
+		cloneURL = fmt.Sprintf("%s/%s", h.apiExposedURL+"/repos", webhookData.Repo.Path)
 		runType = types.RunTypeUser
 	}
 
@@ -240,7 +240,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 	var data []byte
 	err := util.ExponentialBackoff(util.FetchFileBackoff, func() (bool, error) {
 		var err error
-		data, err = gitSource.GetFile(webhookData.Repo.Owner, webhookData.Repo.Name, webhookData.CommitSHA, agolaDefaultConfigPath)
+		data, err = gitSource.GetFile(webhookData.Repo.Path, webhookData.CommitSHA, agolaDefaultConfigPath)
 		if err == nil {
 			return true, nil
 		}

@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"path"
-	"strings"
 
 	"github.com/sorintlab/agola/internal/services/gateway/common"
 	"github.com/sorintlab/agola/internal/services/types"
@@ -67,11 +66,7 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 		return nil, errors.Wrapf(err, "failed to create gitsource client")
 	}
 
-	repoOwner := strings.TrimPrefix(path.Dir(req.RepoPath), "/")
-	repoName := path.Base(req.RepoPath)
-	c.log.Infof("repoOwner: %s, repoName: %s", repoOwner, repoName)
-
-	repo, err := gitsource.GetRepoInfo(repoOwner, repoName)
+	repo, err := gitsource.GetRepoInfo(req.RepoPath)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get repository info from gitsource")
 	}
@@ -113,16 +108,14 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 	c.log.Infof("project %s created, ID: %s", p.Name, p.ID)
 
 	return p, c.SetupProject(ctx, rs, la, &SetupProjectRequest{
-		Project:   p,
-		RepoOwner: repoOwner,
-		RepoName:  repoName,
+		Project:  p,
+		RepoPath: req.RepoPath,
 	})
 }
 
 type SetupProjectRequest struct {
-	Project   *types.Project
-	RepoOwner string
-	RepoName  string
+	Project  *types.Project
+	RepoPath string
 }
 
 func (c *CommandHandler) SetupProject(ctx context.Context, rs *types.RemoteSource, la *types.LinkedAccount, conf *SetupProjectRequest) error {
@@ -143,15 +136,15 @@ func (c *CommandHandler) SetupProject(ctx context.Context, rs *types.RemoteSourc
 	// will trigger multiple different runs
 	deployKeyName := fmt.Sprintf("agola deploy key - %s", conf.Project.ID)
 	c.log.Infof("creating/updating deploy key: %s", string(pubKey))
-	if err := gitsource.UpdateDeployKey(conf.RepoOwner, conf.RepoName, deployKeyName, string(pubKey), true); err != nil {
+	if err := gitsource.UpdateDeployKey(conf.RepoPath, deployKeyName, string(pubKey), true); err != nil {
 		return errors.Wrapf(err, "failed to create deploy key")
 	}
 	c.log.Infof("deleting existing webhooks")
-	if err := gitsource.DeleteRepoWebhook(conf.RepoOwner, conf.RepoName, webhookURL); err != nil {
+	if err := gitsource.DeleteRepoWebhook(conf.RepoPath, webhookURL); err != nil {
 		return errors.Wrapf(err, "failed to delete repository webhook")
 	}
 	c.log.Infof("creating webhook to url: %s", webhookURL)
-	if err := gitsource.CreateRepoWebhook(conf.RepoOwner, conf.RepoName, webhookURL, ""); err != nil {
+	if err := gitsource.CreateRepoWebhook(conf.RepoPath, webhookURL, ""); err != nil {
 		return errors.Wrapf(err, "failed to create repository webhook")
 	}
 
@@ -180,12 +173,8 @@ func (c *CommandHandler) ReconfigProject(ctx context.Context, projectID string) 
 		return errors.Wrapf(err, "failed to get remote source %q", la.RemoteSourceID)
 	}
 
-	repoOwner := strings.TrimPrefix(path.Dir(p.RepoPath), "/")
-	repoName := path.Base(p.RepoPath)
-
 	return c.SetupProject(ctx, rs, la, &SetupProjectRequest{
-		Project:   p,
-		RepoOwner: repoOwner,
-		RepoName:  repoName,
+		Project:  p,
+		RepoPath: p.RepoPath,
 	})
 }

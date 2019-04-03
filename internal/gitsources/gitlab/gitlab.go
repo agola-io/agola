@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"path"
 	"strconv"
 	"time"
 
@@ -121,8 +120,8 @@ func (c *Client) RequestOauth2Token(callbackURL, code string) (*oauth2.Token, er
 	return token, nil
 }
 
-func (c *Client) GetRepoInfo(owner, reponame string) (*gitsource.RepoInfo, error) {
-	repo, _, err := c.client.Projects.GetProject(path.Join(owner, reponame))
+func (c *Client) GetRepoInfo(repopath string) (*gitsource.RepoInfo, error) {
+	repo, _, err := c.client.Projects.GetProject(repopath)
 	if err != nil {
 		return nil, err
 	}
@@ -145,8 +144,8 @@ func (c *Client) GetUserInfo() (*gitsource.UserInfo, error) {
 	}, nil
 }
 
-func (c *Client) GetFile(owner, repo, commit, file string) ([]byte, error) {
-	f, _, err := c.client.RepositoryFiles.GetFile(path.Join(owner, repo), file, &gitlab.GetFileOptions{Ref: gitlab.String(commit)})
+func (c *Client) GetFile(repopath, commit, file string) ([]byte, error) {
+	f, _, err := c.client.RepositoryFiles.GetFile(repopath, file, &gitlab.GetFileOptions{Ref: gitlab.String(commit)})
 	data, err := base64.StdEncoding.DecodeString(f.Content)
 	if err != nil {
 		return nil, err
@@ -154,8 +153,8 @@ func (c *Client) GetFile(owner, repo, commit, file string) ([]byte, error) {
 	return data, err
 }
 
-func (c *Client) CreateDeployKey(owner, repo, title, pubKey string, readonly bool) error {
-	_, _, err := c.client.DeployKeys.AddDeployKey(path.Join(owner, repo), &gitlab.AddDeployKeyOptions{
+func (c *Client) CreateDeployKey(repopath, title, pubKey string, readonly bool) error {
+	_, _, err := c.client.DeployKeys.AddDeployKey(repopath, &gitlab.AddDeployKeyOptions{
 		Title: gitlab.String(title),
 		Key:   gitlab.String(pubKey),
 	})
@@ -163,8 +162,8 @@ func (c *Client) CreateDeployKey(owner, repo, title, pubKey string, readonly boo
 	return errors.Wrapf(err, "error creating deploy key")
 }
 
-func (c *Client) UpdateDeployKey(owner, repo, title, pubKey string, readonly bool) error {
-	keys, _, err := c.client.DeployKeys.ListProjectDeployKeys(path.Join(owner, repo), nil)
+func (c *Client) UpdateDeployKey(repopath, title, pubKey string, readonly bool) error {
+	keys, _, err := c.client.DeployKeys.ListProjectDeployKeys(repopath, nil)
 	if err != nil {
 		return errors.Wrapf(err, "error retrieving existing deploy keys")
 	}
@@ -174,13 +173,13 @@ func (c *Client) UpdateDeployKey(owner, repo, title, pubKey string, readonly boo
 			if key.Key == pubKey {
 				return nil
 			}
-			if _, err := c.client.DeployKeys.DeleteDeployKey(path.Join(owner, repo), key.ID); err != nil {
+			if _, err := c.client.DeployKeys.DeleteDeployKey(repopath, key.ID); err != nil {
 				return errors.Wrapf(err, "error removing existing deploy key")
 			}
 		}
 	}
 
-	if _, _, err := c.client.DeployKeys.AddDeployKey(path.Join(owner, repo), &gitlab.AddDeployKeyOptions{
+	if _, _, err := c.client.DeployKeys.AddDeployKey(repopath, &gitlab.AddDeployKeyOptions{
 		Title: &title,
 		Key:   &pubKey,
 	}); err != nil {
@@ -190,15 +189,15 @@ func (c *Client) UpdateDeployKey(owner, repo, title, pubKey string, readonly boo
 	return nil
 }
 
-func (c *Client) DeleteDeployKey(owner, repo, title string) error {
-	keys, _, err := c.client.DeployKeys.ListProjectDeployKeys(path.Join(owner, repo), nil)
+func (c *Client) DeleteDeployKey(repopath, title string) error {
+	keys, _, err := c.client.DeployKeys.ListProjectDeployKeys(repopath, nil)
 	if err != nil {
 		return errors.Wrapf(err, "error retrieving existing deploy keys")
 	}
 
 	for _, key := range keys {
 		if key.Title == title {
-			if _, err := c.client.DeployKeys.DeleteDeployKey(path.Join(owner, repo), key.ID); err != nil {
+			if _, err := c.client.DeployKeys.DeleteDeployKey(repopath, key.ID); err != nil {
 				return errors.Wrapf(err, "error removing existing deploy key")
 			}
 		}
@@ -207,18 +206,19 @@ func (c *Client) DeleteDeployKey(owner, repo, title string) error {
 	return nil
 }
 
-func (c *Client) CreateRepoWebhook(owner, repo, url, secret string) error {
+func (c *Client) CreateRepoWebhook(repopath, url, secret string) error {
 	opts := &gitlab.AddProjectHookOptions{
-		URL:        gitlab.String(url),
-		PushEvents: gitlab.Bool(true),
+		URL:                 gitlab.String(url),
+		PushEvents:          gitlab.Bool(true),
+		MergeRequestsEvents: gitlab.Bool(true),
 	}
-	_, _, err := c.client.Projects.AddProjectHook(path.Join(owner, repo), opts)
+	_, _, err := c.client.Projects.AddProjectHook(repopath, opts)
 
 	return errors.Wrapf(err, "error creating repository webhook")
 }
 
-func (c *Client) DeleteRepoWebhook(owner, repo, u string) error {
-	hooks, _, err := c.client.Projects.ListProjectHooks(path.Join(owner, repo), nil)
+func (c *Client) DeleteRepoWebhook(repopath, u string) error {
+	hooks, _, err := c.client.Projects.ListProjectHooks(repopath, nil)
 	if err != nil {
 		return errors.Wrapf(err, "error retrieving repository webhooks")
 	}
@@ -227,7 +227,7 @@ func (c *Client) DeleteRepoWebhook(owner, repo, u string) error {
 	// projects
 	for _, hook := range hooks {
 		if hook.URL == u {
-			if _, err := c.client.Projects.DeleteProjectHook(path.Join(owner, repo), hook.ID); err != nil {
+			if _, err := c.client.Projects.DeleteProjectHook(repopath, hook.ID); err != nil {
 				return errors.Wrapf(err, "error deleting existing repository webhook")
 			}
 		}
@@ -237,6 +237,5 @@ func (c *Client) DeleteRepoWebhook(owner, repo, u string) error {
 }
 
 func (c *Client) ParseWebhook(r *http.Request) (*types.WebhookData, error) {
-	hookEvent := "X-Gitea-Event"
-	return nil, errors.Errorf("unknown webhook event type: %q", r.Header.Get(hookEvent))
+	return nil, errors.Errorf("unimplemented")
 }
