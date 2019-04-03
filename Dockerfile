@@ -26,8 +26,6 @@ COPY . .
 COPY --from=agola-web /agola-web/dist/ /agola-web/dist/
 
 RUN make WEBBUNDLE=1 WEBDISTPATH=/agola-web/dist
-#RUN go build -tags "sqlite_unlock_notify webbundle" -o /go/bin/agola ./cmd/agola
-#RUN CGO_ENABLED=0 go build -tags "sqlite_unlock_notify webbundle" -o /go/bin/agola-toolbox ./cmd/toolbox
 
 
 #######
@@ -35,8 +33,10 @@ RUN make WEBBUNDLE=1 WEBDISTPATH=/agola-web/dist
 #######
 FROM debian:stable
 
-WORKDIR /go/src/github.com/sorintlab/agola
+WORKDIR /
 
 # Finally we copy the statically compiled Go binary.
 COPY --from=server_builder /agola/bin/agola /agola/bin/agola-toolbox /bin/
+COPY examples/config.yml .
+
 ENTRYPOINT ["/bin/agola"]
