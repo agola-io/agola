@@ -27,6 +27,7 @@ import (
 	"github.com/sorintlab/agola/internal/services/config"
 	"github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/configstore/command"
+	"github.com/sorintlab/agola/internal/services/configstore/common"
 	"github.com/sorintlab/agola/internal/services/configstore/readdb"
 	"github.com/sorintlab/agola/internal/util"
 	"github.com/sorintlab/agola/internal/wal"
@@ -72,8 +73,9 @@ func NewConfigStore(ctx context.Context, c *config.ConfigStore) (*ConfigStore, e
 	}
 
 	walConf := &wal.WalManagerConfig{
-		E:   e,
-		Lts: lts,
+		E:              e,
+		Lts:            lts,
+		DataToPathFunc: common.DataToPathFunc,
 	}
 	wal, err := wal.NewWalManager(ctx, logger, walConf)
 	if err != nil {

@@ -91,6 +91,27 @@ func PathToTypeID(p string) (types.ConfigType, string) {
 	return configType, path.Base(p)
 }
 
+func DataToPathFunc(dataType string, id string) string {
+	switch types.ConfigType(dataType) {
+	case types.ConfigTypeUser:
+		return StorageUserFile(id)
+	case types.ConfigTypeOrg:
+		return StorageOrgFile(id)
+	case types.ConfigTypeProjectGroup:
+		return StorageProjectGroupFile(id)
+	case types.ConfigTypeProject:
+		return StorageProjectFile(id)
+	case types.ConfigTypeRemoteSource:
+		return StorageRemoteSourceFile(id)
+	case types.ConfigTypeSecret:
+		return StorageSecretFile(id)
+	case types.ConfigTypeVariable:
+		return StorageVariableFile(id)
+	}
+
+	panic(fmt.Errorf("unknown data type %q", dataType))
+}
+
 type RefType int
 
 const (

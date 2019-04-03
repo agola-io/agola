@@ -28,6 +28,7 @@ import (
 
 	"github.com/sorintlab/agola/internal/db"
 	"github.com/sorintlab/agola/internal/services/config"
+	"github.com/sorintlab/agola/internal/services/configstore/command"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/testutil"
 	"github.com/sorintlab/agola/internal/util"
@@ -174,6 +175,7 @@ func TestResync(t *testing.T) {
 			t.Fatalf("err: %v", err)
 		}
 	}()
+	t.Logf("starting cs2")
 	go func() {
 		if err := cs2.Run(ctx2); err != nil {
 			t.Fatalf("err: %v", err)
@@ -183,7 +185,7 @@ func TestResync(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	for i := 0; i < 10; i++ {
-		if _, err := cs1.ch.CreateUser(ctx, &types.User{UserName: fmt.Sprintf("user%d", i)}); err != nil {
+		if _, err := cs1.ch.CreateUser(ctx, &command.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)}); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 		time.Sleep(200 * time.Millisecond)
@@ -197,7 +199,7 @@ func TestResync(t *testing.T) {
 
 	// Do some more changes
 	for i := 11; i < 20; i++ {
-		if _, err := cs1.ch.CreateUser(ctx, &types.User{UserName: fmt.Sprintf("user%d", i)}); err != nil {
+		if _, err := cs1.ch.CreateUser(ctx, &command.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)}); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 		time.Sleep(200 * time.Millisecond)
@@ -311,7 +313,7 @@ func TestUser(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	t.Run("create user", func(t *testing.T) {
-		_, err := cs.ch.CreateUser(ctx, &types.User{UserName: "user01"})
+		_, err := cs.ch.CreateUser(ctx, &command.CreateUserRequest{UserName: "user01"})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -322,7 +324,7 @@ func TestUser(t *testing.T) {
 
 	t.Run("create duplicated user", func(t *testing.T) {
 		expectedErr := fmt.Sprintf("bad request: user with name %q already exists", "user01")
-		_, err := cs.ch.CreateUser(ctx, &types.User{UserName: "user01"})
+		_, err := cs.ch.CreateUser(ctx, &command.CreateUserRequest{UserName: "user01"})
 		if err == nil {
 			t.Fatalf("expected error %v, got nil err", expectedErr)
 		}
@@ -339,7 +341,7 @@ func TestUser(t *testing.T) {
 		wg := sync.WaitGroup{}
 		for i := 0; i < 10; i++ {
 			wg.Add(1)
-			go cs.ch.CreateUser(ctx, &types.User{UserName: "user02"})
+			go cs.ch.CreateUser(ctx, &command.CreateUserRequest{UserName: "user02"})
 			wg.Done()
 		}
 		wg.Wait()
@@ -379,7 +381,7 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 	// TODO(sgotti) change the sleep with a real check that all is ready
 	time.Sleep(2 * time.Second)
 
-	user, err := cs.ch.CreateUser(ctx, &types.User{UserName: "user01"})
+	user, err := cs.ch.CreateUser(ctx, &command.CreateUserRequest{UserName: "user01"})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
