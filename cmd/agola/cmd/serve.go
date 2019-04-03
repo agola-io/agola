@@ -59,7 +59,7 @@ var serveOpts serveOptions
 func init() {
 	flags := cmdServe.PersistentFlags()
 
-	flags.StringVar(&serveOpts.config, "config", "", "config file path")
+	flags.StringVar(&serveOpts.config, "config", "./config.yml", "config file path")
 	flags.BoolVar(&serveOpts.embeddedEtcd, "embedded-etcd", false, "start and use an embedded etcd, only for testing purpose")
 	flags.StringVar(&serveOpts.embeddedEtcdDataDir, "embedded-etcd-data-dir", "/tmp/agola/etcd", "embedded etcd data dir, only for testing purpose")
 
