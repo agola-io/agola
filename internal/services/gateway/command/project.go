@@ -17,7 +17,6 @@ package command
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"path"
 	"strings"
 
@@ -32,7 +31,7 @@ type CreateProjectRequest struct {
 	Name                string
 	ParentID            string
 	RemoteSourceName    string
-	RepoURL             string
+	RepoPath            string
 	CurrentUserID       string
 	SkipSSHHostKeyCheck bool
 }
@@ -40,28 +39,6 @@ type CreateProjectRequest struct {
 func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRequest) (*types.Project, error) {
 	if !util.ValidateName(req.Name) {
 		return nil, errors.Errorf("invalid project name %q", req.Name)
-	}
-
-	u, err := url.Parse(req.RepoURL)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse repo url")
-	}
-
-	repoOwner := strings.TrimPrefix(path.Dir(u.Path), "/")
-	repoName := path.Base(u.Path)
-
-	u.RawQuery = ""
-	u.Path = ""
-	host := u.Hostname()
-	c.log.Infof("repoOwner: %s, repoName: %s", repoOwner, repoName)
-
-	cloneURL := fmt.Sprintf("git@%s:%s/%s.git", host, repoOwner, repoName)
-	c.log.Infof("cloneURL: %s", cloneURL)
-
-	c.log.Infof("generating ssh key pairs")
-	privateKey, _, err := util.GenSSHKeyPair(4096)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to generate ssh key pair")
 	}
 
 	user, _, err := c.configstoreClient.GetUser(ctx, req.CurrentUserID)
@@ -85,6 +62,30 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 		return nil, errors.Errorf("user doesn't have a linked account for remote source %q", rs.Name)
 	}
 
+	gitsource, err := common.GetGitSource(rs, la)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create gitsource client")
+	}
+
+	repoOwner := strings.TrimPrefix(path.Dir(req.RepoPath), "/")
+	repoName := path.Base(req.RepoPath)
+	c.log.Infof("repoOwner: %s, repoName: %s", repoOwner, repoName)
+
+	repo, err := gitsource.GetRepoInfo(repoOwner, repoName)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get repository info from gitsource")
+	}
+
+	//cloneURL := fmt.Sprintf("git@%s:%s/%s.git", host, repoOwner, repoName)
+	sshCloneURL := repo.SSHCloneURL
+	c.log.Infof("sshCloneURL: %s", sshCloneURL)
+
+	c.log.Infof("generating ssh key pairs")
+	privateKey, _, err := util.GenSSHKeyPair(4096)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to generate ssh key pair")
+	}
+
 	parentID := req.ParentID
 	if parentID == "" {
 		// create project in current user namespace
@@ -98,8 +99,8 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 			ID:   parentID,
 		},
 		LinkedAccountID:     la.ID,
-		RepoPath:            fmt.Sprintf("%s/%s", repoOwner, repoName),
-		CloneURL:            cloneURL,
+		RepoPath:            req.RepoPath,
+		CloneURL:            sshCloneURL,
 		SkipSSHHostKeyCheck: req.SkipSSHHostKeyCheck,
 		SSHPrivateKey:       string(privateKey),
 	}
@@ -125,13 +126,14 @@ type SetupProjectRequest struct {
 }
 
 func (c *CommandHandler) SetupProject(ctx context.Context, rs *types.RemoteSource, la *types.LinkedAccount, conf *SetupProjectRequest) error {
-	c.log.Infof("setupproject")
-
 	gitsource, err := common.GetGitSource(rs, la)
+	if err != nil {
+		return errors.Wrapf(err, "failed to create gitsource client")
+	}
 
 	pubKey, err := util.ExtractPublicKey([]byte(conf.Project.SSHPrivateKey))
 	if err != nil {
-		return errors.Wrapf(err, "failed to create gitea client")
+		return errors.Wrapf(err, "failed to extract public key")
 	}
 
 	webhookURL := fmt.Sprintf("%s/webhooks?projectid=%s", c.apiExposedURL, conf.Project.ID)

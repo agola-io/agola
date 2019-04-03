@@ -36,7 +36,7 @@ var cmdProjectCreate = &cobra.Command{
 type projectCreateOptions struct {
 	name                string
 	parentPath          string
-	repoURL             string
+	repoPath            string
 	remoteSourceName    string
 	skipSSHHostKeyCheck bool
 }
@@ -47,7 +47,7 @@ func init() {
 	flags := cmdProjectCreate.Flags()
 
 	flags.StringVarP(&projectCreateOpts.name, "name", "n", "", "project name")
-	flags.StringVar(&projectCreateOpts.repoURL, "repo-url", "", "repository url")
+	flags.StringVar(&projectCreateOpts.repoPath, "repo-path", "", "repository path (i.e agola-io/agola)")
 	flags.StringVar(&projectCreateOpts.remoteSourceName, "remote-source", "", "remote source name")
 	flags.BoolVarP(&projectCreateOpts.skipSSHHostKeyCheck, "skip-ssh-host-key-check", "s", false, "skip ssh host key check")
 	flags.StringVar(&projectCreateOpts.parentPath, "parent", "", `parent project group path (i.e "org/org01" for root project group in org01, "user/user01/group01/subgroub01") or project group id where the project should be created`)
@@ -66,7 +66,7 @@ func projectCreate(cmd *cobra.Command, args []string) error {
 	req := &api.CreateProjectRequest{
 		Name:                projectCreateOpts.name,
 		ParentID:            projectCreateOpts.parentPath,
-		RepoURL:             projectCreateOpts.repoURL,
+		RepoPath:            projectCreateOpts.repoPath,
 		RemoteSourceName:    projectCreateOpts.remoteSourceName,
 		SkipSSHHostKeyCheck: projectCreateOpts.skipSSHHostKeyCheck,
 	}

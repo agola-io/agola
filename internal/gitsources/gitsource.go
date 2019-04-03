@@ -30,6 +30,7 @@ const (
 )
 
 type GitSource interface {
+	GetRepoInfo(owner, repo string) (*RepoInfo, error)
 	GetFile(owner, repo, commit, file string) ([]byte, error)
 	DeleteDeployKey(owner, repo, title string) error
 	CreateDeployKey(owner, repo, title, pubKey string, readonly bool) error
@@ -55,6 +56,12 @@ type Oauth2Source interface {
 	GetOauth2AuthorizationURL(callbackURL, state string) (redirectURL string, err error)
 	// OauthTokenRequest requests the oauth2 access token to the authorization server
 	RequestOauth2Token(callbackURL, code string) (*oauth2.Token, error)
+}
+
+type RepoInfo struct {
+	ID           string
+	SSHCloneURL  string
+	HTTPCloneURL string
 }
 
 type UserInfo struct {

@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"sort"
 	"strconv"
 
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
@@ -194,15 +195,22 @@ func (h *UserByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type UserResponse struct {
-	ID       string `json:"id"`
-	UserName string `json:"username"`
+	ID       string   `json:"id"`
+	UserName string   `json:"username"`
+	Tokens   []string `json:"tokens"`
 }
 
-func createUserResponse(r *types.User) *UserResponse {
+func createUserResponse(u *types.User) *UserResponse {
 	user := &UserResponse{
-		ID:       r.ID,
-		UserName: r.UserName,
+		ID:       u.ID,
+		UserName: u.UserName,
+		Tokens:   make([]string, 0, len(u.Tokens)),
 	}
+	for tokenName := range u.Tokens {
+		user.Tokens = append(user.Tokens, tokenName)
+	}
+	sort.Sort(sort.StringSlice(user.Tokens))
+
 	return user
 }
 

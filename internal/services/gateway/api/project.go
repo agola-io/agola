@@ -31,7 +31,7 @@ import (
 type CreateProjectRequest struct {
 	Name                string `json:"name,omitempty"`
 	ParentID            string `json:"parent_id,omitempty"`
-	RepoURL             string `json:"repo_url,omitempty"`
+	RepoPath            string `json:"repo_path,omitempty"`
 	RemoteSourceName    string `json:"remote_source_name,omitempty"`
 	SkipSSHHostKeyCheck bool   `json:"skip_ssh_host_key_check,omitempty"`
 }
@@ -68,7 +68,7 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	creq := &command.CreateProjectRequest{
 		Name:                req.Name,
 		ParentID:            req.ParentID,
-		RepoURL:             req.RepoURL,
+		RepoPath:            req.RepoPath,
 		RemoteSourceName:    req.RemoteSourceName,
 		CurrentUserID:       userID,
 		SkipSSHHostKeyCheck: req.SkipSSHHostKeyCheck,

@@ -111,6 +111,18 @@ func (c *Client) GetUserInfo() (*gitsource.UserInfo, error) {
 	}, nil
 }
 
+func (c *Client) GetRepoInfo(owner, reponame string) (*gitsource.RepoInfo, error) {
+	repo, err := c.client.GetRepo(owner, reponame)
+	if err != nil {
+		return nil, err
+	}
+	return &gitsource.RepoInfo{
+		ID:           strconv.FormatInt(repo.ID, 10),
+		SSHCloneURL:  repo.SSHURL,
+		HTTPCloneURL: repo.CloneURL,
+	}, nil
+}
+
 func (c *Client) GetFile(owner, repo, commit, file string) ([]byte, error) {
 	data, err := c.client.GetFile(owner, repo, commit, file)
 	return data, err

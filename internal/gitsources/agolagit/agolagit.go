@@ -127,6 +127,10 @@ func (c *Client) GetUserInfo() (*gitsource.UserInfo, error) {
 	return nil, nil
 }
 
+func (c *Client) GetRepoInfo(owner, reponame string) (*gitsource.RepoInfo, error) {
+	return nil, nil
+}
+
 func (c *Client) GetFile(owner, repo, commit, file string) ([]byte, error) {
 	resp, err := c.getResponse("GET", fmt.Sprintf("%s/%s/raw/%s/%s", owner, repo, commit, file), nil, nil, nil)
 	if err != nil {

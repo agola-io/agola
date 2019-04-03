@@ -121,6 +121,18 @@ func (c *Client) RequestOauth2Token(callbackURL, code string) (*oauth2.Token, er
 	return token, nil
 }
 
+func (c *Client) GetRepoInfo(owner, reponame string) (*gitsource.RepoInfo, error) {
+	repo, _, err := c.client.Projects.GetProject(path.Join(owner, reponame))
+	if err != nil {
+		return nil, err
+	}
+	return &gitsource.RepoInfo{
+		ID:           strconv.Itoa(repo.ID),
+		SSHCloneURL:  repo.SSHURLToRepo,
+		HTTPCloneURL: repo.HTTPURLToRepo,
+	}, nil
+}
+
 func (c *Client) GetUserInfo() (*gitsource.UserInfo, error) {
 	user, _, err := c.client.Users.CurrentUser()
 	if err != nil {
