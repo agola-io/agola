@@ -140,9 +140,15 @@ func (s *GitServer) repoPostCreateFunc(githookPath, gatewayURL string) handlers.
 		f.WriteString(githookPath + " $oval $nval $ref\n")
 		f.WriteString("done\n")
 
+		parts := strings.Split(string(repoPath), "/")
+		if len(parts) != 2 {
+			return errors.Errorf("wrong repo path: %q", repoPath)
+		}
+		userID := parts[0]
+
 		git := &util.Git{GitDir: repoAbsPath}
 		git.ConfigSet(context.Background(), "agola.repo", repoPath)
-		git.ConfigSet(context.Background(), "agola.webhookURL", gatewayURL+"/webhooks")
+		git.ConfigSet(context.Background(), "agola.webhookURL", gatewayURL+"/webhooks?userid="+userID)
 
 		return nil
 	}

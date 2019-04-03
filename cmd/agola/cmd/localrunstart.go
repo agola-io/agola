@@ -15,7 +15,11 @@
 package cmd
 
 import (
+	"context"
+	"fmt"
+
 	gitsave "github.com/sorintlab/agola/internal/git-save"
+	"github.com/sorintlab/agola/internal/services/gateway/api"
 
 	uuid "github.com/satori/go.uuid"
 	"github.com/spf13/cobra"
@@ -56,6 +60,13 @@ func init() {
 }
 
 func localRunStart(cmd *cobra.Command, args []string) error {
+	gwclient := api.NewClient(gatewayURL, token)
+
+	user, _, err := gwclient.GetCurrentUser(context.TODO())
+	if err != nil {
+		log.Fatalf("err: %v", err)
+	}
+
 	gs := gitsave.NewGitSave(logger, &gitsave.GitSaveConfig{
 		AddUntracked: localRunStartOpts.untracked,
 		AddIgnored:   localRunStartOpts.ignored,
@@ -68,7 +79,8 @@ func localRunStart(cmd *cobra.Command, args []string) error {
 	}
 
 	log.Infof("pushing branch")
-	if err := gitsave.GitPush("", "http://172.17.0.1:8000/repos/sgotti/test02.git", "refs/gitsave/"+branch); err != nil {
+	repoURL := fmt.Sprintf("%s/repos/%s/test.git", gatewayURL, user.ID)
+	if err := gitsave.GitPush("", repoURL, "refs/gitsave/"+branch); err != nil {
 		return err
 	}
 
