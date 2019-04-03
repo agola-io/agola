@@ -299,8 +299,14 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	q := r.URL.Query()
 
-	phaseFilter := q["phase"]
 	groups := q["group"]
+	// we require that groups are specified to not return all runs
+	if len(groups) == 0 {
+		http.Error(w, "not groups specified", http.StatusBadRequest)
+		return
+	}
+
+	phaseFilter := q["phase"]
 	changeGroups := q["changegroup"]
 	_, lastRun := q["lastrun"]
 
