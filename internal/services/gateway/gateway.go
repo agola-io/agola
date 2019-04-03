@@ -44,6 +44,10 @@ var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
 var logger = slog.New(level)
 var log = logger.Sugar()
 
+const (
+	maxRequestSize = 1024 * 1024
+)
+
 type Gateway struct {
 	c *config.Gateway
 
@@ -269,8 +273,10 @@ func (g *Gateway) Run(ctx context.Context) error {
 	router.Handle("/webhooks", webhooksHandler).Methods("POST")
 	router.PathPrefix("/").HandlerFunc(handlers.NewWebBundleHandlerFunc(g.c.APIExposedURL))
 
+	maxBytesHandler := handlers.NewMaxBytesHandler(router, 1024*1024)
+
 	mainrouter := mux.NewRouter()
-	mainrouter.PathPrefix("/").Handler(corsHandler(router))
+	mainrouter.PathPrefix("/").Handler(corsHandler(maxBytesHandler))
 
 	var tlsConfig *tls.Config
 	if g.c.Web.TLS {
