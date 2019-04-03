@@ -1,0 +1,54 @@
+gateway:
+  apiExposedURL: "http://172.17.0.1:8000"
+  webExposedURL: "http://172.17.0.1:8080"
+  runServiceURL: "http://localhost:4000"
+  configStoreURL: "http://localhost:4002"
+  web:
+    listenAddress: ":8000"
+  tokenSigning:
+    # hmac or rsa (it possible use rsa)
+    method: hmac
+    # key to use when signing with hmac
+    key: supersecretsigningkey
+    # paths to the private and public keys in pem encoding when using rsa signing
+    #privateKeyPath: /path/to/privatekey.pem
+    #publicKeyPath: /path/to/public.pem
+  adminToken: "admintoken"
+
+scheduler:
+  runServiceURL: "http://localhost:4000"
+
+configStore:
+  dataDir: /tmp/agola/configstore
+  etcd:
+    endpoints: "http://localhost:2379"
+  lts:
+    type: posix
+    path: /tmp/agola/configstore/lts
+  web:
+    listenAddress: ":4002"
+
+runServiceScheduler:
+  #debug: true
+  dataDir: /tmp/agola/runservice/scheduler
+  lts:
+    type: posix
+    path: /tmp/agola/runservice/lts
+  etcd:
+    endpoints: "http://localhost:2379"
+  web:
+    listenAddress: ":4000"
+
+runServiceExecutor:
+  dataDir: /tmp/agola/runservice/executor
+  toolboxPath: ./bin/agola-toolbox
+  runServiceURL: "http://localhost:4000"
+  web:
+    listenAddress: ":4001"
+
+gitServer:
+  dataDir: /tmp/agola/gitserver
+  githookPath: ./bin/agola-git-hook
+  gatewayURL: "http://localhost:8000"
+  web:
+    listenAddress: ":4003"
