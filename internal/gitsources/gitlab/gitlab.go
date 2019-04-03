@@ -213,6 +213,7 @@ func (c *Client) CreateRepoWebhook(repopath, url, secret string) error {
 	opts := &gitlab.AddProjectHookOptions{
 		URL:                 gitlab.String(url),
 		PushEvents:          gitlab.Bool(true),
+		TagPushEvents:       gitlab.Bool(true),
 		MergeRequestsEvents: gitlab.Bool(true),
 	}
 	_, _, err := c.client.Projects.AddProjectHook(repopath, opts)
@@ -240,5 +241,5 @@ func (c *Client) DeleteRepoWebhook(repopath, u string) error {
 }
 
 func (c *Client) ParseWebhook(r *http.Request) (*types.WebhookData, error) {
-	return nil, errors.Errorf("unimplemented")
+	return parseWebhook(r)
 }

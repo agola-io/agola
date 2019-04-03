@@ -21,14 +21,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"path"
 	"strconv"
 	"strings"
 
 	"github.com/sorintlab/agola/internal/services/types"
-	"github.com/sorintlab/agola/internal/util"
 
 	"github.com/pkg/errors"
 )
@@ -96,7 +94,6 @@ func parsePullRequestHook(payload io.Reader) (*types.WebhookData, error) {
 }
 
 func webhookDataFromPush(hook *pushHook) (*types.WebhookData, error) {
-	log.Printf("hook: %s", util.Dump(hook))
 	sender := hook.Sender.Username
 	if sender == "" {
 		sender = hook.Sender.Login
@@ -128,7 +125,6 @@ func webhookDataFromPush(hook *pushHook) (*types.WebhookData, error) {
 
 // helper function that extracts the Build data from a Gitea pull_request hook
 func webhookDataFromPullRequest(hook *pullRequestHook) *types.WebhookData {
-	log.Printf("hook: %s", util.Dump(hook))
 	sender := hook.Sender.Username
 	if sender == "" {
 		sender = hook.Sender.Login
