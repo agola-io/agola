@@ -123,6 +123,11 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 	ctx := r.Context()
 
 	projectID := r.URL.Query().Get("projectid")
+	userID := r.URL.Query().Get("userid")
+	if projectID == "" && userID == "" {
+		return http.StatusBadRequest, "", errors.Errorf("bad webhook url %q. Missing projectid or userid", r.URL)
+	}
+
 	isUserBuild := false
 	if projectID == "" {
 		isUserBuild = true
@@ -135,7 +140,6 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 	var cloneURL string
 	var skipSSHHostKeyCheck bool
 	var runType types.RunType
-	var userID string
 	variables := map[string]string{}
 
 	var gitSource gitsource.GitSource
@@ -223,9 +227,9 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 			return http.StatusBadRequest, "", errors.Wrapf(err, "failed to parse webhook")
 		}
 
-		user, _, err := h.configstoreClient.GetUserByName(ctx, webhookData.Repo.Owner)
+		user, _, err := h.configstoreClient.GetUser(ctx, userID)
 		if err != nil {
-			return http.StatusBadRequest, "", errors.Wrapf(err, "failed to get project %s", projectID)
+			return http.StatusBadRequest, "", errors.Wrapf(err, "failed to get user with id %q", userID)
 		}
 		h.log.Debugf("user: %s", util.Dump(user))
 		userID = user.ID
