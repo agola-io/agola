@@ -174,6 +174,13 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		if err != nil {
 			return http.StatusBadRequest, "", errors.Wrapf(err, "failed to parse webhook")
 		}
+		// skip nil webhook data
+		// TODO(sgotti) report the reason of the skip
+		if webhookData == nil {
+			h.log.Infof("skipping webhook")
+			return 0, "", nil
+		}
+
 		webhookData.ProjectID = projectID
 
 		// get project variables
@@ -222,6 +229,12 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		webhookData, err = gitSource.ParseWebhook(r)
 		if err != nil {
 			return http.StatusBadRequest, "", errors.Wrapf(err, "failed to parse webhook")
+		}
+		// skip nil webhook data
+		// TODO(sgotti) report the reason of the skip
+		if webhookData == nil {
+			h.log.Infof("skipping webhook")
+			return 0, "", nil
 		}
 
 		user, _, err := h.configstoreClient.GetUser(ctx, userID)
