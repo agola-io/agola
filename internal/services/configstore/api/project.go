@@ -67,7 +67,8 @@ func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return err
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 
@@ -77,7 +78,8 @@ func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewEncoder(w).Encode(project); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 }
@@ -109,7 +111,8 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	}
 
 	if err := json.NewEncoder(w).Encode(project); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 }

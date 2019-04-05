@@ -210,13 +210,15 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 
 	res := createRunResponse(runResp.Run, runResp.RunConfig)
 	if err := json.NewEncoder(w).Encode(res); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 }
@@ -242,7 +244,8 @@ func (h *RuntaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 
@@ -259,7 +262,8 @@ func (h *RuntaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	res := createRunTaskResponse(rt, rct)
 
 	if err := json.NewEncoder(w).Encode(res); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 }
@@ -343,7 +347,8 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 
@@ -353,7 +358,8 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewEncoder(w).Encode(runs); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 }
@@ -406,7 +412,8 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, err.Error(), http.StatusNotFound)
 				return
 			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			h.log.Errorf("err: %+v", err)
+			httpError(w, err)
 			return
 		}
 
@@ -421,7 +428,8 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, err.Error(), http.StatusNotFound)
 				return
 			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			h.log.Errorf("err: %+v", err)
+			httpError(w, err)
 			return
 		}
 	}
@@ -491,7 +499,8 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
-		http.Error(w, "", http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 

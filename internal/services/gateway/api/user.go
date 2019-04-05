@@ -69,7 +69,8 @@ func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	res := createUserResponse(u)
 
 	if err := json.NewEncoder(w).Encode(res); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 }
@@ -94,7 +95,8 @@ func (h *DeleteUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 }
@@ -124,13 +126,15 @@ func (h *CurrentUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 
 	res := createUserResponse(user)
 	if err := json.NewEncoder(w).Encode(res); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 }
@@ -155,13 +159,15 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 
 	res := createUserResponse(user)
 	if err := json.NewEncoder(w).Encode(res); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 }
@@ -186,13 +192,15 @@ func (h *UserByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 
 	res := createUserResponse(user)
 	if err := json.NewEncoder(w).Encode(res); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 }
@@ -261,7 +269,8 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 
@@ -271,7 +280,8 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewEncoder(w).Encode(users); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 }
@@ -316,7 +326,8 @@ func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 
@@ -364,7 +375,8 @@ func (h *DeleteUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	_, err := h.configstoreClient.DeleteUserLA(ctx, userName, laID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 }
@@ -413,7 +425,8 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		Token: token,
 	}
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 }
@@ -436,7 +449,8 @@ func (h *DeleteUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	h.log.Infof("deleting user %q token %q", userName, tokenName)
 	_, err := h.configstoreClient.DeleteUserToken(ctx, userName, tokenName)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 }
@@ -477,10 +491,10 @@ func (h *RegisterUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
-
 }
 
 func (h *RegisterUserHandler) registerUser(ctx context.Context, req *RegisterUserRequest) (*RegisterUserResponse, error) {
@@ -537,7 +551,8 @@ func (h *AuthorizeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 
@@ -605,7 +620,8 @@ func (h *LoginUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 

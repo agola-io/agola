@@ -53,7 +53,7 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 
@@ -64,7 +64,7 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewEncoder(w).Encode(user); err != nil {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 }
@@ -90,7 +90,7 @@ func (h *UserByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 
@@ -101,7 +101,7 @@ func (h *UserByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewEncoder(w).Encode(user); err != nil {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 }
@@ -153,7 +153,7 @@ func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewEncoder(w).Encode(user); err != nil {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 }
@@ -237,7 +237,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.log.Infof("user: %s", util.Dump(user))
 		if err != nil {
 			h.log.Errorf("err: %+v", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			httpError(w, err)
 			return
 		}
 		if user == nil {
@@ -256,7 +256,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.log.Infof("user: %s", util.Dump(user))
 		if err != nil {
 			h.log.Errorf("err: %+v", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			httpError(w, err)
 			return
 		}
 		if user == nil {
@@ -276,7 +276,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.log.Infof("user: %s", util.Dump(user))
 		if err != nil {
 			h.log.Errorf("err: %+v", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			httpError(w, err)
 			return
 		}
 		if user == nil {
@@ -293,14 +293,14 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		})
 		if err != nil {
 			h.log.Errorf("err: %+v", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			httpError(w, err)
 			return
 		}
 	}
 
 	if err := json.NewEncoder(w).Encode(users); err != nil {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 }
@@ -352,7 +352,7 @@ func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	if err := json.NewEncoder(w).Encode(user); err != nil {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 }
@@ -425,7 +425,7 @@ func (h *UpdateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	if err := json.NewEncoder(w).Encode(user); err != nil {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 }
@@ -470,7 +470,7 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	}
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 }
