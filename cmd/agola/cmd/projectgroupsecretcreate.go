@@ -31,11 +31,13 @@ var cmdProjectGroupSecretCreate = &cobra.Command{
 func init() {
 	flags := cmdProjectGroupSecretCreate.Flags()
 
-	flags.StringVar(&secretCreateOpts.projectRef, "project", "", "project id or full path")
+	flags.StringVar(&secretCreateOpts.parentRef, "projectgroup", "", "project group id or full path")
 	flags.StringVarP(&secretCreateOpts.name, "name", "n", "", "secret name")
+	flags.StringVar(&secretCreateOpts.data, "data", "", "json map of secret data")
 
 	cmdProjectGroupSecretCreate.MarkFlagRequired("project")
 	cmdProjectGroupSecretCreate.MarkFlagRequired("name")
+	cmdProjectGroupSecretCreate.MarkFlagRequired("data")
 
 	cmdProjectGroupSecret.AddCommand(cmdProjectGroupSecretCreate)
 }

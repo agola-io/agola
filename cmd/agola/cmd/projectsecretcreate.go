@@ -16,9 +16,12 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
+
+	"github.com/sorintlab/agola/internal/services/gateway/api"
+	"github.com/sorintlab/agola/internal/services/types"
 
 	"github.com/pkg/errors"
-	"github.com/sorintlab/agola/internal/services/gateway/api"
 	"github.com/spf13/cobra"
 )
 
@@ -35,6 +38,7 @@ var cmdProjectSecretCreate = &cobra.Command{
 type secretCreateOptions struct {
 	projectRef string
 	name       string
+	data       string
 }
 
 var secretCreateOpts secretCreateOptions
@@ -44,9 +48,11 @@ func init() {
 
 	flags.StringVar(&secretCreateOpts.projectRef, "project", "", "project id or full path)")
 	flags.StringVarP(&secretCreateOpts.name, "name", "n", "", "secret name")
+	flags.StringVar(&secretCreateOpts.data, "data", "", "json map of secret data")
 
 	cmdProjectSecretCreate.MarkFlagRequired("project")
 	cmdProjectSecretCreate.MarkFlagRequired("name")
+	cmdProjectSecretCreate.MarkFlagRequired("data")
 
 	cmdProjectSecret.AddCommand(cmdProjectSecretCreate)
 }
@@ -54,8 +60,14 @@ func init() {
 func secretCreate(cmd *cobra.Command, ownertype string, args []string) error {
 	gwclient := api.NewClient(gatewayURL, token)
 
+	var data map[string]string
+	if err := json.Unmarshal([]byte(secretCreateOpts.data), &data); err != nil {
+		log.Fatalf("failed to unmarshall values: %v", err)
+	}
 	req := &api.CreateSecretRequest{
 		Name: secretCreateOpts.name,
+		Type: types.SecretTypeInternal,
+		Data: data,
 	}
 
 	switch ownertype {

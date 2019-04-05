@@ -128,6 +128,8 @@ func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	s := &types.Secret{
 		Name: req.Name,
+		Type: req.Type,
+		Data: req.Data,
 	}
 
 	switch parentType {

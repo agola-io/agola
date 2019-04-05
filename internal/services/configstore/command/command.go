@@ -896,6 +896,15 @@ func (s *CommandHandler) CreateSecret(ctx context.Context, secret *types.Secret)
 	if secret.Name == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("secret name required"))
 	}
+	if secret.Type != types.SecretTypeInternal {
+		return nil, util.NewErrBadRequest(errors.Errorf("wrong secret type %q", secret.Type))
+	}
+	switch secret.Type {
+	case types.SecretTypeInternal:
+		if len(secret.Data) == 0 {
+			return nil, util.NewErrBadRequest(errors.Errorf("empty secret data"))
+		}
+	}
 	if secret.Parent.Type == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("secret parent type required"))
 	}
