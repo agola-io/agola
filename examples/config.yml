@@ -3,6 +3,8 @@ gateway:
   webExposedURL: "http://172.17.0.1:8080"
   runServiceURL: "http://localhost:4000"
   configStoreURL: "http://localhost:4002"
+  gitServerURL: "http://172.17.0.1:4003"
+
   web:
     listenAddress: ":8000"
   tokenSigning:
