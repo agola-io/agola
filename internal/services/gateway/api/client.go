@@ -168,6 +168,10 @@ func (c *Client) CreateProjectGroupSecret(ctx context.Context, projectGroupRef s
 	return secret, resp, err
 }
 
+func (c *Client) DeleteProjectGroupSecret(ctx context.Context, projectGroupRef, secretName string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", path.Join("/projectgroups", url.PathEscape(projectGroupRef), "secrets", secretName), nil, jsonContent, nil)
+}
+
 func (c *Client) CreateProjectSecret(ctx context.Context, projectRef string, req *CreateSecretRequest) (*SecretResponse, *http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
@@ -177,6 +181,10 @@ func (c *Client) CreateProjectSecret(ctx context.Context, projectRef string, req
 	secret := new(SecretResponse)
 	resp, err := c.getParsedResponse(ctx, "PUT", path.Join("/projects", url.PathEscape(projectRef), "secrets"), nil, jsonContent, bytes.NewReader(reqj), secret)
 	return secret, resp, err
+}
+
+func (c *Client) DeleteProjectSecret(ctx context.Context, projectRef, secretName string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", path.Join("/projects", url.PathEscape(projectRef), "secrets", secretName), nil, jsonContent, nil)
 }
 
 func (c *Client) CreateProjectGroupVariable(ctx context.Context, projectGroupRef string, req *CreateVariableRequest) (*VariableResponse, *http.Response, error) {
