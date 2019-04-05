@@ -194,7 +194,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	logsHandler := api.NewLogsHandler(logger, g.runserviceClient)
 
-	reposHandler := api.NewReposHandler(logger, g.configstoreClient)
+	reposHandler := api.NewReposHandler(logger, g.c.GitServerURL)
 
 	loginUserHandler := api.NewLoginUserHandler(logger, g.ch)
 	authorizeHandler := api.NewAuthorizeHandler(logger, g.ch)

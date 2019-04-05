@@ -43,6 +43,7 @@ type Gateway struct {
 
 	RunServiceURL  string `yaml:"runServiceURL"`
 	ConfigStoreURL string `yaml:"configStoreURL"`
+	GitServerURL   string `yaml:"gitServerURL"`
 
 	Web  Web  `yaml:"web"`
 	Etcd Etcd `yaml:"etcd"`

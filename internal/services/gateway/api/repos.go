@@ -19,19 +19,18 @@ import (
 	"net/http"
 	"net/url"
 
-	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"go.uber.org/zap"
 
 	"github.com/gorilla/mux"
 )
 
 type ReposHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
+	log          *zap.SugaredLogger
+	gitServerURL string
 }
 
-func NewReposHandler(logger *zap.Logger, configstoreClient *csapi.Client) *ReposHandler {
-	return &ReposHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewReposHandler(logger *zap.Logger, gitServerURL string) *ReposHandler {
+	return &ReposHandler{log: logger.Sugar(), gitServerURL: gitServerURL}
 }
 
 func (h *ReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -41,7 +40,7 @@ func (h *ReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	h.log.Infof("path: %s", path)
 
-	u, err := url.Parse("http://172.17.0.1:4003")
+	u, err := url.Parse(h.gitServerURL)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
