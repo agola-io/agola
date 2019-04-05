@@ -660,6 +660,11 @@ func (s *CommandHandler) CreateUserToken(ctx context.Context, userName, tokenNam
 	if err != nil {
 		return "", err
 	}
+	if user.Tokens != nil {
+		if _, ok := user.Tokens[tokenName]; ok {
+			return "", util.NewErrBadRequest(errors.Errorf("token %q for user %q already exists", tokenName, userName))
+		}
+	}
 
 	if user.Tokens == nil {
 		user.Tokens = make(map[string]string)
