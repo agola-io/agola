@@ -87,7 +87,7 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	res := createProjectResponse(project)
 	if err := json.NewEncoder(w).Encode(res); err != nil {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 }
@@ -114,7 +114,7 @@ func (h *ProjectReconfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 
 	if err := h.ch.ReconfigProject(ctx, projectID); err != nil {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 }
@@ -144,7 +144,7 @@ func (h *DeleteProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 			return
 		}
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 
@@ -155,7 +155,7 @@ func (h *DeleteProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 			return
 		}
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 }
@@ -185,14 +185,14 @@ func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 
 	res := createProjectResponse(project)
 	if err := json.NewEncoder(w).Encode(res); err != nil {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 }

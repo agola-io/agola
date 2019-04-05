@@ -86,7 +86,8 @@ func (h *OAuth2CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		Response:    response,
 	}
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
 		return
 	}
 }

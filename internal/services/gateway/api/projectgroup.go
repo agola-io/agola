@@ -79,7 +79,7 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 
 	if err := json.NewEncoder(w).Encode(projectGroup); err != nil {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 }
@@ -110,14 +110,14 @@ func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 
 	res := createProjectGroupResponse(projectGroup)
 	if err := json.NewEncoder(w).Encode(res); err != nil {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 }
@@ -148,7 +148,7 @@ func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 			return
 		}
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 
@@ -159,7 +159,7 @@ func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 
 	if err := json.NewEncoder(w).Encode(projects); err != nil {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 }
@@ -190,7 +190,7 @@ func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.
 			return
 		}
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 
@@ -201,7 +201,7 @@ func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.
 
 	if err := json.NewEncoder(w).Encode(subgroups); err != nil {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 }

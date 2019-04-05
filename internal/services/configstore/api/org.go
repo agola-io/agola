@@ -52,7 +52,7 @@ func (h *OrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 
@@ -63,7 +63,7 @@ func (h *OrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewEncoder(w).Encode(org); err != nil {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 }
@@ -89,7 +89,7 @@ func (h *OrgByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 
@@ -100,7 +100,7 @@ func (h *OrgByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewEncoder(w).Encode(org); err != nil {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 }
@@ -132,7 +132,7 @@ func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewEncoder(w).Encode(org); err != nil {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 }
@@ -208,13 +208,13 @@ func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 
 	if err := json.NewEncoder(w).Encode(orgs); err != nil {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err)
 		return
 	}
 }
