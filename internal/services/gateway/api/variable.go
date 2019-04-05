@@ -99,7 +99,7 @@ func (h *VariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		cssecrets, _, err = h.configstoreClient.GetProjectGroupSecrets(ctx, parentRef, tree)
+		cssecrets, _, err = h.configstoreClient.GetProjectGroupSecrets(ctx, parentRef, true)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -111,7 +111,7 @@ func (h *VariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		cssecrets, _, err = h.configstoreClient.GetProjectSecrets(ctx, parentRef, tree)
+		cssecrets, _, err = h.configstoreClient.GetProjectSecrets(ctx, parentRef, true)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
