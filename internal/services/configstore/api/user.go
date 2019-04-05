@@ -471,3 +471,24 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 }
+
+type DeleteUserTokenHandler struct {
+	log *zap.SugaredLogger
+	ch  *command.CommandHandler
+}
+
+func NewDeleteUserTokenHandler(logger *zap.Logger, ch *command.CommandHandler) *DeleteUserTokenHandler {
+	return &DeleteUserTokenHandler{log: logger.Sugar(), ch: ch}
+}
+
+func (h *DeleteUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	userName := vars["username"]
+	tokenName := vars["tokenname"]
+
+	err := h.ch.DeleteUserToken(ctx, userName, tokenName)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+	}
+}

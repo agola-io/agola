@@ -175,6 +175,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	createUserLAHandler := api.NewCreateUserLAHandler(logger, g.ch)
 	deleteUserLAHandler := api.NewDeleteUserLAHandler(logger, g.configstoreClient)
 	createUserTokenHandler := api.NewCreateUserTokenHandler(logger, g.configstoreClient)
+	deleteUserTokenHandler := api.NewDeleteUserTokenHandler(logger, g.configstoreClient)
 
 	remoteSourceHandler := api.NewRemoteSourceHandler(logger, g.configstoreClient)
 	createRemoteSourceHandler := api.NewCreateRemoteSourceHandler(logger, g.configstoreClient)
@@ -247,6 +248,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/users/{username}/linkedaccounts", authForcedHandler(createUserLAHandler)).Methods("PUT")
 	apirouter.Handle("/users/{username}/linkedaccounts/{laid}", authForcedHandler(deleteUserLAHandler)).Methods("DELETE")
 	apirouter.Handle("/users/{username}/tokens", authForcedHandler(createUserTokenHandler)).Methods("PUT")
+	apirouter.Handle("/users/{username}/tokens/{tokenname}", authForcedHandler(deleteUserTokenHandler)).Methods("DELETE")
 
 	apirouter.Handle("/remotesource/{id}", authForcedHandler(remoteSourceHandler)).Methods("GET")
 	apirouter.Handle("/remotesources", authForcedHandler(createRemoteSourceHandler)).Methods("PUT")

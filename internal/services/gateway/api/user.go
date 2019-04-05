@@ -416,6 +416,29 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	}
 }
 
+type DeleteUserTokenHandler struct {
+	log               *zap.SugaredLogger
+	configstoreClient *csapi.Client
+}
+
+func NewDeleteUserTokenHandler(logger *zap.Logger, configstoreClient *csapi.Client) *DeleteUserTokenHandler {
+	return &DeleteUserTokenHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+}
+
+func (h *DeleteUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	userName := vars["username"]
+	tokenName := vars["tokenname"]
+
+	h.log.Infof("deleting user %q token %q", userName, tokenName)
+	_, err := h.configstoreClient.DeleteUserToken(ctx, userName, tokenName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
 type RegisterUserRequest struct {
 	CreateUserRequest
 	CreateUserLARequest

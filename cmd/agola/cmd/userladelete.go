@@ -17,9 +17,9 @@ package cmd
 import (
 	"context"
 
-	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/services/gateway/api"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -58,13 +58,13 @@ func userLADelete(cmd *cobra.Command, args []string) error {
 	userName := userLADeleteOpts.userName
 	laID := userLADeleteOpts.laID
 
-	log.Infof("deleting linked account %s for user %q", userName)
+	log.Infof("deleting linked account %q for user %q", laID, userName)
 	_, err := gwclient.DeleteUserLA(context.TODO(), userName, laID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to delete linked account")
 	}
 
-	log.Infof("linked account %q for user %q deleted", userName, laID)
+	log.Infof("linked account %q for user %q deleted", laID, userName)
 
 	return nil
 }

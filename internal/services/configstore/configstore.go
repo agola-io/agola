@@ -144,6 +144,7 @@ func (s *ConfigStore) Run(ctx context.Context) error {
 	updateUserLAHandler := api.NewUpdateUserLAHandler(logger, s.ch)
 
 	createUserTokenHandler := api.NewCreateUserTokenHandler(logger, s.ch)
+	deleteUserTokenHandler := api.NewDeleteUserTokenHandler(logger, s.ch)
 
 	orgHandler := api.NewOrgHandler(logger, s.readDB)
 	orgsHandler := api.NewOrgsHandler(logger, s.readDB)
@@ -193,6 +194,7 @@ func (s *ConfigStore) Run(ctx context.Context) error {
 	apirouter.Handle("/users/{username}/linkedaccounts/{laid}", deleteUserLAHandler).Methods("DELETE")
 	apirouter.Handle("/users/{username}/linkedaccounts/{laid}", updateUserLAHandler).Methods("PUT")
 	apirouter.Handle("/users/{username}/tokens", createUserTokenHandler).Methods("PUT")
+	apirouter.Handle("/users/{username}/tokens/{tokenname}", deleteUserTokenHandler).Methods("DELETE")
 
 	apirouter.Handle("/org/{orgid}", orgHandler).Methods("GET")
 	apirouter.Handle("/orgs", orgsHandler).Methods("GET")

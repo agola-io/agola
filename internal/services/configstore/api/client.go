@@ -383,6 +383,10 @@ func (c *Client) CreateUserToken(ctx context.Context, userName string, req *Crea
 	return tresp, resp, err
 }
 
+func (c *Client) DeleteUserToken(ctx context.Context, userName, tokenName string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/users/%s/tokens/%s", userName, tokenName), nil, jsonContent, nil)
+}
+
 func (c *Client) GetRemoteSource(ctx context.Context, rsID string) (*types.RemoteSource, *http.Response, error) {
 	rs := new(types.RemoteSource)
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/remotesource/%s", rsID), nil, jsonContent, nil, rs)

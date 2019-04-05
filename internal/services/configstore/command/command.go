@@ -686,6 +686,65 @@ func (s *CommandHandler) CreateUserToken(ctx context.Context, userName, tokenNam
 	return token, err
 }
 
+func (s *CommandHandler) DeleteUserToken(ctx context.Context, userName, tokenName string) error {
+	if userName == "" {
+		return util.NewErrBadRequest(errors.Errorf("user name required"))
+	}
+	if tokenName == "" {
+		return util.NewErrBadRequest(errors.Errorf("token name required"))
+	}
+
+	var user *types.User
+
+	var cgt *wal.ChangeGroupsUpdateToken
+
+	// must do all the check in a single transaction to avoid concurrent changes
+	err := s.readDB.Do(func(tx *db.Tx) error {
+		var err error
+		user, err = s.readDB.GetUserByName(tx, userName)
+		if err != nil {
+			return err
+		}
+		if user == nil {
+			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", userName))
+		}
+
+		cgNames := []string{user.ID}
+		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	_, ok := user.Tokens[tokenName]
+	if !ok {
+		return util.NewErrBadRequest(errors.Errorf("token %q for user %q doesn't exist", tokenName, userName))
+	}
+
+	delete(user.Tokens, tokenName)
+
+	userj, err := json.Marshal(user)
+	if err != nil {
+		return errors.Wrapf(err, "failed to marshal user")
+	}
+	actions := []*wal.Action{
+		{
+			ActionType: wal.ActionTypePut,
+			DataType:   string(types.ConfigTypeUser),
+			ID:         user.ID,
+			Data:       userj,
+		},
+	}
+
+	_, err = s.wal.WriteWal(ctx, actions, cgt)
+	return err
+}
+
 func (s *CommandHandler) CreateRemoteSource(ctx context.Context, remoteSource *types.RemoteSource) (*types.RemoteSource, error) {
 	if remoteSource.Name == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("remotesource name required"))

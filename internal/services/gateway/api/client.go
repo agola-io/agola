@@ -306,6 +306,10 @@ func (c *Client) CreateUserToken(ctx context.Context, userName string, req *Crea
 	return tresp, resp, err
 }
 
+func (c *Client) DeleteUserToken(ctx context.Context, userName, tokenName string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/users/%s/tokens/%s", userName, tokenName), nil, jsonContent, nil)
+}
+
 func (c *Client) GetRun(ctx context.Context, runID string) (*RunResponse, *http.Response, error) {
 	run := new(RunResponse)
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/run/%s", runID), nil, jsonContent, nil, run)
