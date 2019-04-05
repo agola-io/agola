@@ -26,48 +26,48 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var cmdUserLADelete = &cobra.Command{
+var cmdUserTokenDelete = &cobra.Command{
 	Use:   "delete",
-	Short: "delete a user linkedaccount",
+	Short: "delete a user token",
 	Run: func(cmd *cobra.Command, args []string) {
-		if err := userLADelete(cmd, args); err != nil {
+		if err := userTokenDelete(cmd, args); err != nil {
 			log.Fatalf("err: %v", err)
 		}
 	},
 }
 
-type userLADeleteOptions struct {
-	userName string
-	laID     string
+type userTokenDeleteOptions struct {
+	userName  string
+	tokenName string
 }
 
-var userLADeleteOpts userLADeleteOptions
+var userTokenDeleteOpts userTokenDeleteOptions
 
 func init() {
-	flags := cmdUserLADelete.Flags()
+	flags := cmdUserTokenDelete.Flags()
 
-	flags.StringVarP(&userLADeleteOpts.userName, "username", "n", "", "user name")
-	flags.StringVar(&userLADeleteOpts.laID, "laid", "", "linked account id")
+	flags.StringVarP(&userTokenDeleteOpts.userName, "username", "n", "", "user name")
+	flags.StringVarP(&userTokenDeleteOpts.tokenName, "tokenname", "t", "", "token name")
 
-	cmdUserLADelete.MarkFlagRequired("username")
-	cmdUserLADelete.MarkFlagRequired("laid")
+	cmdUserTokenDelete.MarkFlagRequired("username")
+	cmdUserTokenDelete.MarkFlagRequired("tokenname")
 
-	cmdUserLA.AddCommand(cmdUserLADelete)
+	cmdUserToken.AddCommand(cmdUserTokenDelete)
 }
 
-func userLADelete(cmd *cobra.Command, args []string) error {
+func userTokenDelete(cmd *cobra.Command, args []string) error {
 	gwclient := api.NewClient(gatewayURL, token)
 
-	userName := userLADeleteOpts.userName
-	laID := userLADeleteOpts.laID
+	userName := userTokenDeleteOpts.userName
+	tokenName := userTokenDeleteOpts.tokenName
 
-	log.Infof("deleting linked account %q for user %q", laID, userName)
-	_, err := gwclient.DeleteUserLA(context.TODO(), userName, laID)
+	log.Infof("deleting token %q for user %q", tokenName, userName)
+	_, err := gwclient.DeleteUserToken(context.TODO(), userName, tokenName)
 	if err != nil {
-		return errors.Wrapf(err, "failed to delete linked account")
+		return errors.Wrapf(err, "failed to delete user token")
 	}
 
-	log.Infof("linked account %q for user %q deleted", laID, userName)
+	log.Infof("token %q for user %q deleted", tokenName, userName)
 
 	return nil
 }
