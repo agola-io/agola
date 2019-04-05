@@ -54,6 +54,51 @@ func (c *CommandHandler) CreateUser(ctx context.Context, req *CreateUserRequest)
 	return u, nil
 }
 
+type CreateUserTokenRequest struct {
+	UserName  string
+	TokenName string
+}
+
+func (c *CommandHandler) CreateUserToken(ctx context.Context, req *CreateUserTokenRequest) (string, error) {
+	var userID string
+	userIDVal := ctx.Value("userid")
+	if userIDVal != nil {
+		userID = userIDVal.(string)
+	}
+
+	isAdmin := false
+	isAdminVal := ctx.Value("admin")
+	if isAdminVal != nil {
+		isAdmin = isAdminVal.(bool)
+	}
+
+	userName := req.UserName
+	user, _, err := c.configstoreClient.GetUserByName(ctx, userName)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to get user %q", userID)
+	}
+
+	// only admin or the same logged user can create a token
+	if !isAdmin && user.ID != userID {
+		return "", util.NewErrBadRequest(errors.Errorf("logged in user cannot create token for another user"))
+	}
+	if _, ok := user.Tokens[req.TokenName]; ok {
+		return "", util.NewErrBadRequest(errors.Errorf("user %q already have a token with name %q", userName, req.TokenName))
+	}
+
+	c.log.Infof("creating user token")
+	creq := &csapi.CreateUserTokenRequest{
+		TokenName: req.TokenName,
+	}
+	res, _, err := c.configstoreClient.CreateUserToken(ctx, userName, creq)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to create user token")
+	}
+	c.log.Infof("token %q for user %q created", req.TokenName, userName)
+
+	return res.Token, nil
+}
+
 type CreateUserLARequest struct {
 	UserName                       string
 	RemoteSourceName               string

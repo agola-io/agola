@@ -59,6 +59,7 @@ func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	u, err := h.ch.CreateUser(ctx, creq)
 	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
 		return
 	}
 
@@ -68,7 +69,6 @@ func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
 }
 
 type DeleteUserHandler struct {
@@ -375,12 +375,12 @@ type CreateUserTokenResponse struct {
 }
 
 type CreateUserTokenHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ch  *command.CommandHandler
 }
 
-func NewCreateUserTokenHandler(logger *zap.Logger, configstoreClient *csapi.Client) *CreateUserTokenHandler {
-	return &CreateUserTokenHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewCreateUserTokenHandler(logger *zap.Logger, ch *command.CommandHandler) *CreateUserTokenHandler {
+	return &CreateUserTokenHandler{log: logger.Sugar(), ch: ch}
 }
 
 func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -395,20 +395,19 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	creq := &csapi.CreateUserTokenRequest{
+	creq := &command.CreateUserTokenRequest{
+		UserName:  userName,
 		TokenName: req.TokenName,
 	}
 	h.log.Infof("creating user %q token", userName)
-	cresp, _, err := h.configstoreClient.CreateUserToken(ctx, userName, creq)
-	if err != nil {
+	token, err := h.ch.CreateUserToken(ctx, creq)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	h.log.Infof("user %q token created", userName)
 
 	resp := &CreateUserTokenResponse{
-		Token: cresp.Token,
+		Token: token,
 	}
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
