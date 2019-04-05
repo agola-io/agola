@@ -198,6 +198,10 @@ func (c *Client) CreateProjectGroupVariable(ctx context.Context, projectGroupRef
 	return variable, resp, err
 }
 
+func (c *Client) DeleteProjectGroupVariable(ctx context.Context, projectGroupRef, variableName string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", path.Join("/projectgroups", url.PathEscape(projectGroupRef), "variables", variableName), nil, jsonContent, nil)
+}
+
 func (c *Client) CreateProjectVariable(ctx context.Context, projectRef string, req *CreateVariableRequest) (*VariableResponse, *http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
@@ -207,6 +211,10 @@ func (c *Client) CreateProjectVariable(ctx context.Context, projectRef string, r
 	variable := new(VariableResponse)
 	resp, err := c.getParsedResponse(ctx, "PUT", path.Join("/projects", url.PathEscape(projectRef), "variables"), nil, jsonContent, bytes.NewReader(reqj), variable)
 	return variable, resp, err
+}
+
+func (c *Client) DeleteProjectVariable(ctx context.Context, projectRef, variableName string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", path.Join("/projects", url.PathEscape(projectRef), "variables", variableName), nil, jsonContent, nil)
 }
 
 func (c *Client) DeleteProject(ctx context.Context, projectRef string) (*http.Response, error) {
