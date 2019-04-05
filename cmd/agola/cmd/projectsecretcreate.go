@@ -39,9 +39,9 @@ var cmdProjectSecretCreate = &cobra.Command{
 }
 
 type secretCreateOptions struct {
-	projectRef string
-	name       string
-	data       string
+	parentRef string
+	name      string
+	data      string
 }
 
 var secretCreateOpts secretCreateOptions
@@ -49,7 +49,7 @@ var secretCreateOpts secretCreateOptions
 func init() {
 	flags := cmdProjectSecretCreate.Flags()
 
-	flags.StringVar(&secretCreateOpts.projectRef, "project", "", "project id or full path)")
+	flags.StringVar(&secretCreateOpts.parentRef, "project", "", "project id or full path)")
 	flags.StringVarP(&secretCreateOpts.name, "name", "n", "", "secret name")
 	flags.StringVar(&secretCreateOpts.data, "data", "", "json map of secret data")
 
@@ -76,14 +76,14 @@ func secretCreate(cmd *cobra.Command, ownertype string, args []string) error {
 	switch ownertype {
 	case "project":
 		log.Infof("creating project secret")
-		secret, _, err := gwclient.CreateProjectSecret(context.TODO(), secretCreateOpts.projectRef, req)
+		secret, _, err := gwclient.CreateProjectSecret(context.TODO(), secretCreateOpts.parentRef, req)
 		if err != nil {
 			return errors.Wrapf(err, "failed to create project secret")
 		}
 		log.Infof("project secret %q created, ID: %q", secret.Name, secret.ID)
 	case "projectgroup":
 		log.Infof("creating project group secret")
-		secret, _, err := gwclient.CreateProjectGroupSecret(context.TODO(), secretCreateOpts.projectRef, req)
+		secret, _, err := gwclient.CreateProjectGroupSecret(context.TODO(), secretCreateOpts.parentRef, req)
 		if err != nil {
 			return errors.Wrapf(err, "failed to create project group secret")
 		}
