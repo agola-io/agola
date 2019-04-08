@@ -230,7 +230,8 @@ func MatchWhen(when *When, branch, tag, ref string) bool {
 	include := true
 	if when != nil {
 		include = false
-		if when.Branch != nil {
+		// test only if branch is not empty, if empty mean that we are not in a branch
+		if when.Branch != nil && branch != "" {
 			// first check includes and override with excludes
 			if matchCondition(when.Branch.Include, branch) {
 				include = true
@@ -239,7 +240,8 @@ func MatchWhen(when *When, branch, tag, ref string) bool {
 				include = false
 			}
 		}
-		if when.Tag != nil {
+		// test only if tag is not empty, if empty mean that we are not in a tag
+		if when.Tag != nil && tag != "" {
 			// first check includes and override with excludes
 			if matchCondition(when.Tag.Include, tag) {
 				include = true
@@ -248,6 +250,7 @@ func MatchWhen(when *When, branch, tag, ref string) bool {
 				include = false
 			}
 		}
+		// we assume that ref always have a value
 		if when.Ref != nil {
 			// first check includes and override with excludes
 			if matchCondition(when.Ref.Include, ref) {
