@@ -213,16 +213,16 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/logs", logsHandler).Methods("GET")
 
 	//apirouter.Handle("/projectgroups", authForcedHandler(projectsHandler)).Methods("GET")
-	apirouter.Handle("/projectgroups/{projectgroupid}", authForcedHandler(projectGroupHandler)).Methods("GET")
-	apirouter.Handle("/projectgroups/{projectgroupid}/subgroups", authForcedHandler(projectGroupSubgroupsHandler)).Methods("GET")
-	apirouter.Handle("/projectgroups/{projectgroupid}/projects", authForcedHandler(projectGroupProjectsHandler)).Methods("GET")
+	apirouter.Handle("/projectgroups/{projectgroupref}", authForcedHandler(projectGroupHandler)).Methods("GET")
+	apirouter.Handle("/projectgroups/{projectgroupref}/subgroups", authForcedHandler(projectGroupSubgroupsHandler)).Methods("GET")
+	apirouter.Handle("/projectgroups/{projectgroupref}/projects", authForcedHandler(projectGroupProjectsHandler)).Methods("GET")
 	apirouter.Handle("/projectgroups", authForcedHandler(createProjectGroupHandler)).Methods("POST")
-	//apirouter.Handle("/projectgroups/{projectgroupid}", authForcedHandler(deleteProjectGroupHandler)).Methods("DELETE")
+	//apirouter.Handle("/projectgroups/{projectgroupref}", authForcedHandler(deleteProjectGroupHandler)).Methods("DELETE")
 
-	apirouter.Handle("/projects/{projectid}", authForcedHandler(projectHandler)).Methods("GET")
+	apirouter.Handle("/projects/{projectref}", authForcedHandler(projectHandler)).Methods("GET")
 	apirouter.Handle("/projects", authForcedHandler(createProjectHandler)).Methods("POST")
-	apirouter.Handle("/projects/{projectid}", authForcedHandler(deleteProjectHandler)).Methods("DELETE")
-	apirouter.Handle("/projects/{projectid}/reconfig", authForcedHandler(projectReconfigHandler)).Methods("PUT")
+	apirouter.Handle("/projects/{projectref}", authForcedHandler(deleteProjectHandler)).Methods("DELETE")
+	apirouter.Handle("/projects/{projectref}/reconfig", authForcedHandler(projectReconfigHandler)).Methods("PUT")
 
 	apirouter.Handle("/projectgroups/{projectgroupref}/secrets", authForcedHandler(secretHandler)).Methods("GET")
 	apirouter.Handle("/projects/{projectref}/secrets", authForcedHandler(secretHandler)).Methods("GET")

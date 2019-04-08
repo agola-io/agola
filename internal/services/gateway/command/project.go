@@ -151,8 +151,8 @@ func (c *CommandHandler) SetupProject(ctx context.Context, rs *types.RemoteSourc
 	return nil
 }
 
-func (c *CommandHandler) ReconfigProject(ctx context.Context, projectID string) error {
-	p, _, err := c.configstoreClient.GetProject(ctx, projectID)
+func (c *CommandHandler) ReconfigProject(ctx context.Context, projectRef string) error {
+	p, _, err := c.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
 		return err
 	}

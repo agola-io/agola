@@ -103,13 +103,13 @@ func NewProjectReconfigHandler(logger *zap.Logger, ch *command.CommandHandler, c
 func (h *ProjectReconfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	projectID, err := url.PathUnescape(vars["projectid"])
+	projectRef, err := url.PathUnescape(vars["projectref"])
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if err := h.ch.ReconfigProject(ctx, projectID); err != nil {
+	if err := h.ch.ReconfigProject(ctx, projectRef); err != nil {
 		h.log.Errorf("err: %+v", err)
 		httpError(w, err)
 		return
@@ -128,16 +128,16 @@ func NewDeleteProjectHandler(logger *zap.Logger, configstoreClient *csapi.Client
 func (h *DeleteProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	projectID, err := url.PathUnescape(vars["projectid"])
+	projectRef, err := url.PathUnescape(vars["projectref"])
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	project, resp, err := h.configstoreClient.GetProject(ctx, projectID)
+	project, resp, err := h.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			http.Error(w, fmt.Sprintf("project with id %q doesn't exist", projectID), http.StatusNotFound)
+			http.Error(w, fmt.Sprintf("project with ref %q doesn't exist", projectRef), http.StatusNotFound)
 			return
 		}
 		h.log.Errorf("err: %+v", err)
@@ -169,13 +169,13 @@ func NewProjectHandler(logger *zap.Logger, configstoreClient *csapi.Client) *Pro
 func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	projectID, err := url.PathUnescape(vars["projectid"])
+	projectRef, err := url.PathUnescape(vars["projectref"])
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	project, resp, err := h.configstoreClient.GetProject(ctx, projectID)
+	project, resp, err := h.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			http.Error(w, err.Error(), http.StatusNotFound)

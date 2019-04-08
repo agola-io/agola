@@ -93,14 +93,13 @@ func NewProjectGroupHandler(logger *zap.Logger, configstoreClient *csapi.Client)
 func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	projectGroupID, err := url.PathUnescape(vars["projectgroupid"])
+	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	h.log.Infof("projectGroupID: %s", projectGroupID)
 
-	projectGroup, resp, err := h.configstoreClient.GetProjectGroup(ctx, projectGroupID)
+	projectGroup, resp, err := h.configstoreClient.GetProjectGroup(ctx, projectGroupRef)
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -131,14 +130,13 @@ func NewProjectGroupProjectsHandler(logger *zap.Logger, configstoreClient *csapi
 func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	projectGroupID, err := url.PathUnescape(vars["projectgroupid"])
+	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	h.log.Infof("projectGroupID: %s", projectGroupID)
 
-	csprojects, resp, err := h.configstoreClient.GetProjectGroupProjects(ctx, projectGroupID)
+	csprojects, resp, err := h.configstoreClient.GetProjectGroupProjects(ctx, projectGroupRef)
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -173,14 +171,13 @@ func NewProjectGroupSubgroupsHandler(logger *zap.Logger, configstoreClient *csap
 func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	projectGroupID, err := url.PathUnescape(vars["projectgroupid"])
+	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	h.log.Infof("projectGroupID: %s", projectGroupID)
 
-	cssubgroups, resp, err := h.configstoreClient.GetProjectGroupSubgroups(ctx, projectGroupID)
+	cssubgroups, resp, err := h.configstoreClient.GetProjectGroupSubgroups(ctx, projectGroupRef)
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			http.Error(w, err.Error(), http.StatusNotFound)
