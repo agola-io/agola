@@ -152,10 +152,10 @@ func (s *CommandHandler) newRun(ctx context.Context, req *RunCreateRequest) (*ty
 	var run *types.Run
 
 	if req.Group == "" {
-		return nil, errors.Errorf("run group is empty")
+		return nil, util.NewErrBadRequest(errors.Errorf("run group is empty"))
 	}
 	if !path.IsAbs(req.Group) {
-		return nil, errors.Errorf("run group %q must be an absolute path", req.Group)
+		return nil, util.NewErrBadRequest(errors.Errorf("run group %q must be an absolute path", req.Group))
 	}
 
 	// generate a new run sequence that will be the same for the run, runconfig and rundata
@@ -166,14 +166,14 @@ func (s *CommandHandler) newRun(ctx context.Context, req *RunCreateRequest) (*ty
 	id := seq.String()
 
 	if err := runconfig.CheckRunConfig(rc); err != nil {
-		return nil, err
+		return nil, util.NewErrBadRequest(err)
 	}
 	// set the run config ID
 	rc.ID = id
 
 	// generate tasks levels
 	if err := runconfig.GenTasksLevels(rc); err != nil {
-		return nil, err
+		return nil, util.NewErrBadRequest(err)
 	}
 
 	rd := &types.RunData{
@@ -185,7 +185,7 @@ func (s *CommandHandler) newRun(ctx context.Context, req *RunCreateRequest) (*ty
 
 	run, err = s.genRun(ctx, rc, rd)
 	if err != nil {
-		return nil, err
+		return nil, util.NewErrBadRequest(err)
 	}
 	s.log.Debugf("created run: %s", util.Dump(run))
 
@@ -208,14 +208,14 @@ func (s *CommandHandler) recreateRun(ctx context.Context, req *RunCreateRequest)
 	s.log.Infof("creating run from existing run")
 	rc, err := store.LTSGetRunConfig(s.wal, req.RunID)
 	if err != nil {
-		return nil, errors.Wrapf(err, "runconfig %q doens't exist", req.RunID)
+		return nil, util.NewErrBadRequest(errors.Wrapf(err, "runconfig %q doens't exist", req.RunID))
 	}
 	// update the run config ID
 	rc.ID = id
 
 	rd, err := store.LTSGetRunData(s.wal, req.RunID)
 	if err != nil {
-		return nil, errors.Wrapf(err, "rundata %q doens't exist", req.RunID)
+		return nil, util.NewErrBadRequest(errors.Wrapf(err, "rundata %q doens't exist", req.RunID))
 	}
 	// update the run data ID
 	rd.ID = id
@@ -225,16 +225,16 @@ func (s *CommandHandler) recreateRun(ctx context.Context, req *RunCreateRequest)
 		return nil, err
 	}
 	if run == nil {
-		return nil, errors.Wrapf(err, "run %q doens't exist", req.RunID)
+		return nil, util.NewErrBadRequest(errors.Wrapf(err, "run %q doens't exist", req.RunID))
 	}
 
 	if req.FromStart {
 		if canRestart, reason := run.CanRestartFromScratch(); !canRestart {
-			return nil, errors.Errorf("run cannot be restarted: %s", reason)
+			return nil, util.NewErrBadRequest(errors.Errorf("run cannot be restarted: %s", reason))
 		}
 	} else {
 		if canRestart, reason := run.CanRestartFromFailedTasks(); !canRestart {
-			return nil, errors.Errorf("run cannot be restarted: %s", reason)
+			return nil, util.NewErrBadRequest(errors.Errorf("run cannot be restarted: %s", reason))
 		}
 	}
 
@@ -414,15 +414,15 @@ func (s *CommandHandler) ApproveRunTask(ctx context.Context, req *RunTaskApprove
 
 	task, ok := r.RunTasks[req.TaskID]
 	if !ok {
-		return errors.Errorf("run %q doesn't have task %q", r.ID, req.TaskID)
+		return util.NewErrBadRequest(errors.Errorf("run %q doesn't have task %q", r.ID, req.TaskID))
 	}
 
 	if !task.WaitingApproval {
-		return errors.Errorf("run %q, task %q is not in waiting approval state", r.ID, req.TaskID)
+		return util.NewErrBadRequest(errors.Errorf("run %q, task %q is not in waiting approval state", r.ID, req.TaskID))
 	}
 
 	if task.Approved {
-		return errors.Errorf("run %q, task %q is already approved", r.ID, req.TaskID)
+		return util.NewErrBadRequest(errors.Errorf("run %q, task %q is already approved", r.ID, req.TaskID))
 	}
 
 	task.WaitingApproval = false

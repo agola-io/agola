@@ -31,12 +31,65 @@ import (
 	"github.com/sorintlab/agola/internal/services/runservice/scheduler/readdb"
 	"github.com/sorintlab/agola/internal/services/runservice/scheduler/store"
 	"github.com/sorintlab/agola/internal/services/runservice/types"
+	"github.com/sorintlab/agola/internal/util"
 	"github.com/sorintlab/agola/internal/wal"
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
+
+type ErrorResponse struct {
+	Message string `json:"message"`
+}
+
+func ErrorResponseFromError(err error) *ErrorResponse {
+	if util.IsErrBadRequest(err) {
+		return &ErrorResponse{Message: err.Error()}
+	}
+
+	// on generic error return an generic message to not leak the real error
+	return &ErrorResponse{Message: "internal server error"}
+}
+
+func httpError(w http.ResponseWriter, err error) bool {
+	if err != nil {
+		response := ErrorResponseFromError(err)
+		resj, merr := json.Marshal(response)
+		if merr != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return true
+		}
+		if util.IsErrBadRequest(err) {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write(resj)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write(resj)
+		}
+		return true
+	}
+
+	return false
+}
+
+func httpResponse(w http.ResponseWriter, code int, res interface{}) error {
+	w.Header().Set("Content-Type", "application/json")
+
+	if res != nil {
+		resj, err := json.Marshal(res)
+		if err != nil {
+			httpError(w, err)
+			return err
+		}
+		w.WriteHeader(code)
+		_, err = w.Write(resj)
+		return err
+	}
+
+	w.WriteHeader(code)
+	return nil
+}
 
 type LogsHandler struct {
 	log *zap.SugaredLogger
@@ -267,9 +320,8 @@ func (h *ChangeGroupsUpdateTokensHandler) ServeHTTP(w http.ResponseWriter, r *ht
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(cgts); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	if err := httpResponse(w, http.StatusOK, cgts); err != nil {
+		h.log.Errorf("err: %+v", err)
 	}
 }
 
@@ -327,9 +379,8 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		RunConfig: rc,
 	}
 
-	if err := json.NewEncoder(w).Encode(res); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	if err := httpResponse(w, http.StatusOK, res); err != nil {
+		h.log.Errorf("err: %+v", err)
 	}
 }
 
@@ -412,13 +463,12 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := &GetRunsResponse{
+	res := &GetRunsResponse{
 		Runs:                    runs,
 		ChangeGroupsUpdateToken: cgts,
 	}
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	if err := httpResponse(w, http.StatusOK, res); err != nil {
+		h.log.Errorf("err: %+v", err)
 	}
 }
 
@@ -474,7 +524,7 @@ func (h *RunCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	rb, err := h.ch.CreateRun(ctx, creq)
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httpError(w, err)
 		return
 	}
 
@@ -483,9 +533,8 @@ func (h *RunCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		RunConfig: rb.Rc,
 	}
 
-	if err := json.NewEncoder(w).Encode(res); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	if err := httpResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Errorf("err: %+v", err)
 	}
 }
 
@@ -536,7 +585,8 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			ChangeGroupsUpdateToken: req.ChangeGroupsUpdateToken,
 		}
 		if err := h.ch.ChangeRunPhase(ctx, creq); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			h.log.Errorf("err: %+v", err)
+			httpError(w, err)
 			return
 		}
 	case RunActionTypeStop:
@@ -545,7 +595,8 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			ChangeGroupsUpdateToken: req.ChangeGroupsUpdateToken,
 		}
 		if err := h.ch.StopRun(ctx, creq); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			h.log.Errorf("err: %+v", err)
+			httpError(w, err)
 			return
 		}
 	default:
@@ -600,7 +651,8 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 			ChangeGroupsUpdateToken: req.ChangeGroupsUpdateToken,
 		}
 		if err := h.ch.ApproveRunTask(ctx, creq); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			h.log.Errorf("err: %+v", err)
+			httpError(w, err)
 			return
 		}
 	default:
