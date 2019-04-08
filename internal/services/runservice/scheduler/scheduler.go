@@ -1414,10 +1414,10 @@ func (s *Scheduler) Run(ctx context.Context) error {
 	apirouter.Handle("/logs", logsHandler).Methods("GET")
 
 	apirouter.Handle("/runs/{runid}", runHandler).Methods("GET")
-	apirouter.Handle("/runs/{runid}/actions", runActionsHandler).Methods("POST")
-	apirouter.Handle("/runs/{runid}/tasks/{taskid}/actions", runTaskActionsHandler).Methods("POST")
+	apirouter.Handle("/runs/{runid}/actions", runActionsHandler).Methods("PUT")
+	apirouter.Handle("/runs/{runid}/tasks/{taskid}/actions", runTaskActionsHandler).Methods("PUT")
 	apirouter.Handle("/runs", runsHandler).Methods("GET")
-	apirouter.Handle("/runs", runCreateHandler).Methods("PUT")
+	apirouter.Handle("/runs", runCreateHandler).Methods("POST")
 
 	apirouter.Handle("/changegroups", changeGroupsUpdateTokensHandler).Methods("GET")
 

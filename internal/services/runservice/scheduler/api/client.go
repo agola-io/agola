@@ -194,7 +194,7 @@ func (c *Client) CreateRun(ctx context.Context, req *RunCreateRequest) (*http.Re
 		return nil, err
 	}
 
-	return c.getResponse(ctx, "PUT", "/runs", nil, jsonContent, bytes.NewReader(reqj))
+	return c.getResponse(ctx, "POST", "/runs", nil, jsonContent, bytes.NewReader(reqj))
 }
 
 func (c *Client) RunActions(ctx context.Context, runID string, req *RunActionsRequest) (*http.Response, error) {
@@ -202,7 +202,7 @@ func (c *Client) RunActions(ctx context.Context, runID string, req *RunActionsRe
 	if err != nil {
 		return nil, err
 	}
-	return c.getResponse(ctx, "POST", fmt.Sprintf("/runs/%s/actions", runID), nil, jsonContent, bytes.NewReader(reqj))
+	return c.getResponse(ctx, "PUT", fmt.Sprintf("/runs/%s/actions", runID), nil, jsonContent, bytes.NewReader(reqj))
 }
 
 func (c *Client) StartRun(ctx context.Context, runID string, changeGroupsUpdateToken string) (*http.Response, error) {
@@ -220,7 +220,7 @@ func (c *Client) RunTaskActions(ctx context.Context, runID, taskID string, req *
 	if err != nil {
 		return nil, err
 	}
-	return c.getResponse(ctx, "POST", fmt.Sprintf("/runs/%s/tasks/%s/actions", runID, taskID), nil, jsonContent, bytes.NewReader(reqj))
+	return c.getResponse(ctx, "PUT", fmt.Sprintf("/runs/%s/tasks/%s/actions", runID, taskID), nil, jsonContent, bytes.NewReader(reqj))
 }
 
 func (c *Client) ApproveRunTask(ctx context.Context, runID, taskID string, approvalAnnotations map[string]string, changeGroupsUpdateToken string) (*http.Response, error) {

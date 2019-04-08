@@ -133,7 +133,7 @@ func (c *Client) CreateProjectGroup(ctx context.Context, projectGroup *types.Pro
 	}
 
 	projectGroup = new(types.ProjectGroup)
-	resp, err := c.getParsedResponse(ctx, "PUT", "/projectgroups", nil, jsonContent, bytes.NewReader(pj), projectGroup)
+	resp, err := c.getParsedResponse(ctx, "POST", "/projectgroups", nil, jsonContent, bytes.NewReader(pj), projectGroup)
 	return projectGroup, resp, err
 }
 
@@ -150,7 +150,7 @@ func (c *Client) CreateProject(ctx context.Context, project *types.Project) (*ty
 	}
 
 	project = new(types.Project)
-	resp, err := c.getParsedResponse(ctx, "PUT", "/projects", nil, jsonContent, bytes.NewReader(pj), project)
+	resp, err := c.getParsedResponse(ctx, "POST", "/projects", nil, jsonContent, bytes.NewReader(pj), project)
 	return project, resp, err
 }
 
@@ -187,7 +187,7 @@ func (c *Client) CreateProjectGroupSecret(ctx context.Context, projectGroupRef s
 	}
 
 	secret = new(types.Secret)
-	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/projectgroups/%s/secrets", url.PathEscape(projectGroupRef)), nil, jsonContent, bytes.NewReader(pj), secret)
+	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/projectgroups/%s/secrets", url.PathEscape(projectGroupRef)), nil, jsonContent, bytes.NewReader(pj), secret)
 	return secret, resp, err
 }
 
@@ -198,7 +198,7 @@ func (c *Client) CreateProjectSecret(ctx context.Context, projectRef string, sec
 	}
 
 	secret = new(types.Secret)
-	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/projects/%s/secrets", url.PathEscape(projectRef)), nil, jsonContent, bytes.NewReader(pj), secret)
+	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/projects/%s/secrets", url.PathEscape(projectRef)), nil, jsonContent, bytes.NewReader(pj), secret)
 	return secret, resp, err
 }
 
@@ -239,7 +239,7 @@ func (c *Client) CreateProjectGroupVariable(ctx context.Context, projectGroupRef
 	}
 
 	variable = new(types.Variable)
-	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/projectgroups/%s/variables", url.PathEscape(projectGroupRef)), nil, jsonContent, bytes.NewReader(pj), variable)
+	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/projectgroups/%s/variables", url.PathEscape(projectGroupRef)), nil, jsonContent, bytes.NewReader(pj), variable)
 	return variable, resp, err
 }
 
@@ -250,7 +250,7 @@ func (c *Client) CreateProjectVariable(ctx context.Context, projectRef string, v
 	}
 
 	variable = new(types.Variable)
-	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/projects/%s/variables", url.PathEscape(projectRef)), nil, jsonContent, bytes.NewReader(pj), variable)
+	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/projects/%s/variables", url.PathEscape(projectRef)), nil, jsonContent, bytes.NewReader(pj), variable)
 	return variable, resp, err
 }
 
@@ -321,7 +321,7 @@ func (c *Client) CreateUser(ctx context.Context, req *CreateUserRequest) (*types
 	}
 
 	user := new(types.User)
-	resp, err := c.getParsedResponse(ctx, "PUT", "/users", nil, jsonContent, bytes.NewReader(reqj), user)
+	resp, err := c.getParsedResponse(ctx, "POST", "/users", nil, jsonContent, bytes.NewReader(reqj), user)
 	return user, resp, err
 }
 
@@ -353,7 +353,7 @@ func (c *Client) CreateUserLA(ctx context.Context, userName string, req *CreateU
 	}
 
 	la := new(types.LinkedAccount)
-	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/users/%s/linkedaccounts", userName), nil, jsonContent, bytes.NewReader(reqj), la)
+	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/users/%s/linkedaccounts", userName), nil, jsonContent, bytes.NewReader(reqj), la)
 	return la, resp, err
 }
 
@@ -379,7 +379,7 @@ func (c *Client) CreateUserToken(ctx context.Context, userName string, req *Crea
 	}
 
 	tresp := new(CreateUserTokenResponse)
-	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/users/%s/tokens", userName), nil, jsonContent, bytes.NewReader(reqj), tresp)
+	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/users/%s/tokens", userName), nil, jsonContent, bytes.NewReader(reqj), tresp)
 	return tresp, resp, err
 }
 
@@ -423,7 +423,7 @@ func (c *Client) CreateRemoteSource(ctx context.Context, rs *types.RemoteSource)
 	}
 
 	rs = new(types.RemoteSource)
-	resp, err := c.getParsedResponse(ctx, "PUT", "/remotesources", nil, jsonContent, bytes.NewReader(uj), rs)
+	resp, err := c.getParsedResponse(ctx, "POST", "/remotesources", nil, jsonContent, bytes.NewReader(uj), rs)
 	return rs, resp, err
 }
 
@@ -438,7 +438,7 @@ func (c *Client) CreateOrg(ctx context.Context, org *types.Organization) (*types
 	}
 
 	org = new(types.Organization)
-	resp, err := c.getParsedResponse(ctx, "PUT", "/orgs", nil, jsonContent, bytes.NewReader(oj), org)
+	resp, err := c.getParsedResponse(ctx, "POST", "/orgs", nil, jsonContent, bytes.NewReader(oj), org)
 	return org, resp, err
 }
 
