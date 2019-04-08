@@ -32,7 +32,7 @@ func (c *CommandHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (
 		return nil, util.NewErrBadRequest(errors.Errorf("organization name required"))
 	}
 	if !util.ValidateName(req.Name) {
-		return nil, errors.Errorf("invalid organization name %q", req.Name)
+		return nil, util.NewErrBadRequest(errors.Errorf("invalid organization name %q", req.Name))
 	}
 
 	org := &types.Organization{

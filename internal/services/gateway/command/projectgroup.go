@@ -32,7 +32,7 @@ type CreateProjectGroupRequest struct {
 
 func (c *CommandHandler) CreateProjectGroup(ctx context.Context, req *CreateProjectGroupRequest) (*types.ProjectGroup, error) {
 	if !util.ValidateName(req.Name) {
-		return nil, errors.Errorf("invalid projectGroup name %q", req.Name)
+		return nil, util.NewErrBadRequest(errors.Errorf("invalid projectGroup name %q", req.Name))
 	}
 
 	user, _, err := c.configstoreClient.GetUser(ctx, req.CurrentUserID)

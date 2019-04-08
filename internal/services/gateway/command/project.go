@@ -37,7 +37,7 @@ type CreateProjectRequest struct {
 
 func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRequest) (*types.Project, error) {
 	if !util.ValidateName(req.Name) {
-		return nil, errors.Errorf("invalid project name %q", req.Name)
+		return nil, util.NewErrBadRequest(errors.Errorf("invalid project name %q", req.Name))
 	}
 
 	user, _, err := c.configstoreClient.GetUser(ctx, req.CurrentUserID)

@@ -17,6 +17,7 @@ package command
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
@@ -37,7 +38,7 @@ func (c *CommandHandler) CreateUser(ctx context.Context, req *CreateUserRequest)
 		return nil, util.NewErrBadRequest(errors.Errorf("user name required"))
 	}
 	if !util.ValidateName(req.UserName) {
-		return nil, errors.Errorf("invalid user name %q", req.UserName)
+		return nil, util.NewErrBadRequest(errors.Errorf("invalid user name %q", req.UserName))
 	}
 
 	creq := &csapi.CreateUserRequest{
@@ -73,8 +74,11 @@ func (c *CommandHandler) CreateUserToken(ctx context.Context, req *CreateUserTok
 	}
 
 	userName := req.UserName
-	user, _, err := c.configstoreClient.GetUserByName(ctx, userName)
+	user, resp, err := c.configstoreClient.GetUserByName(ctx, userName)
 	if err != nil {
+		if resp != nil && resp.StatusCode == http.StatusNotFound {
+			return "", util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", userID))
+		}
 		return "", errors.Wrapf(err, "failed to get user %q", userID)
 	}
 
@@ -109,8 +113,11 @@ type CreateUserLARequest struct {
 
 func (c *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequest) (*types.LinkedAccount, error) {
 	userName := req.UserName
-	user, _, err := c.configstoreClient.GetUserByName(ctx, userName)
+	user, resp, err := c.configstoreClient.GetUserByName(ctx, userName)
 	if err != nil {
+		if resp != nil && resp.StatusCode == http.StatusNotFound {
+			return nil, util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", userName))
+		}
 		return nil, errors.Wrapf(err, "failed to get user %q", userName)
 	}
 	rs, _, err := c.configstoreClient.GetRemoteSourceByName(ctx, req.RemoteSourceName)
@@ -127,7 +134,7 @@ func (c *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequ
 	}
 	c.log.Infof("la: %s", util.Dump(la))
 	if la != nil {
-		return nil, errors.Errorf("user %q already have a linked account for remote source %q", userName, rs.Name)
+		return nil, util.NewErrBadRequest(errors.Errorf("user %q already have a linked account for remote source %q", userName, rs.Name))
 	}
 
 	accessToken, err := common.GetAccessToken(rs.AuthType, req.RemoteSourceUserAccessToken, req.RemoteSourceOauth2AccessToken)
@@ -179,7 +186,7 @@ func (c *CommandHandler) RegisterUser(ctx context.Context, req *RegisterUserRequ
 		return nil, util.NewErrBadRequest(errors.Errorf("user name required"))
 	}
 	if !util.ValidateName(req.UserName) {
-		return nil, errors.Errorf("invalid user name %q", req.UserName)
+		return nil, util.NewErrBadRequest(errors.Errorf("invalid user name %q", req.UserName))
 	}
 
 	rs, _, err := c.configstoreClient.GetRemoteSourceByName(ctx, req.RemoteSourceName)
