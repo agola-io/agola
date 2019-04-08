@@ -74,10 +74,8 @@ func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(project); err != nil {
+	if err := httpResponse(w, http.StatusOK, project); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -107,10 +105,8 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(project); err != nil {
+	if err := httpResponse(w, http.StatusCreated, project); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -135,6 +131,9 @@ func (h *DeleteProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 
 	err = h.ch.DeleteProject(ctx, projectRef)
 	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+	}
+	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }

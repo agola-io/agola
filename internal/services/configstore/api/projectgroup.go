@@ -62,10 +62,8 @@ func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(projectGroup); err != nil {
+	if err := httpResponse(w, http.StatusOK, projectGroup); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -114,10 +112,8 @@ func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(projects); err != nil {
+	if err := httpResponse(w, http.StatusOK, projects); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -166,10 +162,8 @@ func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(projectGroups); err != nil {
+	if err := httpResponse(w, http.StatusOK, projectGroups); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -199,9 +193,7 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(projectGroup); err != nil {
+	if err := httpResponse(w, http.StatusCreated, projectGroup); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }

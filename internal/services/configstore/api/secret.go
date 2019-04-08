@@ -57,10 +57,8 @@ func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(secret); err != nil {
+	if err := httpResponse(w, http.StatusOK, secret); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -111,10 +109,8 @@ func (h *SecretsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(secrets); err != nil {
+	if err := httpResponse(w, http.StatusOK, secrets); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -152,10 +148,8 @@ func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(secret); err != nil {
+	if err := httpResponse(w, http.StatusCreated, secret); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -181,6 +175,9 @@ func (h *DeleteSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	err = h.ch.DeleteSecret(ctx, parentType, parentRef, secretName)
 	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+	}
+	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }

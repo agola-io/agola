@@ -58,10 +58,8 @@ func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(remoteSource); err != nil {
+	if err := httpResponse(w, http.StatusOK, remoteSource); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -95,10 +93,8 @@ func (h *RemoteSourceByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(remoteSource); err != nil {
+	if err := httpResponse(w, http.StatusOK, remoteSource); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -128,10 +124,8 @@ func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(remoteSource); err != nil {
+	if err := httpResponse(w, http.StatusCreated, remoteSource); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -152,6 +146,9 @@ func (h *DeleteRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 
 	err := h.ch.DeleteRemoteSource(ctx, remoteSourceName)
 	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+	}
+	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -204,9 +201,7 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(remoteSources); err != nil {
+	if err := httpResponse(w, http.StatusOK, remoteSources); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }

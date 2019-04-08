@@ -15,6 +15,7 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/url"
 
@@ -24,17 +25,56 @@ import (
 	"github.com/sorintlab/agola/internal/util"
 )
 
+type ErrorResponse struct {
+	Message string `json:"message"`
+}
+
+func ErrorResponseFromError(err error) *ErrorResponse {
+	if util.IsErrBadRequest(err) {
+		return &ErrorResponse{Message: err.Error()}
+	}
+
+	// on generic error return an generic message to not leak the real error
+	return &ErrorResponse{Message: "internal server error"}
+}
+
 func httpError(w http.ResponseWriter, err error) bool {
 	if err != nil {
+		response := ErrorResponseFromError(err)
+		resj, merr := json.Marshal(response)
+		if merr != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return true
+		}
 		if util.IsErrBadRequest(err) {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write(resj)
 		} else {
-			http.Error(w, "", http.StatusInternalServerError)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write(resj)
 		}
 		return true
 	}
 
 	return false
+}
+
+func httpResponse(w http.ResponseWriter, code int, res interface{}) error {
+	w.Header().Set("Content-Type", "application/json")
+
+	if res != nil {
+		resj, err := json.Marshal(res)
+		if err != nil {
+			httpError(w, err)
+			return err
+		}
+		w.WriteHeader(code)
+		_, err = w.Write(resj)
+		return err
+	}
+
+	w.WriteHeader(code)
+	return nil
 }
 
 func GetConfigTypeRef(r *http.Request) (types.ConfigType, string, error) {
