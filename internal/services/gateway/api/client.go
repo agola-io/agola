@@ -30,7 +30,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-var jsonContent = http.Header{"content-type": []string{"application/json"}}
+var jsonContent = http.Header{"Content-Type": []string{"application/json"}}
 
 // Client represents a Gogs API client.
 type Client struct {

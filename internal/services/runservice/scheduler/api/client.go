@@ -30,7 +30,7 @@ import (
 	rstypes "github.com/sorintlab/agola/internal/services/runservice/types"
 )
 
-var jsonContent = http.Header{"content-type": []string{"application/json"}}
+var jsonContent = http.Header{"Content-Type": []string{"application/json"}}
 
 // Client represents a Gogs API client.
 type Client struct {
