@@ -15,18 +15,16 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
 
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
+	"github.com/sorintlab/agola/internal/services/gateway/command"
 	"github.com/sorintlab/agola/internal/services/types"
-	"github.com/sorintlab/agola/internal/util"
 	"go.uber.org/zap"
 
 	"github.com/gorilla/mux"
-	"github.com/pkg/errors"
 )
 
 type CreateOrgRequest struct {
@@ -34,12 +32,12 @@ type CreateOrgRequest struct {
 }
 
 type CreateOrgHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ch  *command.CommandHandler
 }
 
-func NewCreateOrgHandler(logger *zap.Logger, configstoreClient *csapi.Client) *CreateOrgHandler {
-	return &CreateOrgHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewCreateOrgHandler(logger *zap.Logger, ch *command.CommandHandler) *CreateOrgHandler {
+	return &CreateOrgHandler{log: logger.Sugar(), ch: ch}
 }
 
 func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -52,39 +50,20 @@ func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	org, err := h.createOrg(ctx, &req)
-	if err != nil {
-		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	if err := json.NewEncoder(w).Encode(org); err != nil {
-		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
-	}
-
-}
-
-func (h *CreateOrgHandler) createOrg(ctx context.Context, req *CreateOrgRequest) (*OrgResponse, error) {
-	if !util.ValidateName(req.Name) {
-		return nil, errors.Errorf("invalid org name %q", req.Name)
-	}
-
-	u := &types.Organization{
+	creq := &command.CreateOrgRequest{
 		Name: req.Name,
 	}
 
-	h.log.Infof("creating org")
-	u, _, err := h.configstoreClient.CreateOrg(ctx, u)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create org")
+	org, err := h.ch.CreateOrg(ctx, creq)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
 	}
-	h.log.Infof("org %s created, ID: %s", u.Name, u.ID)
 
-	res := createOrgResponse(u)
-	return res, nil
+	res := createOrgResponse(org)
+	if err := httpResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Errorf("err: %+v", err)
+	}
 }
 
 type DeleteOrgHandler struct {
@@ -111,43 +90,9 @@ func (h *DeleteOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		httpError(w, err)
 		return
 	}
-}
 
-type CurrentOrgHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
-}
-
-func NewCurrentOrgHandler(logger *zap.Logger, configstoreClient *csapi.Client) *CurrentOrgHandler {
-	return &CurrentOrgHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
-}
-
-func (h *CurrentOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	orgIDVal := ctx.Value("orgid")
-	if orgIDVal == nil {
-		http.Error(w, "", http.StatusBadRequest)
-		return
-	}
-	orgID := orgIDVal.(string)
-
-	org, resp, err := h.configstoreClient.GetOrg(ctx, orgID)
-	if err != nil {
-		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
+	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
-	}
-
-	res := createOrgResponse(org)
-	if err := json.NewEncoder(w).Encode(res); err != nil {
-		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -177,10 +122,8 @@ func (h *OrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res := createOrgResponse(org)
-	if err := json.NewEncoder(w).Encode(res); err != nil {
+	if err := httpResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -210,15 +153,9 @@ func (h *OrgByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res := createOrgResponse(org)
-	if err := json.NewEncoder(w).Encode(res); err != nil {
+	if err := httpResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
-}
-
-type OrgsResponse struct {
-	Orgs []*OrgResponse `json:"orgs"`
 }
 
 type OrgResponse struct {
@@ -226,10 +163,10 @@ type OrgResponse struct {
 	Name string `json:"name"`
 }
 
-func createOrgResponse(r *types.Organization) *OrgResponse {
+func createOrgResponse(o *types.Organization) *OrgResponse {
 	org := &OrgResponse{
-		ID:   r.ID,
-		Name: r.Name,
+		ID:   o.ID,
+		Name: o.Name,
 	}
 	return org
 }
@@ -287,13 +224,7 @@ func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for i, p := range csorgs {
 		orgs[i] = createOrgResponse(p)
 	}
-	orgsResponse := &OrgsResponse{
-		Orgs: orgs,
-	}
-
-	if err := json.NewEncoder(w).Encode(orgsResponse); err != nil {
+	if err := httpResponse(w, http.StatusOK, orgs); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }

@@ -132,10 +132,8 @@ func (h *VariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		variables[i] = createVariableResponse(v, cssecrets)
 	}
 
-	if err := json.NewEncoder(w).Encode(variables); err != nil {
+	if err := httpResponse(w, http.StatusOK, variables); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -218,11 +216,8 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	h.log.Infof("variable %s created, ID: %s", v.Name, v.ID)
 
 	res := createVariableResponse(v, cssecrets)
-
-	if err := json.NewEncoder(w).Encode(res); err != nil {
+	if err := httpResponse(w, http.StatusCreated, res); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -263,5 +258,8 @@ func (h *DeleteVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		h.log.Errorf("err: %+v", err)
 		httpError(w, err)
 		return
+	}
+	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Errorf("err: %+v", err)
 	}
 }

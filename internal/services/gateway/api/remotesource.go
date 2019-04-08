@@ -65,12 +65,9 @@ func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	}
 
 	res := createRemoteSourceResponse(rs)
-	if err := json.NewEncoder(w).Encode(res); err != nil {
+	if err := httpResponse(w, http.StatusCreated, res); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
-
 }
 
 func (h *CreateRemoteSourceHandler) createRemoteSource(ctx context.Context, req *CreateRemoteSourceRequest) (*types.RemoteSource, error) {
@@ -165,10 +162,8 @@ func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 
 	res := createRemoteSourceResponse(rs)
-	if err := json.NewEncoder(w).Encode(res); err != nil {
+	if err := httpResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -226,9 +221,7 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		remoteSources[i] = createRemoteSourceResponse(rs)
 	}
 
-	if err := json.NewEncoder(w).Encode(remoteSources); err != nil {
+	if err := httpResponse(w, http.StatusOK, remoteSources); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }

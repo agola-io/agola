@@ -64,11 +64,8 @@ func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res := createUserResponse(u)
-
-	if err := json.NewEncoder(w).Encode(res); err != nil {
+	if err := httpResponse(w, http.StatusCreated, res); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -129,10 +126,8 @@ func (h *CurrentUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res := createUserResponse(user)
-	if err := json.NewEncoder(w).Encode(res); err != nil {
+	if err := httpResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -162,10 +157,8 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res := createUserResponse(user)
-	if err := json.NewEncoder(w).Encode(res); err != nil {
+	if err := httpResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -195,10 +188,8 @@ func (h *UserByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res := createUserResponse(user)
-	if err := json.NewEncoder(w).Encode(res); err != nil {
+	if err := httpResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -276,10 +267,8 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		users[i] = createUserResponse(p)
 	}
 
-	if err := json.NewEncoder(w).Encode(users); err != nil {
+	if err := httpResponse(w, http.StatusOK, users); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -315,19 +304,16 @@ func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	resp, err := h.createUserLA(ctx, userName, req)
+	res, err := h.createUserLA(ctx, userName, req)
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
+	if err := httpResponse(w, http.StatusCreated, res); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
-
 }
 
 func (h *CreateUserLAHandler) createUserLA(ctx context.Context, userName string, req *CreateUserLARequest) (*CreateUserLAResponse, error) {
@@ -376,6 +362,10 @@ func (h *DeleteUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		httpError(w, err)
 		return
 	}
+
+	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Errorf("err: %+v", err)
+	}
 }
 
 type CreateUserTokenRequest struct {
@@ -418,13 +408,12 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	resp := &CreateUserTokenResponse{
+	res := &CreateUserTokenResponse{
 		Token: token,
 	}
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
+
+	if err := httpResponse(w, http.StatusCreated, res); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -449,6 +438,10 @@ func (h *DeleteUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.log.Errorf("err: %+v", err)
 		httpError(w, err)
 		return
+	}
+
+	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Errorf("err: %+v", err)
 	}
 }
 
@@ -480,17 +473,15 @@ func (h *RegisterUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	resp, err := h.registerUser(ctx, req)
+	res, err := h.registerUser(ctx, req)
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
+	if err := httpResponse(w, http.StatusCreated, res); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -540,19 +531,16 @@ func (h *AuthorizeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, err := h.authorize(ctx, req)
+	res, err := h.authorize(ctx, req)
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
+	if err := httpResponse(w, http.StatusCreated, res); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
-
 }
 
 func (h *AuthorizeHandler) authorize(ctx context.Context, req *LoginUserRequest) (*AuthorizeResponse, error) {
@@ -609,23 +597,19 @@ func (h *LoginUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, err := h.loginUser(ctx, req)
+	res, err := h.loginUser(ctx, req)
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
+	if err := httpResponse(w, http.StatusCreated, res); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
-
 }
 
 func (h *LoginUserHandler) loginUser(ctx context.Context, req *LoginUserRequest) (*LoginUserResponse, error) {
-
 	creq := &command.LoginUserRequest{
 		RemoteSourceName: req.RemoteSourceName,
 	}
@@ -647,9 +631,4 @@ func (h *LoginUserHandler) loginUser(ctx context.Context, req *LoginUserRequest)
 		User:  createUserResponse(authresp.User),
 	}
 	return resp, nil
-}
-
-type RemoteSourceAuthResponse struct {
-	Oauth2Redirect string      `json:"oauth_2_redirect"`
-	Response       interface{} `json:"response"`
 }

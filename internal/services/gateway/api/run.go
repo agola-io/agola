@@ -213,10 +213,8 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res := createRunResponse(runResp.Run, runResp.RunConfig)
-	if err := json.NewEncoder(w).Encode(res); err != nil {
+	if err := httpResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -257,11 +255,8 @@ func (h *RuntaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	rct := rc.Tasks[rt.ID]
 
 	res := createRunTaskResponse(rt, rct)
-
-	if err := json.NewEncoder(w).Encode(res); err != nil {
+	if err := httpResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -353,11 +348,8 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for i, r := range runsResp.Runs {
 		runs[i] = createRunsResponse(r)
 	}
-
-	if err := json.NewEncoder(w).Encode(runs); err != nil {
+	if err := httpResponse(w, http.StatusOK, runs); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 

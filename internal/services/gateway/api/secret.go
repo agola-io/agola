@@ -78,10 +78,8 @@ func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		secrets[i] = createSecretResponse(s)
 	}
 
-	if err := json.NewEncoder(w).Encode(secrets); err != nil {
+	if err := httpResponse(w, http.StatusOK, secrets); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -148,11 +146,8 @@ func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	h.log.Infof("secret %s created, ID: %s", s.Name, s.ID)
 
 	res := createSecretResponse(s)
-
-	if err := json.NewEncoder(w).Encode(res); err != nil {
+	if err := httpResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -192,5 +187,8 @@ func (h *DeleteSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		h.log.Errorf("err: %+v", err)
 		httpError(w, err)
 		return
+	}
+	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Errorf("err: %+v", err)
 	}
 }

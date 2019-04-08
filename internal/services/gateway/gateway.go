@@ -184,7 +184,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	orgHandler := api.NewOrgHandler(logger, g.configstoreClient)
 	orgByNameHandler := api.NewOrgByNameHandler(logger, g.configstoreClient)
 	orgsHandler := api.NewOrgsHandler(logger, g.configstoreClient)
-	createOrgHandler := api.NewCreateOrgHandler(logger, g.configstoreClient)
+	createOrgHandler := api.NewCreateOrgHandler(logger, g.ch)
 	deleteOrgHandler := api.NewDeleteOrgHandler(logger, g.configstoreClient)
 
 	runHandler := api.NewRunHandler(logger, g.runserviceClient)
