@@ -62,10 +62,8 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(user); err != nil {
+	if err := httpResponse(w, http.StatusOK, user); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -99,10 +97,8 @@ func (h *UserByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(user); err != nil {
+	if err := httpResponse(w, http.StatusOK, user); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -151,10 +147,8 @@ func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(user); err != nil {
+	if err := httpResponse(w, http.StatusCreated, user); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -175,6 +169,9 @@ func (h *DeleteUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	err := h.ch.DeleteUser(ctx, userName)
 	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+	}
+	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -298,10 +295,8 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := json.NewEncoder(w).Encode(users); err != nil {
+	if err := httpResponse(w, http.StatusOK, users); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -350,10 +345,8 @@ func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(user); err != nil {
+	if err := httpResponse(w, http.StatusCreated, user); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -374,6 +367,9 @@ func (h *DeleteUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	err := h.ch.DeleteUserLA(ctx, userName, laID)
 	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+	}
+	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -423,10 +419,8 @@ func (h *UpdateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(user); err != nil {
+	if err := httpResponse(w, http.StatusOK, user); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -468,10 +462,8 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	resp := &CreateUserTokenResponse{
 		Token: token,
 	}
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
+	if err := httpResponse(w, http.StatusCreated, resp); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -492,6 +484,9 @@ func (h *DeleteUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 
 	err := h.ch.DeleteUserToken(ctx, userName, tokenName)
 	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+	}
+	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }

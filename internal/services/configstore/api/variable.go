@@ -78,10 +78,8 @@ func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(variables); err != nil {
+	if err := httpResponse(w, http.StatusOK, variables); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -121,10 +119,8 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(variable); err != nil {
+	if err := httpResponse(w, http.StatusCreated, variable); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
 
@@ -150,6 +146,9 @@ func (h *DeleteVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 	err = h.ch.DeleteVariable(ctx, parentType, parentRef, variableName)
 	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+	}
+	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
