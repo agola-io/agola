@@ -117,9 +117,12 @@ func (s *Scheduler) advanceRunTasks(ctx context.Context, r *types.Run) error {
 		}
 
 		if canRun {
-			if !rt.WaitingApproval && rct.NeedsApproval {
+			// now that the task can run set it to waiting approval if needed
+			if rct.NeedsApproval && !rt.WaitingApproval && !rt.Approved {
 				rt.WaitingApproval = true
-			} else {
+			}
+			// Run only if approved if needed
+			if !rct.NeedsApproval || (rct.NeedsApproval && rt.Approved) {
 				tasksToRun = append(tasksToRun, rt)
 			}
 		}

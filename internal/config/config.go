@@ -305,6 +305,7 @@ func (e *Element) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		Task          string        `yaml:"task"`
 		Depends       []interface{} `yaml:"depends"`
 		IgnoreFailure bool          `yaml:"ignore_failure"`
+		Approval      bool          `yaml:"approval"`
 		When          *when         `yaml:"when"`
 	}
 
@@ -317,6 +318,7 @@ func (e *Element) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	e.Name = te.Name
 	e.Task = te.Task
 	e.IgnoreFailure = te.IgnoreFailure
+	e.Approval = te.Approval
 
 	depends := make([]*Depend, len(te.Depends))
 	for i, dependEntry := range te.Depends {

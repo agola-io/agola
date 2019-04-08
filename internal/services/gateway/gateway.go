@@ -191,6 +191,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	runsHandler := api.NewRunsHandler(logger, g.runserviceClient)
 	runtaskHandler := api.NewRuntaskHandler(logger, g.runserviceClient)
 	runActionsHandler := api.NewRunActionsHandler(logger, g.runserviceClient)
+	runTaskActionsHandler := api.NewRunTaskActionsHandler(logger, g.runserviceClient)
 
 	logsHandler := api.NewLogsHandler(logger, g.runserviceClient)
 
@@ -263,6 +264,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/runs/{runid}", authForcedHandler(runHandler)).Methods("GET")
 	apirouter.Handle("/runs/{runid}/actions", authForcedHandler(runActionsHandler)).Methods("PUT")
 	apirouter.Handle("/runs/{runid}/tasks/{taskid}", authForcedHandler(runtaskHandler)).Methods("GET")
+	apirouter.Handle("/runs/{runid}/tasks/{taskid}/actions", runTaskActionsHandler).Methods("PUT")
 	apirouter.Handle("/runs", authForcedHandler(runsHandler)).Methods("GET")
 
 	router.Handle("/login", loginUserHandler).Methods("POST")

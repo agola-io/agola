@@ -771,7 +771,7 @@ func TestGenRunConfig(t *testing.T) {
 									Tag:    &types.WhenConditions{Include: []types.WhenCondition{{Match: "v1.x"}, {Match: "v2.x"}}},
 									Ref: &types.WhenConditions{
 										Include: []types.WhenCondition{{Match: "master"}},
-										Exclude: []types.WhenCondition{{Match: "/branch01/", Type: types.WhenConditionTypeRegExp}, {Match: "branch02"}},
+										Exclude: []types.WhenCondition{{Match: "branch01", Type: types.WhenConditionTypeRegExp}, {Match: "branch02"}},
 									},
 								},
 							},

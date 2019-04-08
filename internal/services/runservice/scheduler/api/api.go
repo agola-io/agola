@@ -585,7 +585,6 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	runID := vars["runid"]
 	taskID := vars["taskid"]
 
-	// TODO(sgotti) Check authorized call from client
 	var req RunTaskActionsRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {

@@ -70,6 +70,10 @@ type RunResponseTask struct {
 	Level   int                            `json:"level"`
 	Depends []*rstypes.RunConfigTaskDepend `json:"depends"`
 
+	WaitingApproval     bool              `json:"waiting_approval"`
+	Approved            bool              `json:"approved"`
+	ApprovalAnnotations map[string]string `json:"approval_annotations"`
+
 	StartTime *time.Time `json:"start_time"`
 	EndTime   *time.Time `json:"end_time"`
 }
@@ -78,6 +82,10 @@ type RunTaskResponse struct {
 	ID     string                `json:"id"`
 	Name   string                `json:"name"`
 	Status rstypes.RunTaskStatus `json:"status"`
+
+	WaitingApproval     bool              `json:"waiting_approval"`
+	Approved            bool              `json:"approved"`
+	ApprovalAnnotations map[string]string `json:"approval_annotations"`
 
 	SetupStep *RunTaskResponseSetupStep `json:"setup_step"`
 	Steps     []*RunTaskResponseStep    `json:"steps"`
@@ -139,6 +147,10 @@ func createRunResponseTask(r *rstypes.Run, rt *rstypes.RunTask, rct *rstypes.Run
 		StartTime: rt.StartTime,
 		EndTime:   rt.EndTime,
 
+		WaitingApproval:     rt.WaitingApproval,
+		Approved:            rt.Approved,
+		ApprovalAnnotations: rt.ApprovalAnnotations,
+
 		Level:   rct.Level,
 		Depends: rct.Depends,
 	}
@@ -151,7 +163,12 @@ func createRunTaskResponse(rt *rstypes.RunTask, rct *rstypes.RunConfigTask) *Run
 		ID:     rt.ID,
 		Name:   rct.Name,
 		Status: rt.Status,
-		Steps:  make([]*RunTaskResponseStep, len(rt.Steps)),
+
+		WaitingApproval:     rt.WaitingApproval,
+		Approved:            rt.Approved,
+		ApprovalAnnotations: rt.ApprovalAnnotations,
+
+		Steps: make([]*RunTaskResponseStep, len(rt.Steps)),
 
 		StartTime: rt.StartTime,
 		EndTime:   rt.EndTime,
@@ -390,12 +407,12 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	switch req.ActionType {
 	case RunActionTypeRestart:
-		req := &rsapi.RunCreateRequest{
+		rsreq := &rsapi.RunCreateRequest{
 			RunID:     runID,
 			FromStart: req.FromStart,
 		}
 
-		resp, err := h.runserviceClient.CreateRun(ctx, req)
+		resp, err := h.runserviceClient.CreateRun(ctx, rsreq)
 		if err != nil {
 			if resp != nil && resp.StatusCode == http.StatusNotFound {
 				http.Error(w, err.Error(), http.StatusNotFound)
@@ -407,11 +424,11 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case RunActionTypeStop:
-		req := &rsapi.RunActionsRequest{
+		rsreq := &rsapi.RunActionsRequest{
 			ActionType: rsapi.RunActionTypeStop,
 		}
 
-		resp, err := h.runserviceClient.RunActions(ctx, runID, req)
+		resp, err := h.runserviceClient.RunActions(ctx, runID, rsreq)
 		if err != nil {
 			if resp != nil && resp.StatusCode == http.StatusNotFound {
 				http.Error(w, err.Error(), http.StatusNotFound)
@@ -421,6 +438,62 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			httpError(w, err)
 			return
 		}
+	}
+}
+
+type RunTaskActionType string
+
+const (
+	RunTaskActionTypeApprove RunTaskActionType = "approve"
+)
+
+type RunTaskActionsRequest struct {
+	ActionType          RunTaskActionType `json:"action_type"`
+	ApprovalAnnotations map[string]string `json:"approval_annotations,omitempty"`
+}
+
+type RunTaskActionsHandler struct {
+	log              *zap.SugaredLogger
+	runserviceClient *rsapi.Client
+}
+
+func NewRunTaskActionsHandler(logger *zap.Logger, runserviceClient *rsapi.Client) *RunTaskActionsHandler {
+	return &RunTaskActionsHandler{log: logger.Sugar(), runserviceClient: runserviceClient}
+}
+
+func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	runID := vars["runid"]
+	taskID := vars["taskid"]
+
+	var req RunTaskActionsRequest
+	d := json.NewDecoder(r.Body)
+	if err := d.Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	switch req.ActionType {
+	case RunTaskActionTypeApprove:
+		rsreq := &rsapi.RunTaskActionsRequest{
+			ActionType:          rsapi.RunTaskActionTypeApprove,
+			ApprovalAnnotations: req.ApprovalAnnotations,
+		}
+
+		resp, err := h.runserviceClient.RunTaskActions(ctx, runID, taskID, rsreq)
+		if err != nil {
+			if resp != nil && resp.StatusCode == http.StatusNotFound {
+				http.Error(w, err.Error(), http.StatusNotFound)
+				return
+			}
+			h.log.Errorf("err: %+v", err)
+			httpError(w, err)
+			return
+		}
+	default:
+		http.Error(w, "", http.StatusBadRequest)
+		return
 	}
 }
 

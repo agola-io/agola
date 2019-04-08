@@ -182,6 +182,7 @@ func GenRunConfig(uuid util.UUIDGenerator, c *config.Config, pipelineName string
 			Steps:         steps,
 			IgnoreFailure: cpe.IgnoreFailure,
 			Skip:          !include,
+			NeedsApproval: cpe.Approval,
 		}
 
 		rc.Tasks[t.ID] = t

@@ -421,10 +421,11 @@ func (s *CommandHandler) ApproveRunTask(ctx context.Context, req *RunTaskApprove
 		return errors.Errorf("run %q, task %q is not in waiting approval state", r.ID, req.TaskID)
 	}
 
-	if !task.Approved {
+	if task.Approved {
 		return errors.Errorf("run %q, task %q is already approved", r.ID, req.TaskID)
 	}
 
+	task.WaitingApproval = false
 	task.Approved = true
 	task.ApprovalAnnotations = req.ApprovalAnnotations
 
