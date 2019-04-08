@@ -312,7 +312,7 @@ func (c *Client) DeleteUserToken(ctx context.Context, userName, tokenName string
 
 func (c *Client) GetRun(ctx context.Context, runID string) (*RunResponse, *http.Response, error) {
 	run := new(RunResponse)
-	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/run/%s", runID), nil, jsonContent, nil, run)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/runs/%s", runID), nil, jsonContent, nil, run)
 	return run, resp, err
 }
 

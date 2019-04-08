@@ -260,9 +260,9 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/orgs/{orgname}", authForcedHandler(orgByNameHandler)).Methods("GET")
 	apirouter.Handle("/orgs/{orgname}", authForcedHandler(deleteOrgHandler)).Methods("DELETE")
 
-	apirouter.Handle("/run/{runid}", authForcedHandler(runHandler)).Methods("GET")
-	apirouter.Handle("/run/{runid}/actions", authForcedHandler(runActionsHandler)).Methods("PUT")
-	apirouter.Handle("/run/{runid}/task/{taskid}", authForcedHandler(runtaskHandler)).Methods("GET")
+	apirouter.Handle("/runs/{runid}", authForcedHandler(runHandler)).Methods("GET")
+	apirouter.Handle("/runs/{runid}/actions", authForcedHandler(runActionsHandler)).Methods("PUT")
+	apirouter.Handle("/runs/{runid}/tasks/{taskid}", authForcedHandler(runtaskHandler)).Methods("GET")
 	apirouter.Handle("/runs", authForcedHandler(runsHandler)).Methods("GET")
 
 	router.Handle("/login", loginUserHandler).Methods("POST")
