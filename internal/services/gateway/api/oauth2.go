@@ -18,7 +18,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
@@ -81,13 +80,11 @@ func (h *OAuth2CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		response = &RegisterUserResponse{}
 	}
 
-	resp := RemoteSourceAuthResult{
+	res := RemoteSourceAuthResult{
 		RequestType: string(cresp.RequestType),
 		Response:    response,
 	}
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
+	if err := httpResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
 	}
 }
