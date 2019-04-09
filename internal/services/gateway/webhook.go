@@ -338,7 +338,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 	return 0, "", nil
 }
 
-func (h *webhooksHandler) createRuns(ctx context.Context, configData []byte, group string, annotations, env, variables map[string]string, webhookData *types.WebhookData) error {
+func (h *webhooksHandler) createRuns(ctx context.Context, configData []byte, group string, annotations, staticEnv, variables map[string]string, webhookData *types.WebhookData) error {
 	config, err := config.ParseConfig([]byte(configData))
 	if err != nil {
 		return errors.Wrapf(err, "failed to parse config")
@@ -347,14 +347,16 @@ func (h *webhooksHandler) createRuns(ctx context.Context, configData []byte, gro
 
 	//h.log.Debugf("pipeline: %s", createRunOpts.PipelineName)
 	for _, pipeline := range config.Pipelines {
-		rc := runconfig.GenRunConfig(util.DefaultUUIDGenerator{}, config, pipeline.Name, env, variables, webhookData.Branch, webhookData.Tag, webhookData.Ref)
+		rcts := runconfig.GenRunConfigTasks(util.DefaultUUIDGenerator{}, config, pipeline.Name, variables, webhookData.Branch, webhookData.Tag, webhookData.Ref)
 
-		h.log.Debugf("rc: %s", util.Dump(rc))
+		h.log.Debugf("rcts: %s", util.Dump(rcts))
 		h.log.Infof("group: %s", group)
 		createRunReq := &rsapi.RunCreateRequest{
-			RunConfig:   rc,
-			Group:       group,
-			Annotations: annotations,
+			RunConfigTasks:    rcts,
+			Group:             group,
+			Name:              pipeline.Name,
+			StaticEnvironment: staticEnv,
+			Annotations:       annotations,
 		}
 
 		if _, err := h.runserviceClient.CreateRun(ctx, createRunReq); err != nil {

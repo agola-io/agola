@@ -480,19 +480,22 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type RunCreateRequest struct {
-	// new run
-	RunConfig *types.RunConfig `json:"run_config"`
+	// new run fields
+	RunConfigTasks    map[string]*types.RunConfigTask `json:"run_config_tasks"`
+	Name              string                          `json:"name"`
+	Group             string                          `json:"group"`
+	StaticEnvironment map[string]string               `json:"static_environment"`
 
-	// existing run
-	RunID       string   `json:"run_id"`
-	RunConfigID string   `json:"run_config_id"`
-	FromStart   bool     `json:"from_start"`
-	ResetTasks  []string `json:"reset_tasks"`
+	// existing run fields
+	RunID      string   `json:"run_id"`
+	FromStart  bool     `json:"from_start"`
+	ResetTasks []string `json:"reset_tasks"`
 
-	Group                   string            `json:"group"`
-	Environment             map[string]string `json:"environment"`
-	Annotations             map[string]string `json:"annotations"`
-	ChangeGroupsUpdateToken string            `json:"changeup_update_tokens"`
+	// common fields
+	Environment map[string]string `json:"environment"`
+	Annotations map[string]string `json:"annotations"`
+
+	ChangeGroupsUpdateToken string `json:"changeup_update_tokens"`
 }
 
 type RunCreateHandler struct {
@@ -518,12 +521,15 @@ func (h *RunCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	creq := &command.RunCreateRequest{
-		RunConfig:               req.RunConfig,
-		RunID:                   req.RunID,
-		RunConfigID:             req.RunConfigID,
-		FromStart:               req.FromStart,
-		ResetTasks:              req.ResetTasks,
-		Group:                   req.Group,
+		RunConfigTasks:    req.RunConfigTasks,
+		Name:              req.Name,
+		Group:             req.Group,
+		StaticEnvironment: req.StaticEnvironment,
+
+		RunID:      req.RunID,
+		FromStart:  req.FromStart,
+		ResetTasks: req.ResetTasks,
+
 		Environment:             req.Environment,
 		Annotations:             req.Annotations,
 		ChangeGroupsUpdateToken: req.ChangeGroupsUpdateToken,

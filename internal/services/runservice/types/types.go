@@ -33,7 +33,6 @@ const (
 type RunBundle struct {
 	Run *Run
 	Rc  *RunConfig
-	Rd  *RunData
 }
 
 type RunCounter struct {
@@ -251,13 +250,15 @@ type RunTaskStep struct {
 	EndTime   *time.Time `json:"end_time,omitempty"`
 }
 
-// RunData
+// RunConfig
 
-// RunData is the data for a RUN. It contains everything that isn't a state
-// (it's contained in a Run) and that may use a lot of space. It lives in the
-// storage. There is a RunData for every Run.
-type RunData struct {
-	ID string `json:"id,omitempty"`
+// RunConfig is the run configuration.
+// It contains everything that isn't a state (that is contained in a Run) and
+// that may use a lot of space. It lives in the storage. There is a RunConfig
+// for every Run.
+type RunConfig struct {
+	ID   string `json:"id,omitempty"`
+	Name string `json:"name,omitempty"`
 
 	// Group is the run group of the run. Every run is assigned to a specific group
 	// i.e. project/$projectid/$branch
@@ -266,27 +267,18 @@ type RunData struct {
 	// also needed to fetch them when they aren't indexed in the readdb.
 	Group string `json:"group,omitempty"`
 
-	// Environment contains all environment variables that are different between runs also if using the same RunConfig
-	// (like secrets that may change or user provided enviroment specific to this run)
-	Environment map[string]string `json:"environment,omitempty"`
-
 	// Annotations contain custom run properties
-	// Note: Annotations are currently both saved in a Run and in RunData to easily return them without loading RunData from the lts
+	// Note: Annotations are currently both saved in a Run and in RunConfig to
+	// easily return them without loading RunConfig from the lts
 	Annotations map[string]string `json:"annotations,omitempty"`
-}
 
-// RunConfig
-
-// RunConfig is the run configuration. It lives in the storage. It can be
-// copied (i.e when we create a new run from an previous run).
-// It could also be shared but to simplify the run delete logic we will just
-// copy it when creating a new run as a modified previous run.
-type RunConfig struct {
-	ID   string `json:"id,omitempty"`
-	Name string `json:"name,omitempty"`
-
-	// Environment contains all environment variables that won't change when
+	// StaticEnvironment contains all environment variables that won't change when
 	// generating a new run (like COMMIT_SHA, BRANCH, REPOSITORY_URL etc...)
+	StaticEnvironment map[string]string `json:"static_environment,omitempty"`
+
+	// Environment contains all environment variables that are different between
+	// runs recreations (like secrets that may change or user provided enviroment
+	// specific to this run)
 	Environment map[string]string `json:"environment,omitempty"`
 
 	Tasks map[string]*RunConfigTask `json:"tasks,omitempty"`

@@ -205,25 +205,25 @@ func TestGenTasksLevels(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			inRunConfig := &rstypes.RunConfig{Tasks: map[string]*rstypes.RunConfigTask{}}
+			inRcts := map[string]*rstypes.RunConfigTask{}
 			for _, t := range tt.in {
-				inRunConfig.Tasks[t.ID] = &rstypes.RunConfigTask{
+				inRcts[t.ID] = &rstypes.RunConfigTask{
 					ID:      t.ID,
 					Level:   t.Level,
 					Depends: t.Depends,
 				}
 
 			}
-			outRunConfig := &rstypes.RunConfig{Tasks: map[string]*rstypes.RunConfigTask{}}
+			outRcts := map[string]*rstypes.RunConfigTask{}
 			for _, t := range tt.out {
-				outRunConfig.Tasks[t.ID] = &rstypes.RunConfigTask{
+				outRcts[t.ID] = &rstypes.RunConfigTask{
 					ID:      t.ID,
 					Level:   t.Level,
 					Depends: t.Depends,
 				}
 
 			}
-			if err := GenTasksLevels(inRunConfig); err != nil {
+			if err := GenTasksLevels(inRcts); err != nil {
 				if err.Error() != tt.err.Error() {
 					t.Fatalf("got error: %v, want error: %v", err, tt.err)
 				}
@@ -232,8 +232,8 @@ func TestGenTasksLevels(t *testing.T) {
 			if tt.err != nil {
 				t.Fatalf("got nil error, want error: %v", tt.err)
 			}
-			if !reflect.DeepEqual(inRunConfig.Tasks, outRunConfig.Tasks) {
-				t.Fatalf("got %s, expected %s", util.Dump(inRunConfig), util.Dump(outRunConfig))
+			if !reflect.DeepEqual(inRcts, outRcts) {
+				t.Fatalf("got %s, expected %s", util.Dump(inRcts), util.Dump(outRcts))
 			}
 		})
 	}
@@ -473,9 +473,9 @@ func TestGetAllParents(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			inRunConfig := &rstypes.RunConfig{Tasks: map[string]*rstypes.RunConfigTask{}}
+			inRcts := map[string]*rstypes.RunConfigTask{}
 			for _, t := range tt.in {
-				inRunConfig.Tasks[t.ID] = &rstypes.RunConfigTask{
+				inRcts[t.ID] = &rstypes.RunConfigTask{
 					ID:      t.ID,
 					Level:   t.Level,
 					Depends: t.Depends,
@@ -483,8 +483,8 @@ func TestGetAllParents(t *testing.T) {
 
 			}
 
-			for _, task := range inRunConfig.Tasks {
-				allParents := GetAllParents(inRunConfig, task)
+			for _, task := range inRcts {
+				allParents := GetAllParents(inRcts, task)
 
 				allParentsList := []string{}
 				for _, p := range allParents {
@@ -658,9 +658,9 @@ func TestCheckRunConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			inRunConfig := &rstypes.RunConfig{Tasks: map[string]*rstypes.RunConfigTask{}}
+			inRcts := map[string]*rstypes.RunConfigTask{}
 			for _, t := range tt.in {
-				inRunConfig.Tasks[t.ID] = &rstypes.RunConfigTask{
+				inRcts[t.ID] = &rstypes.RunConfigTask{
 					Name:    fmt.Sprintf("task%s", t.ID),
 					ID:      t.ID,
 					Level:   t.Level,
@@ -669,7 +669,7 @@ func TestCheckRunConfig(t *testing.T) {
 
 			}
 
-			if err := CheckRunConfig(inRunConfig); err != nil {
+			if err := CheckRunConfigTasks(inRcts); err != nil {
 				if errs, ok := err.(*util.Errors); ok {
 					if !errs.Equal(tt.err) {
 						t.Fatalf("got error: %v, want error: %v", err, tt.err)
@@ -692,9 +692,8 @@ func TestGenRunConfig(t *testing.T) {
 	tests := []struct {
 		name      string
 		in        *config.Config
-		env       map[string]string
 		variables map[string]string
-		out       *rstypes.RunConfig
+		out       map[string]*rstypes.RunConfigTask
 	}{
 		{
 			name: "test runconfig generation",
@@ -779,43 +778,34 @@ func TestGenRunConfig(t *testing.T) {
 					},
 				},
 			},
-			env: map[string]string{
-				"ENV01": "ENVVALUE01",
-			},
 			variables: map[string]string{
 				"variable01": "VARVALUE01",
 			},
-			out: &rstypes.RunConfig{
-				Name: "pipeline01",
-				Environment: map[string]string{
-					"ENV01": "ENVVALUE01",
-				},
-				Tasks: map[string]*rstypes.RunConfigTask{
-					uuid.New("element01").String(): &rstypes.RunConfigTask{
-						ID:   uuid.New("element01").String(),
-						Name: "element01", Depends: []*rstypes.RunConfigTaskDepend{},
-						Runtime: &rstypes.Runtime{Type: rstypes.RuntimeType("pod"),
-							Containers: []*rstypes.Container{
-								{
-									Image: "image01",
-									Environment: map[string]string{
-										"ENV01":             "ENV01",
-										"ENVFROMVARIABLE01": "VARVALUE01",
-									},
+			out: map[string]*rstypes.RunConfigTask{
+				uuid.New("element01").String(): &rstypes.RunConfigTask{
+					ID:   uuid.New("element01").String(),
+					Name: "element01", Depends: []*rstypes.RunConfigTaskDepend{},
+					Runtime: &rstypes.Runtime{Type: rstypes.RuntimeType("pod"),
+						Containers: []*rstypes.Container{
+							{
+								Image: "image01",
+								Environment: map[string]string{
+									"ENV01":             "ENV01",
+									"ENVFROMVARIABLE01": "VARVALUE01",
 								},
 							},
 						},
-						Environment: map[string]string{
-							"ENV01":             "ENV01",
-							"ENVFROMVARIABLE01": "VARVALUE01",
-						},
-						Steps: []interface{}{
-							&rstypes.RunStep{Step: rstypes.Step{Type: "run", Name: "command01"}, Command: "command01", Environment: map[string]string{}},
-							&rstypes.RunStep{Step: rstypes.Step{Type: "run", Name: "name different than command"}, Command: "command02", Environment: map[string]string{}},
-							&rstypes.RunStep{Step: rstypes.Step{Type: "run", Name: "command03"}, Command: "command03", Environment: map[string]string{"ENV01": "ENV01", "ENVFROMVARIABLE01": "VARVALUE01"}},
-						},
-						Skip: true,
 					},
+					Environment: map[string]string{
+						"ENV01":             "ENV01",
+						"ENVFROMVARIABLE01": "VARVALUE01",
+					},
+					Steps: []interface{}{
+						&rstypes.RunStep{Step: rstypes.Step{Type: "run", Name: "command01"}, Command: "command01", Environment: map[string]string{}},
+						&rstypes.RunStep{Step: rstypes.Step{Type: "run", Name: "name different than command"}, Command: "command02", Environment: map[string]string{}},
+						&rstypes.RunStep{Step: rstypes.Step{Type: "run", Name: "command03"}, Command: "command03", Environment: map[string]string{"ENV01": "ENV01", "ENVFROMVARIABLE01": "VARVALUE01"}},
+					},
+					Skip: true,
 				},
 			},
 		},
@@ -823,7 +813,7 @@ func TestGenRunConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			out := GenRunConfig(uuid, tt.in, "pipeline01", tt.env, tt.variables, "", "", "")
+			out := GenRunConfigTasks(uuid, tt.in, "pipeline01", tt.variables, "", "", "")
 
 			//if err != nil {
 			//	t.Fatalf("unexpected error: %v", err)

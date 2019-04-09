@@ -55,7 +55,6 @@ const (
 var (
 	StorageDataDir        = ""
 	StorageRunsDir        = path.Join(StorageDataDir, "runs")
-	StorageRunsDataDir    = path.Join(StorageDataDir, "runsdata")
 	StorageRunsConfigDir  = path.Join(StorageDataDir, "runsconfig")
 	StorageRunsIndexesDir = path.Join(StorageDataDir, "runsindexes")
 	StorageCountersDir    = path.Join(StorageDataDir, "counters")
@@ -67,10 +66,6 @@ const (
 
 func StorageRunFile(runID string) string {
 	return path.Join(StorageRunsDir, runID)
-}
-
-func StorageRunDataFile(runID string) string {
-	return path.Join(StorageRunsDataDir, runID)
 }
 
 func StorageRunConfigFile(runID string) string {
@@ -85,7 +80,6 @@ type DataType string
 
 const (
 	DataTypeRun        DataType = "run"
-	DataTypeRunData    DataType = "rundata"
 	DataTypeRunConfig  DataType = "runconfig"
 	DataTypeRunCounter DataType = "runcounter"
 )
@@ -94,8 +88,6 @@ func DataToPathFunc(dataType string, id string) string {
 	switch DataType(dataType) {
 	case DataTypeRun:
 		return StorageRunFile(id)
-	case DataTypeRunData:
-		return StorageRunDataFile(id)
 	case DataTypeRunConfig:
 		return StorageRunConfigFile(id)
 	case DataTypeRunCounter:

@@ -117,14 +117,20 @@ func (s *CommandHandler) StopRun(ctx context.Context, req *RunStopRequest) error
 }
 
 type RunCreateRequest struct {
-	RunConfig               *types.RunConfig
-	RunID                   string
-	RunConfigID             string
-	FromStart               bool
-	ResetTasks              []string
-	Group                   string
-	Environment             map[string]string
-	Annotations             map[string]string
+	RunConfigTasks    map[string]*types.RunConfigTask
+	Name              string
+	Group             string
+	StaticEnvironment map[string]string
+
+	// existing run fields
+	RunID      string
+	FromStart  bool
+	ResetTasks []string
+
+	// common fields
+	Environment map[string]string
+	Annotations map[string]string
+
 	ChangeGroupsUpdateToken string
 }
 
@@ -148,8 +154,7 @@ func (s *CommandHandler) CreateRun(ctx context.Context, req *RunCreateRequest) (
 }
 
 func (s *CommandHandler) newRun(ctx context.Context, req *RunCreateRequest) (*types.RunBundle, error) {
-	rc := req.RunConfig
-	var run *types.Run
+	rcts := req.RunConfigTasks
 
 	if req.Group == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("run group is empty"))
@@ -158,53 +163,50 @@ func (s *CommandHandler) newRun(ctx context.Context, req *RunCreateRequest) (*ty
 		return nil, util.NewErrBadRequest(errors.Errorf("run group %q must be an absolute path", req.Group))
 	}
 
-	// generate a new run sequence that will be the same for the run, runconfig and rundata
+	// generate a new run sequence that will be the same for the run and runconfig
 	seq, err := sequence.IncSequence(ctx, s.e, common.EtcdRunSequenceKey)
 	if err != nil {
 		return nil, err
 	}
 	id := seq.String()
 
-	if err := runconfig.CheckRunConfig(rc); err != nil {
+	if err := runconfig.CheckRunConfigTasks(rcts); err != nil {
 		return nil, util.NewErrBadRequest(err)
 	}
-	// set the run config ID
-	rc.ID = id
 
 	// generate tasks levels
-	if err := runconfig.GenTasksLevels(rc); err != nil {
+	if err := runconfig.GenTasksLevels(rcts); err != nil {
 		return nil, util.NewErrBadRequest(err)
 	}
 
-	rd := &types.RunData{
-		ID:          id,
-		Group:       req.Group,
-		Environment: req.Environment,
-		Annotations: req.Annotations,
+	rc := &types.RunConfig{
+		ID:                id,
+		Name:              req.Name,
+		Group:             req.Group,
+		Tasks:             rcts,
+		StaticEnvironment: req.StaticEnvironment,
+		Environment:       req.Environment,
+		Annotations:       req.Annotations,
 	}
 
-	run, err = s.genRun(ctx, rc, rd)
-	if err != nil {
-		return nil, util.NewErrBadRequest(err)
-	}
+	run := s.genRun(ctx, rc)
 	s.log.Debugf("created run: %s", util.Dump(run))
 
 	return &types.RunBundle{
 		Run: run,
 		Rc:  rc,
-		Rd:  rd,
 	}, nil
 }
 
 func (s *CommandHandler) recreateRun(ctx context.Context, req *RunCreateRequest) (*types.RunBundle, error) {
-	// generate a new run sequence that will be the same for the run, runconfig and rundata
+	// generate a new run sequence that will be the same for the run and runconfig
 	seq, err := sequence.IncSequence(ctx, s.e, common.EtcdRunSequenceKey)
 	if err != nil {
 		return nil, err
 	}
 	id := seq.String()
 
-	// fetch the existing runconfig, rundata and run
+	// fetch the existing runconfig and run
 	s.log.Infof("creating run from existing run")
 	rc, err := store.LTSGetRunConfig(s.wal, req.RunID)
 	if err != nil {
@@ -212,13 +214,8 @@ func (s *CommandHandler) recreateRun(ctx context.Context, req *RunCreateRequest)
 	}
 	// update the run config ID
 	rc.ID = id
-
-	rd, err := store.LTSGetRunData(s.wal, req.RunID)
-	if err != nil {
-		return nil, util.NewErrBadRequest(errors.Wrapf(err, "rundata %q doens't exist", req.RunID))
-	}
-	// update the run data ID
-	rd.ID = id
+	// update the run config Environment
+	rc.Environment = req.Environment
 
 	run, err := store.GetRunEtcdOrLTS(ctx, s.e, s.wal, req.RunID)
 	if err != nil {
@@ -288,14 +285,12 @@ func (s *CommandHandler) recreateRun(ctx context.Context, req *RunCreateRequest)
 	return &types.RunBundle{
 		Run: run,
 		Rc:  rc,
-		Rd:  rd,
 	}, nil
 }
 
 func (s *CommandHandler) saveRun(ctx context.Context, rb *types.RunBundle, runcgt *types.ChangeGroupsUpdateToken) error {
 	run := rb.Run
 	rc := rb.Rc
-	rd := rb.Rd
 
 	c, cgt, err := s.getRunCounter(run.Group)
 	s.log.Infof("c: %d, cgt: %s", c, util.Dump(cgt))
@@ -320,13 +315,6 @@ func (s *CommandHandler) saveRun(ctx context.Context, rb *types.RunBundle, runcg
 		return err
 	}
 	actions = append(actions, rca)
-
-	// persist run data
-	rda, err := store.LTSSaveRunDataAction(rd)
-	if err != nil {
-		return err
-	}
-	actions = append(actions, rda)
 
 	if _, err = s.wal.WriteWal(ctx, actions, cgt); err != nil {
 		return err
@@ -374,12 +362,12 @@ func (s *CommandHandler) genRunTask(ctx context.Context, rct *types.RunConfigTas
 	return rt
 }
 
-func (s *CommandHandler) genRun(ctx context.Context, rc *types.RunConfig, rd *types.RunData) (*types.Run, error) {
+func (s *CommandHandler) genRun(ctx context.Context, rc *types.RunConfig) *types.Run {
 	r := &types.Run{
 		ID:          rc.ID,
 		Name:        rc.Name,
-		Group:       rd.Group,
-		Annotations: rd.Annotations,
+		Group:       rc.Group,
+		Annotations: rc.Annotations,
 		Phase:       types.RunPhaseQueued,
 		Result:      types.RunResultUnknown,
 		RunTasks:    make(map[string]*types.RunTask),
@@ -391,7 +379,7 @@ func (s *CommandHandler) genRun(ctx context.Context, rc *types.RunConfig, rd *ty
 		r.RunTasks[rt.ID] = rt
 	}
 
-	return r, nil
+	return r
 }
 
 type RunTaskApproveRequest struct {

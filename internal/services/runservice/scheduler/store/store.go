@@ -163,38 +163,6 @@ func LTSSaveRunConfigAction(rc *types.RunConfig) (*wal.Action, error) {
 	return action, nil
 }
 
-func LTSGetRunData(wal *wal.WalManager, runDataID string) (*types.RunData, error) {
-	runDataPath := common.StorageRunDataFile(runDataID)
-	rdf, _, err := wal.ReadObject(runDataPath, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer rdf.Close()
-	d := json.NewDecoder(rdf)
-	var rd *types.RunData
-	if err := d.Decode(&rd); err != nil {
-		return nil, err
-	}
-
-	return rd, nil
-}
-
-func LTSSaveRunDataAction(rd *types.RunData) (*wal.Action, error) {
-	rdj, err := json.Marshal(rd)
-	if err != nil {
-		return nil, err
-	}
-
-	action := &wal.Action{
-		ActionType: wal.ActionTypePut,
-		DataType:   string(common.DataTypeRunData),
-		ID:         rd.ID,
-		Data:       rdj,
-	}
-
-	return action, nil
-}
-
 func LTSGetRun(wal *wal.WalManager, runID string) (*types.Run, error) {
 	runPath := common.StorageRunFile(runID)
 	rf, _, err := wal.ReadObject(runPath, nil)
