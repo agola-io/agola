@@ -91,11 +91,6 @@ func (s *Scheduler) advanceRunTasks(ctx context.Context, r *types.Run) error {
 		return errors.Wrapf(err, "cannot get run config %q", r.ID)
 	}
 	log.Debugf("rc: %s", util.Dump(rc))
-	rd, err := store.LTSGetRunData(s.wal, r.ID)
-	if err != nil {
-		return errors.Wrapf(err, "cannot get run data %q", r.ID)
-	}
-	log.Debugf("rd: %s", util.Dump(rd))
 
 	tasksToRun := []*types.RunTask{}
 	// get tasks that can be executed
@@ -109,7 +104,7 @@ func (s *Scheduler) advanceRunTasks(ctx context.Context, r *types.Run) error {
 		}
 
 		rct := rc.Tasks[rt.ID]
-		parents := runconfig.GetParents(rc, rct)
+		parents := runconfig.GetParents(rc.Tasks, rct)
 		canRun := true
 		for _, p := range parents {
 			rp := r.RunTasks[p.ID]
@@ -139,7 +134,7 @@ func (s *Scheduler) advanceRunTasks(ctx context.Context, r *types.Run) error {
 	log.Debugf("tasksToRun: %s", util.Dump(tasksToRun))
 
 	for _, rt := range tasksToRun {
-		et, err := s.genExecutorTask(ctx, r, rt, rc, rd)
+		et, err := s.genExecutorTask(ctx, r, rt, rc)
 		if err != nil {
 			return err
 		}
@@ -181,7 +176,7 @@ func (s *Scheduler) chooseExecutor(ctx context.Context) (*types.Executor, error)
 	return nil, nil
 }
 
-func (s *Scheduler) genExecutorTask(ctx context.Context, r *types.Run, rt *types.RunTask, rc *types.RunConfig, rd *types.RunData) (*types.ExecutorTask, error) {
+func (s *Scheduler) genExecutorTask(ctx context.Context, r *types.Run, rt *types.RunTask, rc *types.RunConfig) (*types.ExecutorTask, error) {
 	executor, err := s.chooseExecutor(ctx)
 	if err != nil {
 		return nil, err
@@ -196,9 +191,9 @@ func (s *Scheduler) genExecutorTask(ctx context.Context, r *types.Run, rt *types
 	if rct.Environment != nil {
 		environment = rct.Environment
 	}
+	mergeEnv(environment, rc.StaticEnvironment)
+	// run config Environment variables ovverride every other environment variable
 	mergeEnv(environment, rc.Environment)
-	// run data Environment variables ovverride every other environment variable
-	mergeEnv(environment, rd.Environment)
 
 	et := &types.ExecutorTask{
 		// The executorTask ID must be the same as the runTask ID so we can detect if
@@ -228,7 +223,7 @@ func (s *Scheduler) genExecutorTask(ctx context.Context, r *types.Run, rt *types
 
 	// calculate workspace layers
 	ws := make(types.Workspace, rct.Level+1)
-	rctAllParents := runconfig.GetAllParents(rc, rct)
+	rctAllParents := runconfig.GetAllParents(rc.Tasks, rct)
 	log.Debugf("rctAllParents: %s", util.Dump(rctAllParents))
 	for _, rctParent := range rctAllParents {
 		log.Debugf("rctParent: %s", util.Dump(rctParent))
