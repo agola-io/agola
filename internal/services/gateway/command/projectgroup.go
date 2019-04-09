@@ -35,9 +35,9 @@ func (c *CommandHandler) CreateProjectGroup(ctx context.Context, req *CreateProj
 		return nil, util.NewErrBadRequest(errors.Errorf("invalid projectGroup name %q", req.Name))
 	}
 
-	user, _, err := c.configstoreClient.GetUser(ctx, req.CurrentUserID)
+	user, resp, err := c.configstoreClient.GetUser(ctx, req.CurrentUserID)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get user %q", req.CurrentUserID)
+		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get user %q", req.CurrentUserID))
 	}
 
 	parentID := req.ParentID
@@ -55,9 +55,9 @@ func (c *CommandHandler) CreateProjectGroup(ctx context.Context, req *CreateProj
 	}
 
 	c.log.Infof("creating projectGroup")
-	p, _, err = c.configstoreClient.CreateProjectGroup(ctx, p)
+	p, resp, err = c.configstoreClient.CreateProjectGroup(ctx, p)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create projectGroup")
+		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to create projectGroup"))
 	}
 	c.log.Infof("projectGroup %s created, ID: %s", p.Name, p.ID)
 

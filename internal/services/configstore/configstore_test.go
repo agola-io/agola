@@ -323,7 +323,7 @@ func TestUser(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	t.Run("create duplicated user", func(t *testing.T) {
-		expectedErr := fmt.Sprintf("bad request: user with name %q already exists", "user01")
+		expectedErr := fmt.Sprintf("user with name %q already exists", "user01")
 		_, err := cs.ch.CreateUser(ctx, &command.CreateUserRequest{UserName: "user01"})
 		if err == nil {
 			t.Fatalf("expected error %v, got nil err", expectedErr)
@@ -432,7 +432,7 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 
 	t.Run("create duplicated project in user root project group", func(t *testing.T) {
 		projectName := "project01"
-		expectedErr := fmt.Sprintf("bad request: project with name %q, path %q already exists", projectName, path.Join("user", user.UserName, projectName))
+		expectedErr := fmt.Sprintf("project with name %q, path %q already exists", projectName, path.Join("user", user.UserName, projectName))
 		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.UserName)}})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
@@ -440,7 +440,7 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 	})
 	t.Run("create duplicated project in org root project group", func(t *testing.T) {
 		projectName := "project01"
-		expectedErr := fmt.Sprintf("bad request: project with name %q, path %q already exists", projectName, path.Join("org", org.Name, projectName))
+		expectedErr := fmt.Sprintf("project with name %q, path %q already exists", projectName, path.Join("org", org.Name, projectName))
 		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
@@ -449,7 +449,7 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 
 	t.Run("create duplicated project in user non root project group", func(t *testing.T) {
 		projectName := "project01"
-		expectedErr := fmt.Sprintf("bad request: project with name %q, path %q already exists", projectName, path.Join("user", user.UserName, "projectgroup01", projectName))
+		expectedErr := fmt.Sprintf("project with name %q, path %q already exists", projectName, path.Join("user", user.UserName, "projectgroup01", projectName))
 		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.UserName, "projectgroup01")}})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
@@ -457,7 +457,7 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 	})
 	t.Run("create duplicated project in org non root project group", func(t *testing.T) {
 		projectName := "project01"
-		expectedErr := fmt.Sprintf("bad request: project with name %q, path %q already exists", projectName, path.Join("org", org.Name, "projectgroup01", projectName))
+		expectedErr := fmt.Sprintf("project with name %q, path %q already exists", projectName, path.Join("org", org.Name, "projectgroup01", projectName))
 		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name, "projectgroup01")}})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
@@ -465,14 +465,14 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 	})
 
 	t.Run("create project in unexistent project group", func(t *testing.T) {
-		expectedErr := `bad request: project group with id "unexistentid" doesn't exist`
+		expectedErr := `project group with id "unexistentid" doesn't exist`
 		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: "unexistentid"}})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
 	})
 	t.Run("create project without parent id specified", func(t *testing.T) {
-		expectedErr := "bad request: project parent id required"
+		expectedErr := "project parent id required"
 		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01"})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)

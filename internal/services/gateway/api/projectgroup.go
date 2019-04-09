@@ -19,9 +19,11 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/pkg/errors"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/gateway/command"
 	"github.com/sorintlab/agola/internal/services/types"
+	"github.com/sorintlab/agola/internal/util"
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
@@ -49,16 +51,16 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	var req CreateProjectGroupRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
 
-	ctxUserID := ctx.Value("userid")
-	if ctxUserID == nil {
-		http.Error(w, "no authenticated user", http.StatusBadRequest)
+	userIDVal := ctx.Value("userid")
+	if userIDVal == nil {
+		httpError(w, util.NewErrBadRequest(errors.Errorf("user not authenticated")))
 		return
 	}
-	userID := ctxUserID.(string)
+	userID := userIDVal.(string)
 	h.log.Infof("userID: %q", userID)
 
 	creq := &command.CreateProjectGroupRequest{
@@ -68,9 +70,8 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	}
 
 	projectGroup, err := h.ch.CreateProjectGroup(ctx, creq)
-	if err != nil {
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -94,18 +95,13 @@ func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	vars := mux.Vars(r)
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
 
 	projectGroup, resp, err := h.configstoreClient.GetProjectGroup(ctx, projectGroupRef)
-	if err != nil {
-		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
+	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
 		return
 	}
 
@@ -129,18 +125,13 @@ func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 	vars := mux.Vars(r)
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
 
 	csprojects, resp, err := h.configstoreClient.GetProjectGroupProjects(ctx, projectGroupRef)
-	if err != nil {
-		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
+	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
 		return
 	}
 
@@ -168,18 +159,13 @@ func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.
 	vars := mux.Vars(r)
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
 
 	cssubgroups, resp, err := h.configstoreClient.GetProjectGroupSubgroups(ctx, projectGroupRef)
-	if err != nil {
-		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
+	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
 		return
 	}
 

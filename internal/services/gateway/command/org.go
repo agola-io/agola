@@ -40,9 +40,9 @@ func (c *CommandHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (
 	}
 
 	c.log.Infof("creating organization")
-	org, _, err := c.configstoreClient.CreateOrg(ctx, org)
+	org, resp, err := c.configstoreClient.CreateOrg(ctx, org)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create organization")
+		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to create organization"))
 	}
 	c.log.Infof("organization %s created, ID: %s", org.Name, org.ID)
 

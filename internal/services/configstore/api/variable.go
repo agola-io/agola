@@ -101,7 +101,7 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	var variable *types.Variable
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&variable); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
 

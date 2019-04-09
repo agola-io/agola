@@ -30,7 +30,10 @@ type ErrorResponse struct {
 }
 
 func ErrorResponseFromError(err error) *ErrorResponse {
-	if util.IsErrBadRequest(err) {
+	switch {
+	case util.IsErrBadRequest(err):
+		fallthrough
+	case util.IsErrNotFound(err):
 		return &ErrorResponse{Message: err.Error()}
 	}
 
@@ -39,24 +42,28 @@ func ErrorResponseFromError(err error) *ErrorResponse {
 }
 
 func httpError(w http.ResponseWriter, err error) bool {
-	if err != nil {
-		response := ErrorResponseFromError(err)
-		resj, merr := json.Marshal(response)
-		if merr != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return true
-		}
-		if util.IsErrBadRequest(err) {
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write(resj)
-		} else {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write(resj)
-		}
-		return true
+	if err == nil {
+		return false
 	}
 
-	return false
+	response := ErrorResponseFromError(err)
+	resj, merr := json.Marshal(response)
+	if merr != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return true
+	}
+	switch {
+	case util.IsErrBadRequest(err):
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write(resj)
+	case util.IsErrNotFound(err):
+		w.WriteHeader(http.StatusNotFound)
+		w.Write(resj)
+	default:
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write(resj)
+	}
+	return true
 }
 
 func httpResponse(w http.ResponseWriter, code int, res interface{}) error {
@@ -75,6 +82,29 @@ func httpResponse(w http.ResponseWriter, code int, res interface{}) error {
 
 	w.WriteHeader(code)
 	return nil
+}
+
+func httpErrorFromRemote(w http.ResponseWriter, resp *http.Response, err error) bool {
+	if err != nil {
+		// on generic error return an generic message to not leak the real error
+		response := &ErrorResponse{Message: "internal server error"}
+		if resp != nil {
+			response = &ErrorResponse{Message: err.Error()}
+		}
+		resj, merr := json.Marshal(response)
+		if merr != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return true
+		}
+		if resp != nil {
+			w.WriteHeader(resp.StatusCode)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		w.Write(resj)
+		return true
+	}
+	return false
 }
 
 func GetConfigTypeRef(r *http.Request) (types.ConfigType, string, error) {

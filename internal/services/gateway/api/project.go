@@ -16,13 +16,14 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/url"
 
+	"github.com/pkg/errors"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/gateway/command"
 	"github.com/sorintlab/agola/internal/services/types"
+	"github.com/sorintlab/agola/internal/util"
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
@@ -53,16 +54,16 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	var req CreateProjectRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
 
-	ctxUserID := ctx.Value("userid")
-	if ctxUserID == nil {
-		http.Error(w, "no authenticated user", http.StatusBadRequest)
+	userIDVal := ctx.Value("userid")
+	if userIDVal == nil {
+		httpError(w, util.NewErrBadRequest(errors.Errorf("user not authenticated")))
 		return
 	}
-	userID := ctxUserID.(string)
+	userID := userIDVal.(string)
 	h.log.Infof("userID: %q", userID)
 
 	creq := &command.CreateProjectRequest{
@@ -102,7 +103,7 @@ func (h *ProjectReconfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	vars := mux.Vars(r)
 	projectRef, err := url.PathUnescape(vars["projectref"])
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
 
@@ -129,29 +130,19 @@ func (h *DeleteProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	vars := mux.Vars(r)
 	projectRef, err := url.PathUnescape(vars["projectref"])
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
 
 	project, resp, err := h.configstoreClient.GetProject(ctx, projectRef)
-	if err != nil {
-		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			http.Error(w, fmt.Sprintf("project with ref %q doesn't exist", projectRef), http.StatusNotFound)
-			return
-		}
+	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
 		return
 	}
 
 	resp, err = h.configstoreClient.DeleteProject(ctx, project.ID)
-	if err != nil {
-		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
+	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
 		return
 	}
 
@@ -174,18 +165,13 @@ func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	projectRef, err := url.PathUnescape(vars["projectref"])
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
 
 	project, resp, err := h.configstoreClient.GetProject(ctx, projectRef)
-	if err != nil {
-		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
+	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
 		return
 	}
 

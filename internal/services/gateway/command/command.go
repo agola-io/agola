@@ -15,8 +15,12 @@
 package command
 
 import (
+	"net/http"
+
+	"github.com/pkg/errors"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/gateway/common"
+	"github.com/sorintlab/agola/internal/util"
 
 	"go.uber.org/zap"
 )
@@ -37,4 +41,22 @@ func NewCommandHandler(logger *zap.Logger, sd *common.TokenSigningData, configst
 		apiExposedURL:     apiExposedURL,
 		webExposedURL:     webExposedURL,
 	}
+}
+
+func ErrFromRemote(resp *http.Response, err error) error {
+	if err == nil {
+		return nil
+	}
+
+	if resp != nil {
+		switch resp.StatusCode {
+		// remove wrapping from errors sent to client
+		case http.StatusBadRequest:
+			return util.NewErrBadRequest(errors.Cause(err))
+		case http.StatusNotFound:
+			return util.NewErrNotFound(errors.Cause(err))
+		}
+	}
+
+	return err
 }

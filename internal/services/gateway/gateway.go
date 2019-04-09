@@ -178,7 +178,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	deleteUserTokenHandler := api.NewDeleteUserTokenHandler(logger, g.configstoreClient)
 
 	remoteSourceHandler := api.NewRemoteSourceHandler(logger, g.configstoreClient)
-	createRemoteSourceHandler := api.NewCreateRemoteSourceHandler(logger, g.configstoreClient)
+	createRemoteSourceHandler := api.NewCreateRemoteSourceHandler(logger, g.ch)
 	remoteSourcesHandler := api.NewRemoteSourcesHandler(logger, g.configstoreClient)
 
 	orgHandler := api.NewOrgHandler(logger, g.configstoreClient)

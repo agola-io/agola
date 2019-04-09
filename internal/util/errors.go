@@ -15,7 +15,6 @@
 package util
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -64,7 +63,7 @@ type ErrBadRequest struct {
 }
 
 func (e *ErrBadRequest) Error() string {
-	return fmt.Sprintf("bad request: %s", e.Err.Error())
+	return e.Err.Error()
 }
 
 func NewErrBadRequest(err error) *ErrBadRequest {
@@ -73,5 +72,24 @@ func NewErrBadRequest(err error) *ErrBadRequest {
 
 func IsErrBadRequest(err error) bool {
 	_, ok := err.(*ErrBadRequest)
+	return ok
+}
+
+// ErrNotFound represent a not found error
+// it's used to differentiate an internal error from an user error
+type ErrNotFound struct {
+	Err error
+}
+
+func (e *ErrNotFound) Error() string {
+	return e.Err.Error()
+}
+
+func NewErrNotFound(err error) *ErrNotFound {
+	return &ErrNotFound{Err: err}
+}
+
+func IsErrNotFound(err error) bool {
+	_, ok := err.(*ErrNotFound)
 	return ok
 }

@@ -80,16 +80,14 @@ func (c *Client) getResponse(ctx context.Context, method, path string, query url
 		defer resp.Body.Close()
 		data, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return nil, err
+			return resp, err
 		}
 
-		if len(data) <= 1 {
-			return resp, errors.New(resp.Status)
+		errMap := make(map[string]interface{})
+		if err = json.Unmarshal(data, &errMap); err != nil {
+			return resp, fmt.Errorf("unknown api error (code: %d): %s", resp.StatusCode, string(data))
 		}
-
-		// TODO(sgotti) use a json error response
-
-		return resp, errors.New(string(data))
+		return resp, errors.New(errMap["message"].(string))
 	}
 
 	return resp, nil

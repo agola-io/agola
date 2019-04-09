@@ -15,19 +15,18 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
 
+	"github.com/pkg/errors"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
-	"github.com/sorintlab/agola/internal/services/gateway/common"
+	"github.com/sorintlab/agola/internal/services/gateway/command"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 	"go.uber.org/zap"
 
 	"github.com/gorilla/mux"
-	"github.com/pkg/errors"
 )
 
 type CreateRemoteSourceRequest struct {
@@ -40,12 +39,12 @@ type CreateRemoteSourceRequest struct {
 }
 
 type CreateRemoteSourceHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ch  *command.CommandHandler
 }
 
-func NewCreateRemoteSourceHandler(logger *zap.Logger, configstoreClient *csapi.Client) *CreateRemoteSourceHandler {
-	return &CreateRemoteSourceHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewCreateRemoteSourceHandler(logger *zap.Logger, ch *command.CommandHandler) *CreateRemoteSourceHandler {
+	return &CreateRemoteSourceHandler{log: logger.Sugar(), ch: ch}
 }
 
 func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -54,13 +53,21 @@ func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	var req CreateRemoteSourceRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
 
-	rs, err := h.createRemoteSource(ctx, &req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	creq := &command.CreateRemoteSourceRequest{
+		Name:               req.Name,
+		APIURL:             req.APIURL,
+		Type:               req.Type,
+		AuthType:           req.AuthType,
+		Oauth2ClientID:     req.Oauth2ClientID,
+		Oauth2ClientSecret: req.Oauth2ClientSecret,
+	}
+	rs, err := h.ch.CreateRemoteSource(ctx, creq)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
 		return
 	}
 
@@ -68,57 +75,6 @@ func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	if err := httpResponse(w, http.StatusCreated, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
-}
-
-func (h *CreateRemoteSourceHandler) createRemoteSource(ctx context.Context, req *CreateRemoteSourceRequest) (*types.RemoteSource, error) {
-	if !util.ValidateName(req.Name) {
-		return nil, errors.Errorf("invalid remotesource name %q", req.Name)
-	}
-
-	if req.Name == "" {
-		return nil, errors.Errorf("remotesource name required")
-	}
-	if req.APIURL == "" {
-		return nil, errors.Errorf("remotesource api url required")
-	}
-	if req.Type == "" {
-		return nil, errors.Errorf("remotesource type required")
-	}
-	if req.AuthType == "" {
-		return nil, errors.Errorf("remotesource auth type required")
-	}
-
-	// validate if the remote source type supports the required auth type
-	if !common.SourceSupportsAuthType(types.RemoteSourceType(req.Type), types.RemoteSourceAuthType(req.AuthType)) {
-		return nil, errors.Errorf("remotesource type %q doesn't support auth type %q", req.Type, req.AuthType)
-	}
-
-	if req.AuthType == string(types.RemoteSourceAuthTypeOauth2) {
-		if req.Oauth2ClientID == "" {
-			return nil, errors.Errorf("remotesource oauth2 clientid required")
-		}
-		if req.Oauth2ClientSecret == "" {
-			return nil, errors.Errorf("remotesource oauth2 client secret required")
-		}
-	}
-
-	rs := &types.RemoteSource{
-		Name:               req.Name,
-		Type:               types.RemoteSourceType(req.Type),
-		AuthType:           types.RemoteSourceAuthType(req.AuthType),
-		APIURL:             req.APIURL,
-		Oauth2ClientID:     req.Oauth2ClientID,
-		Oauth2ClientSecret: req.Oauth2ClientSecret,
-	}
-
-	h.log.Infof("creating remotesource")
-	rs, _, err := h.configstoreClient.CreateRemoteSource(ctx, rs)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create remotesource")
-	}
-	h.log.Infof("remotesource %s created, ID: %s", rs.Name, rs.ID)
-
-	return rs, nil
 }
 
 type RemoteSourceResponse struct {
@@ -151,13 +107,8 @@ func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	rsID := vars["id"]
 
 	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, rsID)
-	if err != nil {
-		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
+	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
 		return
 	}
 
@@ -187,12 +138,12 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		var err error
 		limit, err = strconv.Atoi(limitS)
 		if err != nil {
-			http.Error(w, "", http.StatusBadRequest)
+			httpError(w, util.NewErrBadRequest(errors.Wrapf(err, "cannot parse limit")))
 			return
 		}
 	}
 	if limit < 0 {
-		http.Error(w, "limit must be greater or equal than 0", http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(errors.Errorf("limit must be greater or equal than 0")))
 		return
 	}
 	if limit > MaxRunsLimit {
@@ -206,13 +157,8 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	start := query.Get("start")
 
 	csRemoteSources, resp, err := h.configstoreClient.GetRemoteSources(ctx, start, limit, asc)
-	if err != nil {
-		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
+	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
 		return
 	}
 

@@ -19,9 +19,11 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/pkg/errors"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/gateway/command"
 	"github.com/sorintlab/agola/internal/services/types"
+	"github.com/sorintlab/agola/internal/util"
 	"go.uber.org/zap"
 
 	"github.com/gorilla/mux"
@@ -46,7 +48,7 @@ func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var req CreateOrgRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
 
@@ -81,13 +83,8 @@ func (h *DeleteOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	orgName := vars["orgname"]
 
 	resp, err := h.configstoreClient.DeleteOrg(ctx, orgName)
-	if err != nil {
-		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
+	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
 		return
 	}
 
@@ -111,13 +108,8 @@ func (h *OrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	orgID := vars["orgid"]
 
 	org, resp, err := h.configstoreClient.GetOrg(ctx, orgID)
-	if err != nil {
-		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
+	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
 		return
 	}
 
@@ -142,13 +134,8 @@ func (h *OrgByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	orgName := vars["orgname"]
 
 	org, resp, err := h.configstoreClient.GetOrgByName(ctx, orgName)
-	if err != nil {
-		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
+	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
 		return
 	}
 
@@ -191,12 +178,12 @@ func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		limit, err = strconv.Atoi(limitS)
 		if err != nil {
-			http.Error(w, "", http.StatusBadRequest)
+			httpError(w, util.NewErrBadRequest(errors.Wrapf(err, "cannot parse limit")))
 			return
 		}
 	}
 	if limit < 0 {
-		http.Error(w, "limit must be greater or equal than 0", http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(errors.Errorf("limit must be greater or equal than 0")))
 		return
 	}
 	if limit > MaxRunsLimit {
@@ -210,13 +197,8 @@ func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := query.Get("start")
 
 	csorgs, resp, err := h.configstoreClient.GetOrgs(ctx, start, limit, asc)
-	if err != nil {
-		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
+	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
 		return
 	}
 

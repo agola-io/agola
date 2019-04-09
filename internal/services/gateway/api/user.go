@@ -21,10 +21,12 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/pkg/errors"
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/gateway/command"
 	"github.com/sorintlab/agola/internal/services/types"
+	"github.com/sorintlab/agola/internal/util"
 	"go.uber.org/zap"
 
 	"github.com/gorilla/mux"
@@ -49,7 +51,7 @@ func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var req CreateUserRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
 
@@ -84,14 +86,13 @@ func (h *DeleteUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	userName := vars["username"]
 
 	resp, err := h.configstoreClient.DeleteUser(ctx, userName)
-	if err != nil {
-		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
+	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
 		return
+	}
+
+	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Errorf("err: %+v", err)
 	}
 }
 
@@ -109,19 +110,14 @@ func (h *CurrentUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	userIDVal := ctx.Value("userid")
 	if userIDVal == nil {
-		http.Error(w, "", http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(errors.Errorf("user not authenticated")))
 		return
 	}
 	userID := userIDVal.(string)
 
 	user, resp, err := h.configstoreClient.GetUser(ctx, userID)
-	if err != nil {
-		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
+	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
 		return
 	}
 
@@ -146,13 +142,8 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	userID := vars["userid"]
 
 	user, resp, err := h.configstoreClient.GetUser(ctx, userID)
-	if err != nil {
-		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
+	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
 		return
 	}
 
@@ -177,13 +168,8 @@ func (h *UserByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	userName := vars["username"]
 
 	user, resp, err := h.configstoreClient.GetUserByName(ctx, userName)
-	if err != nil {
-		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
+	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
 		return
 	}
 
@@ -233,12 +219,12 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		limit, err = strconv.Atoi(limitS)
 		if err != nil {
-			http.Error(w, "", http.StatusBadRequest)
+			httpError(w, util.NewErrBadRequest(errors.Wrapf(err, "cannot parse limit")))
 			return
 		}
 	}
 	if limit < 0 {
-		http.Error(w, "limit must be greater or equal than 0", http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(errors.Errorf("limit must be greater or equal than 0")))
 		return
 	}
 	if limit > MaxRunsLimit {
@@ -252,13 +238,8 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := query.Get("start")
 
 	csusers, resp, err := h.configstoreClient.GetUsers(ctx, start, limit, asc)
-	if err != nil {
-		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
+	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
 		return
 	}
 
@@ -300,14 +281,13 @@ func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	var req *CreateUserLARequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
 
 	res, err := h.createUserLA(ctx, userName, req)
-	if err != nil {
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -356,10 +336,9 @@ func (h *DeleteUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	userName := vars["username"]
 	laID := vars["laid"]
 
-	_, err := h.configstoreClient.DeleteUserLA(ctx, userName, laID)
-	if err != nil {
+	resp, err := h.configstoreClient.DeleteUserLA(ctx, userName, laID)
+	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
 		return
 	}
 
@@ -393,7 +372,7 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	var req CreateUserTokenRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
 
@@ -433,10 +412,9 @@ func (h *DeleteUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	tokenName := vars["tokenname"]
 
 	h.log.Infof("deleting user %q token %q", userName, tokenName)
-	_, err := h.configstoreClient.DeleteUserToken(ctx, userName, tokenName)
-	if err != nil {
+	resp, err := h.configstoreClient.DeleteUserToken(ctx, userName, tokenName)
+	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
 		return
 	}
 
@@ -469,14 +447,13 @@ func (h *RegisterUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	var req *RegisterUserRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
 
 	res, err := h.registerUser(ctx, req)
-	if err != nil {
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -527,14 +504,13 @@ func (h *AuthorizeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var req *LoginUserRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
 
 	res, err := h.authorize(ctx, req)
-	if err != nil {
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -593,14 +569,13 @@ func (h *LoginUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var req *LoginUserRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
 
 	res, err := h.loginUser(ctx, req)
-	if err != nil {
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 

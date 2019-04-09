@@ -40,13 +40,15 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 		return nil, util.NewErrBadRequest(errors.Errorf("invalid project name %q", req.Name))
 	}
 
-	user, _, err := c.configstoreClient.GetUser(ctx, req.CurrentUserID)
+	user, resp, err := c.configstoreClient.GetUser(ctx, req.CurrentUserID)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get user %q", req.CurrentUserID)
+		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get user %q", req.CurrentUserID))
 	}
-	rs, _, err := c.configstoreClient.GetRemoteSourceByName(ctx, req.RemoteSourceName)
+
+	rs, resp, err := c.configstoreClient.GetRemoteSourceByName(ctx, req.RemoteSourceName)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get remote source %q", req.RemoteSourceName)
+		c.log.Errorf("err: %+v", err)
+		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get remote source %q", req.RemoteSourceName))
 	}
 	c.log.Infof("rs: %s", util.Dump(rs))
 	var la *types.LinkedAccount
@@ -101,9 +103,9 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 	}
 
 	c.log.Infof("creating project")
-	p, _, err = c.configstoreClient.CreateProject(ctx, p)
+	p, resp, err = c.configstoreClient.CreateProject(ctx, p)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create project")
+		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to create project"))
 	}
 	c.log.Infof("project %s created, ID: %s", p.Name, p.ID)
 
@@ -152,14 +154,14 @@ func (c *CommandHandler) SetupProject(ctx context.Context, rs *types.RemoteSourc
 }
 
 func (c *CommandHandler) ReconfigProject(ctx context.Context, projectRef string) error {
-	p, _, err := c.configstoreClient.GetProject(ctx, projectRef)
+	p, resp, err := c.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
-		return err
+		return ErrFromRemote(resp, errors.Wrapf(err, "failed to get project %q", projectRef))
 	}
 
-	user, _, err := c.configstoreClient.GetUserByLinkedAccount(ctx, p.LinkedAccountID)
+	user, resp, err := c.configstoreClient.GetUserByLinkedAccount(ctx, p.LinkedAccountID)
 	if err != nil {
-		return errors.Wrapf(err, "failed to get user with linked account id %q", p.LinkedAccountID)
+		return ErrFromRemote(resp, errors.Wrapf(err, "failed to get user with linked account id %q", p.LinkedAccountID))
 	}
 
 	la := user.LinkedAccounts[p.LinkedAccountID]
@@ -168,9 +170,9 @@ func (c *CommandHandler) ReconfigProject(ctx context.Context, projectRef string)
 		return errors.Errorf("linked account %q in user %q doesn't exist", p.LinkedAccountID, user.UserName)
 	}
 
-	rs, _, err := c.configstoreClient.GetRemoteSource(ctx, la.RemoteSourceID)
+	rs, resp, err := c.configstoreClient.GetRemoteSource(ctx, la.RemoteSourceID)
 	if err != nil {
-		return errors.Wrapf(err, "failed to get remote source %q", la.RemoteSourceID)
+		return ErrFromRemote(resp, errors.Wrapf(err, "failed to get remote source %q", la.RemoteSourceID))
 	}
 
 	return c.SetupProject(ctx, rs, la, &SetupProjectRequest{

@@ -18,10 +18,12 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/db"
 	"github.com/sorintlab/agola/internal/services/configstore/command"
 	"github.com/sorintlab/agola/internal/services/configstore/readdb"
 	"github.com/sorintlab/agola/internal/services/types"
+	"github.com/sorintlab/agola/internal/util"
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
@@ -53,7 +55,7 @@ func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if secret == nil {
-		http.Error(w, "", http.StatusNotFound)
+		httpError(w, util.NewErrNotFound(errors.Errorf("secret %q doesn't exist", secretID)))
 		return
 	}
 
@@ -135,7 +137,7 @@ func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	var secret *types.Secret
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&secret); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
 

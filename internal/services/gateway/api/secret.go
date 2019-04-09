@@ -62,14 +62,15 @@ func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var cssecrets []*types.Secret
+	var resp *http.Response
 	switch parentType {
 	case types.ConfigTypeProjectGroup:
-		cssecrets, _, err = h.configstoreClient.GetProjectGroupSecrets(ctx, parentRef, tree)
+		cssecrets, resp, err = h.configstoreClient.GetProjectGroupSecrets(ctx, parentRef, tree)
 	case types.ConfigTypeProject:
-		cssecrets, _, err = h.configstoreClient.GetProjectSecrets(ctx, parentRef, tree)
+		cssecrets, resp, err = h.configstoreClient.GetProjectSecrets(ctx, parentRef, tree)
 	}
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	if httpErrorFromRemote(w, resp, err) {
+		h.log.Errorf("err: %+v", err)
 		return
 	}
 
@@ -115,14 +116,13 @@ func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	var req CreateSecretRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
 
 	if !util.ValidateName(req.Name) {
-		err := errors.Errorf("invalid secret name %q", req.Name)
-		h.log.Errorf("err: %+v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(errors.Errorf("invalid secret name %q", req.Name)))
+		return
 	}
 
 	s := &types.Secret{
@@ -131,16 +131,17 @@ func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		Data: req.Data,
 	}
 
+	var resp *http.Response
 	switch parentType {
 	case types.ConfigTypeProjectGroup:
 		h.log.Infof("creating project group secret")
-		s, _, err = h.configstoreClient.CreateProjectGroupSecret(ctx, parentRef, s)
+		s, resp, err = h.configstoreClient.CreateProjectGroupSecret(ctx, parentRef, s)
 	case types.ConfigTypeProject:
 		h.log.Infof("creating project secret")
-		s, _, err = h.configstoreClient.CreateProjectSecret(ctx, parentRef, s)
+		s, resp, err = h.configstoreClient.CreateProjectSecret(ctx, parentRef, s)
 	}
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	if httpErrorFromRemote(w, resp, err) {
+		h.log.Errorf("err: %+v", err)
 		return
 	}
 	h.log.Infof("secret %s created, ID: %s", s.Name, s.ID)
@@ -179,15 +180,11 @@ func (h *DeleteSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		h.log.Infof("deleting project secret")
 		resp, err = h.configstoreClient.DeleteProjectSecret(ctx, parentRef, secretName)
 	}
-	if err != nil {
-		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
+	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
 		return
 	}
+
 	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
