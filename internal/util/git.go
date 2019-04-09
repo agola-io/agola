@@ -128,11 +128,11 @@ func (g *Git) Pipe(ctx context.Context, w io.Writer, r io.Reader, args ...string
 	return nil
 }
 
-type ErrNotFound struct {
+type ErrGitKeyNotFound struct {
 	Key string
 }
 
-func (e *ErrNotFound) Error() string {
+func (e *ErrGitKeyNotFound) Error() string {
 	return fmt.Sprintf("key `%q` was not found", e.Key)
 }
 
@@ -143,7 +143,7 @@ func (g *Git) ConfigGet(ctx context.Context, args ...string) (string, error) {
 	if exitError, ok := err.(*exec.ExitError); ok {
 		if waitStatus, ok := exitError.Sys().(syscall.WaitStatus); ok {
 			if waitStatus.ExitStatus() == 1 {
-				return "", &ErrNotFound{Key: args[len(args)-1]}
+				return "", &ErrGitKeyNotFound{Key: args[len(args)-1]}
 			}
 		}
 		return "", err
@@ -159,7 +159,7 @@ func (g *Git) ConfigSet(ctx context.Context, args ...string) (string, error) {
 	if exitError, ok := err.(*exec.ExitError); ok {
 		if waitStatus, ok := exitError.Sys().(syscall.WaitStatus); ok {
 			if waitStatus.ExitStatus() == 1 {
-				return "", &ErrNotFound{Key: args[len(args)-1]}
+				return "", &ErrGitKeyNotFound{Key: args[len(args)-1]}
 			}
 		}
 		return "", err
