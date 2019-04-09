@@ -120,6 +120,7 @@ type RunCreateRequest struct {
 	RunConfigTasks    map[string]*types.RunConfigTask
 	Name              string
 	Group             string
+	SetupErrors       []string
 	StaticEnvironment map[string]string
 
 	// existing run fields
@@ -155,12 +156,16 @@ func (s *CommandHandler) CreateRun(ctx context.Context, req *RunCreateRequest) (
 
 func (s *CommandHandler) newRun(ctx context.Context, req *RunCreateRequest) (*types.RunBundle, error) {
 	rcts := req.RunConfigTasks
+	setupErrors := req.SetupErrors
 
 	if req.Group == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("run group is empty"))
 	}
 	if !path.IsAbs(req.Group) {
 		return nil, util.NewErrBadRequest(errors.Errorf("run group %q must be an absolute path", req.Group))
+	}
+	if req.RunConfigTasks == nil && len(setupErrors) == 0 {
+		return nil, util.NewErrBadRequest(errors.Errorf("empty run config tasks and setup errors"))
 	}
 
 	// generate a new run sequence that will be the same for the run and runconfig
@@ -171,18 +176,23 @@ func (s *CommandHandler) newRun(ctx context.Context, req *RunCreateRequest) (*ty
 	id := seq.String()
 
 	if err := runconfig.CheckRunConfigTasks(rcts); err != nil {
-		return nil, util.NewErrBadRequest(err)
+		s.log.Errorf("check run config tasks failed: %+v", err)
+		setupErrors = append(setupErrors, err.Error())
 	}
 
 	// generate tasks levels
-	if err := runconfig.GenTasksLevels(rcts); err != nil {
-		return nil, util.NewErrBadRequest(err)
+	if len(setupErrors) == 0 {
+		if err := runconfig.GenTasksLevels(rcts); err != nil {
+			s.log.Errorf("gen tasks leveles failed: %+v", err)
+			setupErrors = append(setupErrors, err.Error())
+		}
 	}
 
 	rc := &types.RunConfig{
 		ID:                id,
 		Name:              req.Name,
 		Group:             req.Group,
+		SetupErrors:       setupErrors,
 		Tasks:             rcts,
 		StaticEnvironment: req.StaticEnvironment,
 		Environment:       req.Environment,
@@ -372,6 +382,11 @@ func (s *CommandHandler) genRun(ctx context.Context, rc *types.RunConfig) *types
 		Result:      types.RunResultUnknown,
 		RunTasks:    make(map[string]*types.RunTask),
 		EnqueueTime: util.TimePtr(time.Now()),
+	}
+
+	if len(rc.SetupErrors) > 0 {
+		r.Phase = types.RunPhaseSetupError
+		return r
 	}
 
 	for _, rct := range rc.Tasks {

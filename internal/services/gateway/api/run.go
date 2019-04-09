@@ -53,6 +53,7 @@ type RunResponse struct {
 	Annotations map[string]string `json:"annotations"`
 	Phase       rstypes.RunPhase  `json:"phase"`
 	Result      rstypes.RunResult `json:"result"`
+	SetupErrors []string          `json:"setup_errors"`
 
 	Tasks                map[string]*RunResponseTask `json:"tasks"`
 	TasksWaitingApproval []string                    `json:"tasks_waiting_approval"`
@@ -121,6 +122,7 @@ func createRunResponse(r *rstypes.Run, rc *rstypes.RunConfig) *RunResponse {
 		Annotations:          r.Annotations,
 		Phase:                r.Phase,
 		Result:               r.Result,
+		SetupErrors:          rc.SetupErrors,
 		Tasks:                make(map[string]*RunResponseTask),
 		TasksWaitingApproval: r.TasksWaitingApproval(),
 

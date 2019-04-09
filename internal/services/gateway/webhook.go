@@ -28,6 +28,7 @@ import (
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/gateway/common"
 	rsapi "github.com/sorintlab/agola/internal/services/runservice/scheduler/api"
+	rstypes "github.com/sorintlab/agola/internal/services/runservice/types"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
@@ -339,9 +340,29 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 }
 
 func (h *webhooksHandler) createRuns(ctx context.Context, configData []byte, group string, annotations, staticEnv, variables map[string]string, webhookData *types.WebhookData) error {
+	setupErrors := []string{}
+
 	config, err := config.ParseConfig([]byte(configData))
 	if err != nil {
-		return errors.Wrapf(err, "failed to parse config")
+		log.Errorf("failed to parse config: %+v", err)
+
+		// create a run (per config file) with a generic error since we cannot parse
+		// it and know how many pipelines are defined
+		setupErrors = append(setupErrors, err.Error())
+		createRunReq := &rsapi.RunCreateRequest{
+			RunConfigTasks:    nil,
+			Group:             group,
+			SetupErrors:       setupErrors,
+			Name:              rstypes.RunGenericSetupErrorName,
+			StaticEnvironment: staticEnv,
+			Annotations:       annotations,
+		}
+
+		if _, err := h.runserviceClient.CreateRun(ctx, createRunReq); err != nil {
+			log.Errorf("failed to create run: %+v", err)
+			return err
+		}
+		return nil
 	}
 	//h.log.Debugf("config: %v", util.Dump(config))
 
@@ -354,12 +375,14 @@ func (h *webhooksHandler) createRuns(ctx context.Context, configData []byte, gro
 		createRunReq := &rsapi.RunCreateRequest{
 			RunConfigTasks:    rcts,
 			Group:             group,
+			SetupErrors:       setupErrors,
 			Name:              pipeline.Name,
 			StaticEnvironment: staticEnv,
 			Annotations:       annotations,
 		}
 
 		if _, err := h.runserviceClient.CreateRun(ctx, createRunReq); err != nil {
+			log.Errorf("failed to create run: %+v", err)
 			return err
 		}
 	}

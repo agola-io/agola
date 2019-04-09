@@ -23,6 +23,10 @@ import (
 	"github.com/sorintlab/agola/internal/util"
 )
 
+const (
+	RunGenericSetupErrorName = "Setup Error"
+)
+
 type SortOrder int
 
 const (
@@ -43,10 +47,11 @@ type RunCounter struct {
 type RunPhase string
 
 const (
-	RunPhaseQueued    RunPhase = "queued"
-	RunPhaseCancelled RunPhase = "cancelled"
-	RunPhaseRunning   RunPhase = "running"
-	RunPhaseFinished  RunPhase = "finished"
+	RunPhaseSetupError RunPhase = "setuperror"
+	RunPhaseQueued     RunPhase = "queued"
+	RunPhaseCancelled  RunPhase = "cancelled"
+	RunPhaseRunning    RunPhase = "running"
+	RunPhaseFinished   RunPhase = "finished"
 )
 
 type RunResult string
@@ -59,7 +64,7 @@ const (
 )
 
 func (s RunPhase) IsFinished() bool {
-	return s == RunPhaseCancelled || s == RunPhaseFinished
+	return s == RunPhaseSetupError || s == RunPhaseCancelled || s == RunPhaseFinished
 }
 
 func (s RunResult) IsSet() bool {
@@ -137,6 +142,9 @@ func (r *Run) TasksWaitingApproval() []string {
 
 // CanRestartFromScratch reports if the run can be restarted from scratch
 func (r *Run) CanRestartFromScratch() (bool, string) {
+	if r.Phase == RunPhaseSetupError {
+		return false, fmt.Sprintf("run has setup errors")
+	}
 	// can restart only if the run phase is finished or cancelled
 	if !r.Phase.IsFinished() {
 		return false, fmt.Sprintf("run is not finished, phase: %q", r.Phase)
@@ -146,6 +154,9 @@ func (r *Run) CanRestartFromScratch() (bool, string) {
 
 // CanRestartFromFailedTasks reports if the run can be restarted from failed tasks
 func (r *Run) CanRestartFromFailedTasks() (bool, string) {
+	if r.Phase == RunPhaseSetupError {
+		return false, fmt.Sprintf("run has setup errors")
+	}
 	// can restart only if the run phase is finished or cancelled
 	if !r.Phase.IsFinished() {
 		return false, fmt.Sprintf("run is not finished, phase: %q", r.Phase)
@@ -266,6 +277,9 @@ type RunConfig struct {
 	// this is the format that will be used to archive the runs in the lts. It's
 	// also needed to fetch them when they aren't indexed in the readdb.
 	Group string `json:"group,omitempty"`
+
+	// A list of setup errors when the run is in phase setuperror
+	SetupErrors []string `json:"setup_errors,omitempty"`
 
 	// Annotations contain custom run properties
 	// Note: Annotations are currently both saved in a Run and in RunConfig to

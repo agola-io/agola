@@ -484,6 +484,7 @@ type RunCreateRequest struct {
 	RunConfigTasks    map[string]*types.RunConfigTask `json:"run_config_tasks"`
 	Name              string                          `json:"name"`
 	Group             string                          `json:"group"`
+	SetupErrors       []string                        `json:"setup_errors"`
 	StaticEnvironment map[string]string               `json:"static_environment"`
 
 	// existing run fields
@@ -524,6 +525,7 @@ func (h *RunCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		RunConfigTasks:    req.RunConfigTasks,
 		Name:              req.Name,
 		Group:             req.Group,
+		SetupErrors:       req.SetupErrors,
 		StaticEnvironment: req.StaticEnvironment,
 
 		RunID:      req.RunID,
