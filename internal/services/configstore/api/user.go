@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/db"
 	"github.com/sorintlab/agola/internal/services/configstore/command"
 	"github.com/sorintlab/agola/internal/services/configstore/readdb"
@@ -58,7 +59,7 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if user == nil {
-		http.Error(w, "", http.StatusNotFound)
+		httpError(w, util.NewErrNotFound(errors.Errorf("user %q doesn't exist", userID)))
 		return
 	}
 
@@ -93,7 +94,7 @@ func (h *UserByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if user == nil {
-		http.Error(w, "", http.StatusNotFound)
+		httpError(w, util.NewErrNotFound(errors.Errorf("user %q doesn't exist", userName)))
 		return
 	}
 
@@ -123,7 +124,7 @@ func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var req *CreateUserRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
 
@@ -199,12 +200,12 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		limit, err = strconv.Atoi(limitS)
 		if err != nil {
-			http.Error(w, "", http.StatusBadRequest)
+			httpError(w, util.NewErrBadRequest(errors.Wrapf(err, "cannot parse limit")))
 			return
 		}
 	}
 	if limit < 0 {
-		http.Error(w, "limit must be greater or equal than 0", http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(errors.Errorf("limit must be greater or equal than 0")))
 		return
 	}
 	if limit > MaxUsersLimit {
@@ -238,7 +239,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if user == nil {
-			http.Error(w, "", http.StatusNotFound)
+			httpError(w, util.NewErrNotFound(errors.Errorf("user with required token doesn't exist")))
 			return
 		}
 		users = []*types.User{user}
@@ -257,7 +258,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if user == nil {
-			http.Error(w, "", http.StatusNotFound)
+			httpError(w, util.NewErrNotFound(errors.Errorf("user with linked account %q token doesn't exist", linkedAccountID)))
 			return
 		}
 		users = []*types.User{user}
@@ -277,7 +278,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if user == nil {
-			http.Error(w, "", http.StatusNotFound)
+			httpError(w, util.NewErrNotFound(errors.Errorf("user with remote user %q for remote source %q token doesn't exist", remoteUserID, remoteSourceID)))
 			return
 		}
 		users = []*types.User{user}
@@ -326,7 +327,7 @@ func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	var req CreateUserLARequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
 
@@ -400,7 +401,7 @@ func (h *UpdateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	var req UpdateUserLARequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
 
@@ -449,7 +450,7 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	var req CreateUserTokenRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
 
