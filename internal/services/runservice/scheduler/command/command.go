@@ -87,7 +87,7 @@ func (s *CommandHandler) ChangeRunPhase(ctx context.Context, req *RunChangePhase
 		r.Stop = true
 	}
 
-	_, err = store.AtomicPutRun(ctx, s.e, r, "", cgt)
+	_, err = store.AtomicPutRun(ctx, s.e, r, nil, cgt)
 	return err
 }
 
@@ -115,7 +115,7 @@ func (s *CommandHandler) StopRun(ctx context.Context, req *RunStopRequest) error
 		r.Stop = true
 	}
 
-	_, err = store.AtomicPutRun(ctx, s.e, r, "", cgt)
+	_, err = store.AtomicPutRun(ctx, s.e, r, nil, cgt)
 	return err
 }
 
@@ -333,7 +333,11 @@ func (s *CommandHandler) saveRun(ctx context.Context, rb *types.RunBundle, runcg
 		return err
 	}
 
-	if _, err := store.AtomicPutRun(ctx, s.e, run, common.RunEventTypeQueued, runcgt); err != nil {
+	runEvent, err := common.NewRunEvent(ctx, s.e, run.ID, run.Phase, run.Result)
+	if err != nil {
+		return err
+	}
+	if _, err := store.AtomicPutRun(ctx, s.e, run, runEvent, runcgt); err != nil {
 		return err
 	}
 	return nil
@@ -435,7 +439,7 @@ func (s *CommandHandler) ApproveRunTask(ctx context.Context, req *RunTaskApprove
 	task.Approved = true
 	task.ApprovalAnnotations = req.ApprovalAnnotations
 
-	_, err = store.AtomicPutRun(ctx, s.e, r, "", cgt)
+	_, err = store.AtomicPutRun(ctx, s.e, r, nil, cgt)
 	return err
 }
 
