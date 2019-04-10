@@ -44,13 +44,13 @@ type Config struct {
 }
 
 type Task struct {
-	Name        string            `yaml:"name"`
-	Runtime     string            `yaml:"runtime"`
-	Environment map[string]EnvVar `yaml:"environment,omitempty"`
-	WorkingDir  string            `yaml:"working_dir"`
-	Shell       string            `yaml:"shell"`
-	User        string            `yaml:"user"`
-	Steps       []interface{}     `yaml:"steps"`
+	Name        string           `yaml:"name"`
+	Runtime     string           `yaml:"runtime"`
+	Environment map[string]Value `yaml:"environment,omitempty"`
+	WorkingDir  string           `yaml:"working_dir"`
+	Shell       string           `yaml:"shell"`
+	User        string           `yaml:"user"`
+	Steps       []interface{}    `yaml:"steps"`
 }
 
 type RuntimeType string
@@ -67,11 +67,11 @@ type Runtime struct {
 }
 
 type Container struct {
-	Image       string            `yaml:"image,omitempty"`
-	Environment map[string]EnvVar `yaml:"environment,omitempty"`
-	User        string            `yaml:"user"`
-	Privileged  bool              `yaml:"privileged"`
-	Entrypoint  string            `yaml:"entrypoint"`
+	Image       string           `yaml:"image,omitempty"`
+	Environment map[string]Value `yaml:"environment,omitempty"`
+	User        string           `yaml:"user"`
+	Privileged  bool             `yaml:"privileged"`
+	Entrypoint  string           `yaml:"entrypoint"`
 }
 
 type Pipeline struct {
@@ -111,22 +111,22 @@ type CloneStep struct {
 
 type RunStep struct {
 	Step        `yaml:",inline"`
-	Command     string            `yaml:"command"`
-	Environment map[string]EnvVar `yaml:"environment,omitempty"`
-	WorkingDir  string            `yaml:"working_dir"`
-	Shell       string            `yaml:"shell"`
-	User        string            `yaml:"user"`
+	Command     string           `yaml:"command"`
+	Environment map[string]Value `yaml:"environment,omitempty"`
+	WorkingDir  string           `yaml:"working_dir"`
+	Shell       string           `yaml:"shell"`
+	User        string           `yaml:"user"`
 }
 
-type EnvVarType int
+type ValueType int
 
 const (
-	EnvVarTypeString EnvVarType = iota
-	EnvVarTypeFromVariable
+	ValueTypeString ValueType = iota
+	ValueTypeFromVariable
 )
 
-type EnvVar struct {
-	Type  EnvVarType
+type Value struct {
+	Type  ValueType
 	Value string
 }
 
@@ -146,73 +146,11 @@ type RestoreWorkspaceStep struct {
 	DestDir string `yaml:"dest_dir"`
 }
 
-func (s *RunStep) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	type runStep struct {
-		Step        `yaml:",inline"`
-		Command     string                 `yaml:"command"`
-		Environment map[string]interface{} `yaml:"environment,omitempty"`
-		WorkingDir  string                 `yaml:"working_dir"`
-		Shell       string                 `yaml:"shell"`
-		User        string                 `yaml:"user"`
-	}
-
-	var st *runStep
-	if err := unmarshal(&st); err != nil {
-		return err
-	}
-
-	s.Step = st.Step
-	s.Command = st.Command
-	s.WorkingDir = st.WorkingDir
-	s.Shell = st.Shell
-	s.User = st.User
-
-	if st.Environment != nil {
-		env, err := parseEnv(st.Environment)
-		if err != nil {
-			return err
-		}
-		s.Environment = env
-	}
-
-	return nil
-}
-
-func (c *Container) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	type container struct {
-		Image       string                 `yaml:"image,omitempty"`
-		Environment map[string]interface{} `yaml:"environment,omitempty"`
-		User        string                 `yaml:"user"`
-		Privileged  bool                   `yaml:"privileged"`
-		Entrypoint  string                 `yaml:"entrypoint"`
-	}
-
-	var ct *container
-	if err := unmarshal(&ct); err != nil {
-		return err
-	}
-
-	c.Image = ct.Image
-	c.User = ct.User
-	c.Privileged = ct.Privileged
-	c.Entrypoint = ct.Entrypoint
-
-	if ct.Environment != nil {
-		env, err := parseEnv(ct.Environment)
-		if err != nil {
-			return err
-		}
-		c.Environment = env
-	}
-
-	return nil
-}
-
 func (t *Task) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	type task struct {
 		Name        string                   `yaml:"name"`
 		Runtime     string                   `yaml:"runtime"`
-		Environment map[string]interface{}   `yaml:"environment,omitempty"`
+		Environment map[string]Value         `yaml:"environment,omitempty"`
 		WorkingDir  string                   `yaml:"working_dir"`
 		Shell       string                   `yaml:"shell"`
 		User        string                   `yaml:"user"`
@@ -226,6 +164,7 @@ func (t *Task) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 	t.Name = tt.Name
 	t.Runtime = tt.Runtime
+	t.Environment = tt.Environment
 	t.WorkingDir = tt.WorkingDir
 	t.Shell = tt.Shell
 	t.User = tt.User
@@ -281,14 +220,6 @@ func (t *Task) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	}
 
 	t.Steps = steps
-
-	if tt.Environment != nil {
-		env, err := parseEnv(tt.Environment)
-		if err != nil {
-			return err
-		}
-		t.Environment = env
-	}
 
 	return nil
 }
@@ -388,34 +319,31 @@ func (e *Element) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-func parseEnv(ienv map[string]interface{}) (map[string]EnvVar, error) {
-	env := map[string]EnvVar{}
-	for envName, envEntry := range ienv {
-		switch envValue := envEntry.(type) {
-		case string:
-			env[envName] = EnvVar{
-				Type:  EnvVarTypeString,
-				Value: envValue,
-			}
-		case map[interface{}]interface{}:
-			for k, v := range envValue {
-				if k == "from_variable" {
-					switch v.(type) {
-					case string:
-					default:
-						return nil, errors.Errorf("unknown environment value: %v", v)
-					}
-					env[envName] = EnvVar{
-						Type:  EnvVarTypeFromVariable,
-						Value: v.(string),
-					}
-				}
-			}
-		default:
-			return nil, errors.Errorf("unknown environment value: %v", envValue)
-		}
+func (val *Value) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var ival interface{}
+	if err := unmarshal(&ival); err != nil {
+		return err
 	}
-	return env, nil
+	switch valValue := ival.(type) {
+	case string:
+		val.Type = ValueTypeString
+		val.Value = valValue
+	case map[interface{}]interface{}:
+		for k, v := range valValue {
+			if k == "from_variable" {
+				switch v.(type) {
+				case string:
+				default:
+					return errors.Errorf("unknown value format: %v", v)
+				}
+				val.Type = ValueTypeFromVariable
+				val.Value = v.(string)
+			}
+		}
+	default:
+		return errors.Errorf("unknown value format: %v", ival)
+	}
+	return nil
 }
 
 func parseWhenConditions(wi interface{}) (*types.WhenConditions, error) {

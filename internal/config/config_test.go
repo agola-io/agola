@@ -183,9 +183,9 @@ func TestParseOutput(t *testing.T) {
 						Containers: []*Container{
 							&Container{
 								Image: "image01",
-								Environment: map[string]EnvVar{
-									"ENV01":             EnvVar{Type: EnvVarTypeString, Value: "ENV01"},
-									"ENVFROMVARIABLE01": EnvVar{Type: EnvVarTypeFromVariable, Value: "variable01"},
+								Environment: map[string]Value{
+									"ENV01":             Value{Type: ValueTypeString, Value: "ENV01"},
+									"ENVFROMVARIABLE01": Value{Type: ValueTypeFromVariable, Value: "variable01"},
 								},
 								User: "",
 							},
@@ -196,9 +196,9 @@ func TestParseOutput(t *testing.T) {
 					"task01": &Task{
 						Name:    "task01",
 						Runtime: "runtime01",
-						Environment: map[string]EnvVar{
-							"ENV01":             EnvVar{Type: EnvVarTypeString, Value: "ENV01"},
-							"ENVFROMVARIABLE01": EnvVar{Type: EnvVarTypeFromVariable, Value: "variable01"},
+						Environment: map[string]Value{
+							"ENV01":             Value{Type: ValueTypeString, Value: "ENV01"},
+							"ENVFROMVARIABLE01": Value{Type: ValueTypeFromVariable, Value: "variable01"},
 						},
 						WorkingDir: "",
 						Shell:      "",
@@ -224,9 +224,9 @@ func TestParseOutput(t *testing.T) {
 									Name: "command03",
 								},
 								Command: "command03",
-								Environment: map[string]EnvVar{
-									"ENV01":             EnvVar{Type: EnvVarTypeString, Value: "ENV01"},
-									"ENVFROMVARIABLE01": EnvVar{Type: EnvVarTypeFromVariable, Value: "variable01"},
+								Environment: map[string]Value{
+									"ENV01":             Value{Type: ValueTypeString, Value: "ENV01"},
+									"ENVFROMVARIABLE01": Value{Type: ValueTypeFromVariable, Value: "variable01"},
 								},
 							},
 						},

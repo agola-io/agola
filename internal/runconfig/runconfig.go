@@ -30,11 +30,7 @@ func genRuntime(c *config.Config, runtimeName string, variables map[string]strin
 
 	containers := []*rstypes.Container{}
 	for _, cc := range ce.Containers {
-
-		env, err := genEnv(cc.Environment, variables)
-		if err != nil {
-			return nil
-		}
+		env := genEnv(cc.Environment, variables)
 		container := &rstypes.Container{
 			Image:       cc.Image,
 			Environment: env,
@@ -44,6 +40,7 @@ func genRuntime(c *config.Config, runtimeName string, variables map[string]strin
 		}
 		containers = append(containers, container)
 	}
+
 	return &rstypes.Runtime{
 		Type:       rstypes.RuntimeType(ce.Type),
 		Containers: containers,
@@ -99,10 +96,7 @@ fi
 	case *config.RunStep:
 		rs := &rstypes.RunStep{}
 
-		env, err := genEnv(cs.Environment, variables)
-		if err != nil {
-			return nil
-		}
+		env := genEnv(cs.Environment, variables)
 
 		rs.Type = cs.Type
 		rs.Name = cs.Name
@@ -161,10 +155,7 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, pipelineName s
 			steps[i] = stepFromConfigStep(cpts, variables)
 		}
 
-		tEnv, err := genEnv(cpt.Environment, variables)
-		if err != nil {
-			return nil
-		}
+		tEnv := genEnv(cpt.Environment, variables)
 
 		t := &rstypes.RunConfigTask{
 			ID: uuid.New(cpe.Name).String(),
@@ -361,15 +352,22 @@ func GetAllParents(rcts map[string]*rstypes.RunConfigTask, task *rstypes.RunConf
 	return parents
 }
 
-func genEnv(cenv map[string]config.EnvVar, variables map[string]string) (map[string]string, error) {
+func genEnv(cenv map[string]config.Value, variables map[string]string) map[string]string {
 	env := map[string]string{}
 	for envName, envVar := range cenv {
-		switch envVar.Type {
-		case config.EnvVarTypeString:
-			env[envName] = envVar.Value
-		case config.EnvVarTypeFromVariable:
-			env[envName] = variables[envVar.Value]
-		}
+		env[envName] = genValue(envVar, variables)
 	}
-	return env, nil
+	return env
+}
+
+func genValue(val config.Value, variables map[string]string) string {
+	switch val.Type {
+	case config.ValueTypeString:
+		return val.Value
+	case config.ValueTypeFromVariable:
+		return variables[val.Value]
+	default:
+		panic(fmt.Errorf("wrong value type: %q", val.Value))
+	}
+	return ""
 }
