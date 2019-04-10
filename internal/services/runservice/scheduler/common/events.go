@@ -19,28 +19,20 @@ import (
 
 	"github.com/sorintlab/agola/internal/etcd"
 	"github.com/sorintlab/agola/internal/sequence"
-)
-
-type RunEventType string
-
-const (
-	RunEventTypeQueued    RunEventType = "queued"
-	RunEventTypeCancelled RunEventType = "cancelled"
-	RunEventTypeRunning   RunEventType = "running"
-	RunEventTypeSuccess   RunEventType = "success"
-	RunEventTypeFailed    RunEventType = "failed"
+	"github.com/sorintlab/agola/internal/services/runservice/types"
 )
 
 type RunEvent struct {
-	Sequence  string
-	EventType RunEventType
-	RunID     string
+	Sequence string
+	RunID    string
+	Phase    types.RunPhase
+	Result   types.RunResult
 }
 
-func NewRunEvent(ctx context.Context, e *etcd.Store, runEventType RunEventType, runID string) (*RunEvent, error) {
+func NewRunEvent(ctx context.Context, e *etcd.Store, runID string, phase types.RunPhase, result types.RunResult) (*RunEvent, error) {
 	seq, err := sequence.IncSequence(ctx, e, EtcdRunEventSequenceKey)
 	if err != nil {
 		return nil, err
 	}
-	return &RunEvent{Sequence: seq.String(), EventType: runEventType, RunID: runID}, nil
+	return &RunEvent{Sequence: seq.String(), RunID: runID, Phase: phase, Result: result}, nil
 }

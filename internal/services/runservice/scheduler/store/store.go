@@ -385,7 +385,7 @@ func GetRun(ctx context.Context, e *etcd.Store, runID string) (*types.Run, int64
 	return r, resp.Header.Revision, nil
 }
 
-func AtomicPutRun(ctx context.Context, e *etcd.Store, r *types.Run, runEventType common.RunEventType, cgt *types.ChangeGroupsUpdateToken) (*types.Run, error) {
+func AtomicPutRun(ctx context.Context, e *etcd.Store, r *types.Run, runEvent *common.RunEvent, cgt *types.ChangeGroupsUpdateToken) (*types.Run, error) {
 	// insert only if the run as changed
 	curRun, _, err := GetRun(ctx, e, r.ID)
 	if err != nil && err != etcd.ErrKeyNotFound {
@@ -438,11 +438,7 @@ func AtomicPutRun(ctx context.Context, e *etcd.Store, r *types.Run, runEventType
 		}
 	}
 
-	if runEventType != "" {
-		runEvent, err := common.NewRunEvent(ctx, e, runEventType, r.ID)
-		if err != nil {
-			return nil, err
-		}
+	if runEvent != nil {
 		eventj, err := json.Marshal(runEvent)
 		if err != nil {
 			return nil, err
