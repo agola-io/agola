@@ -334,6 +334,20 @@ const (
 	RuntimeTypePod RuntimeType = "pod"
 )
 
+type RegistryAuthType string
+
+const (
+	RegistryAuthTypeDefault RegistryAuthType = "default"
+)
+
+type RegistryAuth struct {
+	Type RegistryAuthType `yaml:"type"`
+
+	// default auth
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+}
+
 type Runtime struct {
 	Type       RuntimeType  `json:"type,omitempty"`
 	Containers []*Container `json:"containers,omitempty"`
@@ -480,6 +494,7 @@ type ExecutorTaskStepStatus struct {
 
 type Container struct {
 	Image       string            `json:"image,omitempty"`
+	Auth        *RegistryAuth     `json:"auth,omitempty"`
 	Environment map[string]string `json:"environment,omitempty"`
 	User        string            `json:"user,omitempty"`
 	Privileged  bool              `json:"privileged"`
