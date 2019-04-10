@@ -118,7 +118,7 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 
 	// by default always try to pull the image so we are sure only authorized users can fetch them
 	// see https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#alwayspullimages
-	reader, err := d.client.ImagePull(ctx, containerConfig.Image, types.ImagePullOptions{})
+	reader, err := d.client.ImagePull(ctx, containerConfig.Image, types.ImagePullOptions{RegistryAuth: containerConfig.RegistryAuth})
 	if err != nil {
 		return nil, err
 	}

@@ -487,17 +487,23 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 
 	log.Debugf("starting pod")
 
+	registryAuth, err := registryAuthToken(et.Containers[0].Auth)
+	if err != nil {
+		return err
+	}
+
 	podConfig := &driver.PodConfig{
 		Labels:        createTaskLabels(et.ID),
 		InitVolumeDir: toolboxContainerDir,
 		Containers: []*driver.ContainerConfig{
 			{
-				Image:      et.Containers[0].Image,
-				Cmd:        cmd,
-				Env:        et.Containers[0].Environment,
-				WorkingDir: et.WorkingDir,
-				User:       et.Containers[0].User,
-				Privileged: et.Containers[0].Privileged,
+				Image:        et.Containers[0].Image,
+				Cmd:          cmd,
+				Env:          et.Containers[0].Environment,
+				WorkingDir:   et.WorkingDir,
+				User:         et.Containers[0].User,
+				Privileged:   et.Containers[0].Privileged,
+				RegistryAuth: registryAuth,
 			},
 		},
 	}
@@ -515,7 +521,7 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 	outf.WriteString("Starting pod.\n")
 	pod, err := e.driver.NewPod(ctx, podConfig, outf)
 	if err != nil {
-		outf.WriteString("Pod failed to start.\n")
+		outf.WriteString(fmt.Sprintf("Pod failed to start. Error: %s\n", err))
 		return err
 	}
 	outf.WriteString("Pod started.\n")

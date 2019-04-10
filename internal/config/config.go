@@ -59,15 +59,31 @@ const (
 	RuntimeTypePod RuntimeType = "pod"
 )
 
+type RegistryAuthType string
+
+const (
+	RegistryAuthTypeDefault RegistryAuthType = "default"
+)
+
+type RegistryAuth struct {
+	Type RegistryAuthType `yaml:"type"`
+
+	// default auth
+	Username Value `yaml:"username"`
+	Password Value `yaml:"password"`
+}
+
 type Runtime struct {
-	Name       string       `yaml:"name"`
-	Type       RuntimeType  `yaml:"type,omitempty"`
-	Arch       common.Arch  `yaml:"arch,omitempty"`
-	Containers []*Container `yaml:"containers,omitempty"`
+	Name       string        `yaml:"name"`
+	Type       RuntimeType   `yaml:"type,omitempty"`
+	Auth       *RegistryAuth `yaml:"auth"`
+	Arch       common.Arch   `yaml:"arch,omitempty"`
+	Containers []*Container  `yaml:"containers,omitempty"`
 }
 
 type Container struct {
 	Image       string           `yaml:"image,omitempty"`
+	Auth        *RegistryAuth    `yaml:"auth"`
 	Environment map[string]Value `yaml:"environment,omitempty"`
 	User        string           `yaml:"user"`
 	Privileged  bool             `yaml:"privileged"`
@@ -536,6 +552,22 @@ func ParseConfig(configData []byte) (*Config, error) {
 				return nil, errors.Errorf("pipeline %q: element %q is empty", pipeline.Name, n)
 			}
 			element.Name = n
+		}
+	}
+
+	// Set auth type to default if not specified
+	for _, runtime := range config.Runtimes {
+		if runtime.Auth != nil {
+			if runtime.Auth.Type == "" {
+				runtime.Auth.Type = RegistryAuthTypeDefault
+			}
+		}
+		for _, container := range runtime.Containers {
+			if container.Auth != nil {
+				if container.Auth.Type == "" {
+					container.Auth.Type = RegistryAuthTypeDefault
+				}
+			}
 		}
 	}
 

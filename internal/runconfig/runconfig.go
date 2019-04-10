@@ -38,6 +38,24 @@ func genRuntime(c *config.Config, runtimeName string, variables map[string]strin
 			Privileged:  cc.Privileged,
 			Entrypoint:  cc.Entrypoint,
 		}
+
+		// Set container auth
+		if cc.Auth != nil {
+			container.Auth = &rstypes.RegistryAuth{
+				Type:     rstypes.RegistryAuthType(cc.Auth.Type),
+				Username: genValue(cc.Auth.Username, variables),
+				Password: genValue(cc.Auth.Password, variables),
+			}
+		}
+		// if container auth is nil use runtime auth
+		if container.Auth == nil && ce.Auth != nil {
+			container.Auth = &rstypes.RegistryAuth{
+				Type:     rstypes.RegistryAuthType(ce.Auth.Type),
+				Username: genValue(ce.Auth.Username, variables),
+				Password: genValue(ce.Auth.Password, variables),
+			}
+		}
+
 		containers = append(containers, container)
 	}
 

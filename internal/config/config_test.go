@@ -134,8 +134,16 @@ func TestParseOutput(t *testing.T) {
                 runtimes:
                   runtime01:
                     type: pod
+                    auth:
+                      username: username
+                      password:
+                        from_variable: password
                     containers:
                       - image: image01
+                        auth:
+                          username:
+                            from_variable: username2
+                          password: password2
                         environment:
                           ENV01: ENV01
                           ENVFROMVARIABLE01:
@@ -179,10 +187,20 @@ func TestParseOutput(t *testing.T) {
 					"runtime01": &Runtime{
 						Name: "runtime01",
 						Type: "pod",
+						Auth: &RegistryAuth{
+							Type:     RegistryAuthTypeDefault,
+							Username: Value{Type: ValueTypeString, Value: "username"},
+							Password: Value{Type: ValueTypeFromVariable, Value: "password"},
+						},
 						Arch: "",
 						Containers: []*Container{
 							&Container{
 								Image: "image01",
+								Auth: &RegistryAuth{
+									Type:     RegistryAuthTypeDefault,
+									Username: Value{Type: ValueTypeFromVariable, Value: "username2"},
+									Password: Value{Type: ValueTypeString, Value: "password2"},
+								},
 								Environment: map[string]Value{
 									"ENV01":             Value{Type: ValueTypeString, Value: "ENV01"},
 									"ENVFROMVARIABLE01": Value{Type: ValueTypeFromVariable, Value: "variable01"},
