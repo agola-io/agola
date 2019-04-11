@@ -38,6 +38,7 @@ type pushHook struct {
 		FullName string `json:"full_name"`
 		URL      string `json:"html_url"`
 		Private  bool   `json:"private"`
+		SSHURL   string `json:"ssh_url"`
 		Owner    struct {
 			Name     string `json:"name"`
 			Email    string `json:"email"`
@@ -89,6 +90,7 @@ type pullRequestHook struct {
 				FullName string `json:"full_name"`
 				URL      string `json:"html_url"`
 				Private  bool   `json:"private"`
+				SSHURL   string `json:"ssh_url"`
 				Owner    struct {
 					ID       int64  `json:"id"`
 					Username string `json:"username"`
@@ -108,6 +110,7 @@ type pullRequestHook struct {
 				FullName string `json:"full_name"`
 				URL      string `json:"html_url"`
 				Private  bool   `json:"private"`
+				SSHURL   string `json:"ssh_url"`
 				Owner    struct {
 					ID       int64  `json:"id"`
 					Username string `json:"username"`
@@ -124,6 +127,7 @@ type pullRequestHook struct {
 		FullName string `json:"full_name"`
 		URL      string `json:"html_url"`
 		Private  bool   `json:"private"`
+		SSHURL   string `json:"ssh_url"`
 		Owner    struct {
 			ID       int64  `json:"id"`
 			Username string `json:"username"`

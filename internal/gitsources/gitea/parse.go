@@ -109,6 +109,7 @@ func webhookDataFromPush(hook *pushHook) (*types.WebhookData, error) {
 	// common data
 	whd := &types.WebhookData{
 		CommitSHA:   hook.After,
+		SSHURL:      hook.Repo.SSHURL,
 		Ref:         hook.Ref,
 		CompareLink: hook.Compare,
 		CommitLink:  fmt.Sprintf("%s/commit/%s", hook.Repo.URL, hook.After),
@@ -148,9 +149,10 @@ func webhookDataFromPullRequest(hook *pullRequestHook) *types.WebhookData {
 	if sender == "" {
 		sender = hook.Sender.Login
 	}
-	build := &types.WebhookData{
+	whd := &types.WebhookData{
 		Event:           types.WebhookEventPullRequest,
 		CommitSHA:       hook.PullRequest.Head.Sha,
+		SSHURL:          hook.Repo.SSHURL,
 		Ref:             fmt.Sprintf("refs/pull/%d/head", hook.Number),
 		CommitLink:      fmt.Sprintf("%s/commit/%s", hook.Repo.URL, hook.PullRequest.Head.Sha),
 		Branch:          hook.PullRequest.Base.Ref,
@@ -164,5 +166,5 @@ func webhookDataFromPullRequest(hook *pullRequestHook) *types.WebhookData {
 			WebURL: hook.Repo.URL,
 		},
 	}
-	return build
+	return whd
 }
