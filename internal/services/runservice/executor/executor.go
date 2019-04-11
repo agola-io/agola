@@ -672,11 +672,11 @@ func (e *Executor) executorStatusSenderLoop(ctx context.Context) {
 	}
 }
 
-func (e *Executor) tasksCleanerLoop(ctx context.Context) {
+func (e *Executor) tasksUpdaterLoop(ctx context.Context) {
 	for {
-		log.Debugf("tasksCleaner")
+		log.Debugf("tasksUpdater")
 
-		if err := e.tasksCleaner(ctx); err != nil {
+		if err := e.tasksUpdater(ctx); err != nil {
 			log.Errorf("err: %+v", err)
 		}
 
@@ -690,7 +690,10 @@ func (e *Executor) tasksCleanerLoop(ctx context.Context) {
 	}
 }
 
-func (e *Executor) tasksCleaner(ctx context.Context) error {
+// taskUpdater fetches the executor tasks from the scheduler and handles them
+// this is useful to catch up when some tasks submissions from the scheduler to the executor
+// APIs fails
+func (e *Executor) tasksUpdater(ctx context.Context) error {
 	ets, _, err := e.runserviceClient.GetExecutorTasks(ctx, e.id)
 	if err != nil {
 		log.Warnf("err: %v", err)
@@ -698,13 +701,13 @@ func (e *Executor) tasksCleaner(ctx context.Context) error {
 	}
 	log.Debugf("ets: %v", util.Dump(ets))
 	for _, et := range ets {
-		go e.cleanTask(ctx, et)
+		go e.taskUpdater(ctx, et)
 	}
 
 	return nil
 }
 
-func (e *Executor) cleanTask(ctx context.Context, et *types.ExecutorTask) {
+func (e *Executor) taskUpdater(ctx context.Context, et *types.ExecutorTask) {
 	log.Debugf("et: %v", util.Dump(et))
 	if et.Status.ExecutorID != e.id {
 		return
@@ -947,7 +950,7 @@ func (e *Executor) Run(ctx context.Context) error {
 
 	go e.executorStatusSenderLoop(ctx)
 	go e.podsCleanerLoop(ctx)
-	go e.tasksCleanerLoop(ctx)
+	go e.tasksUpdaterLoop(ctx)
 	go e.tasksDataCleanerLoop(ctx)
 
 	go e.handleTasks(ctx, ch)

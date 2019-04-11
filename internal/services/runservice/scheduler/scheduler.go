@@ -62,23 +62,32 @@ func mergeEnv(dest, src map[string]string) {
 	}
 }
 
-func (s *Scheduler) runHasActiveTasks(ctx context.Context, runID string) (bool, error) {
+func (s *Scheduler) runActiveExecutorTasks(ctx context.Context, runID string) ([]*types.ExecutorTask, error) {
 	// the real source of active tasks is the number of executor tasks in etcd
 	// we can't rely on RunTask.Status since it's only updated when receiveing
 	// updated from the executor so it could be in a NotStarted state but have an
 	// executor tasks scheduled and running
 	ets, err := store.GetExecutorTasksForRun(ctx, s.e, runID)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
-	activeTasks := false
+	activeTasks := []*types.ExecutorTask{}
 	for _, et := range ets {
 		if !et.Status.Phase.IsFinished() {
-			activeTasks = true
+			activeTasks = append(activeTasks, et)
 		}
 	}
 
 	return activeTasks, nil
+}
+
+func (s *Scheduler) runHasActiveExecutorTasks(ctx context.Context, runID string) (bool, error) {
+	activeTasks, err := s.runActiveExecutorTasks(ctx, runID)
+	if err != nil {
+		return false, err
+	}
+
+	return len(activeTasks) > 0, nil
 }
 
 func advanceRunTasks(ctx context.Context, r *types.Run, rc *types.RunConfig) error {
@@ -184,8 +193,6 @@ func (s *Scheduler) submitRunTasks(ctx context.Context, r *types.Run, rc *types.
 		if _, err := store.AtomicPutExecutorTask(ctx, s.e, et); err != nil {
 			return err
 		}
-		// try to send executor task to executor, if this fails the executor will
-		// periodically fetch the executortask anyway
 		if err := s.sendExecutorTask(ctx, et); err != nil {
 			return err
 		}
@@ -267,6 +274,8 @@ func (s *Scheduler) genExecutorTask(ctx context.Context, r *types.Run, rt *types
 	return et
 }
 
+// sendExecutorTask sends executor task to executor, if this fails the executor
+// will periodically fetch the executortask anyway
 func (s *Scheduler) sendExecutorTask(ctx context.Context, et *types.ExecutorTask) error {
 	executor, err := store.GetExecutor(ctx, s.e, et.Status.ExecutorID)
 	if err != nil && err != etcd.ErrKeyNotFound {
@@ -361,7 +370,7 @@ func (s *Scheduler) scheduleRun(ctx context.Context, r *types.Run, rc *types.Run
 	prevPhase := r.Phase
 	prevResult := r.Result
 
-	hasActiveTasks, err := s.runHasActiveTasks(ctx, r.ID)
+	hasActiveTasks, err := s.runHasActiveExecutorTasks(ctx, r.ID)
 	if err != nil {
 		return err
 	}
@@ -383,6 +392,23 @@ func (s *Scheduler) scheduleRun(ctx context.Context, r *types.Run, rc *types.Run
 	r, err = store.AtomicPutRun(ctx, s.e, r, runEvent, nil)
 	if err != nil {
 		return err
+	}
+
+	// if the run is set to stop, stop all tasks
+	if r.Stop {
+		activeExecutorTasks, err := s.runActiveExecutorTasks(ctx, r.ID)
+		if err != nil {
+			return err
+		}
+		for _, et := range activeExecutorTasks {
+			et.Stop = true
+			if _, err := store.AtomicPutExecutorTask(ctx, s.e, et); err != nil {
+				return err
+			}
+			if err := s.sendExecutorTask(ctx, et); err != nil {
+				return err
+			}
+		}
 	}
 
 	if !r.Result.IsSet() && r.Phase == types.RunPhaseRunning {
@@ -658,8 +684,6 @@ func (s *Scheduler) executorTaskCleaner(ctx context.Context, et *types.ExecutorT
 				if _, err := store.AtomicPutExecutorTask(ctx, s.e, et); err != nil {
 					return err
 				}
-				// try to send executor task to executor, if this fails the executor will
-				// periodically fetch the executortask anyway
 				if err := s.sendExecutorTask(ctx, et); err != nil {
 					log.Errorf("err: %+v", err)
 					return err
