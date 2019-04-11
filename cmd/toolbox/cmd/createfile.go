@@ -45,6 +45,12 @@ func init() {
 }
 
 func createFile(r io.Reader) (string, error) {
+	// create a temp dir if the image doesn't have one
+	tmpDir := os.TempDir()
+	if err := os.MkdirAll(tmpDir, 0777); err != nil {
+		return "", fmt.Errorf("failed to create tmp dir %q", tmpDir)
+	}
+
 	file, err := ioutil.TempFile("", "")
 	if err != nil {
 		return "", err
