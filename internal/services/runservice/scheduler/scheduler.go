@@ -81,13 +81,12 @@ func (s *Scheduler) runHasActiveTasks(ctx context.Context, runID string) (bool, 
 	return activeTasks, nil
 }
 
-func (s *Scheduler) advanceRunTasks(ctx context.Context, r *types.Run, rc *types.RunConfig) error {
+func advanceRunTasks(ctx context.Context, r *types.Run, rc *types.RunConfig) error {
 	log.Debugf("run: %s", util.Dump(r))
 	log.Debugf("rc: %s", util.Dump(rc))
 
 	// get tasks that can be executed
 	for _, rt := range r.RunTasks {
-		log.Debugf("rt: %s", util.Dump(rt))
 		if rt.Skip {
 			continue
 		}
@@ -98,12 +97,19 @@ func (s *Scheduler) advanceRunTasks(ctx context.Context, r *types.Run, rc *types
 		rct := rc.Tasks[rt.ID]
 		parents := runconfig.GetParents(rc.Tasks, rct)
 		canRun := true
+		allParentsSkipped := false
 		for _, p := range parents {
+			allParentsSkipped = true
 			rp := r.RunTasks[p.ID]
 			canRun = rp.Status.IsFinished() && rp.ArchivesFetchFinished()
-			if rp.Status == types.RunTaskStatusSkipped {
-				rt.Status = types.RunTaskStatusSkipped
+			// skip only if all parents are skipped
+			if rp.Status != types.RunTaskStatusSkipped {
+				allParentsSkipped = false
 			}
+		}
+
+		if allParentsSkipped {
+			rt.Status = types.RunTaskStatusSkipped
 		}
 
 		if canRun {
@@ -117,18 +123,13 @@ func (s *Scheduler) advanceRunTasks(ctx context.Context, r *types.Run, rc *types
 	return nil
 }
 
-func (s *Scheduler) getTasksToRun(ctx context.Context, r *types.Run) ([]*types.RunTask, error) {
+func getTasksToRun(ctx context.Context, r *types.Run, rc *types.RunConfig) ([]*types.RunTask, error) {
 	log.Debugf("run: %s", util.Dump(r))
-	rc, err := store.LTSGetRunConfig(s.wal, r.ID)
-	if err != nil {
-		return nil, errors.Wrapf(err, "cannot get run config %q", r.ID)
-	}
 	log.Debugf("rc: %s", util.Dump(rc))
 
 	tasksToRun := []*types.RunTask{}
 	// get tasks that can be executed
 	for _, rt := range r.RunTasks {
-		log.Debugf("rt: %s", util.Dump(rt))
 		if rt.Skip {
 			continue
 		}
@@ -145,7 +146,7 @@ func (s *Scheduler) getTasksToRun(ctx context.Context, r *types.Run) ([]*types.R
 		}
 
 		if canRun {
-			// Run only if approved if needed
+			// Run only if approved (when needs approval)
 			if !rct.NeedsApproval || (rct.NeedsApproval && rt.Approved) {
 				tasksToRun = append(tasksToRun, rt)
 			}
@@ -360,7 +361,12 @@ func (s *Scheduler) scheduleRun(ctx context.Context, r *types.Run, rc *types.Run
 	prevPhase := r.Phase
 	prevResult := r.Result
 
-	if err := s.advanceRun(ctx, r, rc); err != nil {
+	hasActiveTasks, err := s.runHasActiveTasks(ctx, r.ID)
+	if err != nil {
+		return err
+	}
+
+	if err := advanceRun(ctx, r, rc, hasActiveTasks); err != nil {
 		return err
 	}
 
@@ -374,13 +380,13 @@ func (s *Scheduler) scheduleRun(ctx context.Context, r *types.Run, rc *types.Run
 		}
 	}
 
-	r, err := store.AtomicPutRun(ctx, s.e, r, runEvent, nil)
+	r, err = store.AtomicPutRun(ctx, s.e, r, runEvent, nil)
 	if err != nil {
 		return err
 	}
 
 	if !r.Result.IsSet() && r.Phase == types.RunPhaseRunning {
-		if err := s.advanceRunTasks(ctx, r, rc); err != nil {
+		if err := advanceRunTasks(ctx, r, rc); err != nil {
 			return err
 		}
 		r, err := store.AtomicPutRun(ctx, s.e, r, nil, nil)
@@ -388,7 +394,7 @@ func (s *Scheduler) scheduleRun(ctx context.Context, r *types.Run, rc *types.Run
 			return err
 		}
 
-		tasksToRun, err := s.getTasksToRun(ctx, r)
+		tasksToRun, err := getTasksToRun(ctx, r, rc)
 		if err != nil {
 			return err
 		}
@@ -401,7 +407,7 @@ func (s *Scheduler) scheduleRun(ctx context.Context, r *types.Run, rc *types.Run
 
 // advanceRun updates the run result and phase. It must be the unique function that
 // should update them.
-func (s *Scheduler) advanceRun(ctx context.Context, r *types.Run, rc *types.RunConfig) error {
+func advanceRun(ctx context.Context, r *types.Run, rc *types.RunConfig, hasActiveTasks bool) error {
 	log.Debugf("run: %s", util.Dump(r))
 
 	// fail run if a task is failed
@@ -446,13 +452,9 @@ func (s *Scheduler) advanceRun(ctx context.Context, r *types.Run, rc *types.RunC
 	// if the run has a result defined then we can stop current tasks
 	if r.Result.IsSet() {
 		if !r.Phase.IsFinished() {
-			hasRunningTasks, err := s.runHasActiveTasks(ctx, r.ID)
-			if err != nil {
-				return err
-			}
 			// if the run has a result defined AND there're no executor tasks scheduled we can mark
 			// the run phase as finished
-			if !hasRunningTasks {
+			if !hasActiveTasks {
 				r.ChangePhase(types.RunPhaseFinished)
 			}
 		}
