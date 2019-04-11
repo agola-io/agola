@@ -76,9 +76,6 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 		return nil, errors.Wrapf(err, "failed to get repository info from gitsource")
 	}
 
-	sshCloneURL := repo.SSHCloneURL
-	c.log.Infof("sshCloneURL: %s", sshCloneURL)
-
 	c.log.Infof("generating ssh key pairs")
 	privateKey, _, err := util.GenSSHKeyPair(4096)
 	if err != nil {
@@ -100,7 +97,6 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 		LinkedAccountID:     la.ID,
 		RepositoryID:        repo.ID,
 		RepositoryPath:      req.RepoPath,
-		RepositoryCloneURL:  sshCloneURL,
 		SkipSSHHostKeyCheck: req.SkipSSHHostKeyCheck,
 		SSHPrivateKey:       string(privateKey),
 	}
