@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/mitchellh/copystructure"
 	"github.com/sorintlab/agola/internal/util"
 )
 
@@ -120,6 +121,14 @@ type Run struct {
 
 	// internal values not saved
 	Revision int64 `json:"-"`
+}
+
+func (r *Run) DeepCopy() *Run {
+	nr, err := copystructure.Copy(r)
+	if err != nil {
+		panic(err)
+	}
+	return nr.(*Run)
 }
 
 func (r *Run) ChangePhase(phase RunPhase) {
@@ -298,6 +307,14 @@ type RunConfig struct {
 	Environment map[string]string `json:"environment,omitempty"`
 
 	Tasks map[string]*RunConfigTask `json:"tasks,omitempty"`
+}
+
+func (rc *RunConfig) DeepCopy() *RunConfig {
+	nrc, err := copystructure.Copy(rc)
+	if err != nil {
+		panic(err)
+	}
+	return nrc.(*RunConfig)
 }
 
 type RunConfigTask struct {
