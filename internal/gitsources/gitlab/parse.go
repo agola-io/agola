@@ -106,6 +106,7 @@ func webhookDataFromPush(hook *pushHook) (*types.WebhookData, error) {
 	// common data
 	whd := &types.WebhookData{
 		CommitSHA:  hook.After,
+		SSHURL:     hook.Project.SSHURL,
 		Ref:        hook.Ref,
 		CommitLink: hook.Commits[0].URL,
 		//CompareLink: hook.Compare,
@@ -153,6 +154,7 @@ func webhookDataFromPullRequest(hook *pullRequestHook) *types.WebhookData {
 	build := &types.WebhookData{
 		Event:     types.WebhookEventPullRequest,
 		CommitSHA: hook.ObjectAttributes.LastCommit.ID,
+		SSHURL:    hook.Project.SSHURL,
 		Ref:       fmt.Sprintf("refs/merge-requests/%d/head", hook.ObjectAttributes.Iid),
 		//CommitLink:      fmt.Sprintf("%s/commit/%s", hook.Repo.URL, hook.PullRequest.Head.Sha),
 		CommitLink:      hook.ObjectAttributes.LastCommit.URL,

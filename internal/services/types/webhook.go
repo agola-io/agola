@@ -32,9 +32,10 @@ const (
 type WebhookData struct {
 	Event     WebhookEvent `json:"event,omitempty"`
 	ProjectID string       `json:"project_id,omitempty"`
+	SSHURL    string       `json:"ssh_url"`
 
-	CompareLink string `json:"compare_link,omitempty"` // Pimray link to source. It can be the commit
-	CommitLink  string `json:"commit_link,omitempty"`  // Pimray link to source. It can be the commit
+	CompareLink string `json:"compare_link,omitempty"` // Compare link to remote git source
+	CommitLink  string `json:"commit_link,omitempty"`  // Commit link to remote git source
 	CommitSHA   string `json:"commit_sha,omitempty"`   // commit SHA (SHA1 but also future SHA like SHA256)
 	Ref         string `json:"ref,omitempty"`          // Ref containing the commit SHA
 	Message     string `json:"message,omitempty"`      // Message to use (Push last commit message summary, PR title, Tag message etc...)

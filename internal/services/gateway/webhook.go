@@ -168,7 +168,6 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		}
 
 		sshPrivKey = project.SSHPrivateKey
-		cloneURL = project.RepositoryCloneURL
 		skipSSHHostKeyCheck = project.SkipSSHHostKeyCheck
 		runType = types.RunTypeProject
 		webhookData, err = gitSource.ParseWebhook(r)
@@ -183,6 +182,8 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		}
 
 		webhookData.ProjectID = projectID
+
+		cloneURL = webhookData.SSHURL
 
 		// get project variables
 		pvars, _, err := h.configstoreClient.GetProjectVariables(ctx, project.ID, true)

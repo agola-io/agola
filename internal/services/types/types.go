@@ -153,8 +153,6 @@ type Project struct {
 	// do this but gitlab can and github has an hidden api to do this)
 	RepositoryPath string `json:"repository_path,omitempty"`
 
-	RepositoryCloneURL string `json:"repository_clone_url,omitempty"`
-
 	LinkedAccountID string `json:"linked_account_id,omitempty"`
 
 	SSHPrivateKey string `json:"ssh_private_key,omitempty"` // PEM Encoded private key
