@@ -168,7 +168,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		}
 
 		sshPrivKey = project.SSHPrivateKey
-		cloneURL = project.CloneURL
+		cloneURL = project.RepositoryCloneURL
 		skipSSHHostKeyCheck = project.SkipSSHHostKeyCheck
 		runType = types.RunTypeProject
 		webhookData, err = gitSource.ParseWebhook(r)

@@ -142,15 +142,21 @@ type Project struct {
 
 	Parent Parent `json:"parent,omitempty"`
 
-	// Project repository path. It may be different for every kind of git source.
-	// It's needed to get git source needed information like the repo owner and
-	// repo user
-	// Examples: sgotti/agola (for github, gitea etc... sources)
-	RepoPath string `json:"repo_path,omitempty"`
+	// The remote repository id
+	RepositoryID string `json:"repository_id,omitempty"`
+
+	// The remote repository path. It may be different for every kind of git source.
+	// NOTE: it may be changed remotely but won't be updated here. Every git source
+	// works differently so we must find a way to update it:
+	// * let the user update it manually
+	// * auto update it if the remote let us query by repository id (gitea cannot
+	// do this but gitlab can and github has an hidden api to do this)
+	RepositoryPath string `json:"repository_path,omitempty"`
+
+	RepositoryCloneURL string `json:"repository_clone_url,omitempty"`
 
 	LinkedAccountID string `json:"linked_account_id,omitempty"`
 
-	CloneURL      string `json:"clone_url,omitempty"`
 	SSHPrivateKey string `json:"ssh_private_key,omitempty"` // PEM Encoded private key
 
 	SkipSSHHostKeyCheck bool `json:"skip_ssh_host_key_check,omitempty"`

@@ -73,7 +73,6 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 		return nil, errors.Wrapf(err, "failed to get repository info from gitsource")
 	}
 
-	//cloneURL := fmt.Sprintf("git@%s:%s/%s.git", host, repoOwner, repoName)
 	sshCloneURL := repo.SSHCloneURL
 	c.log.Infof("sshCloneURL: %s", sshCloneURL)
 
@@ -96,8 +95,9 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 			ID:   parentID,
 		},
 		LinkedAccountID:     la.ID,
-		RepoPath:            req.RepoPath,
-		CloneURL:            sshCloneURL,
+		RepositoryID:        repo.ID,
+		RepositoryPath:      req.RepoPath,
+		RepositoryCloneURL:  sshCloneURL,
 		SkipSSHHostKeyCheck: req.SkipSSHHostKeyCheck,
 		SSHPrivateKey:       string(privateKey),
 	}
@@ -109,44 +109,36 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 	}
 	c.log.Infof("project %s created, ID: %s", p.Name, p.ID)
 
-	return p, c.SetupProject(ctx, rs, la, &SetupProjectRequest{
-		Project:  p,
-		RepoPath: req.RepoPath,
-	})
+	return p, c.SetupProject(ctx, rs, la, p)
 }
 
-type SetupProjectRequest struct {
-	Project  *types.Project
-	RepoPath string
-}
-
-func (c *CommandHandler) SetupProject(ctx context.Context, rs *types.RemoteSource, la *types.LinkedAccount, conf *SetupProjectRequest) error {
+func (c *CommandHandler) SetupProject(ctx context.Context, rs *types.RemoteSource, la *types.LinkedAccount, project *types.Project) error {
 	gitsource, err := common.GetGitSource(rs, la)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create gitsource client")
 	}
 
-	pubKey, err := util.ExtractPublicKey([]byte(conf.Project.SSHPrivateKey))
+	pubKey, err := util.ExtractPublicKey([]byte(project.SSHPrivateKey))
 	if err != nil {
 		return errors.Wrapf(err, "failed to extract public key")
 	}
 
-	webhookURL := fmt.Sprintf("%s/webhooks?projectid=%s", c.apiExposedURL, conf.Project.ID)
+	webhookURL := fmt.Sprintf("%s/webhooks?projectid=%s", c.apiExposedURL, project.ID)
 
 	// generate deploy keys and webhooks containing the agola project id so we
 	// can have multiple projects referencing the same remote repository and this
 	// will trigger multiple different runs
-	deployKeyName := fmt.Sprintf("agola deploy key - %s", conf.Project.ID)
+	deployKeyName := fmt.Sprintf("agola deploy key - %s", project.ID)
 	c.log.Infof("creating/updating deploy key: %s", string(pubKey))
-	if err := gitsource.UpdateDeployKey(conf.RepoPath, deployKeyName, string(pubKey), true); err != nil {
+	if err := gitsource.UpdateDeployKey(project.RepositoryPath, deployKeyName, string(pubKey), true); err != nil {
 		return errors.Wrapf(err, "failed to create deploy key")
 	}
 	c.log.Infof("deleting existing webhooks")
-	if err := gitsource.DeleteRepoWebhook(conf.RepoPath, webhookURL); err != nil {
+	if err := gitsource.DeleteRepoWebhook(project.RepositoryPath, webhookURL); err != nil {
 		return errors.Wrapf(err, "failed to delete repository webhook")
 	}
 	c.log.Infof("creating webhook to url: %s", webhookURL)
-	if err := gitsource.CreateRepoWebhook(conf.RepoPath, webhookURL, ""); err != nil {
+	if err := gitsource.CreateRepoWebhook(project.RepositoryPath, webhookURL, ""); err != nil {
 		return errors.Wrapf(err, "failed to create repository webhook")
 	}
 
@@ -175,8 +167,7 @@ func (c *CommandHandler) ReconfigProject(ctx context.Context, projectRef string)
 		return ErrFromRemote(resp, errors.Wrapf(err, "failed to get remote source %q", la.RemoteSourceID))
 	}
 
-	return c.SetupProject(ctx, rs, la, &SetupProjectRequest{
-		Project:  p,
-		RepoPath: p.RepoPath,
-	})
+	// TODO(sgotti) update project repo path if the remote let us query by repository id
+
+	return c.SetupProject(ctx, rs, la, p)
 }
