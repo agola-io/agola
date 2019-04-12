@@ -316,19 +316,19 @@ func (rc *RunConfig) DeepCopy() *RunConfig {
 }
 
 type RunConfigTask struct {
-	Level         int                    `json:"level,omitempty"`
-	ID            string                 `json:"id,omitempty"`
-	Name          string                 `json:"name,omitempty"`
-	Depends       []*RunConfigTaskDepend `json:"depends"`
-	Runtime       *Runtime               `json:"runtime,omitempty"`
-	Environment   map[string]string      `json:"environment,omitempty"`
-	WorkingDir    string                 `json:"working_dir,omitempty"`
-	Shell         string                 `json:"shell,omitempty"`
-	User          string                 `json:"user,omitempty"`
-	Steps         []interface{}          `json:"steps,omitempty"`
-	IgnoreFailure bool                   `json:"ignore_failure,omitempty"`
-	NeedsApproval bool                   `json:"needs_approval,omitempty"`
-	Skip          bool                   `json:"skip,omitempty"`
+	Level         int                             `json:"level,omitempty"`
+	ID            string                          `json:"id,omitempty"`
+	Name          string                          `json:"name,omitempty"`
+	Depends       map[string]*RunConfigTaskDepend `json:"depends"`
+	Runtime       *Runtime                        `json:"runtime,omitempty"`
+	Environment   map[string]string               `json:"environment,omitempty"`
+	WorkingDir    string                          `json:"working_dir,omitempty"`
+	Shell         string                          `json:"shell,omitempty"`
+	User          string                          `json:"user,omitempty"`
+	Steps         []interface{}                   `json:"steps,omitempty"`
+	IgnoreFailure bool                            `json:"ignore_failure,omitempty"`
+	NeedsApproval bool                            `json:"needs_approval,omitempty"`
+	Skip          bool                            `json:"skip,omitempty"`
 }
 
 type RunConfigTaskDependCondition string

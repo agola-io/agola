@@ -197,8 +197,8 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, pipelineName s
 	for _, rct := range rcts {
 		cpe := cp.Elements[rct.Name]
 
-		depends := make([]*rstypes.RunConfigTaskDepend, len(cpe.Depends))
-		for id, d := range cpe.Depends {
+		depends := make(map[string]*rstypes.RunConfigTaskDepend, len(cpe.Depends))
+		for _, d := range cpe.Depends {
 			conditions := make([]rstypes.RunConfigTaskDependCondition, len(d.Conditions))
 			// when no conditions are defined default to on_success
 			if len(d.Conditions) == 0 {
@@ -217,7 +217,7 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, pipelineName s
 			}
 
 			drct := getRunConfigTaskByName(rcts, d.ElementName)
-			depends[id] = &rstypes.RunConfigTaskDepend{
+			depends[drct.ID] = &rstypes.RunConfigTaskDepend{
 				TaskID:     drct.ID,
 				Conditions: conditions,
 			}
@@ -331,13 +331,7 @@ func GenTasksLevels(rcts map[string]*rstypes.RunConfigTask) error {
 func GetParents(rcts map[string]*rstypes.RunConfigTask, task *rstypes.RunConfigTask) []*rstypes.RunConfigTask {
 	parents := []*rstypes.RunConfigTask{}
 	for _, t := range rcts {
-		isParent := false
-		for _, d := range task.Depends {
-			if d.TaskID == t.ID {
-				isParent = true
-			}
-		}
-		if isParent {
+		if _, ok := task.Depends[t.ID]; ok {
 			parents = append(parents, t)
 		}
 	}
@@ -387,5 +381,4 @@ func genValue(val config.Value, variables map[string]string) string {
 	default:
 		panic(fmt.Errorf("wrong value type: %q", val.Value))
 	}
-	return ""
 }

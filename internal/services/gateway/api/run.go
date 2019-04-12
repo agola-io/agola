@@ -67,11 +67,11 @@ type RunResponse struct {
 }
 
 type RunResponseTask struct {
-	ID      string                         `json:"id"`
-	Name    string                         `json:"name"`
-	Status  rstypes.RunTaskStatus          `json:"status"`
-	Level   int                            `json:"level"`
-	Depends []*rstypes.RunConfigTaskDepend `json:"depends"`
+	ID      string                                  `json:"id"`
+	Name    string                                  `json:"name"`
+	Status  rstypes.RunTaskStatus                   `json:"status"`
+	Level   int                                     `json:"level"`
+	Depends map[string]*rstypes.RunConfigTaskDepend `json:"depends"`
 
 	WaitingApproval     bool              `json:"waiting_approval"`
 	Approved            bool              `json:"approved"`
