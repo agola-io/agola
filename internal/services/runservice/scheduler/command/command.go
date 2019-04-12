@@ -16,10 +16,10 @@ package command
 
 import (
 	"context"
+	"fmt"
 	"path"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
 	"github.com/sorintlab/agola/internal/db"
 	"github.com/sorintlab/agola/internal/etcd"
 	"github.com/sorintlab/agola/internal/objectstorage"
@@ -199,7 +199,7 @@ func (s *CommandHandler) newRun(ctx context.Context, req *RunCreateRequest) (*ty
 		Annotations:       req.Annotations,
 	}
 
-	run := s.genRun(ctx, rc)
+	run := genRun(rc)
 	s.log.Debugf("created run: %s", util.Dump(run))
 
 	return &types.RunBundle{
@@ -222,10 +222,6 @@ func (s *CommandHandler) recreateRun(ctx context.Context, req *RunCreateRequest)
 	if err != nil {
 		return nil, util.NewErrBadRequest(errors.Wrapf(err, "runconfig %q doens't exist", req.RunID))
 	}
-	// update the run config ID
-	rc.ID = id
-	// update the run config Environment
-	rc.Environment = req.Environment
 
 	run, err := store.GetRunEtcdOrLTS(ctx, s.e, s.wal, req.RunID)
 	if err != nil {
@@ -234,6 +230,9 @@ func (s *CommandHandler) recreateRun(ctx context.Context, req *RunCreateRequest)
 	if run == nil {
 		return nil, util.NewErrBadRequest(errors.Wrapf(err, "run %q doens't exist", req.RunID))
 	}
+
+	s.log.Infof("rc: %s", util.Dump(rc))
+	s.log.Infof("run: %s", util.Dump(run))
 
 	if req.FromStart {
 		if canRestart, reason := run.CanRestartFromScratch(); !canRestart {
@@ -245,8 +244,22 @@ func (s *CommandHandler) recreateRun(ctx context.Context, req *RunCreateRequest)
 		}
 	}
 
+	rb := recreateRun(util.DefaultUUIDGenerator{}, run, rc, id, req)
+
+	s.log.Infof("created rc from existing rc: %s", util.Dump(rb.Rc))
+	s.log.Infof("created run from existing run: %s", util.Dump(rb.Run))
+
+	return rb, nil
+}
+
+func recreateRun(uuid util.UUIDGenerator, run *types.Run, rc *types.RunConfig, newID string, req *RunCreateRequest) *types.RunBundle {
+	// update the run config ID
+	rc.ID = newID
+	// update the run config Environment
+	rc.Environment = req.Environment
+
 	// update the run ID
-	run.ID = id
+	run.ID = newID
 	// reset run revision
 	run.Revision = 0
 	// reset phase/result/archived/stop
@@ -254,48 +267,102 @@ func (s *CommandHandler) recreateRun(ctx context.Context, req *RunCreateRequest)
 	run.Result = types.RunResultUnknown
 	run.Archived = false
 	run.Stop = false
+	run.EnqueueTime = nil
+	run.StartTime = nil
+	run.EndTime = nil
 
 	// TODO(sgotti) handle reset tasks
 	// currently we only restart a run resetting al failed tasks
-	tasksToAdd := []*types.RunTask{}
-	tasksToDelete := []string{}
+	recreatedRCTasks := map[string]struct{}{}
 
 	for _, rt := range run.RunTasks {
 		if req.FromStart || rt.Status != types.RunTaskStatusSuccess {
-			rct := rc.Tasks[rt.ID]
+			rct, ok := rc.Tasks[rt.ID]
+			if !ok {
+				panic(fmt.Errorf("no runconfig task %q", rt.ID))
+			}
 			// change rct id
-			rct.ID = uuid.NewV4().String()
+			rct.ID = uuid.New(rct.Name).String()
 
-			// update runconfig
+			// update runconfig with new tasks
 			delete(rc.Tasks, rt.ID)
 			rc.Tasks[rct.ID] = rct
-			// update other tasks depends to new task id
+
+			// update other runconfig tasks depends to new task id
 			for _, t := range rc.Tasks {
-				for _, d := range t.Depends {
-					if d.TaskID == rt.ID {
-						d.TaskID = rct.ID
+				if d, ok := t.Depends[rt.ID]; ok {
+					delete(t.Depends, rt.ID)
+					nd := &types.RunConfigTaskDepend{
+						TaskID:     rct.ID,
+						Conditions: d.Conditions,
 					}
+					t.Depends[rct.ID] = nd
 				}
 			}
 
-			nrt := s.genRunTask(ctx, rct)
-			tasksToAdd = append(tasksToAdd, nrt)
-			tasksToDelete = append(tasksToDelete, rt.ID)
+			recreatedRCTasks[rct.ID] = struct{}{}
 		}
 	}
-	for _, rt := range tasksToAdd {
-		run.RunTasks[rt.ID] = rt
+
+	// also recreate all runconfig tasks that are childs of a previously recreated
+	// runconfig task
+	rcTasksToRecreate := map[string]struct{}{}
+	for _, rct := range rc.Tasks {
+		parents := runconfig.GetAllParents(rc.Tasks, rct)
+		for _, parent := range parents {
+			if _, ok := recreatedRCTasks[parent.ID]; ok {
+				rcTasksToRecreate[rct.ID] = struct{}{}
+				break
+			}
+		}
+	}
+
+	for rcTaskToRecreate := range rcTasksToRecreate {
+		rct := rc.Tasks[rcTaskToRecreate]
+		// change rct id
+		rct.ID = uuid.New(rct.Name).String()
+
+		// update runconfig with new tasks
+		delete(rc.Tasks, rcTaskToRecreate)
+		rc.Tasks[rct.ID] = rct
+
+		// update other runconfig tasks depends to new task id
+		for _, t := range rc.Tasks {
+			if d, ok := t.Depends[rcTaskToRecreate]; ok {
+				delete(t.Depends, rcTaskToRecreate)
+				nd := &types.RunConfigTaskDepend{
+					TaskID:     rct.ID,
+					Conditions: d.Conditions,
+				}
+				t.Depends[rct.ID] = nd
+			}
+		}
+	}
+
+	// update run
+
+	// remove deleted tasks from run config
+	tasksToDelete := []string{}
+	for _, rt := range run.RunTasks {
+		if _, ok := rc.Tasks[rt.ID]; !ok {
+			tasksToDelete = append(tasksToDelete, rt.ID)
+		}
 	}
 	for _, rtID := range tasksToDelete {
 		delete(run.RunTasks, rtID)
 	}
-
-	s.log.Debugf("created run from existing run: %s", util.Dump(run))
+	// create new tasks from runconfig
+	for _, rct := range rc.Tasks {
+		if _, ok := run.RunTasks[rct.ID]; !ok {
+			nrt := genRunTask(rct)
+			run.RunTasks[nrt.ID] = nrt
+		}
+	}
 
 	return &types.RunBundle{
 		Run: run,
 		Rc:  rc,
-	}, nil
+	}
 }
 
 func (s *CommandHandler) saveRun(ctx context.Context, rb *types.RunBundle, runcgt *types.ChangeGroupsUpdateToken) error {
@@ -309,6 +376,8 @@ func (s *CommandHandler) saveRun(ctx context.Context, rb *types.RunBundle, runcg
 	}
 	c++
 	run.Counter = c
+
+	run.EnqueueTime = util.TimePtr(time.Now())
 
 	actions := []*wal.Action{}
 
@@ -340,7 +409,7 @@ func (s *CommandHandler) saveRun(ctx context.Context, rb *types.RunBundle, runcg
 	return nil
 }
 
-func (s *CommandHandler) genRunTask(ctx context.Context, rct *types.RunConfigTask) *types.RunTask {
+func genRunTask(rct *types.RunConfigTask) *types.RunTask {
 	rt := &types.RunTask{
 		ID:                rct.ID,
 		Status:            types.RunTaskStatusNotStarted,
@@ -376,7 +445,7 @@ func (s *CommandHandler) genRunTask(ctx context.Context, rct *types.RunConfigTas
 	return rt
 }
 
-func (s *CommandHandler) genRun(ctx context.Context, rc *types.RunConfig) *types.Run {
+func genRun(rc *types.RunConfig) *types.Run {
 	r := &types.Run{
 		ID:          rc.ID,
 		Name:        rc.Name,
@@ -385,7 +454,6 @@ func (s *CommandHandler) genRun(ctx context.Context, rc *types.RunConfig) *types
 		Phase:       types.RunPhaseQueued,
 		Result:      types.RunResultUnknown,
 		RunTasks:    make(map[string]*types.RunTask),
-		EnqueueTime: util.TimePtr(time.Now()),
 	}
 
 	if len(rc.SetupErrors) > 0 {
@@ -394,7 +462,7 @@ func (s *CommandHandler) genRun(ctx context.Context, rc *types.RunConfig) *types
 	}
 
 	for _, rct := range rc.Tasks {
-		rt := s.genRunTask(ctx, rct)
+		rt := genRunTask(rct)
 		r.RunTasks[rt.ID] = rt
 	}
 

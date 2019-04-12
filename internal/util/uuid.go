@@ -33,3 +33,9 @@ type TestUUIDGenerator struct{}
 func (u TestUUIDGenerator) New(s string) uuid.UUID {
 	return uuid.NewV5(uuid.NamespaceDNS, s)
 }
+
+type TestPrefixUUIDGenerator struct{ Prefix string }
+
+func (u TestPrefixUUIDGenerator) New(s string) uuid.UUID {
+	return uuid.NewV5(uuid.NamespaceDNS, u.Prefix+s)
+}

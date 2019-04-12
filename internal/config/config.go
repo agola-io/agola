@@ -109,6 +109,7 @@ type DependCondition string
 const (
 	DependConditionOnSuccess DependCondition = "on_success"
 	DependConditionOnFailure DependCondition = "on_failure"
+	DependConditionOnSkipped DependCondition = "on_skipped"
 )
 
 type Depend struct {

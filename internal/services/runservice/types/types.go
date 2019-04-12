@@ -336,6 +336,7 @@ type RunConfigTaskDependCondition string
 const (
 	RunConfigTaskDependConditionOnSuccess RunConfigTaskDependCondition = "on_success"
 	RunConfigTaskDependConditionOnFailure RunConfigTaskDependCondition = "on_failure"
+	RunConfigTaskDependConditionOnSkipped RunConfigTaskDependCondition = "on_skipped"
 )
 
 type RunConfigTaskDepend struct {

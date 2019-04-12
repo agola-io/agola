@@ -105,23 +105,51 @@ func advanceRunTasks(ctx context.Context, r *types.Run, rc *types.RunConfig) err
 
 		rct := rc.Tasks[rt.ID]
 		parents := runconfig.GetParents(rc.Tasks, rct)
-		canRun := true
-		allParentsSkipped := false
+		finishedParents := 0
 		for _, p := range parents {
-			allParentsSkipped = true
 			rp := r.RunTasks[p.ID]
-			canRun = rp.Status.IsFinished() && rp.ArchivesFetchFinished()
-			// skip only if all parents are skipped
-			if rp.Status != types.RunTaskStatusSkipped {
-				allParentsSkipped = false
+			if rp.Status.IsFinished() && rp.ArchivesFetchFinished() {
+				finishedParents++
 			}
 		}
 
-		if allParentsSkipped {
-			rt.Status = types.RunTaskStatusSkipped
-		}
+		allParentsFinished := finishedParents == len(parents)
 
-		if canRun {
+		// if all parents are finished check if the task could be executed or be skipped
+		matchedNum := 0
+		if allParentsFinished {
+			for _, p := range parents {
+				matched := false
+				rp := r.RunTasks[p.ID]
+				conds := runconfig.GetParentDependConditions(rct, p)
+				for _, cond := range conds {
+					switch cond {
+					case types.RunConfigTaskDependConditionOnSuccess:
+						if rp.Status == types.RunTaskStatusSuccess {
+							matched = true
+						}
+					case types.RunConfigTaskDependConditionOnFailure:
+						if rp.Status == types.RunTaskStatusFailed {
+							matched = true
+						}
+					case types.RunConfigTaskDependConditionOnSkipped:
+						if rp.Status == types.RunTaskStatusSkipped {
+							matched = true
+						}
+					}
+				}
+				if matched {
+					matchedNum++
+				}
+			}
+
+			// if all parents are matched then we can start it, otherwise we mark the step to be skipped
+			skip := len(parents) != matchedNum
+			if skip {
+				rt.Status = types.RunTaskStatusSkipped
+				continue
+			}
+
 			// now that the task can run set it to waiting approval if needed
 			if rct.NeedsApproval && !rt.WaitingApproval && !rt.Approved {
 				rt.WaitingApproval = true
@@ -148,13 +176,17 @@ func getTasksToRun(ctx context.Context, r *types.Run, rc *types.RunConfig) ([]*t
 
 		rct := rc.Tasks[rt.ID]
 		parents := runconfig.GetParents(rc.Tasks, rct)
-		canRun := true
+		finishedParents := 0
 		for _, p := range parents {
 			rp := r.RunTasks[p.ID]
-			canRun = rp.Status.IsFinished() && rp.ArchivesFetchFinished()
+			if rp.Status.IsFinished() && rp.ArchivesFetchFinished() {
+				finishedParents++
+			}
 		}
 
-		if canRun {
+		allParentsFinished := finishedParents == len(parents)
+
+		if allParentsFinished {
 			// Run only if approved (when needs approval)
 			if !rct.NeedsApproval || (rct.NeedsApproval && rt.Approved) {
 				tasksToRun = append(tasksToRun, rt)
@@ -411,7 +443,8 @@ func (s *Scheduler) scheduleRun(ctx context.Context, r *types.Run, rc *types.Run
 		}
 	}
 
-	if !r.Result.IsSet() && r.Phase == types.RunPhaseRunning {
+	// advance tasks
+	if r.Phase == types.RunPhaseRunning {
 		if err := advanceRunTasks(ctx, r, rc); err != nil {
 			return err
 		}
@@ -454,7 +487,7 @@ func advanceRun(ctx context.Context, r *types.Run, rc *types.RunConfig, hasActiv
 		}
 	}
 
-	// see if run could me marked as success
+	// see if run could be marked as success
 	if !r.Result.IsSet() && r.Phase == types.RunPhaseRunning {
 		finished := true
 		for _, rt := range r.RunTasks {
@@ -475,11 +508,17 @@ func advanceRun(ctx context.Context, r *types.Run, rc *types.RunConfig, hasActiv
 		}
 	}
 
-	// if the run has a result defined then we can stop current tasks
+	// if the run has a result defined AND all tasks are finished AND there're no executor tasks scheduled we can mark
+	// the run phase as finished
 	if r.Result.IsSet() {
-		if !r.Phase.IsFinished() {
-			// if the run has a result defined AND there're no executor tasks scheduled we can mark
-			// the run phase as finished
+		finished := true
+		for _, rt := range r.RunTasks {
+			if !rt.Status.IsFinished() {
+				finished = false
+			}
+		}
+
+		if finished && !r.Phase.IsFinished() {
 			if !hasActiveTasks {
 				r.ChangePhase(types.RunPhaseFinished)
 			}

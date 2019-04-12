@@ -364,6 +364,13 @@ func GetAllParents(rcts map[string]*rstypes.RunConfigTask, task *rstypes.RunConf
 	return parents
 }
 
+func GetParentDependConditions(t, pt *rstypes.RunConfigTask) []rstypes.RunConfigTaskDependCondition {
+	if dt, ok := t.Depends[pt.ID]; ok {
+		return dt.Conditions
+	}
+	return nil
+}
+
 func genEnv(cenv map[string]config.Value, variables map[string]string) map[string]string {
 	env := map[string]string{}
 	for envName, envVar := range cenv {
