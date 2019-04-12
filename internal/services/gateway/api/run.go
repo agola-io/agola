@@ -134,7 +134,7 @@ func createRunResponse(r *rstypes.Run, rc *rstypes.RunConfig) *RunResponse {
 	run.CanRestartFromScratch, _ = r.CanRestartFromScratch()
 	run.CanRestartFromFailedTasks, _ = r.CanRestartFromFailedTasks()
 
-	for name, rt := range r.RunTasks {
+	for name, rt := range r.Tasks {
 		rct := rc.Tasks[rt.ID]
 		run.Tasks[name] = createRunResponseTask(r, rt, rct)
 	}
@@ -258,7 +258,7 @@ func (h *RuntaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	run := runResp.Run
 	rc := runResp.RunConfig
 
-	rt, ok := run.RunTasks[taskID]
+	rt, ok := run.Tasks[taskID]
 	if !ok {
 		httpError(w, util.NewErrNotFound(errors.Errorf("run %q task %q not found", runID, taskID)))
 		return

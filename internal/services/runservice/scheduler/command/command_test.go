@@ -201,11 +201,11 @@ func TestRecreateRun(t *testing.T) {
 			rc:   rc.DeepCopy(),
 			r: func() *types.Run {
 				run := run.DeepCopy()
-				run.RunTasks[inuuid("task01")].Status = types.RunTaskStatusFailed
-				run.RunTasks[inuuid("task02")].Status = types.RunTaskStatusSuccess
-				run.RunTasks[inuuid("task03")].Status = types.RunTaskStatusSuccess
-				run.RunTasks[inuuid("task04")].Status = types.RunTaskStatusSuccess
-				run.RunTasks[inuuid("task05")].Status = types.RunTaskStatusSuccess
+				run.Tasks[inuuid("task01")].Status = types.RunTaskStatusFailed
+				run.Tasks[inuuid("task02")].Status = types.RunTaskStatusSuccess
+				run.Tasks[inuuid("task03")].Status = types.RunTaskStatusSuccess
+				run.Tasks[inuuid("task04")].Status = types.RunTaskStatusSuccess
+				run.Tasks[inuuid("task05")].Status = types.RunTaskStatusSuccess
 				return run
 			}(),
 			outrc: outrc.DeepCopy(),
@@ -217,11 +217,11 @@ func TestRecreateRun(t *testing.T) {
 			rc:   rc.DeepCopy(),
 			r: func() *types.Run {
 				run := run.DeepCopy()
-				run.RunTasks[inuuid("task01")].Status = types.RunTaskStatusFailed
-				run.RunTasks[inuuid("task02")].Status = types.RunTaskStatusSuccess
-				run.RunTasks[inuuid("task03")].Status = types.RunTaskStatusSuccess
-				run.RunTasks[inuuid("task04")].Status = types.RunTaskStatusSuccess
-				run.RunTasks[inuuid("task05")].Status = types.RunTaskStatusSuccess
+				run.Tasks[inuuid("task01")].Status = types.RunTaskStatusFailed
+				run.Tasks[inuuid("task02")].Status = types.RunTaskStatusSuccess
+				run.Tasks[inuuid("task03")].Status = types.RunTaskStatusSuccess
+				run.Tasks[inuuid("task04")].Status = types.RunTaskStatusSuccess
+				run.Tasks[inuuid("task05")].Status = types.RunTaskStatusSuccess
 				return run
 			}(),
 			// task01 and task02 recreated
@@ -246,17 +246,17 @@ func TestRecreateRun(t *testing.T) {
 				outrun := outrun.DeepCopy()
 				nrun := run.DeepCopy()
 				nrun.ID = outuuid("new")
-				nrun.RunTasks = map[string]*types.RunTask{
-					outuuid("task01"): outrun.RunTasks[outuuid("task01")],
-					outuuid("task02"): outrun.RunTasks[outuuid("task02")],
-					inuuid("task03"):  run.RunTasks[inuuid("task03")],
-					inuuid("task04"):  run.RunTasks[inuuid("task04")],
-					inuuid("task05"):  run.RunTasks[inuuid("task05")],
+				nrun.Tasks = map[string]*types.RunTask{
+					outuuid("task01"): outrun.Tasks[outuuid("task01")],
+					outuuid("task02"): outrun.Tasks[outuuid("task02")],
+					inuuid("task03"):  run.Tasks[inuuid("task03")],
+					inuuid("task04"):  run.Tasks[inuuid("task04")],
+					inuuid("task05"):  run.Tasks[inuuid("task05")],
 				}
 
-				nrun.RunTasks[inuuid("task03")].Status = types.RunTaskStatusSuccess
-				nrun.RunTasks[inuuid("task04")].Status = types.RunTaskStatusSuccess
-				nrun.RunTasks[inuuid("task05")].Status = types.RunTaskStatusSuccess
+				nrun.Tasks[inuuid("task03")].Status = types.RunTaskStatusSuccess
+				nrun.Tasks[inuuid("task04")].Status = types.RunTaskStatusSuccess
+				nrun.Tasks[inuuid("task05")].Status = types.RunTaskStatusSuccess
 
 				return nrun
 			}(),

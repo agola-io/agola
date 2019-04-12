@@ -186,7 +186,7 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 		return errors.Errorf("no such run with id: %s", runID), true
 	}
 
-	task, ok := r.RunTasks[taskID]
+	task, ok := r.Tasks[taskID]
 	if !ok {
 		return errors.Errorf("no such task with ID %s in run %s", taskID, runID), true
 	}

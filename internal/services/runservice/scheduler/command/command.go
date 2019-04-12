@@ -275,7 +275,7 @@ func recreateRun(uuid util.UUIDGenerator, run *types.Run, rc *types.RunConfig, n
 	// currently we only restart a run resetting al failed tasks
 	recreatedRCTasks := map[string]struct{}{}
 
-	for _, rt := range run.RunTasks {
+	for _, rt := range run.Tasks {
 		if req.FromStart || rt.Status != types.RunTaskStatusSuccess {
 			rct, ok := rc.Tasks[rt.ID]
 			if !ok {
@@ -343,19 +343,19 @@ func recreateRun(uuid util.UUIDGenerator, run *types.Run, rc *types.RunConfig, n
 
 	// remove deleted tasks from run config
 	tasksToDelete := []string{}
-	for _, rt := range run.RunTasks {
+	for _, rt := range run.Tasks {
 		if _, ok := rc.Tasks[rt.ID]; !ok {
 			tasksToDelete = append(tasksToDelete, rt.ID)
 		}
 	}
 	for _, rtID := range tasksToDelete {
-		delete(run.RunTasks, rtID)
+		delete(run.Tasks, rtID)
 	}
 	// create new tasks from runconfig
 	for _, rct := range rc.Tasks {
-		if _, ok := run.RunTasks[rct.ID]; !ok {
+		if _, ok := run.Tasks[rct.ID]; !ok {
 			nrt := genRunTask(rct)
-			run.RunTasks[nrt.ID] = nrt
+			run.Tasks[nrt.ID] = nrt
 		}
 	}
 
@@ -453,7 +453,7 @@ func genRun(rc *types.RunConfig) *types.Run {
 		Annotations: rc.Annotations,
 		Phase:       types.RunPhaseQueued,
 		Result:      types.RunResultUnknown,
-		RunTasks:    make(map[string]*types.RunTask),
+		Tasks:       make(map[string]*types.RunTask),
 	}
 
 	if len(rc.SetupErrors) > 0 {
@@ -463,7 +463,7 @@ func genRun(rc *types.RunConfig) *types.Run {
 
 	for _, rct := range rc.Tasks {
 		rt := genRunTask(rct)
-		r.RunTasks[rt.ID] = rt
+		r.Tasks[rt.ID] = rt
 	}
 
 	return r
@@ -487,7 +487,7 @@ func (s *CommandHandler) ApproveRunTask(ctx context.Context, req *RunTaskApprove
 		return err
 	}
 
-	task, ok := r.RunTasks[req.TaskID]
+	task, ok := r.Tasks[req.TaskID]
 	if !ok {
 		return util.NewErrBadRequest(errors.Errorf("run %q doesn't have task %q", r.ID, req.TaskID))
 	}

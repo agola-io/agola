@@ -328,8 +328,8 @@ func GetExecutorTasksForRun(ctx context.Context, e *etcd.Store, runID string) ([
 		return nil, err
 	}
 
-	rtIDs := make([]string, len(r.RunTasks))
-	for rtID, _ := range r.RunTasks {
+	rtIDs := make([]string, len(r.Tasks))
+	for rtID, _ := range r.Tasks {
 		rtIDs = append(rtIDs, rtID)
 
 	}

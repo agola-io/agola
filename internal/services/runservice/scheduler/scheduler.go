@@ -95,7 +95,7 @@ func advanceRunTasks(ctx context.Context, r *types.Run, rc *types.RunConfig) err
 	log.Debugf("rc: %s", util.Dump(rc))
 
 	// get tasks that can be executed
-	for _, rt := range r.RunTasks {
+	for _, rt := range r.Tasks {
 		if rt.Skip {
 			continue
 		}
@@ -107,7 +107,7 @@ func advanceRunTasks(ctx context.Context, r *types.Run, rc *types.RunConfig) err
 		parents := runconfig.GetParents(rc.Tasks, rct)
 		finishedParents := 0
 		for _, p := range parents {
-			rp := r.RunTasks[p.ID]
+			rp := r.Tasks[p.ID]
 			if rp.Status.IsFinished() && rp.ArchivesFetchFinished() {
 				finishedParents++
 			}
@@ -120,7 +120,7 @@ func advanceRunTasks(ctx context.Context, r *types.Run, rc *types.RunConfig) err
 		if allParentsFinished {
 			for _, p := range parents {
 				matched := false
-				rp := r.RunTasks[p.ID]
+				rp := r.Tasks[p.ID]
 				conds := runconfig.GetParentDependConditions(rct, p)
 				for _, cond := range conds {
 					switch cond {
@@ -166,7 +166,7 @@ func getTasksToRun(ctx context.Context, r *types.Run, rc *types.RunConfig) ([]*t
 
 	tasksToRun := []*types.RunTask{}
 	// get tasks that can be executed
-	for _, rt := range r.RunTasks {
+	for _, rt := range r.Tasks {
 		if rt.Skip {
 			continue
 		}
@@ -178,7 +178,7 @@ func getTasksToRun(ctx context.Context, r *types.Run, rc *types.RunConfig) ([]*t
 		parents := runconfig.GetParents(rc.Tasks, rct)
 		finishedParents := 0
 		for _, p := range parents {
-			rp := r.RunTasks[p.ID]
+			rp := r.Tasks[p.ID]
 			if rp.Status.IsFinished() && rp.ArchivesFetchFinished() {
 				finishedParents++
 			}
@@ -291,7 +291,7 @@ func (s *Scheduler) genExecutorTask(ctx context.Context, r *types.Run, rt *types
 		log.Debugf("rctParent: %s", util.Dump(rctParent))
 		log.Debugf("ws: %s", util.Dump(ws))
 		archives := []types.WorkspaceArchive{}
-		for _, archiveStep := range r.RunTasks[rctParent.ID].WorkspaceArchives {
+		for _, archiveStep := range r.Tasks[rctParent.ID].WorkspaceArchives {
 			archives = append(archives, types.WorkspaceArchive{TaskID: rctParent.ID, Step: archiveStep})
 		}
 		log.Debugf("archives: %v", util.Dump(archives))
@@ -471,7 +471,7 @@ func advanceRun(ctx context.Context, r *types.Run, rc *types.RunConfig, hasActiv
 
 	// fail run if a task is failed
 	if !r.Result.IsSet() && r.Phase == types.RunPhaseRunning {
-		for _, rt := range r.RunTasks {
+		for _, rt := range r.Tasks {
 			rct, ok := rc.Tasks[rt.ID]
 			log.Debugf("rct: %s", util.Dump(rct))
 			if !ok {
@@ -490,7 +490,7 @@ func advanceRun(ctx context.Context, r *types.Run, rc *types.RunConfig, hasActiv
 	// see if run could be marked as success
 	if !r.Result.IsSet() && r.Phase == types.RunPhaseRunning {
 		finished := true
-		for _, rt := range r.RunTasks {
+		for _, rt := range r.Tasks {
 			if !rt.Status.IsFinished() {
 				finished = false
 			}
@@ -512,7 +512,7 @@ func advanceRun(ctx context.Context, r *types.Run, rc *types.RunConfig, hasActiv
 	// the run phase as finished
 	if r.Result.IsSet() {
 		finished := true
-		for _, rt := range r.RunTasks {
+		for _, rt := range r.Tasks {
 			if !rt.Status.IsFinished() {
 				finished = false
 			}
@@ -527,7 +527,7 @@ func advanceRun(ctx context.Context, r *types.Run, rc *types.RunConfig, hasActiv
 		// if the run is finished AND there're no executor tasks scheduled we can mark
 		// all not started runtasks' fetch phases (setup step, logs and archives) as finished
 		if r.Phase.IsFinished() {
-			for _, rt := range r.RunTasks {
+			for _, rt := range r.Tasks {
 				log.Debugf("rt: %s", util.Dump(rt))
 				if rt.Status == types.RunTaskStatusNotStarted {
 					rt.SetupStep.LogPhase = types.RunTaskFetchPhaseFinished
@@ -569,7 +569,7 @@ func (s *Scheduler) handleExecutorTaskUpdate(ctx context.Context, et *types.Exec
 func (s *Scheduler) updateRunTaskStatus(ctx context.Context, et *types.ExecutorTask, r *types.Run) error {
 	log.Debugf("et: %s", util.Dump(et))
 
-	rt, ok := r.RunTasks[et.ID]
+	rt, ok := r.Tasks[et.ID]
 	if !ok {
 		return errors.Errorf("no such run task with id %s for run %s", et.ID, r.ID)
 	}
@@ -865,7 +865,7 @@ func (s *Scheduler) finishSetupLogPhase(ctx context.Context, runID, runTaskID st
 	if err != nil {
 		return err
 	}
-	rt, ok := r.RunTasks[runTaskID]
+	rt, ok := r.Tasks[runTaskID]
 	if !ok {
 		return errors.Errorf("no such task with ID %s in run %s", runTaskID, runID)
 	}
@@ -882,7 +882,7 @@ func (s *Scheduler) finishStepLogPhase(ctx context.Context, runID, runTaskID str
 	if err != nil {
 		return err
 	}
-	rt, ok := r.RunTasks[runTaskID]
+	rt, ok := r.Tasks[runTaskID]
 	if !ok {
 		return errors.Errorf("no such task with ID %s in run %s", runTaskID, runID)
 	}
@@ -902,7 +902,7 @@ func (s *Scheduler) finishArchivePhase(ctx context.Context, runID, runTaskID str
 	if err != nil {
 		return err
 	}
-	rt, ok := r.RunTasks[runTaskID]
+	rt, ok := r.Tasks[runTaskID]
 	if !ok {
 		return errors.Errorf("no such task with ID %s in run %s", runTaskID, runID)
 	}
@@ -1045,7 +1045,7 @@ func (s *Scheduler) fetcher(ctx context.Context) error {
 	}
 	for _, r := range runs {
 		log.Debugf("r: %s", util.Dump(r))
-		for _, rt := range r.RunTasks {
+		for _, rt := range r.Tasks {
 			log.Debugf("rt: %s", util.Dump(rt))
 			if rt.Status.IsFinished() {
 				s.fetchTaskLogs(ctx, r.ID, rt)
@@ -1160,7 +1160,7 @@ func (s *Scheduler) finishedRunArchiver(ctx context.Context, r *types.Run) error
 	}
 
 	done := true
-	for _, rt := range r.RunTasks {
+	for _, rt := range r.Tasks {
 		// check that all logs are fetched
 		if !rt.LogsFetchFinished() {
 			done = false
@@ -1181,7 +1181,7 @@ func (s *Scheduler) finishedRunArchiver(ctx context.Context, r *types.Run) error
 	// remove it before since it contains the reference to the executor where we
 	// should fetch the data
 
-	for _, rt := range r.RunTasks {
+	for _, rt := range r.Tasks {
 		log.Infof("deleting executor task %s", rt.ID)
 		if err := store.DeleteExecutorTask(ctx, s.e, rt.ID); err != nil {
 			return err

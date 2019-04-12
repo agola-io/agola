@@ -110,7 +110,7 @@ type Run struct {
 	// Stop is used to signal from the scheduler when the run must be stopped
 	Stop bool `json:"stop,omitempty"`
 
-	RunTasks    map[string]*RunTask `json:"run_tasks,omitempty"`
+	Tasks       map[string]*RunTask `json:"tasks,omitempty"`
 	EnqueueTime *time.Time          `json:"enqueue_time,omitempty"`
 	StartTime   *time.Time          `json:"start_time,omitempty"`
 	EndTime     *time.Time          `json:"end_time,omitempty"`
@@ -141,7 +141,7 @@ func (r *Run) ChangePhase(phase RunPhase) {
 
 func (r *Run) TasksWaitingApproval() []string {
 	runTasksIDs := []string{}
-	for _, rt := range r.RunTasks {
+	for _, rt := range r.Tasks {
 		if rt.WaitingApproval {
 			runTasksIDs = append(runTasksIDs, rt.ID)
 		}
@@ -175,7 +175,7 @@ func (r *Run) CanRestartFromFailedTasks() (bool, string) {
 		return false, fmt.Sprintf("run %q has success result, cannot restart from failed tasks", r.ID)
 	}
 	// can restart only if the successful tasks are fully archived
-	for _, rt := range r.RunTasks {
+	for _, rt := range r.Tasks {
 		if rt.Status == RunTaskStatusSuccess {
 			if !rt.LogsFetchFinished() || !rt.ArchivesFetchFinished() {
 				return false, fmt.Sprintf("run %q task %q not fully archived", r.ID, rt.ID)
