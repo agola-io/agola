@@ -36,7 +36,7 @@ func TestGenTasksLevels(t *testing.T) {
 	type task struct {
 		ID      string
 		Level   int
-		Depends []*rstypes.RunConfigTaskDepend
+		Depends map[string]*rstypes.RunConfigTaskDepend
 	}
 	tests := []struct {
 		name string
@@ -92,10 +92,8 @@ func TestGenTasksLevels(t *testing.T) {
 				{
 					ID:    "2",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "1",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
 					},
 				},
 			},
@@ -107,10 +105,8 @@ func TestGenTasksLevels(t *testing.T) {
 				{
 					ID:    "2",
 					Level: 1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "1",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
 					},
 				},
 			},
@@ -121,19 +117,15 @@ func TestGenTasksLevels(t *testing.T) {
 				{
 					ID:    "1",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "2",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
 					},
 				},
 				{
 					ID:    "2",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "1",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
 					},
 				},
 			},
@@ -145,28 +137,22 @@ func TestGenTasksLevels(t *testing.T) {
 				{
 					ID:    "1",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "2",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
 					},
 				},
 				{
 					ID:    "2",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "3",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"3": &rstypes.RunConfigTaskDepend{TaskID: "3"},
 					},
 				},
 				{
 					ID:    "3",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "1",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
 					},
 				},
 			},
@@ -178,28 +164,22 @@ func TestGenTasksLevels(t *testing.T) {
 				{
 					ID:    "1",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "2",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
 					},
 				},
 				{
 					ID:    "2",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "3",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"3": &rstypes.RunConfigTaskDepend{TaskID: "3"},
 					},
 				},
 				{
 					ID:    "3",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "2",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
 					},
 				},
 			},
@@ -246,7 +226,7 @@ func TestGetAllParents(t *testing.T) {
 	type task struct {
 		ID      string
 		Level   int
-		Depends []*rstypes.RunConfigTaskDepend
+		Depends map[string]*rstypes.RunConfigTaskDepend
 	}
 	tests := []struct {
 		name string
@@ -288,10 +268,8 @@ func TestGetAllParents(t *testing.T) {
 				{
 					ID:    "1",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "1",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
 					},
 				},
 			},
@@ -309,10 +287,8 @@ func TestGetAllParents(t *testing.T) {
 				{
 					ID:    "2",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "1",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
 					},
 				},
 			},
@@ -327,31 +303,23 @@ func TestGetAllParents(t *testing.T) {
 				{
 					ID:    "1",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "2",
-						},
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "3",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
+						"3": &rstypes.RunConfigTaskDepend{TaskID: "3"},
 					},
 				},
 				{
 					ID:    "2",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "4",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"4": &rstypes.RunConfigTaskDepend{TaskID: "4"},
 					},
 				},
 				{
 					ID:    "3",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "5",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"5": &rstypes.RunConfigTaskDepend{TaskID: "5"},
 					},
 				},
 				{
@@ -377,19 +345,15 @@ func TestGetAllParents(t *testing.T) {
 				{
 					ID:    "1",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "2",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
 					},
 				},
 				{
 					ID:    "2",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "1",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
 					},
 				},
 			},
@@ -404,28 +368,22 @@ func TestGetAllParents(t *testing.T) {
 				{
 					ID:    "1",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "2",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
 					},
 				},
 				{
 					ID:    "2",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "3",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"3": &rstypes.RunConfigTaskDepend{TaskID: "3"},
 					},
 				},
 				{
 					ID:    "3",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "1",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
 					},
 				},
 			},
@@ -441,28 +399,22 @@ func TestGetAllParents(t *testing.T) {
 				{
 					ID:    "1",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "2",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
 					},
 				},
 				{
 					ID:    "2",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "3",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"3": &rstypes.RunConfigTaskDepend{TaskID: "3"},
 					},
 				},
 				{
 					ID:    "3",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "2",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
 					},
 				},
 			},
@@ -505,7 +457,7 @@ func TestCheckRunConfig(t *testing.T) {
 	type task struct {
 		ID      string
 		Level   int
-		Depends []*rstypes.RunConfigTaskDepend
+		Depends map[string]*rstypes.RunConfigTaskDepend
 	}
 	tests := []struct {
 		name string
@@ -544,10 +496,8 @@ func TestCheckRunConfig(t *testing.T) {
 				{
 					ID:    "2",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "1",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
 					},
 				},
 			},
@@ -558,19 +508,15 @@ func TestCheckRunConfig(t *testing.T) {
 				{
 					ID:    "1",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "2",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
 					},
 				},
 				{
 					ID:    "2",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "1",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
 					},
 				},
 			},
@@ -587,28 +533,22 @@ func TestCheckRunConfig(t *testing.T) {
 				{
 					ID:    "1",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "2",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
 					},
 				},
 				{
 					ID:    "2",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "3",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"3": &rstypes.RunConfigTaskDepend{TaskID: "3"},
 					},
 				},
 				{
 					ID:    "3",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "1",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
 					},
 				},
 			},
@@ -626,28 +566,22 @@ func TestCheckRunConfig(t *testing.T) {
 				{
 					ID:    "1",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "2",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
 					},
 				},
 				{
 					ID:    "2",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "3",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"3": &rstypes.RunConfigTaskDepend{TaskID: "3"},
 					},
 				},
 				{
 					ID:    "3",
 					Level: -1,
-					Depends: []*rstypes.RunConfigTaskDepend{
-						&rstypes.RunConfigTaskDepend{
-							TaskID: "2",
-						},
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
 					},
 				},
 			},
@@ -798,7 +732,7 @@ func TestGenRunConfig(t *testing.T) {
 			out: map[string]*rstypes.RunConfigTask{
 				uuid.New("element01").String(): &rstypes.RunConfigTask{
 					ID:   uuid.New("element01").String(),
-					Name: "element01", Depends: []*rstypes.RunConfigTaskDepend{},
+					Name: "element01", Depends: map[string]*rstypes.RunConfigTaskDepend{},
 					Runtime: &rstypes.Runtime{Type: rstypes.RuntimeType("pod"),
 						Containers: []*rstypes.Container{
 							{
@@ -882,7 +816,7 @@ func TestGenRunConfig(t *testing.T) {
 			out: map[string]*rstypes.RunConfigTask{
 				uuid.New("element01").String(): &rstypes.RunConfigTask{
 					ID:   uuid.New("element01").String(),
-					Name: "element01", Depends: []*rstypes.RunConfigTaskDepend{},
+					Name: "element01", Depends: map[string]*rstypes.RunConfigTaskDepend{},
 					Runtime: &rstypes.Runtime{Type: rstypes.RuntimeType("pod"),
 						Containers: []*rstypes.Container{
 							{
@@ -962,7 +896,7 @@ func TestGenRunConfig(t *testing.T) {
 			out: map[string]*rstypes.RunConfigTask{
 				uuid.New("element01").String(): &rstypes.RunConfigTask{
 					ID:   uuid.New("element01").String(),
-					Name: "element01", Depends: []*rstypes.RunConfigTaskDepend{},
+					Name: "element01", Depends: map[string]*rstypes.RunConfigTaskDepend{},
 					Runtime: &rstypes.Runtime{Type: rstypes.RuntimeType("pod"),
 						Containers: []*rstypes.Container{
 							{
