@@ -33,7 +33,7 @@ func TestAdvanceRunTasks(t *testing.T) {
 			"task01": &types.RunConfigTask{
 				ID:      "task01",
 				Name:    "task01",
-				Depends: []*types.RunConfigTaskDepend{},
+				Depends: map[string]*types.RunConfigTaskDepend{},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},
 				},
@@ -44,10 +44,8 @@ func TestAdvanceRunTasks(t *testing.T) {
 			"task02": &types.RunConfigTask{
 				ID:   "task02",
 				Name: "task02",
-				Depends: []*types.RunConfigTaskDepend{
-					&types.RunConfigTaskDepend{
-						TaskID: "task01",
-					},
+				Depends: map[string]*types.RunConfigTaskDepend{
+					"task01": &types.RunConfigTaskDepend{TaskID: "task01"},
 				},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},
@@ -59,7 +57,7 @@ func TestAdvanceRunTasks(t *testing.T) {
 			"task03": &types.RunConfigTask{
 				ID:      "task03",
 				Name:    "task03",
-				Depends: []*types.RunConfigTaskDepend{},
+				Depends: map[string]*types.RunConfigTaskDepend{},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},
 				},
@@ -80,9 +78,9 @@ func TestAdvanceRunTasks(t *testing.T) {
 			"task05": &types.RunConfigTask{
 				ID:   "task05",
 				Name: "task05",
-				Depends: []*types.RunConfigTaskDepend{
-					&types.RunConfigTaskDepend{TaskID: "task03"},
-					&types.RunConfigTaskDepend{TaskID: "task04"},
+				Depends: map[string]*types.RunConfigTaskDepend{
+					"task03": &types.RunConfigTaskDepend{TaskID: "task03"},
+					"task04": &types.RunConfigTaskDepend{TaskID: "task04"},
 				},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},
@@ -218,7 +216,7 @@ func TestGetTasksToRun(t *testing.T) {
 			"task01": &types.RunConfigTask{
 				ID:      "task01",
 				Name:    "task01",
-				Depends: []*types.RunConfigTaskDepend{},
+				Depends: map[string]*types.RunConfigTaskDepend{},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},
 				},
@@ -229,10 +227,8 @@ func TestGetTasksToRun(t *testing.T) {
 			"task02": &types.RunConfigTask{
 				ID:   "task02",
 				Name: "task02",
-				Depends: []*types.RunConfigTaskDepend{
-					&types.RunConfigTaskDepend{
-						TaskID: "task01",
-					},
+				Depends: map[string]*types.RunConfigTaskDepend{
+					"task01": &types.RunConfigTaskDepend{TaskID: "task01"},
 				},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},
@@ -244,7 +240,7 @@ func TestGetTasksToRun(t *testing.T) {
 			"task03": &types.RunConfigTask{
 				ID:      "task03",
 				Name:    "task03",
-				Depends: []*types.RunConfigTaskDepend{},
+				Depends: map[string]*types.RunConfigTaskDepend{},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},
 				},
@@ -265,9 +261,9 @@ func TestGetTasksToRun(t *testing.T) {
 			"task05": &types.RunConfigTask{
 				ID:   "task05",
 				Name: "task05",
-				Depends: []*types.RunConfigTaskDepend{
-					&types.RunConfigTaskDepend{TaskID: "task03"},
-					&types.RunConfigTaskDepend{TaskID: "task04"},
+				Depends: map[string]*types.RunConfigTaskDepend{
+					"task03": &types.RunConfigTaskDepend{TaskID: "task03"},
+					"task04": &types.RunConfigTaskDepend{TaskID: "task04"},
 				},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},
