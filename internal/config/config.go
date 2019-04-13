@@ -147,7 +147,7 @@ type Value struct {
 	Value string
 }
 
-type SaveToWorkspaceContent struct {
+type SaveContent struct {
 	SourceDir string   `yaml:"source_dir"`
 	DestDir   string   `yaml:"dest_dir"`
 	Paths     []string `yaml:"paths"`
@@ -155,12 +155,24 @@ type SaveToWorkspaceContent struct {
 
 type SaveToWorkspaceStep struct {
 	Step     `yaml:",inline"`
-	Contents []SaveToWorkspaceContent
+	Contents []*SaveContent `yaml:"contents"`
 }
 
 type RestoreWorkspaceStep struct {
 	Step    `yaml:",inline"`
 	DestDir string `yaml:"dest_dir"`
+}
+
+type SaveCacheStep struct {
+	Step     `yaml:",inline"`
+	Key      string         `yaml:"key"`
+	Contents []*SaveContent `yaml:"contents"`
+}
+
+type RestoreCacheStep struct {
+	Step    `yaml:",inline"`
+	Keys    []string `yaml:"keys"`
+	DestDir string   `yaml:"dest_dir"`
 }
 
 func (t *Task) UnmarshalYAML(unmarshal func(interface{}) error) error {
@@ -198,38 +210,54 @@ func (t *Task) UnmarshalYAML(unmarshal func(interface{}) error) error {
 			}
 			switch stepType {
 			case "clone":
-				var cs CloneStep
-				cs.Type = stepType
-				steps[i] = &cs
+				var s CloneStep
+				s.Type = stepType
+				steps[i] = &s
 
 			case "run":
-				var rs RunStep
+				var s RunStep
 				switch stepSpec.(type) {
 				case string:
-					rs.Command = stepSpec.(string)
+					s.Command = stepSpec.(string)
 				default:
-					if err := yaml.Unmarshal(o, &rs); err != nil {
+					if err := yaml.Unmarshal(o, &s); err != nil {
 						return err
 					}
 				}
-				rs.Type = stepType
-				steps[i] = &rs
+				s.Type = stepType
+				steps[i] = &s
 
 			case "save_to_workspace":
-				var sws SaveToWorkspaceStep
-				if err := yaml.Unmarshal(o, &sws); err != nil {
+				var s SaveToWorkspaceStep
+				if err := yaml.Unmarshal(o, &s); err != nil {
 					return err
 				}
-				sws.Type = stepType
-				steps[i] = &sws
+				s.Type = stepType
+				steps[i] = &s
 
 			case "restore_workspace":
-				var rws RestoreWorkspaceStep
-				if err := yaml.Unmarshal(o, &rws); err != nil {
+				var s RestoreWorkspaceStep
+				if err := yaml.Unmarshal(o, &s); err != nil {
 					return err
 				}
-				rws.Type = stepType
-				steps[i] = &rws
+				s.Type = stepType
+				steps[i] = &s
+
+			case "save_cache":
+				var s SaveCacheStep
+				if err := yaml.Unmarshal(o, &s); err != nil {
+					return err
+				}
+				s.Type = stepType
+				steps[i] = &s
+
+			case "restore_cache":
+				var s RestoreCacheStep
+				if err := yaml.Unmarshal(o, &s); err != nil {
+					return err
+				}
+				s.Type = stepType
+				steps[i] = &s
 			default:
 				return errors.Errorf("unknown step type: %s", stepType)
 			}
@@ -568,6 +596,25 @@ func ParseConfig(configData []byte) (*Config, error) {
 				if container.Auth.Type == "" {
 					container.Auth.Type = RegistryAuthTypeDefault
 				}
+			}
+		}
+	}
+
+	// set steps defaults
+	for _, t := range config.Tasks {
+		for _, s := range t.Steps {
+			switch step := s.(type) {
+			// TODO(sgotti) we could use the run step command as step name but when the
+			// command is very long or multi line it doesn't makes sense and will
+			// probably be quite unuseful/confusing from an UI point of view
+			case *SaveCacheStep:
+				for _, content := range step.Contents {
+					if len(content.Paths) == 0 {
+						// default to all files inside the sourceDir
+						content.Paths = []string{"**"}
+					}
+				}
+				log.Infof("s: %s", util.Dump(s))
 			}
 		}
 	}

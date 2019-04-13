@@ -131,9 +131,9 @@ fi
 		sws.Type = cs.Type
 		sws.Name = cs.Name
 
-		sws.Contents = make([]rstypes.SaveToWorkspaceContent, len(cs.Contents))
+		sws.Contents = make([]rstypes.SaveContent, len(cs.Contents))
 		for i, csc := range cs.Contents {
-			sc := rstypes.SaveToWorkspaceContent{}
+			sc := rstypes.SaveContent{}
 			sc.SourceDir = csc.SourceDir
 			sc.DestDir = csc.DestDir
 			sc.Paths = csc.Paths
@@ -146,6 +146,33 @@ fi
 		rws := &rstypes.RestoreWorkspaceStep{}
 		rws.Name = cs.Name
 		rws.Type = cs.Type
+		rws.DestDir = cs.DestDir
+
+		return rws
+
+	case *config.SaveCacheStep:
+		sws := &rstypes.SaveCacheStep{}
+
+		sws.Type = cs.Type
+		sws.Name = cs.Name
+		sws.Key = cs.Key
+
+		sws.Contents = make([]rstypes.SaveContent, len(cs.Contents))
+		for i, csc := range cs.Contents {
+			sc := rstypes.SaveContent{}
+			sc.SourceDir = csc.SourceDir
+			sc.DestDir = csc.DestDir
+			sc.Paths = csc.Paths
+
+			sws.Contents[i] = sc
+		}
+		return sws
+
+	case *config.RestoreCacheStep:
+		rws := &rstypes.RestoreCacheStep{}
+		rws.Name = cs.Name
+		rws.Type = cs.Type
+		rws.Keys = cs.Keys
 		rws.DestDir = cs.DestDir
 
 		return rws

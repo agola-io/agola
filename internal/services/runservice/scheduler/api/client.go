@@ -141,6 +141,26 @@ func (c *Client) GetArchive(ctx context.Context, taskID string, step int) (*http
 	return c.getResponse(ctx, "GET", "/executor/archives", q, nil, nil)
 }
 
+func (c *Client) CheckCache(ctx context.Context, key string, prefix bool) (*http.Response, error) {
+	q := url.Values{}
+	if prefix {
+		q.Add("prefix", "")
+	}
+	return c.getResponse(ctx, "HEAD", fmt.Sprintf("/executor/caches/%s", url.PathEscape(key)), q, nil, nil)
+}
+
+func (c *Client) GetCache(ctx context.Context, key string, prefix bool) (*http.Response, error) {
+	q := url.Values{}
+	if prefix {
+		q.Add("prefix", "")
+	}
+	return c.getResponse(ctx, "GET", fmt.Sprintf("/executor/caches/%s", url.PathEscape(key)), q, nil, nil)
+}
+
+func (c *Client) PutCache(ctx context.Context, key string, r io.Reader) (*http.Response, error) {
+	return c.getResponse(ctx, "POST", fmt.Sprintf("/executor/caches/%s", url.PathEscape(key)), nil, nil, r)
+}
+
 func (c *Client) GetRuns(ctx context.Context, phaseFilter, groups []string, lastRun bool, changeGroups []string, start string, limit int, asc bool) (*GetRunsResponse, *http.Response, error) {
 	q := url.Values{}
 	for _, phase := range phaseFilter {

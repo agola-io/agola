@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"path"
 	"reflect"
+	"strings"
 
 	"github.com/sorintlab/agola/internal/etcd"
 	"github.com/sorintlab/agola/internal/objectstorage"
@@ -42,12 +43,12 @@ func LTSSubGroupsAndGroupTypes(group string) []string {
 }
 
 func LTSRootGroup(group string) string {
-	h := util.PathHierarchy(group)
-	if len(h)%2 != 1 {
-		panic(fmt.Errorf("wrong group path %q", group))
+	pl := util.PathList(group)
+	if len(pl) < 2 {
+		panic(fmt.Errorf("cannot determine root group name, wrong group path %q", group))
 	}
 
-	return h[2]
+	return pl[1]
 }
 
 func LTSSubGroups(group string) []string {
@@ -129,6 +130,19 @@ func LTSRunTaskStepLogPath(rtID string, step int) string {
 
 func LTSRunArchivePath(rtID string, step int) string {
 	return path.Join("workspacearchives", fmt.Sprintf("%s/%d.tar", rtID, step))
+}
+
+func LTSCacheDir() string {
+	return "caches"
+}
+
+func LTSCachePath(key string) string {
+	return path.Join(LTSCacheDir(), fmt.Sprintf("%s.tar", key))
+}
+
+func LTSCacheKey(p string) string {
+	base := path.Base(p)
+	return strings.TrimSuffix(base, path.Ext(base))
 }
 
 func LTSGetRunConfig(wal *wal.WalManager, runConfigID string) (*types.RunConfig, error) {

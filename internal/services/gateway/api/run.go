@@ -200,6 +200,10 @@ func createRunTaskResponse(rt *rstypes.RunTask, rct *rstypes.RunConfigTask) *Run
 			s.Name = "save to workspace"
 		case *rstypes.RestoreWorkspaceStep:
 			s.Name = "restore workspace"
+		case *rstypes.SaveCacheStep:
+			s.Name = "save cache"
+		case *rstypes.RestoreCacheStep:
+			s.Name = "restore cache"
 		}
 
 		t.Steps[i] = s

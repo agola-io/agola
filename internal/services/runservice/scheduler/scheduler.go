@@ -270,6 +270,7 @@ func (s *Scheduler) genExecutorTask(ctx context.Context, r *types.Run, rt *types
 		Shell:       rct.Shell,
 		User:        rct.User,
 		Steps:       rct.Steps,
+		CachePrefix: store.LTSRootGroup(r.Group),
 		Status: types.ExecutorTaskStatus{
 			Phase:      types.ExecutorTaskPhaseNotStarted,
 			Steps:      make([]*types.ExecutorTaskStepStatus, len(rct.Steps)),
@@ -1515,6 +1516,8 @@ func (s *Scheduler) Run(ctx context.Context) error {
 	executorTaskHandler := api.NewExecutorTaskHandler(s.e)
 	executorTasksHandler := api.NewExecutorTasksHandler(s.e)
 	archivesHandler := api.NewArchivesHandler(logger, s.lts)
+	cacheHandler := api.NewCacheHandler(logger, s.lts)
+	cacheCreateHandler := api.NewCacheCreateHandler(logger, s.lts)
 
 	// api from clients
 	executorDeleteHandler := api.NewExecutorDeleteHandler(logger, s.ch)
@@ -1530,6 +1533,8 @@ func (s *Scheduler) Run(ctx context.Context) error {
 
 	router := mux.NewRouter()
 	apirouter := router.PathPrefix("/api/v1alpha").Subrouter()
+
+	// don't return 404 on a call to an undefined handler but 400 to distinguish between a non existent resource and a wrong method
 	apirouter.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusBadRequest) })
 
 	apirouter.Handle("/executor/{executorid}", executorStatusHandler).Methods("POST")
@@ -1538,6 +1543,9 @@ func (s *Scheduler) Run(ctx context.Context) error {
 	apirouter.Handle("/executor/{executorid}/tasks/{taskid}", executorTaskHandler).Methods("GET")
 	apirouter.Handle("/executor/{executorid}/tasks/{taskid}", executorTaskStatusHandler).Methods("POST")
 	apirouter.Handle("/executor/archives", archivesHandler).Methods("GET")
+	apirouter.Handle("/executor/caches/{key}", cacheHandler).Methods("HEAD")
+	apirouter.Handle("/executor/caches/{key}", cacheHandler).Methods("GET")
+	apirouter.Handle("/executor/caches/{key}", cacheCreateHandler).Methods("POST")
 
 	apirouter.Handle("/logs", logsHandler).Methods("GET")
 

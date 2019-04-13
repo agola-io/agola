@@ -253,6 +253,42 @@ func (e *Executor) doSaveToWorkspaceStep(ctx context.Context, s *types.SaveToWor
 	return exitCode, nil
 }
 
+func (e *Executor) template(ctx context.Context, t *types.ExecutorTask, pod driver.Pod, logf io.Writer, key string) (string, error) {
+	cmd := append([]string{toolboxContainerPath, "template"})
+
+	// limit the template answer to max 1MiB
+	stdout := util.NewLimitedBuffer(1024 * 1024)
+
+	execConfig := &driver.ExecConfig{
+		Cmd:        cmd,
+		Env:        t.Environment,
+		WorkingDir: t.WorkingDir,
+		Stdout:     stdout,
+		Stderr:     logf,
+	}
+
+	ce, err := pod.Exec(ctx, execConfig)
+	if err != nil {
+		return "", err
+	}
+
+	stdin := ce.Stdin()
+	go func() {
+		io.WriteString(stdin, key)
+		stdin.Close()
+	}()
+
+	exitCode, err := ce.Wait(ctx)
+	if err != nil {
+		return "", err
+	}
+	if exitCode != 0 {
+		return "", errors.Errorf("template ended with exit code %d", exitCode)
+	}
+
+	return stdout.String(), nil
+}
+
 func (e *Executor) unarchive(ctx context.Context, t *types.ExecutorTask, source io.Reader, pod driver.Pod, logf io.Writer, destDir string, overwrite, removeDestDir bool) error {
 	args := []string{"--destdir", destDir}
 	if overwrite {
@@ -323,6 +359,176 @@ func (e *Executor) doRestoreWorkspaceStep(ctx context.Context, s *types.RestoreW
 				archivef.Close()
 			}
 		}
+	}
+
+	return 0, nil
+}
+
+func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, t *types.ExecutorTask, pod driver.Pod, logPath string, archivePath string) (int, error) {
+	cmd := []string{toolboxContainerPath, "archive"}
+
+	if err := os.MkdirAll(filepath.Dir(logPath), 0770); err != nil {
+		return -1, err
+	}
+	logf, err := os.Create(logPath)
+	if err != nil {
+		return -1, err
+	}
+	defer logf.Close()
+
+	save := false
+
+	// calculate key from template
+	userKey, err := e.template(ctx, t, pod, logf, s.Key)
+	if err != nil {
+		return -1, err
+	}
+	fmt.Fprintf(logf, "cache key %q\n", userKey)
+
+	// append cache prefix
+	key := t.CachePrefix + "-" + userKey
+
+	// check that the cache key doesn't already exists
+	resp, err := e.runserviceClient.CheckCache(ctx, key, false)
+	if err != nil {
+		// ignore 404 errors since they means that the cache key doesn't exists
+		if resp != nil && resp.StatusCode == http.StatusNotFound {
+			fmt.Fprintf(logf, "no cache available for key %q. Saving.\n", userKey)
+			save = true
+		} else {
+			// TODO(sgotti) retry before giving up
+			fmt.Fprintf(logf, "error checking for cache key %q: %v\n", userKey, err)
+			return -1, err
+		}
+	}
+	if !save {
+		fmt.Fprintf(logf, "cache for key %q already exists\n", userKey)
+		return 0, nil
+	}
+
+	fmt.Fprintf(logf, "archiving cache with key %q\n", userKey)
+	if err := os.MkdirAll(filepath.Dir(archivePath), 0770); err != nil {
+		return -1, err
+	}
+	archivef, err := os.Create(archivePath)
+	if err != nil {
+		return -1, err
+	}
+	defer archivef.Close()
+
+	execConfig := &driver.ExecConfig{
+		Cmd:        cmd,
+		Env:        t.Environment,
+		WorkingDir: t.WorkingDir,
+		Stdout:     archivef,
+		Stderr:     logf,
+	}
+
+	ce, err := pod.Exec(ctx, execConfig)
+	if err != nil {
+		return -1, err
+	}
+
+	type ArchiveInfo struct {
+		SourceDir string
+		DestDir   string
+		Paths     []string
+	}
+	type Archive struct {
+		ArchiveInfos []*ArchiveInfo
+		OutFile      string
+	}
+
+	a := &Archive{
+		OutFile:      "", // use stdout
+		ArchiveInfos: make([]*ArchiveInfo, len(s.Contents)),
+	}
+
+	for i, c := range s.Contents {
+		a.ArchiveInfos[i] = &ArchiveInfo{
+			SourceDir: c.SourceDir,
+			DestDir:   c.DestDir,
+			Paths:     c.Paths,
+		}
+
+	}
+
+	stdin := ce.Stdin()
+	enc := json.NewEncoder(stdin)
+
+	go func() {
+		enc.Encode(a)
+		stdin.Close()
+	}()
+
+	exitCode, err := ce.Wait(ctx)
+	if err != nil {
+		return -1, err
+	}
+
+	if exitCode != 0 {
+		return exitCode, errors.Errorf("save cache archiving command ended with exit code %d", exitCode)
+	}
+
+	f, err := os.Open(archivePath)
+	if err != nil {
+		return -1, err
+	}
+
+	// send cache archive to scheduler
+	if resp, err := e.runserviceClient.PutCache(ctx, key, f); err != nil {
+		if resp != nil && resp.StatusCode == http.StatusNotModified {
+			return exitCode, nil
+		}
+		return -1, err
+	}
+
+	return exitCode, nil
+}
+
+func (e *Executor) doRestoreCacheStep(ctx context.Context, s *types.RestoreCacheStep, t *types.ExecutorTask, pod driver.Pod, logPath string) (int, error) {
+	if err := os.MkdirAll(filepath.Dir(logPath), 0770); err != nil {
+		return -1, err
+	}
+	logf, err := os.Create(logPath)
+	if err != nil {
+		return -1, err
+	}
+	defer logf.Close()
+
+	fmt.Fprintf(logf, "restoring cache: %s\n", util.Dump(s))
+	for _, key := range s.Keys {
+		// calculate key from template
+		userKey, err := e.template(ctx, t, pod, logf, key)
+		if err != nil {
+			return -1, err
+		}
+		fmt.Fprintf(logf, "cache key %q\n", userKey)
+
+		// append cache prefix
+		key := t.CachePrefix + "-" + userKey
+
+		resp, err := e.runserviceClient.GetCache(ctx, key, true)
+		if err != nil {
+			// ignore 404 errors since they means that the cache key doesn't exists
+			if resp != nil && resp.StatusCode == http.StatusNotFound {
+				fmt.Fprintf(logf, "no cache available for key %q\n", userKey)
+				continue
+			}
+			// TODO(sgotti) retry before giving up
+			fmt.Fprintf(logf, "error reading cache: %v\n", err)
+			return -1, err
+		}
+		fmt.Fprintf(logf, "restoring cache with key %q\n", userKey)
+		cachef := resp.Body
+		if err := e.unarchive(ctx, t, cachef, pod, logf, s.DestDir, false, false); err != nil {
+			cachef.Close()
+			return -1, err
+		}
+		cachef.Close()
+
+		// stop here
+		break
 	}
 
 	return 0, nil
@@ -569,6 +775,17 @@ func (e *Executor) executeTaskInternal(ctx context.Context, et *types.ExecutorTa
 			log.Debugf("restore workspace step: %s", util.Dump(s))
 			stepName = s.Name
 			exitCode, err = e.doRestoreWorkspaceStep(ctx, s, et, pod, e.stepLogPath(et.ID, i))
+
+		case *types.SaveCacheStep:
+			log.Debugf("save cache step: %s", util.Dump(s))
+			stepName = s.Name
+			archivePath := e.archivePath(et.ID, i)
+			exitCode, err = e.doSaveCacheStep(ctx, s, et, pod, e.stepLogPath(et.ID, i), archivePath)
+
+		case *types.RestoreCacheStep:
+			log.Debugf("restore cache step: %s", util.Dump(s))
+			stepName = s.Name
+			exitCode, err = e.doRestoreCacheStep(ctx, s, et, pod, e.stepLogPath(et.ID, i))
 
 		default:
 			return i, errors.Errorf("unknown step type: %s", util.Dump(s))

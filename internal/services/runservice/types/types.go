@@ -357,11 +357,11 @@ const (
 )
 
 type RegistryAuth struct {
-	Type RegistryAuthType `yaml:"type"`
+	Type RegistryAuthType `json:"type,omitempty"`
 
 	// default auth
-	Username string `yaml:"username"`
-	Password string `yaml:"password"`
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
 }
 
 type Runtime struct {
@@ -387,30 +387,42 @@ func (rct *RunConfigTask) UnmarshalJSON(b []byte) error {
 	}
 
 	steps := make([]interface{}, len(st.Steps))
-	for i, s := range st.Steps {
+	for i, step := range st.Steps {
 		var bs Step
-		if err := json.Unmarshal(s, &bs); err != nil {
+		if err := json.Unmarshal(step, &bs); err != nil {
 			return err
 		}
 		switch bs.Type {
 		case "run":
-			var rs RunStep
-			if err := json.Unmarshal(s, &rs); err != nil {
+			var s RunStep
+			if err := json.Unmarshal(step, &s); err != nil {
 				return err
 			}
-			steps[i] = &rs
+			steps[i] = &s
 		case "save_to_workspace":
-			var rs SaveToWorkspaceStep
-			if err := json.Unmarshal(s, &rs); err != nil {
+			var s SaveToWorkspaceStep
+			if err := json.Unmarshal(step, &s); err != nil {
 				return err
 			}
-			steps[i] = &rs
+			steps[i] = &s
 		case "restore_workspace":
-			var rs RestoreWorkspaceStep
-			if err := json.Unmarshal(s, &rs); err != nil {
+			var s RestoreWorkspaceStep
+			if err := json.Unmarshal(step, &s); err != nil {
 				return err
 			}
-			steps[i] = &rs
+			steps[i] = &s
+		case "save_cache":
+			var s SaveCacheStep
+			if err := json.Unmarshal(step, &s); err != nil {
+				return err
+			}
+			steps[i] = &s
+		case "restore_cache":
+			var s RestoreCacheStep
+			if err := json.Unmarshal(step, &s); err != nil {
+				return err
+			}
+			steps[i] = &s
 		}
 	}
 
@@ -433,7 +445,7 @@ type RunStep struct {
 	User        string            `json:"user,omitempty"`
 }
 
-type SaveToWorkspaceContent struct {
+type SaveContent struct {
 	SourceDir string   `json:"source_dir,omitempty"`
 	DestDir   string   `json:"dest_dir,omitempty"`
 	Paths     []string `json:"paths,omitempty"`
@@ -441,12 +453,24 @@ type SaveToWorkspaceContent struct {
 
 type SaveToWorkspaceStep struct {
 	Step
-	Contents []SaveToWorkspaceContent `json:"contents,omitempty"`
+	Contents []SaveContent `json:"contents,omitempty"`
 }
 
 type RestoreWorkspaceStep struct {
 	Step
 	DestDir string `json:"dest_dir,omitempty"`
+}
+
+type SaveCacheStep struct {
+	Step
+	Key      string        `json:"key,omitempty"`
+	Contents []SaveContent `json:"contents,omitempty"`
+}
+
+type RestoreCacheStep struct {
+	Step
+	Keys    []string `json:"keys,omitempty"`
+	DestDir string   `json:"dest_dir,omitempty"`
 }
 
 type ExecutorTaskPhase string
@@ -474,7 +498,7 @@ type ExecutorTask struct {
 	WorkingDir  string            `json:"working_dir,omitempty"`
 	Shell       string            `json:"shell,omitempty"`
 	User        string            `json:"user,omitempty"`
-	Privileged  bool              `yaml:"privileged"`
+	Privileged  bool              `json:"privileged"`
 
 	Steps []interface{} `json:"steps,omitempty"`
 
@@ -483,6 +507,10 @@ type ExecutorTask struct {
 	FailError  string             `fail_reason:"fail_error,omitempty"`
 
 	Workspace Workspace `json:"workspace,omitempty"`
+
+	// Cache prefix to use when asking for a cache key. To isolate caches between
+	// groups (projects)
+	CachePrefix string `json:"cache_prefix,omitempty"`
 
 	// Stop is used to signal from the scheduler when the task must be stopped
 	Stop bool `json:"stop,omitempty"`
@@ -546,30 +574,42 @@ func (et *ExecutorTask) UnmarshalJSON(b []byte) error {
 	}
 
 	steps := make([]interface{}, len(ett.Steps))
-	for i, s := range st.Steps {
+	for i, step := range st.Steps {
 		var bs Step
-		if err := json.Unmarshal(s, &bs); err != nil {
+		if err := json.Unmarshal(step, &bs); err != nil {
 			return err
 		}
 		switch bs.Type {
 		case "run":
-			var rs RunStep
-			if err := json.Unmarshal(s, &rs); err != nil {
+			var s RunStep
+			if err := json.Unmarshal(step, &s); err != nil {
 				return err
 			}
-			steps[i] = &rs
+			steps[i] = &s
 		case "save_to_workspace":
-			var rs SaveToWorkspaceStep
-			if err := json.Unmarshal(s, &rs); err != nil {
+			var s SaveToWorkspaceStep
+			if err := json.Unmarshal(step, &s); err != nil {
 				return err
 			}
-			steps[i] = &rs
+			steps[i] = &s
 		case "restore_workspace":
-			var rs RestoreWorkspaceStep
-			if err := json.Unmarshal(s, &rs); err != nil {
+			var s RestoreWorkspaceStep
+			if err := json.Unmarshal(step, &s); err != nil {
 				return err
 			}
-			steps[i] = &rs
+			steps[i] = &s
+		case "save_cache":
+			var s SaveCacheStep
+			if err := json.Unmarshal(step, &s); err != nil {
+				return err
+			}
+			steps[i] = &s
+		case "restore_cache":
+			var s RestoreCacheStep
+			if err := json.Unmarshal(step, &s); err != nil {
+				return err
+			}
+			steps[i] = &s
 		}
 	}
 

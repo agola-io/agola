@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/gorilla/mux"
@@ -168,7 +169,7 @@ func NewArchivesHandler(logger *zap.Logger, lts *objectstorage.ObjStorage) *Arch
 }
 
 func (h *ArchivesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// TODO(sgotti) Check authorized call from scheduler
+	// TODO(sgotti) Check authorized call from executors
 
 	taskID := r.URL.Query().Get("taskid")
 	if taskID == "" {
@@ -216,6 +217,165 @@ func (h *ArchivesHandler) readArchive(rtID string, step int, w io.Writer) error 
 	return err
 }
 
+type CacheHandler struct {
+	log *zap.SugaredLogger
+	lts *objectstorage.ObjStorage
+}
+
+func NewCacheHandler(logger *zap.Logger, lts *objectstorage.ObjStorage) *CacheHandler {
+	return &CacheHandler{
+		log: logger.Sugar(),
+		lts: lts,
+	}
+}
+
+func (h *CacheHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	// TODO(sgotti) Check authorized call from executors
+	key, err := url.PathUnescape(vars["key"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if key == "" {
+		http.Error(w, "empty cache key", http.StatusBadRequest)
+		return
+	}
+	if len(key) > common.MaxCacheKeyLength {
+		http.Error(w, "cache key too long", http.StatusBadRequest)
+		return
+	}
+	query := r.URL.Query()
+	_, prefix := query["prefix"]
+
+	matchedKey, err := matchCache(h.lts, key, prefix)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if matchedKey == "" {
+		http.Error(w, "", http.StatusNotFound)
+		return
+	}
+
+	if r.Method == "HEAD" {
+		return
+	}
+
+	w.Header().Set("Cache-Control", "no-cache")
+
+	if err := h.readCache(matchedKey, w); err != nil {
+		switch err.(type) {
+		case common.ErrNotExist:
+			http.Error(w, err.Error(), http.StatusNotFound)
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+}
+
+func matchCache(lts *objectstorage.ObjStorage, key string, prefix bool) (string, error) {
+	cachePath := store.LTSCachePath(key)
+
+	if prefix {
+		doneCh := make(chan struct{})
+		defer close(doneCh)
+
+		// get the latest modified object
+		var lastObject *objectstorage.ObjectInfo
+		for object := range lts.List(store.LTSCacheDir()+"/"+key, "", false, doneCh) {
+			if object.Err != nil {
+				return "", object.Err
+			}
+
+			if (lastObject == nil) || (lastObject != nil && lastObject.LastModified.Before(object.LastModified)) {
+				lastObject = &object
+			}
+
+		}
+		if lastObject == nil {
+			return "", nil
+
+		}
+		return store.LTSCacheKey(lastObject.Path), nil
+	}
+
+	_, err := lts.Stat(cachePath)
+	if err == objectstorage.ErrNotExist {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return key, nil
+}
+
+func (h *CacheHandler) readCache(key string, w io.Writer) error {
+	cachePath := store.LTSCachePath(key)
+	f, err := h.lts.ReadObject(cachePath)
+	if err != nil {
+		if err == objectstorage.ErrNotExist {
+			return common.NewErrNotExist(err)
+		}
+		return err
+	}
+	defer f.Close()
+
+	br := bufio.NewReader(f)
+
+	_, err = io.Copy(w, br)
+	return err
+}
+
+type CacheCreateHandler struct {
+	log *zap.SugaredLogger
+	lts *objectstorage.ObjStorage
+}
+
+func NewCacheCreateHandler(logger *zap.Logger, lts *objectstorage.ObjStorage) *CacheCreateHandler {
+	return &CacheCreateHandler{
+		log: logger.Sugar(),
+		lts: lts,
+	}
+}
+
+func (h *CacheCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	// TODO(sgotti) Check authorized call from executors
+	key, err := url.PathUnescape(vars["key"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if key == "" {
+		http.Error(w, "empty cache key", http.StatusBadRequest)
+		return
+	}
+	if len(key) > common.MaxCacheKeyLength {
+		http.Error(w, "cache key too long", http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Cache-Control", "no-cache")
+
+	matchedKey, err := matchCache(h.lts, key, false)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if matchedKey != "" {
+		http.Error(w, "", http.StatusNotModified)
+		return
+	}
+
+	cachePath := store.LTSCachePath(key)
+	if err := h.lts.WriteObject(cachePath, r.Body); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
 type ExecutorDeleteHandler struct {
 	log *zap.SugaredLogger
 	ch  *command.CommandHandler
@@ -230,7 +390,6 @@ func NewExecutorDeleteHandler(logger *zap.Logger, ch *command.CommandHandler) *E
 
 func (h *ExecutorDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-
 	vars := mux.Vars(r)
 
 	// TODO(sgotti) Check authorized call from executors

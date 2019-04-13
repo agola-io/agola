@@ -167,6 +167,10 @@ func TestParseOutput(t *testing.T) {
                             ENV01: ENV01
                             ENVFROMVARIABLE01:
                               from_variable: variable01
+                      - save_cache:
+                          key: cache-{{ arch }}
+                          contents:
+                            - source_dir: /go/pkg/mod/cache
 
                 pipelines:
                   pipeline01:
@@ -246,6 +250,11 @@ func TestParseOutput(t *testing.T) {
 									"ENV01":             Value{Type: ValueTypeString, Value: "ENV01"},
 									"ENVFROMVARIABLE01": Value{Type: ValueTypeFromVariable, Value: "variable01"},
 								},
+							},
+							&SaveCacheStep{
+								Step:     Step{Type: "save_cache"},
+								Key:      "cache-{{ arch }}",
+								Contents: []*SaveContent{&SaveContent{SourceDir: "/go/pkg/mod/cache", Paths: []string{"**"}}},
 							},
 						},
 					},
