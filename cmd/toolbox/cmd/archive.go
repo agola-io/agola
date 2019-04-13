@@ -20,6 +20,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/mitchellh/go-homedir"
 	"github.com/sorintlab/agola/internal/toolbox/archive"
 	"github.com/sorintlab/agola/internal/util"
 
@@ -57,6 +58,16 @@ func archiveRun(cmd *cobra.Command, args []string) {
 			log.Fatalf("error creating %s: %v", a.OutFile, err)
 		}
 		defer out.Close()
+	}
+
+	// expand ~ in archiveinfos SourceDir
+	for i := range a.ArchiveInfos {
+		exp, err := homedir.Expand(a.ArchiveInfos[i].SourceDir)
+		if err != nil {
+			log.Fatalf("failed to expand dir %q: %v", a.ArchiveInfos[i].SourceDir, err)
+		}
+
+		a.ArchiveInfos[i].SourceDir = exp
 	}
 
 	if err := archive.CreateTar(a.ArchiveInfos, out); err != nil {

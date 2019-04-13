@@ -20,6 +20,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/mitchellh/go-homedir"
 	"github.com/sorintlab/agola/internal/toolbox/unarchive"
 
 	"github.com/spf13/cobra"
@@ -52,9 +53,15 @@ func init() {
 func unarchiveRun(cmd *cobra.Command, args []string) {
 	flag.Parse()
 
+	// expand ~ in destdir
+	destDir, err := homedir.Expand(unarchiveOpts.destDir)
+	if err != nil {
+		log.Fatalf("failed to expand dir %q: %v", unarchiveOpts.destDir, err)
+	}
+
 	br := bufio.NewReader(os.Stdin)
 
-	if err := unarchive.Unarchive(br, unarchiveOpts.destDir, unarchiveOpts.overwrite, unarchiveOpts.removeDestDir); err != nil {
+	if err := unarchive.Unarchive(br, destDir, unarchiveOpts.overwrite, unarchiveOpts.removeDestDir); err != nil {
 		log.Fatalf("untar error: %v", err)
 	}
 }
