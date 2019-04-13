@@ -22,6 +22,10 @@ import (
 	"path"
 )
 
+const (
+	MaxCacheKeyLength = 200
+)
+
 type ErrNotExist struct {
 	err error
 }
