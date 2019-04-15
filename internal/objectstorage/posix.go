@@ -240,14 +240,15 @@ func (s *PosixStorage) Stat(p string) (*ObjectInfo, error) {
 		return nil, err
 	}
 
-	if _, err := os.Stat(fspath); err != nil {
+	fi, err := os.Stat(fspath)
+	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, ErrNotExist
 		}
 		return nil, err
 	}
 
-	return &ObjectInfo{Path: p}, nil
+	return &ObjectInfo{Path: p, LastModified: fi.ModTime()}, nil
 }
 
 func (s *PosixStorage) ReadObject(p string) (io.ReadCloser, error) {
@@ -409,7 +410,7 @@ func (s *PosixStorage) List(prefix, startWith, delimiter string, doneCh <-chan s
 				if p > prevp {
 					select {
 					// Send object content.
-					case objectCh <- ObjectInfo{Path: p}:
+					case objectCh <- ObjectInfo{Path: p, LastModified: info.ModTime()}:
 					// If receives done from the caller, return here.
 					case <-doneCh:
 						return io.EOF

@@ -61,7 +61,8 @@ func NewS3Storage(bucket, location, endpoint, accessKeyID, secretAccessKey strin
 }
 
 func (s *S3Storage) Stat(p string) (*ObjectInfo, error) {
-	if _, err := s.minioClient.StatObject(s.bucket, p, minio.StatObjectOptions{}); err != nil {
+	oi, err := s.minioClient.StatObject(s.bucket, p, minio.StatObjectOptions{})
+	if err != nil {
 		merr := minio.ToErrorResponse(err)
 		if merr.StatusCode == http.StatusNotFound {
 			return nil, ErrNotExist
@@ -69,7 +70,7 @@ func (s *S3Storage) Stat(p string) (*ObjectInfo, error) {
 		return nil, merr
 	}
 
-	return &ObjectInfo{Path: p}, nil
+	return &ObjectInfo{Path: p, LastModified: oi.LastModified}, nil
 }
 
 func (s *S3Storage) ReadObject(filepath string) (io.ReadCloser, error) {
@@ -144,7 +145,7 @@ func (s *S3Storage) List(prefix, startWith, delimiter string, doneCh <-chan stru
 			for _, object := range result.Contents {
 				select {
 				// Send object content.
-				case objectCh <- ObjectInfo{Path: object.Key}:
+				case objectCh <- ObjectInfo{Path: object.Key, LastModified: object.LastModified}:
 				// If receives done from the caller, return here.
 				case <-doneCh:
 					return
