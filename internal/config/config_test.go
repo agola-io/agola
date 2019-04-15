@@ -32,24 +32,24 @@ func TestParseConfig(t *testing.T) {
 		err  error
 	}{
 		{
-			name: "test no pipelines 1",
+			name: "test no runs 1",
 			in:   ``,
-			err:  fmt.Errorf(`no pipelines defined`),
+			err:  fmt.Errorf(`no runs defined`),
 		},
 		{
-			name: "test no pipelines 2",
+			name: "test no runs 2",
 			in: `
-                pipelines:
+                runs:
                 `,
-			err: fmt.Errorf(`no pipelines defined`),
+			err: fmt.Errorf(`no runs defined`),
 		},
 		{
-			name: "test empty pipeline",
+			name: "test empty run",
 			in: `
-                pipelines:
-                  pipeline01:
+                runs:
+                  run01:
                 `,
-			err: fmt.Errorf(`pipeline "pipeline01" is empty`),
+			err: fmt.Errorf(`run "run01" is empty`),
 		},
 		{
 			name: "test missing element dependency",
@@ -59,15 +59,15 @@ func TestParseConfig(t *testing.T) {
                     environment:
                       ENV01: ENV01
 
-                pipelines:
-                  pipeline01:
+                runs:
+                  run01:
                     elements:
                       element01:
                         task: task01
                         depends:
                           - element02
                 `,
-			err: fmt.Errorf(`pipeline element "element02" needed by element "element01" doesn't exist`),
+			err: fmt.Errorf(`run element "element02" needed by element "element01" doesn't exist`),
 		},
 		{
 			name: "test circular dependency between 2 elements a -> b -> a",
@@ -77,8 +77,8 @@ func TestParseConfig(t *testing.T) {
                     environment:
                       ENV01: ENV01
 
-                pipelines:
-                  pipeline01:
+                runs:
+                  run01:
                     elements:
                       element01:
                         task: task01
@@ -172,8 +172,8 @@ func TestParseOutput(t *testing.T) {
                           contents:
                             - source_dir: /go/pkg/mod/cache
 
-                pipelines:
-                  pipeline01:
+                runs:
+                  run01:
                     elements:
                       element01:
                         task: task01
@@ -259,9 +259,9 @@ func TestParseOutput(t *testing.T) {
 						},
 					},
 				},
-				Pipelines: map[string]*Pipeline{
-					"pipeline01": &Pipeline{
-						Name: "pipeline01",
+				Runs: map[string]*Run{
+					"run01": &Run{
+						Name: "run01",
 						Elements: map[string]*Element{
 							"element01": &Element{
 								Name:          "element01",

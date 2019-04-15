@@ -182,39 +182,39 @@ fi
 	}
 }
 
-// GenRunConfigTasks generates a run config tasks from a pipeline in the config, expanding all the references to tasks
+// GenRunConfigTasks generates a run config tasks from a run in the config, expanding all the references to tasks
 // this functions assumes that the config is already checked for possible errors (i.e referenced task must exits)
-func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, pipelineName string, variables map[string]string, branch, tag, ref string) map[string]*rstypes.RunConfigTask {
-	cp := c.Pipeline(pipelineName)
+func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string, variables map[string]string, branch, tag, ref string) map[string]*rstypes.RunConfigTask {
+	cr := c.Run(runName)
 
 	rcts := map[string]*rstypes.RunConfigTask{}
 
-	for _, cpe := range cp.Elements {
-		include := types.MatchWhen(cpe.When, branch, tag, ref)
+	for _, cre := range cr.Elements {
+		include := types.MatchWhen(cre.When, branch, tag, ref)
 
 		// resolve referenced task
-		cpt := c.Task(cpe.Task)
+		ct := c.Task(cre.Task)
 
-		steps := make([]interface{}, len(cpt.Steps))
-		for i, cpts := range cpt.Steps {
+		steps := make([]interface{}, len(ct.Steps))
+		for i, cpts := range ct.Steps {
 			steps[i] = stepFromConfigStep(cpts, variables)
 		}
 
-		tEnv := genEnv(cpt.Environment, variables)
+		tEnv := genEnv(ct.Environment, variables)
 
 		t := &rstypes.RunConfigTask{
-			ID: uuid.New(cpe.Name).String(),
+			ID: uuid.New(cre.Name).String(),
 			// use the element name from the config as the task name
-			Name:          cpe.Name,
-			Runtime:       genRuntime(c, cpt.Runtime, variables),
+			Name:          cre.Name,
+			Runtime:       genRuntime(c, ct.Runtime, variables),
 			Environment:   tEnv,
-			WorkingDir:    cpt.WorkingDir,
-			Shell:         cpt.Shell,
-			User:          cpt.User,
+			WorkingDir:    ct.WorkingDir,
+			Shell:         ct.Shell,
+			User:          ct.User,
 			Steps:         steps,
-			IgnoreFailure: cpe.IgnoreFailure,
+			IgnoreFailure: cre.IgnoreFailure,
 			Skip:          !include,
-			NeedsApproval: cpe.Approval,
+			NeedsApproval: cre.Approval,
 		}
 
 		rcts[t.ID] = t
@@ -222,10 +222,10 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, pipelineName s
 
 	// populate depends, needs to be done after having created all the tasks so we can resolve their id
 	for _, rct := range rcts {
-		cpe := cp.Elements[rct.Name]
+		cre := cr.Elements[rct.Name]
 
-		depends := make(map[string]*rstypes.RunConfigTaskDepend, len(cpe.Depends))
-		for _, d := range cpe.Depends {
+		depends := make(map[string]*rstypes.RunConfigTaskDepend, len(cre.Depends))
+		for _, d := range cre.Depends {
 			conditions := make([]rstypes.RunConfigTaskDependCondition, len(d.Conditions))
 			// when no conditions are defined default to on_success
 			if len(d.Conditions) == 0 {

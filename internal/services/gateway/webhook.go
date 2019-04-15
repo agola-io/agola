@@ -348,7 +348,7 @@ func (h *webhooksHandler) createRuns(ctx context.Context, configData []byte, gro
 		log.Errorf("failed to parse config: %+v", err)
 
 		// create a run (per config file) with a generic error since we cannot parse
-		// it and know how many pipelines are defined
+		// it and know how many runs are defined
 		setupErrors = append(setupErrors, err.Error())
 		createRunReq := &rsapi.RunCreateRequest{
 			RunConfigTasks:    nil,
@@ -365,11 +365,9 @@ func (h *webhooksHandler) createRuns(ctx context.Context, configData []byte, gro
 		}
 		return nil
 	}
-	//h.log.Debugf("config: %v", util.Dump(config))
 
-	//h.log.Debugf("pipeline: %s", createRunOpts.PipelineName)
-	for _, pipeline := range config.Pipelines {
-		rcts := runconfig.GenRunConfigTasks(util.DefaultUUIDGenerator{}, config, pipeline.Name, variables, webhookData.Branch, webhookData.Tag, webhookData.Ref)
+	for _, run := range config.Runs {
+		rcts := runconfig.GenRunConfigTasks(util.DefaultUUIDGenerator{}, config, run.Name, variables, webhookData.Branch, webhookData.Tag, webhookData.Ref)
 
 		h.log.Debugf("rcts: %s", util.Dump(rcts))
 		h.log.Infof("group: %s", group)
@@ -377,7 +375,7 @@ func (h *webhooksHandler) createRuns(ctx context.Context, configData []byte, gro
 			RunConfigTasks:    rcts,
 			Group:             group,
 			SetupErrors:       setupErrors,
-			Name:              pipeline.Name,
+			Name:              run.Name,
 			StaticEnvironment: staticEnv,
 			Annotations:       annotations,
 		}

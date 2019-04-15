@@ -28,9 +28,9 @@ import (
 )
 
 const (
-	maxPipelineNameLength = 100
-	maxTaskNameLength     = 100
-	maxStepNameLength     = 100
+	maxRunNameLength  = 100
+	maxTaskNameLength = 100
+	maxStepNameLength = 100
 )
 
 var (
@@ -38,9 +38,9 @@ var (
 )
 
 type Config struct {
-	Runtimes  map[string]*Runtime  `yaml:"runtimes"`
-	Tasks     map[string]*Task     `yaml:"tasks"`
-	Pipelines map[string]*Pipeline `yaml:"pipelines"`
+	Runtimes map[string]*Runtime `yaml:"runtimes"`
+	Tasks    map[string]*Task    `yaml:"tasks"`
+	Runs     map[string]*Run     `yaml:"runs"`
 }
 
 type Task struct {
@@ -90,7 +90,7 @@ type Container struct {
 	Entrypoint  string           `yaml:"entrypoint"`
 }
 
-type Pipeline struct {
+type Run struct {
 	Name     string              `yaml:"name"`
 	Elements map[string]*Element `yaml:"elements"`
 }
@@ -532,13 +532,13 @@ func (c *Config) Task(taskName string) *Task {
 	panic(fmt.Sprintf("task %q doesn't exists", taskName))
 }
 
-func (c *Config) Pipeline(pipelineName string) *Pipeline {
-	for n, p := range c.Pipelines {
-		if n == pipelineName {
+func (c *Config) Run(runName string) *Run {
+	for n, p := range c.Runs {
+		if n == runName {
 			return p
 		}
 	}
-	panic(fmt.Sprintf("pipeline %q doesn't exists", pipelineName))
+	panic(fmt.Sprintf("run %q doesn't exists", runName))
 }
 
 var DefaultConfig = Config{}
@@ -549,8 +549,8 @@ func ParseConfig(configData []byte) (*Config, error) {
 		return nil, errors.Wrapf(err, "failed to unmarshal config")
 	}
 
-	if len(config.Pipelines) == 0 {
-		return nil, errors.Errorf("no pipelines defined")
+	if len(config.Runs) == 0 {
+		return nil, errors.Errorf("no runs defined")
 	}
 
 	// Set names from maps keys
@@ -568,17 +568,17 @@ func ParseConfig(configData []byte) (*Config, error) {
 		task.Name = n
 	}
 
-	for n, pipeline := range config.Pipelines {
-		if pipeline == nil {
-			return nil, errors.Errorf("pipeline %q is empty", n)
+	for n, run := range config.Runs {
+		if run == nil {
+			return nil, errors.Errorf("run %q is empty", n)
 		}
-		pipeline.Name = n
+		run.Name = n
 	}
 
-	for _, pipeline := range config.Pipelines {
-		for n, element := range pipeline.Elements {
+	for _, run := range config.Runs {
+		for n, element := range run.Elements {
 			if element == nil {
-				return nil, errors.Errorf("pipeline %q: element %q is empty", pipeline.Name, n)
+				return nil, errors.Errorf("run %q: element %q is empty", run.Name, n)
 			}
 			element.Name = n
 		}
@@ -624,33 +624,33 @@ func ParseConfig(configData []byte) (*Config, error) {
 
 func checkConfig(config *Config) error {
 	// check broken dependencies
-	for _, pipeline := range config.Pipelines {
+	for _, run := range config.Runs {
 		// collect all task names
 		allElements := map[string]struct{}{}
-		for _, element := range pipeline.Elements {
+		for _, element := range run.Elements {
 			allElements[element.Name] = struct{}{}
 		}
 
-		for _, element := range pipeline.Elements {
+		for _, element := range run.Elements {
 			for _, dep := range element.Depends {
 				if _, ok := allElements[dep.ElementName]; !ok {
-					return errors.Errorf("pipeline element %q needed by element %q doesn't exist", dep.ElementName, element.Name)
+					return errors.Errorf("run element %q needed by element %q doesn't exist", dep.ElementName, element.Name)
 				}
 			}
 		}
 	}
 
 	// check circular dependencies
-	for _, pipeline := range config.Pipelines {
+	for _, run := range config.Runs {
 		cerrs := &util.Errors{}
-		for _, element := range pipeline.Elements {
-			allParents := getAllElementParents(pipeline, element)
+		for _, element := range run.Elements {
+			allParents := getAllElementParents(run, element)
 			for _, parent := range allParents {
 				if parent.Name == element.Name {
 					// TODO(sgotti) get the parent that depends on task to report it
 					dep := []string{}
 					for _, parent := range allParents {
-						pparents := getElementParents(pipeline, parent)
+						pparents := getElementParents(run, parent)
 						for _, pparent := range pparents {
 							if pparent.Name == element.Name {
 								dep = append(dep, fmt.Sprintf("%q", parent.Name))
@@ -667,12 +667,12 @@ func checkConfig(config *Config) error {
 	}
 
 	// check that the task and its parent don't have a common dependency
-	for _, pipeline := range config.Pipelines {
-		for _, element := range pipeline.Elements {
-			parents := getElementParents(pipeline, element)
+	for _, run := range config.Runs {
+		for _, element := range run.Elements {
+			parents := getElementParents(run, element)
 			for _, parent := range parents {
-				allParents := getAllElementParents(pipeline, element)
-				allParentParents := getAllElementParents(pipeline, parent)
+				allParents := getAllElementParents(run, element)
+				allParentParents := getAllElementParents(run, parent)
 				for _, p := range allParents {
 					for _, pp := range allParentParents {
 						if p.Name == pp.Name {
@@ -725,17 +725,17 @@ func checkConfig(config *Config) error {
 		}
 	}
 
-	for _, pipeline := range config.Pipelines {
-		if len(pipeline.Name) > maxPipelineNameLength {
-			return errors.Errorf("pipeline name %q too long", pipeline.Name)
+	for _, run := range config.Runs {
+		if len(run.Name) > maxRunNameLength {
+			return errors.Errorf("run name %q too long", run.Name)
 		}
-		for _, element := range pipeline.Elements {
+		for _, element := range run.Elements {
 			// check missing tasks reference
 			if element.Task == "" {
-				return errors.Errorf("no task defined for pipeline element %q", element.Name)
+				return errors.Errorf("no task defined for run element %q", element.Name)
 			}
 			if _, ok := config.Tasks[element.Task]; !ok {
-				return errors.Errorf("task %q needed by pipeline element %q doesn't exist", element.Task, element.Name)
+				return errors.Errorf("task %q needed by run element %q doesn't exist", element.Task, element.Name)
 			}
 			// check duplicate dependencies in task
 			seenDependencies := map[string]struct{}{}
@@ -752,9 +752,9 @@ func checkConfig(config *Config) error {
 }
 
 // getElementParents returns direct parents of element.
-func getElementParents(pipeline *Pipeline, element *Element) []*Element {
+func getElementParents(run *Run, element *Element) []*Element {
 	parents := []*Element{}
-	for _, el := range pipeline.Elements {
+	for _, el := range run.Elements {
 		isParent := false
 		for _, d := range element.Depends {
 			if d.ElementName == el.Name {
@@ -771,9 +771,9 @@ func getElementParents(pipeline *Pipeline, element *Element) []*Element {
 // getAllElementParents returns all the parents (both direct and ancestors) of an element.
 // In case of circular dependency it won't loop forever but will also return
 // the element as parent of itself
-func getAllElementParents(pipeline *Pipeline, element *Element) []*Element {
+func getAllElementParents(run *Run, element *Element) []*Element {
 	pMap := map[string]*Element{}
-	nextParents := getElementParents(pipeline, element)
+	nextParents := getElementParents(run, element)
 
 	for len(nextParents) > 0 {
 		parents := nextParents
@@ -783,7 +783,7 @@ func getAllElementParents(pipeline *Pipeline, element *Element) []*Element {
 				continue
 			}
 			pMap[parent.Name] = parent
-			nextParents = append(nextParents, getElementParents(pipeline, parent)...)
+			nextParents = append(nextParents, getElementParents(run, parent)...)
 		}
 	}
 
