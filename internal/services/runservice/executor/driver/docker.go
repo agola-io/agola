@@ -383,8 +383,7 @@ func (dc *DockerPod) Exec(ctx context.Context, execConfig *ExecConfig) (Containe
 	endCh := make(chan error)
 
 	dockerExecConfig := types.ExecConfig{
-		Cmd: execConfig.Cmd,
-		//Cmd:          []string{"/bin/bash", "-s"},
+		Cmd:          execConfig.Cmd,
 		Env:          makeEnv(execConfig.Env),
 		Tty:          execConfig.Tty,
 		WorkingDir:   execConfig.WorkingDir,

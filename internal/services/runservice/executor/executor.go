@@ -156,6 +156,12 @@ func (e *Executor) doRunStep(ctx context.Context, s *types.RunStep, t *types.Exe
 		environment[envName] = envValue
 	}
 
+	workingDir, err = e.expandDir(ctx, t, pod, outf, workingDir)
+	if err != nil {
+		outf.WriteString(fmt.Sprintf("Failed to expand working dir %q. Error: %s\n", workingDir, err))
+		return -1, err
+	}
+
 	execConfig := &driver.ExecConfig{
 		Cmd:        cmd,
 		Env:        environment,
@@ -200,10 +206,16 @@ func (e *Executor) doSaveToWorkspaceStep(ctx context.Context, s *types.SaveToWor
 	}
 	defer archivef.Close()
 
+	workingDir, err := e.expandDir(ctx, t, pod, logf, t.WorkingDir)
+	if err != nil {
+		logf.WriteString(fmt.Sprintf("Failed to expand working dir %q. Error: %s\n", t.WorkingDir, err))
+		return -1, err
+	}
+
 	execConfig := &driver.ExecConfig{
 		Cmd:        cmd,
 		Env:        t.Environment,
-		WorkingDir: t.WorkingDir,
+		WorkingDir: workingDir,
 		Stdout:     archivef,
 		Stderr:     logf,
 	}
@@ -253,16 +265,79 @@ func (e *Executor) doSaveToWorkspaceStep(ctx context.Context, s *types.SaveToWor
 	return exitCode, nil
 }
 
+func (e *Executor) expandDir(ctx context.Context, t *types.ExecutorTask, pod driver.Pod, logf io.Writer, dir string) (string, error) {
+	args := []string{dir}
+	cmd := append([]string{toolboxContainerPath, "expanddir"}, args...)
+
+	// limit the template answer to max 1MiB
+	stdout := &bytes.Buffer{}
+
+	execConfig := &driver.ExecConfig{
+		Cmd:    cmd,
+		Env:    t.Environment,
+		Stdout: stdout,
+		Stderr: logf,
+	}
+
+	ce, err := pod.Exec(ctx, execConfig)
+	if err != nil {
+		return "", err
+	}
+
+	exitCode, err := ce.Wait(ctx)
+	if err != nil {
+		return "", err
+	}
+	if exitCode != 0 {
+		return "", errors.Errorf("expanddir ended with exit code %d", exitCode)
+	}
+
+	return stdout.String(), nil
+}
+
+func (e *Executor) mkdir(ctx context.Context, t *types.ExecutorTask, pod driver.Pod, logf io.Writer, dir string) error {
+	args := []string{dir}
+	cmd := append([]string{toolboxContainerPath, "mkdir"}, args...)
+
+	execConfig := &driver.ExecConfig{
+		Cmd:    cmd,
+		Env:    t.Environment,
+		Stdout: logf,
+		Stderr: logf,
+	}
+
+	ce, err := pod.Exec(ctx, execConfig)
+	if err != nil {
+		return err
+	}
+
+	exitCode, err := ce.Wait(ctx)
+	if err != nil {
+		return err
+	}
+	if exitCode != 0 {
+		return errors.Errorf("mkdir ended with exit code %d", exitCode)
+	}
+
+	return nil
+}
+
 func (e *Executor) template(ctx context.Context, t *types.ExecutorTask, pod driver.Pod, logf io.Writer, key string) (string, error) {
 	cmd := append([]string{toolboxContainerPath, "template"})
 
 	// limit the template answer to max 1MiB
 	stdout := util.NewLimitedBuffer(1024 * 1024)
 
+	workingDir, err := e.expandDir(ctx, t, pod, logf, t.WorkingDir)
+	if err != nil {
+		io.WriteString(logf, fmt.Sprintf("Failed to expand working dir %q. Error: %s\n", t.WorkingDir, err))
+		return "", err
+	}
+
 	execConfig := &driver.ExecConfig{
 		Cmd:        cmd,
 		Env:        t.Environment,
-		WorkingDir: t.WorkingDir,
+		WorkingDir: workingDir,
 		Stdout:     stdout,
 		Stderr:     logf,
 	}
@@ -299,10 +374,16 @@ func (e *Executor) unarchive(ctx context.Context, t *types.ExecutorTask, source 
 	}
 	cmd := append([]string{toolboxContainerPath, "unarchive"}, args...)
 
+	workingDir, err := e.expandDir(ctx, t, pod, logf, t.WorkingDir)
+	if err != nil {
+		io.WriteString(logf, fmt.Sprintf("Failed to expand working dir %q. Error: %s\n", t.WorkingDir, err))
+		return err
+	}
+
 	execConfig := &driver.ExecConfig{
 		Cmd:        cmd,
 		Env:        t.Environment,
-		WorkingDir: t.WorkingDir,
+		WorkingDir: workingDir,
 		Stdout:     logf,
 		Stderr:     logf,
 	}
@@ -416,10 +497,16 @@ func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, 
 	}
 	defer archivef.Close()
 
+	workingDir, err := e.expandDir(ctx, t, pod, logf, t.WorkingDir)
+	if err != nil {
+		io.WriteString(logf, fmt.Sprintf("Failed to expand working dir %q. Error: %s\n", t.WorkingDir, err))
+		return -1, err
+	}
+
 	execConfig := &driver.ExecConfig{
 		Cmd:        cmd,
 		Env:        t.Environment,
-		WorkingDir: t.WorkingDir,
+		WorkingDir: workingDir,
 		Stdout:     archivef,
 		Stderr:     logf,
 	}
@@ -706,7 +793,6 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 				Image:        et.Containers[0].Image,
 				Cmd:          cmd,
 				Env:          et.Containers[0].Environment,
-				WorkingDir:   et.WorkingDir,
 				User:         et.Containers[0].User,
 				Privileged:   et.Containers[0].Privileged,
 				RegistryAuth: registryAuth,
@@ -731,6 +817,14 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 		return err
 	}
 	outf.WriteString("Pod started.\n")
+
+	if et.WorkingDir != "" {
+		outf.WriteString(fmt.Sprintf("Creating working dir %q.\n", et.WorkingDir))
+		if err := e.mkdir(ctx, et, pod, outf, et.WorkingDir); err != nil {
+			outf.WriteString(fmt.Sprintf("Failed to create working dir %q. Error: %s\n", et.WorkingDir, err))
+			return err
+		}
+	}
 
 	rt.pod = pod
 	return nil
