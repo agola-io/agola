@@ -61,7 +61,7 @@ tasks:
       - run: sleep 5
       - run: ./bin/docker-tests -test.parallel 1 -test.v
 
-pipelines:
+runs:
   agola build/test:
     elements:
       build go1.12:

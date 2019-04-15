@@ -702,9 +702,9 @@ func TestGenRunConfig(t *testing.T) {
 						},
 					},
 				},
-				Pipelines: map[string]*config.Pipeline{
-					"pipeline01": &config.Pipeline{
-						Name: "pipeline01",
+				Runs: map[string]*config.Run{
+					"run01": &config.Run{
+						Name: "run01",
 						Elements: map[string]*config.Element{
 							"element01": &config.Element{
 								Name:          "element01",
@@ -797,9 +797,9 @@ func TestGenRunConfig(t *testing.T) {
 						},
 					},
 				},
-				Pipelines: map[string]*config.Pipeline{
-					"pipeline01": &config.Pipeline{
-						Name: "pipeline01",
+				Runs: map[string]*config.Run{
+					"run01": &config.Run{
+						Name: "run01",
 						Elements: map[string]*config.Element{
 							"element01": &config.Element{
 								Name: "element01",
@@ -877,9 +877,9 @@ func TestGenRunConfig(t *testing.T) {
 						},
 					},
 				},
-				Pipelines: map[string]*config.Pipeline{
-					"pipeline01": &config.Pipeline{
-						Name: "pipeline01",
+				Runs: map[string]*config.Run{
+					"run01": &config.Run{
+						Name: "run01",
 						Elements: map[string]*config.Element{
 							"element01": &config.Element{
 								Name: "element01",
@@ -921,7 +921,7 @@ func TestGenRunConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			out := GenRunConfigTasks(uuid, tt.in, "pipeline01", tt.variables, "", "", "")
+			out := GenRunConfigTasks(uuid, tt.in, "run01", tt.variables, "", "", "")
 
 			//if err != nil {
 			//	t.Fatalf("unexpected error: %v", err)
