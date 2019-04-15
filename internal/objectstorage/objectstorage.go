@@ -20,6 +20,7 @@ package objectstorage
 import (
 	"errors"
 	"io"
+	"time"
 )
 
 // TODO(sgotti)
@@ -38,6 +39,8 @@ type Storage interface {
 
 type ObjectInfo struct {
 	Path string
+
+	LastModified time.Time
 
 	Err error
 }
