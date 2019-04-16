@@ -39,7 +39,10 @@ import (
 const (
 	defaultSSHPort = "22"
 
-	agolaDefaultConfigPath = ".agola/config.yml"
+	agolaDefaultConfigDir         = ".agola"
+	agolaDefaultJsonnetConfigFile = "config.jsonnet"
+	agolaDefaultJsonConfigFile    = "config.json"
+	agolaDefaultYamlConfigFile    = "config.yml"
 
 	// List of runs annotations
 	AnnotationEventType = "event_type"
@@ -252,16 +255,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 
 	h.log.Infof("webhookData: %s", util.Dump(webhookData))
 
-	var data []byte
-	err := util.ExponentialBackoff(util.FetchFileBackoff, func() (bool, error) {
-		var err error
-		data, err = gitSource.GetFile(webhookData.Repo.Path, webhookData.CommitSHA, agolaDefaultConfigPath)
-		if err == nil {
-			return true, nil
-		}
-		h.log.Errorf("get file err: %v", err)
-		return false, nil
-	})
+	data, filename, err := h.fetchConfigFiles(gitSource, webhookData)
 	if err != nil {
 		return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to fetch config file")
 	}
@@ -330,7 +324,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		group = genGroup(GroupTypeUser, userID, webhookData)
 	}
 
-	if err := h.createRuns(ctx, data, group, annotations, env, variables, webhookData); err != nil {
+	if err := h.createRuns(ctx, filename, data, group, annotations, env, variables, webhookData); err != nil {
 		return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to create run")
 	}
 	//if err := gitSource.CreateStatus(webhookData.Repo.Owner, webhookData.Repo.Name, webhookData.CommitSHA, gitsource.CommitStatusPending, "localhost:8080", "build %s", "agola"); err != nil {
@@ -340,10 +334,42 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 	return 0, "", nil
 }
 
-func (h *webhooksHandler) createRuns(ctx context.Context, configData []byte, group string, annotations, staticEnv, variables map[string]string, webhookData *types.WebhookData) error {
+// fetchConfigFiles tries to fetch a config file in one of the supported formats. The precedence is for jsonnet, then json and then yml
+// TODO(sgotti) For jsonnet, if we'll support custom import files inside the configdir, also fetch them.
+func (h *webhooksHandler) fetchConfigFiles(gitSource gitsource.GitSource, webhookData *types.WebhookData) ([]byte, string, error) {
+	var data []byte
+	var filename string
+	err := util.ExponentialBackoff(util.FetchFileBackoff, func() (bool, error) {
+		for _, filename = range []string{agolaDefaultJsonnetConfigFile, agolaDefaultJsonConfigFile, agolaDefaultYamlConfigFile} {
+			var err error
+			data, err = gitSource.GetFile(webhookData.Repo.Path, webhookData.CommitSHA, path.Join(agolaDefaultConfigDir, filename))
+			if err == nil {
+				return true, nil
+			}
+			h.log.Errorf("get file err: %v", err)
+		}
+		return false, nil
+	})
+	if err != nil {
+		return nil, "", err
+	}
+	return data, filename, nil
+}
+
+func (h *webhooksHandler) createRuns(ctx context.Context, filename string, configData []byte, group string, annotations, staticEnv, variables map[string]string, webhookData *types.WebhookData) error {
 	setupErrors := []string{}
 
-	config, err := config.ParseConfig([]byte(configData))
+	var configFormat config.ConfigFormat
+	switch path.Ext(filename) {
+	case ".jsonnet":
+		configFormat = config.ConfigFormatJsonnet
+	case ".json":
+		fallthrough
+	case ".yml":
+		configFormat = config.ConfigFormatJSON
+
+	}
+	config, err := config.ParseConfig([]byte(configData), configFormat)
 	if err != nil {
 		log.Errorf("failed to parse config: %+v", err)
 

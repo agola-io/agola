@@ -25,6 +25,7 @@ import (
 	"github.com/sorintlab/agola/internal/util"
 
 	"github.com/ghodss/yaml"
+	"github.com/google/go-jsonnet"
 	"github.com/pkg/errors"
 )
 
@@ -32,6 +33,14 @@ const (
 	maxRunNameLength  = 100
 	maxTaskNameLength = 100
 	maxStepNameLength = 100
+)
+
+type ConfigFormat int
+
+const (
+	// ConfigFormatJSON handles both json or yaml format (since json is a subset of yaml)
+	ConfigFormatJSON ConfigFormat = iota
+	ConfigFormatJsonnet
 )
 
 var (
@@ -595,7 +604,18 @@ func (r *Run) Task(taskName string) *Task {
 
 var DefaultConfig = Config{}
 
-func ParseConfig(configData []byte) (*Config, error) {
+func ParseConfig(configData []byte, format ConfigFormat) (*Config, error) {
+	// Generate json from jsonnet
+	if format == ConfigFormatJsonnet {
+		// TODO(sgotti) support custom import files inside the configdir ???
+		vm := jsonnet.MakeVM()
+		out, err := vm.EvaluateSnippet("", string(configData))
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to evaluate jsonnet config")
+		}
+		configData = []byte(out)
+	}
+
 	config := DefaultConfig
 	if err := yaml.Unmarshal(configData, &config); err != nil {
 		return nil, errors.Wrapf(err, "failed to unmarshal config")
