@@ -36,6 +36,8 @@ const (
 	maxRunNameLength  = 100
 	maxTaskNameLength = 100
 	maxStepNameLength = 100
+
+	defaultWorkingDir = "~/project"
 )
 
 type ConfigFormat int
@@ -761,7 +763,12 @@ func checkConfig(config *Config) error {
 	// Set defaults
 	for _, run := range config.Runs {
 		for _, task := range run.Tasks {
-			// Set auth type to default if not specified
+			// set task default working dir
+			if task.WorkingDir == "" {
+				task.WorkingDir = defaultWorkingDir
+			}
+
+			// set auth type to default if not specified
 			runtime := task.Runtime
 			if runtime.Auth != nil {
 				if runtime.Auth.Type == "" {
