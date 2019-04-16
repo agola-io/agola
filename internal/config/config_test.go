@@ -47,52 +47,61 @@ func TestParseConfig(t *testing.T) {
 			name: "test empty run",
 			in: `
                 runs:
-                  run01:
+                  -
                 `,
-			err: fmt.Errorf(`run "run01" is empty`),
+			err: fmt.Errorf(`run at index 0 is empty`),
 		},
 		{
-			name: "test missing element dependency",
+			name: "test empty task",
 			in: `
-                tasks:
-                  task0k1:
-                    environment:
-                      ENV01: ENV01
-
                 runs:
-                  run01:
-                    elements:
-                      element01:
-                        task: task01
-                        depends:
-                          - element02
+                  - name: run01
+                    tasks:
+                      - 
                 `,
-			err: fmt.Errorf(`run element "element02" needed by element "element01" doesn't exist`),
+			err: fmt.Errorf(`run "run01": task at index 0 is empty`),
 		},
 		{
-			name: "test circular dependency between 2 elements a -> b -> a",
+			name: "test missing task dependency",
 			in: `
-                tasks:
-                  task01:
-                    environment:
-                      ENV01: ENV01
-
                 runs:
-                  run01:
-                    elements:
-                      element01:
-                        task: task01
+                  - name: run01
+                    tasks:
+                      - name: task01
+                        runtime:
+                          type: pod
+                          containers:
+                            - image: busybox
                         depends:
-                          - element02
-                      element02:
-                        task: task01
+                          - task02
+                `,
+			err: fmt.Errorf(`run task "task02" needed by task "task01" doesn't exist`),
+		},
+		{
+			name: "test circular dependency between 2 tasks a -> b -> a",
+			in: `
+                runs:
+                  - name: run01
+                    tasks:
+                      - name: task01
+                        runtime:
+                          type: pod
+                          containers:
+                            - image: busybox
                         depends:
-                          - element01
+                          - task02
+                      - name: task02
+                        runtime:
+                          type: pod
+                          containers:
+                            - image: busybox
+                        depends:
+                          - task01
                 `,
 			err: &util.Errors{
 				Errs: []error{
-					errors.Errorf("circular dependency between element %q and elements %q", "element01", "element02"),
-					errors.Errorf("circular dependency between element %q and elements %q", "element02", "element01"),
+					errors.Errorf("circular dependency between task %q and tasks %q", "task01", "task02"),
+					errors.Errorf("circular dependency between task %q and tasks %q", "task02", "task01"),
 				},
 			},
 		},
@@ -129,54 +138,67 @@ func TestParseOutput(t *testing.T) {
 		out  *Config
 	}{
 		{
-			name: "test element when conditions",
+			name: "test task all options",
 			in: `
-                runtimes:
-                  runtime01:
-                    type: pod
-                    auth:
-                      username: username
-                      password:
-                        from_variable: password
-                    containers:
-                      - image: image01
-                        auth:
-                          username:
-                            from_variable: username2
-                          password: password2
+                runs:
+                  - name: run01
+                    tasks:
+                      - name: task01
+                        runtime:
+                          type: pod
+                          auth:
+                            username: username
+                            password:
+                              from_variable: password
+                          containers:
+                            - image: image01
+                              auth:
+                                username:
+                                  from_variable: username2
+                                password: password2
+                              environment:
+                                ENV01: ENV01
+                                ENVFROMVARIABLE01:
+                                  from_variable: variable01
                         environment:
                           ENV01: ENV01
                           ENVFROMVARIABLE01:
                             from_variable: variable01
+                        steps:
+                          # normal step definition
+                          - type: clone
+                          - type: run
+                            command: command01
+                          - type: run
+                            name: name different than command
+                            command: command02
+                          - type: run
+                            command: command03
+                            environment:
+                              ENV01: ENV01
+                              ENVFROMVARIABLE01:
+                                from_variable: variable01
+                          - type: save_cache
+                            key: cache-{{ arch }}
+                            contents:
+                              - source_dir: /go/pkg/mod/cache
 
-                tasks:
-                  task01:
-                    runtime: runtime01
-                    environment:
-                      ENV01: ENV01
-                      ENVFROMVARIABLE01:
-                        from_variable: variable01
-                    steps:
-                      - run: command01
-                      - run:
-                          name: name different than command
-                          command: command02
-                      - run:
-                          command: command03
-                          environment:
-                            ENV01: ENV01
-                            ENVFROMVARIABLE01:
-                              from_variable: variable01
-                      - save_cache:
-                          key: cache-{{ arch }}
-                          contents:
-                            - source_dir: /go/pkg/mod/cache
-
-                runs:
-                  run01:
-                    elements:
-                      element01:
-                        task: task01
+                          # simpler (for yaml not for json) steps definition
+                          - clone:
+                          - run: command01
+                          - run:
+                              name: name different than command
+                              command: command02
+                          - run:
+                              command: command03
+                              environment:
+                                ENV01: ENV01
+                                ENVFROMVARIABLE01:
+                                  from_variable: variable01
+                          - save_cache:
+                              key: cache-{{ arch }}
+                              contents:
+                                - source_dir: /go/pkg/mod/cache
                         when:
                           branch: master
                           tag:
@@ -185,88 +207,132 @@ func TestParseOutput(t *testing.T) {
                           ref:
                             include: master
                             exclude: [ /branch01/ , branch02 ]
+                        depends:
+                          - task: task02
+                            conditions:
+                              - on_success
+                              - on_failure
+                          - task03
+                          - task04:
+                            - on_success
+                      - name: task02
+                        runtime:
+                          type: pod
+                          containers:
+                            - image: image01
+                      - name: task03
+                        runtime:
+                          type: pod
+                          containers:
+                            - image: image01
+                      - name: task04
+                        runtime:
+                          type: pod
+                          containers:
+                            - image: image01
           `,
 			out: &Config{
-				Runtimes: map[string]*Runtime{
-					"runtime01": &Runtime{
-						Name: "runtime01",
-						Type: "pod",
-						Auth: &RegistryAuth{
-							Type:     RegistryAuthTypeDefault,
-							Username: Value{Type: ValueTypeString, Value: "username"},
-							Password: Value{Type: ValueTypeFromVariable, Value: "password"},
-						},
-						Arch: "",
-						Containers: []*Container{
-							&Container{
-								Image: "image01",
-								Auth: &RegistryAuth{
-									Type:     RegistryAuthTypeDefault,
-									Username: Value{Type: ValueTypeFromVariable, Value: "username2"},
-									Password: Value{Type: ValueTypeString, Value: "password2"},
-								},
-								Environment: map[string]Value{
-									"ENV01":             Value{Type: ValueTypeString, Value: "ENV01"},
-									"ENVFROMVARIABLE01": Value{Type: ValueTypeFromVariable, Value: "variable01"},
-								},
-								User: "",
-							},
-						},
-					},
-				},
-				Tasks: map[string]*Task{
-					"task01": &Task{
-						Name:    "task01",
-						Runtime: "runtime01",
-						Environment: map[string]Value{
-							"ENV01":             Value{Type: ValueTypeString, Value: "ENV01"},
-							"ENVFROMVARIABLE01": Value{Type: ValueTypeFromVariable, Value: "variable01"},
-						},
-						WorkingDir: "",
-						Shell:      "",
-						User:       "",
-						Steps: []interface{}{
-							&RunStep{
-								Step: Step{
-									Type: "run",
-									Name: "command01",
-								},
-								Command: "command01",
-							},
-							&RunStep{
-								Step: Step{
-									Type: "run",
-									Name: "name different than command",
-								},
-								Command: "command02",
-							},
-							&RunStep{
-								Step: Step{
-									Type: "run",
-									Name: "command03",
-								},
-								Command: "command03",
-								Environment: map[string]Value{
-									"ENV01":             Value{Type: ValueTypeString, Value: "ENV01"},
-									"ENVFROMVARIABLE01": Value{Type: ValueTypeFromVariable, Value: "variable01"},
-								},
-							},
-							&SaveCacheStep{
-								Step:     Step{Type: "save_cache"},
-								Key:      "cache-{{ arch }}",
-								Contents: []*SaveContent{&SaveContent{SourceDir: "/go/pkg/mod/cache", Paths: []string{"**"}}},
-							},
-						},
-					},
-				},
-				Runs: map[string]*Run{
-					"run01": &Run{
+				Runs: []*Run{
+					&Run{
 						Name: "run01",
-						Elements: map[string]*Element{
-							"element01": &Element{
-								Name:          "element01",
-								Task:          "task01",
-								Depends:       []*Depend{},
+						Tasks: []*Task{
+							&Task{
+								Name: "task01",
+								Runtime: &Runtime{
+									Type: "pod",
+									Auth: &RegistryAuth{
+										Type:     RegistryAuthTypeDefault,
+										Username: Value{Type: ValueTypeString, Value: "username"},
+										Password: Value{Type: ValueTypeFromVariable, Value: "password"},
+									},
+									Arch: "",
+									Containers: []*Container{
+										&Container{
+											Image: "image01",
+											Auth: &RegistryAuth{
+												Type:     RegistryAuthTypeDefault,
+												Username: Value{Type: ValueTypeFromVariable, Value: "username2"},
+												Password: Value{Type: ValueTypeString, Value: "password2"},
+											},
+											Environment: map[string]Value{
+												"ENV01":             Value{Type: ValueTypeString, Value: "ENV01"},
+												"ENVFROMVARIABLE01": Value{Type: ValueTypeFromVariable, Value: "variable01"},
+											},
+											User: "",
+										},
+									},
+								},
+								Environment: map[string]Value{
+									"ENV01":             Value{Type: ValueTypeString, Value: "ENV01"},
+									"ENVFROMVARIABLE01": Value{Type: ValueTypeFromVariable, Value: "variable01"},
+								},
+								WorkingDir: "",
+								Shell:      "",
+								User:       "",
+								Steps: []interface{}{
+									&CloneStep{Step: Step{Type: "clone"}},
+									&RunStep{
+										Step: Step{
+											Type: "run",
+											Name: "command01",
+										},
+										Command: "command01",
+									},
+									&RunStep{
+										Step: Step{
+											Type: "run",
+											Name: "name different than command",
+										},
+										Command: "command02",
+									},
+									&RunStep{
+										Step: Step{
+											Type: "run",
+											Name: "command03",
+										},
+										Command: "command03",
+										Environment: map[string]Value{
+											"ENV01":             Value{Type: ValueTypeString, Value: "ENV01"},
+											"ENVFROMVARIABLE01": Value{Type: ValueTypeFromVariable, Value: "variable01"},
+										},
+									},
+									&SaveCacheStep{
+										Step:     Step{Type: "save_cache"},
+										Key:      "cache-{{ arch }}",
+										Contents: []*SaveContent{&SaveContent{SourceDir: "/go/pkg/mod/cache", Paths: []string{"**"}}},
+									},
+									&CloneStep{Step: Step{Type: "clone"}},
+									&RunStep{
+										Step: Step{
+											Type: "run",
+											Name: "command01",
+										},
+										Command: "command01",
+									},
+									&RunStep{
+										Step: Step{
+											Type: "run",
+											Name: "name different than command",
+										},
+										Command: "command02",
+									},
+									&RunStep{
+										Step: Step{
+											Type: "run",
+											Name: "command03",
+										},
+										Command: "command03",
+										Environment: map[string]Value{
+											"ENV01":             Value{Type: ValueTypeString, Value: "ENV01"},
+											"ENVFROMVARIABLE01": Value{Type: ValueTypeFromVariable, Value: "variable01"},
+										},
+									},
+									&SaveCacheStep{
+										Step:     Step{Type: "save_cache"},
+										Key:      "cache-{{ arch }}",
+										Contents: []*SaveContent{&SaveContent{SourceDir: "/go/pkg/mod/cache", Paths: []string{"**"}}},
+									},
+								},
 								IgnoreFailure: false,
 								Approval:      false,
 								When: &types.When{
@@ -291,6 +357,56 @@ func TestParseOutput(t *testing.T) {
 										},
 									},
 								},
+								Depends: []*Depend{
+									&Depend{TaskName: "task02", Conditions: []DependCondition{DependConditionOnSuccess, DependConditionOnFailure}},
+									&Depend{TaskName: "task03", Conditions: nil},
+									&Depend{TaskName: "task04", Conditions: []DependCondition{DependConditionOnSuccess}},
+								},
+							},
+							&Task{
+								Name: "task02",
+								Runtime: &Runtime{
+									Type: "pod",
+									Arch: "",
+									Containers: []*Container{
+										&Container{
+											Image: "image01",
+										},
+									},
+								},
+								WorkingDir: "",
+								Steps:      []interface{}{},
+								Depends:    []*Depend{},
+							},
+							&Task{
+								Name: "task03",
+								Runtime: &Runtime{
+									Type: "pod",
+									Arch: "",
+									Containers: []*Container{
+										&Container{
+											Image: "image01",
+										},
+									},
+								},
+								WorkingDir: "",
+								Steps:      []interface{}{},
+								Depends:    []*Depend{},
+							},
+							&Task{
+								Name: "task04",
+								Runtime: &Runtime{
+									Type: "pod",
+									Arch: "",
+									Containers: []*Container{
+										&Container{
+											Image: "image01",
+										},
+									},
+								},
+								WorkingDir: "",
+								Steps:      []interface{}{},
+								Depends:    []*Depend{},
 							},
 						},
 					},

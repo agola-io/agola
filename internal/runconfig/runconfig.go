@@ -25,9 +25,7 @@ import (
 	"github.com/sorintlab/agola/internal/util"
 )
 
-func genRuntime(c *config.Config, runtimeName string, variables map[string]string) *rstypes.Runtime {
-	ce := c.Runtime(runtimeName)
-
+func genRuntime(c *config.Config, ce *config.Runtime, variables map[string]string) *rstypes.Runtime {
 	containers := []*rstypes.Container{}
 	for _, cc := range ce.Containers {
 		env := genEnv(cc.Environment, variables)
@@ -189,11 +187,8 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string
 
 	rcts := map[string]*rstypes.RunConfigTask{}
 
-	for _, cre := range cr.Elements {
-		include := types.MatchWhen(cre.When, branch, tag, ref)
-
-		// resolve referenced task
-		ct := c.Task(cre.Task)
+	for _, ct := range cr.Tasks {
+		include := types.MatchWhen(ct.When, branch, tag, ref)
 
 		steps := make([]interface{}, len(ct.Steps))
 		for i, cpts := range ct.Steps {
@@ -203,18 +198,17 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string
 		tEnv := genEnv(ct.Environment, variables)
 
 		t := &rstypes.RunConfigTask{
-			ID: uuid.New(cre.Name).String(),
-			// use the element name from the config as the task name
-			Name:          cre.Name,
+			ID:            uuid.New(ct.Name).String(),
+			Name:          ct.Name,
 			Runtime:       genRuntime(c, ct.Runtime, variables),
 			Environment:   tEnv,
 			WorkingDir:    ct.WorkingDir,
 			Shell:         ct.Shell,
 			User:          ct.User,
 			Steps:         steps,
-			IgnoreFailure: cre.IgnoreFailure,
+			IgnoreFailure: ct.IgnoreFailure,
 			Skip:          !include,
-			NeedsApproval: cre.Approval,
+			NeedsApproval: ct.Approval,
 		}
 
 		rcts[t.ID] = t
@@ -222,10 +216,10 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string
 
 	// populate depends, needs to be done after having created all the tasks so we can resolve their id
 	for _, rct := range rcts {
-		cre := cr.Elements[rct.Name]
+		ct := cr.Task(rct.Name)
 
-		depends := make(map[string]*rstypes.RunConfigTaskDepend, len(cre.Depends))
-		for _, d := range cre.Depends {
+		depends := make(map[string]*rstypes.RunConfigTaskDepend, len(ct.Depends))
+		for _, d := range ct.Depends {
 			conditions := make([]rstypes.RunConfigTaskDependCondition, len(d.Conditions))
 			// when no conditions are defined default to on_success
 			if len(d.Conditions) == 0 {
@@ -243,7 +237,7 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string
 				}
 			}
 
-			drct := getRunConfigTaskByName(rcts, d.ElementName)
+			drct := getRunConfigTaskByName(rcts, d.TaskName)
 			depends[drct.ID] = &rstypes.RunConfigTaskDepend{
 				TaskID:     drct.ID,
 				Conditions: conditions,

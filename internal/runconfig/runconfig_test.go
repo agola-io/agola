@@ -632,80 +632,71 @@ func TestGenRunConfig(t *testing.T) {
 		{
 			name: "test runconfig generation",
 			in: &config.Config{
-				Runtimes: map[string]*config.Runtime{
-					"runtime01": &config.Runtime{
-						Name: "runtime01",
-						Type: "pod",
-						Auth: &config.RegistryAuth{
-							Type:     config.RegistryAuthTypeDefault,
-							Username: config.Value{Type: config.ValueTypeString, Value: "username"},
-							Password: config.Value{Type: config.ValueTypeFromVariable, Value: "password"},
-						},
-						Arch: "",
-						Containers: []*config.Container{
-							&config.Container{
-								Image: "image01",
-								Auth: &config.RegistryAuth{
-									Type:     config.RegistryAuthTypeDefault,
-									Username: config.Value{Type: config.ValueTypeFromVariable, Value: "registry_username"},
-									Password: config.Value{Type: config.ValueTypeString, Value: "password2"},
-								},
-								Environment: map[string]config.Value{
-									"ENV01":             config.Value{Type: config.ValueTypeString, Value: "ENV01"},
-									"ENVFROMVARIABLE01": config.Value{Type: config.ValueTypeFromVariable, Value: "variable01"},
-								},
-								User: "",
-							},
-						},
-					},
-				},
-				Tasks: map[string]*config.Task{
-					"task01": &config.Task{
-						Name:    "task01",
-						Runtime: "runtime01",
-						Environment: map[string]config.Value{
-							"ENV01":             config.Value{Type: config.ValueTypeString, Value: "ENV01"},
-							"ENVFROMVARIABLE01": config.Value{Type: config.ValueTypeFromVariable, Value: "variable01"},
-						},
-						WorkingDir: "",
-						Shell:      "",
-						User:       "",
-						Steps: []interface{}{
-							&config.RunStep{
-								Step: config.Step{
-									Type: "run",
-									Name: "command01",
-								},
-								Command: "command01",
-							},
-							&config.RunStep{
-								Step: config.Step{
-									Type: "run",
-									Name: "name different than command",
-								},
-								Command: "command02",
-							},
-							&config.RunStep{
-								Step: config.Step{
-									Type: "run",
-									Name: "command03",
-								},
-								Command: "command03",
-								Environment: map[string]config.Value{
-									"ENV01":             config.Value{Type: config.ValueTypeString, Value: "ENV01"},
-									"ENVFROMVARIABLE01": config.Value{Type: config.ValueTypeFromVariable, Value: "variable01"},
-								},
-							},
-						},
-					},
-				},
-				Runs: map[string]*config.Run{
-					"run01": &config.Run{
+				Runs: []*config.Run{
+					&config.Run{
 						Name: "run01",
-						Elements: map[string]*config.Element{
-							"element01": &config.Element{
-								Name:          "element01",
-								Task:          "task01",
+						Tasks: []*config.Task{
+							&config.Task{
+								Name: "task01",
+								Runtime: &config.Runtime{
+									Type: "pod",
+									Auth: &config.RegistryAuth{
+										Type:     config.RegistryAuthTypeDefault,
+										Username: config.Value{Type: config.ValueTypeString, Value: "username"},
+										Password: config.Value{Type: config.ValueTypeFromVariable, Value: "password"},
+									},
+									Arch: "",
+									Containers: []*config.Container{
+										&config.Container{
+											Image: "image01",
+											Auth: &config.RegistryAuth{
+												Type:     config.RegistryAuthTypeDefault,
+												Username: config.Value{Type: config.ValueTypeFromVariable, Value: "registry_username"},
+												Password: config.Value{Type: config.ValueTypeString, Value: "password2"},
+											},
+											Environment: map[string]config.Value{
+												"ENV01":             config.Value{Type: config.ValueTypeString, Value: "ENV01"},
+												"ENVFROMVARIABLE01": config.Value{Type: config.ValueTypeFromVariable, Value: "variable01"},
+											},
+											User: "",
+										},
+									},
+								},
+								Environment: map[string]config.Value{
+									"ENV01":             config.Value{Type: config.ValueTypeString, Value: "ENV01"},
+									"ENVFROMVARIABLE01": config.Value{Type: config.ValueTypeFromVariable, Value: "variable01"},
+								},
+								WorkingDir: "",
+								Shell:      "",
+								User:       "",
+								Steps: []interface{}{
+									&config.RunStep{
+										Step: config.Step{
+											Type: "run",
+											Name: "command01",
+										},
+										Command: "command01",
+									},
+									&config.RunStep{
+										Step: config.Step{
+											Type: "run",
+											Name: "name different than command",
+										},
+										Command: "command02",
+									},
+									&config.RunStep{
+										Step: config.Step{
+											Type: "run",
+											Name: "command03",
+										},
+										Command: "command03",
+										Environment: map[string]config.Value{
+											"ENV01":             config.Value{Type: config.ValueTypeString, Value: "ENV01"},
+											"ENVFROMVARIABLE01": config.Value{Type: config.ValueTypeFromVariable, Value: "variable01"},
+										},
+									},
+								},
+
 								Depends:       []*config.Depend{},
 								IgnoreFailure: false,
 								Approval:      false,
@@ -727,9 +718,9 @@ func TestGenRunConfig(t *testing.T) {
 				"registry_username": "yourregistryusername",
 			},
 			out: map[string]*rstypes.RunConfigTask{
-				uuid.New("element01").String(): &rstypes.RunConfigTask{
-					ID:   uuid.New("element01").String(),
-					Name: "element01", Depends: map[string]*rstypes.RunConfigTaskDepend{},
+				uuid.New("task01").String(): &rstypes.RunConfigTask{
+					ID:   uuid.New("task01").String(),
+					Name: "task01", Depends: map[string]*rstypes.RunConfigTaskDepend{},
 					Runtime: &rstypes.Runtime{Type: rstypes.RuntimeType("pod"),
 						Containers: []*rstypes.Container{
 							{
@@ -762,45 +753,35 @@ func TestGenRunConfig(t *testing.T) {
 		{
 			name: "test runtime auth used for container nil auth",
 			in: &config.Config{
-				Runtimes: map[string]*config.Runtime{
-					"runtime01": &config.Runtime{
-						Name: "runtime01",
-						Type: "pod",
-						Auth: &config.RegistryAuth{
-							Type:     config.RegistryAuthTypeDefault,
-							Username: config.Value{Type: config.ValueTypeString, Value: "username"},
-							Password: config.Value{Type: config.ValueTypeFromVariable, Value: "password"},
-						},
-						Arch: "",
-						Containers: []*config.Container{
-							&config.Container{
-								Image: "image01",
-							},
-						},
-					},
-				},
-				Tasks: map[string]*config.Task{
-					"task01": &config.Task{
-						Name:    "task01",
-						Runtime: "runtime01",
-						Steps: []interface{}{
-							&config.RunStep{
-								Step: config.Step{
-									Type: "run",
-									Name: "command01",
-								},
-								Command: "command01",
-							},
-						},
-					},
-				},
-				Runs: map[string]*config.Run{
-					"run01": &config.Run{
+				Runs: []*config.Run{
+					&config.Run{
 						Name: "run01",
-						Elements: map[string]*config.Element{
-							"element01": &config.Element{
-								Name: "element01",
-								Task: "task01",
+						Tasks: []*config.Task{
+							&config.Task{
+								Name: "task01",
+								Runtime: &config.Runtime{
+									Type: "pod",
+									Auth: &config.RegistryAuth{
+										Type:     config.RegistryAuthTypeDefault,
+										Username: config.Value{Type: config.ValueTypeString, Value: "username"},
+										Password: config.Value{Type: config.ValueTypeFromVariable, Value: "password"},
+									},
+									Arch: "",
+									Containers: []*config.Container{
+										&config.Container{
+											Image: "image01",
+										},
+									},
+								},
+								Steps: []interface{}{
+									&config.RunStep{
+										Step: config.Step{
+											Type: "run",
+											Name: "command01",
+										},
+										Command: "command01",
+									},
+								},
 							},
 						},
 					},
@@ -811,9 +792,9 @@ func TestGenRunConfig(t *testing.T) {
 				"password":   "yourregistrypassword",
 			},
 			out: map[string]*rstypes.RunConfigTask{
-				uuid.New("element01").String(): &rstypes.RunConfigTask{
-					ID:   uuid.New("element01").String(),
-					Name: "element01", Depends: map[string]*rstypes.RunConfigTaskDepend{},
+				uuid.New("task01").String(): &rstypes.RunConfigTask{
+					ID:   uuid.New("task01").String(),
+					Name: "task01", Depends: map[string]*rstypes.RunConfigTaskDepend{},
 					Runtime: &rstypes.Runtime{Type: rstypes.RuntimeType("pod"),
 						Containers: []*rstypes.Container{
 							{
@@ -837,50 +818,40 @@ func TestGenRunConfig(t *testing.T) {
 		{
 			name: "test runtime auth not used for container with auth",
 			in: &config.Config{
-				Runtimes: map[string]*config.Runtime{
-					"runtime01": &config.Runtime{
-						Name: "runtime01",
-						Type: "pod",
-						Auth: &config.RegistryAuth{
-							Type:     config.RegistryAuthTypeDefault,
-							Username: config.Value{Type: config.ValueTypeString, Value: "username"},
-							Password: config.Value{Type: config.ValueTypeFromVariable, Value: "password"},
-						},
-						Arch: "",
-						Containers: []*config.Container{
-							&config.Container{
-								Image: "image01",
-								Auth: &config.RegistryAuth{
-									Type:     config.RegistryAuthTypeDefault,
-									Username: config.Value{Type: config.ValueTypeFromVariable, Value: "registry_username"},
-									Password: config.Value{Type: config.ValueTypeString, Value: "password2"},
-								},
-							},
-						},
-					},
-				},
-				Tasks: map[string]*config.Task{
-					"task01": &config.Task{
-						Name:    "task01",
-						Runtime: "runtime01",
-						Steps: []interface{}{
-							&config.RunStep{
-								Step: config.Step{
-									Type: "run",
-									Name: "command01",
-								},
-								Command: "command01",
-							},
-						},
-					},
-				},
-				Runs: map[string]*config.Run{
-					"run01": &config.Run{
+				Runs: []*config.Run{
+					&config.Run{
 						Name: "run01",
-						Elements: map[string]*config.Element{
-							"element01": &config.Element{
-								Name: "element01",
-								Task: "task01",
+						Tasks: []*config.Task{
+							&config.Task{
+								Name: "task01",
+								Runtime: &config.Runtime{
+									Type: "pod",
+									Auth: &config.RegistryAuth{
+										Type:     config.RegistryAuthTypeDefault,
+										Username: config.Value{Type: config.ValueTypeString, Value: "username"},
+										Password: config.Value{Type: config.ValueTypeFromVariable, Value: "password"},
+									},
+									Arch: "",
+									Containers: []*config.Container{
+										&config.Container{
+											Image: "image01",
+											Auth: &config.RegistryAuth{
+												Type:     config.RegistryAuthTypeDefault,
+												Username: config.Value{Type: config.ValueTypeFromVariable, Value: "registry_username"},
+												Password: config.Value{Type: config.ValueTypeString, Value: "password2"},
+											},
+										},
+									},
+								},
+								Steps: []interface{}{
+									&config.RunStep{
+										Step: config.Step{
+											Type: "run",
+											Name: "command01",
+										},
+										Command: "command01",
+									},
+								},
 							},
 						},
 					},
@@ -891,9 +862,9 @@ func TestGenRunConfig(t *testing.T) {
 				"registry_username": "yourregistryusername",
 			},
 			out: map[string]*rstypes.RunConfigTask{
-				uuid.New("element01").String(): &rstypes.RunConfigTask{
-					ID:   uuid.New("element01").String(),
-					Name: "element01", Depends: map[string]*rstypes.RunConfigTaskDepend{},
+				uuid.New("task01").String(): &rstypes.RunConfigTask{
+					ID:   uuid.New("task01").String(),
+					Name: "task01", Depends: map[string]*rstypes.RunConfigTaskDepend{},
 					Runtime: &rstypes.Runtime{Type: rstypes.RuntimeType("pod"),
 						Containers: []*rstypes.Container{
 							{
