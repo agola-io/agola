@@ -19,6 +19,7 @@ require (
 	github.com/go-ini/ini v1.42.0 // indirect
 	github.com/go-sql-driver/mysql v1.4.1 // indirect
 	github.com/google/go-cmp v0.3.0
+	github.com/google/go-jsonnet v0.12.1
 	github.com/gopherjs/gopherjs v0.0.0-20181103185306-d547d1d9531e // indirect
 	github.com/gorilla/handlers v1.4.0
 	github.com/gorilla/mux v1.7.0
@@ -38,6 +39,7 @@ require (
 	github.com/pkg/errors v0.8.0
 	github.com/sanity-io/litter v1.1.0
 	github.com/satori/go.uuid v1.2.0
+	github.com/sergi/go-diff v1.0.0 // indirect
 	github.com/sgotti/gexpect v0.0.0-20161123102107-0afc6c19f50a
 	github.com/smartystreets/assertions v0.0.0-20190116191733-b6c0e53d7304 // indirect
 	github.com/smartystreets/goconvey v0.0.0-20181108003508-044398e4856c // indirect
