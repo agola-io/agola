@@ -658,6 +658,8 @@ type Executor struct {
 
 	Labels map[string]string `json:"labels,omitempty"`
 
+	ActiveTasks int `json:"active_tasks,omitempty"`
+
 	// internal values not saved
 	Revision int64 `json:"-"`
 }

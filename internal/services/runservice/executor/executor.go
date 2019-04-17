@@ -656,14 +656,17 @@ func (e *Executor) sendExecutorStatus(ctx context.Context) error {
 		labels = make(map[string]string)
 	}
 
+	activeTasks := e.runningTasks.len()
+
 	// Add special labels (and override config provided ones)
 	arch := runtime.GOARCH
 	labels["arch"] = arch
 
 	executor := &types.Executor{
-		ID:        e.id,
-		ListenURL: e.listenURL,
-		Labels:    labels,
+		ID:          e.id,
+		ListenURL:   e.listenURL,
+		Labels:      labels,
+		ActiveTasks: activeTasks,
 	}
 
 	log.Debugf("send executor status: %s", util.Dump(executor))
@@ -1151,6 +1154,12 @@ func (r *runningTasks) delete(rtID string) {
 	r.m.Lock()
 	defer r.m.Unlock()
 	delete(r.tasks, rtID)
+}
+
+func (r *runningTasks) len() int {
+	r.m.Lock()
+	defer r.m.Unlock()
+	return len(r.tasks)
 }
 
 func (e *Executor) handleTasks(ctx context.Context, c <-chan *types.ExecutorTask) {
