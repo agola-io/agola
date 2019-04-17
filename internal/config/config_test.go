@@ -62,6 +62,34 @@ func TestParseConfig(t *testing.T) {
 			err: fmt.Errorf(`run "run01": task at index 0 is empty`),
 		},
 		{
+			name: "test empty runtime arch",
+			in: `
+                runs:
+                  - name: run01
+                    tasks:
+                      - name: task01
+                        runtime:
+                          type: pod
+                          containers:
+                            - image: busybox
+                `,
+		},
+		{
+			name: "test invalid runtime arch",
+			in: `
+                runs:
+                  - name: run01
+                    tasks:
+                      - name: task01
+                        runtime:
+                          type: pod
+                          arch: invalidarch
+                          containers:
+                            - image: busybox
+                `,
+			err: fmt.Errorf(`task "task01" runtime: invalid arch "invalidarch"`),
+		},
+		{
 			name: "test missing task dependency",
 			in: `
                 runs:

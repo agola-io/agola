@@ -22,3 +22,23 @@ const (
 	ArchARM   Arch = "arm"
 	ArchARM64 Arch = "arm64"
 )
+
+var ValidArchs = []Arch{Arch386, ArchAMD64, ArchARM, ArchARM64}
+
+func IsValidArch(arch Arch) bool {
+	for _, va := range ValidArchs {
+		if arch == va {
+			return true
+		}
+	}
+	return false
+}
+
+func ArchFromString(arch string) Arch {
+	for _, va := range ValidArchs {
+		if arch == string(va) {
+			return va
+		}
+	}
+	return ""
+}

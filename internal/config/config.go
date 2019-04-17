@@ -681,6 +681,11 @@ func checkConfig(config *Config) error {
 			if len(r.Containers) == 0 {
 				return errors.Errorf("task %q runtime: at least one container must be defined", task.Name)
 			}
+			if r.Arch != "" {
+				if !common.IsValidArch(r.Arch) {
+					return errors.Errorf("task %q runtime: invalid arch %q", task.Name, r.Arch)
+				}
+			}
 		}
 	}
 
