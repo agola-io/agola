@@ -654,6 +654,8 @@ type Executor struct {
 	ID        string `json:"id,omitempty"`
 	ListenURL string `json:"listenURL,omitempty"`
 
+	Labels map[string]string `json:"labels,omitempty"`
+
 	// internal values not saved
 	Revision int64 `json:"-"`
 }

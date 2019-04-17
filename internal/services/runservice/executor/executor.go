@@ -27,6 +27,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -650,9 +651,19 @@ func (e *Executor) archivePath(taskID string, stepID int) string {
 }
 
 func (e *Executor) sendExecutorStatus(ctx context.Context) error {
+	labels := e.c.Labels
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+
+	// Add special labels (and override config provided ones)
+	arch := runtime.GOARCH
+	labels["arch"] = arch
+
 	executor := &types.Executor{
 		ID:        e.id,
 		ListenURL: e.listenURL,
+		Labels:    labels,
 	}
 
 	log.Debugf("send executor status: %s", util.Dump(executor))
