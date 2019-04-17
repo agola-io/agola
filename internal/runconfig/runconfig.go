@@ -62,6 +62,7 @@ func genRuntime(c *config.Config, ce *config.Runtime, variables map[string]strin
 
 	return &rstypes.Runtime{
 		Type:       rstypes.RuntimeType(ce.Type),
+		Arch:       ce.Arch,
 		Containers: containers,
 	}
 }
