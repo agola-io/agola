@@ -82,6 +82,8 @@ type RunServiceExecutor struct {
 	Web Web `yaml:"web"`
 
 	Labels map[string]string `yaml:"labels"`
+	// ActiveTasksLimit is the max number of concurrent active tasks
+	ActiveTasksLimit int `yaml:"active_tasks_limit"`
 }
 
 type ConfigStore struct {

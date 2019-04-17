@@ -663,10 +663,11 @@ func (e *Executor) sendExecutorStatus(ctx context.Context) error {
 	labels["arch"] = arch
 
 	executor := &types.Executor{
-		ID:          e.id,
-		ListenURL:   e.listenURL,
-		Labels:      labels,
-		ActiveTasks: activeTasks,
+		ID:               e.id,
+		ListenURL:        e.listenURL,
+		Labels:           labels,
+		ActiveTasksLimit: e.c.ActiveTasksLimit,
+		ActiveTasks:      activeTasks,
 	}
 
 	log.Debugf("send executor status: %s", util.Dump(executor))
