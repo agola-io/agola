@@ -208,12 +208,15 @@ func (s *Scheduler) submitRunTasks(ctx context.Context, r *types.Run, rc *types.
 	log.Debugf("tasksToRun: %s", util.Dump(tasks))
 
 	for _, rt := range tasks {
-		executor, err := s.chooseExecutor(ctx)
+		rct := rc.Tasks[rt.ID]
+
+		executor, err := s.chooseExecutor(ctx, rct)
 		if err != nil {
 			return err
 		}
 		if executor == nil {
-			return errors.Errorf("cannot choose an executor")
+			log.Warnf("cannot choose an executor")
+			return nil
 		}
 
 		et := s.genExecutorTask(ctx, r, rt, rc, executor)
@@ -242,12 +245,19 @@ func (s *Scheduler) submitRunTasks(ctx context.Context, r *types.Run, rc *types.
 
 // chooseExecutor chooses the executor to schedule the task on. Now it's a very simple/dumb selection
 // TODO(sgotti) improve this to use executor statistic, labels (arch type) etc...
-func (s *Scheduler) chooseExecutor(ctx context.Context) (*types.Executor, error) {
+func (s *Scheduler) chooseExecutor(ctx context.Context, rct *types.RunConfigTask) (*types.Executor, error) {
 	executors, err := store.GetExecutors(ctx, s.e)
 	if err != nil {
 		return nil, err
 	}
 	for _, e := range executors {
+		// if arch is not defined use any executor arch
+		if rct.Runtime.Arch != "" {
+			if e.Labels["arch"] != string(rct.Runtime.Arch) {
+				continue
+			}
+		}
+
 		return e, nil
 	}
 	return nil, nil
