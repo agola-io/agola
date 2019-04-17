@@ -68,6 +68,8 @@ type RunServiceExecutor struct {
 	ToolboxPath   string `yaml:"toolboxPath"`
 
 	Web Web `yaml:"web"`
+
+	Labels map[string]string `yaml:"labels"`
 }
 
 type ConfigStore struct {
