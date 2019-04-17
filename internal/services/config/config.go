@@ -55,6 +55,8 @@ type RunServiceScheduler struct {
 	LTS     LTS    `yaml:"lts"`
 
 	AllowPrivilegedContainers string `yaml:"allowPrivilegedContainers"`
+
+	RunCacheExpireInterval time.Duration `yaml:"runCacheExpireInterval"`
 }
 
 type RunServiceExecutor struct {
@@ -160,6 +162,9 @@ var defaultConfig = Config{
 		TokenSigning: TokenSigning{
 			Duration: 12 * time.Hour,
 		},
+	},
+	RunServiceScheduler: RunServiceScheduler{
+		RunCacheExpireInterval: 7 * 24 * time.Hour,
 	},
 }
 
