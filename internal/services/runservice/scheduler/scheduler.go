@@ -293,6 +293,11 @@ func (s *Scheduler) chooseExecutor(ctx context.Context, rct *types.RunConfigTask
 			if e.Labels["arch"] != string(rct.Runtime.Arch) {
 				continue
 			}
+			if e.ActiveTasksLimit != 0 {
+				if e.ActiveTasks >= e.ActiveTasksLimit {
+					continue
+				}
+			}
 		}
 
 		return e, nil
