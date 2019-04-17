@@ -97,14 +97,47 @@ func (s *Scheduler) runHasActiveExecutorTasks(ctx context.Context, runID string)
 	return len(activeTasks) > 0, nil
 }
 
-func advanceRunTasks(ctx context.Context, curRun *types.Run, rc *types.RunConfig) (*types.Run, error) {
+func advanceRunTasks(ctx context.Context, curRun *types.Run, rc *types.RunConfig, activeExecutorTasks []*types.ExecutorTask) (*types.Run, error) {
 	log.Debugf("run: %s", util.Dump(curRun))
 	log.Debugf("rc: %s", util.Dump(rc))
 
 	// take a deepcopy of r so we do logic only on fixed status and not affeccted by current changes (due to random map iteration)
 	newRun := curRun.DeepCopy()
 
-	// get tasks that can be executed
+	// handle root tasks
+	for _, rt := range newRun.Tasks {
+		if rt.Skip {
+			continue
+		}
+		if rt.Status != types.RunTaskStatusNotStarted {
+			continue
+		}
+
+		rct := rc.Tasks[rt.ID]
+		parents := runconfig.GetParents(rc.Tasks, rct)
+		if len(parents) > 0 {
+			continue
+		}
+
+		// cancel task if the run has a result set and is not yet scheduled
+		if curRun.Result.IsSet() {
+			isScheduled := false
+			for _, et := range activeExecutorTasks {
+				if rt.ID == et.ID {
+					isScheduled = true
+				}
+			}
+			if isScheduled {
+				continue
+			}
+
+			if rt.Status == types.RunTaskStatusNotStarted {
+				rt.Status = types.RunTaskStatusCancelled
+			}
+		}
+	}
+
+	// handle all tasks
 	for _, rt := range newRun.Tasks {
 		if rt.Skip {
 			continue
@@ -424,12 +457,12 @@ func (s *Scheduler) scheduleRun(ctx context.Context, r *types.Run, rc *types.Run
 	prevPhase := r.Phase
 	prevResult := r.Result
 
-	hasActiveTasks, err := s.runHasActiveExecutorTasks(ctx, r.ID)
+	activeExecutorTasks, err := s.runActiveExecutorTasks(ctx, r.ID)
 	if err != nil {
 		return err
 	}
 
-	if err := advanceRun(ctx, r, rc, hasActiveTasks); err != nil {
+	if err := advanceRun(ctx, r, rc, activeExecutorTasks); err != nil {
 		return err
 	}
 
@@ -450,10 +483,6 @@ func (s *Scheduler) scheduleRun(ctx context.Context, r *types.Run, rc *types.Run
 
 	// if the run is set to stop, stop all tasks
 	if r.Stop {
-		activeExecutorTasks, err := s.runActiveExecutorTasks(ctx, r.ID)
-		if err != nil {
-			return err
-		}
 		for _, et := range activeExecutorTasks {
 			et.Stop = true
 			if _, err := store.AtomicPutExecutorTask(ctx, s.e, et); err != nil {
@@ -467,7 +496,7 @@ func (s *Scheduler) scheduleRun(ctx context.Context, r *types.Run, rc *types.Run
 
 	// advance tasks
 	if r.Phase == types.RunPhaseRunning {
-		r, err := advanceRunTasks(ctx, r, rc)
+		r, err := advanceRunTasks(ctx, r, rc, activeExecutorTasks)
 		if err != nil {
 			return err
 		}
@@ -489,8 +518,9 @@ func (s *Scheduler) scheduleRun(ctx context.Context, r *types.Run, rc *types.Run
 
 // advanceRun updates the run result and phase. It must be the unique function that
 // should update them.
-func advanceRun(ctx context.Context, r *types.Run, rc *types.RunConfig, hasActiveTasks bool) error {
+func advanceRun(ctx context.Context, r *types.Run, rc *types.RunConfig, activeExecutorTasks []*types.ExecutorTask) error {
 	log.Debugf("run: %s", util.Dump(r))
+	hasActiveTasks := len(activeExecutorTasks) > 0
 
 	// fail run if a task is failed
 	if !r.Result.IsSet() && r.Phase == types.RunPhaseRunning {
