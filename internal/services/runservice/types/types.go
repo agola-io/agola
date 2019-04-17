@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/mitchellh/copystructure"
+	"github.com/sorintlab/agola/internal/common"
 	"github.com/sorintlab/agola/internal/util"
 )
 
@@ -366,6 +367,7 @@ type RegistryAuth struct {
 
 type Runtime struct {
 	Type       RuntimeType  `json:"type,omitempty"`
+	Arch       common.Arch  `json:"arch,omitempty"`
 	Containers []*Container `json:"containers,omitempty"`
 }
 
