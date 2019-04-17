@@ -170,6 +170,9 @@ var defaultConfig = Config{
 	RunServiceScheduler: RunServiceScheduler{
 		RunCacheExpireInterval: 7 * 24 * time.Hour,
 	},
+	RunServiceExecutor: RunServiceExecutor{
+		ActiveTasksLimit: 2,
+	},
 }
 
 func Parse(configFile string) (*Config, error) {
