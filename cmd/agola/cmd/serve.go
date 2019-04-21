@@ -100,7 +100,7 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	c, err := config.Parse(serveOpts.config)
 	if err != nil {
-		return errors.Wrapf(err, "cannot parse config")
+		return errors.Wrapf(err, "config error")
 	}
 
 	if serveOpts.embeddedEtcd {
