@@ -47,6 +47,9 @@ runServiceExecutor:
   runServiceURL: "http://localhost:4000"
   web:
     listenAddress: ":4001"
+  activeTasksLimit: 2
+  driver:
+    type: docker
 
 gitServer:
   dataDir: /tmp/agola/gitserver
