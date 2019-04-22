@@ -167,7 +167,7 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 
 	resp, err := d.client.ContainerCreate(ctx, &container.Config{
 		Entrypoint: containerConfig.Cmd,
-		Env:        makeEnv(containerConfig.Env),
+		Env:        makeEnvSlice(containerConfig.Env),
 		WorkingDir: containerConfig.WorkingDir,
 		Image:      containerConfig.Image,
 		Tty:        true,
@@ -389,7 +389,7 @@ func (dp *DockerPod) Exec(ctx context.Context, execConfig *ExecConfig) (Containe
 
 	dockerExecConfig := types.ExecConfig{
 		Cmd:          execConfig.Cmd,
-		Env:          makeEnv(execConfig.Env),
+		Env:          makeEnvSlice(execConfig.Env),
 		Tty:          execConfig.Tty,
 		WorkingDir:   execConfig.WorkingDir,
 		AttachStdin:  true,
@@ -463,7 +463,7 @@ func (e *DockerContainerExec) Stdin() io.WriteCloser {
 	return e.stdin
 }
 
-func makeEnv(env map[string]string) []string {
+func makeEnvSlice(env map[string]string) []string {
 	envList := make([]string, 0, len(env))
 	for k, v := range env {
 		envList = append(envList, fmt.Sprintf("%s=%s", k, v))
