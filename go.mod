@@ -13,7 +13,10 @@ require (
 	github.com/docker/docker v1.13.1
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.3.3 // indirect
+	github.com/docker/spdystream v0.0.0-20181023171402-6480d4af844c // indirect
 	github.com/elazarl/go-bindata-assetfs v1.0.0
+	github.com/elazarl/goproxy v0.0.0-20190421051319-9d40249d3c2f // indirect
+	github.com/elazarl/goproxy/ext v0.0.0-20190421051319-9d40249d3c2f // indirect
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-bindata/go-bindata v1.0.0
 	github.com/go-ini/ini v1.42.0 // indirect
@@ -21,10 +24,14 @@ require (
 	github.com/google/go-cmp v0.3.0
 	github.com/google/go-containerregistry v0.0.0-20190412005658-1d38b9cfdb9d
 	github.com/google/go-jsonnet v0.12.1
+	github.com/google/gofuzz v1.0.0 // indirect
+	github.com/googleapis/gnostic v0.2.0 // indirect
 	github.com/gopherjs/gopherjs v0.0.0-20181103185306-d547d1d9531e // indirect
 	github.com/gorilla/handlers v1.4.0
 	github.com/gorilla/mux v1.7.0
 	github.com/hashicorp/go-sockaddr v1.0.1
+	github.com/imdario/mergo v0.3.7 // indirect
+	github.com/json-iterator/go v1.1.6 // indirect
 	github.com/jtolds/gls v4.2.1+incompatible // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
@@ -34,6 +41,8 @@ require (
 	github.com/minio/minio-go v6.0.14+incompatible
 	github.com/mitchellh/copystructure v1.0.0
 	github.com/mitchellh/go-homedir v1.1.0
+	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
+	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
 	github.com/opencontainers/image-spec v1.0.1 // indirect
 	github.com/opencontainers/runc v0.1.1 // indirect
@@ -50,9 +59,16 @@ require (
 	go.uber.org/zap v1.9.1
 	golang.org/x/crypto v0.0.0-20181203042331-505ab145d0a9
 	golang.org/x/oauth2 v0.0.0-20190220154721-9b3c75971fc9
-	gopkg.in/ini.v1 v1.41.0 // indirect
+	gopkg.in/inf.v0 v0.9.1 // indirect
+	gopkg.in/ini.v1 v1.42.0 // indirect
 	gopkg.in/yaml.v2 v2.2.2
 	gotest.tools v2.2.0+incompatible // indirect
+	k8s.io/api v0.0.0-20190313235455-40a48860b5ab
+	k8s.io/apimachinery v0.0.0-20190313205120-d7deff9243b1
+	k8s.io/client-go v11.0.0+incompatible
+	k8s.io/klog v0.3.0 // indirect
+	k8s.io/utils v0.0.0-20190308190857-21c4ce38f2a7
+	sigs.k8s.io/yaml v1.1.0 // indirect
 )
 
 replace github.com/docker/docker v1.13.1 => github.com/docker/engine v0.0.0-20181106193140-f5749085e9cb
