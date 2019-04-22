@@ -1297,9 +1297,21 @@ func NewExecutor(c *config.RunServiceExecutor) (*Executor, error) {
 	u.Host = net.JoinHostPort(addr, port)
 	e.listenURL = u.String()
 
-	d, err := driver.NewDockerDriver(logger, e.id, "/tmp/agola/bin", e.c.ToolboxPath)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create docker driver")
+	var d driver.Driver
+	switch c.Driver.Type {
+	case config.DriverTypeDocker:
+		d, err = driver.NewDockerDriver(logger, e.id, "/tmp/agola/bin", e.c.ToolboxPath)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to create docker driver")
+		}
+	case config.DriverTypeK8s:
+		d, err = driver.NewK8sDriver(logger, e.id, c.ToolboxPath)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to create kubernetes driver")
+		}
+		e.dynamic = true
+	default:
+		return nil, errors.Errorf("unknown driver type %q", c.Driver.Type)
 	}
 	e.driver = d
 

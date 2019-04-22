@@ -81,6 +81,8 @@ type RunServiceExecutor struct {
 
 	Web Web `yaml:"web"`
 
+	Driver Driver `yaml:"driver"`
+
 	Labels map[string]string `yaml:"labels"`
 	// ActiveTasksLimit is the max number of concurrent active tasks
 	ActiveTasksLimit int `yaml:"active_tasks_limit"`
@@ -158,6 +160,22 @@ type Etcd struct {
 	TLSKeyFile    string `yaml:"tlsKeyFile"`
 	TLSCAFile     string `yaml:"tlsCAFile"`
 	TLSSkipVerify bool   `yaml:"tlsSkipVerify"`
+}
+
+type DriverType string
+
+const (
+	DriverTypeDocker DriverType = "docker"
+	DriverTypeK8s    DriverType = "kubernetes"
+)
+
+type Driver struct {
+	Type DriverType `yaml:"type"`
+
+	// docker fields
+
+	// k8s fields
+
 }
 
 type TokenSigning struct {
@@ -261,6 +279,15 @@ func Validate(c *Config) error {
 	}
 	if c.RunServiceExecutor.RunServiceURL == "" {
 		return errors.Errorf("runservice executor runServiceURL is empty")
+	}
+	if c.RunServiceExecutor.Driver.Type == "" {
+		return errors.Errorf("runservice executor driver type is empty")
+	}
+	switch c.RunServiceExecutor.Driver.Type {
+	case DriverTypeDocker:
+	case DriverTypeK8s:
+	default:
+		return errors.Errorf("runservice executor driver type %q unknown", c.RunServiceExecutor.Driver.Type)
 	}
 
 	// Scheduler

@@ -34,7 +34,7 @@ local task_build_go(version, arch) = {
     { type: 'clone' },
     { type: 'restore_cache', keys: ['cache-sum-{{ md5sum "go.sum" }}', 'cache-date-'], dest_dir: '/go/pkg/mod/cache' },
     { type: 'run', command: 'make' },
-    { type: 'run', command: 'SKIP_DOCKER_TESTS=1 go test -v -count 1 ./...' },
+    { type: 'run', name: 'run tests', command: 'SKIP_DOCKER_TESTS=1 SKIP_K8S_TESTS=1 go test -v -count 1 ./...' },
     { type: 'save_cache', key: 'cache-sum-{{ md5sum "go.sum" }}', contents: [{ source_dir: '/go/pkg/mod/cache' }] },
     { type: 'save_cache', key: 'cache-date-{{ year }}-{{ month }}-{{ day }}', contents: [{ source_dir: '/go/pkg/mod/cache' }] },
   ],
