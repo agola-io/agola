@@ -17,6 +17,8 @@ package driver
 import (
 	"context"
 	"io"
+
+	"github.com/sorintlab/agola/internal/services/runservice/executor/registry"
 )
 
 const (
@@ -68,16 +70,16 @@ type PodConfig struct {
 	Labels     map[string]string
 	// The container dir where the init volume will be mounted
 	InitVolumeDir string
+	DockerConfig  *registry.DockerConfig
 }
 
 type ContainerConfig struct {
-	Cmd          []string
-	Env          map[string]string
-	WorkingDir   string
-	Image        string
-	User         string
-	Privileged   bool
-	RegistryAuth string
+	Cmd        []string
+	Env        map[string]string
+	WorkingDir string
+	Image      string
+	User       string
+	Privileged bool
 }
 
 type ExecConfig struct {

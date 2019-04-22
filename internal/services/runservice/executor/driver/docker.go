@@ -16,6 +16,8 @@ package driver
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -25,6 +27,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/sorintlab/agola/internal/services/runservice/executor/registry"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -116,9 +119,25 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 
 	containerConfig := podConfig.Containers[0]
 
+	regName, err := registry.GetRegistry(containerConfig.Image)
+	if err != nil {
+		return nil, err
+	}
+	var registryAuth registry.DockerConfigAuth
+	if podConfig.DockerConfig != nil {
+		if regauth, ok := podConfig.DockerConfig.Auths[regName]; ok {
+			registryAuth = regauth
+		}
+	}
+	buf, err := json.Marshal(registryAuth)
+	if err != nil {
+		return nil, err
+	}
+	registryAuthEnc := base64.URLEncoding.EncodeToString(buf)
+
 	// by default always try to pull the image so we are sure only authorized users can fetch them
 	// see https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#alwayspullimages
-	reader, err := d.client.ImagePull(ctx, containerConfig.Image, types.ImagePullOptions{RegistryAuth: containerConfig.RegistryAuth})
+	reader, err := d.client.ImagePull(ctx, containerConfig.Image, types.ImagePullOptions{RegistryAuth: registryAuthEnc})
 	if err != nil {
 		return nil, err
 	}

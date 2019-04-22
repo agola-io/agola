@@ -335,6 +335,7 @@ func (s *Scheduler) genExecutorTask(ctx context.Context, r *types.Run, rt *types
 			Steps:      make([]*types.ExecutorTaskStepStatus, len(rct.Steps)),
 			ExecutorID: executor.ID,
 		},
+		DockerRegistriesAuth: rct.DockerRegistriesAuth,
 	}
 
 	for i := range et.Status.Steps {

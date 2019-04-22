@@ -37,23 +37,6 @@ func genRuntime(c *config.Config, ce *config.Runtime, variables map[string]strin
 			Entrypoint:  cc.Entrypoint,
 		}
 
-		// Set container auth
-		if cc.Auth != nil {
-			container.Auth = &rstypes.RegistryAuth{
-				Type:     rstypes.RegistryAuthType(cc.Auth.Type),
-				Username: genValue(cc.Auth.Username, variables),
-				Password: genValue(cc.Auth.Password, variables),
-			}
-		}
-		// if container auth is nil use runtime auth
-		if container.Auth == nil && ce.Auth != nil {
-			container.Auth = &rstypes.RegistryAuth{
-				Type:     rstypes.RegistryAuthType(ce.Auth.Type),
-				Username: genValue(ce.Auth.Username, variables),
-				Password: genValue(ce.Auth.Password, variables),
-			}
-		}
-
 		containers = append(containers, container)
 	}
 
@@ -199,17 +182,39 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string
 		tEnv := genEnv(ct.Environment, variables)
 
 		t := &rstypes.RunConfigTask{
-			ID:            uuid.New(ct.Name).String(),
-			Name:          ct.Name,
-			Runtime:       genRuntime(c, ct.Runtime, variables),
-			Environment:   tEnv,
-			WorkingDir:    ct.WorkingDir,
-			Shell:         ct.Shell,
-			User:          ct.User,
-			Steps:         steps,
-			IgnoreFailure: ct.IgnoreFailure,
-			Skip:          !include,
-			NeedsApproval: ct.Approval,
+			ID:                   uuid.New(ct.Name).String(),
+			Name:                 ct.Name,
+			Runtime:              genRuntime(c, ct.Runtime, variables),
+			Environment:          tEnv,
+			WorkingDir:           ct.WorkingDir,
+			Shell:                ct.Shell,
+			User:                 ct.User,
+			Steps:                steps,
+			IgnoreFailure:        ct.IgnoreFailure,
+			Skip:                 !include,
+			NeedsApproval:        ct.Approval,
+			DockerRegistriesAuth: make(map[string]rstypes.DockerRegistryAuth),
+		}
+
+		if cr.DockerRegistriesAuth != nil {
+			for regname, auth := range cr.DockerRegistriesAuth {
+				t.DockerRegistriesAuth[regname] = rstypes.DockerRegistryAuth{
+					Type:     rstypes.DockerRegistryAuthType(auth.Type),
+					Username: genValue(auth.Username, variables),
+					Password: genValue(auth.Password, variables),
+				}
+			}
+		}
+
+		// override with per task docker registry auth
+		if ct.DockerRegistriesAuth != nil {
+			for regname, auth := range ct.DockerRegistriesAuth {
+				t.DockerRegistriesAuth[regname] = rstypes.DockerRegistryAuth{
+					Type:     rstypes.DockerRegistryAuthType(auth.Type),
+					Username: genValue(auth.Username, variables),
+					Password: genValue(auth.Password, variables),
+				}
+			}
 		}
 
 		rcts[t.ID] = t

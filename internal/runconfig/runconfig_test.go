@@ -635,25 +635,29 @@ func TestGenRunConfig(t *testing.T) {
 				Runs: []*config.Run{
 					&config.Run{
 						Name: "run01",
+						DockerRegistriesAuth: map[string]*config.DockerRegistryAuth{
+							"index.docker.io": {
+								Type:     config.DockerRegistryAuthTypeBasic,
+								Username: config.Value{Type: config.ValueTypeString, Value: "username"},
+								Password: config.Value{Type: config.ValueTypeFromVariable, Value: "password"},
+							},
+						},
 						Tasks: []*config.Task{
 							&config.Task{
 								Name: "task01",
+								DockerRegistriesAuth: map[string]*config.DockerRegistryAuth{
+									"index.docker.io": {
+										Type:     config.DockerRegistryAuthTypeBasic,
+										Username: config.Value{Type: config.ValueTypeFromVariable, Value: "registry_username"},
+										Password: config.Value{Type: config.ValueTypeString, Value: "password2"},
+									},
+								},
 								Runtime: &config.Runtime{
 									Type: "pod",
-									Auth: &config.RegistryAuth{
-										Type:     config.RegistryAuthTypeDefault,
-										Username: config.Value{Type: config.ValueTypeString, Value: "username"},
-										Password: config.Value{Type: config.ValueTypeFromVariable, Value: "password"},
-									},
 									Arch: "",
 									Containers: []*config.Container{
 										&config.Container{
 											Image: "image01",
-											Auth: &config.RegistryAuth{
-												Type:     config.RegistryAuthTypeDefault,
-												Username: config.Value{Type: config.ValueTypeFromVariable, Value: "registry_username"},
-												Password: config.Value{Type: config.ValueTypeString, Value: "password2"},
-											},
 											Environment: map[string]config.Value{
 												"ENV01":             config.Value{Type: config.ValueTypeString, Value: "ENV01"},
 												"ENVFROMVARIABLE01": config.Value{Type: config.ValueTypeFromVariable, Value: "variable01"},
@@ -721,15 +725,17 @@ func TestGenRunConfig(t *testing.T) {
 				uuid.New("task01").String(): &rstypes.RunConfigTask{
 					ID:   uuid.New("task01").String(),
 					Name: "task01", Depends: map[string]*rstypes.RunConfigTaskDepend{},
+					DockerRegistriesAuth: map[string]rstypes.DockerRegistryAuth{
+						"index.docker.io": {
+							Type:     rstypes.DockerRegistryAuthTypeBasic,
+							Username: "yourregistryusername",
+							Password: "password2",
+						},
+					},
 					Runtime: &rstypes.Runtime{Type: rstypes.RuntimeType("pod"),
 						Containers: []*rstypes.Container{
 							{
 								Image: "image01",
-								Auth: &rstypes.RegistryAuth{
-									Type:     rstypes.RegistryAuthTypeDefault,
-									Username: "yourregistryusername",
-									Password: "password2",
-								},
 								Environment: map[string]string{
 									"ENV01":             "ENV01",
 									"ENVFROMVARIABLE01": "VARVALUE01",
@@ -751,21 +757,23 @@ func TestGenRunConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "test runtime auth used for container nil auth",
+			name: "test run auth used for task undefined auth",
 			in: &config.Config{
 				Runs: []*config.Run{
 					&config.Run{
 						Name: "run01",
+						DockerRegistriesAuth: map[string]*config.DockerRegistryAuth{
+							"index.docker.io": {
+								Type:     config.DockerRegistryAuthTypeBasic,
+								Username: config.Value{Type: config.ValueTypeString, Value: "username"},
+								Password: config.Value{Type: config.ValueTypeFromVariable, Value: "password"},
+							},
+						},
 						Tasks: []*config.Task{
 							&config.Task{
 								Name: "task01",
 								Runtime: &config.Runtime{
 									Type: "pod",
-									Auth: &config.RegistryAuth{
-										Type:     config.RegistryAuthTypeDefault,
-										Username: config.Value{Type: config.ValueTypeString, Value: "username"},
-										Password: config.Value{Type: config.ValueTypeFromVariable, Value: "password"},
-									},
 									Arch: "",
 									Containers: []*config.Container{
 										&config.Container{
@@ -795,15 +803,17 @@ func TestGenRunConfig(t *testing.T) {
 				uuid.New("task01").String(): &rstypes.RunConfigTask{
 					ID:   uuid.New("task01").String(),
 					Name: "task01", Depends: map[string]*rstypes.RunConfigTaskDepend{},
+					DockerRegistriesAuth: map[string]rstypes.DockerRegistryAuth{
+						"index.docker.io": {
+							Type:     rstypes.DockerRegistryAuthTypeBasic,
+							Username: "username",
+							Password: "yourregistrypassword",
+						},
+					},
 					Runtime: &rstypes.Runtime{Type: rstypes.RuntimeType("pod"),
 						Containers: []*rstypes.Container{
 							{
-								Image: "image01",
-								Auth: &rstypes.RegistryAuth{
-									Type:     rstypes.RegistryAuthTypeDefault,
-									Username: "username",
-									Password: "yourregistrypassword",
-								},
+								Image:       "image01",
 								Environment: map[string]string{},
 							},
 						},
@@ -816,30 +826,44 @@ func TestGenRunConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "test runtime auth not used for container with auth",
+			name: "test run auth override by task auth",
 			in: &config.Config{
 				Runs: []*config.Run{
 					&config.Run{
 						Name: "run01",
+						DockerRegistriesAuth: map[string]*config.DockerRegistryAuth{
+							"index.docker.io": {
+								Type:     config.DockerRegistryAuthTypeBasic,
+								Username: config.Value{Type: config.ValueTypeString, Value: "username"},
+								Password: config.Value{Type: config.ValueTypeFromVariable, Value: "password"},
+							},
+							"https://myregistry.example.com": {
+								Type:     config.DockerRegistryAuthTypeBasic,
+								Username: config.Value{Type: config.ValueTypeString, Value: "username"},
+								Password: config.Value{Type: config.ValueTypeFromVariable, Value: "password"},
+							},
+						},
 						Tasks: []*config.Task{
 							&config.Task{
 								Name: "task01",
+								DockerRegistriesAuth: map[string]*config.DockerRegistryAuth{
+									"index.docker.io": {
+										Type:     config.DockerRegistryAuthTypeBasic,
+										Username: config.Value{Type: config.ValueTypeFromVariable, Value: "registry_username"},
+										Password: config.Value{Type: config.ValueTypeString, Value: "password2"},
+									},
+									"https://anotherregistry.example.com": {
+										Type:     config.DockerRegistryAuthTypeBasic,
+										Username: config.Value{Type: config.ValueTypeFromVariable, Value: "registry_username"},
+										Password: config.Value{Type: config.ValueTypeString, Value: "password2"},
+									},
+								},
 								Runtime: &config.Runtime{
 									Type: "pod",
-									Auth: &config.RegistryAuth{
-										Type:     config.RegistryAuthTypeDefault,
-										Username: config.Value{Type: config.ValueTypeString, Value: "username"},
-										Password: config.Value{Type: config.ValueTypeFromVariable, Value: "password"},
-									},
 									Arch: "",
 									Containers: []*config.Container{
 										&config.Container{
 											Image: "image01",
-											Auth: &config.RegistryAuth{
-												Type:     config.RegistryAuthTypeDefault,
-												Username: config.Value{Type: config.ValueTypeFromVariable, Value: "registry_username"},
-												Password: config.Value{Type: config.ValueTypeString, Value: "password2"},
-											},
 										},
 									},
 								},
@@ -860,20 +884,33 @@ func TestGenRunConfig(t *testing.T) {
 			variables: map[string]string{
 				"variable01":        "VARVALUE01",
 				"registry_username": "yourregistryusername",
+				"password":          "myregistrypassword",
 			},
 			out: map[string]*rstypes.RunConfigTask{
 				uuid.New("task01").String(): &rstypes.RunConfigTask{
 					ID:   uuid.New("task01").String(),
 					Name: "task01", Depends: map[string]*rstypes.RunConfigTaskDepend{},
+					DockerRegistriesAuth: map[string]rstypes.DockerRegistryAuth{
+						"index.docker.io": {
+							Type:     rstypes.DockerRegistryAuthTypeBasic,
+							Username: "yourregistryusername",
+							Password: "password2",
+						},
+						"https://myregistry.example.com": {
+							Type:     rstypes.DockerRegistryAuthTypeBasic,
+							Username: "username",
+							Password: "myregistrypassword",
+						},
+						"https://anotherregistry.example.com": {
+							Type:     rstypes.DockerRegistryAuthTypeBasic,
+							Username: "yourregistryusername",
+							Password: "password2",
+						},
+					},
 					Runtime: &rstypes.Runtime{Type: rstypes.RuntimeType("pod"),
 						Containers: []*rstypes.Container{
 							{
-								Image: "image01",
-								Auth: &rstypes.RegistryAuth{
-									Type:     rstypes.RegistryAuthTypeDefault,
-									Username: "yourregistryusername",
-									Password: "password2",
-								},
+								Image:       "image01",
 								Environment: map[string]string{},
 							},
 						},

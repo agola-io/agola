@@ -170,14 +170,20 @@ func TestParseOutput(t *testing.T) {
 			in: `
                 runs:
                   - name: run01
+                    docker_registries_auth:
+                      index.docker.io:
+                        username: username
+                        password:
+                          from_variable: password
                     tasks:
                       - name: task01
-                        runtime:
-                          type: pod
-                          auth:
+                        docker_registries_auth:
+                          index.docker.io:
                             username: username
                             password:
                               from_variable: password
+                        runtime:
+                          type: pod
                           containers:
                             - image: image01
                               auth:
@@ -263,25 +269,29 @@ func TestParseOutput(t *testing.T) {
 				Runs: []*Run{
 					&Run{
 						Name: "run01",
+						DockerRegistriesAuth: map[string]*DockerRegistryAuth{
+							"index.docker.io": {
+								Type:     DockerRegistryAuthTypeBasic,
+								Username: Value{Type: ValueTypeString, Value: "username"},
+								Password: Value{Type: ValueTypeFromVariable, Value: "password"},
+							},
+						},
 						Tasks: []*Task{
 							&Task{
 								Name: "task01",
-								Runtime: &Runtime{
-									Type: "pod",
-									Auth: &RegistryAuth{
-										Type:     RegistryAuthTypeDefault,
+								DockerRegistriesAuth: map[string]*DockerRegistryAuth{
+									"index.docker.io": {
+										Type:     DockerRegistryAuthTypeBasic,
 										Username: Value{Type: ValueTypeString, Value: "username"},
 										Password: Value{Type: ValueTypeFromVariable, Value: "password"},
 									},
+								},
+								Runtime: &Runtime{
+									Type: "pod",
 									Arch: "",
 									Containers: []*Container{
 										&Container{
 											Image: "image01",
-											Auth: &RegistryAuth{
-												Type:     RegistryAuthTypeDefault,
-												Username: Value{Type: ValueTypeFromVariable, Value: "username2"},
-												Password: Value{Type: ValueTypeString, Value: "password2"},
-											},
 											Environment: map[string]Value{
 												"ENV01":             Value{Type: ValueTypeString, Value: "ENV01"},
 												"ENVFROMVARIABLE01": Value{Type: ValueTypeFromVariable, Value: "variable01"},

@@ -59,30 +59,34 @@ const (
 	RuntimeTypePod RuntimeType = "pod"
 )
 
-type RegistryAuthType string
+type DockerRegistryAuthType string
 
 const (
-	RegistryAuthTypeDefault RegistryAuthType = "default"
+	DockerRegistryAuthTypeBasic       DockerRegistryAuthType = "basic"
+	DockerRegistryAuthTypeEncodedAuth DockerRegistryAuthType = "encodedauth"
 )
 
-type RegistryAuth struct {
-	Type RegistryAuthType `json:"type"`
+type DockerRegistryAuth struct {
+	Type DockerRegistryAuthType `json:"type"`
 
-	// default auth
+	// basic auth
 	Username Value `json:"username"`
 	Password Value `json:"password"`
+
+	// encoded auth string
+	Auth string `json:"auth"`
+
+	// future auths like aws ecr auth
 }
 
 type Runtime struct {
-	Type       RuntimeType   `json:"type,omitempty"`
-	Auth       *RegistryAuth `json:"auth"`
-	Arch       common.Arch   `json:"arch,omitempty"`
-	Containers []*Container  `json:"containers,omitempty"`
+	Type       RuntimeType  `json:"type,omitempty"`
+	Arch       common.Arch  `json:"arch,omitempty"`
+	Containers []*Container `json:"containers,omitempty"`
 }
 
 type Container struct {
 	Image       string           `json:"image,omitempty"`
-	Auth        *RegistryAuth    `json:"auth"`
 	Environment map[string]Value `json:"environment,omitempty"`
 	User        string           `json:"user"`
 	Privileged  bool             `json:"privileged"`
@@ -90,22 +94,24 @@ type Container struct {
 }
 
 type Run struct {
-	Name  string  `json:"name"`
-	Tasks []*Task `json:"tasks"`
+	Name                 string                         `json:"name"`
+	Tasks                []*Task                        `json:"tasks"`
+	DockerRegistriesAuth map[string]*DockerRegistryAuth `json:"docker_registries_auth"`
 }
 
 type Task struct {
-	Name          string           `json:"name"`
-	Runtime       *Runtime         `json:"runtime"`
-	Environment   map[string]Value `json:"environment,omitempty"`
-	WorkingDir    string           `json:"working_dir"`
-	Shell         string           `json:"shell"`
-	User          string           `json:"user"`
-	Steps         []interface{}    `json:"steps"`
-	Depends       []*Depend        `json:"depends"`
-	IgnoreFailure bool             `json:"ignore_failure"`
-	Approval      bool             `json:"approval"`
-	When          *types.When      `json:"when"`
+	Name                 string                         `json:"name"`
+	Runtime              *Runtime                       `json:"runtime"`
+	Environment          map[string]Value               `json:"environment,omitempty"`
+	WorkingDir           string                         `json:"working_dir"`
+	Shell                string                         `json:"shell"`
+	User                 string                         `json:"user"`
+	Steps                []interface{}                  `json:"steps"`
+	Depends              []*Depend                      `json:"depends"`
+	IgnoreFailure        bool                           `json:"ignore_failure"`
+	Approval             bool                           `json:"approval"`
+	When                 *types.When                    `json:"when"`
+	DockerRegistriesAuth map[string]*DockerRegistryAuth `json:"docker_registries_auth"`
 }
 
 type DependCondition string
@@ -187,17 +193,18 @@ func (t *Task) UnmarshalJSON(b []byte) error {
 	}
 
 	type runtask struct {
-		Name          string                   `json:"name"`
-		Runtime       *Runtime                 `json:"runtime"`
-		Environment   map[string]Value         `json:"environment,omitempty"`
-		WorkingDir    string                   `json:"working_dir"`
-		Shell         string                   `json:"shell"`
-		User          string                   `json:"user"`
-		Steps         []map[string]interface{} `json:"steps"`
-		Depends       []interface{}            `json:"depends"`
-		IgnoreFailure bool                     `json:"ignore_failure"`
-		Approval      bool                     `json:"approval"`
-		When          *when                    `json:"when"`
+		Name                 string                         `json:"name"`
+		Runtime              *Runtime                       `json:"runtime"`
+		Environment          map[string]Value               `json:"environment,omitempty"`
+		WorkingDir           string                         `json:"working_dir"`
+		Shell                string                         `json:"shell"`
+		User                 string                         `json:"user"`
+		Steps                []map[string]interface{}       `json:"steps"`
+		Depends              []interface{}                  `json:"depends"`
+		IgnoreFailure        bool                           `json:"ignore_failure"`
+		Approval             bool                           `json:"approval"`
+		When                 *when                          `json:"when"`
+		DockerRegistriesAuth map[string]*DockerRegistryAuth `json:"docker_registries_auth"`
 	}
 
 	var tr *runtask
@@ -214,6 +221,7 @@ func (t *Task) UnmarshalJSON(b []byte) error {
 	t.User = tr.User
 	t.IgnoreFailure = tr.IgnoreFailure
 	t.Approval = tr.Approval
+	t.DockerRegistriesAuth = tr.DockerRegistriesAuth
 
 	steps := make([]interface{}, len(tr.Steps))
 	for i, stepEntry := range tr.Steps {
@@ -766,25 +774,23 @@ func checkConfig(config *Config) error {
 
 	// Set defaults
 	for _, run := range config.Runs {
+		// set auth type to basic if not specified
+		for _, registryAuth := range run.DockerRegistriesAuth {
+			if registryAuth.Type == "" {
+				registryAuth.Type = DockerRegistryAuthTypeBasic
+			}
+		}
 		for _, task := range run.Tasks {
+			// set auth type to basic if not specified
+			for _, registryAuth := range task.DockerRegistriesAuth {
+				if registryAuth.Type == "" {
+					registryAuth.Type = DockerRegistryAuthTypeBasic
+				}
+			}
+
 			// set task default working dir
 			if task.WorkingDir == "" {
 				task.WorkingDir = defaultWorkingDir
-			}
-
-			// set auth type to default if not specified
-			runtime := task.Runtime
-			if runtime.Auth != nil {
-				if runtime.Auth.Type == "" {
-					runtime.Auth.Type = RegistryAuthTypeDefault
-				}
-			}
-			for _, container := range runtime.Containers {
-				if container.Auth != nil {
-					if container.Auth.Type == "" {
-						container.Auth.Type = RegistryAuthTypeDefault
-					}
-				}
 			}
 
 			// set steps defaults

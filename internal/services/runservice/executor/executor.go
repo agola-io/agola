@@ -37,6 +37,7 @@ import (
 	slog "github.com/sorintlab/agola/internal/log"
 	"github.com/sorintlab/agola/internal/services/config"
 	"github.com/sorintlab/agola/internal/services/runservice/executor/driver"
+	"github.com/sorintlab/agola/internal/services/runservice/executor/registry"
 	rsapi "github.com/sorintlab/agola/internal/services/runservice/scheduler/api"
 	"github.com/sorintlab/agola/internal/services/runservice/types"
 	"github.com/sorintlab/agola/internal/util"
@@ -795,7 +796,7 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 
 	log.Debugf("starting pod")
 
-	registryAuth, err := registryAuthToken(et.Containers[0].Auth)
+	dockerConfig, err := registry.GenDockerConfig(et.DockerRegistriesAuth, []string{et.Containers[0].Image})
 	if err != nil {
 		return err
 	}
@@ -803,14 +804,14 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 	podConfig := &driver.PodConfig{
 		Labels:        createTaskLabels(et.ID),
 		InitVolumeDir: toolboxContainerDir,
+		DockerConfig:  dockerConfig,
 		Containers: []*driver.ContainerConfig{
 			{
-				Image:        et.Containers[0].Image,
-				Cmd:          cmd,
-				Env:          et.Containers[0].Environment,
-				User:         et.Containers[0].User,
-				Privileged:   et.Containers[0].Privileged,
-				RegistryAuth: registryAuth,
+				Image:      et.Containers[0].Image,
+				Cmd:        cmd,
+				Env:        et.Containers[0].Environment,
+				User:       et.Containers[0].User,
+				Privileged: et.Containers[0].Privileged,
 			},
 		},
 	}
