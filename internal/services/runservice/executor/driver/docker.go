@@ -355,26 +355,6 @@ func (dp *DockerPod) Remove(ctx context.Context) error {
 	return nil
 }
 
-func (dp *DockerPod) CopyTo(ctx context.Context, srcPath, dstPath string) error {
-	srcInfo, err := archive.CopyInfoSourcePath(srcPath, false)
-	if err != nil {
-		return err
-	}
-
-	srcArchive, err := archive.TarResource(srcInfo)
-	if err != nil {
-		return err
-	}
-	defer srcArchive.Close()
-
-	options := types.CopyToContainerOptions{
-		AllowOverwriteDirWithFile: false,
-		CopyUIDGID:                false,
-	}
-
-	return dp.client.CopyToContainer(ctx, dp.containers[0].ID, dstPath, srcArchive, options)
-}
-
 type DockerContainerExec struct {
 	execID string
 	hresp  *types.HijackedResponse

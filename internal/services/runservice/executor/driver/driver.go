@@ -56,8 +56,6 @@ type Pod interface {
 	Remove(ctx context.Context) error
 	// Exec executes a command inside the first container in the Pod
 	Exec(ctx context.Context, execConfig *ExecConfig) (ContainerExec, error)
-	// CopyTo copies srcPath inside dstPath of the first container in the Pod
-	CopyTo(ctx context.Context, srcPath, dstPath string) error
 }
 
 type ContainerExec interface {
