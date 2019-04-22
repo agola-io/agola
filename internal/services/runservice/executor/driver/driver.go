@@ -22,14 +22,16 @@ import (
 )
 
 const (
-	agolaLabelKey   = "agola"
+	labelPrefix = "agola.io/"
+
+	agolaLabelKey   = labelPrefix + "agola"
 	agolaLabelValue = "true"
 
-	podIDKey          = "podID"
-	containerIndexKey = "index"
-	taskKey           = "task"
+	executorIDKey = labelPrefix + "executorid"
+	podIDKey      = labelPrefix + "podid"
+	taskIDKey     = labelPrefix + "taskid"
 
-	podLabelPrefix = "podlabel_"
+	containerIndexKey = labelPrefix + "containerindex"
 )
 
 // Driver is a generic interface around the pod concept (a group of "containers"

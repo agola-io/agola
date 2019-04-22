@@ -151,7 +151,7 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 	labels := map[string]string{}
 	// prepend the podLabelPrefix to the labels' keys
 	for k, v := range podConfig.Labels {
-		labels[podLabelPrefix+k] = v
+		labels[labelPrefix+k] = v
 	}
 	labels[agolaLabelKey] = agolaLabelValue
 	labels[podIDKey] = podConfig.ID
@@ -211,7 +211,7 @@ func (d *DockerDriver) GetPodsByLabels(ctx context.Context, labels map[string]st
 	args := filters.NewArgs()
 	// search label adding the podLabelPrefix
 	for k, v := range labels {
-		args.Add("label", fmt.Sprintf("%s%s=%s", podLabelPrefix, k, v))
+		args.Add("label", fmt.Sprintf("%s%s=%s", labelPrefix, k, v))
 	}
 
 	containers, err := d.client.ContainerList(ctx,
@@ -269,8 +269,8 @@ func (d *DockerDriver) GetPodsByLabels(ctx context.Context, labels map[string]st
 		if cIndex == 0 {
 			podLabels := map[string]string{}
 			for labelName, labelValue := range container.Labels {
-				if strings.HasPrefix(labelName, podLabelPrefix) {
-					podLabels[strings.TrimPrefix(labelName, podLabelPrefix)] = labelValue
+				if strings.HasPrefix(labelName, labelPrefix) {
+					podLabels[strings.TrimPrefix(labelName, labelPrefix)] = labelValue
 				}
 			}
 			pod.labels = podLabels
@@ -287,8 +287,8 @@ func (d *DockerDriver) GetPodsByLabels(ctx context.Context, labels map[string]st
 func podLabelsFromContainer(containerLabels map[string]string) map[string]string {
 	labels := map[string]string{}
 	for k, v := range containerLabels {
-		if strings.HasPrefix(k, podLabelPrefix) {
-			labels[strings.TrimPrefix(k, podLabelPrefix)] = v
+		if strings.HasPrefix(k, labelPrefix) {
+			labels[strings.TrimPrefix(k, labelPrefix)] = v
 		}
 	}
 	return labels
