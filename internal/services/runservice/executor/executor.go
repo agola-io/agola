@@ -1216,7 +1216,7 @@ func NewExecutor(c *config.RunServiceExecutor) (*Executor, error) {
 		c.ToolboxPath = path
 	}
 
-	dockerDriver, err := driver.NewDockerDriver(logger, "/tmp/agola/bin")
+	dockerDriver, err := driver.NewDockerDriver(logger, "/tmp/agola/bin", c.ToolboxPath)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create docker client")
 	}
@@ -1269,7 +1269,7 @@ func NewExecutor(c *config.RunServiceExecutor) (*Executor, error) {
 }
 
 func (e *Executor) Run(ctx context.Context) error {
-	if err := e.driver.(*driver.DockerDriver).CopyToolbox(context.TODO(), e.c.ToolboxPath); err != nil {
+	if err := e.driver.Setup(ctx); err != nil {
 		return err
 	}
 

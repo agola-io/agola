@@ -42,9 +42,10 @@ type DockerDriver struct {
 	logger            *zap.Logger
 	client            *client.Client
 	initVolumeHostDir string
+	toolboxPath       string
 }
 
-func NewDockerDriver(logger *zap.Logger, initVolumeHostDir string) (*DockerDriver, error) {
+func NewDockerDriver(logger *zap.Logger, initVolumeHostDir, toolboxPath string) (*DockerDriver, error) {
 	cli, err := client.NewEnvClient()
 	if err != nil {
 		return nil, err
@@ -53,13 +54,18 @@ func NewDockerDriver(logger *zap.Logger, initVolumeHostDir string) (*DockerDrive
 		logger:            logger,
 		client:            cli,
 		initVolumeHostDir: initVolumeHostDir,
+		toolboxPath:       toolboxPath,
 	}, nil
+}
+
+func (d *DockerDriver) Setup(ctx context.Context) error {
+	return d.CopyToolbox(ctx)
 }
 
 // CopyToolbox is an hack needed when running the executor inside a docker
 // container. It copies the agola-toolbox binaries from the container to an
 // host path so it can be bind mounted to the other containers
-func (d *DockerDriver) CopyToolbox(ctx context.Context, toolboxPath string) error {
+func (d *DockerDriver) CopyToolbox(ctx context.Context) error {
 	// by default always try to pull the image so we are sure only authorized users can fetch them
 	// see https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#alwayspullimages
 	reader, err := d.client.ImagePull(ctx, "busybox", types.ImagePullOptions{})
@@ -85,7 +91,7 @@ func (d *DockerDriver) CopyToolbox(ctx context.Context, toolboxPath string) erro
 		return err
 	}
 
-	srcInfo, err := archive.CopyInfoSourcePath(toolboxPath, false)
+	srcInfo, err := archive.CopyInfoSourcePath(d.toolboxPath, false)
 	if err != nil {
 		return err
 	}
@@ -288,9 +294,9 @@ func podLabelsFromContainer(containerLabels map[string]string) map[string]string
 	return labels
 }
 
-func (d *DockerDriver) GetPodByID(ctx context.Context, containerID string) (Pod, error) {
+func (d *DockerDriver) GetPodByID(ctx context.Context, podID string) (Pod, error) {
 	args := filters.NewArgs()
-	args.Add(podIDKey, containerID)
+	args.Add(podIDKey, podID)
 
 	containers, err := d.client.ContainerList(ctx,
 		types.ContainerListOptions{
@@ -300,7 +306,7 @@ func (d *DockerDriver) GetPodByID(ctx context.Context, containerID string) (Pod,
 		return nil, err
 	}
 	if len(containers) == 0 {
-		return nil, errors.Errorf("no container with id %s", containerID)
+		return nil, errors.Errorf("no pod with id %s", podID)
 	}
 
 	return &DockerPod{
@@ -375,7 +381,7 @@ func (s *Stdin) Close() error {
 	return s.hresp.CloseWrite()
 }
 
-func (dc *DockerPod) Exec(ctx context.Context, execConfig *ExecConfig) (ContainerExec, error) {
+func (dp *DockerPod) Exec(ctx context.Context, execConfig *ExecConfig) (ContainerExec, error) {
 	endCh := make(chan error)
 
 	dockerExecConfig := types.ExecConfig{
@@ -389,7 +395,7 @@ func (dc *DockerPod) Exec(ctx context.Context, execConfig *ExecConfig) (Containe
 		User:         execConfig.User,
 	}
 
-	response, err := dc.client.ContainerExecCreate(ctx, dc.containers[0].ID, dockerExecConfig)
+	response, err := dp.client.ContainerExecCreate(ctx, dp.containers[0].ID, dockerExecConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -397,7 +403,7 @@ func (dc *DockerPod) Exec(ctx context.Context, execConfig *ExecConfig) (Containe
 		Detach: dockerExecConfig.Detach,
 		Tty:    dockerExecConfig.Tty,
 	}
-	hresp, err := dc.client.ContainerExecAttach(ctx, response.ID, execStartCheck)
+	hresp, err := dp.client.ContainerExecAttach(ctx, response.ID, execStartCheck)
 	if err != nil {
 		return nil, err
 	}
@@ -429,7 +435,7 @@ func (dc *DockerPod) Exec(ctx context.Context, execConfig *ExecConfig) (Containe
 	return &DockerContainerExec{
 		execID: response.ID,
 		hresp:  &hresp,
-		client: dc.client,
+		client: dp.client,
 		stdin:  stdin,
 		endCh:  endCh,
 	}, nil

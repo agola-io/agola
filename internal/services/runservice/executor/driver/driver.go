@@ -40,6 +40,7 @@ const (
 // * Kubernetes pods
 // * A Virtual Machine on which we execute multiple processes
 type Driver interface {
+	Setup(ctx context.Context) error
 	NewPod(ctx context.Context, podConfig *PodConfig, out io.Writer) (Pod, error)
 	GetPodsByLabels(ctx context.Context, labels map[string]string, all bool) ([]Pod, error)
 	GetPodByID(ctx context.Context, containerID string) (Pod, error)

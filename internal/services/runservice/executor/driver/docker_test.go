@@ -76,6 +76,10 @@ func TestPod(t *testing.T) {
 	if os.Getenv("SKIP_DOCKER_TESTS") == "1" {
 		t.Skip("skipping since env var SKIP_DOCKER_TESTS is 1")
 	}
+	toolboxPath := os.Getenv("AGOLA_TOOLBOX_PATH")
+	if toolboxPath == "" {
+		t.Fatalf("env var AGOLA_TOOLBOX_PATH is undefined")
+	}
 
 	dir, err := ioutil.TempDir("", "agola")
 	if err != nil {
@@ -83,7 +87,7 @@ func TestPod(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
-	d, err := NewDockerDriver(logger, dir)
+	d, err := NewDockerDriver(logger, dir, toolboxPath)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
