@@ -319,19 +319,20 @@ func (rc *RunConfig) DeepCopy() *RunConfig {
 }
 
 type RunConfigTask struct {
-	Level         int                             `json:"level,omitempty"`
-	ID            string                          `json:"id,omitempty"`
-	Name          string                          `json:"name,omitempty"`
-	Depends       map[string]*RunConfigTaskDepend `json:"depends"`
-	Runtime       *Runtime                        `json:"runtime,omitempty"`
-	Environment   map[string]string               `json:"environment,omitempty"`
-	WorkingDir    string                          `json:"working_dir,omitempty"`
-	Shell         string                          `json:"shell,omitempty"`
-	User          string                          `json:"user,omitempty"`
-	Steps         []interface{}                   `json:"steps,omitempty"`
-	IgnoreFailure bool                            `json:"ignore_failure,omitempty"`
-	NeedsApproval bool                            `json:"needs_approval,omitempty"`
-	Skip          bool                            `json:"skip,omitempty"`
+	Level                int                             `json:"level,omitempty"`
+	ID                   string                          `json:"id,omitempty"`
+	Name                 string                          `json:"name,omitempty"`
+	Depends              map[string]*RunConfigTaskDepend `json:"depends"`
+	Runtime              *Runtime                        `json:"runtime,omitempty"`
+	Environment          map[string]string               `json:"environment,omitempty"`
+	WorkingDir           string                          `json:"working_dir,omitempty"`
+	Shell                string                          `json:"shell,omitempty"`
+	User                 string                          `json:"user,omitempty"`
+	Steps                []interface{}                   `json:"steps,omitempty"`
+	IgnoreFailure        bool                            `json:"ignore_failure,omitempty"`
+	NeedsApproval        bool                            `json:"needs_approval,omitempty"`
+	Skip                 bool                            `json:"skip,omitempty"`
+	DockerRegistriesAuth map[string]DockerRegistryAuth   `json:"docker_registries_auth"`
 }
 
 type RunConfigTaskDependCondition string
@@ -353,18 +354,24 @@ const (
 	RuntimeTypePod RuntimeType = "pod"
 )
 
-type RegistryAuthType string
+type DockerRegistryAuthType string
 
 const (
-	RegistryAuthTypeDefault RegistryAuthType = "default"
+	DockerRegistryAuthTypeBasic       DockerRegistryAuthType = "basic"
+	DockerRegistryAuthTypeEncodedAuth DockerRegistryAuthType = "encodedauth"
 )
 
-type RegistryAuth struct {
-	Type RegistryAuthType `json:"type,omitempty"`
+type DockerRegistryAuth struct {
+	Type DockerRegistryAuthType `json:"type"`
 
-	// default auth
-	Username string `json:"username,omitempty"`
-	Password string `json:"password,omitempty"`
+	// basic auth
+	Username string `json:"username"`
+	Password string `json:"password"`
+
+	// encoded auth string
+	Auth string `json:"auth"`
+
+	// future auths like aws ecr auth
 }
 
 type Runtime struct {
@@ -504,6 +511,8 @@ type ExecutorTask struct {
 	User        string            `json:"user,omitempty"`
 	Privileged  bool              `json:"privileged"`
 
+	DockerRegistriesAuth map[string]DockerRegistryAuth `json:"docker_registries_auth"`
+
 	Steps []interface{} `json:"steps,omitempty"`
 
 	Status     ExecutorTaskStatus `json:"status,omitempty"`
@@ -542,7 +551,6 @@ type ExecutorTaskStepStatus struct {
 
 type Container struct {
 	Image       string            `json:"image,omitempty"`
-	Auth        *RegistryAuth     `json:"auth,omitempty"`
 	Environment map[string]string `json:"environment,omitempty"`
 	User        string            `json:"user,omitempty"`
 	Privileged  bool              `json:"privileged"`
