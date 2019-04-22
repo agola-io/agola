@@ -67,6 +67,7 @@ type ContainerExec interface {
 }
 
 type PodConfig struct {
+	ID         string
 	Containers []*ContainerConfig
 	Labels     map[string]string
 	// The container dir where the init volume will be mounted
