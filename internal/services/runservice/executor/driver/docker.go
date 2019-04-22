@@ -35,7 +35,6 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/stdcopy"
-	uuid "github.com/satori/go.uuid"
 	"go.uber.org/zap"
 )
 
@@ -143,15 +142,13 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 	}
 	io.Copy(out, reader)
 
-	podID := uuid.NewV4().String()
-
 	labels := map[string]string{}
 	// prepend the podLabelPrefix to the labels' keys
 	for k, v := range podConfig.Labels {
 		labels[podLabelPrefix+k] = v
 	}
 	labels[agolaLabelKey] = agolaLabelValue
-	labels[podIDKey] = podID
+	labels[podIDKey] = podConfig.ID
 
 	containerLabels := map[string]string{}
 	for k, v := range labels {
@@ -198,7 +195,7 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 	}
 
 	return &DockerPod{
-		id:         podID,
+		id:         podConfig.ID,
 		client:     d.client,
 		containers: containers,
 	}, nil

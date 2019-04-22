@@ -742,6 +742,7 @@ func (e *Executor) executeTask(ctx context.Context, et *types.ExecutorTask) {
 	}
 
 	if err := e.setupTask(ctx, rt); err != nil {
+		log.Errorf("err: %+v", err)
 		rt.et.Status.Phase = types.ExecutorTaskPhaseFailed
 		et.Status.SetupStep.EndTime = util.TimePtr(time.Now())
 		et.Status.SetupStep.Phase = types.ExecutorTaskPhaseFailed
@@ -802,6 +803,9 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 	}
 
 	podConfig := &driver.PodConfig{
+		// generate a random pod id (don't use task id for future ability to restart
+		// tasks failed to start and don't clash with existing pods)
+		ID:            uuid.NewV4().String(),
 		Labels:        createTaskLabels(et.ID),
 		InitVolumeDir: toolboxContainerDir,
 		DockerConfig:  dockerConfig,
