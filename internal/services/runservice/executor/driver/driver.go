@@ -44,15 +44,19 @@ const (
 type Driver interface {
 	Setup(ctx context.Context) error
 	NewPod(ctx context.Context, podConfig *PodConfig, out io.Writer) (Pod, error)
-	GetPodsByLabels(ctx context.Context, labels map[string]string, all bool) ([]Pod, error)
+	GetPods(ctx context.Context, all bool) ([]Pod, error)
 	GetPodByID(ctx context.Context, containerID string) (Pod, error)
+	ExecutorGroup(ctx context.Context) (string, error)
+	GetExecutors(ctx context.Context) ([]string, error)
 }
 
 type Pod interface {
 	// ID returns the pod id
 	ID() string
-	// Labels returns the pod labels
-	Labels() map[string]string
+	// ExecutorID return the pod owner executor id
+	ExecutorID() string
+	// TaskID return the pod task id
+	TaskID() string
 	// Stop stops the pod
 	Stop(ctx context.Context) error
 	// Stop stops the pod
@@ -68,8 +72,8 @@ type ContainerExec interface {
 
 type PodConfig struct {
 	ID         string
+	TaskID     string
 	Containers []*ContainerConfig
-	Labels     map[string]string
 	// The container dir where the init volume will be mounted
 	InitVolumeDir string
 	DockerConfig  *registry.DockerConfig

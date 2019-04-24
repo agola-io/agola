@@ -669,6 +669,17 @@ type Executor struct {
 	ActiveTasksLimit int `json:"active_tasks_limit,omitempty"`
 	ActiveTasks      int `json:"active_tasks,omitempty"`
 
+	// Dynamic represents an executor that can be automatically removed since it's
+	// part of a group of executors managing the same resources (i.e. a k8s
+	// namespace managed by multiple executors that will automatically clean pods
+	// owned of an old executor)
+	Dynamic bool `json:"dynamic,omitempty"`
+
+	// ExecutorGroup is the executor group which this executor belongs
+	ExecutorGroup string `json:"executor_group,omitempty"`
+	// SiblingExecutors are all the executors in the ExecutorGroup
+	SiblingsExecutors []string `json:"siblings_executors,omitempty"`
+
 	// internal values not saved
 	Revision int64 `json:"-"`
 }

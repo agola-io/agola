@@ -56,8 +56,6 @@ var log = logger.Sugar()
 const (
 	defaultShell = "/bin/sh -e"
 
-	taskIDLabel = "taskid"
-
 	toolboxContainerDir = "/mnt/agola"
 )
 
@@ -66,7 +64,7 @@ var (
 )
 
 func (e *Executor) getAllPods(ctx context.Context, all bool) ([]driver.Pod, error) {
-	return e.driver.GetPodsByLabels(ctx, createAllLabels(), all)
+	return e.driver.GetPods(ctx, all)
 }
 
 func (e *Executor) createFile(ctx context.Context, pod driver.Pod, command, user string, outf io.Writer) (string, error) {
@@ -160,7 +158,7 @@ func (e *Executor) doRunStep(ctx context.Context, s *types.RunStep, t *types.Exe
 
 	workingDir, err = e.expandDir(ctx, t, pod, outf, workingDir)
 	if err != nil {
-		outf.WriteString(fmt.Sprintf("Failed to expand working dir %q. Error: %s\n", workingDir, err))
+		outf.WriteString(fmt.Sprintf("failed to expand working dir %q. Error: %s\n", workingDir, err))
 		return -1, err
 	}
 
@@ -210,7 +208,7 @@ func (e *Executor) doSaveToWorkspaceStep(ctx context.Context, s *types.SaveToWor
 
 	workingDir, err := e.expandDir(ctx, t, pod, logf, t.WorkingDir)
 	if err != nil {
-		logf.WriteString(fmt.Sprintf("Failed to expand working dir %q. Error: %s\n", t.WorkingDir, err))
+		logf.WriteString(fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.WorkingDir, err))
 		return -1, err
 	}
 
@@ -332,7 +330,7 @@ func (e *Executor) template(ctx context.Context, t *types.ExecutorTask, pod driv
 
 	workingDir, err := e.expandDir(ctx, t, pod, logf, t.WorkingDir)
 	if err != nil {
-		io.WriteString(logf, fmt.Sprintf("Failed to expand working dir %q. Error: %s\n", t.WorkingDir, err))
+		io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.WorkingDir, err))
 		return "", err
 	}
 
@@ -378,7 +376,7 @@ func (e *Executor) unarchive(ctx context.Context, t *types.ExecutorTask, source 
 
 	workingDir, err := e.expandDir(ctx, t, pod, logf, t.WorkingDir)
 	if err != nil {
-		io.WriteString(logf, fmt.Sprintf("Failed to expand working dir %q. Error: %s\n", t.WorkingDir, err))
+		io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.WorkingDir, err))
 		return err
 	}
 
@@ -501,7 +499,7 @@ func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, 
 
 	workingDir, err := e.expandDir(ctx, t, pod, logf, t.WorkingDir)
 	if err != nil {
-		io.WriteString(logf, fmt.Sprintf("Failed to expand working dir %q. Error: %s\n", t.WorkingDir, err))
+		io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.WorkingDir, err))
 		return -1, err
 	}
 
@@ -663,16 +661,45 @@ func (e *Executor) sendExecutorStatus(ctx context.Context) error {
 	arch := runtime.GOARCH
 	labels["arch"] = arch
 
+	executorGroup, err := e.driver.ExecutorGroup(ctx)
+	if err != nil {
+		return err
+	}
+	// report all the executors that are active OR that have some owned pods not yet removed
+	activeExecutors, err := e.driver.GetExecutors(ctx)
+	if err != nil {
+		return err
+	}
+	pods, err := e.driver.GetPods(ctx, true)
+	if err != nil {
+		return err
+	}
+
+	executorsMap := map[string]struct{}{}
+	for _, executorID := range activeExecutors {
+		executorsMap[executorID] = struct{}{}
+	}
+	for _, pod := range pods {
+		executorsMap[pod.ExecutorID()] = struct{}{}
+	}
+	siblingsExecutors := []string{}
+	for executorID := range executorsMap {
+		siblingsExecutors = append(siblingsExecutors, executorID)
+	}
+
 	executor := &types.Executor{
-		ID:               e.id,
-		ListenURL:        e.listenURL,
-		Labels:           labels,
-		ActiveTasksLimit: e.c.ActiveTasksLimit,
-		ActiveTasks:      activeTasks,
+		ID:                e.id,
+		ListenURL:         e.listenURL,
+		Labels:            labels,
+		ActiveTasksLimit:  e.c.ActiveTasksLimit,
+		ActiveTasks:       activeTasks,
+		Dynamic:           e.dynamic,
+		ExecutorGroup:     executorGroup,
+		SiblingsExecutors: siblingsExecutors,
 	}
 
 	log.Debugf("send executor status: %s", util.Dump(executor))
-	_, err := e.runserviceClient.SendExecutorStatus(ctx, executor)
+	_, err = e.runserviceClient.SendExecutorStatus(ctx, executor)
 	return err
 }
 
@@ -806,7 +833,7 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 		// generate a random pod id (don't use task id for future ability to restart
 		// tasks failed to start and don't clash with existing pods)
 		ID:            uuid.NewV4().String(),
-		Labels:        createTaskLabels(et.ID),
+		TaskID:        et.ID,
 		InitVolumeDir: toolboxContainerDir,
 		DockerConfig:  dockerConfig,
 		Containers: []*driver.ContainerConfig{
@@ -938,16 +965,6 @@ func (e *Executor) executeTaskInternal(ctx context.Context, et *types.ExecutorTa
 	return 0, nil
 }
 
-func createAllLabels() map[string]string {
-	return map[string]string{}
-}
-
-func createTaskLabels(taskID string) map[string]string {
-	return map[string]string{
-		taskIDLabel: taskID,
-	}
-}
-
 func (e *Executor) podsCleanerLoop(ctx context.Context) {
 	for {
 		log.Debugf("podsCleaner")
@@ -971,13 +988,33 @@ func (e *Executor) podsCleaner(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	executors, err := e.driver.GetExecutors(ctx)
+	if err != nil {
+		return err
+	}
+	// always add ourself to executors
+	executors = append(executors, e.id)
+
 	for _, pod := range pods {
-		taskID, ok := pod.Labels()[taskIDLabel]
-		if !ok {
-			continue
+		taskID := pod.TaskID()
+		// clean our owned pods
+		if pod.ExecutorID() == e.id {
+			if _, ok := e.runningTasks.get(taskID); !ok {
+				log.Infof("removing pod %s for not running task: %s", pod.ID(), taskID)
+				pod.Remove(ctx)
+			}
 		}
-		if _, ok := e.runningTasks.get(taskID); !ok {
-			log.Infof("removing pod %s for not running task: %s", pod.ID(), taskID)
+
+		// if no executor owns the pod we'll delete it
+		owned := false
+		for _, executorID := range executors {
+			if pod.ExecutorID() == executorID {
+				owned = true
+				break
+			}
+		}
+		if !owned {
+			log.Infof("removing pod %s since it's not owned by any active executor", pod.ID())
 			pod.Remove(ctx)
 		}
 	}
@@ -1196,6 +1233,7 @@ type Executor struct {
 	runningTasks     *runningTasks
 	driver           driver.Driver
 	listenURL        string
+	dynamic          bool
 }
 
 func NewExecutor(c *config.RunServiceExecutor) (*Executor, error) {
@@ -1216,15 +1254,9 @@ func NewExecutor(c *config.RunServiceExecutor) (*Executor, error) {
 		c.ToolboxPath = path
 	}
 
-	dockerDriver, err := driver.NewDockerDriver(logger, "/tmp/agola/bin", c.ToolboxPath)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create docker client")
-	}
-
 	e := &Executor{
 		c:                c,
 		runserviceClient: rsapi.NewClient(c.RunServiceURL),
-		driver:           dockerDriver,
 		runningTasks: &runningTasks{
 			tasks: make(map[string]*runningTask),
 		},
@@ -1264,6 +1296,12 @@ func NewExecutor(c *config.RunServiceExecutor) (*Executor, error) {
 	}
 	u.Host = net.JoinHostPort(addr, port)
 	e.listenURL = u.String()
+
+	d, err := driver.NewDockerDriver(logger, e.id, "/tmp/agola/bin", e.c.ToolboxPath)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create docker driver")
+	}
+	e.driver = d
 
 	return e, nil
 }

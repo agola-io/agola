@@ -43,9 +43,10 @@ type DockerDriver struct {
 	client            *client.Client
 	initVolumeHostDir string
 	toolboxPath       string
+	executorID        string
 }
 
-func NewDockerDriver(logger *zap.Logger, initVolumeHostDir, toolboxPath string) (*DockerDriver, error) {
+func NewDockerDriver(logger *zap.Logger, executorID, initVolumeHostDir, toolboxPath string) (*DockerDriver, error) {
 	cli, err := client.NewEnvClient()
 	if err != nil {
 		return nil, err
@@ -55,6 +56,7 @@ func NewDockerDriver(logger *zap.Logger, initVolumeHostDir, toolboxPath string) 
 		client:            cli,
 		initVolumeHostDir: initVolumeHostDir,
 		toolboxPath:       toolboxPath,
+		executorID:        executorID,
 	}, nil
 }
 
@@ -149,12 +151,9 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 	io.Copy(out, reader)
 
 	labels := map[string]string{}
-	// prepend the podLabelPrefix to the labels' keys
-	for k, v := range podConfig.Labels {
-		labels[labelPrefix+k] = v
-	}
 	labels[agolaLabelKey] = agolaLabelValue
 	labels[podIDKey] = podConfig.ID
+	labels[taskIDKey] = podConfig.TaskID
 
 	containerLabels := map[string]string{}
 	for k, v := range labels {
@@ -204,15 +203,21 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 		id:         podConfig.ID,
 		client:     d.client,
 		containers: containers,
+		executorID: d.executorID,
 	}, nil
 }
 
-func (d *DockerDriver) GetPodsByLabels(ctx context.Context, labels map[string]string, all bool) ([]Pod, error) {
+func (d *DockerDriver) ExecutorGroup(ctx context.Context) (string, error) {
+	// use the same group as the executor id
+	return d.executorID, nil
+}
+
+func (d *DockerDriver) GetExecutors(ctx context.Context) ([]string, error) {
+	return []string{d.executorID}, nil
+}
+
+func (d *DockerDriver) GetPods(ctx context.Context, all bool) ([]Pod, error) {
 	args := filters.NewArgs()
-	// search label adding the podLabelPrefix
-	for k, v := range labels {
-		args.Add("label", fmt.Sprintf("%s%s=%s", labelPrefix, k, v))
-	}
 
 	containers, err := d.client.ContainerList(ctx,
 		types.ContainerListOptions{
@@ -235,6 +240,7 @@ func (d *DockerDriver) GetPodsByLabels(ctx context.Context, labels map[string]st
 				id:         podID,
 				client:     d.client,
 				containers: []types.Container{container},
+				executorID: d.executorID,
 			}
 			podsMap[podID] = pod
 
@@ -268,9 +274,10 @@ func (d *DockerDriver) GetPodsByLabels(ctx context.Context, labels map[string]st
 		// add labels from the container with index 0
 		if cIndex == 0 {
 			podLabels := map[string]string{}
+			// keep only labels starting with our prefix
 			for labelName, labelValue := range container.Labels {
 				if strings.HasPrefix(labelName, labelPrefix) {
-					podLabels[strings.TrimPrefix(labelName, labelPrefix)] = labelValue
+					podLabels[labelName] = labelValue
 				}
 			}
 			pod.labels = podLabels
@@ -286,9 +293,10 @@ func (d *DockerDriver) GetPodsByLabels(ctx context.Context, labels map[string]st
 
 func podLabelsFromContainer(containerLabels map[string]string) map[string]string {
 	labels := map[string]string{}
+	// keep only labels starting with our prefix
 	for k, v := range containerLabels {
 		if strings.HasPrefix(k, labelPrefix) {
-			labels[strings.TrimPrefix(k, labelPrefix)] = v
+			labels[k] = v
 		}
 	}
 	return labels
@@ -321,14 +329,19 @@ type DockerPod struct {
 	client     *client.Client
 	labels     map[string]string
 	containers []types.Container
+	executorID string
 }
 
 func (dp *DockerPod) ID() string {
 	return dp.id
 }
 
-func (dp *DockerPod) Labels() map[string]string {
-	return dp.labels
+func (dp *DockerPod) ExecutorID() string {
+	return dp.executorID
+}
+
+func (dp *DockerPod) TaskID() string {
+	return dp.labels[taskIDKey]
 }
 
 func (dp *DockerPod) Stop(ctx context.Context) error {
