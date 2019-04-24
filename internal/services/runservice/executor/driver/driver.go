@@ -45,7 +45,6 @@ type Driver interface {
 	Setup(ctx context.Context) error
 	NewPod(ctx context.Context, podConfig *PodConfig, out io.Writer) (Pod, error)
 	GetPods(ctx context.Context, all bool) ([]Pod, error)
-	GetPodByID(ctx context.Context, containerID string) (Pod, error)
 	ExecutorGroup(ctx context.Context) (string, error)
 	GetExecutors(ctx context.Context) ([]string, error)
 }

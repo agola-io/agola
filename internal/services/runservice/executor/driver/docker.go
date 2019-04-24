@@ -302,28 +302,6 @@ func podLabelsFromContainer(containerLabels map[string]string) map[string]string
 	return labels
 }
 
-func (d *DockerDriver) GetPodByID(ctx context.Context, podID string) (Pod, error) {
-	args := filters.NewArgs()
-	args.Add(podIDKey, podID)
-
-	containers, err := d.client.ContainerList(ctx,
-		types.ContainerListOptions{
-			Filters: args,
-		})
-	if err != nil {
-		return nil, err
-	}
-	if len(containers) == 0 {
-		return nil, errors.Errorf("no pod with id %s", podID)
-	}
-
-	return &DockerPod{
-		labels:     podLabelsFromContainer(containers[0].Labels),
-		client:     d.client,
-		containers: containers,
-	}, nil
-}
-
 type DockerPod struct {
 	id         string
 	client     *client.Client
