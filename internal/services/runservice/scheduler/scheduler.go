@@ -1625,7 +1625,7 @@ func (s *Scheduler) Run(ctx context.Context) error {
 	corsHandler = ghandlers.CORS(corsAllowedMethodsOptions, corsAllowedHeadersOptions, corsAllowedOriginsOptions)
 
 	// executor dedicated api, only calls from executor should happen on these handlers
-	executorStatusHandler := api.NewExecutorStatusHandler(s.e, ch)
+	executorStatusHandler := api.NewExecutorStatusHandler(logger, s.e, s.ch)
 	executorTaskStatusHandler := api.NewExecutorTaskStatusHandler(s.e, ch)
 	executorTaskHandler := api.NewExecutorTaskHandler(s.e)
 	executorTasksHandler := api.NewExecutorTasksHandler(s.e)

@@ -16,6 +16,7 @@ package api
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -33,12 +34,13 @@ import (
 )
 
 type ExecutorStatusHandler struct {
-	e *etcd.Store
-	c chan<- *types.ExecutorTask
+	log *zap.SugaredLogger
+	e   *etcd.Store
+	ch  *command.CommandHandler
 }
 
-func NewExecutorStatusHandler(e *etcd.Store, c chan<- *types.ExecutorTask) *ExecutorStatusHandler {
-	return &ExecutorStatusHandler{e: e, c: c}
+func NewExecutorStatusHandler(logger *zap.Logger, e *etcd.Store, ch *command.CommandHandler) *ExecutorStatusHandler {
+	return &ExecutorStatusHandler{log: logger.Sugar(), e: e, ch: ch}
 }
 
 func (h *ExecutorStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -58,6 +60,45 @@ func (h *ExecutorStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		http.Error(w, "", http.StatusInternalServerError)
 		return
 	}
+
+	if err := h.deleteStaleExecutors(ctx, executor); err != nil {
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
+}
+
+func (h *ExecutorStatusHandler) deleteStaleExecutors(ctx context.Context, curExecutor *types.Executor) error {
+	executors, err := store.GetExecutors(ctx, h.e)
+	if err != nil {
+		return err
+	}
+
+	for _, executor := range executors {
+		if executor.ID == curExecutor.ID {
+			continue
+		}
+		if !executor.Dynamic {
+			continue
+		}
+		if executor.ExecutorGroup != curExecutor.ExecutorGroup {
+			continue
+		}
+		// executor is dynamic and in the same executor group
+		active := false
+		for _, seID := range curExecutor.SiblingsExecutors {
+			if executor.ID == seID {
+				active = true
+				break
+			}
+		}
+		if !active {
+			if err := h.ch.DeleteExecutor(ctx, executor.ID); err != nil {
+				h.log.Errorf("failed to delete executor %q: %v", executor.ID, err)
+			}
+		}
+	}
+
+	return nil
 }
 
 type ExecutorTaskStatusHandler struct {
