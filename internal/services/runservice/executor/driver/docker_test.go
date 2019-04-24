@@ -29,6 +29,7 @@ import (
 	"testing"
 	"unicode"
 
+	uuid "github.com/satori/go.uuid"
 	slog "github.com/sorintlab/agola/internal/log"
 
 	"github.com/google/go-cmp/cmp"
@@ -75,7 +76,7 @@ func parseEnvs(r io.Reader) (map[string]string, error) {
 	return envs, nil
 }
 
-func TestPod(t *testing.T) {
+func TestDockerPod(t *testing.T) {
 	if os.Getenv("SKIP_DOCKER_TESTS") == "1" {
 		t.Skip("skipping since env var SKIP_DOCKER_TESTS is 1")
 	}
@@ -90,7 +91,7 @@ func TestPod(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
-	d, err := NewDockerDriver(logger, dir, toolboxPath)
+	d, err := NewDockerDriver(logger, "executorid01", dir, toolboxPath)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -99,6 +100,8 @@ func TestPod(t *testing.T) {
 
 	t.Run("create a pod with one container", func(t *testing.T) {
 		pod, err := d.NewPod(ctx, &PodConfig{
+			ID:     uuid.NewV4().String(),
+			TaskID: uuid.NewV4().String(),
 			Containers: []*ContainerConfig{
 				&ContainerConfig{
 					Cmd:   []string{"cat"},
@@ -110,12 +113,13 @@ func TestPod(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
-
 		defer pod.Remove(ctx)
 	})
 
 	t.Run("execute a command inside a pod", func(t *testing.T) {
 		pod, err := d.NewPod(ctx, &PodConfig{
+			ID:     uuid.NewV4().String(),
+			TaskID: uuid.NewV4().String(),
 			Containers: []*ContainerConfig{
 				&ContainerConfig{
 					Cmd:   []string{"cat"},
@@ -127,6 +131,7 @@ func TestPod(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
+		defer pod.Remove(ctx)
 
 		ce, err := pod.Exec(ctx, &ExecConfig{
 			Cmd: []string{"ls"},
@@ -141,10 +146,8 @@ func TestPod(t *testing.T) {
 			t.Fatalf("unexpected err: %v", err)
 		}
 		if code != 0 {
-			t.Fatalf("unexpected exito code: %d", code)
+			t.Fatalf("unexpected exit code: %d", code)
 		}
-
-		defer pod.Remove(ctx)
 	})
 
 	t.Run("test pod environment", func(t *testing.T) {
@@ -154,6 +157,8 @@ func TestPod(t *testing.T) {
 		}
 
 		pod, err := d.NewPod(ctx, &PodConfig{
+			ID:     uuid.NewV4().String(),
+			TaskID: uuid.NewV4().String(),
 			Containers: []*ContainerConfig{
 				&ContainerConfig{
 					Cmd:   []string{"cat"},
@@ -166,6 +171,7 @@ func TestPod(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
+		defer pod.Remove(ctx)
 
 		var buf bytes.Buffer
 		ce, err := pod.Exec(ctx, &ExecConfig{
@@ -200,12 +206,12 @@ func TestPod(t *testing.T) {
 				}
 			}
 		}
-
-		defer pod.Remove(ctx)
 	})
 
-	t.Run("test get pods by label", func(t *testing.T) {
+	t.Run("test get pods", func(t *testing.T) {
 		pod, err := d.NewPod(ctx, &PodConfig{
+			ID:     uuid.NewV4().String(),
+			TaskID: uuid.NewV4().String(),
 			Containers: []*ContainerConfig{
 				&ContainerConfig{
 					Cmd:   []string{"cat"},
@@ -217,8 +223,9 @@ func TestPod(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
+		defer pod.Remove(ctx)
 
-		pods, err := d.GetPodsByLabels(ctx, map[string]string{}, true)
+		pods, err := d.GetPods(ctx, true)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -242,8 +249,6 @@ func TestPod(t *testing.T) {
 		if !ok {
 			t.Fatalf("pod with id %q not found", pod.ID())
 		}
-
-		defer pod.Remove(ctx)
 	})
 
 }
