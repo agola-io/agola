@@ -18,6 +18,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/sorintlab/agola/internal/common"
 	"github.com/sorintlab/agola/internal/services/runservice/executor/registry"
 )
 
@@ -47,6 +48,7 @@ type Driver interface {
 	GetPods(ctx context.Context, all bool) ([]Pod, error)
 	ExecutorGroup(ctx context.Context) (string, error)
 	GetExecutors(ctx context.Context) ([]string, error)
+	Archs(ctx context.Context) ([]common.Arch, error)
 }
 
 type Pod interface {

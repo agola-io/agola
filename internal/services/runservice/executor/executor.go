@@ -27,7 +27,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -657,9 +656,10 @@ func (e *Executor) sendExecutorStatus(ctx context.Context) error {
 
 	activeTasks := e.runningTasks.len()
 
-	// Add special labels (and override config provided ones)
-	arch := runtime.GOARCH
-	labels["arch"] = arch
+	archs, err := e.driver.Archs(ctx)
+	if err != nil {
+		return err
+	}
 
 	executorGroup, err := e.driver.ExecutorGroup(ctx)
 	if err != nil {
@@ -689,6 +689,7 @@ func (e *Executor) sendExecutorStatus(ctx context.Context) error {
 
 	executor := &types.Executor{
 		ID:                e.id,
+		Archs:             archs,
 		ListenURL:         e.listenURL,
 		Labels:            labels,
 		ActiveTasksLimit:  e.c.ActiveTasksLimit,

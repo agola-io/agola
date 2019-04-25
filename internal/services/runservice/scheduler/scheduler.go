@@ -290,13 +290,19 @@ func (s *Scheduler) chooseExecutor(ctx context.Context, rct *types.RunConfigTask
 	for _, e := range executors {
 		// if arch is not defined use any executor arch
 		if rct.Runtime.Arch != "" {
-			if e.Labels["arch"] != string(rct.Runtime.Arch) {
+			hasArch := false
+			for _, arch := range e.Archs {
+				if arch == rct.Runtime.Arch {
+					hasArch = true
+				}
+			}
+			if !hasArch {
 				continue
 			}
-			if e.ActiveTasksLimit != 0 {
-				if e.ActiveTasks >= e.ActiveTasksLimit {
-					continue
-				}
+		}
+		if e.ActiveTasksLimit != 0 {
+			if e.ActiveTasks >= e.ActiveTasksLimit {
+				continue
 			}
 		}
 

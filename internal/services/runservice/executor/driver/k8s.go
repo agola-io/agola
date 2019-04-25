@@ -29,6 +29,7 @@ import (
 	"github.com/docker/docker/pkg/archive"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
+	"github.com/sorintlab/agola/internal/common"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -196,6 +197,25 @@ func NewKubeClientConfig(kubeconfigPath, context, namespace string) clientcmd.Cl
 
 func (d *K8sDriver) Setup(ctx context.Context) error {
 	return nil
+}
+
+func (d *K8sDriver) Archs(ctx context.Context) ([]common.Arch, error) {
+	// TODO(sgotti) use go client listers instead of querying every time
+	nodeClient := d.client.CoreV1().Nodes()
+	nodes, err := nodeClient.List(metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	archsMap := map[common.Arch]struct{}{}
+	archs := []common.Arch{}
+	for _, node := range nodes.Items {
+		archsMap[common.ArchFromString(node.Status.NodeInfo.Architecture)] = struct{}{}
+	}
+	for arch := range archsMap {
+		archs = append(archs, arch)
+	}
+
+	return archs, nil
 }
 
 func (d *K8sDriver) ExecutorGroup(ctx context.Context) (string, error) {

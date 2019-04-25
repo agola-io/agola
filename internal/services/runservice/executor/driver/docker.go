@@ -22,11 +22,13 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/sorintlab/agola/internal/common"
 	"github.com/sorintlab/agola/internal/services/runservice/executor/registry"
 
 	"github.com/docker/docker/api/types"
@@ -117,6 +119,11 @@ func (d *DockerDriver) CopyToolbox(ctx context.Context) error {
 	d.client.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{Force: true})
 
 	return nil
+}
+
+func (d *DockerDriver) Archs(ctx context.Context) ([]common.Arch, error) {
+	// since we are using the local docker driver we can return our go arch information
+	return []common.Arch{common.ArchFromString(runtime.GOARCH)}, nil
 }
 
 func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Writer) (Pod, error) {

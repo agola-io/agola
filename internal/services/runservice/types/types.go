@@ -664,6 +664,8 @@ type Executor struct {
 	ID        string `json:"id,omitempty"`
 	ListenURL string `json:"listenURL,omitempty"`
 
+	Archs []common.Arch `json:"archs,omitempty"`
+
 	Labels map[string]string `json:"labels,omitempty"`
 
 	ActiveTasksLimit int `json:"active_tasks_limit,omitempty"`
