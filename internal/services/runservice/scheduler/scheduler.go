@@ -329,6 +329,7 @@ func (s *Scheduler) genExecutorTask(ctx context.Context, r *types.Run, rt *types
 		ID:          rt.ID,
 		RunID:       r.ID,
 		TaskName:    rct.Name,
+		Arch:        rct.Runtime.Arch,
 		Containers:  rct.Runtime.Containers,
 		Environment: environment,
 		WorkingDir:  rct.WorkingDir,

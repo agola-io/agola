@@ -502,6 +502,7 @@ type ExecutorTask struct {
 	ID          string            `json:"id,omitempty"`
 	RunID       string            `json:"run_id,omitempty"`
 	TaskName    string            `json:"task_name,omitempty"`
+	Arch        common.Arch       `json:"arch,omitempty"`
 	Containers  []*Container      `json:"containers,omitempty"`
 	Environment map[string]string `json:"environment,omitempty"`
 	WorkingDir  string            `json:"working_dir,omitempty"`

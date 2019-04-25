@@ -362,6 +362,12 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 		},
 	}
 
+	if podConfig.Arch != "" {
+		pod.Spec.NodeSelector = map[string]string{
+			corev1.LabelArchStable: string(podConfig.Arch),
+		}
+	}
+
 	pod, err = podClient.Create(pod)
 	if err != nil {
 		return nil, err

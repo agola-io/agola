@@ -75,6 +75,7 @@ type PodConfig struct {
 	ID         string
 	TaskID     string
 	Containers []*ContainerConfig
+	Arch       common.Arch
 	// The container dir where the init volume will be mounted
 	InitVolumeDir string
 	DockerConfig  *registry.DockerConfig

@@ -835,6 +835,7 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 		// tasks failed to start and don't clash with existing pods)
 		ID:            uuid.NewV4().String(),
 		TaskID:        et.ID,
+		Arch:          et.Arch,
 		InitVolumeDir: toolboxContainerDir,
 		DockerConfig:  dockerConfig,
 		Containers: []*driver.ContainerConfig{
