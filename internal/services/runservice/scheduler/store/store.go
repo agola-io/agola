@@ -22,12 +22,12 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/sorintlab/agola/internal/datamanager"
 	"github.com/sorintlab/agola/internal/etcd"
 	"github.com/sorintlab/agola/internal/objectstorage"
 	"github.com/sorintlab/agola/internal/services/runservice/scheduler/common"
 	"github.com/sorintlab/agola/internal/services/runservice/types"
 	"github.com/sorintlab/agola/internal/util"
-	"github.com/sorintlab/agola/internal/wal"
 
 	"github.com/pkg/errors"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
@@ -85,16 +85,7 @@ func OSTSubGroupTypes(group string) []string {
 	return sg
 }
 
-func OSTRunCounterPaths(group, runID string, sortOrder types.SortOrder) []string {
-	paths := []string{}
-	subGroups := OSTSubGroups(group)
-	for _, subGroup := range subGroups {
-		paths = append(paths, common.StorageRunCounterFile(subGroup))
-	}
-	return paths
-}
-
-func OSTUpdateRunCounterAction(ctx context.Context, c uint64, group string) (*wal.Action, error) {
+func OSTUpdateRunCounterAction(ctx context.Context, c uint64, group string) (*datamanager.Action, error) {
 	// use the first group dir after the root
 	pl := util.PathList(group)
 	if len(pl) < 2 {
@@ -106,8 +97,8 @@ func OSTUpdateRunCounterAction(ctx context.Context, c uint64, group string) (*wa
 		return nil, err
 	}
 
-	action := &wal.Action{
-		ActionType: wal.ActionTypePut,
+	action := &datamanager.Action{
+		ActionType: datamanager.ActionTypePut,
 		DataType:   string(common.DataTypeRunCounter),
 		ID:         pl[1],
 		Data:       cj,
@@ -145,9 +136,8 @@ func OSTCacheKey(p string) string {
 	return strings.TrimSuffix(base, path.Ext(base))
 }
 
-func OSTGetRunConfig(wal *wal.WalManager, runConfigID string) (*types.RunConfig, error) {
-	runConfigPath := common.StorageRunConfigFile(runConfigID)
-	rcf, _, err := wal.ReadObject(runConfigPath, nil)
+func OSTGetRunConfig(dm *datamanager.DataManager, runConfigID string) (*types.RunConfig, error) {
+	rcf, _, err := dm.ReadObject(string(common.DataTypeRunConfig), runConfigID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -161,14 +151,14 @@ func OSTGetRunConfig(wal *wal.WalManager, runConfigID string) (*types.RunConfig,
 	return rc, nil
 }
 
-func OSTSaveRunConfigAction(rc *types.RunConfig) (*wal.Action, error) {
+func OSTSaveRunConfigAction(rc *types.RunConfig) (*datamanager.Action, error) {
 	rcj, err := json.Marshal(rc)
 	if err != nil {
 		return nil, err
 	}
 
-	action := &wal.Action{
-		ActionType: wal.ActionTypePut,
+	action := &datamanager.Action{
+		ActionType: datamanager.ActionTypePut,
 		DataType:   string(common.DataTypeRunConfig),
 		ID:         rc.ID,
 		Data:       rcj,
@@ -177,10 +167,8 @@ func OSTSaveRunConfigAction(rc *types.RunConfig) (*wal.Action, error) {
 	return action, nil
 }
 
-func OSTGetRun(wal *wal.WalManager, runID string) (*types.Run, error) {
-	runPath := common.StorageRunFile(runID)
-	rf, _, err := wal.ReadObject(runPath, nil)
-
+func OSTGetRun(dm *datamanager.DataManager, runID string) (*types.Run, error) {
+	rf, _, err := dm.ReadObject(string(common.DataTypeRun), runID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -194,14 +182,14 @@ func OSTGetRun(wal *wal.WalManager, runID string) (*types.Run, error) {
 	return r, nil
 }
 
-func OSTSaveRunAction(r *types.Run) (*wal.Action, error) {
+func OSTSaveRunAction(r *types.Run) (*datamanager.Action, error) {
 	rj, err := json.Marshal(r)
 	if err != nil {
 		return nil, err
 	}
 
-	action := &wal.Action{
-		ActionType: wal.ActionTypePut,
+	action := &datamanager.Action{
+		ActionType: datamanager.ActionTypePut,
 		DataType:   string(common.DataTypeRun),
 		ID:         r.ID,
 		Data:       rj,
@@ -501,13 +489,13 @@ func GetRuns(ctx context.Context, e *etcd.Store) ([]*types.Run, error) {
 	return runs, nil
 }
 
-func GetRunEtcdOrOST(ctx context.Context, e *etcd.Store, wal *wal.WalManager, runID string) (*types.Run, error) {
+func GetRunEtcdOrOST(ctx context.Context, e *etcd.Store, dm *datamanager.DataManager, runID string) (*types.Run, error) {
 	r, _, err := GetRun(ctx, e, runID)
 	if err != nil && err != etcd.ErrKeyNotFound {
 		return nil, err
 	}
 	if r == nil {
-		r, err = OSTGetRun(wal, runID)
+		r, err = OSTGetRun(dm, runID)
 		if err != nil && err != objectstorage.ErrNotExist {
 			return nil, err
 		}

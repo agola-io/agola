@@ -73,7 +73,7 @@ func (s *S3Storage) Stat(p string) (*ObjectInfo, error) {
 	return &ObjectInfo{Path: p, LastModified: oi.LastModified}, nil
 }
 
-func (s *S3Storage) ReadObject(filepath string) (io.ReadCloser, error) {
+func (s *S3Storage) ReadObject(filepath string) (ReadSeekCloser, error) {
 	if _, err := s.minioClient.StatObject(s.bucket, filepath, minio.StatObjectOptions{}); err != nil {
 		merr := minio.ToErrorResponse(err)
 		if merr.StatusCode == http.StatusNotFound {

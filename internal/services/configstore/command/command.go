@@ -19,11 +19,11 @@ import (
 	"encoding/json"
 	"path"
 
+	"github.com/sorintlab/agola/internal/datamanager"
 	"github.com/sorintlab/agola/internal/db"
 	"github.com/sorintlab/agola/internal/services/configstore/readdb"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
-	"github.com/sorintlab/agola/internal/wal"
 
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
@@ -33,14 +33,14 @@ import (
 type CommandHandler struct {
 	log    *zap.SugaredLogger
 	readDB *readdb.ReadDB
-	wal    *wal.WalManager
+	dm     *datamanager.DataManager
 }
 
-func NewCommandHandler(logger *zap.Logger, readDB *readdb.ReadDB, wal *wal.WalManager) *CommandHandler {
+func NewCommandHandler(logger *zap.Logger, readDB *readdb.ReadDB, dm *datamanager.DataManager) *CommandHandler {
 	return &CommandHandler{
 		log:    logger.Sugar(),
 		readDB: readDB,
-		wal:    wal,
+		dm:     dm,
 	}
 }
 
@@ -52,7 +52,7 @@ func (s *CommandHandler) CreateProjectGroup(ctx context.Context, projectGroup *t
 		return nil, util.NewErrBadRequest(errors.Errorf("project group parent id required"))
 	}
 
-	var cgt *wal.ChangeGroupsUpdateToken
+	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
@@ -106,16 +106,16 @@ func (s *CommandHandler) CreateProjectGroup(ctx context.Context, projectGroup *t
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to marshal projectGroup")
 	}
-	actions := []*wal.Action{
+	actions := []*datamanager.Action{
 		{
-			ActionType: wal.ActionTypePut,
+			ActionType: datamanager.ActionTypePut,
 			DataType:   string(types.ConfigTypeProjectGroup),
 			ID:         projectGroup.ID,
 			Data:       pcj,
 		},
 	}
 
-	_, err = s.wal.WriteWal(ctx, actions, cgt)
+	_, err = s.dm.WriteWal(ctx, actions, cgt)
 	return projectGroup, err
 }
 
@@ -127,7 +127,7 @@ func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Proje
 		return nil, util.NewErrBadRequest(errors.Errorf("project parent id required"))
 	}
 
-	var cgt *wal.ChangeGroupsUpdateToken
+	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
@@ -182,23 +182,23 @@ func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Proje
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to marshal project")
 	}
-	actions := []*wal.Action{
+	actions := []*datamanager.Action{
 		{
-			ActionType: wal.ActionTypePut,
+			ActionType: datamanager.ActionTypePut,
 			DataType:   string(types.ConfigTypeProject),
 			ID:         project.ID,
 			Data:       pcj,
 		},
 	}
 
-	_, err = s.wal.WriteWal(ctx, actions, cgt)
+	_, err = s.dm.WriteWal(ctx, actions, cgt)
 	return project, err
 }
 
 func (s *CommandHandler) DeleteProject(ctx context.Context, projectRef string) error {
 	var project *types.Project
 
-	var cgt *wal.ChangeGroupsUpdateToken
+	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
@@ -230,15 +230,15 @@ func (s *CommandHandler) DeleteProject(ctx context.Context, projectRef string) e
 	}
 
 	// TODO(sgotti) delete project secrets/variables
-	actions := []*wal.Action{
+	actions := []*datamanager.Action{
 		{
-			ActionType: wal.ActionTypeDelete,
+			ActionType: datamanager.ActionTypeDelete,
 			DataType:   string(types.ConfigTypeProject),
 			ID:         project.ID,
 		},
 	}
 
-	_, err = s.wal.WriteWal(ctx, actions, cgt)
+	_, err = s.dm.WriteWal(ctx, actions, cgt)
 	return err
 }
 
@@ -253,7 +253,7 @@ func (s *CommandHandler) CreateUser(ctx context.Context, req *CreateUserRequest)
 		return nil, util.NewErrBadRequest(errors.Errorf("user name required"))
 	}
 
-	var cgt *wal.ChangeGroupsUpdateToken
+	var cgt *datamanager.ChangeGroupsUpdateToken
 	cgNames := []string{req.UserName}
 	var rs *types.RemoteSource
 
@@ -335,29 +335,29 @@ func (s *CommandHandler) CreateUser(ctx context.Context, req *CreateUserRequest)
 		return nil, errors.Wrapf(err, "failed to marshal project group")
 	}
 
-	actions := []*wal.Action{
+	actions := []*datamanager.Action{
 		{
-			ActionType: wal.ActionTypePut,
+			ActionType: datamanager.ActionTypePut,
 			DataType:   string(types.ConfigTypeUser),
 			ID:         user.ID,
 			Data:       userj,
 		},
 		{
-			ActionType: wal.ActionTypePut,
+			ActionType: datamanager.ActionTypePut,
 			DataType:   string(types.ConfigTypeProjectGroup),
 			ID:         pg.ID,
 			Data:       pgj,
 		},
 	}
 
-	_, err = s.wal.WriteWal(ctx, actions, cgt)
+	_, err = s.dm.WriteWal(ctx, actions, cgt)
 	return user, err
 }
 
 func (s *CommandHandler) DeleteUser(ctx context.Context, userName string) error {
 	var user *types.User
 
-	var cgt *wal.ChangeGroupsUpdateToken
+	var cgt *datamanager.ChangeGroupsUpdateToken
 	cgNames := []string{user.UserName}
 
 	// must do all the check in a single transaction to avoid concurrent changes
@@ -382,9 +382,9 @@ func (s *CommandHandler) DeleteUser(ctx context.Context, userName string) error 
 		return err
 	}
 
-	actions := []*wal.Action{
+	actions := []*datamanager.Action{
 		{
-			ActionType: wal.ActionTypeDelete,
+			ActionType: datamanager.ActionTypeDelete,
 			DataType:   string(types.ConfigTypeUser),
 			ID:         user.ID,
 		},
@@ -392,7 +392,7 @@ func (s *CommandHandler) DeleteUser(ctx context.Context, userName string) error 
 
 	// changegroup is the username (and in future the email) to ensure no
 	// concurrent user creation/modification using the same name
-	_, err = s.wal.WriteWal(ctx, actions, cgt)
+	_, err = s.dm.WriteWal(ctx, actions, cgt)
 	return err
 }
 
@@ -417,7 +417,7 @@ func (s *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequ
 	var user *types.User
 	var rs *types.RemoteSource
 
-	var cgt *wal.ChangeGroupsUpdateToken
+	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
@@ -477,16 +477,16 @@ func (s *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequ
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to marshal user")
 	}
-	actions := []*wal.Action{
+	actions := []*datamanager.Action{
 		{
-			ActionType: wal.ActionTypePut,
+			ActionType: datamanager.ActionTypePut,
 			DataType:   string(types.ConfigTypeUser),
 			ID:         user.ID,
 			Data:       userj,
 		},
 	}
 
-	_, err = s.wal.WriteWal(ctx, actions, cgt)
+	_, err = s.dm.WriteWal(ctx, actions, cgt)
 	return la, err
 }
 
@@ -500,7 +500,7 @@ func (s *CommandHandler) DeleteUserLA(ctx context.Context, userName, laID string
 
 	var user *types.User
 
-	var cgt *wal.ChangeGroupsUpdateToken
+	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
@@ -536,16 +536,16 @@ func (s *CommandHandler) DeleteUserLA(ctx context.Context, userName, laID string
 	if err != nil {
 		return errors.Wrapf(err, "failed to marshal user")
 	}
-	actions := []*wal.Action{
+	actions := []*datamanager.Action{
 		{
-			ActionType: wal.ActionTypePut,
+			ActionType: datamanager.ActionTypePut,
 			DataType:   string(types.ConfigTypeUser),
 			ID:         user.ID,
 			Data:       userj,
 		},
 	}
 
-	_, err = s.wal.WriteWal(ctx, actions, cgt)
+	_, err = s.dm.WriteWal(ctx, actions, cgt)
 	return err
 }
 
@@ -567,7 +567,7 @@ func (s *CommandHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLARequ
 	var user *types.User
 	var rs *types.RemoteSource
 
-	var cgt *wal.ChangeGroupsUpdateToken
+	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
@@ -616,16 +616,16 @@ func (s *CommandHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLARequ
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to marshal user")
 	}
-	actions := []*wal.Action{
+	actions := []*datamanager.Action{
 		{
-			ActionType: wal.ActionTypePut,
+			ActionType: datamanager.ActionTypePut,
 			DataType:   string(types.ConfigTypeUser),
 			ID:         user.ID,
 			Data:       userj,
 		},
 	}
 
-	_, err = s.wal.WriteWal(ctx, actions, cgt)
+	_, err = s.dm.WriteWal(ctx, actions, cgt)
 	return la, err
 }
 
@@ -636,7 +636,7 @@ func (s *CommandHandler) CreateUserToken(ctx context.Context, userName, tokenNam
 
 	var user *types.User
 
-	var cgt *wal.ChangeGroupsUpdateToken
+	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
@@ -677,9 +677,9 @@ func (s *CommandHandler) CreateUserToken(ctx context.Context, userName, tokenNam
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to marshal user")
 	}
-	actions := []*wal.Action{
+	actions := []*datamanager.Action{
 		{
-			ActionType: wal.ActionTypePut,
+			ActionType: datamanager.ActionTypePut,
 			DataType:   string(types.ConfigTypeUser),
 			ID:         user.ID,
 			Data:       userj,
@@ -687,7 +687,7 @@ func (s *CommandHandler) CreateUserToken(ctx context.Context, userName, tokenNam
 	}
 
 	// changegroup is the userid
-	_, err = s.wal.WriteWal(ctx, actions, cgt)
+	_, err = s.dm.WriteWal(ctx, actions, cgt)
 	return token, err
 }
 
@@ -701,7 +701,7 @@ func (s *CommandHandler) DeleteUserToken(ctx context.Context, userName, tokenNam
 
 	var user *types.User
 
-	var cgt *wal.ChangeGroupsUpdateToken
+	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
@@ -737,16 +737,16 @@ func (s *CommandHandler) DeleteUserToken(ctx context.Context, userName, tokenNam
 	if err != nil {
 		return errors.Wrapf(err, "failed to marshal user")
 	}
-	actions := []*wal.Action{
+	actions := []*datamanager.Action{
 		{
-			ActionType: wal.ActionTypePut,
+			ActionType: datamanager.ActionTypePut,
 			DataType:   string(types.ConfigTypeUser),
 			ID:         user.ID,
 			Data:       userj,
 		},
 	}
 
-	_, err = s.wal.WriteWal(ctx, actions, cgt)
+	_, err = s.dm.WriteWal(ctx, actions, cgt)
 	return err
 }
 
@@ -755,7 +755,7 @@ func (s *CommandHandler) CreateRemoteSource(ctx context.Context, remoteSource *t
 		return nil, util.NewErrBadRequest(errors.Errorf("remotesource name required"))
 	}
 
-	var cgt *wal.ChangeGroupsUpdateToken
+	var cgt *datamanager.ChangeGroupsUpdateToken
 	cgNames := []string{remoteSource.Name}
 
 	// must do all the check in a single transaction to avoid concurrent changes
@@ -786,23 +786,23 @@ func (s *CommandHandler) CreateRemoteSource(ctx context.Context, remoteSource *t
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to marshal remotesource")
 	}
-	actions := []*wal.Action{
+	actions := []*datamanager.Action{
 		{
-			ActionType: wal.ActionTypePut,
+			ActionType: datamanager.ActionTypePut,
 			DataType:   string(types.ConfigTypeRemoteSource),
 			ID:         remoteSource.ID,
 			Data:       rsj,
 		},
 	}
 
-	_, err = s.wal.WriteWal(ctx, actions, cgt)
+	_, err = s.dm.WriteWal(ctx, actions, cgt)
 	return remoteSource, err
 }
 
 func (s *CommandHandler) DeleteRemoteSource(ctx context.Context, remoteSourceName string) error {
 	var remoteSource *types.RemoteSource
 
-	var cgt *wal.ChangeGroupsUpdateToken
+	var cgt *datamanager.ChangeGroupsUpdateToken
 	cgNames := []string{remoteSource.ID}
 
 	// must do all the check in a single transaction to avoid concurrent changes
@@ -827,16 +827,16 @@ func (s *CommandHandler) DeleteRemoteSource(ctx context.Context, remoteSourceNam
 		return err
 	}
 
-	actions := []*wal.Action{
+	actions := []*datamanager.Action{
 		{
-			ActionType: wal.ActionTypeDelete,
+			ActionType: datamanager.ActionTypeDelete,
 			DataType:   string(types.ConfigTypeRemoteSource),
 			ID:         remoteSource.ID,
 		},
 	}
 
 	// changegroup is all the remote sources
-	_, err = s.wal.WriteWal(ctx, actions, cgt)
+	_, err = s.dm.WriteWal(ctx, actions, cgt)
 	return err
 }
 
@@ -845,7 +845,7 @@ func (s *CommandHandler) CreateOrg(ctx context.Context, org *types.Organization)
 		return nil, util.NewErrBadRequest(errors.Errorf("org name required"))
 	}
 
-	var cgt *wal.ChangeGroupsUpdateToken
+	var cgt *datamanager.ChangeGroupsUpdateToken
 	cgNames := []string{org.Name}
 
 	// must do all the check in a single transaction to avoid concurrent changes
@@ -887,22 +887,22 @@ func (s *CommandHandler) CreateOrg(ctx context.Context, org *types.Organization)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to marshal project group")
 	}
-	actions := []*wal.Action{
+	actions := []*datamanager.Action{
 		{
-			ActionType: wal.ActionTypePut,
+			ActionType: datamanager.ActionTypePut,
 			DataType:   string(types.ConfigTypeOrg),
 			ID:         org.ID,
 			Data:       orgj,
 		},
 		{
-			ActionType: wal.ActionTypePut,
+			ActionType: datamanager.ActionTypePut,
 			DataType:   string(types.ConfigTypeProjectGroup),
 			ID:         pg.ID,
 			Data:       pgj,
 		},
 	}
 
-	_, err = s.wal.WriteWal(ctx, actions, cgt)
+	_, err = s.dm.WriteWal(ctx, actions, cgt)
 	return org, err
 }
 
@@ -910,7 +910,7 @@ func (s *CommandHandler) DeleteOrg(ctx context.Context, orgName string) error {
 	var org *types.Organization
 	var projects []*types.Project
 
-	var cgt *wal.ChangeGroupsUpdateToken
+	var cgt *datamanager.ChangeGroupsUpdateToken
 	cgNames := []string{orgName}
 
 	// must do all the check in a single transaction to avoid concurrent changes
@@ -936,23 +936,23 @@ func (s *CommandHandler) DeleteOrg(ctx context.Context, orgName string) error {
 		return err
 	}
 
-	actions := []*wal.Action{
+	actions := []*datamanager.Action{
 		{
-			ActionType: wal.ActionTypeDelete,
+			ActionType: datamanager.ActionTypeDelete,
 			DataType:   string(types.ConfigTypeOrg),
 			ID:         org.ID,
 		},
 	}
 	// delete all org projects
 	for _, project := range projects {
-		actions = append(actions, &wal.Action{
-			ActionType: wal.ActionTypeDelete,
+		actions = append(actions, &datamanager.Action{
+			ActionType: datamanager.ActionTypeDelete,
 			DataType:   string(types.ConfigTypeProject),
 			ID:         project.ID,
 		})
 	}
 
-	_, err = s.wal.WriteWal(ctx, actions, cgt)
+	_, err = s.dm.WriteWal(ctx, actions, cgt)
 	return err
 }
 
@@ -979,7 +979,7 @@ func (s *CommandHandler) CreateSecret(ctx context.Context, secret *types.Secret)
 		return nil, util.NewErrBadRequest(errors.Errorf("invalid secret parent type %q", secret.Parent.Type))
 	}
 
-	var cgt *wal.ChangeGroupsUpdateToken
+	var cgt *datamanager.ChangeGroupsUpdateToken
 	cgNames := []string{secret.Name}
 
 	// must do all the check in a single transaction to avoid concurrent changes
@@ -1017,23 +1017,23 @@ func (s *CommandHandler) CreateSecret(ctx context.Context, secret *types.Secret)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to marshal secret")
 	}
-	actions := []*wal.Action{
+	actions := []*datamanager.Action{
 		{
-			ActionType: wal.ActionTypePut,
+			ActionType: datamanager.ActionTypePut,
 			DataType:   string(types.ConfigTypeSecret),
 			ID:         secret.ID,
 			Data:       secretj,
 		},
 	}
 
-	_, err = s.wal.WriteWal(ctx, actions, cgt)
+	_, err = s.dm.WriteWal(ctx, actions, cgt)
 	return secret, err
 }
 
 func (s *CommandHandler) DeleteSecret(ctx context.Context, parentType types.ConfigType, parentRef, secretName string) error {
 	var secret *types.Secret
 
-	var cgt *wal.ChangeGroupsUpdateToken
+	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
@@ -1064,15 +1064,15 @@ func (s *CommandHandler) DeleteSecret(ctx context.Context, parentType types.Conf
 		return err
 	}
 
-	actions := []*wal.Action{
+	actions := []*datamanager.Action{
 		{
-			ActionType: wal.ActionTypeDelete,
+			ActionType: datamanager.ActionTypeDelete,
 			DataType:   string(types.ConfigTypeSecret),
 			ID:         secret.ID,
 		},
 	}
 
-	_, err = s.wal.WriteWal(ctx, actions, cgt)
+	_, err = s.dm.WriteWal(ctx, actions, cgt)
 	return err
 }
 
@@ -1093,7 +1093,7 @@ func (s *CommandHandler) CreateVariable(ctx context.Context, variable *types.Var
 		return nil, util.NewErrBadRequest(errors.Errorf("invalid variable parent type %q", variable.Parent.Type))
 	}
 
-	var cgt *wal.ChangeGroupsUpdateToken
+	var cgt *datamanager.ChangeGroupsUpdateToken
 	cgNames := []string{variable.Name}
 
 	// must do all the check in a single transaction to avoid concurrent changes
@@ -1131,23 +1131,23 @@ func (s *CommandHandler) CreateVariable(ctx context.Context, variable *types.Var
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to marshal variable")
 	}
-	actions := []*wal.Action{
+	actions := []*datamanager.Action{
 		{
-			ActionType: wal.ActionTypePut,
+			ActionType: datamanager.ActionTypePut,
 			DataType:   string(types.ConfigTypeVariable),
 			ID:         variable.ID,
 			Data:       variablej,
 		},
 	}
 
-	_, err = s.wal.WriteWal(ctx, actions, cgt)
+	_, err = s.dm.WriteWal(ctx, actions, cgt)
 	return variable, err
 }
 
 func (s *CommandHandler) DeleteVariable(ctx context.Context, parentType types.ConfigType, parentRef, variableName string) error {
 	var variable *types.Variable
 
-	var cgt *wal.ChangeGroupsUpdateToken
+	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
@@ -1177,14 +1177,14 @@ func (s *CommandHandler) DeleteVariable(ctx context.Context, parentType types.Co
 		return err
 	}
 
-	actions := []*wal.Action{
+	actions := []*datamanager.Action{
 		{
-			ActionType: wal.ActionTypeDelete,
+			ActionType: datamanager.ActionTypeDelete,
 			DataType:   string(types.ConfigTypeVariable),
 			ID:         variable.ID,
 		},
 	}
 
-	_, err = s.wal.WriteWal(ctx, actions, cgt)
+	_, err = s.dm.WriteWal(ctx, actions, cgt)
 	return err
 }

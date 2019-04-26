@@ -21,16 +21,16 @@ import (
 	"path/filepath"
 
 	scommon "github.com/sorintlab/agola/internal/common"
+	"github.com/sorintlab/agola/internal/datamanager"
 	"github.com/sorintlab/agola/internal/etcd"
 	slog "github.com/sorintlab/agola/internal/log"
 	"github.com/sorintlab/agola/internal/objectstorage"
 	"github.com/sorintlab/agola/internal/services/config"
 	"github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/configstore/command"
-	"github.com/sorintlab/agola/internal/services/configstore/common"
 	"github.com/sorintlab/agola/internal/services/configstore/readdb"
+	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
-	"github.com/sorintlab/agola/internal/wal"
 
 	ghandlers "github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
@@ -45,7 +45,7 @@ var log = logger.Sugar()
 type ConfigStore struct {
 	c             *config.ConfigStore
 	e             *etcd.Store
-	wal           *wal.WalManager
+	dm            *datamanager.DataManager
 	readDB        *readdb.ReadDB
 	ost           *objectstorage.ObjStorage
 	ch            *command.CommandHandler
@@ -72,24 +72,32 @@ func NewConfigStore(ctx context.Context, c *config.ConfigStore) (*ConfigStore, e
 		ost: ost,
 	}
 
-	walConf := &wal.WalManagerConfig{
-		E:              e,
-		OST:            ost,
-		DataToPathFunc: common.DataToPathFunc,
+	dmConf := &datamanager.DataManagerConfig{
+		E:   e,
+		OST: ost,
+		DataTypes: []string{
+			string(types.ConfigTypeUser),
+			string(types.ConfigTypeOrg),
+			string(types.ConfigTypeProjectGroup),
+			string(types.ConfigTypeProject),
+			string(types.ConfigTypeRemoteSource),
+			string(types.ConfigTypeSecret),
+			string(types.ConfigTypeVariable),
+		},
 	}
-	wal, err := wal.NewWalManager(ctx, logger, walConf)
+	dm, err := datamanager.NewDataManager(ctx, logger, dmConf)
 	if err != nil {
 		return nil, err
 	}
-	readDB, err := readdb.NewReadDB(ctx, logger, filepath.Join(c.DataDir, "readdb"), e, ost, wal)
+	readDB, err := readdb.NewReadDB(ctx, logger, filepath.Join(c.DataDir, "readdb"), e, ost, dm)
 	if err != nil {
 		return nil, err
 	}
 
-	cs.wal = wal
+	cs.dm = dm
 	cs.readDB = readDB
 
-	ch := command.NewCommandHandler(logger, readDB, wal)
+	ch := command.NewCommandHandler(logger, readDB, dm)
 	cs.ch = ch
 
 	return cs, nil
@@ -97,12 +105,12 @@ func NewConfigStore(ctx context.Context, c *config.ConfigStore) (*ConfigStore, e
 
 func (s *ConfigStore) Run(ctx context.Context) error {
 	errCh := make(chan error)
-	walReadyCh := make(chan struct{})
+	dmReadyCh := make(chan struct{})
 
-	go func() { errCh <- s.wal.Run(ctx, walReadyCh) }()
+	go func() { errCh <- s.dm.Run(ctx, dmReadyCh) }()
 
-	// wait for wal to be ready
-	<-walReadyCh
+	// wait for dm to be ready
+	<-dmReadyCh
 
 	go func() { errCh <- s.readDB.Run(ctx) }()
 

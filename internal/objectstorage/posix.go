@@ -251,7 +251,7 @@ func (s *PosixStorage) Stat(p string) (*ObjectInfo, error) {
 	return &ObjectInfo{Path: p, LastModified: fi.ModTime()}, nil
 }
 
-func (s *PosixStorage) ReadObject(p string) (io.ReadCloser, error) {
+func (s *PosixStorage) ReadObject(p string) (ReadSeekCloser, error) {
 	fspath, err := s.fsPath(p)
 	if err != nil {
 		return nil, err

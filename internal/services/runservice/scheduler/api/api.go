@@ -32,7 +32,7 @@ import (
 	"github.com/sorintlab/agola/internal/services/runservice/scheduler/store"
 	"github.com/sorintlab/agola/internal/services/runservice/types"
 	"github.com/sorintlab/agola/internal/util"
-	"github.com/sorintlab/agola/internal/wal"
+	"github.com/sorintlab/agola/internal/datamanager"
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
@@ -102,15 +102,15 @@ type LogsHandler struct {
 	log *zap.SugaredLogger
 	e   *etcd.Store
 	ost *objectstorage.ObjStorage
-	wal *wal.WalManager
+	dm  *datamanager.DataManager
 }
 
-func NewLogsHandler(logger *zap.Logger, e *etcd.Store, ost *objectstorage.ObjStorage, wal *wal.WalManager) *LogsHandler {
+func NewLogsHandler(logger *zap.Logger, e *etcd.Store, ost *objectstorage.ObjStorage, dm *datamanager.DataManager) *LogsHandler {
 	return &LogsHandler{
 		log: logger.Sugar(),
 		e:   e,
 		ost: ost,
-		wal: wal,
+		dm:  dm,
 	}
 }
 
@@ -178,7 +178,7 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, setup bool, step int, w http.ResponseWriter, follow, stream bool) (error, bool) {
-	r, err := store.GetRunEtcdOrOST(ctx, h.e, h.wal, runID)
+	r, err := store.GetRunEtcdOrOST(ctx, h.e, h.dm, runID)
 	if err != nil {
 		return err, true
 	}
@@ -340,15 +340,15 @@ type RunResponse struct {
 type RunHandler struct {
 	log    *zap.SugaredLogger
 	e      *etcd.Store
-	wal    *wal.WalManager
+	dm     *datamanager.DataManager
 	readDB *readdb.ReadDB
 }
 
-func NewRunHandler(logger *zap.Logger, e *etcd.Store, wal *wal.WalManager, readDB *readdb.ReadDB) *RunHandler {
+func NewRunHandler(logger *zap.Logger, e *etcd.Store, dm *datamanager.DataManager, readDB *readdb.ReadDB) *RunHandler {
 	return &RunHandler{
 		log:    logger.Sugar(),
 		e:      e,
-		wal:    wal,
+		dm:     dm,
 		readDB: readDB,
 	}
 }
@@ -364,7 +364,7 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if run == nil {
-		run, err = store.OSTGetRun(h.wal, runID)
+		run, err = store.OSTGetRun(h.dm, runID)
 		if err != nil && err != objectstorage.ErrNotExist {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -375,7 +375,7 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rc, err := store.OSTGetRunConfig(h.wal, run.ID)
+	rc, err := store.OSTGetRunConfig(h.dm, run.ID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

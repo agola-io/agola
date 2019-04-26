@@ -15,7 +15,6 @@
 package common
 
 import (
-	"fmt"
 	"path"
 )
 
@@ -75,18 +74,6 @@ const (
 	etcdWalsMinRevisionRange = 100
 )
 
-func StorageRunFile(runID string) string {
-	return path.Join(StorageRunsDir, runID)
-}
-
-func StorageRunConfigFile(runID string) string {
-	return path.Join(StorageRunsConfigDir, runID)
-}
-
-func StorageRunCounterFile(group string) string {
-	return path.Join(StorageCountersDir, group)
-}
-
 type DataType string
 
 const (
@@ -94,16 +81,3 @@ const (
 	DataTypeRunConfig  DataType = "runconfig"
 	DataTypeRunCounter DataType = "runcounter"
 )
-
-func DataToPathFunc(dataType string, id string) string {
-	switch DataType(dataType) {
-	case DataTypeRun:
-		return StorageRunFile(id)
-	case DataTypeRunConfig:
-		return StorageRunConfigFile(id)
-	case DataTypeRunCounter:
-		return StorageRunCounterFile(id)
-	}
-
-	panic(fmt.Errorf("unknown data type %q", dataType))
-}

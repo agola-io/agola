@@ -20,6 +20,7 @@ import (
 	"path"
 	"time"
 
+	"github.com/sorintlab/agola/internal/datamanager"
 	"github.com/sorintlab/agola/internal/db"
 	"github.com/sorintlab/agola/internal/etcd"
 	"github.com/sorintlab/agola/internal/objectstorage"
@@ -30,7 +31,6 @@ import (
 	"github.com/sorintlab/agola/internal/services/runservice/scheduler/store"
 	"github.com/sorintlab/agola/internal/services/runservice/types"
 	"github.com/sorintlab/agola/internal/util"
-	"github.com/sorintlab/agola/internal/wal"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -41,16 +41,16 @@ type CommandHandler struct {
 	e      *etcd.Store
 	readDB *readdb.ReadDB
 	ost    *objectstorage.ObjStorage
-	wal    *wal.WalManager
+	dm     *datamanager.DataManager
 }
 
-func NewCommandHandler(logger *zap.Logger, e *etcd.Store, readDB *readdb.ReadDB, ost *objectstorage.ObjStorage, wal *wal.WalManager) *CommandHandler {
+func NewCommandHandler(logger *zap.Logger, e *etcd.Store, readDB *readdb.ReadDB, ost *objectstorage.ObjStorage, dm *datamanager.DataManager) *CommandHandler {
 	return &CommandHandler{
 		log:    logger.Sugar(),
 		e:      e,
 		readDB: readDB,
 		ost:    ost,
-		wal:    wal,
+		dm:     dm,
 	}
 }
 
@@ -218,12 +218,12 @@ func (s *CommandHandler) recreateRun(ctx context.Context, req *RunCreateRequest)
 
 	// fetch the existing runconfig and run
 	s.log.Infof("creating run from existing run")
-	rc, err := store.OSTGetRunConfig(s.wal, req.RunID)
+	rc, err := store.OSTGetRunConfig(s.dm, req.RunID)
 	if err != nil {
 		return nil, util.NewErrBadRequest(errors.Wrapf(err, "runconfig %q doens't exist", req.RunID))
 	}
 
-	run, err := store.GetRunEtcdOrOST(ctx, s.e, s.wal, req.RunID)
+	run, err := store.GetRunEtcdOrOST(ctx, s.e, s.dm, req.RunID)
 	if err != nil {
 		return nil, err
 	}
@@ -379,7 +379,7 @@ func (s *CommandHandler) saveRun(ctx context.Context, rb *types.RunBundle, runcg
 
 	run.EnqueueTime = util.TimePtr(time.Now())
 
-	actions := []*wal.Action{}
+	actions := []*datamanager.Action{}
 
 	// persist group counter
 	rca, err := store.OSTUpdateRunCounterAction(ctx, c, run.Group)
@@ -395,7 +395,7 @@ func (s *CommandHandler) saveRun(ctx context.Context, rb *types.RunBundle, runcg
 	}
 	actions = append(actions, rca)
 
-	if _, err = s.wal.WriteWal(ctx, actions, cgt); err != nil {
+	if _, err = s.dm.WriteWal(ctx, actions, cgt); err != nil {
 		return err
 	}
 
@@ -531,7 +531,7 @@ func (s *CommandHandler) DeleteExecutor(ctx context.Context, executorID string) 
 	return nil
 }
 
-func (s *CommandHandler) getRunCounter(group string) (uint64, *wal.ChangeGroupsUpdateToken, error) {
+func (s *CommandHandler) getRunCounter(group string) (uint64, *datamanager.ChangeGroupsUpdateToken, error) {
 	// use the first group dir after the root
 	pl := util.PathList(group)
 	if len(pl) < 2 {
@@ -539,7 +539,7 @@ func (s *CommandHandler) getRunCounter(group string) (uint64, *wal.ChangeGroupsU
 	}
 
 	var c uint64
-	var cgt *wal.ChangeGroupsUpdateToken
+	var cgt *datamanager.ChangeGroupsUpdateToken
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		c, err = s.readDB.GetRunCounterOST(tx, pl[1])

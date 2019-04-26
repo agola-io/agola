@@ -19,20 +19,18 @@ import (
 	"database/sql"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
 
+	"github.com/sorintlab/agola/internal/datamanager"
 	"github.com/sorintlab/agola/internal/db"
 	"github.com/sorintlab/agola/internal/etcd"
 	"github.com/sorintlab/agola/internal/objectstorage"
 	"github.com/sorintlab/agola/internal/sequence"
-	"github.com/sorintlab/agola/internal/services/configstore/common"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
-	"github.com/sorintlab/agola/internal/wal"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/pkg/errors"
@@ -59,13 +57,13 @@ type ReadDB struct {
 	e       *etcd.Store
 	rdb     *db.DB
 	ost     *objectstorage.ObjStorage
-	wal     *wal.WalManager
+	dm      *datamanager.DataManager
 
 	Initialized bool
 	initMutex   sync.Mutex
 }
 
-func NewReadDB(ctx context.Context, logger *zap.Logger, dataDir string, e *etcd.Store, ost *objectstorage.ObjStorage, wal *wal.WalManager) (*ReadDB, error) {
+func NewReadDB(ctx context.Context, logger *zap.Logger, dataDir string, e *etcd.Store, ost *objectstorage.ObjStorage, dm *datamanager.DataManager) (*ReadDB, error) {
 	if err := os.MkdirAll(dataDir, 0770); err != nil {
 		return nil, err
 	}
@@ -85,7 +83,7 @@ func NewReadDB(ctx context.Context, logger *zap.Logger, dataDir string, e *etcd.
 		rdb:     rdb,
 		e:       e,
 		ost:     ost,
-		wal:     wal,
+		dm:      dm,
 	}
 
 	return readDB, nil
@@ -125,65 +123,44 @@ func (r *ReadDB) ResetDB() error {
 	return nil
 }
 
-func (r *ReadDB) SyncFromFiles() (string, error) {
-	doneCh := make(chan struct{})
-	defer close(doneCh)
-
-	var lastCheckpointedWal string
-	// Get last checkpointed wal from lts
-	for wal := range r.wal.ListOSTWals("") {
-		if wal.Err != nil {
-			return "", wal.Err
+func (r *ReadDB) SyncFromDump() (string, error) {
+	dumpIndex, err := r.dm.GetLastDataStatus()
+	if err != nil && err != objectstorage.ErrNotExist {
+		return "", errors.WithStack(err)
+	}
+	if err == objectstorage.ErrNotExist {
+		return "", nil
+	}
+	for dataType, files := range dumpIndex.Files {
+		dumpf, err := r.ost.ReadObject(files[0])
+		if err != nil {
+			return "", errors.WithStack(err)
 		}
-		if wal.Checkpointed {
-			lastCheckpointedWal = wal.WalSequence
+		dumpEntries := []*datamanager.DataEntry{}
+		dec := json.NewDecoder(dumpf)
+		for {
+			var de *datamanager.DataEntry
+
+			err := dec.Decode(&de)
+			if err == io.EOF {
+				// all done
+				break
+			}
+			if err != nil {
+				dumpf.Close()
+				return "", err
+			}
+			dumpEntries = append(dumpEntries, de)
 		}
-	}
+		dumpf.Close()
 
-	doneCh = make(chan struct{})
-	haveConfigFiles := false
-	for object := range r.wal.List(common.StorageDataDir, "", true, doneCh) {
-		if object.Err != nil {
-			close(doneCh)
-			return "", object.Err
-		}
-
-		haveConfigFiles = true
-		break
-	}
-	close(doneCh)
-
-	if lastCheckpointedWal == "" && haveConfigFiles {
-		return "", errors.Errorf("no last checkpointed wal in lts but the storage has config files. This should never happen!")
-	}
-
-	if !haveConfigFiles {
-		return lastCheckpointedWal, nil
-	}
-
-	insertfunc := func(objs []string) error {
-		err := r.rdb.Do(func(tx *db.Tx) error {
-			for _, obj := range objs {
-				f, _, err := r.wal.ReadObject(obj, nil)
-				if err != nil {
-					if err == objectstorage.ErrNotExist {
-						r.log.Warnf("object %s disappeared, ignoring", obj)
-					}
-					return err
-				}
-				data, err := ioutil.ReadAll(f)
-				if err != nil {
-					f.Close()
-					return err
-				}
-				f.Close()
-
-				configType, id := common.PathToTypeID(obj)
-				action := &wal.Action{
-					ActionType: wal.ActionTypePut,
-					DataType:   string(configType),
-					ID:         id,
-					Data:       data,
+		err = r.rdb.Do(func(tx *db.Tx) error {
+			for _, de := range dumpEntries {
+				action := &datamanager.Action{
+					ActionType: datamanager.ActionTypePut,
+					ID:         de.ID,
+					DataType:   dataType,
+					Data:       de.Data,
 				}
 				if err := r.applyAction(tx, action); err != nil {
 					return err
@@ -191,59 +168,24 @@ func (r *ReadDB) SyncFromFiles() (string, error) {
 			}
 			return nil
 		})
-		return err
-	}
-
-	objs := []string{}
-	count := 0
-	doneCh = make(chan struct{})
-	defer close(doneCh)
-
-	// file may have changed in the meantime (due to checkpointing) but we don't
-	// need to have a consistent snapshot since we'll apply all the wals and handle
-	// them
-	for object := range r.wal.List(common.StorageDataDir, "", true, doneCh) {
-		if object.Err != nil {
-			return "", object.Err
-		}
-
-		objs = append(objs, object.Path)
-
-		if count > 100 {
-			if err := insertfunc(objs); err != nil {
-				return "", err
-			}
-			count = 0
-			objs = []string{}
-		} else {
-			count++
+		if err != nil {
+			return "", err
 		}
 	}
-	if err := insertfunc(objs); err != nil {
-		return "", err
-	}
 
-	// save the wal sequence of the last checkpointed wal before syncing from files
-	err := r.rdb.Do(func(tx *db.Tx) error {
-		return r.insertCommittedWalSequence(tx, lastCheckpointedWal)
-	})
-	if err != nil {
-		return "", err
-	}
-
-	return lastCheckpointedWal, nil
+	return dumpIndex.WalSequence, nil
 }
 
 func (r *ReadDB) SyncFromWals(startWalSeq, endWalSeq string) (string, error) {
-	insertfunc := func(walFiles []*wal.WalFile) error {
+	insertfunc := func(walFiles []*datamanager.WalFile) error {
 		err := r.rdb.Do(func(tx *db.Tx) error {
 			for _, walFile := range walFiles {
-				walFilef, err := r.wal.ReadWal(walFile.WalSequence)
+				walFilef, err := r.dm.ReadWal(walFile.WalSequence)
 				if err != nil {
 					return err
 				}
 				dec := json.NewDecoder(walFilef)
-				var header *wal.WalHeader
+				var header *datamanager.WalHeader
 				if err = dec.Decode(&header); err != nil && err != io.EOF {
 					walFilef.Close()
 					return err
@@ -262,13 +204,13 @@ func (r *ReadDB) SyncFromWals(startWalSeq, endWalSeq string) (string, error) {
 	}
 
 	lastWalSeq := startWalSeq
-	walFiles := []*wal.WalFile{}
+	walFiles := []*datamanager.WalFile{}
 	count := 0
 
 	doneCh := make(chan struct{})
 	defer close(doneCh)
 
-	for walFile := range r.wal.ListOSTWals(startWalSeq) {
+	for walFile := range r.dm.ListOSTWals(startWalSeq) {
 		if walFile.Err != nil {
 			return "", walFile.Err
 		}
@@ -281,7 +223,7 @@ func (r *ReadDB) SyncFromWals(startWalSeq, endWalSeq string) (string, error) {
 				return "", err
 			}
 			count = 0
-			walFiles = []*wal.WalFile{}
+			walFiles = []*datamanager.WalFile{}
 		} else {
 			count++
 		}
@@ -308,7 +250,7 @@ func (r *ReadDB) SyncRDB(ctx context.Context) error {
 		return err
 	}
 
-	lastCommittedStorageWal, _, err := r.wal.LastCommittedStorageWal(ctx)
+	lastCommittedStorageWal, _, err := r.dm.LastCommittedStorageWal(ctx)
 	if err != nil {
 		return err
 	}
@@ -318,7 +260,7 @@ func (r *ReadDB) SyncRDB(ctx context.Context) error {
 		doFullSync = true
 		r.log.Warn("no startWalSeq in db, doing a full sync")
 	} else {
-		ok, err := r.wal.HasOSTWal(curWalSeq)
+		ok, err := r.dm.HasOSTWal(curWalSeq)
 		if err != nil {
 			return err
 		}
@@ -349,15 +291,15 @@ func (r *ReadDB) SyncRDB(ctx context.Context) error {
 	}
 
 	if doFullSync {
-		r.log.Infof("doing a full sync from lts files")
+		r.log.Infof("doing a full sync from dump")
 		if err := r.ResetDB(); err != nil {
 			return err
 		}
 
 		var err error
-		curWalSeq, err = r.SyncFromFiles()
+		curWalSeq, err = r.SyncFromDump()
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	}
 
@@ -377,7 +319,7 @@ func (r *ReadDB) SyncRDB(ctx context.Context) error {
 	// from wals on objectstorage is >=
 	// if not (this happens when syncFromWals takes some time and in the meantime
 	// many new wals are written, the next sync should be faster and able to continue
-	firstAvailableWalData, revision, err := r.wal.FirstAvailableWalData(ctx)
+	firstAvailableWalData, revision, err := r.dm.FirstAvailableWalData(ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to get first available wal data")
 	}
@@ -401,14 +343,14 @@ func (r *ReadDB) SyncRDB(ctx context.Context) error {
 		}
 
 		// use the same revision as previous operation
-		for walElement := range r.wal.ListEtcdWals(ctx, revision) {
+		for walElement := range r.dm.ListEtcdWals(ctx, revision) {
 			if walElement.Err != nil {
 				return err
 			}
 			if walElement.WalData.WalSequence <= curWalSeq {
 				continue
 			}
-			//if walElement.WalData.WalStatus == wal.WalStatusCommittedStorage {
+			//if walElement.WalData.WalStatus == datamanager.WalStatusCommittedStorage {
 
 			if err := r.insertCommittedWalSequence(tx, walElement.WalData.WalSequence); err != nil {
 				return err
@@ -416,7 +358,7 @@ func (r *ReadDB) SyncRDB(ctx context.Context) error {
 			//}
 
 			//// update readdb only when the wal has been committed to objectstorage
-			//if walElement.WalData.WalStatus != wal.WalStatusCommittedStorage {
+			//if walElement.WalData.WalStatus != datamanager.WalStatusCommittedStorage {
 			//	return nil
 			//}
 
@@ -494,12 +436,12 @@ func (r *ReadDB) HandleEvents(ctx context.Context) error {
 	wctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	r.log.Infof("revision: %d", revision)
-	wch := r.wal.Watch(wctx, revision+1)
+	wch := r.dm.Watch(wctx, revision+1)
 	for we := range wch {
 		r.log.Debugf("we: %s", util.Dump(we))
 		if we.Err != nil {
 			err := we.Err
-			if err == wal.ErrCompacted {
+			if err == datamanager.ErrCompacted {
 				r.log.Warnf("required events already compacted, reinitializing readdb")
 				r.Initialized = false
 				return nil
@@ -558,7 +500,7 @@ func (r *ReadDB) HandleEvents(ctx context.Context) error {
 	return nil
 }
 
-func (r *ReadDB) handleEvent(tx *db.Tx, we *wal.WatchElement) error {
+func (r *ReadDB) handleEvent(tx *db.Tx, we *datamanager.WatchElement) error {
 	//r.log.Debugf("event: %s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
 	//key := string(ev.Kv.Key)
 
@@ -568,7 +510,7 @@ func (r *ReadDB) handleEvent(tx *db.Tx, we *wal.WatchElement) error {
 	return nil
 }
 
-func (r *ReadDB) handleWalEvent(tx *db.Tx, we *wal.WatchElement) error {
+func (r *ReadDB) handleWalEvent(tx *db.Tx, we *datamanager.WatchElement) error {
 	// update readdb only when the wal has been committed to objectstorage
 	//if we.WalData.WalStatus != wal.WalStatusCommittedStorage {
 	//	return nil
@@ -594,7 +536,7 @@ func (r *ReadDB) handleWalEvent(tx *db.Tx, we *wal.WatchElement) error {
 }
 
 func (r *ReadDB) applyWal(tx *db.Tx, walDataFileID string) error {
-	walFile, err := r.wal.ReadWalData(walDataFileID)
+	walFile, err := r.dm.ReadWalData(walDataFileID)
 	if err != nil {
 		return errors.Wrapf(err, "cannot read wal data file %q", walDataFileID)
 	}
@@ -602,7 +544,7 @@ func (r *ReadDB) applyWal(tx *db.Tx, walDataFileID string) error {
 
 	dec := json.NewDecoder(walFile)
 	for {
-		var action *wal.Action
+		var action *datamanager.Action
 
 		err := dec.Decode(&action)
 		if err == io.EOF {
@@ -621,9 +563,9 @@ func (r *ReadDB) applyWal(tx *db.Tx, walDataFileID string) error {
 	return nil
 }
 
-func (r *ReadDB) applyAction(tx *db.Tx, action *wal.Action) error {
+func (r *ReadDB) applyAction(tx *db.Tx, action *datamanager.Action) error {
 	switch action.ActionType {
-	case wal.ActionTypePut:
+	case datamanager.ActionTypePut:
 		switch types.ConfigType(action.DataType) {
 		case types.ConfigTypeUser:
 			if err := r.insertUser(tx, action.Data); err != nil {
@@ -655,7 +597,7 @@ func (r *ReadDB) applyAction(tx *db.Tx, action *wal.Action) error {
 			}
 		}
 
-	case wal.ActionTypeDelete:
+	case datamanager.ActionTypeDelete:
 		switch types.ConfigType(action.DataType) {
 		case types.ConfigTypeUser:
 			r.log.Debugf("deleting user with id: %s", action.ID)
@@ -799,7 +741,7 @@ func (r *ReadDB) insertChangeGroupRevision(tx *db.Tx, changegroup string, revisi
 	return nil
 }
 
-func (r *ReadDB) GetChangeGroupsUpdateTokens(tx *db.Tx, groups []string) (*wal.ChangeGroupsUpdateToken, error) {
+func (r *ReadDB) GetChangeGroupsUpdateTokens(tx *db.Tx, groups []string) (*datamanager.ChangeGroupsUpdateToken, error) {
 	s := changegrouprevisionSelect.Where(sq.Eq{"id": groups})
 	q, args, err := s.ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
@@ -823,7 +765,7 @@ func (r *ReadDB) GetChangeGroupsUpdateTokens(tx *db.Tx, groups []string) (*wal.C
 		}
 	}
 
-	return &wal.ChangeGroupsUpdateToken{CurRevision: revision, ChangeGroupsRevisions: cgr}, nil
+	return &datamanager.ChangeGroupsUpdateToken{CurRevision: revision, ChangeGroupsRevisions: cgr}, nil
 }
 
 func fetchChangeGroupsRevision(tx *db.Tx, q string, args ...interface{}) (map[string]int64, error) {

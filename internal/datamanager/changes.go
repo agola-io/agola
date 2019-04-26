@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package wal
+package datamanager
 
 import (
 	"context"
@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 	"path"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -32,11 +31,12 @@ import (
 	"go.etcd.io/etcd/mvcc/mvccpb"
 )
 
+// TODO(sgotti) rewrite this to use a sqlite local cache
+
 type WalChanges struct {
 	actions               map[string][]*Action
-	puts                  map[string]string
-	deletes               map[string]string
-	pathsOrdered          []string
+	puts                  map[string]map[string]string // map[dataType]map[id]
+	deletes               map[string]map[string]string
 	walSeq                string
 	revision              int64
 	changeGroupsRevisions changeGroupsRevisions
@@ -44,13 +44,20 @@ type WalChanges struct {
 	sync.Mutex
 }
 
-func NewWalChanges() *WalChanges {
-	return &WalChanges{
+func NewWalChanges(dataTypes []string) *WalChanges {
+	changes := &WalChanges{
 		actions:               make(map[string][]*Action),
-		puts:                  make(map[string]string),
-		deletes:               make(map[string]string),
+		puts:                  make(map[string]map[string]string),
+		deletes:               make(map[string]map[string]string),
 		changeGroupsRevisions: make(changeGroupsRevisions),
 	}
+
+	for _, dataType := range dataTypes {
+		changes.puts[dataType] = make(map[string]string)
+		changes.deletes[dataType] = make(map[string]string)
+	}
+
+	return changes
 }
 
 func (c *WalChanges) String() string {
@@ -69,8 +76,8 @@ func (c *WalChanges) curWalSeq() string {
 	return c.walSeq
 }
 
-func (c *WalChanges) getPut(p string) (string, bool) {
-	walseq, ok := c.puts[p]
+func (c *WalChanges) getPut(dataType, id string) (string, bool) {
+	walseq, ok := c.puts[dataType][id]
 	return walseq, ok
 }
 
@@ -87,30 +94,30 @@ func (c *WalChanges) getDelete(p string) bool {
 	return ok
 }
 
-func (c *WalChanges) addPut(p, walseq string, revision int64) {
-	delete(c.deletes, p)
-	c.puts[p] = walseq
+func (c *WalChanges) addPut(dataType, id, walseq string, revision int64) {
+	delete(c.deletes[dataType], id)
+	c.puts[dataType][id] = walseq
 
 	c.walSeq = walseq
 	c.revision = revision
 }
 
-func (c *WalChanges) removePut(p string, revision int64) {
-	delete(c.puts, p)
+func (c *WalChanges) removePut(dataType, id string, revision int64) {
+	delete(c.puts[dataType], id)
 
 	c.revision = revision
 }
 
-func (c *WalChanges) addDelete(p, walseq string, revision int64) {
-	delete(c.puts, p)
-	c.deletes[p] = walseq
+func (c *WalChanges) addDelete(dataType, id, walseq string, revision int64) {
+	delete(c.puts[dataType], id)
+	c.deletes[dataType][id] = walseq
 
 	c.walSeq = walseq
 	c.revision = revision
 }
 
-func (c *WalChanges) removeDelete(p string, revision int64) {
-	delete(c.deletes, p)
+func (c *WalChanges) removeDelete(dataType, id string, revision int64) {
+	delete(c.deletes[dataType], id)
 
 	c.revision = revision
 }
@@ -137,28 +144,18 @@ func (c *WalChanges) removeChangeGroup(cgName string) {
 	delete(c.changeGroupsRevisions, cgName)
 }
 
-func (c *WalChanges) updatePathsOrdered() {
-	c.pathsOrdered = make([]string, len(c.puts))
-	i := 0
-	for p := range c.puts {
-		c.pathsOrdered[i] = p
-		i++
-	}
-	sort.Sort(sort.StringSlice(c.pathsOrdered))
-}
+func (d *DataManager) applyWalChanges(ctx context.Context, walData *WalData, revision int64) error {
+	walDataFilePath := d.storageWalDataFile(walData.WalDataFileID)
 
-func (w *WalManager) applyWalChanges(ctx context.Context, walData *WalData, revision int64) error {
-	walDataFilePath := w.storageWalDataFile(walData.WalDataFileID)
-
-	walDataFile, err := w.ost.ReadObject(walDataFilePath)
+	walDataFile, err := d.ost.ReadObject(walDataFilePath)
 	if err != nil {
 		return errors.Wrapf(err, "failed to read waldata %q", walDataFilePath)
 	}
 	defer walDataFile.Close()
 	dec := json.NewDecoder(walDataFile)
 
-	w.changes.Lock()
-	defer w.changes.Unlock()
+	d.changes.Lock()
+	defer d.changes.Unlock()
 	for {
 		var action *Action
 
@@ -171,48 +168,42 @@ func (w *WalManager) applyWalChanges(ctx context.Context, walData *WalData, revi
 			return errors.Wrapf(err, "failed to decode wal file")
 		}
 
-		w.applyWalChangesAction(ctx, action, walData.WalSequence, revision)
+		d.applyWalChangesAction(ctx, action, walData.WalSequence, revision)
 	}
-
-	w.changes.updatePathsOrdered()
 
 	return nil
 }
 
-func (w *WalManager) applyWalChangesAction(ctx context.Context, action *Action, walSequence string, revision int64) {
-	dataPath := w.dataToPathFunc(action.DataType, action.ID)
-	if dataPath == "" {
-		return
-	}
+func (d *DataManager) applyWalChangesAction(ctx context.Context, action *Action, walSequence string, revision int64) {
 	switch action.ActionType {
 	case ActionTypePut:
-		w.changes.addPut(dataPath, walSequence, revision)
+		d.changes.addPut(action.DataType, action.ID, walSequence, revision)
 
 	case ActionTypeDelete:
-		w.changes.addDelete(dataPath, walSequence, revision)
+		d.changes.addDelete(action.DataType, action.ID, walSequence, revision)
 	}
-	if w.changes.actions[walSequence] == nil {
-		w.changes.actions[walSequence] = []*Action{}
+	if d.changes.actions[walSequence] == nil {
+		d.changes.actions[walSequence] = []*Action{}
 	}
-	w.changes.actions[walSequence] = append(w.changes.actions[walSequence], action)
+	d.changes.actions[walSequence] = append(d.changes.actions[walSequence], action)
 }
 
-func (w *WalManager) watcherLoop(ctx context.Context) error {
+func (d *DataManager) watcherLoop(ctx context.Context) error {
 	for {
-		initialized := w.changes.initialized
+		initialized := d.changes.initialized
 		if !initialized {
-			if err := w.initializeChanges(ctx); err != nil {
-				w.log.Errorf("watcher err: %+v", err)
+			if err := d.initializeChanges(ctx); err != nil {
+				d.log.Errorf("watcher err: %+v", err)
 			}
 		} else {
-			if err := w.watcher(ctx); err != nil {
-				w.log.Errorf("watcher err: %+v", err)
+			if err := d.watcher(ctx); err != nil {
+				d.log.Errorf("watcher err: %+v", err)
 			}
 		}
 
 		select {
 		case <-ctx.Done():
-			w.log.Infof("watcher exiting")
+			d.log.Infof("watcher exiting")
 			return nil
 		default:
 		}
@@ -221,11 +212,11 @@ func (w *WalManager) watcherLoop(ctx context.Context) error {
 	}
 }
 
-func (w *WalManager) initializeChanges(ctx context.Context) error {
+func (d *DataManager) initializeChanges(ctx context.Context) error {
 	var revision int64
 	var continuation *etcd.ListPagedContinuation
 	for {
-		listResp, err := w.e.ListPaged(ctx, etcdWalsDir+"/", 0, 10, continuation)
+		listResp, err := d.e.ListPaged(ctx, etcdWalsDir+"/", 0, 10, continuation)
 		if err != nil {
 			return err
 		}
@@ -239,7 +230,7 @@ func (w *WalManager) initializeChanges(ctx context.Context) error {
 			if err := json.Unmarshal(kv.Value, &walData); err != nil {
 				return err
 			}
-			if err := w.applyWalChanges(ctx, walData, revision); err != nil {
+			if err := d.applyWalChanges(ctx, walData, revision); err != nil {
 				return err
 			}
 		}
@@ -251,7 +242,7 @@ func (w *WalManager) initializeChanges(ctx context.Context) error {
 	continuation = nil
 	// use the same revision
 	for {
-		listResp, err := w.e.ListPaged(ctx, etcdChangeGroupsDir+"/", 0, 10, continuation)
+		listResp, err := d.e.ListPaged(ctx, etcdChangeGroupsDir+"/", 0, 10, continuation)
 		if err != nil {
 			return err
 		}
@@ -259,40 +250,40 @@ func (w *WalManager) initializeChanges(ctx context.Context) error {
 		continuation = listResp.Continuation
 
 		for _, kv := range resp.Kvs {
-			w.changes.Lock()
+			d.changes.Lock()
 			changeGroup := path.Base(string(kv.Key))
-			w.changes.putChangeGroup(changeGroup, kv.ModRevision)
-			w.changes.Unlock()
+			d.changes.putChangeGroup(changeGroup, kv.ModRevision)
+			d.changes.Unlock()
 		}
 		if !listResp.HasMore {
 			break
 		}
 	}
 
-	w.changes.Lock()
-	w.changes.revision = revision
-	w.changes.initialized = true
-	w.changes.Unlock()
+	d.changes.Lock()
+	d.changes.revision = revision
+	d.changes.initialized = true
+	d.changes.Unlock()
 
 	return nil
 }
 
-func (w *WalManager) watcher(ctx context.Context) error {
-	w.changes.Lock()
-	revision := w.changes.curRevision()
-	w.changes.Unlock()
+func (d *DataManager) watcher(ctx context.Context) error {
+	d.changes.Lock()
+	revision := d.changes.curRevision()
+	d.changes.Unlock()
 
 	wctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	wch := w.e.Watch(wctx, etcdWalBaseDir+"/", revision+1)
+	wch := d.e.Watch(wctx, etcdWalBaseDir+"/", revision+1)
 	for wresp := range wch {
 		if wresp.Canceled {
 			err := wresp.Err()
 			if err == etcdclientv3rpc.ErrCompacted {
-				w.log.Errorf("required events already compacted, reinitializing watcher changes")
-				w.changes.Lock()
-				w.changes.initialized = false
-				w.changes.Unlock()
+				d.log.Errorf("required events already compacted, reinitializing watcher changes")
+				d.changes.Lock()
+				d.changes.initialized = false
+				d.changes.Unlock()
 			}
 			return errors.Wrapf(err, "watch error")
 		}
@@ -312,56 +303,66 @@ func (w *WalManager) watcher(ctx context.Context) error {
 					if walData.WalStatus != WalStatusCommitted {
 						continue
 					}
-					if err := w.applyWalChanges(ctx, walData, revision); err != nil {
+					if err := d.applyWalChanges(ctx, walData, revision); err != nil {
 						return err
 					}
 				case mvccpb.DELETE:
 					walseq := path.Base(string(key))
-					w.changes.Lock()
-					putsToDelete := []string{}
-					deletesToDelete := []string{}
-					for p, pwalseq := range w.changes.puts {
-						if pwalseq == walseq {
-							putsToDelete = append(putsToDelete, p)
+					d.changes.Lock()
+					putsToDelete := map[string][]string{}
+					deletesToDelete := map[string][]string{}
+					for _, dataType := range d.dataTypes {
+						putsToDelete[dataType] = []string{}
+						deletesToDelete[dataType] = []string{}
+					}
+					for _, dataType := range d.dataTypes {
+						for p, pwalseq := range d.changes.puts[dataType] {
+							if pwalseq == walseq {
+								putsToDelete[dataType] = append(putsToDelete[dataType], p)
+							}
 						}
 					}
-					for p, pwalseq := range w.changes.deletes {
-						if pwalseq == walseq {
-							deletesToDelete = append(deletesToDelete, p)
+					for _, dataType := range d.dataTypes {
+						for id, pwalseq := range d.changes.deletes[dataType] {
+							if pwalseq == walseq {
+								deletesToDelete[dataType] = append(deletesToDelete[dataType], id)
+							}
 						}
 					}
-					for _, p := range putsToDelete {
-						w.changes.removePut(p, revision)
+					for dataType, ids := range putsToDelete {
+						for _, id := range ids {
+							d.changes.removePut(dataType, id, revision)
+						}
 					}
-					for _, p := range deletesToDelete {
-						w.changes.removeDelete(p, revision)
+					for dataType, ids := range putsToDelete {
+						for _, id := range ids {
+							d.changes.removeDelete(dataType, id, revision)
+						}
 					}
 
-					delete(w.changes.actions, walseq)
+					delete(d.changes.actions, walseq)
 
-					w.changes.updatePathsOrdered()
-
-					w.changes.Unlock()
+					d.changes.Unlock()
 				}
 
 			case strings.HasPrefix(key, etcdChangeGroupsDir+"/"):
 				switch ev.Type {
 				case mvccpb.PUT:
-					w.changes.Lock()
+					d.changes.Lock()
 					changeGroup := strings.TrimPrefix(string(ev.Kv.Key), etcdChangeGroupsDir+"/")
-					w.changes.putChangeGroup(changeGroup, ev.Kv.ModRevision)
-					w.changes.Unlock()
+					d.changes.putChangeGroup(changeGroup, ev.Kv.ModRevision)
+					d.changes.Unlock()
 				case mvccpb.DELETE:
-					w.changes.Lock()
+					d.changes.Lock()
 					changeGroup := strings.TrimPrefix(string(ev.Kv.Key), etcdChangeGroupsDir+"/")
-					w.changes.removeChangeGroup(changeGroup)
-					w.changes.Unlock()
+					d.changes.removeChangeGroup(changeGroup)
+					d.changes.Unlock()
 				}
 
 			case key == etcdPingKey:
-				w.changes.Lock()
-				w.changes.putRevision(wresp.Header.Revision)
-				w.changes.Unlock()
+				d.changes.Lock()
+				d.changes.putRevision(wresp.Header.Revision)
+				d.changes.Unlock()
 			}
 		}
 	}
