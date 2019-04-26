@@ -31,6 +31,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sorintlab/agola/internal/datamanager"
 	"github.com/sorintlab/agola/internal/db"
 	"github.com/sorintlab/agola/internal/etcd"
 	"github.com/sorintlab/agola/internal/objectstorage"
@@ -39,7 +40,6 @@ import (
 	"github.com/sorintlab/agola/internal/services/runservice/scheduler/store"
 	"github.com/sorintlab/agola/internal/services/runservice/types"
 	"github.com/sorintlab/agola/internal/util"
-	"github.com/sorintlab/agola/internal/wal"
 	"go.uber.org/zap"
 
 	sq "github.com/Masterminds/squirrel"
@@ -97,7 +97,7 @@ type ReadDB struct {
 	e       *etcd.Store
 	rdb     *db.DB
 	ost     *objectstorage.ObjStorage
-	wal     *wal.WalManager
+	dm      *datamanager.DataManager
 
 	Initialized bool
 	initLock    sync.Mutex
@@ -111,7 +111,7 @@ type ReadDB struct {
 	dbWriteLock sync.Mutex
 }
 
-func NewReadDB(ctx context.Context, logger *zap.Logger, dataDir string, e *etcd.Store, ost *objectstorage.ObjStorage, wal *wal.WalManager) (*ReadDB, error) {
+func NewReadDB(ctx context.Context, logger *zap.Logger, dataDir string, e *etcd.Store, ost *objectstorage.ObjStorage, dm *datamanager.DataManager) (*ReadDB, error) {
 	if err := os.MkdirAll(dataDir, 0770); err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func NewReadDB(ctx context.Context, logger *zap.Logger, dataDir string, e *etcd.
 		e:       e,
 		dataDir: dataDir,
 		ost:     ost,
-		wal:     wal,
+		dm:      dm,
 		rdb:     rdb,
 	}
 
@@ -454,7 +454,7 @@ func (r *ReadDB) handleRunEvent(tx *db.Tx, ev *etcdclientv3.Event, wresp *etcdcl
 		// TODO(sgotti) this is here just to avoid a window where the run is not in
 		// run table and in the run_os table but should be changed/removed when we'll
 		// implement run removal
-		run, err := store.OSTGetRun(r.wal, runID)
+		run, err := store.OSTGetRun(r.dm, runID)
 		if err != nil {
 			return err
 		}
@@ -519,7 +519,7 @@ func (r *ReadDB) SyncObjectStorage(ctx context.Context) error {
 		return err
 	}
 
-	lastCommittedStorageWal, _, err := r.wal.LastCommittedStorageWal(ctx)
+	lastCommittedStorageWal, _, err := r.dm.LastCommittedStorageWal(ctx)
 	if err != nil {
 		return err
 	}
@@ -529,7 +529,7 @@ func (r *ReadDB) SyncObjectStorage(ctx context.Context) error {
 		doFullSync = true
 		r.log.Warn("no startWalSeq in db, doing a full sync")
 	} else {
-		ok, err := r.wal.HasOSTWal(curWalSeq)
+		ok, err := r.dm.HasOSTWal(curWalSeq)
 		if err != nil {
 			return err
 		}
@@ -560,7 +560,7 @@ func (r *ReadDB) SyncObjectStorage(ctx context.Context) error {
 	}
 
 	if doFullSync {
-		r.log.Infof("doing a full sync from objectstorage files")
+		r.log.Infof("doing a full sync from dump")
 		if err := r.ResetDB(); err != nil {
 			return err
 		}
@@ -588,7 +588,7 @@ func (r *ReadDB) SyncObjectStorage(ctx context.Context) error {
 	// from wals on objectstorage is >=
 	// if not (this happens when syncFromWals takes some time and in the meantime
 	// many new wals are written, the next sync should be faster and able to continue
-	firstAvailableWalData, revision, err := r.wal.FirstAvailableWalData(ctx)
+	firstAvailableWalData, revision, err := r.dm.FirstAvailableWalData(ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to get first available wal data")
 	}
@@ -612,7 +612,7 @@ func (r *ReadDB) SyncObjectStorage(ctx context.Context) error {
 		}
 
 		// use the same revision as previous operation
-		for walElement := range r.wal.ListEtcdWals(ctx, revision) {
+		for walElement := range r.dm.ListEtcdWals(ctx, revision) {
 			if walElement.Err != nil {
 				return err
 			}
@@ -637,134 +637,68 @@ func (r *ReadDB) SyncObjectStorage(ctx context.Context) error {
 }
 
 func (r *ReadDB) SyncFromDump() (string, error) {
-	type indexHeader struct {
-		LastWalSequence string
+	dumpIndex, err := r.dm.GetLastDataStatus()
+	if err != nil && err != objectstorage.ErrNotExist {
+		return "", errors.WithStack(err)
 	}
-	type indexData struct {
-		DataType string
-		Data     json.RawMessage
+	if err == objectstorage.ErrNotExist {
+		return "", nil
 	}
+	for dataType, files := range dumpIndex.Files {
+		dumpf, err := r.ost.ReadObject(files[0])
+		if err != nil {
+			return "", errors.WithStack(err)
+		}
+		dumpEntries := []*datamanager.DataEntry{}
+		dec := json.NewDecoder(dumpf)
+		for {
+			var de *datamanager.DataEntry
 
-	type indexDataRun struct {
-		ID    string
-		Phase types.RunPhase
-		Group string
-	}
+			err := dec.Decode(&de)
+			if err == io.EOF {
+				// all done
+				break
+			}
+			if err != nil {
+				dumpf.Close()
+				return "", err
+			}
+			dumpEntries = append(dumpEntries, de)
+		}
+		dumpf.Close()
 
-	type indexDataRunCounter struct {
-		Group   string
-		Counter uint64
-	}
-
-	var iheader *indexHeader
-	insertfunc := func(ids []*indexData) error {
-		err := r.rdb.Do(func(tx *db.Tx) error {
-			for _, id := range ids {
-				switch common.DataType(id.DataType) {
-				case common.DataTypeRun:
-					var ir *indexDataRun
-					if err := json.Unmarshal(id.Data, &ir); err != nil {
-						return err
-					}
-					run := &types.Run{
-						ID:    ir.ID,
-						Group: ir.Group,
-						Phase: ir.Phase,
-					}
-					r.log.Infof("inserting run %q", run.ID)
-					if err := r.insertRunOST(tx, run, []byte{}); err != nil {
-						return err
-					}
-				case common.DataTypeRunCounter:
-					var irc *indexDataRunCounter
-					if err := json.Unmarshal(id.Data, &irc); err != nil {
-						return err
-					}
-					r.log.Infof("inserting run counter %q, c: %d", irc.Group, irc.Counter)
-					if err := r.insertRunCounterOST(tx, irc.Group, irc.Counter); err != nil {
-						return err
-					}
+		err = r.rdb.Do(func(tx *db.Tx) error {
+			for _, de := range dumpEntries {
+				action := &datamanager.Action{
+					ActionType: datamanager.ActionTypePut,
+					ID:         de.ID,
+					DataType:   dataType,
+					Data:       de.Data,
+				}
+				if err := r.applyAction(tx, action); err != nil {
+					return err
 				}
 			}
 			return nil
 		})
-		return err
-	}
-
-	doneCh := make(chan struct{})
-	defer close(doneCh)
-
-	// get last dump
-	var dumpPath string
-	for object := range r.ost.List(path.Join(common.StorageRunsIndexesDir)+"/", "", true, doneCh) {
-		if object.Err != nil {
-			return "", object.Err
-		}
-		r.log.Infof("path: %s", object.Path)
-
-		dumpPath = object.Path
-	}
-	if dumpPath == "" {
-		return "", nil
-	}
-
-	f, err := r.ost.ReadObject(dumpPath)
-	if err != nil {
-		if err == objectstorage.ErrNotExist {
-			r.log.Warnf("object %s disappeared, ignoring", dumpPath)
-		}
-		return "", err
-	}
-	defer f.Close()
-
-	dec := json.NewDecoder(f)
-
-	if err := dec.Decode(&iheader); err != nil {
-		return "", err
-	}
-	count := 0
-	ids := make([]*indexData, 0, paginationSize)
-	for {
-		var id *indexData
-
-		err := dec.Decode(&id)
-		if err == io.EOF {
-			// all done
-			break
-		}
 		if err != nil {
-			f.Close()
 			return "", err
 		}
-		ids = append(ids, id)
-
-		if count > paginationSize {
-			if err := insertfunc(ids); err != nil {
-				return "", err
-			}
-			count = 0
-			ids = make([]*indexData, 0, paginationSize)
-		} else {
-			count++
-		}
-	}
-	if err := insertfunc(ids); err != nil {
-		return "", err
 	}
 
-	return iheader.LastWalSequence, nil
+	return dumpIndex.WalSequence, nil
 }
 
 func (r *ReadDB) SyncFromWals(startWalSeq, endWalSeq string) (string, error) {
-	insertfunc := func(walFiles []*wal.WalFile) error {
+	insertfunc := func(walFiles []*datamanager.WalFile) error {
 		err := r.rdb.Do(func(tx *db.Tx) error {
 			for _, walFile := range walFiles {
-				walFilef, err := r.wal.ReadWal(walFile.WalSequence)
+				walFilef, err := r.dm.ReadWal(walFile.WalSequence)
 				if err != nil {
 					return err
 				}
 				dec := json.NewDecoder(walFilef)
-				var header *wal.WalHeader
+				var header *datamanager.WalHeader
 				if err = dec.Decode(&header); err != nil && err != io.EOF {
 					walFilef.Close()
 					return err
@@ -783,13 +717,13 @@ func (r *ReadDB) SyncFromWals(startWalSeq, endWalSeq string) (string, error) {
 	}
 
 	lastWalSeq := startWalSeq
-	walFiles := []*wal.WalFile{}
+	walFiles := []*datamanager.WalFile{}
 	count := 0
 
 	doneCh := make(chan struct{})
 	defer close(doneCh)
 
-	for walFile := range r.wal.ListOSTWals(startWalSeq) {
+	for walFile := range r.dm.ListOSTWals(startWalSeq) {
 		if walFile.Err != nil {
 			return "", walFile.Err
 		}
@@ -802,7 +736,7 @@ func (r *ReadDB) SyncFromWals(startWalSeq, endWalSeq string) (string, error) {
 				return "", err
 			}
 			count = 0
-			walFiles = []*wal.WalFile{}
+			walFiles = []*datamanager.WalFile{}
 		} else {
 			count++
 		}
@@ -834,12 +768,12 @@ func (r *ReadDB) handleEventsOST(ctx context.Context) error {
 	wctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	r.log.Infof("revision: %d", revision)
-	wch := r.wal.Watch(wctx, revision+1)
+	wch := r.dm.Watch(wctx, revision+1)
 	for we := range wch {
 		r.log.Debugf("we: %s", util.Dump(we))
 		if we.Err != nil {
 			err := we.Err
-			if err == wal.ErrCompacted {
+			if err == datamanager.ErrCompacted {
 				r.log.Warnf("required events already compacted, reinitializing readdb")
 				r.Initialized = false
 				return nil
@@ -900,7 +834,7 @@ func (r *ReadDB) handleEventsOST(ctx context.Context) error {
 }
 
 func (r *ReadDB) applyWal(tx *db.Tx, walDataFileID string) error {
-	walFile, err := r.wal.ReadWalData(walDataFileID)
+	walFile, err := r.dm.ReadWalData(walDataFileID)
 	if err != nil {
 		return errors.Wrapf(err, "cannot read wal data file %q", walDataFileID)
 	}
@@ -908,7 +842,7 @@ func (r *ReadDB) applyWal(tx *db.Tx, walDataFileID string) error {
 
 	dec := json.NewDecoder(walFile)
 	for {
-		var action *wal.Action
+		var action *datamanager.Action
 
 		err := dec.Decode(&action)
 		if err == io.EOF {
@@ -927,10 +861,10 @@ func (r *ReadDB) applyWal(tx *db.Tx, walDataFileID string) error {
 	return nil
 }
 
-func (r *ReadDB) applyAction(tx *db.Tx, action *wal.Action) error {
+func (r *ReadDB) applyAction(tx *db.Tx, action *datamanager.Action) error {
 	r.log.Infof("action: dataType: %s, ID: %s", action.DataType, action.ID)
 	switch action.ActionType {
-	case wal.ActionTypePut:
+	case datamanager.ActionTypePut:
 		switch action.DataType {
 		case string(common.DataTypeRun):
 			var run *types.Run
@@ -951,7 +885,7 @@ func (r *ReadDB) applyAction(tx *db.Tx, action *wal.Action) error {
 			}
 		}
 
-	case wal.ActionTypeDelete:
+	case datamanager.ActionTypeDelete:
 		switch action.DataType {
 		case string(common.DataTypeRun):
 		case string(common.DataTypeRunCounter):
@@ -961,7 +895,7 @@ func (r *ReadDB) applyAction(tx *db.Tx, action *wal.Action) error {
 	return nil
 }
 
-func (r *ReadDB) handleEventOST(tx *db.Tx, we *wal.WatchElement) error {
+func (r *ReadDB) handleEventOST(tx *db.Tx, we *datamanager.WatchElement) error {
 	//r.log.Debugf("event: %s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
 	//key := string(ev.Kv.Key)
 
@@ -971,7 +905,7 @@ func (r *ReadDB) handleEventOST(tx *db.Tx, we *wal.WatchElement) error {
 	return nil
 }
 
-func (r *ReadDB) handleWalEvent(tx *db.Tx, we *wal.WatchElement) error {
+func (r *ReadDB) handleWalEvent(tx *db.Tx, we *datamanager.WatchElement) error {
 	for cgName, cgRev := range we.ChangeGroupsRevisions {
 		if err := r.insertChangeGroupRevisionOST(tx, cgName, cgRev); err != nil {
 			return err
@@ -980,7 +914,7 @@ func (r *ReadDB) handleWalEvent(tx *db.Tx, we *wal.WatchElement) error {
 
 	if we.WalData != nil {
 		// update readdb only when the wal has been committed to objectstorage
-		if we.WalData.WalStatus != wal.WalStatusCommitted {
+		if we.WalData.WalStatus != datamanager.WalStatusCommitted {
 			return nil
 		}
 
@@ -1255,7 +1189,7 @@ func (r *ReadDB) GetRuns(tx *db.Tx, groups []string, lastRun bool, phaseFilter [
 		}
 
 		// get run from objectstorage
-		run, err := store.OSTGetRun(r.wal, runID)
+		run, err := store.OSTGetRun(r.dm, runID)
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
@@ -1501,7 +1435,7 @@ func (r *ReadDB) insertChangeGroupRevisionOST(tx *db.Tx, changegroup string, rev
 	return nil
 }
 
-func (r *ReadDB) GetChangeGroupsUpdateTokensOST(tx *db.Tx, groups []string) (*wal.ChangeGroupsUpdateToken, error) {
+func (r *ReadDB) GetChangeGroupsUpdateTokensOST(tx *db.Tx, groups []string) (*datamanager.ChangeGroupsUpdateToken, error) {
 	s := changegrouprevisionOSTSelect.Where(sq.Eq{"id": groups})
 	q, args, err := s.ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
@@ -1525,7 +1459,7 @@ func (r *ReadDB) GetChangeGroupsUpdateTokensOST(tx *db.Tx, groups []string) (*wa
 		}
 	}
 
-	return &wal.ChangeGroupsUpdateToken{CurRevision: revision, ChangeGroupsRevisions: cgr}, nil
+	return &datamanager.ChangeGroupsUpdateToken{CurRevision: revision, ChangeGroupsRevisions: cgr}, nil
 }
 
 func fetchChangeGroupsRevisionOST(tx *db.Tx, q string, args ...interface{}) (map[string]int64, error) {
