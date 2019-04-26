@@ -37,9 +37,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apilabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	coordinationlistersv1 "k8s.io/client-go/listers/coordination/v1"
+	listerscorev1 "k8s.io/client-go/listers/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
@@ -60,6 +63,7 @@ const (
 
 	renewExecutorLeaseInterval = 10 * time.Second
 	staleExecutorLeaseInterval = 1 * time.Minute
+	informerResyncInterval     = 10 * time.Second
 )
 
 type K8sDriver struct {
@@ -71,6 +75,10 @@ type K8sDriver struct {
 	executorID       string
 	executorsGroupID string
 	useLeaseAPI      bool
+	nodeLister       listerscorev1.NodeLister
+	podLister        listerscorev1.PodLister
+	cmLister         listerscorev1.ConfigMapLister
+	leaseLister      coordinationlistersv1.LeaseLister
 }
 
 type K8sPod struct {
@@ -169,6 +177,26 @@ func NewK8sDriver(logger *zap.Logger, executorID, toolboxPath string) (*K8sDrive
 		}
 	}()
 
+	factory := informers.NewSharedInformerFactoryWithOptions(d.client, informerResyncInterval, informers.WithNamespace(d.namespace))
+
+	nodeInformer := factory.Core().V1().Nodes()
+	d.nodeLister = nodeInformer.Lister()
+	go nodeInformer.Informer().Run(ctx.Done())
+
+	podInformer := factory.Core().V1().Pods()
+	d.podLister = podInformer.Lister()
+	go podInformer.Informer().Run(ctx.Done())
+
+	if d.useLeaseAPI {
+		leaseInformer := factory.Coordination().V1().Leases()
+		d.leaseLister = leaseInformer.Lister()
+		go leaseInformer.Informer().Run(ctx.Done())
+	} else {
+		cmInformer := factory.Core().V1().ConfigMaps()
+		d.cmLister = cmInformer.Lister()
+		go cmInformer.Informer().Run(ctx.Done())
+	}
+
 	return d, nil
 }
 
@@ -202,14 +230,13 @@ func (d *K8sDriver) Setup(ctx context.Context) error {
 
 func (d *K8sDriver) Archs(ctx context.Context) ([]common.Arch, error) {
 	// TODO(sgotti) use go client listers instead of querying every time
-	nodeClient := d.client.CoreV1().Nodes()
-	nodes, err := nodeClient.List(metav1.ListOptions{})
+	nodes, err := d.nodeLister.List(apilabels.SelectorFromSet(nil))
 	if err != nil {
 		return nil, err
 	}
 	archsMap := map[common.Arch]struct{}{}
 	archs := []common.Arch{}
-	for _, node := range nodes.Items {
+	for _, node := range nodes {
 		archsMap[common.ArchFromString(node.Status.NodeInfo.Architecture)] = struct{}{}
 	}
 	for arch := range archsMap {
@@ -500,19 +527,16 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 }
 
 func (d *K8sDriver) GetPods(ctx context.Context, all bool) ([]Pod, error) {
-	podClient := d.client.CoreV1().Pods(d.namespace)
-
 	// get all pods for the executor group, also the ones managed by other executors in the same executor group
 	labels := map[string]string{executorsGroupIDKey: d.executorsGroupID}
 
-	// TODO(sgotti) use go client listers instead of querying every time
-	k8sPods, err := podClient.List(metav1.ListOptions{LabelSelector: apilabels.SelectorFromSet(labels).String()})
+	k8sPods, err := d.podLister.List(apilabels.SelectorFromSet(labels))
 	if err != nil {
 		return nil, err
 	}
 
-	pods := make([]Pod, len(k8sPods.Items))
-	for i, k8sPod := range k8sPods.Items {
+	pods := make([]Pod, len(k8sPods))
+	for i, k8sPod := range k8sPods {
 		labels := map[string]string{}
 		// keep only labels starting with our prefix
 		for n, v := range k8sPod.Labels {
