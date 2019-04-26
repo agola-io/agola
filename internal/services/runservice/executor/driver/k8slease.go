@@ -143,7 +143,6 @@ func (d *K8sDriver) getLeases(ctx context.Context) ([]string, error) {
 	labels := map[string]string{}
 	labels[executorsGroupIDKey] = d.executorsGroupID
 
-	// TODO(sgotti) use go client listers instead of querying every time
 	if d.useLeaseAPI {
 		leaseClient := d.client.CoordinationV1().Leases(d.namespace)
 
@@ -177,15 +176,14 @@ func (d *K8sDriver) cleanStaleExecutorsLease(ctx context.Context) error {
 	labels := map[string]string{}
 	labels[executorsGroupIDKey] = d.executorsGroupID
 
-	// TODO(sgotti) use go client listers instead of querying every time
 	if d.useLeaseAPI {
 		leaseClient := d.client.CoordinationV1().Leases(d.namespace)
 
-		leases, err := leaseClient.List(metav1.ListOptions{LabelSelector: apilabels.SelectorFromSet(labels).String()})
+		leases, err := d.leaseLister.List(apilabels.SelectorFromSet(labels))
 		if err != nil {
 			return err
 		}
-		for _, lease := range leases.Items {
+		for _, lease := range leases {
 			if lease.Spec.HolderIdentity == nil {
 				d.log.Warnf("missing holder identity for lease %q", lease.Name)
 				continue
@@ -200,17 +198,19 @@ func (d *K8sDriver) cleanStaleExecutorsLease(ctx context.Context) error {
 			}
 			if lease.Spec.RenewTime.Add(staleExecutorLeaseInterval).Before(time.Now()) {
 				d.log.Infof("deleting stale lease %q", lease.Name)
-				leaseClient.Delete(lease.Name, nil)
+				if err := leaseClient.Delete(lease.Name, nil); err != nil {
+					d.log.Errorf("failed to delete stale lease %q, err: %v", lease.Name, err)
+				}
 			}
 		}
 	} else {
 		cmClient := d.client.CoreV1().ConfigMaps(d.namespace)
 
-		cms, err := cmClient.List(metav1.ListOptions{LabelSelector: apilabels.SelectorFromSet(labels).String()})
+		cms, err := d.cmLister.List(apilabels.SelectorFromSet(labels))
 		if err != nil {
 			return err
 		}
-		for _, cm := range cms.Items {
+		for _, cm := range cms {
 			var ld *LeaseData
 			if cm.Annotations == nil {
 				// this shouldn't happen
@@ -228,7 +228,9 @@ func (d *K8sDriver) cleanStaleExecutorsLease(ctx context.Context) error {
 			}
 			if ld.RenewTime.Add(staleExecutorLeaseInterval).Before(time.Now()) {
 				d.log.Infof("deleting stale configmap lease %q", cm.Name)
-				cmClient.Delete(cm.Name, nil)
+				if err := cmClient.Delete(cm.Name, nil); err != nil {
+					d.log.Errorf("failed to delete stale configmap lease %q, err: %v", cm.Name, err)
+				}
 			}
 		}
 	}
