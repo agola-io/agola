@@ -54,7 +54,7 @@ const (
 type Gateway struct {
 	c *config.Gateway
 
-	lts               *objectstorage.ObjStorage
+	ost               *objectstorage.ObjStorage
 	runserviceClient  *rsapi.Client
 	configstoreClient *csapi.Client
 	ch                *command.CommandHandler
@@ -118,7 +118,7 @@ func NewGateway(c *config.Gateway) (*Gateway, error) {
 		return nil, errors.Errorf("unknown token signing method: %q", c.TokenSigning.Method)
 	}
 
-	lts, err := scommon.NewLTS(&c.LTS)
+	ost, err := scommon.NewObjectStorage(&c.ObjectStorage)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func NewGateway(c *config.Gateway) (*Gateway, error) {
 
 	return &Gateway{
 		c:                 c,
-		lts:               lts,
+		ost:               ost,
 		runserviceClient:  rsapi.NewClient(c.RunServiceURL),
 		configstoreClient: configstoreClient,
 		ch:                ch,
