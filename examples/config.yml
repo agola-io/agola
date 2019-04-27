@@ -24,18 +24,18 @@ configStore:
   dataDir: /tmp/agola/configstore
   etcd:
     endpoints: "http://localhost:2379"
-  lts:
+  objectStorage:
     type: posix
-    path: /tmp/agola/configstore/lts
+    path: /tmp/agola/configstore/ost
   web:
     listenAddress: ":4002"
 
 runServiceScheduler:
   #debug: true
   dataDir: /tmp/agola/runservice/scheduler
-  lts:
+  objectStorage:
     type: posix
-    path: /tmp/agola/runservice/lts
+    path: /tmp/agola/runservice/ost
   etcd:
     endpoints: "http://localhost:2379"
   web:

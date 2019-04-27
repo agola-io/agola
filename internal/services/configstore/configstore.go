@@ -50,7 +50,7 @@ type ConfigStore struct {
 	e             *etcd.Store
 	wal           *wal.WalManager
 	readDB        *readdb.ReadDB
-	lts           *objectstorage.ObjStorage
+	ost           *objectstorage.ObjStorage
 	ch            *command.CommandHandler
 	listenAddress string
 }
@@ -60,7 +60,7 @@ func NewConfigStore(ctx context.Context, c *config.ConfigStore) (*ConfigStore, e
 		level.SetLevel(zapcore.DebugLevel)
 	}
 
-	lts, err := scommon.NewLTS(&c.LTS)
+	ost, err := scommon.NewObjectStorage(&c.ObjectStorage)
 	if err != nil {
 		return nil, err
 	}
@@ -72,19 +72,19 @@ func NewConfigStore(ctx context.Context, c *config.ConfigStore) (*ConfigStore, e
 	cs := &ConfigStore{
 		c:   c,
 		e:   e,
-		lts: lts,
+		ost: ost,
 	}
 
 	walConf := &wal.WalManagerConfig{
 		E:              e,
-		Lts:            lts,
+		OST:            ost,
 		DataToPathFunc: common.DataToPathFunc,
 	}
 	wal, err := wal.NewWalManager(ctx, logger, walConf)
 	if err != nil {
 		return nil, err
 	}
-	readDB, err := readdb.NewReadDB(ctx, logger, filepath.Join(c.DataDir, "readdb"), e, lts, wal)
+	readDB, err := readdb.NewReadDB(ctx, logger, filepath.Join(c.DataDir, "readdb"), e, ost, wal)
 	if err != nil {
 		return nil, err
 	}
