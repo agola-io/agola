@@ -1532,6 +1532,34 @@ func (s *Scheduler) cacheCleaner(ctx context.Context, cacheExpireInterval time.D
 	return nil
 }
 
+// etcdPingerLoop periodically updates a key.
+// This is used by watchers to inform the client of the current revision
+// this is needed since if other users are updating other unwatched keys on
+// etcd we won't be notified, not updating the known revisions
+// TODO(sgotti) use upcoming etcd 3.4 watch RequestProgress???
+func (s *Scheduler) etcdPingerLoop(ctx context.Context) {
+	for {
+		if err := s.etcdPinger(ctx); err != nil {
+			log.Errorf("err: %+v", err)
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		time.Sleep(1 * time.Second)
+	}
+}
+
+func (s *Scheduler) etcdPinger(ctx context.Context) error {
+	if _, err := s.e.Put(ctx, common.EtcdPingKey, []byte{}, nil); err != nil {
+		return err
+	}
+	return nil
+}
+
 type Scheduler struct {
 	c      *config.RunServiceScheduler
 	e      *etcd.Store
@@ -1693,8 +1721,9 @@ func (s *Scheduler) Run(ctx context.Context) error {
 	go s.dumpLTSCleanerLoop(ctx)
 	go s.compactChangeGroupsLoop(ctx)
 	go s.cacheCleanerLoop(ctx, s.c.RunCacheExpireInterval)
-
 	go s.executorTaskUpdateHandler(ctx, ch)
+
+	go s.etcdPingerLoop(ctx)
 
 	var tlsConfig *tls.Config
 	if s.c.Web.TLS {
