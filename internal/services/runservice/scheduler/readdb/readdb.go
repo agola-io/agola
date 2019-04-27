@@ -377,7 +377,7 @@ func (r *ReadDB) HandleEvents(ctx context.Context) error {
 	wctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	wctx = etcdclientv3.WithRequireLeader(wctx)
-	wch := r.e.Watch(wctx, "", revision+1)
+	wch := r.e.Watch(wctx, common.EtcdSchedulerBaseDir+"/", revision+1)
 	for wresp := range wch {
 		if wresp.Canceled {
 			err = wresp.Err()

@@ -36,18 +36,23 @@ func (e ErrNotExist) Error() string {
 }
 
 var (
-	EtcdRunsDir             = "runs"
-	EtcdRunSequenceKey      = "runsequence"
-	EtcdRunEventKey         = "runevents"
-	EtcdRunEventSequenceKey = "runeventsequence"
+	EtcdSchedulerBaseDir = "scheduler"
 
-	EtcdChangeGroupsDir           = "changegroups"
-	EtcdChangeGroupMinRevisionKey = "changegroupsminrev"
+	EtcdRunsDir             = path.Join(EtcdSchedulerBaseDir, "runs")
+	EtcdRunSequenceKey      = path.Join(EtcdSchedulerBaseDir, "runsequence")
+	EtcdRunEventKey         = path.Join(EtcdSchedulerBaseDir, "runevents")
+	EtcdRunEventSequenceKey = path.Join(EtcdSchedulerBaseDir, "runeventsequence")
 
-	EtcdExecutorsDir = "executors"
-	EtcdTasksDir     = "tasks"
+	EtcdChangeGroupsDir           = path.Join(EtcdSchedulerBaseDir, "changegroups")
+	EtcdChangeGroupMinRevisionKey = path.Join(EtcdSchedulerBaseDir, "changegroupsminrev")
 
-	EtcdPingKey = "ping"
+	EtcdExecutorsDir = path.Join(EtcdSchedulerBaseDir, "executors")
+	EtcdTasksDir     = path.Join(EtcdSchedulerBaseDir, "tasks")
+
+	EtcdPingKey = path.Join(EtcdSchedulerBaseDir, "ping")
+
+	EtcdCacheCleanerLockKey = path.Join(EtcdSchedulerBaseDir, "locks", "cachecleaner")
+	EtcdTaskUpdaterLockKey  = path.Join(EtcdSchedulerBaseDir, "locks", "taskupdater")
 )
 
 func EtcdRunKey(runID string) string       { return path.Join(EtcdRunsDir, runID) }

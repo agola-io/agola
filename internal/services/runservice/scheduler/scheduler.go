@@ -54,9 +54,6 @@ import (
 
 const (
 	cacheCleanerInterval = 1 * 24 * time.Hour
-
-	cacheCleanerLock = "locks/cachecleaner"
-	taskUpdaterLock  = "locks/taskupdater"
 )
 
 var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
@@ -835,7 +832,7 @@ func (s *Scheduler) runTasksUpdater(ctx context.Context) error {
 	}
 	defer session.Close()
 
-	m := concurrency.NewMutex(session, taskUpdaterLock)
+	m := concurrency.NewMutex(session, common.EtcdTaskUpdaterLockKey)
 
 	// TODO(sgotti) find a way to use a trylock so we'll just return if already
 	// locked. Currently multiple task updaters will enqueue and start when another
@@ -1504,7 +1501,7 @@ func (s *Scheduler) cacheCleaner(ctx context.Context, cacheExpireInterval time.D
 	}
 	defer session.Close()
 
-	m := concurrency.NewMutex(session, cacheCleanerLock)
+	m := concurrency.NewMutex(session, common.EtcdCacheCleanerLockKey)
 
 	// TODO(sgotti) find a way to use a trylock so we'll just return if already
 	// locked. Currently multiple cachecleaners will enqueue and start when another
