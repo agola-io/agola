@@ -63,16 +63,16 @@ func setupConfigstore(t *testing.T, ctx context.Context, dir string) (*ConfigSto
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	ltsDir, err := ioutil.TempDir(dir, "lts")
+	ostDir, err := ioutil.TempDir(dir, "ost")
 	csDir, err := ioutil.TempDir(dir, "cs")
 
 	baseConfig := config.ConfigStore{
 		Etcd: config.Etcd{
 			Endpoints: tetcd.Endpoint,
 		},
-		LTS: config.LTS{
-			Type: config.LTSTypePosix,
-			Path: ltsDir,
+		ObjectStorage: config.ObjectStorage{
+			Type: config.ObjectStorageTypePosix,
+			Path: ostDir,
 		},
 		Web: config.Web{},
 	}
@@ -134,7 +134,7 @@ func TestResync(t *testing.T) {
 
 	ctx := context.Background()
 
-	ltsDir, err := ioutil.TempDir(dir, "lts")
+	ostDir, err := ioutil.TempDir(dir, "ost")
 	csDir1, err := ioutil.TempDir(dir, "cs1")
 	csDir2, err := ioutil.TempDir(dir, "cs2")
 	csDir3, err := ioutil.TempDir(dir, "cs3")
@@ -143,9 +143,9 @@ func TestResync(t *testing.T) {
 		Etcd: config.Etcd{
 			Endpoints: tetcd.Endpoint,
 		},
-		LTS: config.LTS{
-			Type: config.LTSTypePosix,
-			Path: ltsDir,
+		ObjectStorage: config.ObjectStorage{
+			Type: config.ObjectStorageTypePosix,
+			Path: ostDir,
 		},
 		Web: config.Web{},
 	}

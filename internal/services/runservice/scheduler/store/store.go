@@ -33,7 +33,7 @@ import (
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
 )
 
-func LTSSubGroupsAndGroupTypes(group string) []string {
+func OSTSubGroupsAndGroupTypes(group string) []string {
 	h := util.PathHierarchy(group)
 	if len(h)%2 != 1 {
 		panic(fmt.Errorf("wrong group path %q", group))
@@ -42,7 +42,7 @@ func LTSSubGroupsAndGroupTypes(group string) []string {
 	return h
 }
 
-func LTSRootGroup(group string) string {
+func OSTRootGroup(group string) string {
 	pl := util.PathList(group)
 	if len(pl) < 2 {
 		panic(fmt.Errorf("cannot determine root group name, wrong group path %q", group))
@@ -51,7 +51,7 @@ func LTSRootGroup(group string) string {
 	return pl[1]
 }
 
-func LTSSubGroups(group string) []string {
+func OSTSubGroups(group string) []string {
 	h := util.PathHierarchy(group)
 	if len(h)%2 != 1 {
 		panic(fmt.Errorf("wrong group path %q", group))
@@ -68,7 +68,7 @@ func LTSSubGroups(group string) []string {
 	return sg
 }
 
-func LTSSubGroupTypes(group string) []string {
+func OSTSubGroupTypes(group string) []string {
 	h := util.PathHierarchy(group)
 	if len(h)%2 != 1 {
 		panic(fmt.Errorf("wrong group path %q", group))
@@ -85,16 +85,16 @@ func LTSSubGroupTypes(group string) []string {
 	return sg
 }
 
-func LTSRunCounterPaths(group, runID string, sortOrder types.SortOrder) []string {
+func OSTRunCounterPaths(group, runID string, sortOrder types.SortOrder) []string {
 	paths := []string{}
-	subGroups := LTSSubGroups(group)
+	subGroups := OSTSubGroups(group)
 	for _, subGroup := range subGroups {
 		paths = append(paths, common.StorageRunCounterFile(subGroup))
 	}
 	return paths
 }
 
-func LTSUpdateRunCounterAction(ctx context.Context, c uint64, group string) (*wal.Action, error) {
+func OSTUpdateRunCounterAction(ctx context.Context, c uint64, group string) (*wal.Action, error) {
 	// use the first group dir after the root
 	pl := util.PathList(group)
 	if len(pl) < 2 {
@@ -116,36 +116,36 @@ func LTSUpdateRunCounterAction(ctx context.Context, c uint64, group string) (*wa
 	return action, nil
 }
 
-func LTSRunTaskLogsDir(rtID string) string {
+func OSTRunTaskLogsDir(rtID string) string {
 	return path.Join("logs", rtID)
 }
 
-func LTSRunTaskSetupLogPath(rtID string) string {
-	return path.Join(LTSRunTaskLogsDir(rtID), "setup.log")
+func OSTRunTaskSetupLogPath(rtID string) string {
+	return path.Join(OSTRunTaskLogsDir(rtID), "setup.log")
 }
 
-func LTSRunTaskStepLogPath(rtID string, step int) string {
-	return path.Join(LTSRunTaskLogsDir(rtID), "steps", fmt.Sprintf("%d.log", step))
+func OSTRunTaskStepLogPath(rtID string, step int) string {
+	return path.Join(OSTRunTaskLogsDir(rtID), "steps", fmt.Sprintf("%d.log", step))
 }
 
-func LTSRunArchivePath(rtID string, step int) string {
+func OSTRunArchivePath(rtID string, step int) string {
 	return path.Join("workspacearchives", fmt.Sprintf("%s/%d.tar", rtID, step))
 }
 
-func LTSCacheDir() string {
+func OSTCacheDir() string {
 	return "caches"
 }
 
-func LTSCachePath(key string) string {
-	return path.Join(LTSCacheDir(), fmt.Sprintf("%s.tar", key))
+func OSTCachePath(key string) string {
+	return path.Join(OSTCacheDir(), fmt.Sprintf("%s.tar", key))
 }
 
-func LTSCacheKey(p string) string {
+func OSTCacheKey(p string) string {
 	base := path.Base(p)
 	return strings.TrimSuffix(base, path.Ext(base))
 }
 
-func LTSGetRunConfig(wal *wal.WalManager, runConfigID string) (*types.RunConfig, error) {
+func OSTGetRunConfig(wal *wal.WalManager, runConfigID string) (*types.RunConfig, error) {
 	runConfigPath := common.StorageRunConfigFile(runConfigID)
 	rcf, _, err := wal.ReadObject(runConfigPath, nil)
 	if err != nil {
@@ -161,7 +161,7 @@ func LTSGetRunConfig(wal *wal.WalManager, runConfigID string) (*types.RunConfig,
 	return rc, nil
 }
 
-func LTSSaveRunConfigAction(rc *types.RunConfig) (*wal.Action, error) {
+func OSTSaveRunConfigAction(rc *types.RunConfig) (*wal.Action, error) {
 	rcj, err := json.Marshal(rc)
 	if err != nil {
 		return nil, err
@@ -177,7 +177,7 @@ func LTSSaveRunConfigAction(rc *types.RunConfig) (*wal.Action, error) {
 	return action, nil
 }
 
-func LTSGetRun(wal *wal.WalManager, runID string) (*types.Run, error) {
+func OSTGetRun(wal *wal.WalManager, runID string) (*types.Run, error) {
 	runPath := common.StorageRunFile(runID)
 	rf, _, err := wal.ReadObject(runPath, nil)
 
@@ -194,7 +194,7 @@ func LTSGetRun(wal *wal.WalManager, runID string) (*types.Run, error) {
 	return r, nil
 }
 
-func LTSSaveRunAction(r *types.Run) (*wal.Action, error) {
+func OSTSaveRunAction(r *types.Run) (*wal.Action, error) {
 	rj, err := json.Marshal(r)
 	if err != nil {
 		return nil, err
@@ -501,13 +501,13 @@ func GetRuns(ctx context.Context, e *etcd.Store) ([]*types.Run, error) {
 	return runs, nil
 }
 
-func GetRunEtcdOrLTS(ctx context.Context, e *etcd.Store, wal *wal.WalManager, runID string) (*types.Run, error) {
+func GetRunEtcdOrOST(ctx context.Context, e *etcd.Store, wal *wal.WalManager, runID string) (*types.Run, error) {
 	r, _, err := GetRun(ctx, e, runID)
 	if err != nil && err != etcd.ErrKeyNotFound {
 		return nil, err
 	}
 	if r == nil {
-		r, err = LTSGetRun(wal, runID)
+		r, err = OSTGetRun(wal, runID)
 		if err != nil && err != objectstorage.ErrNotExist {
 			return nil, err
 		}

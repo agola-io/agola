@@ -128,11 +128,11 @@ type WalHeader struct {
 type WalStatus string
 
 const (
-	// WalStatusCommitted represent a wal written to the lts
+	// WalStatusCommitted represent a wal written to the objectstorage
 	WalStatusCommitted WalStatus = "committed"
-	// WalStatusCommittedStorage represent the .committed marker file written to the lts
+	// WalStatusCommittedStorage represent the .committed marker file written to the objectstorage
 	WalStatusCommittedStorage WalStatus = "committed_storage"
-	// WalStatusCheckpointed mean that all the wal actions have been executed on the lts
+	// WalStatusCheckpointed mean that all the wal actions have been executed on the objectstorage
 	WalStatusCheckpointed WalStatus = "checkpointed"
 )
 
@@ -225,7 +225,7 @@ func (w *WalManager) ReadObject(p string, cgNames []string) (io.ReadCloser, *Cha
 		return nil, nil, errors.Errorf("no file %s in wal %s", p, walseq)
 	}
 
-	f, err := w.lts.ReadObject(w.toStorageDataPath(p))
+	f, err := w.ost.ReadObject(w.toStorageDataPath(p))
 	return f, cgt, err
 }
 
@@ -234,7 +234,7 @@ func (w *WalManager) changesList(paths []string, prefix, startWith string, recur
 	for _, p := range paths {
 		if !recursive && len(p) > len(prefix) {
 			rel := strings.TrimPrefix(p, prefix)
-			skip := strings.Contains(rel, w.lts.Delimiter())
+			skip := strings.Contains(rel, w.ost.Delimiter())
 			if skip {
 				continue
 			}
@@ -266,7 +266,7 @@ func (w *WalManager) List(prefix, startWith string, recursive bool, doneCh <-cha
 	ci := 0
 	go func(objectCh chan<- objectstorage.ObjectInfo) {
 		defer close(objectCh)
-		for object := range w.lts.List(prefix, startWith, recursive, doneCh) {
+		for object := range w.ost.List(prefix, startWith, recursive, doneCh) {
 			if object.Err != nil {
 				objectCh <- object
 				return
@@ -318,8 +318,8 @@ func (w *WalManager) List(prefix, startWith string, recursive bool, doneCh <-cha
 	return objectCh
 }
 
-func (w *WalManager) HasLtsWal(walseq string) (bool, error) {
-	_, err := w.lts.Stat(w.storageWalStatusFile(walseq) + ".committed")
+func (w *WalManager) HasOSTWal(walseq string) (bool, error) {
+	_, err := w.ost.Stat(w.storageWalStatusFile(walseq) + ".committed")
 	if err == objectstorage.ErrNotExist {
 		return false, nil
 	}
@@ -330,11 +330,11 @@ func (w *WalManager) HasLtsWal(walseq string) (bool, error) {
 }
 
 func (w *WalManager) ReadWal(walseq string) (io.ReadCloser, error) {
-	return w.lts.ReadObject(w.storageWalStatusFile(walseq) + ".committed")
+	return w.ost.ReadObject(w.storageWalStatusFile(walseq) + ".committed")
 }
 
 func (w *WalManager) ReadWalData(walFileID string) (io.ReadCloser, error) {
-	return w.lts.ReadObject(w.storageWalDataFile(walFileID))
+	return w.ost.ReadObject(w.storageWalDataFile(walFileID))
 }
 
 type WalFile struct {
@@ -344,7 +344,7 @@ type WalFile struct {
 	Checkpointed bool
 }
 
-func (w *WalManager) ListLtsWals(start string) <-chan *WalFile {
+func (w *WalManager) ListOSTWals(start string) <-chan *WalFile {
 	walCh := make(chan *WalFile, 1)
 
 	go func() {
@@ -358,7 +358,7 @@ func (w *WalManager) ListLtsWals(start string) <-chan *WalFile {
 			startPath = w.storageWalStatusFile(start)
 		}
 
-		for object := range w.lts.List(path.Join(w.basePath, storageWalsStatusDir)+"/", startPath, true, doneCh) {
+		for object := range w.ost.List(path.Join(w.basePath, storageWalsStatusDir)+"/", startPath, true, doneCh) {
 			if object.Err != nil {
 				walCh <- &WalFile{
 					Err: object.Err,
@@ -371,7 +371,7 @@ func (w *WalManager) ListLtsWals(start string) <-chan *WalFile {
 			walSequence := strings.TrimSuffix(name, ext)
 			// wal file refers to another wal, so return the current one
 			if curWal.WalSequence != walSequence {
-				// if this happen something is wrong on the lts
+				// if this happen something is wrong on the objectstorage
 				if !curWal.Committed && curWal.Checkpointed {
 					walCh <- &WalFile{
 						Err: errors.Errorf("wal is checkpointed but not committed. this should never happen"),
@@ -574,9 +574,9 @@ func (w *WalManager) Watch(ctx context.Context, revision int64) <-chan *WatchEle
 // be committed
 //
 // TODO(sgotti) save inside the wal file also the previous committed wal to
-// handle possible lts list operation eventual consistency gaps (list won't
-// report a wal at seq X but a wal at X+n, if this kind of eventual consistency
-// ever exists)
+// handle possible objectstorage list operation eventual consistency gaps (list
+// won't report a wal at seq X but a wal at X+n, if this kind of eventual
+// consistency ever exists)
 func (w *WalManager) WriteWal(ctx context.Context, actions []*Action, cgt *ChangeGroupsUpdateToken) (*ChangeGroupsUpdateToken, error) {
 	return w.WriteWalAdditionalOps(ctx, actions, cgt, nil, nil)
 }
@@ -616,7 +616,7 @@ func (w *WalManager) WriteWalAdditionalOps(ctx context.Context, actions []*Actio
 			return nil, err
 		}
 	}
-	if err := w.lts.WriteObject(walDataFilePath, bytes.NewReader(buf.Bytes())); err != nil {
+	if err := w.ost.WriteObject(walDataFilePath, bytes.NewReader(buf.Bytes())); err != nil {
 		return nil, err
 	}
 	w.log.Debugf("wrote wal file: %s", walDataFilePath)
@@ -761,7 +761,7 @@ func (w *WalManager) sync(ctx context.Context) error {
 			}
 
 			walFileCommittedPath := walFilePath + ".committed"
-			if err := w.lts.WriteObject(walFileCommittedPath, bytes.NewReader(headerj)); err != nil {
+			if err := w.ost.WriteObject(walFileCommittedPath, bytes.NewReader(headerj)); err != nil {
 				return err
 			}
 
@@ -791,7 +791,7 @@ func (w *WalManager) sync(ctx context.Context) error {
 			walFilePath := w.storageWalStatusFile(walData.WalSequence)
 			w.log.Debugf("checkpointing committed wal to storage")
 			walFileCheckpointedPath := walFilePath + ".checkpointed"
-			if err := w.lts.WriteObject(walFileCheckpointedPath, bytes.NewReader([]byte{})); err != nil {
+			if err := w.ost.WriteObject(walFileCheckpointedPath, bytes.NewReader([]byte{})); err != nil {
 				return err
 			}
 		}
@@ -849,7 +849,7 @@ func (w *WalManager) checkpoint(ctx context.Context) error {
 		walFilePath := w.storageWalDataFile(walData.WalDataFileID)
 		w.log.Debugf("checkpointing wal: %q", walData.WalSequence)
 
-		walFile, err := w.lts.ReadObject(walFilePath)
+		walFile, err := w.ost.ReadObject(walFilePath)
 		if err != nil {
 			return err
 		}
@@ -896,13 +896,13 @@ func (w *WalManager) checkpointAction(ctx context.Context, action *Action) error
 	switch action.ActionType {
 	case ActionTypePut:
 		w.log.Debugf("writing file: %q", path)
-		if err := w.lts.WriteObject(path, bytes.NewReader(action.Data)); err != nil {
+		if err := w.ost.WriteObject(path, bytes.NewReader(action.Data)); err != nil {
 			return err
 		}
 
 	case ActionTypeDelete:
 		w.log.Debugf("deleting file: %q", path)
-		if err := w.lts.DeleteObject(path); err != nil && err != objectstorage.ErrNotExist {
+		if err := w.ost.DeleteObject(path); err != nil && err != objectstorage.ErrNotExist {
 			return err
 		}
 	}
@@ -1076,7 +1076,7 @@ func (w *WalManager) etcdPinger(ctx context.Context) error {
 func (w *WalManager) InitEtcd(ctx context.Context) error {
 	writeWal := func(wal *WalFile) error {
 		w.log.Infof("wal seq: %s", wal.WalSequence)
-		walFile, err := w.lts.ReadObject(w.storageWalStatusFile(wal.WalSequence) + ".committed")
+		walFile, err := w.ost.ReadObject(w.storageWalStatusFile(wal.WalSequence) + ".committed")
 		if err != nil {
 			return err
 		}
@@ -1141,14 +1141,14 @@ func (w *WalManager) InitEtcd(ctx context.Context) error {
 
 	// walsdata not found in etcd
 
-	// if there're some wals in the lts this means etcd has been reset.
+	// if there're some wals in the objectstorage this means etcd has been reset.
 	// So take all the wals in committed or checkpointed state starting from the
 	// first not checkpointed wal and put them in etcd
 	lastCommittedStorageWalsRing := ring.New(100)
 	lastCommittedStorageWalElem := lastCommittedStorageWalsRing
 	lastCommittedStorageWalSequence := ""
 	wroteWals := 0
-	for wal := range w.ListLtsWals("") {
+	for wal := range w.ListOSTWals("") {
 		w.log.Infof("wal: %s", wal)
 		if wal.Err != nil {
 			return wal.Err
@@ -1228,7 +1228,7 @@ func NoOpDataToPath(dataType string, id string) string {
 type WalManagerConfig struct {
 	BasePath        string
 	E               *etcd.Store
-	Lts             *objectstorage.ObjStorage
+	OST             *objectstorage.ObjStorage
 	EtcdWalsKeepNum int
 	CheckpointFunc  CheckpointFunc
 	DataToPathFunc  DataToPathFunc
@@ -1238,7 +1238,7 @@ type WalManager struct {
 	basePath        string
 	log             *zap.SugaredLogger
 	e               *etcd.Store
-	lts             *objectstorage.ObjStorage
+	ost             *objectstorage.ObjStorage
 	changes         *WalChanges
 	etcdWalsKeepNum int
 	checkpointFunc  CheckpointFunc
@@ -1262,7 +1262,7 @@ func NewWalManager(ctx context.Context, logger *zap.Logger, conf *WalManagerConf
 		basePath:        conf.BasePath,
 		log:             logger.Sugar(),
 		e:               conf.E,
-		lts:             conf.Lts,
+		ost:             conf.OST,
 		etcdWalsKeepNum: conf.EtcdWalsKeepNum,
 		changes:         NewWalChanges(),
 		checkpointFunc:  conf.CheckpointFunc,

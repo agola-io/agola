@@ -45,9 +45,9 @@ type Gateway struct {
 	ConfigStoreURL string `yaml:"configStoreURL"`
 	GitServerURL   string `yaml:"gitServerURL"`
 
-	Web  Web  `yaml:"web"`
-	Etcd Etcd `yaml:"etcd"`
-	LTS  LTS  `yaml:"lts"`
+	Web           Web           `yaml:"web"`
+	Etcd          Etcd          `yaml:"etcd"`
+	ObjectStorage ObjectStorage `yaml:"objectStorage"`
 
 	TokenSigning TokenSigning `yaml:"tokenSigning"`
 
@@ -63,10 +63,10 @@ type Scheduler struct {
 type RunServiceScheduler struct {
 	Debug bool `yaml:"debug"`
 
-	DataDir string `yaml:"dataDir"`
-	Web     Web    `yaml:"web"`
-	Etcd    Etcd   `yaml:"etcd"`
-	LTS     LTS    `yaml:"lts"`
+	DataDir       string        `yaml:"dataDir"`
+	Web           Web           `yaml:"web"`
+	Etcd          Etcd          `yaml:"etcd"`
+	ObjectStorage ObjectStorage `yaml:"objectStorage"`
 
 	RunCacheExpireInterval time.Duration `yaml:"runCacheExpireInterval"`
 }
@@ -93,9 +93,9 @@ type ConfigStore struct {
 
 	DataDir string `yaml:"dataDir"`
 
-	Web  Web  `yaml:"web"`
-	Etcd Etcd `yaml:"etcd"`
-	LTS  LTS  `yaml:"lts"`
+	Web           Web           `yaml:"web"`
+	Etcd          Etcd          `yaml:"etcd"`
+	ObjectStorage ObjectStorage `yaml:"objectStorage"`
 }
 
 type GitServer struct {
@@ -106,9 +106,9 @@ type GitServer struct {
 	GithookPath string `yaml:"githookPath"`
 	GatewayURL  string `yaml:"gatewayURL"`
 
-	Web  Web  `yaml:"web"`
-	Etcd Etcd `yaml:"etcd"`
-	LTS  LTS  `yaml:"lts"`
+	Web           Web           `yaml:"web"`
+	Etcd          Etcd          `yaml:"etcd"`
+	ObjectStorage ObjectStorage `yaml:"objectStorage"`
 }
 
 type Web struct {
@@ -130,15 +130,15 @@ type Web struct {
 	AllowedOrigins []string `yaml:"allowedOrigins"`
 }
 
-type LTSType string
+type ObjectStorageType string
 
 const (
-	LTSTypePosix LTSType = "posix"
-	LTSTypeS3    LTSType = "s3"
+	ObjectStorageTypePosix ObjectStorageType = "posix"
+	ObjectStorageTypeS3    ObjectStorageType = "s3"
 )
 
-type LTS struct {
-	Type LTSType `yaml:"type"`
+type ObjectStorage struct {
+	Type ObjectStorageType `yaml:"type"`
 
 	// Posix
 	Path string `yaml:"path"`

@@ -101,15 +101,15 @@ func httpResponse(w http.ResponseWriter, code int, res interface{}) error {
 type LogsHandler struct {
 	log *zap.SugaredLogger
 	e   *etcd.Store
-	lts *objectstorage.ObjStorage
+	ost *objectstorage.ObjStorage
 	wal *wal.WalManager
 }
 
-func NewLogsHandler(logger *zap.Logger, e *etcd.Store, lts *objectstorage.ObjStorage, wal *wal.WalManager) *LogsHandler {
+func NewLogsHandler(logger *zap.Logger, e *etcd.Store, ost *objectstorage.ObjStorage, wal *wal.WalManager) *LogsHandler {
 	return &LogsHandler{
 		log: logger.Sugar(),
 		e:   e,
-		lts: lts,
+		ost: ost,
 		wal: wal,
 	}
 }
@@ -178,7 +178,7 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, setup bool, step int, w http.ResponseWriter, follow, stream bool) (error, bool) {
-	r, err := store.GetRunEtcdOrLTS(ctx, h.e, h.wal, runID)
+	r, err := store.GetRunEtcdOrOST(ctx, h.e, h.wal, runID)
 	if err != nil {
 		return err, true
 	}
@@ -198,11 +198,11 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 	if task.Steps[step].LogPhase == types.RunTaskFetchPhaseFinished {
 		var logPath string
 		if setup {
-			logPath = store.LTSRunTaskSetupLogPath(task.ID)
+			logPath = store.OSTRunTaskSetupLogPath(task.ID)
 		} else {
-			logPath = store.LTSRunTaskStepLogPath(task.ID, step)
+			logPath = store.OSTRunTaskStepLogPath(task.ID, step)
 		}
-		f, err := h.lts.ReadObject(logPath)
+		f, err := h.ost.ReadObject(logPath)
 		if err != nil {
 			if err == objectstorage.ErrNotExist {
 				return common.NewErrNotExist(err), true
@@ -364,7 +364,7 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if run == nil {
-		run, err = store.LTSGetRun(h.wal, runID)
+		run, err = store.OSTGetRun(h.wal, runID)
 		if err != nil && err != objectstorage.ErrNotExist {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -375,7 +375,7 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rc, err := store.LTSGetRunConfig(h.wal, run.ID)
+	rc, err := store.OSTGetRunConfig(h.wal, run.ID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

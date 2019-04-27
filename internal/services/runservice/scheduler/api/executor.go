@@ -199,13 +199,13 @@ func (h *ExecutorTasksHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 
 type ArchivesHandler struct {
 	log *zap.SugaredLogger
-	lts *objectstorage.ObjStorage
+	ost *objectstorage.ObjStorage
 }
 
-func NewArchivesHandler(logger *zap.Logger, lts *objectstorage.ObjStorage) *ArchivesHandler {
+func NewArchivesHandler(logger *zap.Logger, ost *objectstorage.ObjStorage) *ArchivesHandler {
 	return &ArchivesHandler{
 		log: logger.Sugar(),
-		lts: lts,
+		ost: ost,
 	}
 }
 
@@ -242,8 +242,8 @@ func (h *ArchivesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ArchivesHandler) readArchive(rtID string, step int, w io.Writer) error {
-	archivePath := store.LTSRunArchivePath(rtID, step)
-	f, err := h.lts.ReadObject(archivePath)
+	archivePath := store.OSTRunArchivePath(rtID, step)
+	f, err := h.ost.ReadObject(archivePath)
 	if err != nil {
 		if err == objectstorage.ErrNotExist {
 			return common.NewErrNotExist(err)
@@ -260,13 +260,13 @@ func (h *ArchivesHandler) readArchive(rtID string, step int, w io.Writer) error 
 
 type CacheHandler struct {
 	log *zap.SugaredLogger
-	lts *objectstorage.ObjStorage
+	ost *objectstorage.ObjStorage
 }
 
-func NewCacheHandler(logger *zap.Logger, lts *objectstorage.ObjStorage) *CacheHandler {
+func NewCacheHandler(logger *zap.Logger, ost *objectstorage.ObjStorage) *CacheHandler {
 	return &CacheHandler{
 		log: logger.Sugar(),
-		lts: lts,
+		ost: ost,
 	}
 }
 
@@ -289,7 +289,7 @@ func (h *CacheHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	_, prefix := query["prefix"]
 
-	matchedKey, err := matchCache(h.lts, key, prefix)
+	matchedKey, err := matchCache(h.ost, key, prefix)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -316,8 +316,8 @@ func (h *CacheHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func matchCache(lts *objectstorage.ObjStorage, key string, prefix bool) (string, error) {
-	cachePath := store.LTSCachePath(key)
+func matchCache(ost *objectstorage.ObjStorage, key string, prefix bool) (string, error) {
+	cachePath := store.OSTCachePath(key)
 
 	if prefix {
 		doneCh := make(chan struct{})
@@ -325,7 +325,7 @@ func matchCache(lts *objectstorage.ObjStorage, key string, prefix bool) (string,
 
 		// get the latest modified object
 		var lastObject *objectstorage.ObjectInfo
-		for object := range lts.List(store.LTSCacheDir()+"/"+key, "", false, doneCh) {
+		for object := range ost.List(store.OSTCacheDir()+"/"+key, "", false, doneCh) {
 			if object.Err != nil {
 				return "", object.Err
 			}
@@ -339,10 +339,10 @@ func matchCache(lts *objectstorage.ObjStorage, key string, prefix bool) (string,
 			return "", nil
 
 		}
-		return store.LTSCacheKey(lastObject.Path), nil
+		return store.OSTCacheKey(lastObject.Path), nil
 	}
 
-	_, err := lts.Stat(cachePath)
+	_, err := ost.Stat(cachePath)
 	if err == objectstorage.ErrNotExist {
 		return "", nil
 	}
@@ -353,8 +353,8 @@ func matchCache(lts *objectstorage.ObjStorage, key string, prefix bool) (string,
 }
 
 func (h *CacheHandler) readCache(key string, w io.Writer) error {
-	cachePath := store.LTSCachePath(key)
-	f, err := h.lts.ReadObject(cachePath)
+	cachePath := store.OSTCachePath(key)
+	f, err := h.ost.ReadObject(cachePath)
 	if err != nil {
 		if err == objectstorage.ErrNotExist {
 			return common.NewErrNotExist(err)
@@ -371,13 +371,13 @@ func (h *CacheHandler) readCache(key string, w io.Writer) error {
 
 type CacheCreateHandler struct {
 	log *zap.SugaredLogger
-	lts *objectstorage.ObjStorage
+	ost *objectstorage.ObjStorage
 }
 
-func NewCacheCreateHandler(logger *zap.Logger, lts *objectstorage.ObjStorage) *CacheCreateHandler {
+func NewCacheCreateHandler(logger *zap.Logger, ost *objectstorage.ObjStorage) *CacheCreateHandler {
 	return &CacheCreateHandler{
 		log: logger.Sugar(),
-		lts: lts,
+		ost: ost,
 	}
 }
 
@@ -400,7 +400,7 @@ func (h *CacheCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Cache-Control", "no-cache")
 
-	matchedKey, err := matchCache(h.lts, key, false)
+	matchedKey, err := matchCache(h.ost, key, false)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -410,8 +410,8 @@ func (h *CacheCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cachePath := store.LTSCachePath(key)
-	if err := h.lts.WriteObject(cachePath, r.Body); err != nil {
+	cachePath := store.OSTCachePath(key)
+	if err := h.ost.WriteObject(cachePath, r.Body); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

@@ -75,9 +75,9 @@ func TestEtcdReset(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	ltsDir, err := ioutil.TempDir(dir, "lts")
+	ostDir, err := ioutil.TempDir(dir, "ost")
 
-	lts, err := objectstorage.NewPosixStorage(ltsDir)
+	ost, err := objectstorage.NewPosixStorage(ostDir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestEtcdReset(t *testing.T) {
 	walConfig := &WalManagerConfig{
 		BasePath:        "basepath",
 		E:               tetcd.TestEtcd.Store,
-		Lts:             objectstorage.NewObjStorage(lts, "/"),
+		OST:             objectstorage.NewObjStorage(ost, "/"),
 		EtcdWalsKeepNum: 10,
 	}
 	wal, err := NewWalManager(ctx, logger, walConfig)
@@ -136,7 +136,7 @@ func TestEtcdReset(t *testing.T) {
 	walConfig = &WalManagerConfig{
 		BasePath:        "basepath",
 		E:               tetcd.TestEtcd.Store,
-		Lts:             objectstorage.NewObjStorage(lts, "/"),
+		OST:             objectstorage.NewObjStorage(ost, "/"),
 		EtcdWalsKeepNum: 10,
 	}
 	wal, err = NewWalManager(ctx, logger, walConfig)
@@ -178,16 +178,16 @@ func TestConcurrentUpdate(t *testing.T) {
 
 	ctx := context.Background()
 
-	ltsDir, err := ioutil.TempDir(dir, "lts")
+	ostDir, err := ioutil.TempDir(dir, "ost")
 
-	lts, err := objectstorage.NewPosixStorage(ltsDir)
+	ost, err := objectstorage.NewPosixStorage(ostDir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
 	walConfig := &WalManagerConfig{
 		E:               tetcd.TestEtcd.Store,
-		Lts:             objectstorage.NewObjStorage(lts, "/"),
+		OST:             objectstorage.NewObjStorage(ost, "/"),
 		EtcdWalsKeepNum: 10,
 	}
 	wal, err := NewWalManager(ctx, logger, walConfig)
@@ -258,9 +258,9 @@ func TestWalCleaner(t *testing.T) {
 
 	ctx := context.Background()
 
-	ltsDir, err := ioutil.TempDir(dir, "lts")
+	ostDir, err := ioutil.TempDir(dir, "ost")
 
-	lts, err := objectstorage.NewPosixStorage(ltsDir)
+	ost, err := objectstorage.NewPosixStorage(ostDir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -268,7 +268,7 @@ func TestWalCleaner(t *testing.T) {
 	walKeepNum := 10
 	walConfig := &WalManagerConfig{
 		E:               tetcd.TestEtcd.Store,
-		Lts:             objectstorage.NewObjStorage(lts, "/"),
+		OST:             objectstorage.NewObjStorage(ost, "/"),
 		EtcdWalsKeepNum: walKeepNum,
 	}
 	wal, err := NewWalManager(ctx, logger, walConfig)

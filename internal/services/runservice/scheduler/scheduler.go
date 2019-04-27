@@ -333,7 +333,7 @@ func (s *Scheduler) genExecutorTask(ctx context.Context, r *types.Run, rt *types
 		Shell:       rct.Shell,
 		User:        rct.User,
 		Steps:       rct.Steps,
-		CachePrefix: store.LTSRootGroup(r.Group),
+		CachePrefix: store.OSTRootGroup(r.Group),
 		Status: types.ExecutorTaskStatus{
 			Phase:      types.ExecutorTaskPhaseNotStarted,
 			Steps:      make([]*types.ExecutorTaskStepStatus, len(rct.Steps)),
@@ -613,7 +613,7 @@ func (s *Scheduler) handleExecutorTaskUpdate(ctx context.Context, et *types.Exec
 	if err != nil {
 		return err
 	}
-	rc, err := store.LTSGetRunConfig(s.wal, r.ID)
+	rc, err := store.OSTGetRunConfig(s.wal, r.ID)
 	if err != nil {
 		return errors.Wrapf(err, "cannot get run config %q", r.ID)
 	}
@@ -891,9 +891,9 @@ func (s *Scheduler) fetchLog(ctx context.Context, rt *types.RunTask, setup bool,
 
 	var logPath string
 	if setup {
-		logPath = store.LTSRunTaskSetupLogPath(rt.ID)
+		logPath = store.OSTRunTaskSetupLogPath(rt.ID)
 	} else {
-		logPath = store.LTSRunTaskStepLogPath(rt.ID, stepnum)
+		logPath = store.OSTRunTaskStepLogPath(rt.ID, stepnum)
 	}
 	ok, err := s.fileExists(logPath)
 	if err != nil {
@@ -923,7 +923,7 @@ func (s *Scheduler) fetchLog(ctx context.Context, rt *types.RunTask, setup bool,
 		return errors.Errorf("received http status: %d", r.StatusCode)
 	}
 
-	return s.lts.WriteObject(logPath, r.Body)
+	return s.ost.WriteObject(logPath, r.Body)
 }
 
 func (s *Scheduler) finishSetupLogPhase(ctx context.Context, runID, runTaskID string) error {
@@ -1040,7 +1040,7 @@ func (s *Scheduler) fetchArchive(ctx context.Context, rt *types.RunTask, stepnum
 		return nil
 	}
 
-	path := store.LTSRunArchivePath(rt.ID, stepnum)
+	path := store.OSTRunArchivePath(rt.ID, stepnum)
 	ok, err := s.fileExists(path)
 	if err != nil {
 		return err
@@ -1065,7 +1065,7 @@ func (s *Scheduler) fetchArchive(ctx context.Context, rt *types.RunTask, stepnum
 		return errors.Errorf("received http status: %d", r.StatusCode)
 	}
 
-	return s.lts.WriteObject(path, r.Body)
+	return s.ost.WriteObject(path, r.Body)
 }
 
 func (s *Scheduler) fetchTaskArchives(ctx context.Context, runID string, rt *types.RunTask) {
@@ -1163,7 +1163,7 @@ func (s *Scheduler) runsScheduler(ctx context.Context) error {
 
 func (s *Scheduler) runScheduler(ctx context.Context, r *types.Run) error {
 	log.Debugf("runScheduler")
-	rc, err := store.LTSGetRunConfig(s.wal, r.ID)
+	rc, err := store.OSTGetRunConfig(s.wal, r.ID)
 	if err != nil {
 		return errors.Wrapf(err, "cannot get run config %q", r.ID)
 	}
@@ -1201,14 +1201,14 @@ func (s *Scheduler) finishedRunsArchiver(ctx context.Context) error {
 		}
 	}
 
-	// We write archived runs in lts in the ordered they were archived
+	// We write archived runs in objectstorage in the ordered they were archived
 	runs, err = store.GetRuns(ctx, s.e)
 	if err != nil {
 		return err
 	}
 	for _, r := range runs {
 		if r.Archived {
-			if err := s.runLTSArchiver(ctx, r); err != nil {
+			if err := s.runOSTArchiver(ctx, r); err != nil {
 				log.Errorf("err: %+v", err)
 			}
 		}
@@ -1262,11 +1262,11 @@ func (s *Scheduler) finishedRunArchiver(ctx context.Context, r *types.Run) error
 	return nil
 }
 
-func (s *Scheduler) runLTSArchiver(ctx context.Context, r *types.Run) error {
-	// TODO(sgotti) avoid saving multiple times the run on lts if the
+func (s *Scheduler) runOSTArchiver(ctx context.Context, r *types.Run) error {
+	// TODO(sgotti) avoid saving multiple times the run on objectstorage if the
 	// store.DeletedArchivedRun fails
-	log.Infof("saving run in lts: %s", r.ID)
-	ra, err := store.LTSSaveRunAction(r)
+	log.Infof("saving run in objectstorage: %s", r.ID)
+	ra, err := store.OSTSaveRunAction(r)
 	if err != nil {
 		return err
 	}
@@ -1285,12 +1285,12 @@ func (s *Scheduler) runLTSArchiver(ctx context.Context, r *types.Run) error {
 	return nil
 }
 
-func (s *Scheduler) dumpLTSLoop(ctx context.Context) {
+func (s *Scheduler) dumpOSTLoop(ctx context.Context) {
 	for {
-		log.Debugf("lts dump loop")
+		log.Debugf("objectstorage dump loop")
 
 		// TODO(sgotti) create new dump only after N files
-		if err := s.dumpLTS(ctx); err != nil {
+		if err := s.dumpOST(ctx); err != nil {
 			log.Errorf("err: %+v", err)
 		}
 
@@ -1304,7 +1304,7 @@ func (s *Scheduler) dumpLTSLoop(ctx context.Context) {
 	}
 }
 
-func (s *Scheduler) dumpLTS(ctx context.Context) error {
+func (s *Scheduler) dumpOST(ctx context.Context) error {
 	type indexHeader struct {
 		LastWalSequence string
 	}
@@ -1328,7 +1328,7 @@ func (s *Scheduler) dumpLTS(ctx context.Context) error {
 	var lastWalSequence string
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		lastWalSequence, err = s.readDB.GetCommittedWalSequenceLTS(tx)
+		lastWalSequence, err = s.readDB.GetCommittedWalSequenceOST(tx)
 		return err
 	})
 	if err != nil {
@@ -1348,7 +1348,7 @@ func (s *Scheduler) dumpLTS(ctx context.Context) error {
 	for {
 		err := s.readDB.Do(func(tx *db.Tx) error {
 			var err error
-			lruns, err := s.readDB.GetRunsFilteredLTS(tx, nil, false, nil, lastRunID, 1000, types.SortOrderDesc)
+			lruns, err := s.readDB.GetRunsFilteredOST(tx, nil, false, nil, lastRunID, 1000, types.SortOrderDesc)
 			if err != nil {
 				return err
 			}
@@ -1380,7 +1380,7 @@ func (s *Scheduler) dumpLTS(ctx context.Context) error {
 	for {
 		err := s.readDB.Do(func(tx *db.Tx) error {
 			var err error
-			counters, err := s.readDB.GetRunCountersLTS(tx, lastGroup, 1000)
+			counters, err := s.readDB.GetRunCountersOST(tx, lastGroup, 1000)
 			if err != nil {
 				return err
 			}
@@ -1409,18 +1409,18 @@ func (s *Scheduler) dumpLTS(ctx context.Context) error {
 
 	index := path.Join(common.StorageRunsIndexesDir, indexDir, "all")
 
-	if err = s.lts.WriteObject(index, bytes.NewReader(data)); err != nil {
+	if err = s.ost.WriteObject(index, bytes.NewReader(data)); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (s *Scheduler) dumpLTSCleanerLoop(ctx context.Context) {
+func (s *Scheduler) dumpOSTCleanerLoop(ctx context.Context) {
 	for {
-		log.Infof("lts dump cleaner loop")
+		log.Infof("objectstorage dump cleaner loop")
 
-		if err := s.dumpLTSCleaner(ctx); err != nil {
+		if err := s.dumpOSTCleaner(ctx); err != nil {
 			log.Errorf("err: %+v", err)
 		}
 
@@ -1434,7 +1434,7 @@ func (s *Scheduler) dumpLTSCleanerLoop(ctx context.Context) {
 	}
 }
 
-func (s *Scheduler) dumpLTSCleaner(ctx context.Context) error {
+func (s *Scheduler) dumpOSTCleaner(ctx context.Context) error {
 	type indexData struct {
 		ID    string
 		Group string
@@ -1446,7 +1446,7 @@ func (s *Scheduler) dumpLTSCleaner(ctx context.Context) error {
 	doneCh := make(chan struct{})
 	defer close(doneCh)
 	var indexPath string
-	for object := range s.lts.List(common.StorageRunsIndexesDir+"/", "", true, doneCh) {
+	for object := range s.ost.List(common.StorageRunsIndexesDir+"/", "", true, doneCh) {
 		if object.Err != nil {
 			return object.Err
 		}
@@ -1467,7 +1467,7 @@ func (s *Scheduler) dumpLTSCleaner(ctx context.Context) error {
 	}
 
 	for _, object := range objects {
-		if err := s.lts.DeleteObject(object); err != nil {
+		if err := s.ost.DeleteObject(object); err != nil {
 			log.Errorf("object: %s, err: %v", object, err)
 			return err
 		}
@@ -1513,12 +1513,12 @@ func (s *Scheduler) cacheCleaner(ctx context.Context, cacheExpireInterval time.D
 
 	doneCh := make(chan struct{})
 	defer close(doneCh)
-	for object := range s.lts.List(store.LTSCacheDir()+"/", "", true, doneCh) {
+	for object := range s.ost.List(store.OSTCacheDir()+"/", "", true, doneCh) {
 		if object.Err != nil {
 			return object.Err
 		}
 		if object.LastModified.Add(cacheExpireInterval).Before(time.Now()) {
-			if err := s.lts.DeleteObject(object.Path); err != nil {
+			if err := s.ost.DeleteObject(object.Path); err != nil {
 				if err != objectstorage.ErrNotExist {
 					log.Warnf("failed to delete cache object %q: %v", object.Path, err)
 				}
@@ -1560,7 +1560,7 @@ func (s *Scheduler) etcdPinger(ctx context.Context) error {
 type Scheduler struct {
 	c      *config.RunServiceScheduler
 	e      *etcd.Store
-	lts    *objectstorage.ObjStorage
+	ost    *objectstorage.ObjStorage
 	wal    *wal.WalManager
 	readDB *readdb.ReadDB
 	ch     *command.CommandHandler
@@ -1571,7 +1571,7 @@ func NewScheduler(ctx context.Context, c *config.RunServiceScheduler) (*Schedule
 		level.SetLevel(zapcore.DebugLevel)
 	}
 
-	lts, err := scommon.NewLTS(&c.LTS)
+	ost, err := scommon.NewObjectStorage(&c.ObjectStorage)
 	if err != nil {
 		return nil, err
 	}
@@ -1583,12 +1583,12 @@ func NewScheduler(ctx context.Context, c *config.RunServiceScheduler) (*Schedule
 	s := &Scheduler{
 		c:   c,
 		e:   e,
-		lts: lts,
+		ost: ost,
 	}
 
 	walConf := &wal.WalManagerConfig{
 		E:              e,
-		Lts:            lts,
+		OST:            ost,
 		DataToPathFunc: common.DataToPathFunc,
 	}
 	wal, err := wal.NewWalManager(ctx, logger, walConf)
@@ -1597,13 +1597,13 @@ func NewScheduler(ctx context.Context, c *config.RunServiceScheduler) (*Schedule
 	}
 	s.wal = wal
 
-	readDB, err := readdb.NewReadDB(ctx, logger, filepath.Join(c.DataDir, "readdb"), e, lts, wal)
+	readDB, err := readdb.NewReadDB(ctx, logger, filepath.Join(c.DataDir, "readdb"), e, ost, wal)
 	if err != nil {
 		return nil, err
 	}
 	s.readDB = readDB
 
-	ch := command.NewCommandHandler(logger, e, readDB, lts, wal)
+	ch := command.NewCommandHandler(logger, e, readDB, ost, wal)
 	s.ch = ch
 
 	return s, nil
@@ -1661,14 +1661,14 @@ func (s *Scheduler) Run(ctx context.Context) error {
 	executorTaskStatusHandler := api.NewExecutorTaskStatusHandler(s.e, ch)
 	executorTaskHandler := api.NewExecutorTaskHandler(s.e)
 	executorTasksHandler := api.NewExecutorTasksHandler(s.e)
-	archivesHandler := api.NewArchivesHandler(logger, s.lts)
-	cacheHandler := api.NewCacheHandler(logger, s.lts)
-	cacheCreateHandler := api.NewCacheCreateHandler(logger, s.lts)
+	archivesHandler := api.NewArchivesHandler(logger, s.ost)
+	cacheHandler := api.NewCacheHandler(logger, s.ost)
+	cacheCreateHandler := api.NewCacheCreateHandler(logger, s.ost)
 
 	// api from clients
 	executorDeleteHandler := api.NewExecutorDeleteHandler(logger, s.ch)
 
-	logsHandler := api.NewLogsHandler(logger, s.e, s.lts, s.wal)
+	logsHandler := api.NewLogsHandler(logger, s.e, s.ost, s.wal)
 
 	runHandler := api.NewRunHandler(logger, s.e, s.wal, s.readDB)
 	runTaskActionsHandler := api.NewRunTaskActionsHandler(logger, s.ch)
@@ -1714,8 +1714,8 @@ func (s *Scheduler) Run(ctx context.Context) error {
 	go s.runTasksUpdaterLoop(ctx)
 	go s.fetcherLoop(ctx)
 	go s.finishedRunsArchiverLoop(ctx)
-	go s.dumpLTSLoop(ctx)
-	go s.dumpLTSCleanerLoop(ctx)
+	go s.dumpOSTLoop(ctx)
+	go s.dumpOSTCleanerLoop(ctx)
 	go s.compactChangeGroupsLoop(ctx)
 	go s.cacheCleanerLoop(ctx, s.c.RunCacheExpireInterval)
 	go s.executorTaskUpdateHandler(ctx, ch)

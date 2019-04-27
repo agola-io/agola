@@ -40,16 +40,16 @@ type CommandHandler struct {
 	log    *zap.SugaredLogger
 	e      *etcd.Store
 	readDB *readdb.ReadDB
-	lts    *objectstorage.ObjStorage
+	ost    *objectstorage.ObjStorage
 	wal    *wal.WalManager
 }
 
-func NewCommandHandler(logger *zap.Logger, e *etcd.Store, readDB *readdb.ReadDB, lts *objectstorage.ObjStorage, wal *wal.WalManager) *CommandHandler {
+func NewCommandHandler(logger *zap.Logger, e *etcd.Store, readDB *readdb.ReadDB, ost *objectstorage.ObjStorage, wal *wal.WalManager) *CommandHandler {
 	return &CommandHandler{
 		log:    logger.Sugar(),
 		e:      e,
 		readDB: readDB,
-		lts:    lts,
+		ost:    ost,
 		wal:    wal,
 	}
 }
@@ -218,12 +218,12 @@ func (s *CommandHandler) recreateRun(ctx context.Context, req *RunCreateRequest)
 
 	// fetch the existing runconfig and run
 	s.log.Infof("creating run from existing run")
-	rc, err := store.LTSGetRunConfig(s.wal, req.RunID)
+	rc, err := store.OSTGetRunConfig(s.wal, req.RunID)
 	if err != nil {
 		return nil, util.NewErrBadRequest(errors.Wrapf(err, "runconfig %q doens't exist", req.RunID))
 	}
 
-	run, err := store.GetRunEtcdOrLTS(ctx, s.e, s.wal, req.RunID)
+	run, err := store.GetRunEtcdOrOST(ctx, s.e, s.wal, req.RunID)
 	if err != nil {
 		return nil, err
 	}
@@ -382,14 +382,14 @@ func (s *CommandHandler) saveRun(ctx context.Context, rb *types.RunBundle, runcg
 	actions := []*wal.Action{}
 
 	// persist group counter
-	rca, err := store.LTSUpdateRunCounterAction(ctx, c, run.Group)
+	rca, err := store.OSTUpdateRunCounterAction(ctx, c, run.Group)
 	if err != nil {
 		return err
 	}
 	actions = append(actions, rca)
 
 	// persist run config
-	rca, err = store.LTSSaveRunConfigAction(rc)
+	rca, err = store.OSTSaveRunConfigAction(rc)
 	if err != nil {
 		return err
 	}
@@ -542,11 +542,11 @@ func (s *CommandHandler) getRunCounter(group string) (uint64, *wal.ChangeGroupsU
 	var cgt *wal.ChangeGroupsUpdateToken
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		c, err = s.readDB.GetRunCounterLTS(tx, pl[1])
+		c, err = s.readDB.GetRunCounterOST(tx, pl[1])
 		if err != nil {
 			return err
 		}
-		cgt, err = s.readDB.GetChangeGroupsUpdateTokensLTS(tx, []string{"counter-" + pl[1]})
+		cgt, err = s.readDB.GetChangeGroupsUpdateTokensOST(tx, []string{"counter-" + pl[1]})
 		return err
 	})
 	if err != nil {

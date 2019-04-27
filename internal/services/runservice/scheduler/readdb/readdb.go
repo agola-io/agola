@@ -69,23 +69,23 @@ var (
 	changegrouprevisionSelect = sb.Select("id, revision").From("changegrouprevision")
 	changegrouprevisionInsert = sb.Insert("changegrouprevision").Columns("id", "revision")
 
-	// readdb tables based on lts data
-	revisionLTSSelect = sb.Select("revision").From("revision_lts")
-	revisionLTSInsert = sb.Insert("revision_lts").Columns("revision")
+	// readdb tables based on objectstorage data
+	revisionOSTSelect = sb.Select("revision").From("revision_ost")
+	revisionOSTInsert = sb.Insert("revision_ost").Columns("revision")
 
-	runLTSSelect = sb.Select("id", "grouppath", "phase").From("run_lts")
-	runLTSInsert = sb.Insert("run_lts").Columns("id", "grouppath", "phase")
+	runOSTSelect = sb.Select("id", "grouppath", "phase").From("run_ost")
+	runOSTInsert = sb.Insert("run_ost").Columns("id", "grouppath", "phase")
 
-	rundataLTSInsert = sb.Insert("rundata_lts").Columns("id", "data")
+	rundataOSTInsert = sb.Insert("rundata_ost").Columns("id", "data")
 
-	committedwalsequenceLTSSelect = sb.Select("seq").From("committedwalsequence_lts")
-	committedwalsequenceLTSInsert = sb.Insert("committedwalsequence_lts").Columns("seq")
+	committedwalsequenceOSTSelect = sb.Select("seq").From("committedwalsequence_ost")
+	committedwalsequenceOSTInsert = sb.Insert("committedwalsequence_ost").Columns("seq")
 
-	changegrouprevisionLTSSelect = sb.Select("id, revision").From("changegrouprevision_lts")
-	changegrouprevisionLTSInsert = sb.Insert("changegrouprevision_lts").Columns("id", "revision")
+	changegrouprevisionOSTSelect = sb.Select("id, revision").From("changegrouprevision_ost")
+	changegrouprevisionOSTInsert = sb.Insert("changegrouprevision_ost").Columns("id", "revision")
 
-	runcounterLTSSelect = sb.Select("groupid", "counter").From("runcounter_lts")
-	runcounterLTSInsert = sb.Insert("runcounter_lts").Columns("groupid", "counter")
+	runcounterOSTSelect = sb.Select("groupid", "counter").From("runcounter_ost")
+	runcounterOSTInsert = sb.Insert("runcounter_ost").Columns("groupid", "counter")
 )
 
 type ReadDB struct {
@@ -93,7 +93,7 @@ type ReadDB struct {
 	dataDir string
 	e       *etcd.Store
 	rdb     *db.DB
-	lts     *objectstorage.ObjStorage
+	ost     *objectstorage.ObjStorage
 	wal     *wal.WalManager
 
 	Initialized bool
@@ -108,7 +108,7 @@ type ReadDB struct {
 	dbWriteLock sync.Mutex
 }
 
-func NewReadDB(ctx context.Context, logger *zap.Logger, dataDir string, e *etcd.Store, lts *objectstorage.ObjStorage, wal *wal.WalManager) (*ReadDB, error) {
+func NewReadDB(ctx context.Context, logger *zap.Logger, dataDir string, e *etcd.Store, ost *objectstorage.ObjStorage, wal *wal.WalManager) (*ReadDB, error) {
 	if err := os.MkdirAll(dataDir, 0770); err != nil {
 		return nil, err
 	}
@@ -126,7 +126,7 @@ func NewReadDB(ctx context.Context, logger *zap.Logger, dataDir string, e *etcd.
 		log:     logger.Sugar(),
 		e:       e,
 		dataDir: dataDir,
-		lts:     lts,
+		ost:     ost,
 		wal:     wal,
 		rdb:     rdb,
 	}
@@ -152,8 +152,8 @@ func (r *ReadDB) Initialize(ctx context.Context) error {
 	if err := r.ResetDB(); err != nil {
 		return errors.Wrapf(err, "failed to reset db")
 	}
-	if err := r.SyncLTS(ctx); err != nil {
-		return errors.Wrapf(err, "error syncing lts db")
+	if err := r.SyncObjectStorage(ctx); err != nil {
+		return errors.Wrapf(err, "error syncing objectstorage db")
 	}
 	if err := r.SyncRDB(ctx); err != nil {
 		return errors.Wrapf(err, "error syncing run db")
@@ -297,9 +297,9 @@ func (r *ReadDB) Run(ctx context.Context) error {
 
 		wg.Add(1)
 		go func() {
-			r.log.Infof("starting HandleEvents")
-			if err := r.HandleEvents(ctx); err != nil {
-				r.log.Errorf("handleevents err: %+v", err)
+			r.log.Infof("starting handleEvents")
+			if err := r.handleEvents(ctx); err != nil {
+				r.log.Errorf("handleEvents err: %+v", err)
 				errCh <- err
 			}
 			wg.Done()
@@ -307,9 +307,9 @@ func (r *ReadDB) Run(ctx context.Context) error {
 
 		wg.Add(1)
 		go func() {
-			r.log.Infof("starting HandleEventsLTS")
-			if err := r.HandleEventsLTS(ctx); err != nil {
-				r.log.Errorf("handleevents lts err: %+v", err)
+			r.log.Infof("starting handleEventsOST")
+			if err := r.handleEventsOST(ctx); err != nil {
+				r.log.Errorf("handleEventsOST err: %+v", err)
 				errCh <- err
 			}
 			wg.Done()
@@ -331,7 +331,7 @@ func (r *ReadDB) Run(ctx context.Context) error {
 	}
 }
 
-func (r *ReadDB) HandleEvents(ctx context.Context) error {
+func (r *ReadDB) handleEvents(ctx context.Context) error {
 	var revision int64
 	var lastRuns []*RunData
 	err := r.rdb.Do(func(tx *db.Tx) error {
@@ -447,16 +447,16 @@ func (r *ReadDB) handleRunEvent(tx *db.Tx, ev *etcdclientv3.Event, wresp *etcdcl
 			return errors.Wrap(err, "failed to delete run")
 		}
 
-		// Run has been deleted from etcd, this means that it was stored in the LTS
+		// Run has been deleted from etcd, this means that it was stored in the objectstorage
 		// TODO(sgotti) this is here just to avoid a window where the run is not in
-		// run table and in the run_lts table but should be changed/removed when we'll
+		// run table and in the run_os table but should be changed/removed when we'll
 		// implement run removal
-		run, err := store.LTSGetRun(r.wal, runID)
+		run, err := store.OSTGetRun(r.wal, runID)
 		if err != nil {
 			return err
 		}
 
-		return r.insertRunLTS(tx, run, []byte{})
+		return r.insertRunOST(tx, run, []byte{})
 	}
 
 	return nil
@@ -501,12 +501,12 @@ func (r *ReadDB) handleChangeGroupEvent(tx *db.Tx, ev *etcdclientv3.Event, wresp
 	return nil
 }
 
-func (r *ReadDB) SyncLTS(ctx context.Context) error {
+func (r *ReadDB) SyncObjectStorage(ctx context.Context) error {
 	// get the last committed storage wal sequence saved in the rdb
 	curWalSeq := ""
 	err := r.rdb.Do(func(tx *db.Tx) error {
 		var err error
-		curWalSeq, err = r.GetCommittedWalSequenceLTS(tx)
+		curWalSeq, err = r.GetCommittedWalSequenceOST(tx)
 		if err != nil {
 			return err
 		}
@@ -526,19 +526,19 @@ func (r *ReadDB) SyncLTS(ctx context.Context) error {
 		doFullSync = true
 		r.log.Warn("no startWalSeq in db, doing a full sync")
 	} else {
-		ok, err := r.wal.HasLtsWal(curWalSeq)
+		ok, err := r.wal.HasOSTWal(curWalSeq)
 		if err != nil {
 			return err
 		}
 		if !ok {
-			r.log.Warnf("no wal with seq %q in lts, doing a full sync", curWalSeq)
+			r.log.Warnf("no wal with seq %q in objectstorage, doing a full sync", curWalSeq)
 			doFullSync = true
 		}
 
 		// if the epoch of the wals has changed this means etcd has been reset. If so
 		// we should do a full resync since we are saving in the rdb also data that
-		// was not yet committed to lts so we should have the rdb ahead of the current
-		// lts data
+		// was not yet committed to objectstorage so we should have the rdb ahead of
+		// the current objectstorage data
 		// TODO(sgotti) improve this to avoid doing a full resync
 		curWalSequence, err := sequence.Parse(curWalSeq)
 		if err != nil {
@@ -557,7 +557,7 @@ func (r *ReadDB) SyncLTS(ctx context.Context) error {
 	}
 
 	if doFullSync {
-		r.log.Infof("doing a full sync from lts files")
+		r.log.Infof("doing a full sync from objectstorage files")
 		if err := r.ResetDB(); err != nil {
 			return err
 		}
@@ -572,8 +572,8 @@ func (r *ReadDB) SyncLTS(ctx context.Context) error {
 	r.log.Infof("startWalSeq: %s", curWalSeq)
 
 	// Sync from wals
-	// sync from lts until the current known lastCommittedStorageWal in etcd
-	// since wals are first committed to lts and then in etcd we would like to
+	// sync from objectstorage until the current known lastCommittedStorageWal in etcd
+	// since wals are first committed to objectstorage and then in etcd we would like to
 	// avoid to store in rdb something that is not yet marked as committedstorage
 	// in etcd
 	curWalSeq, err = r.SyncFromWals(curWalSeq, lastCommittedStorageWal)
@@ -582,7 +582,7 @@ func (r *ReadDB) SyncLTS(ctx context.Context) error {
 	}
 
 	// Get the first available wal from etcd and check that our current walseq
-	// from wals on lts is >=
+	// from wals on objectstorage is >=
 	// if not (this happens when syncFromWals takes some time and in the meantime
 	// many new wals are written, the next sync should be faster and able to continue
 	firstAvailableWalData, revision, err := r.wal.FirstAvailableWalData(ctx)
@@ -604,7 +604,7 @@ func (r *ReadDB) SyncLTS(ctx context.Context) error {
 	}
 
 	err = r.rdb.Do(func(tx *db.Tx) error {
-		if err := insertRevisionLTS(tx, revision); err != nil {
+		if err := insertRevisionOST(tx, revision); err != nil {
 			return err
 		}
 
@@ -617,7 +617,7 @@ func (r *ReadDB) SyncLTS(ctx context.Context) error {
 				continue
 			}
 
-			if err := r.insertCommittedWalSequenceLTS(tx, walElement.WalData.WalSequence); err != nil {
+			if err := r.insertCommittedWalSequenceOST(tx, walElement.WalData.WalSequence); err != nil {
 				return err
 			}
 
@@ -669,7 +669,7 @@ func (r *ReadDB) SyncFromDump() (string, error) {
 						Phase: ir.Phase,
 					}
 					r.log.Infof("inserting run %q", run.ID)
-					if err := r.insertRunLTS(tx, run, []byte{}); err != nil {
+					if err := r.insertRunOST(tx, run, []byte{}); err != nil {
 						return err
 					}
 				case common.DataTypeRunCounter:
@@ -678,7 +678,7 @@ func (r *ReadDB) SyncFromDump() (string, error) {
 						return err
 					}
 					r.log.Infof("inserting run counter %q, c: %d", irc.Group, irc.Counter)
-					if err := r.insertRunCounterLTS(tx, irc.Group, irc.Counter); err != nil {
+					if err := r.insertRunCounterOST(tx, irc.Group, irc.Counter); err != nil {
 						return err
 					}
 				}
@@ -693,7 +693,7 @@ func (r *ReadDB) SyncFromDump() (string, error) {
 
 	// get last dump
 	var dumpPath string
-	for object := range r.lts.List(path.Join(common.StorageRunsIndexesDir)+"/", "", true, doneCh) {
+	for object := range r.ost.List(path.Join(common.StorageRunsIndexesDir)+"/", "", true, doneCh) {
 		if object.Err != nil {
 			return "", object.Err
 		}
@@ -705,7 +705,7 @@ func (r *ReadDB) SyncFromDump() (string, error) {
 		return "", nil
 	}
 
-	f, err := r.lts.ReadObject(dumpPath)
+	f, err := r.ost.ReadObject(dumpPath)
 	if err != nil {
 		if err == objectstorage.ErrNotExist {
 			r.log.Warnf("object %s disappeared, ignoring", dumpPath)
@@ -767,7 +767,7 @@ func (r *ReadDB) SyncFromWals(startWalSeq, endWalSeq string) (string, error) {
 					return err
 				}
 				walFilef.Close()
-				if err := r.insertCommittedWalSequenceLTS(tx, walFile.WalSequence); err != nil {
+				if err := r.insertCommittedWalSequenceOST(tx, walFile.WalSequence); err != nil {
 					return err
 				}
 				if err := r.applyWal(tx, header.WalDataFileID); err != nil {
@@ -786,7 +786,7 @@ func (r *ReadDB) SyncFromWals(startWalSeq, endWalSeq string) (string, error) {
 	doneCh := make(chan struct{})
 	defer close(doneCh)
 
-	for walFile := range r.wal.ListLtsWals(startWalSeq) {
+	for walFile := range r.wal.ListOSTWals(startWalSeq) {
 		if walFile.Err != nil {
 			return "", walFile.Err
 		}
@@ -811,7 +811,7 @@ func (r *ReadDB) SyncFromWals(startWalSeq, endWalSeq string) (string, error) {
 	return lastWalSeq, nil
 }
 
-func (r *ReadDB) HandleEventsLTS(ctx context.Context) error {
+func (r *ReadDB) handleEventsOST(ctx context.Context) error {
 	var revision int64
 	err := r.rdb.Do(func(tx *db.Tx) error {
 		err := tx.QueryRow("select revision from revision order by revision desc limit 1").Scan(&revision)
@@ -851,9 +851,10 @@ func (r *ReadDB) HandleEventsLTS(ctx context.Context) error {
 
 			// if theres a wal seq epoch change something happened to etcd, usually (if
 			// the user hasn't messed up with etcd keys) this means etcd has been reset
-			// in such case we should resync from the lts state to ensure we apply all the
-			// wal marked as committedstorage (since they could have been lost from etcd)
-			curWalSeq, err := r.GetCommittedWalSequenceLTS(tx)
+			// in such case we should resync from the objectstorage state to ensure we
+			// apply all the wal marked as committedstorage (since they could have been
+			// lost from etcd)
+			curWalSeq, err := r.GetCommittedWalSequenceOST(tx)
 			if err != nil {
 				return err
 			}
@@ -873,15 +874,15 @@ func (r *ReadDB) HandleEventsLTS(ctx context.Context) error {
 				weWalEpoch := weWalSequence.Epoch
 				if curWalEpoch != weWalEpoch {
 					r.Initialized = false
-					return errors.Errorf("current rdb wal sequence epoch %d different than new wal sequence epoch %d, resyncing from lts", curWalEpoch, weWalEpoch)
+					return errors.Errorf("current rdb wal sequence epoch %d different than new wal sequence epoch %d, resyncing from objectstorage", curWalEpoch, weWalEpoch)
 				}
 			}
 
-			if err := r.handleEventLTS(tx, we); err != nil {
+			if err := r.handleEventOST(tx, we); err != nil {
 				return err
 			}
 
-			if err := insertRevisionLTS(tx, we.Revision); err != nil {
+			if err := insertRevisionOST(tx, we.Revision); err != nil {
 				return err
 			}
 			return nil
@@ -933,7 +934,7 @@ func (r *ReadDB) applyAction(tx *db.Tx, action *wal.Action) error {
 			if err := json.Unmarshal(action.Data, &run); err != nil {
 				return err
 			}
-			if err := r.insertRunLTS(tx, run, action.Data); err != nil {
+			if err := r.insertRunOST(tx, run, action.Data); err != nil {
 				return err
 			}
 		case string(common.DataTypeRunCounter):
@@ -942,7 +943,7 @@ func (r *ReadDB) applyAction(tx *db.Tx, action *wal.Action) error {
 				return err
 			}
 			r.log.Infof("inserting run counter %q, c: %d", action.ID, runCounter)
-			if err := r.insertRunCounterLTS(tx, action.ID, runCounter); err != nil {
+			if err := r.insertRunCounterOST(tx, action.ID, runCounter); err != nil {
 				return err
 			}
 		}
@@ -957,7 +958,7 @@ func (r *ReadDB) applyAction(tx *db.Tx, action *wal.Action) error {
 	return nil
 }
 
-func (r *ReadDB) handleEventLTS(tx *db.Tx, we *wal.WatchElement) error {
+func (r *ReadDB) handleEventOST(tx *db.Tx, we *wal.WatchElement) error {
 	//r.log.Debugf("event: %s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
 	//key := string(ev.Kv.Key)
 
@@ -969,18 +970,18 @@ func (r *ReadDB) handleEventLTS(tx *db.Tx, we *wal.WatchElement) error {
 
 func (r *ReadDB) handleWalEvent(tx *db.Tx, we *wal.WatchElement) error {
 	for cgName, cgRev := range we.ChangeGroupsRevisions {
-		if err := r.insertChangeGroupRevisionLTS(tx, cgName, cgRev); err != nil {
+		if err := r.insertChangeGroupRevisionOST(tx, cgName, cgRev); err != nil {
 			return err
 		}
 	}
 
 	if we.WalData != nil {
-		// update readdb only when the wal has been committed to lts
+		// update readdb only when the wal has been committed to objectstorage
 		if we.WalData.WalStatus != wal.WalStatusCommitted {
 			return nil
 		}
 
-		if err := r.insertCommittedWalSequenceLTS(tx, we.WalData.WalSequence); err != nil {
+		if err := r.insertCommittedWalSequenceOST(tx, we.WalData.WalSequence); err != nil {
 			return err
 		}
 
@@ -1014,14 +1015,14 @@ func insertRevision(tx *db.Tx, revision int64) error {
 	return nil
 }
 
-func insertRevisionLTS(tx *db.Tx, revision int64) error {
+func insertRevisionOST(tx *db.Tx, revision int64) error {
 	// poor man insert or update that works because transaction isolation level is serializable
-	if _, err := tx.Exec("delete from revision_lts"); err != nil {
+	if _, err := tx.Exec("delete from revision_ost"); err != nil {
 		return errors.Wrap(err, "failed to delete revision")
 	}
 	// TODO(sgotti) go database/sql and mattn/sqlite3 don't support uint64 types...
 	//q, args, err = revisionInsert.Values(int64(wresp.Header.ClusterId), run.Revision).ToSql()
-	q, args, err := revisionLTSInsert.Values(revision).ToSql()
+	q, args, err := revisionOSTInsert.Values(revision).ToSql()
 	if err != nil {
 		return errors.Wrap(err, "failed to build query")
 	}
@@ -1065,7 +1066,7 @@ func insertRun(tx *db.Tx, run *types.Run, data []byte) error {
 	return nil
 }
 
-func (r *ReadDB) insertRunLTS(tx *db.Tx, run *types.Run, data []byte) error {
+func (r *ReadDB) insertRunOST(tx *db.Tx, run *types.Run, data []byte) error {
 	// add ending slash to distinguish between final group (i.e project/projectid/branch/feature and project/projectid/branch/feature02)
 	groupPath := run.Group
 	if !strings.HasSuffix(groupPath, "/") {
@@ -1073,10 +1074,10 @@ func (r *ReadDB) insertRunLTS(tx *db.Tx, run *types.Run, data []byte) error {
 	}
 
 	// poor man insert or update that works because transaction isolation level is serializable
-	if _, err := tx.Exec("delete from run_lts where id = $1", run.ID); err != nil {
-		return errors.Wrap(err, "failed to delete run lts")
+	if _, err := tx.Exec("delete from run_ost where id = $1", run.ID); err != nil {
+		return errors.Wrap(err, "failed to delete run objectstorage")
 	}
-	q, args, err := runLTSInsert.Values(run.ID, groupPath, run.Phase).ToSql()
+	q, args, err := runOSTInsert.Values(run.ID, groupPath, run.Phase).ToSql()
 	if err != nil {
 		return errors.Wrap(err, "failed to build query")
 	}
@@ -1085,10 +1086,10 @@ func (r *ReadDB) insertRunLTS(tx *db.Tx, run *types.Run, data []byte) error {
 	}
 
 	// poor man insert or update that works because transaction isolation level is serializable
-	if _, err := tx.Exec("delete from rundata_lts where id = $1", run.ID); err != nil {
+	if _, err := tx.Exec("delete from rundata_ost where id = $1", run.ID); err != nil {
 		return errors.Wrap(err, "failed to delete rundata")
 	}
-	q, args, err = rundataLTSInsert.Values(run.ID, data).ToSql()
+	q, args, err = rundataOSTInsert.Values(run.ID, data).ToSql()
 	if err != nil {
 		return errors.Wrap(err, "failed to build query")
 	}
@@ -1173,14 +1174,14 @@ func (r *ReadDB) GetActiveRuns(tx *db.Tx, groups []string, lastRun bool, phaseFi
 }
 
 func (r *ReadDB) GetRuns(tx *db.Tx, groups []string, lastRun bool, phaseFilter []types.RunPhase, startRunID string, limit int, sortOrder types.SortOrder) ([]*types.Run, error) {
-	useLTS := false
+	useObjectStorage := false
 	for _, phase := range phaseFilter {
 		if phase == types.RunPhaseFinished || phase == types.RunPhaseCancelled {
-			useLTS = true
+			useObjectStorage = true
 		}
 	}
 	if len(phaseFilter) == 0 {
-		useLTS = true
+		useObjectStorage = true
 	}
 
 	runDataRDB, err := r.getRunsFilteredActive(tx, groups, lastRun, phaseFilter, startRunID, limit, sortOrder)
@@ -1194,14 +1195,14 @@ func (r *ReadDB) GetRuns(tx *db.Tx, groups []string, lastRun bool, phaseFilter [
 		lastRunsMap[r.GroupPath] = r
 	}
 
-	if useLTS {
+	if useObjectStorage {
 		// skip if the phase requested is not finished
-		runDataLTS, err := r.GetRunsFilteredLTS(tx, groups, lastRun, phaseFilter, startRunID, limit, sortOrder)
+		runDataOST, err := r.GetRunsFilteredOST(tx, groups, lastRun, phaseFilter, startRunID, limit, sortOrder)
 		if err != nil {
 			return nil, err
 		}
 
-		for _, rd := range runDataLTS {
+		for _, rd := range runDataOST {
 			if lastRun {
 				if lr, ok := lastRunsMap[rd.GroupPath]; ok {
 					switch sortOrder {
@@ -1250,8 +1251,8 @@ func (r *ReadDB) GetRuns(tx *db.Tx, groups []string, lastRun bool, phaseFilter [
 			continue
 		}
 
-		// get run from lts
-		run, err := store.LTSGetRun(r.wal, runID)
+		// get run from objectstorage
+		run, err := store.OSTGetRun(r.wal, runID)
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
@@ -1262,16 +1263,16 @@ func (r *ReadDB) GetRuns(tx *db.Tx, groups []string, lastRun bool, phaseFilter [
 	return aruns, nil
 }
 
-func (r *ReadDB) getRunsFilteredQuery(phaseFilter []types.RunPhase, groups []string, lastRun bool, startRunID string, limit int, sortOrder types.SortOrder, lts bool) sq.SelectBuilder {
+func (r *ReadDB) getRunsFilteredQuery(phaseFilter []types.RunPhase, groups []string, lastRun bool, startRunID string, limit int, sortOrder types.SortOrder, objectstorage bool) sq.SelectBuilder {
 	runt := "run"
 	rundatat := "rundata"
 	fields := []string{"run.id", "run.grouppath", "run.phase", "rundata.data"}
 	if len(groups) > 0 && lastRun {
 		fields = []string{"max(run.id)", "run.grouppath", "run.phase", "rundata.data"}
 	}
-	if lts {
-		runt = "run_lts"
-		rundatat = "rundata_lts"
+	if objectstorage {
+		runt = "run_ost"
+		rundatat = "rundata_ost"
 	}
 
 	r.log.Debugf("runt: %s", runt)
@@ -1329,7 +1330,7 @@ func (r *ReadDB) getRunsFilteredActive(tx *db.Tx, groups []string, lastRun bool,
 	return fetchRuns(tx, q, args...)
 }
 
-func (r *ReadDB) GetRunsFilteredLTS(tx *db.Tx, groups []string, lastRun bool, phaseFilter []types.RunPhase, startRunID string, limit int, sortOrder types.SortOrder) ([]*RunData, error) {
+func (r *ReadDB) GetRunsFilteredOST(tx *db.Tx, groups []string, lastRun bool, phaseFilter []types.RunPhase, startRunID string, limit int, sortOrder types.SortOrder) ([]*RunData, error) {
 	s := r.getRunsFilteredQuery(phaseFilter, groups, lastRun, startRunID, limit, sortOrder, true)
 
 	q, args, err := s.ToSql()
@@ -1445,13 +1446,13 @@ func scanChangeGroupsRevision(rows *sql.Rows) (types.ChangeGroupsRevisions, erro
 	return changegroups, nil
 }
 
-func (r *ReadDB) insertCommittedWalSequenceLTS(tx *db.Tx, seq string) error {
+func (r *ReadDB) insertCommittedWalSequenceOST(tx *db.Tx, seq string) error {
 	r.log.Infof("insert seq: %s", seq)
 	// poor man insert or update that works because transaction isolation level is serializable
-	if _, err := tx.Exec("delete from committedwalsequence_lts"); err != nil {
+	if _, err := tx.Exec("delete from committedwalsequence_ost"); err != nil {
 		return errors.Wrap(err, "failed to delete committedwalsequence")
 	}
-	q, args, err := committedwalsequenceLTSInsert.Values(seq).ToSql()
+	q, args, err := committedwalsequenceOSTInsert.Values(seq).ToSql()
 	if err != nil {
 		return errors.Wrap(err, "failed to build query")
 	}
@@ -1461,10 +1462,10 @@ func (r *ReadDB) insertCommittedWalSequenceLTS(tx *db.Tx, seq string) error {
 	return nil
 }
 
-func (r *ReadDB) GetCommittedWalSequenceLTS(tx *db.Tx) (string, error) {
+func (r *ReadDB) GetCommittedWalSequenceOST(tx *db.Tx) (string, error) {
 	var seq string
 
-	q, args, err := committedwalsequenceLTSSelect.OrderBy("seq").Limit(1).ToSql()
+	q, args, err := committedwalsequenceOSTSelect.OrderBy("seq").Limit(1).ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return "", errors.Wrap(err, "failed to build query")
@@ -1477,16 +1478,16 @@ func (r *ReadDB) GetCommittedWalSequenceLTS(tx *db.Tx) (string, error) {
 	return seq, err
 }
 
-func (r *ReadDB) insertChangeGroupRevisionLTS(tx *db.Tx, changegroup string, revision int64) error {
+func (r *ReadDB) insertChangeGroupRevisionOST(tx *db.Tx, changegroup string, revision int64) error {
 	r.log.Infof("insertChangeGroupRevision: %s %d", changegroup, revision)
 
 	// poor man insert or update that works because transaction isolation level is serializable
-	if _, err := tx.Exec("delete from changegrouprevision_lts where id = $1", changegroup); err != nil {
+	if _, err := tx.Exec("delete from changegrouprevision_ost where id = $1", changegroup); err != nil {
 		return errors.Wrap(err, "failed to delete run")
 	}
 	// insert only if revision > 0
 	if revision > 0 {
-		q, args, err := changegrouprevisionLTSInsert.Values(changegroup, revision).ToSql()
+		q, args, err := changegrouprevisionOSTInsert.Values(changegroup, revision).ToSql()
 		if err != nil {
 			return errors.Wrap(err, "failed to build query")
 		}
@@ -1497,14 +1498,14 @@ func (r *ReadDB) insertChangeGroupRevisionLTS(tx *db.Tx, changegroup string, rev
 	return nil
 }
 
-func (r *ReadDB) GetChangeGroupsUpdateTokensLTS(tx *db.Tx, groups []string) (*wal.ChangeGroupsUpdateToken, error) {
-	s := changegrouprevisionLTSSelect.Where(sq.Eq{"id": groups})
+func (r *ReadDB) GetChangeGroupsUpdateTokensOST(tx *db.Tx, groups []string) (*wal.ChangeGroupsUpdateToken, error) {
+	s := changegrouprevisionOSTSelect.Where(sq.Eq{"id": groups})
 	q, args, err := s.ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to build query")
 	}
-	cgr, err := fetchChangeGroupsRevisionLTS(tx, q, args...)
+	cgr, err := fetchChangeGroupsRevisionOST(tx, q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -1524,7 +1525,7 @@ func (r *ReadDB) GetChangeGroupsUpdateTokensLTS(tx *db.Tx, groups []string) (*wa
 	return &wal.ChangeGroupsUpdateToken{CurRevision: revision, ChangeGroupsRevisions: cgr}, nil
 }
 
-func fetchChangeGroupsRevisionLTS(tx *db.Tx, q string, args ...interface{}) (map[string]int64, error) {
+func fetchChangeGroupsRevisionOST(tx *db.Tx, q string, args ...interface{}) (map[string]int64, error) {
 	rows, err := tx.Query(q, args...)
 	if err != nil {
 		return nil, err
@@ -1533,7 +1534,7 @@ func fetchChangeGroupsRevisionLTS(tx *db.Tx, q string, args ...interface{}) (map
 	return scanChangeGroupsRevision(rows)
 }
 
-func scanChangeGroupsRevisionLTS(rows *sql.Rows) (map[string]int64, error) {
+func scanChangeGroupsRevisionOST(rows *sql.Rows) (map[string]int64, error) {
 	changegroups := map[string]int64{}
 	for rows.Next() {
 		var (
@@ -1551,14 +1552,14 @@ func scanChangeGroupsRevisionLTS(rows *sql.Rows) (map[string]int64, error) {
 	return changegroups, nil
 }
 
-func (r *ReadDB) insertRunCounterLTS(tx *db.Tx, group string, counter uint64) error {
+func (r *ReadDB) insertRunCounterOST(tx *db.Tx, group string, counter uint64) error {
 	// poor man insert or update that works because transaction isolation level is serializable
-	if _, err := tx.Exec("delete from runcounter_lts where groupid = $1", group); err != nil {
+	if _, err := tx.Exec("delete from runcounter_ost where groupid = $1", group); err != nil {
 		return errors.Wrap(err, "failed to delete revision")
 	}
 	// TODO(sgotti) go database/sql and mattn/sqlite3 don't support uint64 types...
 	//q, args, err = revisionInsert.Values(int64(wresp.Header.ClusterId), run.Revision).ToSql()
-	q, args, err := runcounterLTSInsert.Values(group, counter).ToSql()
+	q, args, err := runcounterOSTInsert.Values(group, counter).ToSql()
 	if err != nil {
 		return errors.Wrap(err, "failed to build query")
 	}
@@ -1568,11 +1569,11 @@ func (r *ReadDB) insertRunCounterLTS(tx *db.Tx, group string, counter uint64) er
 	return nil
 }
 
-func (r *ReadDB) GetRunCounterLTS(tx *db.Tx, group string) (uint64, error) {
+func (r *ReadDB) GetRunCounterOST(tx *db.Tx, group string) (uint64, error) {
 	var g string
 	var counter uint64
 
-	q, args, err := runcounterLTSSelect.Where(sq.Eq{"groupid": group}).ToSql()
+	q, args, err := runcounterOSTSelect.Where(sq.Eq{"groupid": group}).ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to build query")
@@ -1585,8 +1586,8 @@ func (r *ReadDB) GetRunCounterLTS(tx *db.Tx, group string) (uint64, error) {
 	return counter, err
 }
 
-func (r *ReadDB) GetRunCountersLTS(tx *db.Tx, start string, limit int) ([]*types.RunCounter, error) {
-	s := runcounterLTSSelect.Where(sq.Gt{"groupid": start})
+func (r *ReadDB) GetRunCountersOST(tx *db.Tx, start string, limit int) ([]*types.RunCounter, error) {
+	s := runcounterOSTSelect.Where(sq.Gt{"groupid": start})
 	if limit > 0 {
 		s = s.Limit(uint64(limit))
 	}

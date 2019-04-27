@@ -73,19 +73,19 @@ func WriteFileAtomic(filename string, data []byte, perm os.FileMode) error {
 		})
 }
 
-func NewLTS(c *config.LTS) (*objectstorage.ObjStorage, error) {
+func NewObjectStorage(c *config.ObjectStorage) (*objectstorage.ObjStorage, error) {
 	var (
 		err error
-		lts objectstorage.Storage
+		ost objectstorage.Storage
 	)
 
 	switch c.Type {
-	case config.LTSTypePosix:
-		lts, err = objectstorage.NewPosixStorage(c.Path)
+	case config.ObjectStorageTypePosix:
+		ost, err = objectstorage.NewPosixStorage(c.Path)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create posix object storage")
 		}
-	case config.LTSTypeS3:
+	case config.ObjectStorageTypeS3:
 		// minio golang client doesn't accept an url as an endpoint
 		endpoint := c.Endpoint
 		secure := !c.DisableTLS
@@ -100,13 +100,13 @@ func NewLTS(c *config.LTS) (*objectstorage.ObjStorage, error) {
 				return nil, errors.Errorf("wrong s3 endpoint scheme %q (must be http or https)", u.Scheme)
 			}
 		}
-		lts, err = objectstorage.NewS3Storage(c.Bucket, c.Location, endpoint, c.AccessKey, c.SecretAccessKey, secure)
+		ost, err = objectstorage.NewS3Storage(c.Bucket, c.Location, endpoint, c.AccessKey, c.SecretAccessKey, secure)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create s3 object storage")
 		}
 	}
 
-	return objectstorage.NewObjStorage(lts, "/"), nil
+	return objectstorage.NewObjStorage(ost, "/"), nil
 }
 
 func NewEtcd(c *config.Etcd, logger *zap.Logger, prefix string) (*etcd.Store, error) {

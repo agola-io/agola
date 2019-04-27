@@ -58,14 +58,14 @@ type ReadDB struct {
 	dataDir string
 	e       *etcd.Store
 	rdb     *db.DB
-	lts     *objectstorage.ObjStorage
+	ost     *objectstorage.ObjStorage
 	wal     *wal.WalManager
 
 	Initialized bool
 	initMutex   sync.Mutex
 }
 
-func NewReadDB(ctx context.Context, logger *zap.Logger, dataDir string, e *etcd.Store, lts *objectstorage.ObjStorage, wal *wal.WalManager) (*ReadDB, error) {
+func NewReadDB(ctx context.Context, logger *zap.Logger, dataDir string, e *etcd.Store, ost *objectstorage.ObjStorage, wal *wal.WalManager) (*ReadDB, error) {
 	if err := os.MkdirAll(dataDir, 0770); err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func NewReadDB(ctx context.Context, logger *zap.Logger, dataDir string, e *etcd.
 		dataDir: dataDir,
 		rdb:     rdb,
 		e:       e,
-		lts:     lts,
+		ost:     ost,
 		wal:     wal,
 	}
 
@@ -131,7 +131,7 @@ func (r *ReadDB) SyncFromFiles() (string, error) {
 
 	var lastCheckpointedWal string
 	// Get last checkpointed wal from lts
-	for wal := range r.wal.ListLtsWals("") {
+	for wal := range r.wal.ListOSTWals("") {
 		if wal.Err != nil {
 			return "", wal.Err
 		}
@@ -268,7 +268,7 @@ func (r *ReadDB) SyncFromWals(startWalSeq, endWalSeq string) (string, error) {
 	doneCh := make(chan struct{})
 	defer close(doneCh)
 
-	for walFile := range r.wal.ListLtsWals(startWalSeq) {
+	for walFile := range r.wal.ListOSTWals(startWalSeq) {
 		if walFile.Err != nil {
 			return "", walFile.Err
 		}
@@ -318,16 +318,19 @@ func (r *ReadDB) SyncRDB(ctx context.Context) error {
 		doFullSync = true
 		r.log.Warn("no startWalSeq in db, doing a full sync")
 	} else {
-		ok, err := r.wal.HasLtsWal(curWalSeq)
+		ok, err := r.wal.HasOSTWal(curWalSeq)
 		if err != nil {
 			return err
 		}
 		if !ok {
-			r.log.Warnf("no wal with seq %q in lts, doing a full sync", curWalSeq)
+			r.log.Warnf("no wal with seq %q in objectstorage, doing a full sync", curWalSeq)
 			doFullSync = true
 		}
 
-		// if the epoch of the wals has changed this means etcd has been reset. If so we should do a full resync since we are saving in the rdb also data that was not yet committed to lts so we should have the rdb ahead of the current lts data
+		// if the epoch of the wals has changed this means etcd has been reset. If so
+		// we should do a full resync since we are saving in the rdb also data that
+		// was not yet committed to objectstorage so we should have the rdb ahead of
+		// the current objectstorage data
 		// TODO(sgotti) improve this to avoid doing a full resync
 		curWalSequence, err := sequence.Parse(curWalSeq)
 		if err != nil {
@@ -361,17 +364,17 @@ func (r *ReadDB) SyncRDB(ctx context.Context) error {
 	r.log.Infof("startWalSeq: %s", curWalSeq)
 
 	// Sync from wals
-	// sync from lts until the current known lastCommittedStorageWal in etcd
-	// since wals are first committed to lts and then in etcd we would like to
-	// avoid to store in rdb something that is not yet marked as committedstorage
-	// in etcd
+	// sync from objectstorage until the current known lastCommittedStorageWal in
+	// etcd since wals are first committed to objectstorage and then in etcd we
+	// would like to avoid to store in rdb something that is not yet marked as
+	// committedstorage in etcd
 	curWalSeq, err = r.SyncFromWals(curWalSeq, lastCommittedStorageWal)
 	if err != nil {
 		return errors.Wrap(err, "failed to sync from wals")
 	}
 
 	// Get the first available wal from etcd and check that our current walseq
-	// from wals on lts is >=
+	// from wals on objectstorage is >=
 	// if not (this happens when syncFromWals takes some time and in the meantime
 	// many new wals are written, the next sync should be faster and able to continue
 	firstAvailableWalData, revision, err := r.wal.FirstAvailableWalData(ctx)
@@ -412,7 +415,7 @@ func (r *ReadDB) SyncRDB(ctx context.Context) error {
 			}
 			//}
 
-			//// update readdb only when the wal has been committed to lts
+			//// update readdb only when the wal has been committed to objectstorage
 			//if walElement.WalData.WalStatus != wal.WalStatusCommittedStorage {
 			//	return nil
 			//}
@@ -510,8 +513,9 @@ func (r *ReadDB) HandleEvents(ctx context.Context) error {
 
 			// if theres a wal seq epoch change something happened to etcd, usually (if
 			// the user hasn't messed up with etcd keys) this means etcd has been reset
-			// in such case we should resync from the lts state to ensure we apply all the
-			// wal marked as committedstorage (since they could have been lost from etcd)
+			// in such case we should resync from the objectstorage state to ensure we
+			// apply all the wal marked as committedstorage (since they could have been
+			// lost from etcd)
 			curWalSeq, err := r.GetCommittedWalSequence(tx)
 			if err != nil {
 				return err
@@ -532,7 +536,7 @@ func (r *ReadDB) HandleEvents(ctx context.Context) error {
 				weWalEpoch := weWalSequence.Epoch
 				if curWalEpoch != weWalEpoch {
 					r.Initialized = false
-					return errors.Errorf("current rdb wal sequence epoch %d different than new wal sequence epoch %d, resyncing from lts", curWalEpoch, weWalEpoch)
+					return errors.Errorf("current rdb wal sequence epoch %d different than new wal sequence epoch %d, resyncing from objectstorage", curWalEpoch, weWalEpoch)
 				}
 			}
 
@@ -565,7 +569,7 @@ func (r *ReadDB) handleEvent(tx *db.Tx, we *wal.WatchElement) error {
 }
 
 func (r *ReadDB) handleWalEvent(tx *db.Tx, we *wal.WatchElement) error {
-	// update readdb only when the wal has been committed to lts
+	// update readdb only when the wal has been committed to objectstorage
 	//if we.WalData.WalStatus != wal.WalStatusCommittedStorage {
 	//	return nil
 	//}

@@ -150,7 +150,7 @@ func (c *WalChanges) updatePathsOrdered() {
 func (w *WalManager) applyWalChanges(ctx context.Context, walData *WalData, revision int64) error {
 	walDataFilePath := w.storageWalDataFile(walData.WalDataFileID)
 
-	walDataFile, err := w.lts.ReadObject(walDataFilePath)
+	walDataFile, err := w.ost.ReadObject(walDataFilePath)
 	if err != nil {
 		return errors.Wrapf(err, "failed to read waldata %q", walDataFilePath)
 	}

@@ -16,7 +16,6 @@ package readdb
 
 var Stmts = []string{
 	// last processed etcd event revision
-	//"create table revision (clusterid varchar, revision bigint, PRIMARY KEY(revision))",
 	"create table revision (revision bigint, PRIMARY KEY(revision))",
 
 	"create table run (id varchar, grouppath varchar, phase varchar, PRIMARY KEY (id, grouppath, phase))",
@@ -28,17 +27,17 @@ var Stmts = []string{
 	// changegrouprevision stores the current revision of the changegroup for optimistic locking
 	"create table changegrouprevision (id varchar, revision varchar, PRIMARY KEY (id, revision))",
 
-	// LTS
-	"create table revision_lts (revision bigint, PRIMARY KEY(revision))",
+	// objectstorage
+	"create table revision_ost (revision bigint, PRIMARY KEY(revision))",
 
 	// committedwalsequence stores the last committed wal sequence
-	"create table committedwalsequence_lts (seq varchar, PRIMARY KEY (seq))",
+	"create table committedwalsequence_ost (seq varchar, PRIMARY KEY (seq))",
 
-	"create table changegrouprevision_lts (id varchar, revision varchar, PRIMARY KEY (id, revision))",
+	"create table changegrouprevision_ost (id varchar, revision varchar, PRIMARY KEY (id, revision))",
 
-	"create table run_lts (id varchar, grouppath varchar, phase varchar, PRIMARY KEY (id, grouppath, phase))",
+	"create table run_ost (id varchar, grouppath varchar, phase varchar, PRIMARY KEY (id, grouppath, phase))",
 
-	"create table rundata_lts (id varchar, data bytea, PRIMARY KEY (id))",
+	"create table rundata_ost (id varchar, data bytea, PRIMARY KEY (id))",
 
-	"create table runcounter_lts (groupid varchar, counter bigint, PRIMARY KEY (groupid))",
+	"create table runcounter_ost (groupid varchar, counter bigint, PRIMARY KEY (groupid))",
 }
