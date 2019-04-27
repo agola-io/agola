@@ -49,6 +49,8 @@ var (
 
 	EtcdExecutorsDir = "executors"
 	EtcdTasksDir     = "tasks"
+
+	EtcdPingKey = "ping"
 )
 
 func EtcdRunKey(runID string) string       { return path.Join(EtcdRunsDir, runID) }
