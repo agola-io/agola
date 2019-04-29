@@ -33,6 +33,10 @@ import (
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
 )
 
+const (
+	MaxChangegroupNameLength = 256
+)
+
 func OSTSubGroupsAndGroupTypes(group string) []string {
 	h := util.PathHierarchy(group)
 	if len(h)%2 != 1 {
@@ -388,6 +392,18 @@ func GetRun(ctx context.Context, e *etcd.Store, runID string) (*types.Run, int64
 }
 
 func AtomicPutRun(ctx context.Context, e *etcd.Store, r *types.Run, runEvent *common.RunEvent, cgt *types.ChangeGroupsUpdateToken) (*types.Run, error) {
+	// check changegroups name
+	if cgt != nil {
+		for cgName := range cgt.ChangeGroupsRevisions {
+			if strings.Contains(cgName, "/") {
+				return nil, fmt.Errorf(`changegroup name %q must not contain "/"`, cgName)
+			}
+			if len(cgName) > MaxChangegroupNameLength {
+				return nil, fmt.Errorf("changegroup name %q too long", cgName)
+			}
+		}
+	}
+
 	// insert only if the run as changed
 	curRun, _, err := GetRun(ctx, e, r.ID)
 	if err != nil && err != etcd.ErrKeyNotFound {
