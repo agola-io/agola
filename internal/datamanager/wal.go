@@ -288,6 +288,20 @@ func (d *DataManager) ListEtcdWals(ctx context.Context, revision int64) <-chan *
 	return walCh
 }
 
+func (d *DataManager) ListEtcdChangeGroups(ctx context.Context, revision int64) (changeGroupsRevisions, error) {
+	changeGroupsRevisions := changeGroupsRevisions{}
+	resp, err := d.e.List(ctx, etcdChangeGroupsDir, "", revision)
+	if err != nil {
+		return nil, err
+	}
+	for _, kv := range resp.Kvs {
+		changegroupID := path.Base(string(kv.Key))
+		changeGroupsRevisions[changegroupID] = kv.ModRevision
+	}
+
+	return changeGroupsRevisions, nil
+}
+
 // FirstAvailableWalData returns the first (the one with smaller sequence) wal
 // and returns it (or nil if not available) and the etcd revision at the time of
 // the operation
