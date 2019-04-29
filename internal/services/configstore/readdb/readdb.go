@@ -368,6 +368,18 @@ func (r *ReadDB) SyncRDB(ctx context.Context) error {
 			}
 		}
 
+		// sync changegroups, use the same revision of previous operations
+		changeGroupsRevisions, err := r.dm.ListEtcdChangeGroups(ctx, revision)
+		if err != nil {
+			return err
+		}
+
+		for changeGroupID, changeGroupRevision := range changeGroupsRevisions {
+			if err := r.insertChangeGroupRevision(tx, changeGroupID, changeGroupRevision); err != nil {
+				return err
+			}
+		}
+
 		return nil
 	})
 
