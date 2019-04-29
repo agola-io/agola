@@ -132,15 +132,11 @@ func (c *Client) RefreshOauth2Token(refreshToken string) (*oauth2.Token, error) 
 }
 
 func (c *Client) GetRepoInfo(repopath string) (*gitsource.RepoInfo, error) {
-	repo, _, err := c.client.Projects.GetProject(repopath)
+	rr, _, err := c.client.Projects.GetProject(repopath)
 	if err != nil {
 		return nil, err
 	}
-	return &gitsource.RepoInfo{
-		ID:           strconv.Itoa(repo.ID),
-		SSHCloneURL:  repo.SSHURLToRepo,
-		HTTPCloneURL: repo.HTTPURLToRepo,
-	}, nil
+	return fromGitlabRepo(rr), nil
 }
 
 func (c *Client) GetUserInfo() (*gitsource.UserInfo, error) {
@@ -256,4 +252,29 @@ func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource
 		Context:     gitlab.String(context),
 	})
 	return err
+}
+
+func (c *Client) ListUserRepos() ([]*gitsource.RepoInfo, error) {
+	opts := &gitlab.ListProjectsOptions{MinAccessLevel: gitlab.AccessLevel(gitlab.MaintainerPermissions)}
+	remoteRepos, _, err := c.client.Projects.ListProjects(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	repos := []*gitsource.RepoInfo{}
+
+	for _, rr := range remoteRepos {
+		repos = append(repos, fromGitlabRepo(rr))
+	}
+
+	return repos, nil
+}
+
+func fromGitlabRepo(rr *gitlab.Project) *gitsource.RepoInfo {
+	return &gitsource.RepoInfo{
+		ID:           strconv.Itoa(rr.ID),
+		Path:         rr.PathWithNamespace,
+		SSHCloneURL:  rr.SSHURLToRepo,
+		HTTPCloneURL: rr.HTTPURLToRepo,
+	}
 }

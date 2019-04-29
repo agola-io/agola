@@ -169,3 +169,7 @@ func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource
 func (c *Client) ParseWebhook(r *http.Request) (*types.WebhookData, error) {
 	return parseWebhook(r)
 }
+
+func (c *Client) ListUserRepos() ([]*gitsource.RepoInfo, error) {
+	return nil, nil
+}
