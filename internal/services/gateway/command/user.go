@@ -29,6 +29,17 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	expireTimeRange time.Duration = 5 * time.Minute
+)
+
+func isAccessTokenExpired(expiresAt time.Time) bool {
+	if expiresAt.IsZero() {
+		return false
+	}
+	return expiresAt.Add(-expireTimeRange).Before(time.Now())
+}
+
 type CreateUserRequest struct {
 	UserName string
 }
@@ -132,7 +143,7 @@ func (c *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequ
 		return nil, util.NewErrBadRequest(errors.Errorf("user %q already have a linked account for remote source %q", userName, rs.Name))
 	}
 
-	accessToken, err := common.GetAccessToken(rs.AuthType, req.UserAccessToken, req.Oauth2AccessToken)
+	accessToken, err := common.GetAccessToken(rs, req.UserAccessToken, req.Oauth2AccessToken)
 	if err != nil {
 		return nil, err
 	}
@@ -169,6 +180,81 @@ func (c *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequ
 	return la, nil
 }
 
+func (c *CommandHandler) UpdateUserLA(ctx context.Context, userName string, la *types.LinkedAccount) error {
+	user, resp, err := c.configstoreClient.GetUserByName(ctx, userName)
+	if err != nil {
+		return ErrFromRemote(resp, errors.Wrapf(err, "failed to get user %q", userName))
+	}
+	laFound := false
+	for _, ula := range user.LinkedAccounts {
+		if ula.ID == la.ID {
+			laFound = true
+			break
+		}
+	}
+	c.log.Infof("la: %s", util.Dump(la))
+	if !laFound {
+		return util.NewErrBadRequest(errors.Errorf("user %q doesn't have a linked account with id %q", userName, la.ID))
+	}
+
+	creq := &csapi.UpdateUserLARequest{
+		RemoteUserID:               la.RemoteUserID,
+		RemoteUserName:             la.RemoteUserName,
+		UserAccessToken:            la.UserAccessToken,
+		Oauth2AccessToken:          la.Oauth2AccessToken,
+		Oauth2RefreshToken:         la.Oauth2RefreshToken,
+		Oauth2AccessTokenExpiresAt: la.Oauth2AccessTokenExpiresAt,
+	}
+
+	c.log.Infof("updating user %q linked account", userName)
+	la, resp, err = c.configstoreClient.UpdateUserLA(ctx, userName, la.ID, creq)
+	if err != nil {
+		return ErrFromRemote(resp, errors.Wrapf(err, "failed to update user"))
+	}
+	c.log.Infof("linked account %q for user %q updated", la.ID, userName)
+
+	return nil
+}
+
+// RefreshLinkedAccount refreshed the linked account oauth2 access token and update linked account in the configstore
+func (c *CommandHandler) RefreshLinkedAccount(ctx context.Context, rs *types.RemoteSource, userName string, la *types.LinkedAccount) (*types.LinkedAccount, error) {
+	switch rs.AuthType {
+	case types.RemoteSourceAuthTypeOauth2:
+		// refresh access token if expired
+		if isAccessTokenExpired(la.Oauth2AccessTokenExpiresAt) {
+			userSource, err := common.GetOauth2Source(rs, "")
+			if err != nil {
+				return nil, err
+			}
+			token, err := userSource.RefreshOauth2Token(la.Oauth2RefreshToken)
+			if err != nil {
+				return nil, err
+			}
+
+			if la.Oauth2AccessToken != token.AccessToken {
+				la.Oauth2AccessToken = token.AccessToken
+				la.Oauth2RefreshToken = token.RefreshToken
+				la.Oauth2AccessTokenExpiresAt = token.Expiry
+
+				if err := c.UpdateUserLA(ctx, userName, la); err != nil {
+					return nil, errors.Wrapf(err, "failed to update linked account")
+				}
+			}
+		}
+	}
+	return la, nil
+}
+
+// GetGitSource is a wrapper around common.GetGitSource that will also refresh
+// the oauth2 access token and update the linked account when needed
+func (c *CommandHandler) GetGitSource(ctx context.Context, rs *types.RemoteSource, userName string, la *types.LinkedAccount) (gitsource.GitSource, error) {
+	la, err := c.RefreshLinkedAccount(ctx, rs, userName, la)
+	if err != nil {
+		return nil, err
+	}
+	return common.GetGitSource(rs, la)
+}
+
 type RegisterUserRequest struct {
 	UserName                   string
 	RemoteSourceName           string
@@ -192,7 +278,7 @@ func (c *CommandHandler) RegisterUser(ctx context.Context, req *RegisterUserRequ
 	}
 	c.log.Infof("rs: %s", util.Dump(rs))
 
-	accessToken, err := common.GetAccessToken(rs.AuthType, req.UserAccessToken, req.Oauth2AccessToken)
+	accessToken, err := common.GetAccessToken(rs, req.UserAccessToken, req.Oauth2AccessToken)
 	if err != nil {
 		return nil, err
 	}
@@ -252,7 +338,7 @@ func (c *CommandHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (
 	}
 	c.log.Infof("rs: %s", util.Dump(rs))
 
-	accessToken, err := common.GetAccessToken(rs.AuthType, req.UserAccessToken, req.Oauth2AccessToken)
+	accessToken, err := common.GetAccessToken(rs, req.UserAccessToken, req.Oauth2AccessToken)
 	if err != nil {
 		return nil, err
 	}
@@ -343,7 +429,7 @@ func (c *CommandHandler) Authorize(ctx context.Context, req *AuthorizeRequest) (
 	}
 	c.log.Infof("rs: %s", util.Dump(rs))
 
-	accessToken, err := common.GetAccessToken(rs.AuthType, req.UserAccessToken, req.Oauth2AccessToken)
+	accessToken, err := common.GetAccessToken(rs, req.UserAccessToken, req.Oauth2AccessToken)
 	if err != nil {
 		return nil, err
 	}

@@ -145,7 +145,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	corsAllowedOriginsOptions := ghandlers.AllowedOrigins([]string{"*"})
 	corsHandler = ghandlers.CORS(corsAllowedMethodsOptions, corsAllowedHeadersOptions, corsAllowedOriginsOptions)
 
-	webhooksHandler := &webhooksHandler{log: log, configstoreClient: g.configstoreClient, runserviceClient: g.runserviceClient, apiExposedURL: g.c.APIExposedURL}
+	webhooksHandler := &webhooksHandler{log: log, ch: g.ch, configstoreClient: g.configstoreClient, runserviceClient: g.runserviceClient, apiExposedURL: g.c.APIExposedURL}
 
 	projectGroupHandler := api.NewProjectGroupHandler(logger, g.configstoreClient)
 	projectGroupSubgroupsHandler := api.NewProjectGroupSubgroupsHandler(logger, g.configstoreClient)

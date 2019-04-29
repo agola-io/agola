@@ -17,11 +17,12 @@ package common
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
 	"github.com/sorintlab/agola/internal/gitsources/gitea"
 	"github.com/sorintlab/agola/internal/gitsources/gitlab"
 	"github.com/sorintlab/agola/internal/services/types"
+
+	"github.com/pkg/errors"
 )
 
 func SourceSupportedAuthTypes(rsType types.RemoteSourceType) []types.RemoteSourceAuthType {
@@ -66,14 +67,14 @@ func newGitlab(rs *types.RemoteSource, accessToken string) (*gitlab.Client, erro
 	})
 }
 
-func GetAccessToken(authType types.RemoteSourceAuthType, userAccessToken, oauth2AccessToken string) (string, error) {
-	switch authType {
+func GetAccessToken(rs *types.RemoteSource, userAccessToken, oauth2AccessToken string) (string, error) {
+	switch rs.AuthType {
 	case types.RemoteSourceAuthTypePassword:
 		return userAccessToken, nil
 	case types.RemoteSourceAuthTypeOauth2:
 		return oauth2AccessToken, nil
 	default:
-		return "", errors.Errorf("invalid remote source auth type %q", authType)
+		return "", errors.Errorf("invalid remote source auth type %q", rs.AuthType)
 	}
 }
 
@@ -81,7 +82,7 @@ func GetGitSource(rs *types.RemoteSource, la *types.LinkedAccount) (gitsource.Gi
 	var accessToken string
 	if la != nil {
 		var err error
-		accessToken, err = GetAccessToken(rs.AuthType, la.UserAccessToken, la.Oauth2AccessToken)
+		accessToken, err = GetAccessToken(rs, la.UserAccessToken, la.Oauth2AccessToken)
 		if err != nil {
 			return nil, err
 		}

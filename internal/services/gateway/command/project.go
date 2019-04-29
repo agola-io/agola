@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/sorintlab/agola/internal/services/gateway/common"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
@@ -63,7 +62,7 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 		return nil, errors.Errorf("user doesn't have a linked account for remote source %q", rs.Name)
 	}
 
-	gitsource, err := common.GetGitSource(rs, la)
+	gitsource, err := c.GetGitSource(ctx, rs, user.UserName, la)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create gitsource client")
 	}
@@ -105,11 +104,11 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 	}
 	c.log.Infof("project %s created, ID: %s", p.Name, p.ID)
 
-	return p, c.SetupProject(ctx, rs, la, p)
+	return p, c.SetupProject(ctx, rs, user, la, p)
 }
 
-func (c *CommandHandler) SetupProject(ctx context.Context, rs *types.RemoteSource, la *types.LinkedAccount, project *types.Project) error {
-	gitsource, err := common.GetGitSource(rs, la)
+func (c *CommandHandler) SetupProject(ctx context.Context, rs *types.RemoteSource, user *types.User, la *types.LinkedAccount, project *types.Project) error {
+	gitsource, err := c.GetGitSource(ctx, rs, user.UserName, la)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create gitsource client")
 	}
@@ -165,5 +164,5 @@ func (c *CommandHandler) ReconfigProject(ctx context.Context, projectRef string)
 
 	// TODO(sgotti) update project repo path if the remote let us query by repository id
 
-	return c.SetupProject(ctx, rs, la, p)
+	return c.SetupProject(ctx, rs, user, la, p)
 }
