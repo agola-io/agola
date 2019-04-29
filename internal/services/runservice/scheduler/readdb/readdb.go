@@ -222,7 +222,7 @@ func (r *ReadDB) SyncRDB(ctx context.Context) error {
 			}
 		}
 
-		// use the same revision
+		// sync changegroups, use the same revision of previous operations
 		key = common.EtcdChangeGroupsDir
 		continuation = nil
 		for {
@@ -623,6 +623,18 @@ func (r *ReadDB) SyncObjectStorage(ctx context.Context) error {
 
 			r.log.Debugf("applying wal to db")
 			if err := r.applyWal(tx, walElement.WalData.WalDataFileID); err != nil {
+				return err
+			}
+		}
+
+		// sync changegroups, use the same revision of previous operations
+		changeGroupsRevisions, err := r.dm.ListEtcdChangeGroups(ctx, revision)
+		if err != nil {
+			return err
+		}
+
+		for changeGroupID, changeGroupRevision := range changeGroupsRevisions {
+			if err := r.insertChangeGroupRevisionOST(tx, changeGroupID, changeGroupRevision); err != nil {
 				return err
 			}
 		}
