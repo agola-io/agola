@@ -22,6 +22,7 @@ import (
 	slog "github.com/sorintlab/agola/internal/log"
 	"github.com/sorintlab/agola/internal/services/config"
 	rsapi "github.com/sorintlab/agola/internal/services/runservice/scheduler/api"
+	"github.com/sorintlab/agola/internal/util"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -89,7 +90,8 @@ func (s *Scheduler) scheduleRun(ctx context.Context, groupID string) error {
 	//log.Infof("queued runs: %s", queuedRunsResponse.Runs)
 	run := queuedRunsResponse.Runs[0]
 
-	runningRunsResponse, _, err := s.runserviceClient.GetGroupRunningRuns(ctx, groupID, 1, []string{fmt.Sprintf("changegroup-%s", groupID)})
+	changegroup := util.EncodeSha256Hex(fmt.Sprintf("changegroup-%s", groupID))
+	runningRunsResponse, _, err := s.runserviceClient.GetGroupRunningRuns(ctx, groupID, 1, []string{changegroup})
 	if err != nil {
 		return errors.Wrapf(err, "failed to get running runs")
 	}
