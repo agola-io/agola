@@ -19,6 +19,7 @@ package gitea
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -59,7 +60,7 @@ func fromCommitStatus(status gitsource.CommitStatus) gitea.StatusState {
 	case gitsource.CommitStatusFailed:
 		return gitea.StatusFailure
 	default:
-		return gitea.StatusError
+		panic(fmt.Errorf("unknown commit status %q", status))
 	}
 }
 
@@ -276,6 +277,20 @@ func (c *Client) DeleteRepoWebhook(repopath, u string) error {
 	}
 
 	return nil
+}
+
+func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource.CommitStatus, targetURL, description, context string) error {
+	owner, reponame, err := parseRepoPath(repopath)
+	if err != nil {
+		return err
+	}
+	_, err = c.client.CreateStatus(owner, reponame, commitSHA, gitea.CreateStatusOption{
+		State:       fromCommitStatus(status),
+		TargetURL:   targetURL,
+		Description: description,
+		Context:     context,
+	})
+	return err
 }
 
 // helper function to return matching hooks.
