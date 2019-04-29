@@ -71,7 +71,9 @@ func (s *CommandHandler) CreateProjectGroup(ctx context.Context, projectGroup *t
 		}
 		pp := path.Join(groupPath, projectGroup.Name)
 
-		cgNames := []string{util.EncodeSha256Hex(pp)}
+		// changegroup is the projectgroup path. Use "projectpath" prefix as it must
+		// cover both projects and projectgroups
+		cgNames := []string{util.EncodeSha256Hex("projectpath-" + pp)}
 		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
 			return err
@@ -147,7 +149,9 @@ func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Proje
 		}
 		pp := path.Join(groupPath, project.Name)
 
-		cgNames := []string{util.EncodeSha256Hex(pp)}
+		// changegroup is the project path. Use "projectpath" prefix as it must
+		// cover both projects and projectgroups
+		cgNames := []string{util.EncodeSha256Hex("projectpath-" + pp)}
 		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
 			return err
@@ -212,12 +216,9 @@ func (s *CommandHandler) DeleteProject(ctx context.Context, projectRef string) e
 		if project == nil {
 			return util.NewErrBadRequest(errors.Errorf("project %q doesn't exist", projectRef))
 		}
-		group, err := s.readDB.GetProjectGroup(tx, project.Parent.ID)
-		if err != nil {
-			return err
-		}
 
-		cgNames := []string{util.EncodeSha256Hex(group.ID)}
+		// changegroup is the project id.
+		cgNames := []string{util.EncodeSha256Hex(project.ID)}
 		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
 			return err
@@ -254,7 +255,9 @@ func (s *CommandHandler) CreateUser(ctx context.Context, req *CreateUserRequest)
 	}
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
-	cgNames := []string{util.EncodeSha256Hex(req.UserName)}
+	// changegroup is the username (and in future the email) to ensure no
+	// concurrent user creation/modification using the same name
+	cgNames := []string{util.EncodeSha256Hex("username-" + req.UserName)}
 	var rs *types.RemoteSource
 
 	// must do all the check in a single transaction to avoid concurrent changes
@@ -358,15 +361,9 @@ func (s *CommandHandler) DeleteUser(ctx context.Context, userName string) error 
 	var user *types.User
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
-	cgNames := []string{util.EncodeSha256Hex(user.UserName)}
-
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
-		if err != nil {
-			return err
-		}
 
 		// check user existance
 		user, err = s.readDB.GetUserByName(tx, userName)
@@ -376,6 +373,14 @@ func (s *CommandHandler) DeleteUser(ctx context.Context, userName string) error 
 		if user == nil {
 			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", userName))
 		}
+
+		// changegroup is the userid
+		cgNames := []string{util.EncodeSha256Hex("userid-" + user.ID)}
+		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		if err != nil {
+			return err
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -390,8 +395,6 @@ func (s *CommandHandler) DeleteUser(ctx context.Context, userName string) error 
 		},
 	}
 
-	// changegroup is the username (and in future the email) to ensure no
-	// concurrent user creation/modification using the same name
 	_, err = s.dm.WriteWal(ctx, actions, cgt)
 	return err
 }
@@ -430,7 +433,8 @@ func (s *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequ
 			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", req.UserName))
 		}
 
-		cgNames := []string{util.EncodeSha256Hex(user.ID)}
+		// changegroup is the userid
+		cgNames := []string{util.EncodeSha256Hex("userid-" + user.ID)}
 		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
 			return err
@@ -513,7 +517,8 @@ func (s *CommandHandler) DeleteUserLA(ctx context.Context, userName, laID string
 			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", userName))
 		}
 
-		cgNames := []string{util.EncodeSha256Hex(user.ID)}
+		// changegroup is the userid
+		cgNames := []string{util.EncodeSha256Hex("userid-" + user.ID)}
 		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
 			return err
@@ -580,7 +585,8 @@ func (s *CommandHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLARequ
 			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", req.UserName))
 		}
 
-		cgNames := []string{util.EncodeSha256Hex(user.ID)}
+		// changegroup is the userid
+		cgNames := []string{util.EncodeSha256Hex("userid-" + user.ID)}
 		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
 			return err
@@ -649,7 +655,8 @@ func (s *CommandHandler) CreateUserToken(ctx context.Context, userName, tokenNam
 			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", userName))
 		}
 
-		cgNames := []string{util.EncodeSha256Hex(user.ID)}
+		// changegroup is the userid
+		cgNames := []string{util.EncodeSha256Hex("userid-" + user.ID)}
 		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
 			return err
@@ -686,7 +693,6 @@ func (s *CommandHandler) CreateUserToken(ctx context.Context, userName, tokenNam
 		},
 	}
 
-	// changegroup is the userid
 	_, err = s.dm.WriteWal(ctx, actions, cgt)
 	return token, err
 }
@@ -714,7 +720,8 @@ func (s *CommandHandler) DeleteUserToken(ctx context.Context, userName, tokenNam
 			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", userName))
 		}
 
-		cgNames := []string{util.EncodeSha256Hex(user.ID)}
+		// changegroup is the userid
+		cgNames := []string{util.EncodeSha256Hex("userid-" + user.ID)}
 		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
 			return err
@@ -756,7 +763,8 @@ func (s *CommandHandler) CreateRemoteSource(ctx context.Context, remoteSource *t
 	}
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
-	cgNames := []string{util.EncodeSha256Hex(remoteSource.Name)}
+	// changegroup is the remotesource name
+	cgNames := []string{util.EncodeSha256Hex("remotesourcename-" + remoteSource.Name)}
 
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
@@ -803,7 +811,9 @@ func (s *CommandHandler) DeleteRemoteSource(ctx context.Context, remoteSourceNam
 	var remoteSource *types.RemoteSource
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
-	cgNames := []string{util.EncodeSha256Hex(remoteSource.ID)}
+
+	// changegroup is the remotesource id
+	cgNames := []string{util.EncodeSha256Hex("remotesourceid-" + remoteSource.ID)}
 
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
@@ -846,7 +856,8 @@ func (s *CommandHandler) CreateOrg(ctx context.Context, org *types.Organization)
 	}
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
-	cgNames := []string{util.EncodeSha256Hex(org.Name)}
+	// changegroup is the org name
+	cgNames := []string{util.EncodeSha256Hex("orgname-" + org.Name)}
 
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
@@ -911,7 +922,8 @@ func (s *CommandHandler) DeleteOrg(ctx context.Context, orgName string) error {
 	var projects []*types.Project
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
-	cgNames := []string{util.EncodeSha256Hex(orgName)}
+	// changegroup is the org id
+	cgNames := []string{util.EncodeSha256Hex("orgid-" + org.ID)}
 
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
@@ -980,7 +992,8 @@ func (s *CommandHandler) CreateSecret(ctx context.Context, secret *types.Secret)
 	}
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
-	cgNames := []string{util.EncodeSha256Hex(secret.Name)}
+	// changegroup is the secret name
+	cgNames := []string{util.EncodeSha256Hex("secretname-" + secret.Name)}
 
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
@@ -1052,7 +1065,8 @@ func (s *CommandHandler) DeleteSecret(ctx context.Context, parentType types.Conf
 			return util.NewErrBadRequest(errors.Errorf("secret with name %q doesn't exist", secretName))
 		}
 
-		cgNames := []string{util.EncodeSha256Hex(secretName)}
+		// changegroup is the secret id
+		cgNames := []string{util.EncodeSha256Hex("secretid-" + secret.ID)}
 		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
 			return err
@@ -1094,7 +1108,8 @@ func (s *CommandHandler) CreateVariable(ctx context.Context, variable *types.Var
 	}
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
-	cgNames := []string{util.EncodeSha256Hex(variable.Name)}
+	// changegroup is the variable name
+	cgNames := []string{util.EncodeSha256Hex("variablename-" + variable.Name)}
 
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
@@ -1166,7 +1181,8 @@ func (s *CommandHandler) DeleteVariable(ctx context.Context, parentType types.Co
 			return util.NewErrBadRequest(errors.Errorf("variable with name %q doesn't exist", variableName))
 		}
 
-		cgNames := []string{util.EncodeSha256Hex(variableName)}
+		// changegroup is the variable id
+		cgNames := []string{util.EncodeSha256Hex("variableid-" + variable.ID)}
 		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
 			return err
