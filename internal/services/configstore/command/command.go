@@ -645,6 +645,9 @@ func (s *CommandHandler) CreateUserToken(ctx context.Context, userName, tokenNam
 	if userName == "" {
 		return "", util.NewErrBadRequest(errors.Errorf("user name required"))
 	}
+	if tokenName == "" {
+		return "", util.NewErrBadRequest(errors.Errorf("token name required"))
+	}
 
 	var user *types.User
 
