@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -143,15 +144,11 @@ func (c *Client) GetRepoInfo(repopath string) (*gitsource.RepoInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	repo, err := c.client.GetRepo(owner, reponame)
+	rr, err := c.client.GetRepo(owner, reponame)
 	if err != nil {
 		return nil, err
 	}
-	return &gitsource.RepoInfo{
-		ID:           strconv.FormatInt(repo.ID, 10),
-		SSHCloneURL:  repo.SSHURL,
-		HTTPCloneURL: repo.CloneURL,
-	}, nil
+	return fromGiteaRepo(rr), nil
 }
 
 func (c *Client) GetFile(repopath, commit, file string) ([]byte, error) {
@@ -308,4 +305,28 @@ func matchingHooks(hooks []*gitea.Hook, rawurl string) *gitea.Hook {
 		}
 	}
 	return nil
+}
+
+func (c *Client) ListUserRepos() ([]*gitsource.RepoInfo, error) {
+	remoteRepos, err := c.client.ListMyRepos()
+	if err != nil {
+		return nil, err
+	}
+
+	repos := []*gitsource.RepoInfo{}
+
+	for _, rr := range remoteRepos {
+		repos = append(repos, fromGiteaRepo(rr))
+	}
+
+	return repos, nil
+}
+
+func fromGiteaRepo(rr *gitea.Repository) *gitsource.RepoInfo {
+	return &gitsource.RepoInfo{
+		ID:           strconv.FormatInt(rr.ID, 10),
+		Path:         path.Join(rr.Owner.UserName, rr.Name),
+		SSHCloneURL:  rr.SSHURL,
+		HTTPCloneURL: rr.CloneURL,
+	}
 }
