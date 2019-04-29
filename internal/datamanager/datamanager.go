@@ -75,6 +75,8 @@ var (
 
 const (
 	etcdChangeGroupMinRevisionRange = 1000
+
+	maxChangegroupNameLength = 256
 )
 
 type DataManagerConfig struct {

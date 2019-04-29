@@ -19,6 +19,7 @@ import (
 	"container/ring"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"path"
@@ -424,6 +425,18 @@ func (d *DataManager) WriteWal(ctx context.Context, actions []*Action, cgt *Chan
 }
 
 func (d *DataManager) WriteWalAdditionalOps(ctx context.Context, actions []*Action, cgt *ChangeGroupsUpdateToken, cmp []etcdclientv3.Cmp, then []etcdclientv3.Op) (*ChangeGroupsUpdateToken, error) {
+	// check changegroups name
+	if cgt != nil {
+		for cgName := range cgt.ChangeGroupsRevisions {
+			if strings.Contains(cgName, "/") {
+				return nil, fmt.Errorf(`changegroup name %q must not contain "/"`, cgName)
+			}
+			if len(cgName) > maxChangegroupNameLength {
+				return nil, fmt.Errorf("changegroup name %q too long", cgName)
+			}
+		}
+	}
+
 	if len(actions) == 0 {
 		return nil, errors.Errorf("cannot write wal: actions is empty")
 	}
