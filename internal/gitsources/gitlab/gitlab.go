@@ -26,7 +26,6 @@ import (
 
 	"github.com/pkg/errors"
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
-	"github.com/sorintlab/agola/internal/services/types"
 	gitlab "github.com/xanzy/go-gitlab"
 	"golang.org/x/oauth2"
 )
@@ -55,6 +54,20 @@ type Client struct {
 	URL            string
 	oauth2ClientID string
 	oauth2Secret   string
+}
+
+// fromCommitStatus converts a gitsource commit status to a gitea commit status
+func fromCommitStatus(status gitsource.CommitStatus) gitlab.BuildStateValue {
+	switch status {
+	case gitsource.CommitStatusPending:
+		return gitlab.Pending
+	case gitsource.CommitStatusSuccess:
+		return gitlab.Success
+	case gitsource.CommitStatusFailed:
+		return gitlab.Failed
+	default:
+		panic(fmt.Errorf("unknown commit status %q", status))
+	}
 }
 
 func New(opts Opts) (*Client, error) {
@@ -235,6 +248,12 @@ func (c *Client) DeleteRepoWebhook(repopath, u string) error {
 	return nil
 }
 
-func (c *Client) ParseWebhook(r *http.Request) (*types.WebhookData, error) {
-	return parseWebhook(r)
+func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource.CommitStatus, targetURL, description, context string) error {
+	_, _, err := c.client.Commits.SetCommitStatus(repopath, commitSHA, &gitlab.SetCommitStatusOptions{
+		State:       fromCommitStatus(status),
+		TargetURL:   gitlab.String(targetURL),
+		Description: gitlab.String(description),
+		Context:     gitlab.String(context),
+	})
+	return err
 }

@@ -40,7 +40,7 @@ const (
 	prActionSync = "synchronized"
 )
 
-func parseWebhook(r *http.Request) (*types.WebhookData, error) {
+func (c *Client) ParseWebhook(r *http.Request) (*types.WebhookData, error) {
 	switch r.Header.Get(hookEvent) {
 	case hookPush:
 		return parsePushHook(r.Body)

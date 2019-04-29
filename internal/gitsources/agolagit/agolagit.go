@@ -162,7 +162,7 @@ func (c *Client) DeleteRepoWebhook(repopath, u string) error {
 	return nil
 }
 
-func (c *Client) CreateStatus(repopath, commitSHA string, status gitsource.CommitStatus, targetURL, description, context string) error {
+func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource.CommitStatus, targetURL, description, context string) error {
 	return nil
 }
 
