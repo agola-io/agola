@@ -84,9 +84,8 @@ func New(opts Opts) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) GetOauth2AuthorizationURL(callbackURL, state string) (string, error) {
-
-	var config = &oauth2.Config{
+func (c *Client) oauth2Config(callbackURL string) *oauth2.Config {
+	return &oauth2.Config{
 		ClientID:     c.oauth2ClientID,
 		ClientSecret: c.oauth2Secret,
 		Scopes:       GitlabOauth2Scopes,
@@ -96,28 +95,27 @@ func (c *Client) GetOauth2AuthorizationURL(callbackURL, state string) (string, e
 		},
 		RedirectURL: callbackURL,
 	}
+}
 
+func (c *Client) GetOauth2AuthorizationURL(callbackURL, state string) (string, error) {
+	var config = c.oauth2Config(callbackURL)
 	return config.AuthCodeURL(state), nil
 }
 
 func (c *Client) RequestOauth2Token(callbackURL, code string) (*oauth2.Token, error) {
-
-	var config = &oauth2.Config{
-		ClientID:     c.oauth2ClientID,
-		ClientSecret: c.oauth2Secret,
-		Scopes:       GitlabOauth2Scopes,
-		Endpoint: oauth2.Endpoint{
-			AuthURL:  fmt.Sprintf("%s/oauth/authorize", c.URL),
-			TokenURL: fmt.Sprintf("%s/oauth/token", c.URL),
-		},
-		RedirectURL: callbackURL,
-	}
-
+	var config = c.oauth2Config(callbackURL)
 	token, err := config.Exchange(context.TODO(), code)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot get oauth2 token")
 	}
 	return token, nil
+}
+
+func (c *Client) RefreshOauth2Token(refreshToken string) (*oauth2.Token, error) {
+	var config = c.oauth2Config("")
+	token := &oauth2.Token{RefreshToken: refreshToken}
+	ts := config.TokenSource(context.TODO(), token)
+	return ts.Token()
 }
 
 func (c *Client) GetRepoInfo(repopath string) (*gitsource.RepoInfo, error) {

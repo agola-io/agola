@@ -51,11 +51,13 @@ type PasswordSource interface {
 
 type Oauth2Source interface {
 	UserSource
-	// Oauth2AuthorizationRequest return the authorization request URL to the
+	// GetOauth2AuthorizationURL return the authorization request URL to the
 	// authorization server
 	GetOauth2AuthorizationURL(callbackURL, state string) (redirectURL string, err error)
-	// OauthTokenRequest requests the oauth2 access token to the authorization server
+	// RequestOauth2Token requests the oauth2 token to the authorization server
 	RequestOauth2Token(callbackURL, code string) (*oauth2.Token, error)
+	// RefreshOauth2Token refreshed the oauth2 token
+	RefreshOauth2Token(refreshToken string) (*oauth2.Token, error)
 }
 
 type RepoInfo struct {
