@@ -16,9 +16,11 @@ package gitea
 
 import (
 	"crypto/tls"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
 
@@ -66,14 +68,25 @@ func parseRepoPath(repopath string) (string, string, error) {
 }
 
 func New(opts Opts) (*Client, error) {
-	client := gitea.NewClient(opts.URL, opts.Token)
-	if opts.SkipVerify {
-		httpClient := &http.Client{}
-		httpClient.Transport = &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-		client.SetHTTPClient(httpClient)
+	// copied from net/http until it has a clone function: https://github.com/golang/go/issues/26013
+	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		TLSClientConfig:       &tls.Config{InsecureSkipVerify: opts.SkipVerify},
 	}
+	httpClient := &http.Client{Transport: transport}
+
+	client := gitea.NewClient(opts.URL, opts.Token)
+	client.SetHTTPClient(httpClient)
+
 	return &Client{
 		client: client,
 	}, nil
