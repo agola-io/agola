@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/db"
@@ -130,12 +131,13 @@ func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.CreateUserLARequest != nil {
 		creq.CreateUserLARequest = &command.CreateUserLARequest{
-			RemoteSourceName:   req.CreateUserLARequest.RemoteSourceName,
-			RemoteUserID:       req.CreateUserLARequest.RemoteUserID,
-			RemoteUserName:     req.CreateUserLARequest.RemoteUserName,
-			Oauth2AccessToken:  req.CreateUserLARequest.Oauth2AccessToken,
-			Oauth2RefreshToken: req.CreateUserLARequest.Oauth2RefreshToken,
-			UserAccessToken:    req.CreateUserLARequest.UserAccessToken,
+			RemoteSourceName:           req.CreateUserLARequest.RemoteSourceName,
+			RemoteUserID:               req.CreateUserLARequest.RemoteUserID,
+			RemoteUserName:             req.CreateUserLARequest.RemoteUserName,
+			UserAccessToken:            req.CreateUserLARequest.UserAccessToken,
+			Oauth2AccessToken:          req.CreateUserLARequest.Oauth2AccessToken,
+			Oauth2RefreshToken:         req.CreateUserLARequest.Oauth2RefreshToken,
+			Oauth2AccessTokenExpiresAt: req.CreateUserLARequest.Oauth2AccessTokenExpiresAt,
 		}
 	}
 
@@ -299,12 +301,13 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type CreateUserLARequest struct {
-	RemoteSourceName   string `json:"remote_source_name"`
-	RemoteUserID       string `json:"remote_user_id"`
-	RemoteUserName     string `json:"remote_user_name"`
-	UserAccessToken    string `json:"user_access_token"`
-	Oauth2AccessToken  string `json:"oauth2_access_token"`
-	Oauth2RefreshToken string `json:"oauth2_refresh_token"`
+	RemoteSourceName           string    `json:"remote_source_name"`
+	RemoteUserID               string    `json:"remote_user_id"`
+	RemoteUserName             string    `json:"remote_user_name"`
+	UserAccessToken            string    `json:"user_access_token"`
+	Oauth2AccessToken          string    `json:"oauth2_access_token"`
+	Oauth2RefreshToken         string    `json:"oauth2_refresh_token"`
+	Oauth2AccessTokenExpiresAt time.Time `json:"oauth_2_access_token_expires_at"`
 }
 
 type CreateUserLAHandler struct {
@@ -329,13 +332,14 @@ func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 
 	creq := &command.CreateUserLARequest{
-		UserName:           userName,
-		RemoteSourceName:   req.RemoteSourceName,
-		RemoteUserID:       req.RemoteUserID,
-		RemoteUserName:     req.RemoteUserName,
-		Oauth2AccessToken:  req.Oauth2AccessToken,
-		Oauth2RefreshToken: req.Oauth2RefreshToken,
-		UserAccessToken:    req.UserAccessToken,
+		UserName:                   userName,
+		RemoteSourceName:           req.RemoteSourceName,
+		RemoteUserID:               req.RemoteUserID,
+		RemoteUserName:             req.RemoteUserName,
+		UserAccessToken:            req.UserAccessToken,
+		Oauth2AccessToken:          req.Oauth2AccessToken,
+		Oauth2RefreshToken:         req.Oauth2RefreshToken,
+		Oauth2AccessTokenExpiresAt: req.Oauth2AccessTokenExpiresAt,
 	}
 	user, err := h.ch.CreateUserLA(ctx, creq)
 	if httpError(w, err) {
@@ -373,11 +377,12 @@ func (h *DeleteUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 }
 
 type UpdateUserLARequest struct {
-	RemoteUserID       string `json:"remote_user_id"`
-	RemoteUserName     string `json:"remote_user_name"`
-	UserAccessToken    string `json:"user_access_token"`
-	Oauth2AccessToken  string `json:"oauth2_access_token"`
-	Oauth2RefreshToken string `json:"oauth2_refresh_token"`
+	RemoteUserID               string    `json:"remote_user_id"`
+	RemoteUserName             string    `json:"remote_user_name"`
+	UserAccessToken            string    `json:"user_access_token"`
+	Oauth2AccessToken          string    `json:"oauth2_access_token"`
+	Oauth2RefreshToken         string    `json:"oauth2_refresh_token"`
+	Oauth2AccessTokenExpiresAt time.Time `json:"oauth_2_access_token_expires_at"`
 }
 
 type UpdateUserLAHandler struct {
@@ -403,13 +408,14 @@ func (h *UpdateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 
 	creq := &command.UpdateUserLARequest{
-		UserName:           userName,
-		LinkedAccountID:    linkedAccountID,
-		RemoteUserID:       req.RemoteUserID,
-		RemoteUserName:     req.RemoteUserName,
-		Oauth2AccessToken:  req.Oauth2AccessToken,
-		Oauth2RefreshToken: req.Oauth2RefreshToken,
-		UserAccessToken:    req.UserAccessToken,
+		UserName:                   userName,
+		LinkedAccountID:            linkedAccountID,
+		RemoteUserID:               req.RemoteUserID,
+		RemoteUserName:             req.RemoteUserName,
+		UserAccessToken:            req.UserAccessToken,
+		Oauth2AccessToken:          req.Oauth2AccessToken,
+		Oauth2RefreshToken:         req.Oauth2RefreshToken,
+		Oauth2AccessTokenExpiresAt: req.Oauth2AccessTokenExpiresAt,
 	}
 	user, err := h.ch.UpdateUserLA(ctx, creq)
 	if httpError(w, err) {

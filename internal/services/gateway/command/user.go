@@ -17,6 +17,7 @@ package command
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
@@ -100,11 +101,12 @@ func (c *CommandHandler) CreateUserToken(ctx context.Context, req *CreateUserTok
 }
 
 type CreateUserLARequest struct {
-	UserName                       string
-	RemoteSourceName               string
-	RemoteSourceUserAccessToken    string
-	RemoteSourceOauth2AccessToken  string
-	RemoteSourceOauth2RefreshToken string
+	UserName                   string
+	RemoteSourceName           string
+	UserAccessToken            string
+	Oauth2AccessToken          string
+	Oauth2RefreshToken         string
+	Oauth2AccessTokenExpiresAt time.Time
 }
 
 func (c *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequest) (*types.LinkedAccount, error) {
@@ -130,7 +132,7 @@ func (c *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequ
 		return nil, util.NewErrBadRequest(errors.Errorf("user %q already have a linked account for remote source %q", userName, rs.Name))
 	}
 
-	accessToken, err := common.GetAccessToken(rs.AuthType, req.RemoteSourceUserAccessToken, req.RemoteSourceOauth2AccessToken)
+	accessToken, err := common.GetAccessToken(rs.AuthType, req.UserAccessToken, req.Oauth2AccessToken)
 	if err != nil {
 		return nil, err
 	}
@@ -148,12 +150,13 @@ func (c *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequ
 	}
 
 	creq := &csapi.CreateUserLARequest{
-		RemoteSourceName:   req.RemoteSourceName,
-		RemoteUserID:       remoteUserInfo.ID,
-		RemoteUserName:     remoteUserInfo.LoginName,
-		Oauth2AccessToken:  req.RemoteSourceOauth2AccessToken,
-		Oauth2RefreshToken: req.RemoteSourceOauth2RefreshToken,
-		UserAccessToken:    req.RemoteSourceUserAccessToken,
+		RemoteSourceName:           req.RemoteSourceName,
+		RemoteUserID:               remoteUserInfo.ID,
+		RemoteUserName:             remoteUserInfo.LoginName,
+		UserAccessToken:            req.UserAccessToken,
+		Oauth2AccessToken:          req.Oauth2AccessToken,
+		Oauth2RefreshToken:         req.Oauth2RefreshToken,
+		Oauth2AccessTokenExpiresAt: req.Oauth2AccessTokenExpiresAt,
 	}
 
 	c.log.Infof("creating linked account")
@@ -167,11 +170,12 @@ func (c *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequ
 }
 
 type RegisterUserRequest struct {
-	UserName                       string
-	RemoteSourceName               string
-	RemoteSourceUserAccessToken    string
-	RemoteSourceOauth2AccessToken  string
-	RemoteSourceOauth2RefreshToken string
+	UserName                   string
+	RemoteSourceName           string
+	UserAccessToken            string
+	Oauth2AccessToken          string
+	Oauth2RefreshToken         string
+	Oauth2AccessTokenExpiresAt time.Time
 }
 
 func (c *CommandHandler) RegisterUser(ctx context.Context, req *RegisterUserRequest) (*types.User, error) {
@@ -188,7 +192,7 @@ func (c *CommandHandler) RegisterUser(ctx context.Context, req *RegisterUserRequ
 	}
 	c.log.Infof("rs: %s", util.Dump(rs))
 
-	accessToken, err := common.GetAccessToken(rs.AuthType, req.RemoteSourceUserAccessToken, req.RemoteSourceOauth2AccessToken)
+	accessToken, err := common.GetAccessToken(rs.AuthType, req.UserAccessToken, req.Oauth2AccessToken)
 	if err != nil {
 		return nil, err
 	}
@@ -208,12 +212,13 @@ func (c *CommandHandler) RegisterUser(ctx context.Context, req *RegisterUserRequ
 	creq := &csapi.CreateUserRequest{
 		UserName: req.UserName,
 		CreateUserLARequest: &csapi.CreateUserLARequest{
-			RemoteSourceName:   req.RemoteSourceName,
-			RemoteUserID:       remoteUserInfo.ID,
-			RemoteUserName:     remoteUserInfo.LoginName,
-			Oauth2AccessToken:  req.RemoteSourceOauth2AccessToken,
-			Oauth2RefreshToken: req.RemoteSourceOauth2RefreshToken,
-			UserAccessToken:    req.RemoteSourceUserAccessToken,
+			RemoteSourceName:           req.RemoteSourceName,
+			RemoteUserID:               remoteUserInfo.ID,
+			RemoteUserName:             remoteUserInfo.LoginName,
+			UserAccessToken:            req.UserAccessToken,
+			Oauth2AccessToken:          req.Oauth2AccessToken,
+			Oauth2RefreshToken:         req.Oauth2RefreshToken,
+			Oauth2AccessTokenExpiresAt: req.Oauth2AccessTokenExpiresAt,
 		},
 	}
 
@@ -228,10 +233,11 @@ func (c *CommandHandler) RegisterUser(ctx context.Context, req *RegisterUserRequ
 }
 
 type LoginUserRequest struct {
-	RemoteSourceName               string
-	RemoteSourceUserAccessToken    string
-	RemoteSourceOauth2AccessToken  string
-	RemoteSourceOauth2RefreshToken string
+	RemoteSourceName           string
+	UserAccessToken            string
+	Oauth2AccessToken          string
+	Oauth2RefreshToken         string
+	Oauth2AccessTokenExpiresAt time.Time
 }
 
 type LoginUserResponse struct {
@@ -246,7 +252,7 @@ func (c *CommandHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (
 	}
 	c.log.Infof("rs: %s", util.Dump(rs))
 
-	accessToken, err := common.GetAccessToken(rs.AuthType, req.RemoteSourceUserAccessToken, req.RemoteSourceOauth2AccessToken)
+	accessToken, err := common.GetAccessToken(rs.AuthType, req.UserAccessToken, req.Oauth2AccessToken)
 	if err != nil {
 		return nil, err
 	}
@@ -281,20 +287,21 @@ func (c *CommandHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (
 	}
 
 	// Update oauth tokens if they have changed since the getuserinfo request may have updated them
-	if la.Oauth2AccessToken != req.RemoteSourceOauth2AccessToken ||
-		la.Oauth2RefreshToken != req.RemoteSourceOauth2RefreshToken ||
-		la.UserAccessToken != req.RemoteSourceUserAccessToken {
+	if la.Oauth2AccessToken != req.Oauth2AccessToken ||
+		la.Oauth2RefreshToken != req.Oauth2RefreshToken ||
+		la.UserAccessToken != req.UserAccessToken {
 
-		la.Oauth2AccessToken = req.RemoteSourceOauth2AccessToken
-		la.Oauth2RefreshToken = req.RemoteSourceOauth2RefreshToken
-		la.UserAccessToken = req.RemoteSourceUserAccessToken
+		la.Oauth2AccessToken = req.Oauth2AccessToken
+		la.Oauth2RefreshToken = req.Oauth2RefreshToken
+		la.UserAccessToken = req.UserAccessToken
 
 		creq := &csapi.UpdateUserLARequest{
-			RemoteUserID:       la.RemoteUserID,
-			RemoteUserName:     la.RemoteUserName,
-			Oauth2AccessToken:  la.Oauth2AccessToken,
-			Oauth2RefreshToken: la.Oauth2RefreshToken,
-			UserAccessToken:    la.UserAccessToken,
+			RemoteUserID:               la.RemoteUserID,
+			RemoteUserName:             la.RemoteUserName,
+			UserAccessToken:            la.UserAccessToken,
+			Oauth2AccessToken:          la.Oauth2AccessToken,
+			Oauth2RefreshToken:         la.Oauth2RefreshToken,
+			Oauth2AccessTokenExpiresAt: la.Oauth2AccessTokenExpiresAt,
 		}
 
 		c.log.Infof("updating user %q linked account", user.UserName)
@@ -317,10 +324,11 @@ func (c *CommandHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (
 }
 
 type AuthorizeRequest struct {
-	RemoteSourceName               string
-	RemoteSourceUserAccessToken    string
-	RemoteSourceOauth2AccessToken  string
-	RemoteSourceOauth2RefreshToken string
+	RemoteSourceName           string
+	UserAccessToken            string
+	Oauth2AccessToken          string
+	Oauth2RefreshToken         string
+	Oauth2AccessTokenExpiresAt time.Time
 }
 
 type AuthorizeResponse struct {
@@ -335,7 +343,7 @@ func (c *CommandHandler) Authorize(ctx context.Context, req *AuthorizeRequest) (
 	}
 	c.log.Infof("rs: %s", util.Dump(rs))
 
-	accessToken, err := common.GetAccessToken(rs.AuthType, req.RemoteSourceUserAccessToken, req.RemoteSourceOauth2AccessToken)
+	accessToken, err := common.GetAccessToken(rs.AuthType, req.UserAccessToken, req.Oauth2AccessToken)
 	if err != nil {
 		return nil, err
 	}
@@ -433,7 +441,7 @@ func (c *CommandHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSourc
 		if err != nil {
 			return nil, err
 		}
-		cres, err := c.HandleRemoteSourceAuthRequest(ctx, requestType, string(requestj), accessToken, "", "")
+		cres, err := c.HandleRemoteSourceAuthRequest(ctx, requestType, string(requestj), accessToken, "", "", time.Time{})
 		if err != nil {
 			return nil, err
 		}
@@ -464,7 +472,7 @@ type CreateUserLAResponse struct {
 	LinkedAccount *types.LinkedAccount
 }
 
-func (c *CommandHandler) HandleRemoteSourceAuthRequest(ctx context.Context, requestType RemoteSourceRequestType, requestString string, userAccessToken, Oauth2AccessToken, Oauth2RefreshToken string) (*RemoteSourceAuthResult, error) {
+func (c *CommandHandler) HandleRemoteSourceAuthRequest(ctx context.Context, requestType RemoteSourceRequestType, requestString string, userAccessToken, oauth2AccessToken, oauth2RefreshToken string, oauth2AccessTokenExpiresAt time.Time) (*RemoteSourceAuthResult, error) {
 	switch requestType {
 	case RemoteSourceRequestTypeCreateUserLA:
 		var req *CreateUserLARequest
@@ -473,11 +481,12 @@ func (c *CommandHandler) HandleRemoteSourceAuthRequest(ctx context.Context, requ
 		}
 
 		creq := &CreateUserLARequest{
-			UserName:                       req.UserName,
-			RemoteSourceName:               req.RemoteSourceName,
-			RemoteSourceUserAccessToken:    userAccessToken,
-			RemoteSourceOauth2AccessToken:  Oauth2AccessToken,
-			RemoteSourceOauth2RefreshToken: Oauth2RefreshToken,
+			UserName:                   req.UserName,
+			RemoteSourceName:           req.RemoteSourceName,
+			UserAccessToken:            userAccessToken,
+			Oauth2AccessToken:          oauth2AccessToken,
+			Oauth2RefreshToken:         oauth2RefreshToken,
+			Oauth2AccessTokenExpiresAt: oauth2AccessTokenExpiresAt,
 		}
 		la, err := c.CreateUserLA(ctx, creq)
 		if err != nil {
@@ -490,6 +499,29 @@ func (c *CommandHandler) HandleRemoteSourceAuthRequest(ctx context.Context, requ
 			},
 		}, nil
 
+	case RemoteSourceRequestTypeRegisterUser:
+		var req *RegisterUserRequest
+		if err := json.Unmarshal([]byte(requestString), &req); err != nil {
+			return nil, errors.Errorf("failed to unmarshal request")
+		}
+
+		creq := &RegisterUserRequest{
+			UserName:                   req.UserName,
+			RemoteSourceName:           req.RemoteSourceName,
+			UserAccessToken:            userAccessToken,
+			Oauth2AccessToken:          oauth2AccessToken,
+			Oauth2RefreshToken:         oauth2RefreshToken,
+			Oauth2AccessTokenExpiresAt: oauth2AccessTokenExpiresAt,
+		}
+		cresp, err := c.RegisterUser(ctx, creq)
+		if err != nil {
+			return nil, err
+		}
+		return &RemoteSourceAuthResult{
+			RequestType: requestType,
+			Response:    cresp,
+		}, nil
+
 	case RemoteSourceRequestTypeLoginUser:
 		var req *LoginUserRequest
 		if err := json.Unmarshal([]byte(requestString), &req); err != nil {
@@ -497,10 +529,11 @@ func (c *CommandHandler) HandleRemoteSourceAuthRequest(ctx context.Context, requ
 		}
 
 		creq := &LoginUserRequest{
-			RemoteSourceName:               req.RemoteSourceName,
-			RemoteSourceUserAccessToken:    userAccessToken,
-			RemoteSourceOauth2AccessToken:  Oauth2AccessToken,
-			RemoteSourceOauth2RefreshToken: Oauth2RefreshToken,
+			RemoteSourceName:           req.RemoteSourceName,
+			UserAccessToken:            userAccessToken,
+			Oauth2AccessToken:          oauth2AccessToken,
+			Oauth2RefreshToken:         oauth2RefreshToken,
+			Oauth2AccessTokenExpiresAt: oauth2AccessTokenExpiresAt,
 		}
 		cresp, err := c.LoginUser(ctx, creq)
 		if err != nil {
@@ -518,34 +551,13 @@ func (c *CommandHandler) HandleRemoteSourceAuthRequest(ctx context.Context, requ
 		}
 
 		creq := &AuthorizeRequest{
-			RemoteSourceName:               req.RemoteSourceName,
-			RemoteSourceUserAccessToken:    userAccessToken,
-			RemoteSourceOauth2AccessToken:  Oauth2AccessToken,
-			RemoteSourceOauth2RefreshToken: Oauth2RefreshToken,
+			RemoteSourceName:           req.RemoteSourceName,
+			UserAccessToken:            userAccessToken,
+			Oauth2AccessToken:          oauth2AccessToken,
+			Oauth2RefreshToken:         oauth2RefreshToken,
+			Oauth2AccessTokenExpiresAt: oauth2AccessTokenExpiresAt,
 		}
 		cresp, err := c.Authorize(ctx, creq)
-		if err != nil {
-			return nil, err
-		}
-		return &RemoteSourceAuthResult{
-			RequestType: requestType,
-			Response:    cresp,
-		}, nil
-
-	case RemoteSourceRequestTypeRegisterUser:
-		var req *RegisterUserRequest
-		if err := json.Unmarshal([]byte(requestString), &req); err != nil {
-			return nil, errors.Errorf("failed to unmarshal request")
-		}
-
-		creq := &RegisterUserRequest{
-			UserName:                       req.UserName,
-			RemoteSourceName:               req.RemoteSourceName,
-			RemoteSourceUserAccessToken:    userAccessToken,
-			RemoteSourceOauth2AccessToken:  Oauth2AccessToken,
-			RemoteSourceOauth2RefreshToken: Oauth2RefreshToken,
-		}
-		cresp, err := c.RegisterUser(ctx, creq)
 		if err != nil {
 			return nil, err
 		}
@@ -603,5 +615,5 @@ func (c *CommandHandler) HandleOauth2Callback(ctx context.Context, code, state s
 		return nil, err
 	}
 
-	return c.HandleRemoteSourceAuthRequest(ctx, requestType, requestString, "", oauth2Token.AccessToken, oauth2Token.RefreshToken)
+	return c.HandleRemoteSourceAuthRequest(ctx, requestType, requestString, "", oauth2Token.AccessToken, oauth2Token.RefreshToken, oauth2Token.Expiry)
 }

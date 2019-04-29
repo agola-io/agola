@@ -127,9 +127,9 @@ type LinkedAccount struct {
 
 	UserAccessToken string `json:"user_access_token,omitempty"`
 
-	Oauth2AccessToken  string        `json:"oauth2_access_token,omitempty"`
-	Oauth2RefreshToken string        `json:"oauth2_refresh_token,omitempty"`
-	Oauth2Expire       time.Duration `json:"oauth2_expire,omitempty"`
+	Oauth2AccessToken          string    `json:"oauth2_access_token,omitempty"`
+	Oauth2RefreshToken         string    `json:"oauth2_refresh_token,omitempty"`
+	Oauth2AccessTokenExpiresAt time.Time `json:"oauth_2_access_token_expires_at,omitempty"`
 }
 
 type Project struct {

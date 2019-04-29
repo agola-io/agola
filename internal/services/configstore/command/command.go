@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"path"
+	"time"
 
 	"github.com/sorintlab/agola/internal/datamanager"
 	"github.com/sorintlab/agola/internal/db"
@@ -309,13 +310,14 @@ func (s *CommandHandler) CreateUser(ctx context.Context, req *CreateUserRequest)
 		}
 
 		la := &types.LinkedAccount{
-			ID:                 uuid.NewV4().String(),
-			RemoteSourceID:     rs.ID,
-			RemoteUserID:       req.CreateUserLARequest.RemoteUserID,
-			RemoteUserName:     req.CreateUserLARequest.RemoteUserName,
-			UserAccessToken:    req.CreateUserLARequest.UserAccessToken,
-			Oauth2AccessToken:  req.CreateUserLARequest.Oauth2AccessToken,
-			Oauth2RefreshToken: req.CreateUserLARequest.Oauth2RefreshToken,
+			ID:                         uuid.NewV4().String(),
+			RemoteSourceID:             rs.ID,
+			RemoteUserID:               req.CreateUserLARequest.RemoteUserID,
+			RemoteUserName:             req.CreateUserLARequest.RemoteUserName,
+			UserAccessToken:            req.CreateUserLARequest.UserAccessToken,
+			Oauth2AccessToken:          req.CreateUserLARequest.Oauth2AccessToken,
+			Oauth2RefreshToken:         req.CreateUserLARequest.Oauth2RefreshToken,
+			Oauth2AccessTokenExpiresAt: req.CreateUserLARequest.Oauth2AccessTokenExpiresAt,
 		}
 
 		user.LinkedAccounts[la.ID] = la
@@ -400,13 +402,14 @@ func (s *CommandHandler) DeleteUser(ctx context.Context, userName string) error 
 }
 
 type CreateUserLARequest struct {
-	UserName           string
-	RemoteSourceName   string
-	RemoteUserID       string
-	RemoteUserName     string
-	UserAccessToken    string
-	Oauth2AccessToken  string
-	Oauth2RefreshToken string
+	UserName                   string
+	RemoteSourceName           string
+	RemoteUserID               string
+	RemoteUserName             string
+	UserAccessToken            string
+	Oauth2AccessToken          string
+	Oauth2RefreshToken         string
+	Oauth2AccessTokenExpiresAt time.Time
 }
 
 func (s *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequest) (*types.LinkedAccount, error) {
@@ -466,13 +469,14 @@ func (s *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequ
 	}
 
 	la := &types.LinkedAccount{
-		ID:                 uuid.NewV4().String(),
-		RemoteSourceID:     rs.ID,
-		RemoteUserID:       req.RemoteUserID,
-		RemoteUserName:     req.RemoteUserName,
-		UserAccessToken:    req.UserAccessToken,
-		Oauth2AccessToken:  req.Oauth2AccessToken,
-		Oauth2RefreshToken: req.Oauth2RefreshToken,
+		ID:                         uuid.NewV4().String(),
+		RemoteSourceID:             rs.ID,
+		RemoteUserID:               req.RemoteUserID,
+		RemoteUserName:             req.RemoteUserName,
+		UserAccessToken:            req.UserAccessToken,
+		Oauth2AccessToken:          req.Oauth2AccessToken,
+		Oauth2RefreshToken:         req.Oauth2RefreshToken,
+		Oauth2AccessTokenExpiresAt: req.Oauth2AccessTokenExpiresAt,
 	}
 
 	user.LinkedAccounts[la.ID] = la
@@ -555,13 +559,14 @@ func (s *CommandHandler) DeleteUserLA(ctx context.Context, userName, laID string
 }
 
 type UpdateUserLARequest struct {
-	UserName           string
-	LinkedAccountID    string
-	RemoteUserID       string
-	RemoteUserName     string
-	UserAccessToken    string
-	Oauth2AccessToken  string
-	Oauth2RefreshToken string
+	UserName                   string
+	LinkedAccountID            string
+	RemoteUserID               string
+	RemoteUserName             string
+	UserAccessToken            string
+	Oauth2AccessToken          string
+	Oauth2RefreshToken         string
+	Oauth2AccessTokenExpiresAt time.Time
 }
 
 func (s *CommandHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLARequest) (*types.LinkedAccount, error) {
@@ -617,6 +622,7 @@ func (s *CommandHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLARequ
 	la.UserAccessToken = req.UserAccessToken
 	la.Oauth2AccessToken = req.Oauth2AccessToken
 	la.Oauth2RefreshToken = req.Oauth2RefreshToken
+	la.Oauth2AccessTokenExpiresAt = req.Oauth2AccessTokenExpiresAt
 
 	userj, err := json.Marshal(user)
 	if err != nil {
