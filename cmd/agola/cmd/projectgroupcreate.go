@@ -22,6 +22,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/services/gateway/api"
+	"github.com/sorintlab/agola/internal/services/types"
 
 	"github.com/spf13/cobra"
 )
@@ -39,6 +40,7 @@ var cmdProjectGroupCreate = &cobra.Command{
 type projectGroupCreateOptions struct {
 	name       string
 	parentPath string
+	visibility string
 }
 
 var projectGroupCreateOpts projectGroupCreateOptions
@@ -48,6 +50,7 @@ func init() {
 
 	flags.StringVarP(&projectGroupCreateOpts.name, "name", "n", "", "project group name")
 	flags.StringVar(&projectGroupCreateOpts.parentPath, "parent", "", `parent project group path (i.e "org/org01" for root project group in org01, "user/user01/group01/subgroub01") or project group id where the project group should be created`)
+	flags.StringVar(&projectGroupCreateOpts.visibility, "visibility", "public", `project group visibility (public or private)`)
 
 	cmdProjectGroupCreate.MarkFlagRequired("name")
 	cmdProjectGroupCreate.MarkFlagRequired("parent")
@@ -58,9 +61,15 @@ func init() {
 func projectGroupCreate(cmd *cobra.Command, args []string) error {
 	gwclient := api.NewClient(gatewayURL, token)
 
+	// TODO(sgotti) make this a custom pflag Value?
+	if !types.IsValidVisibility(types.Visibility(projectCreateOpts.visibility)) {
+		return errors.Errorf("invalid visibility %q", projectCreateOpts.visibility)
+	}
+
 	req := &api.CreateProjectGroupRequest{
-		Name:     projectGroupCreateOpts.name,
-		ParentID: projectGroupCreateOpts.parentPath,
+		Name:       projectGroupCreateOpts.name,
+		ParentID:   projectGroupCreateOpts.parentPath,
+		Visibility: types.Visibility(projectCreateOpts.visibility),
 	}
 
 	log.Infof("creating project group")
