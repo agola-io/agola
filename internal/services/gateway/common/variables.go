@@ -15,20 +15,20 @@
 package common
 
 import (
-	"strings"
-
+	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/types"
+	"github.com/sorintlab/agola/internal/util"
 )
 
-func FilterOverridenVariables(variables []*types.Variable) []*types.Variable {
-	variablesMap := map[string]*types.Variable{}
+func FilterOverridenVariables(variables []*csapi.Variable) []*csapi.Variable {
+	variablesMap := map[string]*csapi.Variable{}
 	for _, v := range variables {
 		if _, ok := variablesMap[v.Name]; !ok {
 			variablesMap[v.Name] = v
 		}
 	}
 
-	filteredVariables := make([]*types.Variable, len(variablesMap))
+	filteredVariables := make([]*csapi.Variable, len(variablesMap))
 	i := 0
 	// keep the original order
 	for _, v := range variables {
@@ -43,15 +43,15 @@ func FilterOverridenVariables(variables []*types.Variable) []*types.Variable {
 	return filteredVariables
 }
 
-func GetVarValueMatchingSecret(varval types.VariableValue, varParentPath string, secrets []*types.Secret) *types.Secret {
+func GetVarValueMatchingSecret(varval types.VariableValue, varParentPath string, secrets []*csapi.Secret) *csapi.Secret {
 	// get the secret value referenced by the variable, it must be a secret at the same level or a lower level
-	var secret *types.Secret
+	var secret *csapi.Secret
 	for _, s := range secrets {
 		// we assume the root path will be the same
 		if s.Name != varval.SecretName {
 			continue
 		}
-		if strings.Contains(varParentPath, s.Parent.Path) {
+		if util.IsSameOrParentPath(s.ParentPath, varParentPath) {
 			secret = s
 			break
 		}

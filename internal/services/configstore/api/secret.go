@@ -29,6 +29,14 @@ import (
 	"go.uber.org/zap"
 )
 
+// Secret augments types.Secret with dynamic data
+type Secret struct {
+	*types.Secret
+
+	// dynamic data
+	ParentPath string
+}
+
 type SecretHandler struct {
 	log    *zap.SugaredLogger
 	readDB *readdb.ReadDB
@@ -95,13 +103,27 @@ func (h *SecretsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		} else {
 			secrets, err = h.readDB.GetSecrets(tx, parentID)
 		}
+		return err
+	})
+	if err != nil {
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
+		return
+	}
+
+	resSecrets := make([]*Secret, len(secrets))
+	for i, s := range secrets {
+		resSecrets[i] = &Secret{Secret: s}
+	}
+
+	err = h.readDB.Do(func(tx *db.Tx) error {
 		// populate parent path
-		for _, s := range secrets {
+		for _, s := range resSecrets {
 			pp, err := h.readDB.GetParentPath(tx, s.Parent.Type, s.Parent.ID)
 			if err != nil {
 				return err
 			}
-			s.Parent.Path = pp
+			s.ParentPath = pp
 		}
 		return err
 	})
@@ -111,7 +133,7 @@ func (h *SecretsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, secrets); err != nil {
+	if err := httpResponse(w, http.StatusOK, resSecrets); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }

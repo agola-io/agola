@@ -36,9 +36,6 @@ const (
 type Parent struct {
 	Type ConfigType `json:"type,omitempty"`
 	ID   string     `json:"id,omitempty"`
-
-	// fields the is only used in api response and shoukd be empty when saved in the store
-	Path string `json:"path,omitempty"`
 }
 
 type User struct {

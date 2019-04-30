@@ -43,12 +43,12 @@ type VariableResponse struct {
 	ParentPath string          `json:"parent_path"`
 }
 
-func createVariableResponse(v *types.Variable, secrets []*types.Secret) *VariableResponse {
+func createVariableResponse(v *csapi.Variable, secrets []*csapi.Secret) *VariableResponse {
 	nv := &VariableResponse{
 		ID:         v.ID,
 		Name:       v.Name,
 		Values:     make([]VariableValue, len(v.Values)),
-		ParentPath: v.Parent.Path,
+		ParentPath: v.ParentPath,
 	}
 
 	for i, varvalue := range v.Values {
@@ -58,9 +58,9 @@ func createVariableResponse(v *types.Variable, secrets []*types.Secret) *Variabl
 			When:       varvalue.When,
 		}
 		// get matching secret for var value
-		secret := common.GetVarValueMatchingSecret(varvalue, v.Parent.Path, secrets)
+		secret := common.GetVarValueMatchingSecret(varvalue, v.ParentPath, secrets)
 		if secret != nil {
-			nv.Values[i].MatchingSecretParentPath = secret.Parent.Path
+			nv.Values[i].MatchingSecretParentPath = secret.ParentPath
 		}
 	}
 
@@ -88,8 +88,8 @@ func (h *VariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var csvars []*types.Variable
-	var cssecrets []*types.Secret
+	var csvars []*csapi.Variable
+	var cssecrets []*csapi.Secret
 
 	switch parentType {
 	case types.ConfigTypeProjectGroup:
@@ -184,7 +184,8 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		Values: req.Values,
 	}
 
-	var cssecrets []*types.Secret
+	var cssecrets []*csapi.Secret
+	var rv *csapi.Variable
 
 	switch parentType {
 	case types.ConfigTypeProjectGroup:
@@ -197,7 +198,7 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		}
 
 		h.log.Infof("creating project group variable")
-		v, resp, err = h.configstoreClient.CreateProjectGroupVariable(ctx, parentRef, v)
+		rv, resp, err = h.configstoreClient.CreateProjectGroupVariable(ctx, parentRef, v)
 		if httpErrorFromRemote(w, resp, err) {
 			h.log.Errorf("err: %+v", err)
 			return
@@ -212,15 +213,15 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		}
 
 		h.log.Infof("creating project variable")
-		v, resp, err = h.configstoreClient.CreateProjectVariable(ctx, parentRef, v)
+		rv, resp, err = h.configstoreClient.CreateProjectVariable(ctx, parentRef, v)
 		if httpErrorFromRemote(w, resp, err) {
 			h.log.Errorf("err: %+v", err)
 			return
 		}
 	}
-	h.log.Infof("variable %s created, ID: %s", v.Name, v.ID)
+	h.log.Infof("variable %s created, ID: %s", rv.Name, rv.ID)
 
-	res := createVariableResponse(v, cssecrets)
+	res := createVariableResponse(rv, cssecrets)
 	if err := httpResponse(w, http.StatusCreated, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}

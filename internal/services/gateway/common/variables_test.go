@@ -18,86 +18,87 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/types"
 )
 
 func TestFilterOverridenVariables(t *testing.T) {
 	tests := []struct {
 		name      string
-		variables []*types.Variable
-		out       []*types.Variable
+		variables []*csapi.Variable
+		out       []*csapi.Variable
 	}{
 		{
 			name:      "test empty variables",
-			variables: []*types.Variable{},
-			out:       []*types.Variable{},
+			variables: []*csapi.Variable{},
+			out:       []*csapi.Variable{},
 		},
 		{
 			name: "test variable overrides",
-			variables: []*types.Variable{
+			variables: []*csapi.Variable{
 				// variables must be in depth (from leaves to root) order as returned by the
 				// configstore apis
-				&types.Variable{
-					Name: "var04",
-					Parent: types.Parent{
-						Path: "org/org01/projectgroup02/projectgroup03/project02",
+				&csapi.Variable{
+					Variable: &types.Variable{
+						Name: "var04",
 					},
+					ParentPath: "org/org01/projectgroup02/projectgroup03/project02",
 				},
-				&types.Variable{
-					Name: "var03",
-					Parent: types.Parent{
-						Path: "org/org01/projectgroup01/project01",
+				&csapi.Variable{
+					Variable: &types.Variable{
+						Name: "var03",
 					},
+					ParentPath: "org/org01/projectgroup01/project01",
 				},
-				&types.Variable{
-					Name: "var02",
-					Parent: types.Parent{
-						Path: "org/org01/projectgroup01/project01",
+				&csapi.Variable{
+					Variable: &types.Variable{
+						Name: "var02",
 					},
+					ParentPath: "org/org01/projectgroup01/project01",
 				},
-				&types.Variable{
-					Name: "var02",
-					Parent: types.Parent{
-						Path: "org/org01/projectgroup01",
+				&csapi.Variable{
+					Variable: &types.Variable{
+						Name: "var02",
 					},
+					ParentPath: "org/org01/projectgroup01",
 				},
-				&types.Variable{
-					Name: "var01",
-					Parent: types.Parent{
-						Path: "org/org01/projectgroup01",
+				&csapi.Variable{
+					Variable: &types.Variable{
+						Name: "var01",
 					},
+					ParentPath: "org/org01/projectgroup01",
 				},
-				&types.Variable{
-					Name: "var01",
-					Parent: types.Parent{
-						Path: "org/org01",
+				&csapi.Variable{
+					Variable: &types.Variable{
+						Name: "var01",
 					},
+					ParentPath: "org/org01",
 				},
 			},
-			out: []*types.Variable{
-				&types.Variable{
-					Name: "var04",
-					Parent: types.Parent{
-						Path: "org/org01/projectgroup02/projectgroup03/project02",
+			out: []*csapi.Variable{
+				&csapi.Variable{
+					Variable: &types.Variable{
+						Name: "var04",
 					},
+					ParentPath: "org/org01/projectgroup02/projectgroup03/project02",
 				},
-				&types.Variable{
-					Name: "var03",
-					Parent: types.Parent{
-						Path: "org/org01/projectgroup01/project01",
+				&csapi.Variable{
+					Variable: &types.Variable{
+						Name: "var03",
 					},
+					ParentPath: "org/org01/projectgroup01/project01",
 				},
-				&types.Variable{
-					Name: "var02",
-					Parent: types.Parent{
-						Path: "org/org01/projectgroup01/project01",
+				&csapi.Variable{
+					Variable: &types.Variable{
+						Name: "var02",
 					},
+					ParentPath: "org/org01/projectgroup01/project01",
 				},
-				&types.Variable{
-					Name: "var01",
-					Parent: types.Parent{
-						Path: "org/org01/projectgroup01",
+				&csapi.Variable{
+					Variable: &types.Variable{
+						Name: "var01",
 					},
+					ParentPath: "org/org01/projectgroup01",
 				},
 			},
 		},
@@ -119,8 +120,8 @@ func TestGetVarValueMatchingSecret(t *testing.T) {
 		name          string
 		varValue      types.VariableValue
 		varParentPath string
-		secrets       []*types.Secret
-		out           *types.Secret
+		secrets       []*csapi.Secret
+		out           *csapi.Secret
 	}{
 		{
 			name: "test empty secrets",
@@ -129,7 +130,7 @@ func TestGetVarValueMatchingSecret(t *testing.T) {
 				SecretVar:  "secretvar01",
 			},
 			varParentPath: "org/org01/projectgroup01/project01",
-			secrets:       []*types.Secret{},
+			secrets:       []*csapi.Secret{},
 			out:           nil,
 		},
 		{
@@ -139,12 +140,12 @@ func TestGetVarValueMatchingSecret(t *testing.T) {
 				SecretVar:  "secretvar01",
 			},
 			varParentPath: "org/org01/projectgroup01/projectgroup02",
-			secrets: []*types.Secret{
-				&types.Secret{
-					Name: "secret02",
-					Parent: types.Parent{
-						Path: "org/org01/projectgroup01/projectgroup02",
+			secrets: []*csapi.Secret{
+				&csapi.Secret{
+					Secret: &types.Secret{
+						Name: "secret02",
 					},
+					ParentPath: "org/org01/projectgroup01/projectgroup02",
 				},
 			},
 			out: nil,
@@ -156,12 +157,12 @@ func TestGetVarValueMatchingSecret(t *testing.T) {
 				SecretVar:  "secretvar01",
 			},
 			varParentPath: "org/org01/projectgroup01/projectgroup02",
-			secrets: []*types.Secret{
-				&types.Secret{
-					Name: "secret02",
-					Parent: types.Parent{
-						Path: "org/org01/projectgroup01/projectgroup03",
+			secrets: []*csapi.Secret{
+				&csapi.Secret{
+					Secret: &types.Secret{
+						Name: "secret02",
 					},
+					ParentPath: "org/org01/projectgroup01/projectgroup03",
 				},
 			},
 			out: nil,
@@ -173,12 +174,12 @@ func TestGetVarValueMatchingSecret(t *testing.T) {
 				SecretVar:  "secretvar01",
 			},
 			varParentPath: "org/org01/projectgroup01/projectgroup02",
-			secrets: []*types.Secret{
-				&types.Secret{
-					Name: "secret01",
-					Parent: types.Parent{
-						Path: "org/org01/projectgroup01/projectgroup02/project01",
+			secrets: []*csapi.Secret{
+				&csapi.Secret{
+					Secret: &types.Secret{
+						Name: "secret01",
 					},
+					ParentPath: "org/org01/projectgroup01/projectgroup02/project01",
 				},
 			},
 			out: nil,
@@ -190,25 +191,25 @@ func TestGetVarValueMatchingSecret(t *testing.T) {
 				SecretVar:  "secretvar01",
 			},
 			varParentPath: "org/org01/projectgroup01/projectgroup02",
-			secrets: []*types.Secret{
-				&types.Secret{
-					Name: "secret01",
-					Parent: types.Parent{
-						Path: "org/org01/projectgroup01/projectgroup02/project01",
+			secrets: []*csapi.Secret{
+				&csapi.Secret{
+					Secret: &types.Secret{
+						Name: "secret01",
 					},
+					ParentPath: "org/org01/projectgroup01/projectgroup02/project01",
 				},
-				&types.Secret{
-					Name: "secret01",
-					Parent: types.Parent{
-						Path: "org/org01/projectgroup01/projectgroup02",
+				&csapi.Secret{
+					Secret: &types.Secret{
+						Name: "secret01",
 					},
+					ParentPath: "org/org01/projectgroup01/projectgroup02",
 				},
 			},
-			out: &types.Secret{
-				Name: "secret01",
-				Parent: types.Parent{
-					Path: "org/org01/projectgroup01/projectgroup02",
+			out: &csapi.Secret{
+				Secret: &types.Secret{
+					Name: "secret01",
 				},
+				ParentPath: "org/org01/projectgroup01/projectgroup02",
 			},
 		},
 		{
@@ -218,19 +219,19 @@ func TestGetVarValueMatchingSecret(t *testing.T) {
 				SecretVar:  "secretvar01",
 			},
 			varParentPath: "org/org01/projectgroup01/projectgroup02",
-			secrets: []*types.Secret{
-				&types.Secret{
-					Name: "secret01",
-					Parent: types.Parent{
-						Path: "org/org01/projectgroup01",
+			secrets: []*csapi.Secret{
+				&csapi.Secret{
+					Secret: &types.Secret{
+						Name: "secret01",
 					},
+					ParentPath: "org/org01/projectgroup01",
 				},
 			},
-			out: &types.Secret{
-				Name: "secret01",
-				Parent: types.Parent{
-					Path: "org/org01/projectgroup01",
+			out: &csapi.Secret{
+				Secret: &types.Secret{
+					Name: "secret01",
 				},
+				ParentPath: "org/org01/projectgroup01",
 			},
 		},
 		{
@@ -240,33 +241,33 @@ func TestGetVarValueMatchingSecret(t *testing.T) {
 				SecretVar:  "secretvar01",
 			},
 			varParentPath: "org/org01/projectgroup01/projectgroup02",
-			secrets: []*types.Secret{
+			secrets: []*csapi.Secret{
 				// secrets must be in depth (from leaves to root) order as returned by the
 				// configstore apis
-				&types.Secret{
-					Name: "secret01",
-					Parent: types.Parent{
-						Path: "org/org01/projectgroup01/projectgroup02/project01",
+				&csapi.Secret{
+					Secret: &types.Secret{
+						Name: "secret01",
 					},
+					ParentPath: "org/org01/projectgroup01/projectgroup02/project01",
 				},
-				&types.Secret{
-					Name: "secret01",
-					Parent: types.Parent{
-						Path: "org/org01/projectgroup01/projectgroup02",
+				&csapi.Secret{
+					Secret: &types.Secret{
+						Name: "secret01",
 					},
+					ParentPath: "org/org01/projectgroup01/projectgroup02",
 				},
-				&types.Secret{
-					Name: "secret01",
-					Parent: types.Parent{
-						Path: "org/org01/projectgroup01",
+				&csapi.Secret{
+					Secret: &types.Secret{
+						Name: "secret01",
 					},
+					ParentPath: "org/org01/projectgroup01",
 				},
 			},
-			out: &types.Secret{
-				Name: "secret01",
-				Parent: types.Parent{
-					Path: "org/org01/projectgroup01/projectgroup02",
+			out: &csapi.Secret{
+				Secret: &types.Secret{
+					Name: "secret01",
 				},
+				ParentPath: "org/org01/projectgroup01/projectgroup02",
 			},
 		},
 	}

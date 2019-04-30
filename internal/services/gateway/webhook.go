@@ -217,7 +217,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 					continue
 				}
 				// get the secret value referenced by the variable, it must be a secret at the same level or a lower level
-				secret := common.GetVarValueMatchingSecret(varval, pvar.Parent.Path, secrets)
+				secret := common.GetVarValueMatchingSecret(varval, pvar.ParentPath, secrets)
 				h.log.Infof("secret: %v", util.Dump(secret))
 				if secret != nil {
 					varValue, ok := secret.Data[varval.SecretVar]

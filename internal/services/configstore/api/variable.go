@@ -28,6 +28,14 @@ import (
 	"go.uber.org/zap"
 )
 
+// Variable augments types.Variable with dynamic data
+type Variable struct {
+	*types.Variable
+
+	// dynamic data
+	ParentPath string
+}
+
 type VariablesHandler struct {
 	log    *zap.SugaredLogger
 	readDB *readdb.ReadDB
@@ -59,13 +67,26 @@ func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		} else {
 			variables, err = h.readDB.GetVariables(tx, parentID)
 		}
+		return err
+	})
+	if err != nil {
+		h.log.Errorf("err: %+v", err)
+		httpError(w, err)
+		return
+	}
+
+	resVariables := make([]*Variable, len(variables))
+	for i, v := range variables {
+		resVariables[i] = &Variable{Variable: v}
+	}
+	err = h.readDB.Do(func(tx *db.Tx) error {
 		// populate parent path
-		for _, v := range variables {
+		for _, v := range resVariables {
 			pp, err := h.readDB.GetParentPath(tx, v.Parent.Type, v.Parent.ID)
 			if err != nil {
 				return err
 			}
-			v.Parent.Path = pp
+			v.ParentPath = pp
 		}
 		return err
 	})
@@ -75,7 +96,7 @@ func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, variables); err != nil {
+	if err := httpResponse(w, http.StatusOK, resVariables); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -107,8 +128,6 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 	variable.Parent.Type = parentType
 	variable.Parent.ID = parentRef
-
-	h.log.Infof("variable: %s", util.Dump(variable))
 
 	variable, err = h.ch.CreateVariable(ctx, variable)
 	if httpError(w, err) {

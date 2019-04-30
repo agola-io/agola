@@ -33,11 +33,11 @@ type SecretResponse struct {
 	ParentPath string `json:"parent_path"`
 }
 
-func createSecretResponse(s *types.Secret) *SecretResponse {
+func createSecretResponse(s *csapi.Secret) *SecretResponse {
 	return &SecretResponse{
 		ID:         s.ID,
 		Name:       s.Name,
-		ParentPath: s.Parent.Path,
+		ParentPath: s.ParentPath,
 	}
 }
 
@@ -61,7 +61,7 @@ func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var cssecrets []*types.Secret
+	var cssecrets []*csapi.Secret
 	var resp *http.Response
 	switch parentType {
 	case types.ConfigTypeProjectGroup:
@@ -132,21 +132,22 @@ func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var resp *http.Response
+	var rs *csapi.Secret
 	switch parentType {
 	case types.ConfigTypeProjectGroup:
 		h.log.Infof("creating project group secret")
-		s, resp, err = h.configstoreClient.CreateProjectGroupSecret(ctx, parentRef, s)
+		rs, resp, err = h.configstoreClient.CreateProjectGroupSecret(ctx, parentRef, s)
 	case types.ConfigTypeProject:
 		h.log.Infof("creating project secret")
-		s, resp, err = h.configstoreClient.CreateProjectSecret(ctx, parentRef, s)
+		rs, resp, err = h.configstoreClient.CreateProjectSecret(ctx, parentRef, s)
 	}
 	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
-	h.log.Infof("secret %s created, ID: %s", s.Name, s.ID)
+	h.log.Infof("secret %s created, ID: %s", rs.Name, rs.ID)
 
-	res := createSecretResponse(s)
+	res := createSecretResponse(rs)
 	if err := httpResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
