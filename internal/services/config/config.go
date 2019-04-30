@@ -19,10 +19,20 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/sorintlab/agola/internal/util"
 	yaml "gopkg.in/yaml.v2"
 )
 
+const (
+	maxIDLength = 20
+)
+
 type Config struct {
+	// ID defines the agola installation id. It's used inside the
+	// various services to uniquely distinguish it from other installations
+	// Defaults to "agola"
+	ID string `yaml:"id"`
+
 	Gateway             Gateway             `yaml:"gateway"`
 	Scheduler           Scheduler           `yaml:"scheduler"`
 	RunServiceScheduler RunServiceScheduler `yaml:"runServiceScheduler"`
@@ -192,6 +202,7 @@ type TokenSigning struct {
 }
 
 var defaultConfig = Config{
+	ID: "agola",
 	Gateway: Gateway{
 		TokenSigning: TokenSigning{
 			Duration: 12 * time.Hour,
@@ -237,6 +248,14 @@ func validateWeb(w *Web) error {
 }
 
 func Validate(c *Config) error {
+	// Global
+	if len(c.ID) > maxIDLength {
+		return errors.Errorf("id too long")
+	}
+	if !util.ValidateName(c.ID) {
+		return errors.Errorf("invalid id")
+	}
+
 	// Gateway
 	if c.Gateway.APIExposedURL == "" {
 		return errors.Errorf("gateway apiExposedURL is empty")
