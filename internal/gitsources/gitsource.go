@@ -51,7 +51,7 @@ type UserSource interface {
 
 type PasswordSource interface {
 	UserSource
-	LoginPassword(username, password string) (string, error)
+	LoginPassword(username, password, tokenName string) (string, error)
 }
 
 type Oauth2Source interface {
