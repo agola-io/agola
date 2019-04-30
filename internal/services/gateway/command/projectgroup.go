@@ -29,6 +29,7 @@ type CreateProjectGroupRequest struct {
 	CurrentUserID string
 	Name          string
 	ParentID      string
+	Visibility    types.Visibility
 }
 
 func (c *CommandHandler) CreateProjectGroup(ctx context.Context, req *CreateProjectGroupRequest) (*csapi.ProjectGroup, error) {
@@ -53,6 +54,7 @@ func (c *CommandHandler) CreateProjectGroup(ctx context.Context, req *CreateProj
 			Type: types.ConfigTypeProjectGroup,
 			ID:   parentID,
 		},
+		Visibility: req.Visibility,
 	}
 
 	c.log.Infof("creating projectGroup")

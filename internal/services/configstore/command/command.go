@@ -52,6 +52,9 @@ func (s *CommandHandler) CreateProjectGroup(ctx context.Context, projectGroup *t
 	if projectGroup.Parent.ID == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("project group parent id required"))
 	}
+	if !types.IsValidVisibility(projectGroup.Visibility) {
+		return nil, util.NewErrBadRequest(errors.Errorf("invalid project group visibility"))
+	}
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
@@ -128,6 +131,9 @@ func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Proje
 	}
 	if project.Parent.ID == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("project parent id required"))
+	}
+	if !types.IsValidVisibility(project.Visibility) {
+		return nil, util.NewErrBadRequest(errors.Errorf("invalid project visibility"))
 	}
 
 	var cgt *datamanager.ChangeGroupsUpdateToken

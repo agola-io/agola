@@ -22,6 +22,7 @@ import (
 	"github.com/pkg/errors"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/gateway/command"
+	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
 	"github.com/gorilla/mux"
@@ -29,8 +30,9 @@ import (
 )
 
 type CreateProjectGroupRequest struct {
-	Name     string `json:"name,omitempty"`
-	ParentID string `json:"parent_id,omitempty"`
+	Name       string           `json:"name,omitempty"`
+	ParentID   string           `json:"parent_id,omitempty"`
+	Visibility types.Visibility `json:"visibility,omitempty"`
 }
 
 type CreateProjectGroupHandler struct {
@@ -65,6 +67,7 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	creq := &command.CreateProjectGroupRequest{
 		Name:          req.Name,
 		ParentID:      req.ParentID,
+		Visibility:    req.Visibility,
 		CurrentUserID: userID,
 	}
 
@@ -179,18 +182,20 @@ func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.
 }
 
 type ProjectGroupResponse struct {
-	ID         string `json:"id,omitempty"`
-	Name       string `json:"name,omitempty"`
-	Path       string `json:"path,omitempty"`
-	ParentPath string `json:"parent_path,omitempty"`
+	ID               string `json:"id,omitempty"`
+	Name             string `json:"name,omitempty"`
+	Path             string `json:"path,omitempty"`
+	ParentPath       string `json:"parent_path,omitempty"`
+	GlobalVisibility string `json:"global_visibility,omitempty"`
 }
 
 func createProjectGroupResponse(r *csapi.ProjectGroup) *ProjectGroupResponse {
 	run := &ProjectGroupResponse{
-		ID:         r.ID,
-		Name:       r.Name,
-		Path:       r.Path,
-		ParentPath: r.ParentPath,
+		ID:               r.ID,
+		Name:             r.Name,
+		Path:             r.Path,
+		ParentPath:       r.ParentPath,
+		GlobalVisibility: string(r.GlobalVisibility),
 	}
 
 	return run

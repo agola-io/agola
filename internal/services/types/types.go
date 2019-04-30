@@ -33,6 +33,23 @@ const (
 	ConfigTypeVariable     ConfigType = "variable"
 )
 
+type Visibility string
+
+const (
+	VisibilityPublic  Visibility = "public"
+	VisibilityPrivate Visibility = "private"
+)
+
+func IsValidVisibility(v Visibility) bool {
+	switch v {
+	case VisibilityPublic:
+	case VisibilityPrivate:
+	default:
+		return false
+	}
+	return true
+}
+
 type Parent struct {
 	Type ConfigType `json:"type,omitempty"`
 	ID   string     `json:"id,omitempty"`
@@ -73,6 +90,8 @@ type ProjectGroup struct {
 	Name string `json:"name,omitempty"`
 
 	Parent Parent `json:"parent,omitempty"`
+
+	Visibility Visibility `json:"visibility,omitempty"`
 }
 
 type RemoteSourceType string
@@ -138,6 +157,8 @@ type Project struct {
 	Name string `json:"name,omitempty"`
 
 	Parent Parent `json:"parent,omitempty"`
+
+	Visibility Visibility `json:"visibility,omitempty"`
 
 	// The remote repository id
 	RepositoryID string `json:"repository_id,omitempty"`

@@ -37,8 +37,9 @@ type Project struct {
 	*types.Project
 
 	// dynamic data
-	Path       string
-	ParentPath string
+	Path             string
+	ParentPath       string
+	GlobalVisibility types.Visibility
 }
 
 func projectResponse(readDB *readdb.ReadDB, project *types.Project) (*Project, error) {
@@ -58,18 +59,49 @@ func projectsResponse(readDB *readdb.ReadDB, projects []*types.Project) ([]*Proj
 			if err != nil {
 				return err
 			}
+
+			// calculate global visibility
+			visibility, err := getGlobalVisibility(readDB, tx, project.Visibility, &project.Parent)
+			if err != nil {
+				return err
+			}
+
 			// we calculate the path here from parent path since the db could not yet be
 			// updated on create
 			resProjects[i] = &Project{
-				Project:    project,
-				Path:       path.Join(pp, project.Name),
-				ParentPath: pp,
+				Project:          project,
+				Path:             path.Join(pp, project.Name),
+				ParentPath:       pp,
+				GlobalVisibility: visibility,
 			}
 		}
+
 		return nil
 	})
 
 	return resProjects, err
+}
+
+func getGlobalVisibility(readDB *readdb.ReadDB, tx *db.Tx, curVisibility types.Visibility, parent *types.Parent) (types.Visibility, error) {
+	curParent := parent
+	if curVisibility == types.VisibilityPrivate {
+		return curVisibility, nil
+	}
+
+	for curParent.Type == types.ConfigTypeProjectGroup {
+		projectGroup, err := readDB.GetProjectGroupByID(tx, curParent.ID)
+		if err != nil {
+			return "", err
+		}
+		if projectGroup.Visibility == types.VisibilityPrivate {
+			curVisibility = types.VisibilityPrivate
+			continue
+		}
+
+		curParent = &projectGroup.Parent
+	}
+
+	return curVisibility, nil
 }
 
 type ProjectHandler struct {

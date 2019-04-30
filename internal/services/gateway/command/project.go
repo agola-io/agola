@@ -31,6 +31,7 @@ type CreateProjectRequest struct {
 	CurrentUserID       string
 	Name                string
 	ParentID            string
+	Visibility          types.Visibility
 	RemoteSourceName    string
 	RepoPath            string
 	SkipSSHHostKeyCheck bool
@@ -92,6 +93,7 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 			Type: types.ConfigTypeProjectGroup,
 			ID:   parentID,
 		},
+		Visibility:          req.Visibility,
 		LinkedAccountID:     la.ID,
 		RepositoryID:        repo.ID,
 		RepositoryPath:      req.RepoPath,
