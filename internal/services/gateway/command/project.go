@@ -20,6 +20,7 @@ package command
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"path"
 
 	"github.com/sorintlab/agola/internal/services/types"
@@ -121,7 +122,14 @@ func (c *CommandHandler) SetupProject(ctx context.Context, rs *types.RemoteSourc
 		return errors.Wrapf(err, "failed to extract public key")
 	}
 
-	webhookURL := fmt.Sprintf("%s/webhooks?projectid=%s", c.apiExposedURL, project.ID)
+	webhookURL, err := url.Parse(fmt.Sprintf("%s/webhooks", c.apiExposedURL))
+	if err != nil {
+		return errors.Wrapf(err, "failed to generate webhook url")
+	}
+	q := url.Values{}
+	q.Add("projectid", project.ID)
+	q.Add("agolaid", c.agolaID)
+	webhookURL.RawQuery = q.Encode()
 
 	// generate deploy keys and webhooks containing the agola project id so we
 	// can have multiple projects referencing the same remote repository and this
@@ -132,11 +140,11 @@ func (c *CommandHandler) SetupProject(ctx context.Context, rs *types.RemoteSourc
 		return errors.Wrapf(err, "failed to create deploy key")
 	}
 	c.log.Infof("deleting existing webhooks")
-	if err := gitsource.DeleteRepoWebhook(project.RepositoryPath, webhookURL); err != nil {
+	if err := gitsource.DeleteRepoWebhook(project.RepositoryPath, webhookURL.String()); err != nil {
 		return errors.Wrapf(err, "failed to delete repository webhook")
 	}
 	c.log.Infof("creating webhook to url: %s", webhookURL)
-	if err := gitsource.CreateRepoWebhook(project.RepositoryPath, webhookURL, ""); err != nil {
+	if err := gitsource.CreateRepoWebhook(project.RepositoryPath, webhookURL.String(), ""); err != nil {
 		return errors.Wrapf(err, "failed to create repository webhook")
 	}
 
