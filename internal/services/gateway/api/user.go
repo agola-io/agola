@@ -188,7 +188,7 @@ type UserResponse struct {
 func createUserResponse(u *types.User) *UserResponse {
 	user := &UserResponse{
 		ID:       u.ID,
-		UserName: u.UserName,
+		UserName: u.Name,
 		Tokens:   make([]string, 0, len(u.Tokens)),
 	}
 	for tokenName := range u.Tokens {

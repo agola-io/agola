@@ -48,7 +48,7 @@ type User struct {
 
 	ID string `json:"id,omitempty"`
 
-	UserName string `json:"user_name,omitempty"`
+	Name string `json:"name,omitempty"`
 
 	LinkedAccounts map[string]*LinkedAccount `json:"linked_accounts,omitempty"`
 

@@ -132,7 +132,7 @@ func (r *ReadDB) GetProjectGroupPath(tx *db.Tx, group *types.ProjectGroup) (stri
 		if user == nil {
 			return "", errors.Errorf("cannot find user with id %q", rootGroupID)
 		}
-		p = path.Join("user", user.UserName)
+		p = path.Join("user", user.Name)
 	}
 
 	for _, group := range groups {

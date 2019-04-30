@@ -394,7 +394,7 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	t.Run("create a project in user root project group", func(t *testing.T) {
-		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.UserName)}})
+		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -406,7 +406,7 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 		}
 	})
 	t.Run("create a projectgroup in user root project group", func(t *testing.T) {
-		_, err := cs.ch.CreateProjectGroup(ctx, &types.ProjectGroup{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.UserName)}})
+		_, err := cs.ch.CreateProjectGroup(ctx, &types.ProjectGroup{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -418,7 +418,7 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 		}
 	})
 	t.Run("create a project in user non root project group with same name as a root project", func(t *testing.T) {
-		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.UserName, "projectgroup01")}})
+		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}})
 		if err != nil {
 			t.Fatalf("unexpected err: %+#v", err)
 		}
@@ -432,8 +432,8 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 
 	t.Run("create duplicated project in user root project group", func(t *testing.T) {
 		projectName := "project01"
-		expectedErr := fmt.Sprintf("project with name %q, path %q already exists", projectName, path.Join("user", user.UserName, projectName))
-		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.UserName)}})
+		expectedErr := fmt.Sprintf("project with name %q, path %q already exists", projectName, path.Join("user", user.Name, projectName))
+		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
@@ -449,8 +449,8 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 
 	t.Run("create duplicated project in user non root project group", func(t *testing.T) {
 		projectName := "project01"
-		expectedErr := fmt.Sprintf("project with name %q, path %q already exists", projectName, path.Join("user", user.UserName, "projectgroup01", projectName))
-		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.UserName, "projectgroup01")}})
+		expectedErr := fmt.Sprintf("project with name %q, path %q already exists", projectName, path.Join("user", user.Name, "projectgroup01", projectName))
+		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
@@ -488,7 +488,7 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 		wg := sync.WaitGroup{}
 		for i := 0; i < 10; i++ {
 			wg.Add(1)
-			go cs.ch.CreateProject(ctx, &types.Project{Name: "project02", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.UserName)}})
+			go cs.ch.CreateProject(ctx, &types.Project{Name: "project02", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}})
 			wg.Done()
 		}
 		wg.Wait()

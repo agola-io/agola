@@ -63,7 +63,7 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 		return nil, errors.Errorf("user doesn't have a linked account for remote source %q", rs.Name)
 	}
 
-	gitsource, err := c.GetGitSource(ctx, rs, user.UserName, la)
+	gitsource, err := c.GetGitSource(ctx, rs, user.Name, la)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create gitsource client")
 	}
@@ -82,7 +82,7 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 	parentID := req.ParentID
 	if parentID == "" {
 		// create project in current user namespace
-		parentID = path.Join("user", user.UserName)
+		parentID = path.Join("user", user.Name)
 	}
 
 	p := &types.Project{
@@ -109,7 +109,7 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 }
 
 func (c *CommandHandler) SetupProject(ctx context.Context, rs *types.RemoteSource, user *types.User, la *types.LinkedAccount, project *types.Project) error {
-	gitsource, err := c.GetGitSource(ctx, rs, user.UserName, la)
+	gitsource, err := c.GetGitSource(ctx, rs, user.Name, la)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create gitsource client")
 	}
@@ -162,7 +162,7 @@ func (c *CommandHandler) ReconfigProject(ctx context.Context, projectRef string)
 	la := user.LinkedAccounts[p.LinkedAccountID]
 	c.log.Infof("la: %s", util.Dump(la))
 	if la == nil {
-		return errors.Errorf("linked account %q in user %q doesn't exist", p.LinkedAccountID, user.UserName)
+		return errors.Errorf("linked account %q in user %q doesn't exist", p.LinkedAccountID, user.Name)
 	}
 
 	rs, resp, err := c.configstoreClient.GetRemoteSource(ctx, la.RemoteSourceID)

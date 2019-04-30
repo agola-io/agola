@@ -50,7 +50,7 @@ func (r *ReadDB) insertUser(tx *db.Tx, data []byte) error {
 	if err := r.deleteUser(tx, user.ID); err != nil {
 		return err
 	}
-	q, args, err := userInsert.Values(user.ID, user.UserName, data).ToSql()
+	q, args, err := userInsert.Values(user.ID, user.Name, data).ToSql()
 	if err != nil {
 		return errors.Wrap(err, "failed to build query")
 	}

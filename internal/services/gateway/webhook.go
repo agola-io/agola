@@ -160,14 +160,14 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		la := user.LinkedAccounts[project.LinkedAccountID]
 		h.log.Infof("la: %s", util.Dump(la))
 		if la == nil {
-			return http.StatusInternalServerError, "", errors.Errorf("linked account %q in user %q doesn't exist", project.LinkedAccountID, user.UserName)
+			return http.StatusInternalServerError, "", errors.Errorf("linked account %q in user %q doesn't exist", project.LinkedAccountID, user.Name)
 		}
 		rs, _, err := h.configstoreClient.GetRemoteSource(ctx, la.RemoteSourceID)
 		if err != nil {
 			return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to get remote source %q", la.RemoteSourceID)
 		}
 
-		gitSource, err = h.ch.GetGitSource(ctx, rs, user.UserName, la)
+		gitSource, err = h.ch.GetGitSource(ctx, rs, user.Name, la)
 		if err != nil {
 			return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to create gitea client")
 		}

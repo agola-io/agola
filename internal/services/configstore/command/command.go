@@ -275,7 +275,7 @@ func (s *CommandHandler) CreateUser(ctx context.Context, req *CreateUserRequest)
 			return err
 		}
 		if u != nil {
-			return util.NewErrBadRequest(errors.Errorf("user with name %q already exists", u.UserName))
+			return util.NewErrBadRequest(errors.Errorf("user with name %q already exists", u.Name))
 		}
 
 		if req.CreateUserLARequest != nil {
@@ -301,8 +301,8 @@ func (s *CommandHandler) CreateUser(ctx context.Context, req *CreateUserRequest)
 	}
 
 	user := &types.User{
-		ID:       uuid.NewV4().String(),
-		UserName: req.UserName,
+		ID:   uuid.NewV4().String(),
+		Name: req.UserName,
 	}
 	if req.CreateUserLARequest != nil {
 		if user.LinkedAccounts == nil {
@@ -599,7 +599,7 @@ func (s *CommandHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLARequ
 
 		la, ok := user.LinkedAccounts[req.LinkedAccountID]
 		if !ok {
-			return util.NewErrBadRequest(errors.Errorf("linked account id %q for user %q doesn't exist", req.LinkedAccountID, user.UserName))
+			return util.NewErrBadRequest(errors.Errorf("linked account id %q for user %q doesn't exist", req.LinkedAccountID, user.Name))
 		}
 
 		rs, err = s.readDB.GetRemoteSource(tx, la.RemoteSourceID)

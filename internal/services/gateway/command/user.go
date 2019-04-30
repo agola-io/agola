@@ -61,7 +61,7 @@ func (c *CommandHandler) CreateUser(ctx context.Context, req *CreateUserRequest)
 	if err != nil {
 		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to create user"))
 	}
-	c.log.Infof("user %s created, ID: %s", u.UserName, u.ID)
+	c.log.Infof("user %s created, ID: %s", u.Name, u.ID)
 
 	return u, nil
 }
@@ -369,7 +369,7 @@ func (c *CommandHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (
 	}
 	c.log.Infof("la: %s", util.Dump(la))
 	if la == nil {
-		return nil, errors.Errorf("linked account for user %q for remote source %q doesn't exist", user.UserName, rs.Name)
+		return nil, errors.Errorf("linked account for user %q for remote source %q doesn't exist", user.Name, rs.Name)
 	}
 
 	// Update oauth tokens if they have changed since the getuserinfo request may have updated them
@@ -390,12 +390,12 @@ func (c *CommandHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (
 			Oauth2AccessTokenExpiresAt: la.Oauth2AccessTokenExpiresAt,
 		}
 
-		c.log.Infof("updating user %q linked account", user.UserName)
-		la, resp, err = c.configstoreClient.UpdateUserLA(ctx, user.UserName, la.ID, creq)
+		c.log.Infof("updating user %q linked account", user.Name)
+		la, resp, err = c.configstoreClient.UpdateUserLA(ctx, user.Name, la.ID, creq)
 		if err != nil {
 			return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to update user"))
 		}
-		c.log.Infof("linked account %q for user %q updated", la.ID, user.UserName)
+		c.log.Infof("linked account %q for user %q updated", la.ID, user.Name)
 	}
 
 	// generate jwt token
