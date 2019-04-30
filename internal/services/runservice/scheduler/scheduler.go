@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	scommon "github.com/sorintlab/agola/internal/common"
@@ -305,6 +306,17 @@ func (s *Scheduler) chooseExecutor(ctx context.Context, rct *types.RunConfigTask
 	return nil, nil
 }
 
+type parentsByLevelName []*types.RunConfigTask
+
+func (p parentsByLevelName) Len() int { return len(p) }
+func (p parentsByLevelName) Less(i, j int) bool {
+	if p[i].Level != p[j].Level {
+		return p[i].Level < p[j].Level
+	}
+	return p[i].Name < p[j].Name
+}
+func (p parentsByLevelName) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
+
 func (s *Scheduler) genExecutorTask(ctx context.Context, r *types.Run, rt *types.RunTask, rc *types.RunConfig, executor *types.Executor) *types.ExecutorTask {
 	rct := rc.Tasks[rt.ID]
 
@@ -345,25 +357,24 @@ func (s *Scheduler) genExecutorTask(ctx context.Context, r *types.Run, rt *types
 		}
 	}
 
-	// calculate workspace layers
-	ws := make(types.Workspace, rct.Level+1)
+	// calculate workspace operations
+	// TODO(sgotti) right now we don't support duplicated files. So it's not currently possibile to overwrite a file in a upper layer.
+	// this simplifies the workspaces extractions since they could be extracted in any order. We make them ordered just for reproducibility
+	wsops := []types.WorkspaceOperation{}
 	rctAllParents := runconfig.GetAllParents(rc.Tasks, rct)
-	log.Debugf("rctAllParents: %s", util.Dump(rctAllParents))
+
+	// sort parents by level and name just for reproducibility
+	sort.Sort(parentsByLevelName(rctAllParents))
+
 	for _, rctParent := range rctAllParents {
 		log.Debugf("rctParent: %s", util.Dump(rctParent))
-		log.Debugf("ws: %s", util.Dump(ws))
-		archives := []types.WorkspaceArchive{}
 		for _, archiveStep := range r.Tasks[rctParent.ID].WorkspaceArchives {
-			archives = append(archives, types.WorkspaceArchive{TaskID: rctParent.ID, Step: archiveStep})
-		}
-		log.Debugf("archives: %v", util.Dump(archives))
-		if len(archives) > 0 {
-			ws[rctParent.Level] = append(ws[rctParent.Level], archives)
+			wsop := types.WorkspaceOperation{TaskID: rctParent.ID, Step: archiveStep}
+			wsops = append(wsops, wsop)
 		}
 	}
-	log.Debugf("ws: %s", util.Dump(ws))
 
-	et.Workspace = ws
+	et.WorkspaceOperations = wsops
 
 	return et
 }

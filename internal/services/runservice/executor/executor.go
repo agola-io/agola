@@ -419,26 +419,20 @@ func (e *Executor) doRestoreWorkspaceStep(ctx context.Context, s *types.RestoreW
 	}
 	defer logf.Close()
 
-	// TODO(sgotti) right now we don't support duplicated files. So it's not currently possibile to overwrite a file in a upper layer.
-	for level, wl := range t.Workspace {
-		log.Debugf("unarchiving archives at level %d", level)
-		for _, archives := range wl {
-			for _, archive := range archives {
-				log.Debugf("unarchiving workspace at level %d, taskID: %s, step: %d", level, archive.TaskID, archive.Step)
-				resp, err := e.runserviceClient.GetArchive(ctx, archive.TaskID, archive.Step)
-				if err != nil {
-					// TODO(sgotti) retry before giving up
-					fmt.Fprintf(logf, "error reading workspace archive: %v\n", err)
-					return -1, err
-				}
-				archivef := resp.Body
-				if err := e.unarchive(ctx, t, archivef, pod, logf, s.DestDir, false, false); err != nil {
-					archivef.Close()
-					return -1, err
-				}
-				archivef.Close()
-			}
+	for _, op := range t.WorkspaceOperations {
+		log.Debugf("unarchiving workspace for taskID: %s, step: %d", level, op.TaskID, op.Step)
+		resp, err := e.runserviceClient.GetArchive(ctx, op.TaskID, op.Step)
+		if err != nil {
+			// TODO(sgotti) retry before giving up
+			fmt.Fprintf(logf, "error reading workspace archive: %v\n", err)
+			return -1, err
 		}
+		archivef := resp.Body
+		if err := e.unarchive(ctx, t, archivef, pod, logf, s.DestDir, false, false); err != nil {
+			archivef.Close()
+			return -1, err
+		}
+		archivef.Close()
 	}
 
 	return 0, nil

@@ -518,7 +518,7 @@ type ExecutorTask struct {
 	SetupError string             `fail_reason:"setup_error,omitempty"`
 	FailError  string             `fail_reason:"fail_error,omitempty"`
 
-	Workspace Workspace `json:"workspace,omitempty"`
+	WorkspaceOperations []WorkspaceOperation `json:"workspace_operations,omitempty"`
 
 	// Cache prefix to use when asking for a cache key. To isolate caches between
 	// groups (projects)
@@ -556,15 +556,10 @@ type Container struct {
 	Entrypoint  string            `json:"entrypoint"`
 }
 
-type Workspace []WorkspaceLevel
-
-type WorkspaceLevel []WorkspaceArchives
-
-type WorkspaceArchives []WorkspaceArchive
-
-type WorkspaceArchive struct {
-	TaskID string `json:"task_id,omitempty"`
-	Step   int    `json:"step,omitempty"`
+type WorkspaceOperation struct {
+	TaskID    string `json:"task_id,omitempty"`
+	Step      int    `json:"step,omitempty"`
+	Overwrite bool   `json:"overwrite,omitempty"`
 }
 
 func (et *ExecutorTask) UnmarshalJSON(b []byte) error {
