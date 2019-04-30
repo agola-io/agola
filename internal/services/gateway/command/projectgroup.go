@@ -46,7 +46,7 @@ func (c *CommandHandler) CreateProjectGroup(ctx context.Context, req *CreateProj
 	parentID := req.ParentID
 	if parentID == "" {
 		// create projectGroup in current user namespace
-		parentID = path.Join("user", user.UserName)
+		parentID = path.Join("user", user.Name)
 	}
 
 	p := &types.ProjectGroup{
