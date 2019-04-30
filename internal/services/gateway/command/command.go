@@ -29,15 +29,17 @@ type CommandHandler struct {
 	log               *zap.SugaredLogger
 	sd                *common.TokenSigningData
 	configstoreClient *csapi.Client
+	agolaID           string
 	apiExposedURL     string
 	webExposedURL     string
 }
 
-func NewCommandHandler(logger *zap.Logger, sd *common.TokenSigningData, configstoreClient *csapi.Client, apiExposedURL, webExposedURL string) *CommandHandler {
+func NewCommandHandler(logger *zap.Logger, sd *common.TokenSigningData, configstoreClient *csapi.Client, agolaID, apiExposedURL, webExposedURL string) *CommandHandler {
 	return &CommandHandler{
 		log:               logger.Sugar(),
 		sd:                sd,
 		configstoreClient: configstoreClient,
+		agolaID:           agolaID,
 		apiExposedURL:     apiExposedURL,
 		webExposedURL:     webExposedURL,
 	}

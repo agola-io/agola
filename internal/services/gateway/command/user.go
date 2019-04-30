@@ -518,7 +518,8 @@ func (c *CommandHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSourc
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create git source")
 		}
-		accessToken, err := passwordSource.LoginPassword(loginName, loginPassword)
+		tokenName := "agola-" + c.agolaID
+		accessToken, err := passwordSource.LoginPassword(loginName, loginPassword, tokenName)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to login to remote source %q with login name %q", rs.Name, loginName)
 		}

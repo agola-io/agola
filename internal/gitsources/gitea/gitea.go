@@ -94,13 +94,13 @@ func New(opts Opts) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) LoginPassword(username, password string) (string, error) {
+func (c *Client) LoginPassword(username, password, tokenName string) (string, error) {
 	// try to get agola access token if it already exists
 	var accessToken string
 	tokens, err := c.client.ListAccessTokens(username, password)
 	if err == nil {
 		for _, token := range tokens {
-			if token.Name == "agola" {
+			if token.Name == tokenName {
 				accessToken = token.Sha1
 				break
 			}
@@ -112,7 +112,7 @@ func (c *Client) LoginPassword(username, password string) (string, error) {
 		token, terr := c.client.CreateAccessToken(
 			username,
 			password,
-			gitea.CreateAccessTokenOption{Name: "agola"},
+			gitea.CreateAccessTokenOption{Name: tokenName},
 		)
 		if terr != nil {
 			return "", terr

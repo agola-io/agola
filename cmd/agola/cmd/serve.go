@@ -129,7 +129,7 @@ func serve(cmd *cobra.Command, args []string) error {
 		return errors.Wrapf(err, "failed to start scheduler")
 	}
 
-	gateway, err := gateway.NewGateway(&c.Gateway)
+	gateway, err := gateway.NewGateway(c)
 	if err != nil {
 		return errors.Wrapf(err, "failed to start gateway")
 	}

@@ -58,7 +58,8 @@ type Gateway struct {
 	sd                *common.TokenSigningData
 }
 
-func NewGateway(c *config.Gateway) (*Gateway, error) {
+func NewGateway(gc *config.Config) (*Gateway, error) {
+	c := &gc.Gateway
 	if c.Debug {
 		level.SetLevel(zapcore.DebugLevel)
 	}
@@ -122,7 +123,7 @@ func NewGateway(c *config.Gateway) (*Gateway, error) {
 
 	configstoreClient := csapi.NewClient(c.ConfigStoreURL)
 
-	ch := command.NewCommandHandler(logger, sd, configstoreClient, c.APIExposedURL, c.WebExposedURL)
+	ch := command.NewCommandHandler(logger, sd, configstoreClient, gc.ID, c.APIExposedURL, c.WebExposedURL)
 
 	return &Gateway{
 		c:                 c,
