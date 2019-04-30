@@ -25,6 +25,7 @@ import (
 	"github.com/pkg/errors"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/gateway/command"
+	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
 	"github.com/gorilla/mux"
@@ -32,11 +33,12 @@ import (
 )
 
 type CreateProjectRequest struct {
-	Name                string `json:"name,omitempty"`
-	ParentID            string `json:"parent_id,omitempty"`
-	RepoPath            string `json:"repo_path,omitempty"`
-	RemoteSourceName    string `json:"remote_source_name,omitempty"`
-	SkipSSHHostKeyCheck bool   `json:"skip_ssh_host_key_check,omitempty"`
+	Name                string           `json:"name,omitempty"`
+	ParentID            string           `json:"parent_id,omitempty"`
+	Visibility          types.Visibility `json:"visibility,omitempty"`
+	RepoPath            string           `json:"repo_path,omitempty"`
+	RemoteSourceName    string           `json:"remote_source_name,omitempty"`
+	SkipSSHHostKeyCheck bool             `json:"skip_ssh_host_key_check,omitempty"`
 }
 
 type CreateProjectHandler struct {
@@ -71,6 +73,7 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	creq := &command.CreateProjectRequest{
 		Name:                req.Name,
 		ParentID:            req.ParentID,
+		Visibility:          req.Visibility,
 		RepoPath:            req.RepoPath,
 		RemoteSourceName:    req.RemoteSourceName,
 		CurrentUserID:       userID,
@@ -184,18 +187,20 @@ func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type ProjectResponse struct {
-	ID         string `json:"id,omitempty"`
-	Name       string `json:"name,omitempty"`
-	Path       string `json:"path,omitempty"`
-	ParentPath string `json:"parent_path,omitempty"`
+	ID               string `json:"id,omitempty"`
+	Name             string `json:"name,omitempty"`
+	Path             string `json:"path,omitempty"`
+	ParentPath       string `json:"parent_path,omitempty"`
+	GlobalVisibility string `json:"global_visibility,omitempty"`
 }
 
 func createProjectResponse(r *csapi.Project) *ProjectResponse {
 	res := &ProjectResponse{
-		ID:         r.ID,
-		Name:       r.Name,
-		Path:       r.Path,
-		ParentPath: r.ParentPath,
+		ID:               r.ID,
+		Name:             r.Name,
+		Path:             r.Path,
+		ParentPath:       r.ParentPath,
+		GlobalVisibility: string(r.GlobalVisibility),
 	}
 
 	return res

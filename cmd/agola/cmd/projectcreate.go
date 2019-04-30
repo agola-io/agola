@@ -22,6 +22,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/services/gateway/api"
+	"github.com/sorintlab/agola/internal/services/types"
 
 	"github.com/spf13/cobra"
 )
@@ -42,6 +43,7 @@ type projectCreateOptions struct {
 	repoPath            string
 	remoteSourceName    string
 	skipSSHHostKeyCheck bool
+	visibility          string
 }
 
 var projectCreateOpts projectCreateOptions
@@ -54,6 +56,7 @@ func init() {
 	flags.StringVar(&projectCreateOpts.remoteSourceName, "remote-source", "", "remote source name")
 	flags.BoolVarP(&projectCreateOpts.skipSSHHostKeyCheck, "skip-ssh-host-key-check", "s", false, "skip ssh host key check")
 	flags.StringVar(&projectCreateOpts.parentPath, "parent", "", `parent project group path (i.e "org/org01" for root project group in org01, "user/user01/group01/subgroub01") or project group id where the project should be created`)
+	flags.StringVar(&projectCreateOpts.visibility, "visibility", "public", `project visibility (public or private)`)
 
 	cmdProjectCreate.MarkFlagRequired("name")
 	cmdProjectCreate.MarkFlagRequired("parent")
@@ -66,9 +69,15 @@ func init() {
 func projectCreate(cmd *cobra.Command, args []string) error {
 	gwclient := api.NewClient(gatewayURL, token)
 
+	// TODO(sgotti) make this a custom pflag Value?
+	if !types.IsValidVisibility(types.Visibility(projectCreateOpts.visibility)) {
+		return errors.Errorf("invalid visibility %q", projectCreateOpts.visibility)
+	}
+
 	req := &api.CreateProjectRequest{
 		Name:                projectCreateOpts.name,
 		ParentID:            projectCreateOpts.parentPath,
+		Visibility:          types.Visibility(projectCreateOpts.visibility),
 		RepoPath:            projectCreateOpts.repoPath,
 		RemoteSourceName:    projectCreateOpts.remoteSourceName,
 		SkipSSHHostKeyCheck: projectCreateOpts.skipSSHHostKeyCheck,
