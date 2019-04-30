@@ -22,7 +22,6 @@ import (
 	"github.com/pkg/errors"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/gateway/command"
-	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
 	"github.com/gorilla/mux"
@@ -182,14 +181,18 @@ func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type ProjectResponse struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID         string `json:"id,omitempty"`
+	Name       string `json:"name,omitempty"`
+	Path       string `json:"path,omitempty"`
+	ParentPath string `json:"parent_path,omitempty"`
 }
 
-func createProjectResponse(r *types.Project) *ProjectResponse {
+func createProjectResponse(r *csapi.Project) *ProjectResponse {
 	res := &ProjectResponse{
-		ID:   r.ID,
-		Name: r.Name,
+		ID:         r.ID,
+		Name:       r.Name,
+		Path:       r.Path,
+		ParentPath: r.ParentPath,
 	}
 
 	return res

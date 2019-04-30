@@ -20,6 +20,7 @@ import (
 	"net/url"
 	"path"
 
+	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
@@ -27,15 +28,15 @@ import (
 )
 
 type CreateProjectRequest struct {
+	CurrentUserID       string
 	Name                string
 	ParentID            string
 	RemoteSourceName    string
 	RepoPath            string
-	CurrentUserID       string
 	SkipSSHHostKeyCheck bool
 }
 
-func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRequest) (*types.Project, error) {
+func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRequest) (*csapi.Project, error) {
 	if !util.ValidateName(req.Name) {
 		return nil, util.NewErrBadRequest(errors.Errorf("invalid project name %q", req.Name))
 	}
@@ -99,16 +100,16 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 	}
 
 	c.log.Infof("creating project")
-	p, resp, err = c.configstoreClient.CreateProject(ctx, p)
+	rp, resp, err := c.configstoreClient.CreateProject(ctx, p)
 	if err != nil {
 		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to create project"))
 	}
 	c.log.Infof("project %s created, ID: %s", p.Name, p.ID)
 
-	return p, c.SetupProject(ctx, rs, user, la, p)
+	return rp, c.SetupProject(ctx, rs, user, la, rp)
 }
 
-func (c *CommandHandler) SetupProject(ctx context.Context, rs *types.RemoteSource, user *types.User, la *types.LinkedAccount, project *types.Project) error {
+func (c *CommandHandler) SetupProject(ctx context.Context, rs *types.RemoteSource, user *types.User, la *types.LinkedAccount, project *csapi.Project) error {
 	gitsource, err := c.GetGitSource(ctx, rs, user.Name, la)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create gitsource client")

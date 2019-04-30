@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"path"
 
 	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/db"
@@ -29,6 +30,46 @@ import (
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 )
+
+// ProjectGroup augments types.ProjectGroup with dynamic data
+type ProjectGroup struct {
+	*types.ProjectGroup
+
+	// dynamic data
+	Path       string
+	ParentPath string
+}
+
+func projectGroupResponse(readDB *readdb.ReadDB, projectGroup *types.ProjectGroup) (*ProjectGroup, error) {
+	r, err := projectGroupsResponse(readDB, []*types.ProjectGroup{projectGroup})
+	if err != nil {
+		return nil, err
+	}
+	return r[0], nil
+}
+
+func projectGroupsResponse(readDB *readdb.ReadDB, projectGroups []*types.ProjectGroup) ([]*ProjectGroup, error) {
+	resProjectGroups := make([]*ProjectGroup, len(projectGroups))
+
+	err := readDB.Do(func(tx *db.Tx) error {
+		for i, projectGroup := range projectGroups {
+			pp, err := readDB.GetPath(tx, projectGroup.Parent.Type, projectGroup.Parent.ID)
+			if err != nil {
+				return err
+			}
+			// we calculate the path here from parent path since the db could not yet be
+			// updated on create
+			resProjectGroups[i] = &ProjectGroup{
+				ProjectGroup: projectGroup,
+				Path:         path.Join(pp, projectGroup.Name),
+				ParentPath:   pp,
+			}
+		}
+		return nil
+	})
+
+	return resProjectGroups, err
+}
 
 type ProjectGroupHandler struct {
 	log    *zap.SugaredLogger
@@ -64,7 +105,13 @@ func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, projectGroup); err != nil {
+	resProjectGroup, err := projectGroupResponse(h.readDB, projectGroup)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	if err := httpResponse(w, http.StatusOK, resProjectGroup); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -114,7 +161,13 @@ func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, projects); err != nil {
+	resProjects, err := projectsResponse(h.readDB, projects)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	if err := httpResponse(w, http.StatusOK, resProjects); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -164,7 +217,13 @@ func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, projectGroups); err != nil {
+	resProjectGroups, err := projectGroupsResponse(h.readDB, projectGroups)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	if err := httpResponse(w, http.StatusOK, resProjectGroups); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -175,8 +234,8 @@ type CreateProjectGroupHandler struct {
 	readDB *readdb.ReadDB
 }
 
-func NewCreateProjectGroupHandler(logger *zap.Logger, ch *command.CommandHandler) *CreateProjectGroupHandler {
-	return &CreateProjectGroupHandler{log: logger.Sugar(), ch: ch}
+func NewCreateProjectGroupHandler(logger *zap.Logger, ch *command.CommandHandler, readDB *readdb.ReadDB) *CreateProjectGroupHandler {
+	return &CreateProjectGroupHandler{log: logger.Sugar(), ch: ch, readDB: readDB}
 }
 
 func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -195,7 +254,13 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err := httpResponse(w, http.StatusCreated, projectGroup); err != nil {
+	resProjectGroup, err := projectGroupResponse(h.readDB, projectGroup)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	if err := httpResponse(w, http.StatusCreated, resProjectGroup); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }

@@ -22,7 +22,6 @@ import (
 	"github.com/pkg/errors"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/gateway/command"
-	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
 	"github.com/gorilla/mux"
@@ -180,14 +179,18 @@ func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.
 }
 
 type ProjectGroupResponse struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID         string `json:"id,omitempty"`
+	Name       string `json:"name,omitempty"`
+	Path       string `json:"path,omitempty"`
+	ParentPath string `json:"parent_path,omitempty"`
 }
 
-func createProjectGroupResponse(r *types.ProjectGroup) *ProjectGroupResponse {
+func createProjectGroupResponse(r *csapi.ProjectGroup) *ProjectGroupResponse {
 	run := &ProjectGroupResponse{
-		ID:   r.ID,
-		Name: r.Name,
+		ID:         r.ID,
+		Name:       r.Name,
+		Path:       r.Path,
+		ParentPath: r.ParentPath,
 	}
 
 	return run

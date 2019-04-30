@@ -127,10 +127,10 @@ func (s *ConfigStore) Run(ctx context.Context) error {
 	projectGroupHandler := api.NewProjectGroupHandler(logger, s.readDB)
 	projectGroupSubgroupsHandler := api.NewProjectGroupSubgroupsHandler(logger, s.readDB)
 	projectGroupProjectsHandler := api.NewProjectGroupProjectsHandler(logger, s.readDB)
-	createProjectGroupHandler := api.NewCreateProjectGroupHandler(logger, s.ch)
+	createProjectGroupHandler := api.NewCreateProjectGroupHandler(logger, s.ch, s.readDB)
 
 	projectHandler := api.NewProjectHandler(logger, s.readDB)
-	createProjectHandler := api.NewCreateProjectHandler(logger, s.ch)
+	createProjectHandler := api.NewCreateProjectHandler(logger, s.ch, s.readDB)
 	deleteProjectHandler := api.NewDeleteProjectHandler(logger, s.ch)
 
 	secretsHandler := api.NewSecretsHandler(logger, s.readDB)

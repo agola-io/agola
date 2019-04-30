@@ -18,6 +18,7 @@ import (
 	"context"
 	"path"
 
+	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
@@ -25,12 +26,12 @@ import (
 )
 
 type CreateProjectGroupRequest struct {
+	CurrentUserID string
 	Name          string
 	ParentID      string
-	CurrentUserID string
 }
 
-func (c *CommandHandler) CreateProjectGroup(ctx context.Context, req *CreateProjectGroupRequest) (*types.ProjectGroup, error) {
+func (c *CommandHandler) CreateProjectGroup(ctx context.Context, req *CreateProjectGroupRequest) (*csapi.ProjectGroup, error) {
 	if !util.ValidateName(req.Name) {
 		return nil, util.NewErrBadRequest(errors.Errorf("invalid projectGroup name %q", req.Name))
 	}
@@ -55,11 +56,11 @@ func (c *CommandHandler) CreateProjectGroup(ctx context.Context, req *CreateProj
 	}
 
 	c.log.Infof("creating projectGroup")
-	p, resp, err = c.configstoreClient.CreateProjectGroup(ctx, p)
+	rp, resp, err := c.configstoreClient.CreateProjectGroup(ctx, p)
 	if err != nil {
 		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to create projectGroup"))
 	}
-	c.log.Infof("projectGroup %s created, ID: %s", p.Name, p.ID)
+	c.log.Infof("projectGroup %s created, ID: %s", rp.Name, rp.ID)
 
-	return p, nil
+	return rp, nil
 }

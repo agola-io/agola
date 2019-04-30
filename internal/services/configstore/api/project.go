@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"path"
 
 	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/db"
@@ -30,6 +31,46 @@ import (
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 )
+
+// Project augments types.Project with dynamic data
+type Project struct {
+	*types.Project
+
+	// dynamic data
+	Path       string
+	ParentPath string
+}
+
+func projectResponse(readDB *readdb.ReadDB, project *types.Project) (*Project, error) {
+	r, err := projectsResponse(readDB, []*types.Project{project})
+	if err != nil {
+		return nil, err
+	}
+	return r[0], nil
+}
+
+func projectsResponse(readDB *readdb.ReadDB, projects []*types.Project) ([]*Project, error) {
+	resProjects := make([]*Project, len(projects))
+
+	err := readDB.Do(func(tx *db.Tx) error {
+		for i, project := range projects {
+			pp, err := readDB.GetPath(tx, project.Parent.Type, project.Parent.ID)
+			if err != nil {
+				return err
+			}
+			// we calculate the path here from parent path since the db could not yet be
+			// updated on create
+			resProjects[i] = &Project{
+				Project:    project,
+				Path:       path.Join(pp, project.Name),
+				ParentPath: pp,
+			}
+		}
+		return nil
+	})
+
+	return resProjects, err
+}
 
 type ProjectHandler struct {
 	log    *zap.SugaredLogger
@@ -76,7 +117,13 @@ func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, project); err != nil {
+	resProject, err := projectResponse(h.readDB, project)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	if err := httpResponse(w, http.StatusOK, resProject); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -87,8 +134,8 @@ type CreateProjectHandler struct {
 	readDB *readdb.ReadDB
 }
 
-func NewCreateProjectHandler(logger *zap.Logger, ch *command.CommandHandler) *CreateProjectHandler {
-	return &CreateProjectHandler{log: logger.Sugar(), ch: ch}
+func NewCreateProjectHandler(logger *zap.Logger, ch *command.CommandHandler, readDB *readdb.ReadDB) *CreateProjectHandler {
+	return &CreateProjectHandler{log: logger.Sugar(), ch: ch, readDB: readDB}
 }
 
 func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -107,7 +154,13 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusCreated, project); err != nil {
+	resProject, err := projectResponse(h.readDB, project)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	if err := httpResponse(w, http.StatusCreated, resProject); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }

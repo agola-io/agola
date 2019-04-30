@@ -106,50 +106,50 @@ func (c *Client) getParsedResponse(ctx context.Context, method, path string, que
 	return resp, d.Decode(obj)
 }
 
-func (c *Client) GetProjectGroup(ctx context.Context, projectGroupRef string) (*types.ProjectGroup, *http.Response, error) {
-	projectGroup := new(types.ProjectGroup)
+func (c *Client) GetProjectGroup(ctx context.Context, projectGroupRef string) (*ProjectGroup, *http.Response, error) {
+	projectGroup := new(ProjectGroup)
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s", url.PathEscape(projectGroupRef)), nil, jsonContent, nil, projectGroup)
 	return projectGroup, resp, err
 }
 
-func (c *Client) GetProjectGroupSubgroups(ctx context.Context, projectGroupRef string) ([]*types.ProjectGroup, *http.Response, error) {
-	projectGroups := []*types.ProjectGroup{}
+func (c *Client) GetProjectGroupSubgroups(ctx context.Context, projectGroupRef string) ([]*ProjectGroup, *http.Response, error) {
+	projectGroups := []*ProjectGroup{}
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s/subgroups", url.PathEscape(projectGroupRef)), nil, jsonContent, nil, &projectGroups)
 	return projectGroups, resp, err
 }
 
-func (c *Client) GetProjectGroupProjects(ctx context.Context, projectGroupRef string) ([]*types.Project, *http.Response, error) {
-	projects := []*types.Project{}
+func (c *Client) GetProjectGroupProjects(ctx context.Context, projectGroupRef string) ([]*Project, *http.Response, error) {
+	projects := []*Project{}
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s/projects", url.PathEscape(projectGroupRef)), nil, jsonContent, nil, &projects)
 	return projects, resp, err
 }
 
-func (c *Client) CreateProjectGroup(ctx context.Context, projectGroup *types.ProjectGroup) (*types.ProjectGroup, *http.Response, error) {
+func (c *Client) CreateProjectGroup(ctx context.Context, projectGroup *types.ProjectGroup) (*ProjectGroup, *http.Response, error) {
 	pj, err := json.Marshal(projectGroup)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	projectGroup = new(types.ProjectGroup)
-	resp, err := c.getParsedResponse(ctx, "POST", "/projectgroups", nil, jsonContent, bytes.NewReader(pj), projectGroup)
-	return projectGroup, resp, err
+	resProjectGroup := new(ProjectGroup)
+	resp, err := c.getParsedResponse(ctx, "POST", "/projectgroups", nil, jsonContent, bytes.NewReader(pj), resProjectGroup)
+	return resProjectGroup, resp, err
 }
 
-func (c *Client) GetProject(ctx context.Context, projectRef string) (*types.Project, *http.Response, error) {
-	project := new(types.Project)
+func (c *Client) GetProject(ctx context.Context, projectRef string) (*Project, *http.Response, error) {
+	project := new(Project)
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s", url.PathEscape(projectRef)), nil, jsonContent, nil, project)
 	return project, resp, err
 }
 
-func (c *Client) CreateProject(ctx context.Context, project *types.Project) (*types.Project, *http.Response, error) {
+func (c *Client) CreateProject(ctx context.Context, project *types.Project) (*Project, *http.Response, error) {
 	pj, err := json.Marshal(project)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	project = new(types.Project)
-	resp, err := c.getParsedResponse(ctx, "POST", "/projects", nil, jsonContent, bytes.NewReader(pj), project)
-	return project, resp, err
+	resProject := new(Project)
+	resp, err := c.getParsedResponse(ctx, "POST", "/projects", nil, jsonContent, bytes.NewReader(pj), resProject)
+	return resProject, resp, err
 }
 
 func (c *Client) DeleteProject(ctx context.Context, projectRef string) (*http.Response, error) {
