@@ -16,6 +16,7 @@ package util
 
 import (
 	"path"
+	"strings"
 )
 
 // PathHierarchy return a slice of paths from the base path (root included as . or / ).
@@ -50,4 +51,25 @@ func PathList(p string) []string {
 		}
 	}
 	return paths
+}
+
+// IsParentPath returns if the provided parent is parent of p
+// parent and p paths must use slash "/" separators and must be absolute paths
+func IsParentPath(parent, p string) bool {
+	// add ending / to avoid names with common prefix, like:
+	// /path/to
+	// /path/t
+	if !strings.HasSuffix(parent, "/") {
+		parent = parent + "/"
+	}
+	return strings.Contains(p, parent)
+}
+
+// IsParentPath returns if the provided parent the same path as p or a parent of p
+// parent and p paths must use slash "/" separators
+func IsSameOrParentPath(parent, p string) bool {
+	if parent == p {
+		return true
+	}
+	return IsParentPath(parent, p)
 }
