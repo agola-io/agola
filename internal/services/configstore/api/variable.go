@@ -82,7 +82,7 @@ func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err = h.readDB.Do(func(tx *db.Tx) error {
 		// populate parent path
 		for _, v := range resVariables {
-			pp, err := h.readDB.GetParentPath(tx, v.Parent.Type, v.Parent.ID)
+			pp, err := h.readDB.GetPath(tx, v.Parent.Type, v.Parent.ID)
 			if err != nil {
 				return err
 			}

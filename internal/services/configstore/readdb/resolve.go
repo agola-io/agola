@@ -48,33 +48,35 @@ func (r *ReadDB) ResolveConfigID(tx *db.Tx, configType types.ConfigType, ref str
 	}
 }
 
-func (r *ReadDB) GetParentPath(tx *db.Tx, parentType types.ConfigType, parentID string) (string, error) {
+func (r *ReadDB) GetPath(tx *db.Tx, configType types.ConfigType, id string) (string, error) {
 	var p string
-	switch parentType {
+	switch configType {
 	case types.ConfigTypeProjectGroup:
-		projectGroup, err := r.GetProjectGroup(tx, parentID)
+		projectGroup, err := r.GetProjectGroup(tx, id)
 		if err != nil {
 			return "", err
 		}
 		if projectGroup == nil {
-			return "", errors.Errorf("projectgroup with id %q doesn't exist", parentID)
+			return "", errors.Errorf("projectgroup with id %q doesn't exist", id)
 		}
 		p, err = r.GetProjectGroupPath(tx, projectGroup)
 		if err != nil {
 			return "", err
 		}
 	case types.ConfigTypeProject:
-		project, err := r.GetProject(tx, parentID)
+		project, err := r.GetProject(tx, id)
 		if err != nil {
 			return "", err
 		}
 		if project == nil {
-			return "", errors.Errorf("project with id %q doesn't exist", parentID)
+			return "", errors.Errorf("project with id %q doesn't exist", id)
 		}
 		p, err = r.GetProjectPath(tx, project)
 		if err != nil {
 			return "", err
 		}
+	default:
+		return "", errors.Errorf("config type %q doesn't provide a path", configType)
 	}
 
 	return p, nil
