@@ -264,7 +264,7 @@ func (s *PosixStorage) ReadObject(p string) (ReadSeekCloser, error) {
 	return f, err
 }
 
-func (s *PosixStorage) WriteObject(p string, data io.Reader) error {
+func (s *PosixStorage) WriteObject(p string, data io.Reader, persist bool) error {
 	fspath, err := s.fsPath(p)
 	if err != nil {
 		return err
@@ -273,7 +273,7 @@ func (s *PosixStorage) WriteObject(p string, data io.Reader) error {
 	if err := os.MkdirAll(path.Dir(fspath), 0770); err != nil {
 		return err
 	}
-	return s.WriteFileAtomicFunc(fspath, 0660, func(f io.Writer) error {
+	return s.WriteFileAtomicFunc(fspath, 0660, persist, func(f io.Writer) error {
 		_, err := io.Copy(f, data)
 		return err
 	})
@@ -437,13 +437,13 @@ func (s *PosixStorage) List(prefix, startWith, delimiter string, doneCh <-chan s
 // data to the file.
 // TODO(sgotti) remove left over tmp files if process crashes before calling
 // os.Remove
-func (s *PosixStorage) WriteFileAtomicFunc(p string, perm os.FileMode, writeFunc func(f io.Writer) error) error {
+func (s *PosixStorage) WriteFileAtomicFunc(p string, perm os.FileMode, persist bool, writeFunc func(f io.Writer) error) error {
 	f, err := ioutil.TempFile(s.tmpDir, "tmpfile")
 	if err != nil {
 		return err
 	}
 	err = writeFunc(f)
-	if err == nil {
+	if persist && err == nil {
 		err = f.Sync()
 	}
 	if closeErr := f.Close(); err == nil {
@@ -460,6 +460,9 @@ func (s *PosixStorage) WriteFileAtomicFunc(p string, perm os.FileMode, writeFunc
 		return err
 	}
 
+	if !persist {
+		return nil
+	}
 	// sync parent dirs
 	pdir := filepath.Dir(p)
 	for {
@@ -482,8 +485,8 @@ func (s *PosixStorage) WriteFileAtomicFunc(p string, perm os.FileMode, writeFunc
 	return nil
 }
 
-func (s *PosixStorage) WriteFileAtomic(filename string, perm os.FileMode, data []byte) error {
-	return s.WriteFileAtomicFunc(filename, perm,
+func (s *PosixStorage) WriteFileAtomic(filename string, perm os.FileMode, persist bool, data []byte) error {
+	return s.WriteFileAtomicFunc(filename, perm, persist,
 		func(f io.Writer) error {
 			_, err := f.Write(data)
 			return err

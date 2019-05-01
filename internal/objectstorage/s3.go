@@ -84,7 +84,7 @@ func (s *S3Storage) ReadObject(filepath string) (ReadSeekCloser, error) {
 	return s.minioClient.GetObject(s.bucket, filepath, minio.GetObjectOptions{})
 }
 
-func (s *S3Storage) WriteObject(filepath string, data io.Reader) error {
+func (s *S3Storage) WriteObject(filepath string, data io.Reader, persist bool) error {
 	// hack to know the real file size or minio will do this in memory with big memory usage since s3 doesn't support real streaming of unknown sizes
 	// TODO(sgotti) wait for minio client to expose an api to provide the max part size so we can remove this
 	tmpfile, err := ioutil.TempFile(os.TempDir(), "s3")

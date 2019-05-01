@@ -35,7 +35,7 @@ type ReadSeekCloser interface {
 type Storage interface {
 	Stat(filepath string) (*ObjectInfo, error)
 	ReadObject(filepath string) (ReadSeekCloser, error)
-	WriteObject(filepath string, data io.Reader) error
+	WriteObject(filepath string, data io.Reader, persist bool) error
 	DeleteObject(filepath string) error
 	List(prefix, startWith, delimiter string, doneCh <-chan struct{}) <-chan ObjectInfo
 }
