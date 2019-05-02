@@ -485,7 +485,7 @@ func (d *DataManager) WriteWalAdditionalOps(ctx context.Context, actions []*Acti
 			return nil, err
 		}
 	}
-	if err := d.ost.WriteObject(walDataFilePath, bytes.NewReader(buf.Bytes()), -1, true); err != nil {
+	if err := d.ost.WriteObject(walDataFilePath, bytes.NewReader(buf.Bytes()), int64(buf.Len()), true); err != nil {
 		return nil, err
 	}
 	d.log.Debugf("wrote wal file: %s", walDataFilePath)
@@ -629,7 +629,7 @@ func (d *DataManager) sync(ctx context.Context) error {
 			}
 
 			walFileCommittedPath := walFilePath + ".committed"
-			if err := d.ost.WriteObject(walFileCommittedPath, bytes.NewReader(headerj), -1, true); err != nil {
+			if err := d.ost.WriteObject(walFileCommittedPath, bytes.NewReader(headerj), int64(len(headerj)), true); err != nil {
 				return err
 			}
 
@@ -659,7 +659,7 @@ func (d *DataManager) sync(ctx context.Context) error {
 			walFilePath := d.storageWalStatusFile(walData.WalSequence)
 			d.log.Debugf("checkpointing committed wal to storage")
 			walFileCheckpointedPath := walFilePath + ".checkpointed"
-			if err := d.ost.WriteObject(walFileCheckpointedPath, bytes.NewReader([]byte{}), -1, true); err != nil {
+			if err := d.ost.WriteObject(walFileCheckpointedPath, bytes.NewReader([]byte{}), 0, true); err != nil {
 				return err
 			}
 		}

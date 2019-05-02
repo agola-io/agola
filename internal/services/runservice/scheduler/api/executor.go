@@ -410,8 +410,18 @@ func (h *CacheCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	size := int64(-1)
+	sizeStr := r.Header.Get("Content-Length")
+	if sizeStr != "" {
+		size, err = strconv.ParseInt(sizeStr, 10, 64)
+		if err != nil {
+			http.Error(w, "", http.StatusBadRequest)
+			return
+		}
+	}
+
 	cachePath := store.OSTCachePath(key)
-	if err := h.ost.WriteObject(cachePath, r.Body, -1, false); err != nil {
+	if err := h.ost.WriteObject(cachePath, r.Body, size, false); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

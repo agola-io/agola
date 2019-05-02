@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/sorintlab/agola/internal/datamanager"
 	"github.com/sorintlab/agola/internal/db"
 	"github.com/sorintlab/agola/internal/etcd"
 	"github.com/sorintlab/agola/internal/objectstorage"
@@ -32,7 +33,6 @@ import (
 	"github.com/sorintlab/agola/internal/services/runservice/scheduler/store"
 	"github.com/sorintlab/agola/internal/services/runservice/types"
 	"github.com/sorintlab/agola/internal/util"
-	"github.com/sorintlab/agola/internal/datamanager"
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"

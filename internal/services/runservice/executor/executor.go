@@ -554,9 +554,13 @@ func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, 
 	if err != nil {
 		return -1, err
 	}
+	fi, err := f.Stat()
+	if err != nil {
+		return -1, err
+	}
 
 	// send cache archive to scheduler
-	if resp, err := e.runserviceClient.PutCache(ctx, key, f); err != nil {
+	if resp, err := e.runserviceClient.PutCache(ctx, key, fi.Size(), f); err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotModified {
 			return exitCode, nil
 		}

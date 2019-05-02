@@ -123,11 +123,22 @@ func (h *logsHandler) readLogs(taskID string, setup bool, step int, logPath stri
 	}
 	defer f.Close()
 
-	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
 	br := bufio.NewReader(f)
+
+	// if not following return the Content-Length and just do io.Copy
+	if !follow {
+		fi, err := f.Stat()
+		if err != nil {
+			return err
+		}
+		w.Header().Set("Content-Length", strconv.FormatInt(fi.Size(), 10))
+
+		_, err = io.Copy(w, br)
+		return err
+	}
 
 	var flusher http.Flusher
 	if fl, ok := w.(http.Flusher); ok {
@@ -184,7 +195,6 @@ func NewArchivesHandler(e *Executor) *archivesHandler {
 }
 
 func (h *archivesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-
 	q := r.URL.Query()
 
 	taskID := q.Get("taskid")
@@ -215,7 +225,7 @@ func (h *archivesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *archivesHandler) readArchive(taskID string, step int, w io.Writer) error {
+func (h *archivesHandler) readArchive(taskID string, step int, w http.ResponseWriter) error {
 	archivePath := h.e.archivePath(taskID, step)
 
 	f, err := os.Open(archivePath)
@@ -223,6 +233,12 @@ func (h *archivesHandler) readArchive(taskID string, step int, w io.Writer) erro
 		return err
 	}
 	defer f.Close()
+	fi, err := f.Stat()
+	if err != nil {
+		return err
+	}
+
+	w.Header().Set("Content-Length", strconv.FormatInt(fi.Size(), 10))
 
 	br := bufio.NewReader(f)
 

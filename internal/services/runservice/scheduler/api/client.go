@@ -51,7 +51,7 @@ func (c *Client) SetHTTPClient(client *http.Client) {
 	c.client = client
 }
 
-func (c *Client) doRequest(ctx context.Context, method, path string, query url.Values, header http.Header, ibody io.Reader) (*http.Response, error) {
+func (c *Client) doRequest(ctx context.Context, method, path string, query url.Values, contentLength int64, header http.Header, ibody io.Reader) (*http.Response, error) {
 	u, err := url.Parse(c.url + "/api/v1alpha" + path)
 	if err != nil {
 		return nil, err
@@ -67,11 +67,15 @@ func (c *Client) doRequest(ctx context.Context, method, path string, query url.V
 		req.Header[k] = v
 	}
 
+	if contentLength >= 0 {
+		req.ContentLength = contentLength
+	}
+
 	return c.client.Do(req)
 }
 
-func (c *Client) getResponse(ctx context.Context, method, path string, query url.Values, header http.Header, ibody io.Reader) (*http.Response, error) {
-	resp, err := c.doRequest(ctx, method, path, query, header, ibody)
+func (c *Client) getResponse(ctx context.Context, method, path string, query url.Values, contentLength int64, header http.Header, ibody io.Reader) (*http.Response, error) {
+	resp, err := c.doRequest(ctx, method, path, query, contentLength, header, ibody)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +98,7 @@ func (c *Client) getResponse(ctx context.Context, method, path string, query url
 }
 
 func (c *Client) getParsedResponse(ctx context.Context, method, path string, query url.Values, header http.Header, ibody io.Reader, obj interface{}) (*http.Response, error) {
-	resp, err := c.getResponse(ctx, method, path, query, header, ibody)
+	resp, err := c.getResponse(ctx, method, path, query, -1, header, ibody)
 	if err != nil {
 		return resp, err
 	}
@@ -110,7 +114,7 @@ func (c *Client) SendExecutorStatus(ctx context.Context, executor *rstypes.Execu
 	if err != nil {
 		return nil, err
 	}
-	return c.getResponse(ctx, "POST", fmt.Sprintf("/executor/%s", executor.ID), nil, jsonContent, bytes.NewReader(executorj))
+	return c.getResponse(ctx, "POST", fmt.Sprintf("/executor/%s", executor.ID), nil, -1, jsonContent, bytes.NewReader(executorj))
 }
 
 func (c *Client) SendExecutorTaskStatus(ctx context.Context, executorID string, et *rstypes.ExecutorTask) (*http.Response, error) {
@@ -118,7 +122,7 @@ func (c *Client) SendExecutorTaskStatus(ctx context.Context, executorID string, 
 	if err != nil {
 		return nil, err
 	}
-	return c.getResponse(ctx, "POST", fmt.Sprintf("/executor/%s/tasks/%s", executorID, et.ID), nil, jsonContent, bytes.NewReader(etj))
+	return c.getResponse(ctx, "POST", fmt.Sprintf("/executor/%s/tasks/%s", executorID, et.ID), nil, -1, jsonContent, bytes.NewReader(etj))
 }
 
 func (c *Client) GetExecutorTask(ctx context.Context, executorID, etID string) (*rstypes.ExecutorTask, *http.Response, error) {
@@ -138,7 +142,7 @@ func (c *Client) GetArchive(ctx context.Context, taskID string, step int) (*http
 	q.Add("taskid", taskID)
 	q.Add("step", strconv.Itoa(step))
 
-	return c.getResponse(ctx, "GET", "/executor/archives", q, nil, nil)
+	return c.getResponse(ctx, "GET", "/executor/archives", q, -1, nil, nil)
 }
 
 func (c *Client) CheckCache(ctx context.Context, key string, prefix bool) (*http.Response, error) {
@@ -146,7 +150,7 @@ func (c *Client) CheckCache(ctx context.Context, key string, prefix bool) (*http
 	if prefix {
 		q.Add("prefix", "")
 	}
-	return c.getResponse(ctx, "HEAD", fmt.Sprintf("/executor/caches/%s", url.PathEscape(key)), q, nil, nil)
+	return c.getResponse(ctx, "HEAD", fmt.Sprintf("/executor/caches/%s", url.PathEscape(key)), q, -1, nil, nil)
 }
 
 func (c *Client) GetCache(ctx context.Context, key string, prefix bool) (*http.Response, error) {
@@ -154,11 +158,11 @@ func (c *Client) GetCache(ctx context.Context, key string, prefix bool) (*http.R
 	if prefix {
 		q.Add("prefix", "")
 	}
-	return c.getResponse(ctx, "GET", fmt.Sprintf("/executor/caches/%s", url.PathEscape(key)), q, nil, nil)
+	return c.getResponse(ctx, "GET", fmt.Sprintf("/executor/caches/%s", url.PathEscape(key)), q, -1, nil, nil)
 }
 
-func (c *Client) PutCache(ctx context.Context, key string, r io.Reader) (*http.Response, error) {
-	return c.getResponse(ctx, "POST", fmt.Sprintf("/executor/caches/%s", url.PathEscape(key)), nil, nil, r)
+func (c *Client) PutCache(ctx context.Context, key string, size int64, r io.Reader) (*http.Response, error) {
+	return c.getResponse(ctx, "POST", fmt.Sprintf("/executor/caches/%s", url.PathEscape(key)), nil, size, nil, r)
 }
 
 func (c *Client) GetRuns(ctx context.Context, phaseFilter, groups []string, lastRun bool, changeGroups []string, start string, limit int, asc bool) (*GetRunsResponse, *http.Response, error) {
@@ -212,7 +216,7 @@ func (c *Client) CreateRun(ctx context.Context, req *RunCreateRequest) (*http.Re
 		return nil, err
 	}
 
-	return c.getResponse(ctx, "POST", "/runs", nil, jsonContent, bytes.NewReader(reqj))
+	return c.getResponse(ctx, "POST", "/runs", nil, -1, jsonContent, bytes.NewReader(reqj))
 }
 
 func (c *Client) RunActions(ctx context.Context, runID string, req *RunActionsRequest) (*http.Response, error) {
@@ -220,7 +224,7 @@ func (c *Client) RunActions(ctx context.Context, runID string, req *RunActionsRe
 	if err != nil {
 		return nil, err
 	}
-	return c.getResponse(ctx, "PUT", fmt.Sprintf("/runs/%s/actions", runID), nil, jsonContent, bytes.NewReader(reqj))
+	return c.getResponse(ctx, "PUT", fmt.Sprintf("/runs/%s/actions", runID), nil, -1, jsonContent, bytes.NewReader(reqj))
 }
 
 func (c *Client) StartRun(ctx context.Context, runID string, changeGroupsUpdateToken string) (*http.Response, error) {
@@ -238,7 +242,7 @@ func (c *Client) RunTaskActions(ctx context.Context, runID, taskID string, req *
 	if err != nil {
 		return nil, err
 	}
-	return c.getResponse(ctx, "PUT", fmt.Sprintf("/runs/%s/tasks/%s/actions", runID, taskID), nil, jsonContent, bytes.NewReader(reqj))
+	return c.getResponse(ctx, "PUT", fmt.Sprintf("/runs/%s/tasks/%s/actions", runID, taskID), nil, -1, jsonContent, bytes.NewReader(reqj))
 }
 
 func (c *Client) ApproveRunTask(ctx context.Context, runID, taskID string, approvalAnnotations map[string]string, changeGroupsUpdateToken string) (*http.Response, error) {
@@ -273,5 +277,5 @@ func (c *Client) GetLogs(ctx context.Context, runID, taskID string, setup bool, 
 		q.Add("stream", "")
 	}
 
-	return c.getResponse(ctx, "GET", "/logs", q, nil, nil)
+	return c.getResponse(ctx, "GET", "/logs", q, -1, nil, nil)
 }

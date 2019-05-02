@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"time"
 
 	scommon "github.com/sorintlab/agola/internal/common"
@@ -931,7 +932,16 @@ func (s *Scheduler) fetchLog(ctx context.Context, rt *types.RunTask, setup bool,
 		return errors.Errorf("received http status: %d", r.StatusCode)
 	}
 
-	return s.ost.WriteObject(logPath, r.Body, -1, false)
+	size := int64(-1)
+	sizeStr := r.Header.Get("Content-Length")
+	if sizeStr != "" {
+		size, err = strconv.ParseInt(sizeStr, 10, 64)
+		if err != nil {
+			return errors.Errorf("failed to parse content length %q", sizeStr)
+		}
+	}
+
+	return s.ost.WriteObject(logPath, r.Body, size, false)
 }
 
 func (s *Scheduler) finishSetupLogPhase(ctx context.Context, runID, runTaskID string) error {
@@ -1073,7 +1083,16 @@ func (s *Scheduler) fetchArchive(ctx context.Context, rt *types.RunTask, stepnum
 		return errors.Errorf("received http status: %d", r.StatusCode)
 	}
 
-	return s.ost.WriteObject(path, r.Body, -1, false)
+	size := int64(-1)
+	sizeStr := r.Header.Get("Content-Length")
+	if sizeStr != "" {
+		size, err = strconv.ParseInt(sizeStr, 10, 64)
+		if err != nil {
+			return errors.Errorf("failed to parse content length %q", sizeStr)
+		}
+	}
+
+	return s.ost.WriteObject(path, r.Body, size, false)
 }
 
 func (s *Scheduler) fetchTaskArchives(ctx context.Context, runID string, rt *types.RunTask) {
