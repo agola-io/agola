@@ -934,7 +934,7 @@ func (s *Scheduler) fetchLog(ctx context.Context, rt *types.RunTask, setup bool,
 		return errors.Errorf("received http status: %d", r.StatusCode)
 	}
 
-	return s.ost.WriteObject(logPath, r.Body, false)
+	return s.ost.WriteObject(logPath, r.Body, -1, false)
 }
 
 func (s *Scheduler) finishSetupLogPhase(ctx context.Context, runID, runTaskID string) error {
@@ -1076,7 +1076,7 @@ func (s *Scheduler) fetchArchive(ctx context.Context, rt *types.RunTask, stepnum
 		return errors.Errorf("received http status: %d", r.StatusCode)
 	}
 
-	return s.ost.WriteObject(path, r.Body, false)
+	return s.ost.WriteObject(path, r.Body, -1, false)
 }
 
 func (s *Scheduler) fetchTaskArchives(ctx context.Context, runID string, rt *types.RunTask) {
