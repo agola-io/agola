@@ -264,7 +264,7 @@ func (s *PosixStorage) ReadObject(p string) (ReadSeekCloser, error) {
 	return f, err
 }
 
-func (s *PosixStorage) WriteObject(p string, data io.Reader, persist bool) error {
+func (s *PosixStorage) WriteObject(p string, data io.Reader, size int64, persist bool) error {
 	fspath, err := s.fsPath(p)
 	if err != nil {
 		return err

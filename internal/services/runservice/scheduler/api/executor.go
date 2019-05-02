@@ -411,7 +411,7 @@ func (h *CacheCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cachePath := store.OSTCachePath(key)
-	if err := h.ost.WriteObject(cachePath, r.Body, false); err != nil {
+	if err := h.ost.WriteObject(cachePath, r.Body, -1, false); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

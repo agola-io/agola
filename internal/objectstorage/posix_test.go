@@ -92,7 +92,7 @@ func TestDeleteObject(t *testing.T) {
 	}
 
 	for _, obj := range objects {
-		if err := ls.WriteObject(obj, bytes.NewReader([]byte{}), true); err != nil {
+		if err := ls.WriteObject(obj, bytes.NewReader([]byte{}), 0, true); err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
 		if err := ls.DeleteObject(obj); err != nil {

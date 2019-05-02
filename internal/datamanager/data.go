@@ -89,7 +89,7 @@ func (d *DataManager) writeData(ctx context.Context, wals []*WalData) error {
 	if err != nil {
 		return err
 	}
-	if err := d.ost.WriteObject(dataStatusPath(dataSequence.String()), bytes.NewReader(dataStatusj), true); err != nil {
+	if err := d.ost.WriteObject(dataStatusPath(dataSequence.String()), bytes.NewReader(dataStatusj), -1, true); err != nil {
 		return err
 	}
 
@@ -203,7 +203,7 @@ func (d *DataManager) writeDataType(ctx context.Context, wals []*WalData, dataty
 
 		pos += len(dataEntryj)
 	}
-	if err := d.ost.WriteObject(dataFilePath(datatype, dataSequence), &buf, true); err != nil {
+	if err := d.ost.WriteObject(dataFilePath(datatype, dataSequence), &buf, -1, true); err != nil {
 		return err
 	}
 
@@ -211,7 +211,7 @@ func (d *DataManager) writeDataType(ctx context.Context, wals []*WalData, dataty
 	if err != nil {
 		return err
 	}
-	if err := d.ost.WriteObject(dataFileIndexPath(datatype, dataSequence), bytes.NewReader(dataFileIndexj), true); err != nil {
+	if err := d.ost.WriteObject(dataFileIndexPath(datatype, dataSequence), bytes.NewReader(dataFileIndexj), -1, true); err != nil {
 		return err
 	}
 

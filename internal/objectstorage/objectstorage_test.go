@@ -260,7 +260,7 @@ func TestList(t *testing.T) {
 				os := NewObjStorage(s, "/")
 				// populate
 				for _, p := range tt.objects {
-					if err := os.WriteObject(p, strings.NewReader(""), true); err != nil {
+					if err := os.WriteObject(p, strings.NewReader(""), 0, true); err != nil {
 						t.Fatalf("%s %d err: %v", sname, i, err)
 					}
 				}
