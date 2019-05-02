@@ -197,6 +197,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	logsHandler := api.NewLogsHandler(logger, g.runserviceClient)
 
 	reposHandler := api.NewReposHandler(logger, g.c.GitServerURL)
+	userRemoteReposHandler := api.NewUserRemoteReposHandler(logger, g.ch, g.configstoreClient)
 
 	loginUserHandler := api.NewLoginUserHandler(logger, g.ch)
 	authorizeHandler := api.NewAuthorizeHandler(logger, g.ch)
@@ -268,12 +269,14 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/runs/{runid}/tasks/{taskid}/actions", runTaskActionsHandler).Methods("PUT")
 	apirouter.Handle("/runs", authForcedHandler(runsHandler)).Methods("GET")
 
+	router.Handle("/repos/{rest:.*}", reposHandler).Methods("GET", "POST")
+
+	apirouter.Handle("/user/remoterepos/{remotesourceid}", authForcedHandler(userRemoteReposHandler)).Methods("GET")
+
 	router.Handle("/login", loginUserHandler).Methods("POST")
 	router.Handle("/authorize", authorizeHandler).Methods("POST")
 	router.Handle("/register", registerHandler).Methods("POST")
 	router.Handle("/oauth2/callback", oauth2callbackHandler).Methods("GET")
-
-	router.Handle("/repos/{rest:.*}", reposHandler).Methods("GET", "POST")
 
 	router.Handle("/webhooks", webhooksHandler).Methods("POST")
 	router.PathPrefix("/").HandlerFunc(handlers.NewWebBundleHandlerFunc(g.c.APIExposedURL))
