@@ -160,8 +160,12 @@ func (c *Client) GetCache(ctx context.Context, key string, prefix bool) (*http.R
 	return c.getResponse(ctx, "GET", fmt.Sprintf("/executor/caches/%s", url.PathEscape(key)), q, nil, nil)
 }
 
-func (c *Client) PutCache(ctx context.Context, key string, r io.Reader) (*http.Response, error) {
-	return c.getResponse(ctx, "POST", fmt.Sprintf("/executor/caches/%s", url.PathEscape(key)), nil, nil, r)
+func (c *Client) PutCache(ctx context.Context, key string, size int64, r io.Reader) (*http.Response, error) {
+	header := http.Header{}
+	if size >= 0 {
+		header.Set("Content-Length", strconv.FormatInt(size, 10))
+	}
+	return c.getResponse(ctx, "POST", fmt.Sprintf("/executor/caches/%s", url.PathEscape(key)), nil, header, r)
 }
 
 func (c *Client) GetRuns(ctx context.Context, phaseFilter, groups []string, lastRun bool, changeGroups []string, start string, limit int, asc bool) (*GetRunsResponse, *http.Response, error) {
