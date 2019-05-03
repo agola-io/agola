@@ -28,6 +28,8 @@ import (
 
 type CreateOrgRequest struct {
 	Name string
+
+	CreatorUserID string
 }
 
 func (c *CommandHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*types.Organization, error) {
@@ -40,6 +42,9 @@ func (c *CommandHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (
 
 	org := &types.Organization{
 		Name: req.Name,
+	}
+	if req.CreatorUserID != "" {
+		org.CreatorUserID = req.CreatorUserID
 	}
 
 	c.log.Infof("creating organization")
