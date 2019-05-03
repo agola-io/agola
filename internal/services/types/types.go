@@ -30,6 +30,7 @@ type ConfigType string
 const (
 	ConfigTypeUser         ConfigType = "user"
 	ConfigTypeOrg          ConfigType = "org"
+	ConfigTypeOrgMember    ConfigType = "orgmember"
 	ConfigTypeProjectGroup ConfigType = "projectgroup"
 	ConfigTypeProject      ConfigType = "project"
 	ConfigTypeRemoteSource ConfigType = "remotesource"
@@ -53,6 +54,13 @@ func IsValidVisibility(v Visibility) bool {
 	}
 	return true
 }
+
+type MemberRole string
+
+const (
+	MemberRoleOwner  MemberRole = "owner"
+	MemberRoleMember MemberRole = "member"
+)
 
 type Parent struct {
 	Type ConfigType `json:"type,omitempty"`
@@ -92,6 +100,17 @@ type Organization struct {
 	// if the org was created by using the admin user or the user has been removed.
 	CreatorUserID string    `json:"creator_user_id,omitempty"`
 	CreatedAt     time.Time `json:"created_at,omitempty"`
+}
+
+type OrganizationMember struct {
+	Version string `json:"version,omitempty"`
+
+	ID string `json:"id,omitempty"`
+
+	OrganizationID string `json:"organization_id,omitempty"`
+	UserID         string `json:"user_id,omitempty"`
+
+	MemberRole MemberRole `json:"member_role,omitempty"`
 }
 
 type ProjectGroup struct {
