@@ -26,7 +26,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/sorintlab/agola/internal/etcd"
 	"github.com/sorintlab/agola/internal/objectstorage"
-	"github.com/sorintlab/agola/internal/services/runservice/scheduler/command"
+	"github.com/sorintlab/agola/internal/services/runservice/scheduler/action"
 	"github.com/sorintlab/agola/internal/services/runservice/scheduler/common"
 	"github.com/sorintlab/agola/internal/services/runservice/scheduler/store"
 	"github.com/sorintlab/agola/internal/services/runservice/types"
@@ -36,11 +36,11 @@ import (
 type ExecutorStatusHandler struct {
 	log *zap.SugaredLogger
 	e   *etcd.Store
-	ch  *command.CommandHandler
+	ah  *action.ActionHandler
 }
 
-func NewExecutorStatusHandler(logger *zap.Logger, e *etcd.Store, ch *command.CommandHandler) *ExecutorStatusHandler {
-	return &ExecutorStatusHandler{log: logger.Sugar(), e: e, ch: ch}
+func NewExecutorStatusHandler(logger *zap.Logger, e *etcd.Store, ah *action.ActionHandler) *ExecutorStatusHandler {
+	return &ExecutorStatusHandler{log: logger.Sugar(), e: e, ah: ah}
 }
 
 func (h *ExecutorStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -92,7 +92,7 @@ func (h *ExecutorStatusHandler) deleteStaleExecutors(ctx context.Context, curExe
 			}
 		}
 		if !active {
-			if err := h.ch.DeleteExecutor(ctx, executor.ID); err != nil {
+			if err := h.ah.DeleteExecutor(ctx, executor.ID); err != nil {
 				h.log.Errorf("failed to delete executor %q: %v", executor.ID, err)
 			}
 		}
@@ -429,13 +429,13 @@ func (h *CacheCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 type ExecutorDeleteHandler struct {
 	log *zap.SugaredLogger
-	ch  *command.CommandHandler
+	ah  *action.ActionHandler
 }
 
-func NewExecutorDeleteHandler(logger *zap.Logger, ch *command.CommandHandler) *ExecutorDeleteHandler {
+func NewExecutorDeleteHandler(logger *zap.Logger, ah *action.ActionHandler) *ExecutorDeleteHandler {
 	return &ExecutorDeleteHandler{
 		log: logger.Sugar(),
-		ch:  ch,
+		ah:  ah,
 	}
 }
 
@@ -450,7 +450,7 @@ func (h *ExecutorDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := h.ch.DeleteExecutor(ctx, executorID); err != nil {
+	if err := h.ah.DeleteExecutor(ctx, executorID); err != nil {
 		http.Error(w, "", http.StatusInternalServerError)
 		return
 	}

@@ -34,8 +34,8 @@ import (
 	"github.com/sorintlab/agola/internal/objectstorage"
 	"github.com/sorintlab/agola/internal/runconfig"
 	"github.com/sorintlab/agola/internal/services/config"
+	"github.com/sorintlab/agola/internal/services/runservice/scheduler/action"
 	"github.com/sorintlab/agola/internal/services/runservice/scheduler/api"
-	"github.com/sorintlab/agola/internal/services/runservice/scheduler/command"
 	"github.com/sorintlab/agola/internal/services/runservice/scheduler/common"
 	"github.com/sorintlab/agola/internal/services/runservice/scheduler/readdb"
 	"github.com/sorintlab/agola/internal/services/runservice/scheduler/store"
@@ -1399,7 +1399,7 @@ type Scheduler struct {
 	ost    *objectstorage.ObjStorage
 	dm     *datamanager.DataManager
 	readDB *readdb.ReadDB
-	ch     *command.CommandHandler
+	ah     *action.ActionHandler
 }
 
 func NewScheduler(ctx context.Context, c *config.RunServiceScheduler) (*Scheduler, error) {
@@ -1443,8 +1443,8 @@ func NewScheduler(ctx context.Context, c *config.RunServiceScheduler) (*Schedule
 	}
 	s.readDB = readDB
 
-	ch := command.NewCommandHandler(logger, e, readDB, ost, dm)
-	s.ch = ch
+	ah := action.NewActionHandler(logger, e, readDB, ost, dm)
+	s.ah = ah
 
 	return s, nil
 }
@@ -1497,7 +1497,7 @@ func (s *Scheduler) Run(ctx context.Context) error {
 	corsHandler = ghandlers.CORS(corsAllowedMethodsOptions, corsAllowedHeadersOptions, corsAllowedOriginsOptions)
 
 	// executor dedicated api, only calls from executor should happen on these handlers
-	executorStatusHandler := api.NewExecutorStatusHandler(logger, s.e, s.ch)
+	executorStatusHandler := api.NewExecutorStatusHandler(logger, s.e, s.ah)
 	executorTaskStatusHandler := api.NewExecutorTaskStatusHandler(s.e, ch)
 	executorTaskHandler := api.NewExecutorTaskHandler(s.e)
 	executorTasksHandler := api.NewExecutorTasksHandler(s.e)
@@ -1506,15 +1506,15 @@ func (s *Scheduler) Run(ctx context.Context) error {
 	cacheCreateHandler := api.NewCacheCreateHandler(logger, s.ost)
 
 	// api from clients
-	executorDeleteHandler := api.NewExecutorDeleteHandler(logger, s.ch)
+	executorDeleteHandler := api.NewExecutorDeleteHandler(logger, s.ah)
 
 	logsHandler := api.NewLogsHandler(logger, s.e, s.ost, s.dm)
 
 	runHandler := api.NewRunHandler(logger, s.e, s.dm, s.readDB)
-	runTaskActionsHandler := api.NewRunTaskActionsHandler(logger, s.ch)
+	runTaskActionsHandler := api.NewRunTaskActionsHandler(logger, s.ah)
 	runsHandler := api.NewRunsHandler(logger, s.readDB)
-	runActionsHandler := api.NewRunActionsHandler(logger, s.ch)
-	runCreateHandler := api.NewRunCreateHandler(logger, s.ch)
+	runActionsHandler := api.NewRunActionsHandler(logger, s.ah)
+	runCreateHandler := api.NewRunCreateHandler(logger, s.ah)
 	changeGroupsUpdateTokensHandler := api.NewChangeGroupsUpdateTokensHandler(logger, s.readDB)
 
 	router := mux.NewRouter()

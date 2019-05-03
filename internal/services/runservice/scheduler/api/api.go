@@ -27,7 +27,7 @@ import (
 	"github.com/sorintlab/agola/internal/db"
 	"github.com/sorintlab/agola/internal/etcd"
 	"github.com/sorintlab/agola/internal/objectstorage"
-	"github.com/sorintlab/agola/internal/services/runservice/scheduler/command"
+	"github.com/sorintlab/agola/internal/services/runservice/scheduler/action"
 	"github.com/sorintlab/agola/internal/services/runservice/scheduler/common"
 	"github.com/sorintlab/agola/internal/services/runservice/scheduler/readdb"
 	"github.com/sorintlab/agola/internal/services/runservice/scheduler/store"
@@ -501,13 +501,13 @@ type RunCreateRequest struct {
 
 type RunCreateHandler struct {
 	log *zap.SugaredLogger
-	ch  *command.CommandHandler
+	ah  *action.ActionHandler
 }
 
-func NewRunCreateHandler(logger *zap.Logger, ch *command.CommandHandler) *RunCreateHandler {
+func NewRunCreateHandler(logger *zap.Logger, ah *action.ActionHandler) *RunCreateHandler {
 	return &RunCreateHandler{
 		log: logger.Sugar(),
-		ch:  ch,
+		ah:  ah,
 	}
 }
 
@@ -521,7 +521,7 @@ func (h *RunCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	creq := &command.RunCreateRequest{
+	creq := &action.RunCreateRequest{
 		RunConfigTasks:    req.RunConfigTasks,
 		Name:              req.Name,
 		Group:             req.Group,
@@ -536,7 +536,7 @@ func (h *RunCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Annotations:             req.Annotations,
 		ChangeGroupsUpdateToken: req.ChangeGroupsUpdateToken,
 	}
-	rb, err := h.ch.CreateRun(ctx, creq)
+	rb, err := h.ah.CreateRun(ctx, creq)
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
 		httpError(w, err)
@@ -569,14 +569,14 @@ type RunActionsRequest struct {
 
 type RunActionsHandler struct {
 	log    *zap.SugaredLogger
-	ch     *command.CommandHandler
+	ah     *action.ActionHandler
 	readDB *readdb.ReadDB
 }
 
-func NewRunActionsHandler(logger *zap.Logger, ch *command.CommandHandler) *RunActionsHandler {
+func NewRunActionsHandler(logger *zap.Logger, ah *action.ActionHandler) *RunActionsHandler {
 	return &RunActionsHandler{
 		log: logger.Sugar(),
-		ch:  ch,
+		ah:  ah,
 	}
 }
 
@@ -594,22 +594,22 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	switch req.ActionType {
 	case RunActionTypeChangePhase:
-		creq := &command.RunChangePhaseRequest{
+		creq := &action.RunChangePhaseRequest{
 			RunID:                   runID,
 			Phase:                   req.Phase,
 			ChangeGroupsUpdateToken: req.ChangeGroupsUpdateToken,
 		}
-		if err := h.ch.ChangeRunPhase(ctx, creq); err != nil {
+		if err := h.ah.ChangeRunPhase(ctx, creq); err != nil {
 			h.log.Errorf("err: %+v", err)
 			httpError(w, err)
 			return
 		}
 	case RunActionTypeStop:
-		creq := &command.RunStopRequest{
+		creq := &action.RunStopRequest{
 			RunID:                   runID,
 			ChangeGroupsUpdateToken: req.ChangeGroupsUpdateToken,
 		}
-		if err := h.ch.StopRun(ctx, creq); err != nil {
+		if err := h.ah.StopRun(ctx, creq); err != nil {
 			h.log.Errorf("err: %+v", err)
 			httpError(w, err)
 			return
@@ -634,14 +634,14 @@ type RunTaskActionsRequest struct {
 
 type RunTaskActionsHandler struct {
 	log    *zap.SugaredLogger
-	ch     *command.CommandHandler
+	ah     *action.ActionHandler
 	readDB *readdb.ReadDB
 }
 
-func NewRunTaskActionsHandler(logger *zap.Logger, ch *command.CommandHandler) *RunTaskActionsHandler {
+func NewRunTaskActionsHandler(logger *zap.Logger, ah *action.ActionHandler) *RunTaskActionsHandler {
 	return &RunTaskActionsHandler{
 		log: logger.Sugar(),
-		ch:  ch,
+		ah:  ah,
 	}
 }
 
@@ -660,12 +660,12 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 	switch req.ActionType {
 	case RunTaskActionTypeApprove:
-		creq := &command.RunTaskApproveRequest{
+		creq := &action.RunTaskApproveRequest{
 			RunID:                   runID,
 			TaskID:                  taskID,
 			ChangeGroupsUpdateToken: req.ChangeGroupsUpdateToken,
 		}
-		if err := h.ch.ApproveRunTask(ctx, creq); err != nil {
+		if err := h.ah.ApproveRunTask(ctx, creq); err != nil {
 			h.log.Errorf("err: %+v", err)
 			httpError(w, err)
 			return

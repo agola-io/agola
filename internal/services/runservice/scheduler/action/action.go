@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package command
+package action
 
 import (
 	"context"
@@ -36,7 +36,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type CommandHandler struct {
+type ActionHandler struct {
 	log    *zap.SugaredLogger
 	e      *etcd.Store
 	readDB *readdb.ReadDB
@@ -44,8 +44,8 @@ type CommandHandler struct {
 	dm     *datamanager.DataManager
 }
 
-func NewCommandHandler(logger *zap.Logger, e *etcd.Store, readDB *readdb.ReadDB, ost *objectstorage.ObjStorage, dm *datamanager.DataManager) *CommandHandler {
-	return &CommandHandler{
+func NewActionHandler(logger *zap.Logger, e *etcd.Store, readDB *readdb.ReadDB, ost *objectstorage.ObjStorage, dm *datamanager.DataManager) *ActionHandler {
+	return &ActionHandler{
 		log:    logger.Sugar(),
 		e:      e,
 		readDB: readDB,
@@ -60,13 +60,13 @@ type RunChangePhaseRequest struct {
 	ChangeGroupsUpdateToken string
 }
 
-func (s *CommandHandler) ChangeRunPhase(ctx context.Context, req *RunChangePhaseRequest) error {
+func (h *ActionHandler) ChangeRunPhase(ctx context.Context, req *RunChangePhaseRequest) error {
 	cgt, err := types.UnmarshalChangeGroupsUpdateToken(req.ChangeGroupsUpdateToken)
 	if err != nil {
 		return err
 	}
 
-	r, _, err := store.GetRun(ctx, s.e, req.RunID)
+	r, _, err := store.GetRun(ctx, h.e, req.RunID)
 	if err != nil {
 		return err
 	}
@@ -84,7 +84,7 @@ func (s *CommandHandler) ChangeRunPhase(ctx context.Context, req *RunChangePhase
 		r.Stop = true
 	}
 
-	_, err = store.AtomicPutRun(ctx, s.e, r, nil, cgt)
+	_, err = store.AtomicPutRun(ctx, h.e, r, nil, cgt)
 	return err
 }
 
@@ -93,13 +93,13 @@ type RunStopRequest struct {
 	ChangeGroupsUpdateToken string
 }
 
-func (s *CommandHandler) StopRun(ctx context.Context, req *RunStopRequest) error {
+func (h *ActionHandler) StopRun(ctx context.Context, req *RunStopRequest) error {
 	cgt, err := types.UnmarshalChangeGroupsUpdateToken(req.ChangeGroupsUpdateToken)
 	if err != nil {
 		return err
 	}
 
-	r, _, err := store.GetRun(ctx, s.e, req.RunID)
+	r, _, err := store.GetRun(ctx, h.e, req.RunID)
 	if err != nil {
 		return err
 	}
@@ -112,7 +112,7 @@ func (s *CommandHandler) StopRun(ctx context.Context, req *RunStopRequest) error
 		r.Stop = true
 	}
 
-	_, err = store.AtomicPutRun(ctx, s.e, r, nil, cgt)
+	_, err = store.AtomicPutRun(ctx, h.e, r, nil, cgt)
 	return err
 }
 
@@ -135,7 +135,7 @@ type RunCreateRequest struct {
 	ChangeGroupsUpdateToken string
 }
 
-func (s *CommandHandler) CreateRun(ctx context.Context, req *RunCreateRequest) (*types.RunBundle, error) {
+func (h *ActionHandler) CreateRun(ctx context.Context, req *RunCreateRequest) (*types.RunBundle, error) {
 	runcgt, err := types.UnmarshalChangeGroupsUpdateToken(req.ChangeGroupsUpdateToken)
 	if err != nil {
 		return nil, err
@@ -143,18 +143,18 @@ func (s *CommandHandler) CreateRun(ctx context.Context, req *RunCreateRequest) (
 
 	var rb *types.RunBundle
 	if req.RunID == "" {
-		rb, err = s.newRun(ctx, req)
+		rb, err = h.newRun(ctx, req)
 	} else {
-		rb, err = s.recreateRun(ctx, req)
+		rb, err = h.recreateRun(ctx, req)
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	return rb, s.saveRun(ctx, rb, runcgt)
+	return rb, h.saveRun(ctx, rb, runcgt)
 }
 
-func (s *CommandHandler) newRun(ctx context.Context, req *RunCreateRequest) (*types.RunBundle, error) {
+func (h *ActionHandler) newRun(ctx context.Context, req *RunCreateRequest) (*types.RunBundle, error) {
 	rcts := req.RunConfigTasks
 	setupErrors := req.SetupErrors
 
@@ -169,21 +169,21 @@ func (s *CommandHandler) newRun(ctx context.Context, req *RunCreateRequest) (*ty
 	}
 
 	// generate a new run sequence that will be the same for the run and runconfig
-	seq, err := sequence.IncSequence(ctx, s.e, common.EtcdRunSequenceKey)
+	seq, err := sequence.IncSequence(ctx, h.e, common.EtcdRunSequenceKey)
 	if err != nil {
 		return nil, err
 	}
 	id := seq.String()
 
 	if err := runconfig.CheckRunConfigTasks(rcts); err != nil {
-		s.log.Errorf("check run config tasks failed: %+v", err)
+		h.log.Errorf("check run config tasks failed: %+v", err)
 		setupErrors = append(setupErrors, err.Error())
 	}
 
 	// generate tasks levels
 	if len(setupErrors) == 0 {
 		if err := runconfig.GenTasksLevels(rcts); err != nil {
-			s.log.Errorf("gen tasks leveles failed: %+v", err)
+			h.log.Errorf("gen tasks leveles failed: %+v", err)
 			setupErrors = append(setupErrors, err.Error())
 		}
 	}
@@ -200,7 +200,7 @@ func (s *CommandHandler) newRun(ctx context.Context, req *RunCreateRequest) (*ty
 	}
 
 	run := genRun(rc)
-	s.log.Debugf("created run: %s", util.Dump(run))
+	h.log.Debugf("created run: %s", util.Dump(run))
 
 	return &types.RunBundle{
 		Run: run,
@@ -208,22 +208,22 @@ func (s *CommandHandler) newRun(ctx context.Context, req *RunCreateRequest) (*ty
 	}, nil
 }
 
-func (s *CommandHandler) recreateRun(ctx context.Context, req *RunCreateRequest) (*types.RunBundle, error) {
+func (h *ActionHandler) recreateRun(ctx context.Context, req *RunCreateRequest) (*types.RunBundle, error) {
 	// generate a new run sequence that will be the same for the run and runconfig
-	seq, err := sequence.IncSequence(ctx, s.e, common.EtcdRunSequenceKey)
+	seq, err := sequence.IncSequence(ctx, h.e, common.EtcdRunSequenceKey)
 	if err != nil {
 		return nil, err
 	}
 	id := seq.String()
 
 	// fetch the existing runconfig and run
-	s.log.Infof("creating run from existing run")
-	rc, err := store.OSTGetRunConfig(s.dm, req.RunID)
+	h.log.Infof("creating run from existing run")
+	rc, err := store.OSTGetRunConfig(h.dm, req.RunID)
 	if err != nil {
 		return nil, util.NewErrBadRequest(errors.Wrapf(err, "runconfig %q doens't exist", req.RunID))
 	}
 
-	run, err := store.GetRunEtcdOrOST(ctx, s.e, s.dm, req.RunID)
+	run, err := store.GetRunEtcdOrOST(ctx, h.e, h.dm, req.RunID)
 	if err != nil {
 		return nil, err
 	}
@@ -231,8 +231,8 @@ func (s *CommandHandler) recreateRun(ctx context.Context, req *RunCreateRequest)
 		return nil, util.NewErrBadRequest(errors.Wrapf(err, "run %q doens't exist", req.RunID))
 	}
 
-	s.log.Infof("rc: %s", util.Dump(rc))
-	s.log.Infof("run: %s", util.Dump(run))
+	h.log.Infof("rc: %s", util.Dump(rc))
+	h.log.Infof("run: %s", util.Dump(run))
 
 	if req.FromStart {
 		if canRestart, reason := run.CanRestartFromScratch(); !canRestart {
@@ -246,8 +246,8 @@ func (s *CommandHandler) recreateRun(ctx context.Context, req *RunCreateRequest)
 
 	rb := recreateRun(util.DefaultUUIDGenerator{}, run, rc, id, req)
 
-	s.log.Infof("created rc from existing rc: %s", util.Dump(rb.Rc))
-	s.log.Infof("created run from existing run: %s", util.Dump(rb.Run))
+	h.log.Infof("created rc from existing rc: %s", util.Dump(rb.Rc))
+	h.log.Infof("created run from existing run: %s", util.Dump(rb.Run))
 
 	return rb, nil
 }
@@ -365,12 +365,12 @@ func recreateRun(uuid util.UUIDGenerator, run *types.Run, rc *types.RunConfig, n
 	}
 }
 
-func (s *CommandHandler) saveRun(ctx context.Context, rb *types.RunBundle, runcgt *types.ChangeGroupsUpdateToken) error {
+func (h *ActionHandler) saveRun(ctx context.Context, rb *types.RunBundle, runcgt *types.ChangeGroupsUpdateToken) error {
 	run := rb.Run
 	rc := rb.Rc
 
-	c, cgt, err := s.getRunCounter(run.Group)
-	s.log.Infof("c: %d, cgt: %s", c, util.Dump(cgt))
+	c, cgt, err := h.getRunCounter(run.Group)
+	h.log.Infof("c: %d, cgt: %s", c, util.Dump(cgt))
 	if err != nil {
 		return err
 	}
@@ -395,15 +395,15 @@ func (s *CommandHandler) saveRun(ctx context.Context, rb *types.RunBundle, runcg
 	}
 	actions = append(actions, rca)
 
-	if _, err = s.dm.WriteWal(ctx, actions, cgt); err != nil {
+	if _, err = h.dm.WriteWal(ctx, actions, cgt); err != nil {
 		return err
 	}
 
-	runEvent, err := common.NewRunEvent(ctx, s.e, run.ID, run.Phase, run.Result)
+	runEvent, err := common.NewRunEvent(ctx, h.e, run.ID, run.Phase, run.Result)
 	if err != nil {
 		return err
 	}
-	if _, err := store.AtomicPutRun(ctx, s.e, run, runEvent, runcgt); err != nil {
+	if _, err := store.AtomicPutRun(ctx, h.e, run, runEvent, runcgt); err != nil {
 		return err
 	}
 	return nil
@@ -476,13 +476,13 @@ type RunTaskApproveRequest struct {
 	ChangeGroupsUpdateToken string
 }
 
-func (s *CommandHandler) ApproveRunTask(ctx context.Context, req *RunTaskApproveRequest) error {
+func (h *ActionHandler) ApproveRunTask(ctx context.Context, req *RunTaskApproveRequest) error {
 	cgt, err := types.UnmarshalChangeGroupsUpdateToken(req.ChangeGroupsUpdateToken)
 	if err != nil {
 		return err
 	}
 
-	r, _, err := store.GetRun(ctx, s.e, req.RunID)
+	r, _, err := store.GetRun(ctx, h.e, req.RunID)
 	if err != nil {
 		return err
 	}
@@ -504,13 +504,13 @@ func (s *CommandHandler) ApproveRunTask(ctx context.Context, req *RunTaskApprove
 	task.Approved = true
 	task.ApprovalAnnotations = req.ApprovalAnnotations
 
-	_, err = store.AtomicPutRun(ctx, s.e, r, nil, cgt)
+	_, err = store.AtomicPutRun(ctx, h.e, r, nil, cgt)
 	return err
 }
 
-func (s *CommandHandler) DeleteExecutor(ctx context.Context, executorID string) error {
+func (h *ActionHandler) DeleteExecutor(ctx context.Context, executorID string) error {
 	// mark all executor tasks as failed
-	ets, err := store.GetExecutorTasks(ctx, s.e, executorID)
+	ets, err := store.GetExecutorTasks(ctx, h.e, executorID)
 	if err != nil {
 		return err
 	}
@@ -518,20 +518,20 @@ func (s *CommandHandler) DeleteExecutor(ctx context.Context, executorID string) 
 	for _, et := range ets {
 		et.Status.Phase = types.ExecutorTaskPhaseFailed
 		et.FailError = "executor deleted"
-		if _, err := store.AtomicPutExecutorTask(ctx, s.e, et); err != nil {
+		if _, err := store.AtomicPutExecutorTask(ctx, h.e, et); err != nil {
 			return err
 		}
 	}
 
 	// delete the executor
-	if err := store.DeleteExecutor(ctx, s.e, executorID); err != nil {
+	if err := store.DeleteExecutor(ctx, h.e, executorID); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (s *CommandHandler) getRunCounter(group string) (uint64, *datamanager.ChangeGroupsUpdateToken, error) {
+func (h *ActionHandler) getRunCounter(group string) (uint64, *datamanager.ChangeGroupsUpdateToken, error) {
 	// use the first group dir after the root
 	pl := util.PathList(group)
 	if len(pl) < 2 {
@@ -540,13 +540,13 @@ func (s *CommandHandler) getRunCounter(group string) (uint64, *datamanager.Chang
 
 	var c uint64
 	var cgt *datamanager.ChangeGroupsUpdateToken
-	err := s.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		c, err = s.readDB.GetRunCounterOST(tx, pl[1])
+		c, err = h.readDB.GetRunCounterOST(tx, pl[1])
 		if err != nil {
 			return err
 		}
-		cgt, err = s.readDB.GetChangeGroupsUpdateTokensOST(tx, []string{"counter-" + pl[1]})
+		cgt, err = h.readDB.GetChangeGroupsUpdateTokensOST(tx, []string{"counter-" + pl[1]})
 		return err
 	})
 	if err != nil {
