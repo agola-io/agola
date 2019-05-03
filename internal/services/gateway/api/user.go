@@ -180,21 +180,33 @@ func (h *UserByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type UserResponse struct {
-	ID       string   `json:"id"`
-	UserName string   `json:"username"`
-	Tokens   []string `json:"tokens"`
+	ID             string                   `json:"id,omitempty"`
+	UserName       string                   `json:"username,omitempty"`
+	Tokens         []string                 `json:"tokens,omitempty"`
+	LinkedAccounts []*LinkedAccountResponse `json:"linked_accounts,omitempty"`
+}
+
+type LinkedAccountResponse struct {
+	RemoteSourceID string `json:"remote_source_id,omitempty"`
 }
 
 func createUserResponse(u *types.User) *UserResponse {
 	user := &UserResponse{
-		ID:       u.ID,
-		UserName: u.Name,
-		Tokens:   make([]string, 0, len(u.Tokens)),
+		ID:             u.ID,
+		UserName:       u.Name,
+		Tokens:         make([]string, 0, len(u.Tokens)),
+		LinkedAccounts: make([]*LinkedAccountResponse, 0, len(u.LinkedAccounts)),
 	}
 	for tokenName := range u.Tokens {
 		user.Tokens = append(user.Tokens, tokenName)
 	}
 	sort.Sort(sort.StringSlice(user.Tokens))
+
+	for _, la := range u.LinkedAccounts {
+		user.LinkedAccounts = append(user.LinkedAccounts, &LinkedAccountResponse{
+			RemoteSourceID: la.RemoteSourceID,
+		})
+	}
 
 	return user
 }
