@@ -73,11 +73,39 @@ func (s *CommandHandler) CreateOrg(ctx context.Context, org *types.Organization)
 		return nil, err
 	}
 
+	actions := []*datamanager.Action{}
+
 	org.ID = uuid.NewV4().String()
 	org.CreatedAt = time.Now()
 	orgj, err := json.Marshal(org)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to marshal org")
+	}
+	actions = append(actions, &datamanager.Action{
+		ActionType: datamanager.ActionTypePut,
+		DataType:   string(types.ConfigTypeOrg),
+		ID:         org.ID,
+		Data:       orgj,
+	})
+
+	if org.CreatorUserID != "" {
+		// add the creator as org member with role owner
+		orgmember := &types.OrganizationMember{
+			ID:             uuid.NewV4().String(),
+			OrganizationID: org.ID,
+			UserID:         org.CreatorUserID,
+			MemberRole:     types.MemberRoleOwner,
+		}
+		orgmemberj, err := json.Marshal(orgmember)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to marshal project group")
+		}
+		actions = append(actions, &datamanager.Action{
+			ActionType: datamanager.ActionTypePut,
+			DataType:   string(types.ConfigTypeOrgMember),
+			ID:         orgmember.ID,
+			Data:       orgmemberj,
+		})
 	}
 
 	pg := &types.ProjectGroup{
@@ -91,20 +119,12 @@ func (s *CommandHandler) CreateOrg(ctx context.Context, org *types.Organization)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to marshal project group")
 	}
-	actions := []*datamanager.Action{
-		{
-			ActionType: datamanager.ActionTypePut,
-			DataType:   string(types.ConfigTypeOrg),
-			ID:         org.ID,
-			Data:       orgj,
-		},
-		{
-			ActionType: datamanager.ActionTypePut,
-			DataType:   string(types.ConfigTypeProjectGroup),
-			ID:         pg.ID,
-			Data:       pgj,
-		},
-	}
+	actions = append(actions, &datamanager.Action{
+		ActionType: datamanager.ActionTypePut,
+		DataType:   string(types.ConfigTypeProjectGroup),
+		ID:         pg.ID,
+		Data:       pgj,
+	})
 
 	_, err = s.dm.WriteWal(ctx, actions, cgt)
 	return org, err
@@ -115,7 +135,6 @@ func (s *CommandHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 	var projects []*types.Project
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
-
 	// must do all the checks in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error

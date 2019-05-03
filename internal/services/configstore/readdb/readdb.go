@@ -587,6 +587,10 @@ func (r *ReadDB) applyAction(tx *db.Tx, action *datamanager.Action) error {
 			if err := r.insertOrg(tx, action.Data); err != nil {
 				return err
 			}
+		case types.ConfigTypeOrgMember:
+			if err := r.insertOrgMember(tx, action.Data); err != nil {
+				return err
+			}
 		case types.ConfigTypeProjectGroup:
 			if err := r.insertProjectGroup(tx, action.Data); err != nil {
 				return err
@@ -619,6 +623,11 @@ func (r *ReadDB) applyAction(tx *db.Tx, action *datamanager.Action) error {
 		case types.ConfigTypeOrg:
 			r.log.Debugf("deleting org with id: %s", action.ID)
 			if err := r.deleteOrg(tx, action.ID); err != nil {
+				return err
+			}
+		case types.ConfigTypeOrgMember:
+			r.log.Debugf("deleting orgmember with id: %s", action.ID)
+			if err := r.deleteOrgMember(tx, action.ID); err != nil {
 				return err
 			}
 		case types.ConfigTypeProjectGroup:

@@ -38,6 +38,10 @@ var Stmts = []string{
 	"create table org (id uuid, name varchar, data bytea, PRIMARY KEY (id))",
 	"create index org_name on org(name)",
 
+	"create table orgmember (id uuid, orgid uuid, userid uuid, role varchar, data bytea, PRIMARY KEY (id))",
+	"create index orgmember_role on orgmember(role)",
+	"create index orgmember_orgid_userid on orgmember(orgid, userid)",
+
 	"create table remotesource (id uuid, name varchar, data bytea, PRIMARY KEY (id))",
 
 	"create table linkedaccount_user (id uuid, remotesourceid uuid, userid uuid, remoteuserid uuid, PRIMARY KEY (id), FOREIGN KEY(userid) REFERENCES user(id))",

@@ -30,6 +30,9 @@ import (
 var (
 	orgSelect = sb.Select("org.id", "org.data").From("org")
 	orgInsert = sb.Insert("org").Columns("id", "name", "data")
+
+	orgmemberSelect = sb.Select("orgmember.id", "orgmember.data").From("orgmember")
+	orgmemberInsert = sb.Insert("orgmember").Columns("id", "orgid", "userid", "role", "data")
 )
 
 func (r *ReadDB) insertOrg(tx *db.Tx, data []byte) error {
@@ -187,16 +190,189 @@ func scanOrgs(rows *sql.Rows) ([]*types.Organization, []string, error) {
 	orgs := []*types.Organization{}
 	ids := []string{}
 	for rows.Next() {
-		p, id, err := scanOrg(rows)
+		org, id, err := scanOrg(rows)
 		if err != nil {
 			rows.Close()
 			return nil, nil, err
 		}
-		orgs = append(orgs, p)
+		orgs = append(orgs, org)
 		ids = append(ids, id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, nil, err
 	}
 	return orgs, ids, nil
+}
+
+func (r *ReadDB) insertOrgMember(tx *db.Tx, data []byte) error {
+	orgmember := types.OrganizationMember{}
+	if err := json.Unmarshal(data, &orgmember); err != nil {
+		return errors.Wrap(err, "failed to unmarshal orgmember")
+	}
+	r.log.Infof("inserting orgmember: %s", util.Dump(orgmember))
+	// poor man insert or update...
+	if err := r.deleteOrgMember(tx, orgmember.ID); err != nil {
+		return err
+	}
+	q, args, err := orgmemberInsert.Values(orgmember.ID, orgmember.OrganizationID, orgmember.UserID, orgmember.MemberRole, data).ToSql()
+	if err != nil {
+		return errors.Wrap(err, "failed to build query")
+	}
+	if _, err := tx.Exec(q, args...); err != nil {
+		return errors.Wrap(err, "failed to insert orgmember")
+	}
+
+	return nil
+}
+
+func (r *ReadDB) deleteOrgMember(tx *db.Tx, orgmemberID string) error {
+	if _, err := tx.Exec("delete from orgmember where id = $1", orgmemberID); err != nil {
+		return errors.Wrap(err, "failed to delete orgmember")
+	}
+	return nil
+}
+
+func fetchOrgMembers(tx *db.Tx, q string, args ...interface{}) ([]*types.OrganizationMember, []string, error) {
+	rows, err := tx.Query(q, args...)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+	return scanOrgMembers(rows)
+}
+
+func scanOrgMember(rows *sql.Rows, additionalFields ...interface{}) (*types.OrganizationMember, string, error) {
+	var id string
+	var data []byte
+	if err := rows.Scan(&id, &data); err != nil {
+		return nil, "", errors.Wrap(err, "failed to scan rows")
+	}
+	orgmember := types.OrganizationMember{}
+	if len(data) > 0 {
+		if err := json.Unmarshal(data, &orgmember); err != nil {
+			return nil, "", errors.Wrap(err, "failed to unmarshal org")
+		}
+	}
+
+	return &orgmember, id, nil
+}
+
+func scanOrgMembers(rows *sql.Rows) ([]*types.OrganizationMember, []string, error) {
+	orgmembers := []*types.OrganizationMember{}
+	ids := []string{}
+	for rows.Next() {
+		orgmember, id, err := scanOrgMember(rows)
+		if err != nil {
+			rows.Close()
+			return nil, nil, err
+		}
+		orgmembers = append(orgmembers, orgmember)
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, err
+	}
+	return orgmembers, ids, nil
+}
+
+type OrgUser struct {
+	User *types.User
+	Role types.MemberRole
+}
+
+// TODO(sgotti) implement cursor fetching
+func (r *ReadDB) GetOrgUsers(tx *db.Tx, orgID string) ([]*OrgUser, error) {
+	s := sb.Select("orgmember.data", "user.data").From("orgmember")
+	s = s.Where(sq.Eq{"orgmember.orgid": orgID})
+	s = s.Join("user on user.id = orgmember.userid")
+	s = s.OrderBy("user.name")
+	q, args, err := s.ToSql()
+	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to build query")
+	}
+
+	rows, err := tx.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	orgusers := []*OrgUser{}
+	for rows.Next() {
+		var orgmember *types.OrganizationMember
+		var user *types.User
+		var orgmemberdata []byte
+		var userdata []byte
+		if err := rows.Scan(&orgmemberdata, &userdata); err != nil {
+			return nil, errors.Wrap(err, "failed to scan rows")
+		}
+		if err := json.Unmarshal(orgmemberdata, &orgmember); err != nil {
+			return nil, errors.Wrap(err, "failed to unmarshal orgmember")
+		}
+		if err := json.Unmarshal(userdata, &user); err != nil {
+			return nil, errors.Wrap(err, "failed to unmarshal org")
+		}
+
+		orgusers = append(orgusers, &OrgUser{
+			User: user,
+			Role: orgmember.MemberRole,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return orgusers, nil
+}
+
+type UserOrg struct {
+	Organization *types.Organization
+	Role         types.MemberRole
+}
+
+// TODO(sgotti) implement cursor fetching
+func (r *ReadDB) GetUserOrgs(tx *db.Tx, userID string) ([]*UserOrg, error) {
+	s := sb.Select("orgmember.data", "org.data").From("orgmember")
+	s = s.Where(sq.Eq{"orgmember.userid": userID})
+	s = s.Join("org on org.id = orgmember.orgid")
+	s = s.OrderBy("org.name")
+	q, args, err := s.ToSql()
+	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to build query")
+	}
+
+	rows, err := tx.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	userorgs := []*UserOrg{}
+	for rows.Next() {
+		var orgmember *types.OrganizationMember
+		var org *types.Organization
+		var orgmemberdata []byte
+		var orgdata []byte
+		if err := rows.Scan(&orgmemberdata, &orgdata); err != nil {
+			return nil, errors.Wrap(err, "failed to scan rows")
+		}
+		if err := json.Unmarshal(orgmemberdata, &orgmember); err != nil {
+			return nil, errors.Wrap(err, "failed to unmarshal orgmember")
+		}
+		if err := json.Unmarshal(orgdata, &org); err != nil {
+			return nil, errors.Wrap(err, "failed to unmarshal org")
+		}
+
+		userorgs = append(userorgs, &UserOrg{
+			Organization: org,
+			Role:         orgmember.MemberRole,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return userorgs, nil
 }

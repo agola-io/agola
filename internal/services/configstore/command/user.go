@@ -21,6 +21,7 @@ import (
 
 	"github.com/sorintlab/agola/internal/datamanager"
 	"github.com/sorintlab/agola/internal/db"
+	"github.com/sorintlab/agola/internal/services/configstore/readdb"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
@@ -623,4 +624,43 @@ func (s *CommandHandler) DeleteUserToken(ctx context.Context, userRef, tokenName
 
 	_, err = s.dm.WriteWal(ctx, actions, cgt)
 	return err
+}
+
+type UserOrgsResponse struct {
+	Organization *types.Organization
+	Role         types.MemberRole
+}
+
+func userOrgsResponse(userOrg *readdb.UserOrg) *UserOrgsResponse {
+	return &UserOrgsResponse{
+		Organization: userOrg.Organization,
+		Role:         userOrg.Role,
+	}
+}
+
+func (s *CommandHandler) GetUserOrgs(ctx context.Context, userRef string) ([]*UserOrgsResponse, error) {
+	var userOrgs []*readdb.UserOrg
+	err := s.readDB.Do(func(tx *db.Tx) error {
+		var err error
+		user, err := s.readDB.GetUser(tx, userRef)
+		if err != nil {
+			return err
+		}
+		if user == nil {
+			return util.NewErrNotFound(errors.Errorf("user %q doesn't exist", userRef))
+		}
+
+		userOrgs, err = s.readDB.GetUserOrgs(tx, user.ID)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]*UserOrgsResponse, len(userOrgs))
+	for i, userOrg := range userOrgs {
+		res[i] = userOrgsResponse(userOrg)
+	}
+
+	return res, nil
 }

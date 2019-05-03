@@ -496,8 +496,51 @@ func (h *DeleteUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	err := h.ch.DeleteUserToken(ctx, userRef, tokenName)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
+		return
 	}
 	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Errorf("err: %+v", err)
+	}
+}
+
+type UserOrgsResponse struct {
+	Organization *types.Organization
+	Role         types.MemberRole
+}
+
+func userOrgsResponse(userOrg *command.UserOrgsResponse) *UserOrgsResponse {
+	return &UserOrgsResponse{
+		Organization: userOrg.Organization,
+		Role:         userOrg.Role,
+	}
+}
+
+type UserOrgsHandler struct {
+	log *zap.SugaredLogger
+	ch  *command.CommandHandler
+}
+
+func NewUserOrgsHandler(logger *zap.Logger, ch *command.CommandHandler) *UserOrgsHandler {
+	return &UserOrgsHandler{log: logger.Sugar(), ch: ch}
+}
+
+func (h *UserOrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	userRef := vars["userref"]
+
+	userOrgs, err := h.ch.GetUserOrgs(ctx, userRef)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	res := make([]*UserOrgsResponse, len(userOrgs))
+	for i, userOrg := range userOrgs {
+		res[i] = userOrgsResponse(userOrg)
+	}
+
+	if err := httpResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }

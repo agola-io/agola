@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/sorintlab/agola/internal/db"
 	"github.com/sorintlab/agola/internal/services/config"
 	"github.com/sorintlab/agola/internal/services/configstore/command"
@@ -504,4 +505,98 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 			t.Fatalf("expected %d projects, got %d", len(prevProjects)+1, len(projects))
 		}
 	})
+}
+
+func TestOrgMembers(t *testing.T) {
+	dir, err := ioutil.TempDir("", "agola")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	ctx := context.Background()
+
+	cs, tetcd := setupConfigstore(t, ctx, dir)
+	defer shutdownEtcd(tetcd)
+
+	t.Logf("starting cs")
+	go func() {
+		if err := cs.Run(ctx); err != nil {
+			t.Fatalf("err: %v", err)
+		}
+	}()
+
+	// TODO(sgotti) change the sleep with a real check that all is ready
+	time.Sleep(2 * time.Second)
+
+	user, err := cs.ch.CreateUser(ctx, &command.CreateUserRequest{UserName: "user01"})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	org, err := cs.ch.CreateOrg(ctx, &types.Organization{Name: "org01", CreatorUserID: user.ID})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// TODO(sgotti) change the sleep with a real check that all is ready
+	time.Sleep(2 * time.Second)
+
+	t.Run("test user org creator is org member with owner role", func(t *testing.T) {
+		expectedResponse := []*command.UserOrgsResponse{
+			{
+				Organization: org,
+				Role:         types.MemberRoleOwner,
+			},
+		}
+		res, err := cs.ch.GetUserOrgs(ctx, user.ID)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if diff := cmp.Diff(res, expectedResponse); diff != "" {
+			t.Error(diff)
+		}
+	})
+
+	orgs := []*types.Organization{}
+	for i := 0; i < 10; i++ {
+		org, err := cs.ch.CreateOrg(ctx, &types.Organization{Name: fmt.Sprintf("org%d", i), CreatorUserID: user.ID})
+		if err != nil {
+			t.Fatalf("err: %v", err)
+		}
+		orgs = append(orgs, org)
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	for i := 0; i < 5; i++ {
+		if err := cs.ch.DeleteOrg(ctx, fmt.Sprintf("org%d", i)); err != nil {
+			t.Fatalf("err: %v", err)
+		}
+	}
+
+	// delete some org and check that if also orgmembers aren't yet cleaned only the existing orgs are reported
+	t.Run("test only existing orgs are reported", func(t *testing.T) {
+		expectedResponse := []*command.UserOrgsResponse{
+			{
+				Organization: org,
+				Role:         types.MemberRoleOwner,
+			},
+		}
+		for i := 5; i < 10; i++ {
+			expectedResponse = append(expectedResponse, &command.UserOrgsResponse{
+				Organization: orgs[i],
+				Role:         types.MemberRoleOwner,
+			})
+		}
+		res, err := cs.ch.GetUserOrgs(ctx, user.ID)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if diff := cmp.Diff(res, expectedResponse); diff != "" {
+			t.Error(diff)
+		}
+	})
+
+	// TODO(sgotti) change the sleep with a real check that user is in readdb
+	time.Sleep(2 * time.Second)
+
 }

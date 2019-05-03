@@ -390,6 +390,12 @@ func (c *Client) DeleteUserToken(ctx context.Context, userRef, tokenName string)
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/users/%s/tokens/%s", userRef, tokenName), nil, jsonContent, nil)
 }
 
+func (c *Client) GetUserOrgs(ctx context.Context, userRef string) ([]*UserOrgsResponse, *http.Response, error) {
+	userOrgs := []*UserOrgsResponse{}
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/users/%s/orgs", userRef), nil, jsonContent, nil, &userOrgs)
+	return userOrgs, resp, err
+}
+
 func (c *Client) GetRemoteSource(ctx context.Context, rsRef string) (*types.RemoteSource, *http.Response, error) {
 	rs := new(types.RemoteSource)
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/remotesources/%s", rsRef), nil, jsonContent, nil, rs)

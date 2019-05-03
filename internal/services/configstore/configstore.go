@@ -78,6 +78,7 @@ func NewConfigStore(ctx context.Context, c *config.ConfigStore) (*ConfigStore, e
 		DataTypes: []string{
 			string(types.ConfigTypeUser),
 			string(types.ConfigTypeOrg),
+			string(types.ConfigTypeOrgMember),
 			string(types.ConfigTypeProjectGroup),
 			string(types.ConfigTypeProject),
 			string(types.ConfigTypeRemoteSource),
@@ -154,6 +155,8 @@ func (s *ConfigStore) Run(ctx context.Context) error {
 	createUserTokenHandler := api.NewCreateUserTokenHandler(logger, s.ch)
 	deleteUserTokenHandler := api.NewDeleteUserTokenHandler(logger, s.ch)
 
+	userOrgsHandler := api.NewUserOrgsHandler(logger, s.ch)
+
 	orgHandler := api.NewOrgHandler(logger, s.readDB)
 	orgsHandler := api.NewOrgsHandler(logger, s.readDB)
 	createOrgHandler := api.NewCreateOrgHandler(logger, s.ch)
@@ -201,6 +204,8 @@ func (s *ConfigStore) Run(ctx context.Context) error {
 	apirouter.Handle("/users/{userref}/linkedaccounts/{laid}", updateUserLAHandler).Methods("PUT")
 	apirouter.Handle("/users/{userref}/tokens", createUserTokenHandler).Methods("POST")
 	apirouter.Handle("/users/{userref}/tokens/{tokenname}", deleteUserTokenHandler).Methods("DELETE")
+
+	apirouter.Handle("/users/{userref}/orgs", userOrgsHandler).Methods("GET")
 
 	apirouter.Handle("/orgs/{orgref}", orgHandler).Methods("GET")
 	apirouter.Handle("/orgs", orgsHandler).Methods("GET")
