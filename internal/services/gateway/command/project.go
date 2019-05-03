@@ -45,7 +45,7 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 		return nil, util.NewErrBadRequest(errors.Errorf("empty remote source name"))
 	}
 	if req.RepoPath == "" {
-		return nil, util.NewErrBadRequest(errors.Errorf("empty remote repo path name"))
+		return nil, util.NewErrBadRequest(errors.Errorf("empty remote repo path"))
 	}
 
 	user, resp, err := c.configstoreClient.GetUser(ctx, req.CurrentUserID)

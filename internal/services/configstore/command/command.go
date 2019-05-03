@@ -49,6 +49,9 @@ func (s *CommandHandler) CreateProjectGroup(ctx context.Context, projectGroup *t
 	if projectGroup.Name == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("project group name required"))
 	}
+	if !util.ValidateName(projectGroup.Name) {
+		return nil, util.NewErrBadRequest(errors.Errorf("invalid project group name %q", projectGroup.Name))
+	}
 	if projectGroup.Parent.ID == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("project group parent id required"))
 	}
@@ -58,7 +61,7 @@ func (s *CommandHandler) CreateProjectGroup(ctx context.Context, projectGroup *t
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
-	// must do all the check in a single transaction to avoid concurrent changes
+	// must do all the checks in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		parentProjectGroup, err := s.readDB.GetProjectGroup(tx, projectGroup.Parent.ID)
 		if err != nil {
@@ -129,8 +132,14 @@ func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Proje
 	if project.Name == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("project name required"))
 	}
+	if !util.ValidateName(project.Name) {
+		return nil, util.NewErrBadRequest(errors.Errorf("invalid project name %q", project.Name))
+	}
 	if project.Parent.ID == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("project parent id required"))
+	}
+	if project.Parent.Type != types.ConfigTypeProjectGroup {
+		return nil, util.NewErrBadRequest(errors.Errorf("invalid project parent type %q", project.Parent.Type))
 	}
 	if !types.IsValidVisibility(project.Visibility) {
 		return nil, util.NewErrBadRequest(errors.Errorf("invalid project visibility"))
@@ -138,10 +147,24 @@ func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Proje
 	if !types.IsValidRemoteRepositoryConfigType(project.RemoteRepositoryConfigType) {
 		return nil, util.NewErrBadRequest(errors.Errorf("invalid project remote repository config type %q", project.RemoteRepositoryConfigType))
 	}
+	if project.RemoteRepositoryConfigType == types.RemoteRepositoryConfigTypeRemoteSource {
+		if project.RemoteSourceID == "" {
+			return nil, util.NewErrBadRequest(errors.Errorf("empty remote source id"))
+		}
+		if project.LinkedAccountID == "" {
+			return nil, util.NewErrBadRequest(errors.Errorf("empty linked account id"))
+		}
+		if project.RepositoryID == "" {
+			return nil, util.NewErrBadRequest(errors.Errorf("empty remote repository id"))
+		}
+		if project.RepositoryPath == "" {
+			return nil, util.NewErrBadRequest(errors.Errorf("empty remote repository path"))
+		}
+	}
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
-	// must do all the check in a single transaction to avoid concurrent changes
+	// must do all the checks in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		group, err := s.readDB.GetProjectGroup(tx, project.Parent.ID)
@@ -233,7 +256,7 @@ func (s *CommandHandler) DeleteProject(ctx context.Context, projectRef string) e
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
-	// must do all the check in a single transaction to avoid concurrent changes
+	// must do all the checks in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 
@@ -282,6 +305,9 @@ func (s *CommandHandler) CreateUser(ctx context.Context, req *CreateUserRequest)
 	if req.UserName == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("user name required"))
 	}
+	if !util.ValidateName(req.UserName) {
+		return nil, util.NewErrBadRequest(errors.Errorf("invalid user name %q", req.UserName))
+	}
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
 	// changegroup is the username (and in future the email) to ensure no
@@ -289,7 +315,7 @@ func (s *CommandHandler) CreateUser(ctx context.Context, req *CreateUserRequest)
 	cgNames := []string{util.EncodeSha256Hex("username-" + req.UserName)}
 	var rs *types.RemoteSource
 
-	// must do all the check in a single transaction to avoid concurrent changes
+	// must do all the checks in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
@@ -391,7 +417,7 @@ func (s *CommandHandler) DeleteUser(ctx context.Context, userRef string) error {
 	var user *types.User
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
-	// must do all the check in a single transaction to avoid concurrent changes
+	// must do all the checks in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 
@@ -441,7 +467,7 @@ func (s *CommandHandler) UpdateUser(ctx context.Context, req *UpdateUserRequest)
 	cgNames := []string{}
 	var user *types.User
 
-	// must do all the check in a single transaction to avoid concurrent changes
+	// must do all the checks in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		user, err = s.readDB.GetUser(tx, req.UserRef)
@@ -524,7 +550,7 @@ func (s *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequ
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
-	// must do all the check in a single transaction to avoid concurrent changes
+	// must do all the checks in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		user, err = s.readDB.GetUser(tx, req.UserRef)
@@ -609,7 +635,7 @@ func (s *CommandHandler) DeleteUserLA(ctx context.Context, userRef, laID string)
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
-	// must do all the check in a single transaction to avoid concurrent changes
+	// must do all the checks in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		user, err = s.readDB.GetUser(tx, userRef)
@@ -679,7 +705,7 @@ func (s *CommandHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLARequ
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
-	// must do all the check in a single transaction to avoid concurrent changes
+	// must do all the checks in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		user, err = s.readDB.GetUser(tx, req.UserRef)
@@ -753,7 +779,7 @@ func (s *CommandHandler) CreateUserToken(ctx context.Context, userRef, tokenName
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
-	// must do all the check in a single transaction to avoid concurrent changes
+	// must do all the checks in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		user, err = s.readDB.GetUser(tx, userRef)
@@ -818,7 +844,7 @@ func (s *CommandHandler) DeleteUserToken(ctx context.Context, userRef, tokenName
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
-	// must do all the check in a single transaction to avoid concurrent changes
+	// must do all the checks in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		user, err = s.readDB.GetUser(tx, userRef)
@@ -870,12 +896,41 @@ func (s *CommandHandler) CreateRemoteSource(ctx context.Context, remoteSource *t
 	if remoteSource.Name == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("remotesource name required"))
 	}
+	if !util.ValidateName(remoteSource.Name) {
+		return nil, util.NewErrBadRequest(errors.Errorf("invalid remotesource name %q", remoteSource.Name))
+	}
+
+	if remoteSource.Name == "" {
+		return nil, util.NewErrBadRequest(errors.Errorf("remotesource name required"))
+	}
+	if remoteSource.APIURL == "" {
+		return nil, util.NewErrBadRequest(errors.Errorf("remotesource api url required"))
+	}
+	if remoteSource.Type == "" {
+		return nil, util.NewErrBadRequest(errors.Errorf("remotesource type required"))
+	}
+	if remoteSource.AuthType == "" {
+		return nil, util.NewErrBadRequest(errors.Errorf("remotesource auth type required"))
+	}
+
+	// validate if the remote source type supports the required auth type
+	if !types.SourceSupportsAuthType(types.RemoteSourceType(remoteSource.Type), types.RemoteSourceAuthType(remoteSource.AuthType)) {
+		return nil, util.NewErrBadRequest(errors.Errorf("remotesource type %q doesn't support auth type %q", remoteSource.Type, remoteSource.AuthType))
+	}
+	if remoteSource.AuthType == types.RemoteSourceAuthTypeOauth2 {
+		if remoteSource.Oauth2ClientID == "" {
+			return nil, util.NewErrBadRequest(errors.Errorf("remotesource oauth2clientid required for auth type %q", types.RemoteSourceAuthTypeOauth2))
+		}
+		if remoteSource.Oauth2ClientSecret == "" {
+			return nil, util.NewErrBadRequest(errors.Errorf("remotesource oauth2clientsecret required for auth type %q", types.RemoteSourceAuthTypeOauth2))
+		}
+	}
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
 	// changegroup is the remotesource name
 	cgNames := []string{util.EncodeSha256Hex("remotesourcename-" + remoteSource.Name)}
 
-	// must do all the check in a single transaction to avoid concurrent changes
+	// must do all the checks in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
@@ -924,7 +979,7 @@ func (s *CommandHandler) DeleteRemoteSource(ctx context.Context, remoteSourceNam
 	// changegroup is the remotesource id
 	cgNames := []string{util.EncodeSha256Hex("remotesourceid-" + remoteSource.ID)}
 
-	// must do all the check in a single transaction to avoid concurrent changes
+	// must do all the checks in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
@@ -961,14 +1016,17 @@ func (s *CommandHandler) DeleteRemoteSource(ctx context.Context, remoteSourceNam
 
 func (s *CommandHandler) CreateOrg(ctx context.Context, org *types.Organization) (*types.Organization, error) {
 	if org.Name == "" {
-		return nil, util.NewErrBadRequest(errors.Errorf("org name required"))
+		return nil, util.NewErrBadRequest(errors.Errorf("organization name required"))
+	}
+	if !util.ValidateName(org.Name) {
+		return nil, util.NewErrBadRequest(errors.Errorf("invalid organization name %q", org.Name))
 	}
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
 	// changegroup is the org name
 	cgNames := []string{util.EncodeSha256Hex("orgname-" + org.Name)}
 
-	// must do all the check in a single transaction to avoid concurrent changes
+	// must do all the checks in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
@@ -1032,7 +1090,7 @@ func (s *CommandHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
-	// must do all the check in a single transaction to avoid concurrent changes
+	// must do all the checks in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		// check org existance
@@ -1082,8 +1140,11 @@ func (s *CommandHandler) CreateSecret(ctx context.Context, secret *types.Secret)
 	if secret.Name == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("secret name required"))
 	}
+	if !util.ValidateName(secret.Name) {
+		return nil, util.NewErrBadRequest(errors.Errorf("invalid secret name %q", secret.Name))
+	}
 	if secret.Type != types.SecretTypeInternal {
-		return nil, util.NewErrBadRequest(errors.Errorf("wrong secret type %q", secret.Type))
+		return nil, util.NewErrBadRequest(errors.Errorf("invalid secret type %q", secret.Type))
 	}
 	switch secret.Type {
 	case types.SecretTypeInternal:
@@ -1105,7 +1166,7 @@ func (s *CommandHandler) CreateSecret(ctx context.Context, secret *types.Secret)
 	// changegroup is the secret name
 	cgNames := []string{util.EncodeSha256Hex("secretname-" + secret.Name)}
 
-	// must do all the check in a single transaction to avoid concurrent changes
+	// must do all the checks in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
@@ -1158,7 +1219,7 @@ func (s *CommandHandler) DeleteSecret(ctx context.Context, parentType types.Conf
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
-	// must do all the check in a single transaction to avoid concurrent changes
+	// must do all the checks in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		parentID, err := s.readDB.ResolveConfigID(tx, parentType, parentRef)
@@ -1204,6 +1265,9 @@ func (s *CommandHandler) CreateVariable(ctx context.Context, variable *types.Var
 	if variable.Name == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("variable name required"))
 	}
+	if !util.ValidateName(variable.Name) {
+		return nil, util.NewErrBadRequest(errors.Errorf("invalid variable name %q", variable.Name))
+	}
 	if len(variable.Values) == 0 {
 		return nil, util.NewErrBadRequest(errors.Errorf("variable values required"))
 	}
@@ -1221,7 +1285,7 @@ func (s *CommandHandler) CreateVariable(ctx context.Context, variable *types.Var
 	// changegroup is the variable name
 	cgNames := []string{util.EncodeSha256Hex("variablename-" + variable.Name)}
 
-	// must do all the check in a single transaction to avoid concurrent changes
+	// must do all the checks in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
@@ -1274,7 +1338,7 @@ func (s *CommandHandler) DeleteVariable(ctx context.Context, parentType types.Co
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
-	// must do all the check in a single transaction to avoid concurrent changes
+	// must do all the checks in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		parentID, err := s.readDB.ResolveConfigID(tx, parentType, parentRef)

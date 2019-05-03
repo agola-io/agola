@@ -17,7 +17,6 @@ package command
 import (
 	"context"
 
-	"github.com/sorintlab/agola/internal/services/gateway/common"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
@@ -52,7 +51,7 @@ func (c *CommandHandler) CreateRemoteSource(ctx context.Context, req *CreateRemo
 	}
 
 	// validate if the remote source type supports the required auth type
-	if !common.SourceSupportsAuthType(types.RemoteSourceType(req.Type), types.RemoteSourceAuthType(req.AuthType)) {
+	if !types.SourceSupportsAuthType(types.RemoteSourceType(req.Type), types.RemoteSourceAuthType(req.AuthType)) {
 		return nil, util.NewErrBadRequest(errors.Errorf("remotesource type %q doesn't support auth type %q", req.Type, req.AuthType))
 	}
 

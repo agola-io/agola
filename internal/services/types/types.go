@@ -15,6 +15,7 @@
 package types
 
 import (
+	"fmt"
 	"regexp"
 	"time"
 )
@@ -127,6 +128,30 @@ type RemoteSource struct {
 	// Oauth2 data
 	Oauth2ClientID     string `json:"client_id,omitempty"`
 	Oauth2ClientSecret string `json:"client_secret,omitempty"`
+}
+
+func SourceSupportedAuthTypes(rsType RemoteSourceType) []RemoteSourceAuthType {
+	switch rsType {
+	case RemoteSourceTypeGitea:
+		return []RemoteSourceAuthType{RemoteSourceAuthTypePassword}
+	case RemoteSourceTypeGithub:
+		fallthrough
+	case RemoteSourceTypeGitlab:
+		return []RemoteSourceAuthType{RemoteSourceAuthTypeOauth2}
+
+	default:
+		panic(fmt.Errorf("unsupported remote source type: %q", rsType))
+	}
+}
+
+func SourceSupportsAuthType(rsType RemoteSourceType, authType RemoteSourceAuthType) bool {
+	supportedAuthTypes := SourceSupportedAuthTypes(rsType)
+	for _, st := range supportedAuthTypes {
+		if st == authType {
+			return true
+		}
+	}
+	return false
 }
 
 type LinkedAccount struct {

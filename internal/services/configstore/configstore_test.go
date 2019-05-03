@@ -420,7 +420,7 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 	t.Run("create a project in user non root project group with same name as a root project", func(t *testing.T) {
 		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err != nil {
-			t.Fatalf("unexpected err: %+#v", err)
+			t.Fatalf("unexpected err: %v", err)
 		}
 	})
 	t.Run("create a project in org non root project group with same name as a root project", func(t *testing.T) {
