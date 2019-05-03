@@ -44,6 +44,12 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 	if !util.ValidateName(req.Name) {
 		return nil, util.NewErrBadRequest(errors.Errorf("invalid project name %q", req.Name))
 	}
+	if req.RemoteSourceName == "" {
+		return nil, util.NewErrBadRequest(errors.Errorf("empty remote source name"))
+	}
+	if req.RepoPath == "" {
+		return nil, util.NewErrBadRequest(errors.Errorf("empty remote repo path name"))
+	}
 
 	user, resp, err := c.configstoreClient.GetUser(ctx, req.CurrentUserID)
 	if err != nil {
@@ -52,7 +58,6 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 
 	rs, resp, err := c.configstoreClient.GetRemoteSourceByName(ctx, req.RemoteSourceName)
 	if err != nil {
-		c.log.Errorf("err: %+v", err)
 		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get remote source %q", req.RemoteSourceName))
 	}
 	c.log.Infof("rs: %s", util.Dump(rs))
@@ -97,6 +102,7 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 			ID:   parentID,
 		},
 		Visibility:          req.Visibility,
+		RemoteSourceID:      rs.ID,
 		LinkedAccountID:     la.ID,
 		RepositoryID:        repo.ID,
 		RepositoryPath:      req.RepoPath,
