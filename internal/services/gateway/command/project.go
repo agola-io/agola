@@ -17,6 +17,7 @@ package command
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 	"path"
 
@@ -46,6 +47,21 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 	}
 	if req.RepoPath == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("empty remote repo path"))
+	}
+
+	pg, resp, err := c.configstoreClient.GetProjectGroup(ctx, req.ParentID)
+	if err != nil {
+		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get project group %q", req.Name))
+	}
+
+	projectPath := path.Join(pg.Path, req.Name)
+	_, resp, err = c.configstoreClient.GetProject(ctx, projectPath)
+	if err != nil {
+		if resp != nil && resp.StatusCode != http.StatusNotFound {
+			return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get project %q", req.Name))
+		}
+	} else {
+		return nil, util.NewErrBadRequest(errors.Errorf("project %q already exists", projectPath))
 	}
 
 	user, resp, err := c.configstoreClient.GetUser(ctx, req.CurrentUserID)
