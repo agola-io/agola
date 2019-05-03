@@ -41,6 +41,10 @@ func isAccessTokenExpired(expiresAt time.Time) bool {
 }
 
 func (h *ActionHandler) GetUser(ctx context.Context, userRef string) (*types.User, error) {
+	if !h.IsUserLoggedOrAdmin(ctx) {
+		return nil, errors.Errorf("user not logged in")
+	}
+
 	user, resp, err := h.configstoreClient.GetUser(ctx, userRef)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
@@ -55,6 +59,10 @@ type GetUsersRequest struct {
 }
 
 func (h *ActionHandler) GetUsers(ctx context.Context, req *GetUsersRequest) ([]*types.User, error) {
+	if !h.IsUserAdmin(ctx) {
+		return nil, errors.Errorf("user not logged in")
+	}
+
 	users, resp, err := h.configstoreClient.GetUsers(ctx, req.Start, req.Limit, req.Asc)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
@@ -67,6 +75,10 @@ type CreateUserRequest struct {
 }
 
 func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) (*types.User, error) {
+	if !h.IsUserAdmin(ctx) {
+		return nil, errors.Errorf("user not admin")
+	}
+
 	if req.UserName == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("user name required"))
 	}
@@ -490,10 +502,20 @@ func (h *ActionHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSource
 	switch requestType {
 	case RemoteSourceRequestTypeCreateUserLA:
 		req := req.(*CreateUserLARequest)
+
 		user, resp, err := h.configstoreClient.GetUser(ctx, req.UserRef)
 		if err != nil {
 			return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get user %q", req.UserRef))
 		}
+
+		curUserID := h.CurrentUserID(ctx)
+
+		// user must be already logged in the create a linked account and can create a
+		// linked account only on itself.
+		if user.ID != curUserID {
+			return nil, util.NewErrBadRequest(errors.Errorf("logged in user cannot create linked account for another user"))
+		}
+
 		var la *types.LinkedAccount
 		for _, v := range user.LinkedAccounts {
 			if v.RemoteSourceID == rs.ID {
@@ -729,6 +751,10 @@ func (h *ActionHandler) HandleOauth2Callback(ctx context.Context, code, state st
 }
 
 func (h *ActionHandler) DeleteUser(ctx context.Context, userRef string) error {
+	if !h.IsUserAdmin(ctx) {
+		return errors.Errorf("user not logged in")
+	}
+
 	resp, err := h.configstoreClient.DeleteUser(ctx, userRef)
 	if err != nil {
 		return ErrFromRemote(resp, errors.Wrapf(err, "failed to delete user"))
@@ -737,7 +763,24 @@ func (h *ActionHandler) DeleteUser(ctx context.Context, userRef string) error {
 }
 
 func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) error {
-	resp, err := h.configstoreClient.DeleteUserLA(ctx, userRef, laID)
+	if !h.IsUserLoggedOrAdmin(ctx) {
+		return errors.Errorf("user not logged in")
+	}
+
+	isAdmin := !h.IsUserAdmin(ctx)
+	curUserID := h.CurrentUserID(ctx)
+
+	user, resp, err := h.configstoreClient.GetUser(ctx, userRef)
+	if err != nil {
+		return ErrFromRemote(resp, errors.Wrapf(err, "failed to get user %q", userRef))
+	}
+
+	// only admin or the same logged user can create a token
+	if !isAdmin && user.ID != curUserID {
+		return util.NewErrBadRequest(errors.Errorf("logged in user cannot create token for another user"))
+	}
+
+	resp, err = h.configstoreClient.DeleteUserLA(ctx, userRef, laID)
 	if err != nil {
 		return ErrFromRemote(resp, errors.Wrapf(err, "failed to delete user linked account"))
 	}
@@ -745,7 +788,24 @@ func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) 
 }
 
 func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName string) error {
-	resp, err := h.configstoreClient.DeleteUserToken(ctx, userRef, tokenName)
+	if !h.IsUserLoggedOrAdmin(ctx) {
+		return errors.Errorf("user not logged in")
+	}
+
+	isAdmin := !h.IsUserAdmin(ctx)
+	curUserID := h.CurrentUserID(ctx)
+
+	user, resp, err := h.configstoreClient.GetUser(ctx, userRef)
+	if err != nil {
+		return ErrFromRemote(resp, errors.Wrapf(err, "failed to get user %q", userRef))
+	}
+
+	// only admin or the same logged user can create a token
+	if !isAdmin && user.ID != curUserID {
+		return util.NewErrBadRequest(errors.Errorf("logged in user cannot delete token for another user"))
+	}
+
+	resp, err = h.configstoreClient.DeleteUserToken(ctx, userRef, tokenName)
 	if err != nil {
 		return ErrFromRemote(resp, errors.Wrapf(err, "failed to delete user token"))
 	}

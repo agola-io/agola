@@ -55,6 +55,10 @@ type CreateRemoteSourceRequest struct {
 }
 
 func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemoteSourceRequest) (*types.RemoteSource, error) {
+	if !h.IsUserAdmin(ctx) {
+		return nil, errors.Errorf("user not admin")
+	}
+
 	if !util.ValidateName(req.Name) {
 		return nil, util.NewErrBadRequest(errors.Errorf("invalid remotesource name %q", req.Name))
 	}
@@ -106,6 +110,10 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemot
 }
 
 func (h *ActionHandler) DeleteRemoteSource(ctx context.Context, rsRef string) error {
+	if !h.IsUserAdmin(ctx) {
+		return errors.Errorf("user not admin")
+	}
+
 	resp, err := h.configstoreClient.DeleteRemoteSource(ctx, rsRef)
 	if err != nil {
 		return ErrFromRemote(resp, errors.Wrapf(err, "failed to delete remote source"))

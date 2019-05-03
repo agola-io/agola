@@ -30,12 +30,20 @@ func (h *ActionHandler) GetRun(ctx context.Context, runID string) (*rsapi.RunRes
 		return nil, ErrFromRemote(resp, err)
 	}
 
+	canGetRun, err := h.CanGetRun(ctx, runResp.RunConfig.Group)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to determine permissions")
+	}
+	if !canGetRun {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	return runResp, nil
 }
 
 type GetRunsRequest struct {
 	PhaseFilter  []string
-	Groups       []string
+	Group        string
 	LastRun      bool
 	ChangeGroups []string
 	StartRunID   string
@@ -44,7 +52,16 @@ type GetRunsRequest struct {
 }
 
 func (h *ActionHandler) GetRuns(ctx context.Context, req *GetRunsRequest) (*rsapi.GetRunsResponse, error) {
-	runsResp, resp, err := h.runserviceClient.GetRuns(ctx, req.PhaseFilter, req.Groups, req.LastRun, req.ChangeGroups, req.StartRunID, req.Limit, req.Asc)
+	canGetRun, err := h.CanGetRun(ctx, req.Group)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to determine permissions")
+	}
+	if !canGetRun {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
+	groups := []string{req.Group}
+	runsResp, resp, err := h.runserviceClient.GetRuns(ctx, req.PhaseFilter, groups, req.LastRun, req.ChangeGroups, req.StartRunID, req.Limit, req.Asc)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
 	}
@@ -62,7 +79,19 @@ type GetLogsRequest struct {
 }
 
 func (h *ActionHandler) GetLogs(ctx context.Context, req *GetLogsRequest) (*http.Response, error) {
-	resp, err := h.runserviceClient.GetLogs(ctx, req.RunID, req.TaskID, req.Setup, req.Step, req.Follow, req.Stream)
+	runResp, resp, err := h.runserviceClient.GetRun(ctx, req.RunID)
+	if err != nil {
+		return nil, ErrFromRemote(resp, err)
+	}
+	canGetRun, err := h.CanGetRun(ctx, runResp.RunConfig.Group)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to determine permissions")
+	}
+	if !canGetRun {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
+	resp, err = h.runserviceClient.GetLogs(ctx, req.RunID, req.TaskID, req.Setup, req.Step, req.Follow, req.Stream)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
 	}
@@ -86,6 +115,18 @@ type RunActionsRequest struct {
 }
 
 func (h *ActionHandler) RunAction(ctx context.Context, req *RunActionsRequest) error {
+	runResp, resp, err := h.runserviceClient.GetRun(ctx, req.RunID)
+	if err != nil {
+		return ErrFromRemote(resp, err)
+	}
+	canGetRun, err := h.CanDoRunActions(ctx, runResp.RunConfig.Group)
+	if err != nil {
+		return errors.Wrapf(err, "failed to determine permissions")
+	}
+	if !canGetRun {
+		return util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	switch req.ActionType {
 	case RunActionTypeRestart:
 		rsreq := &rsapi.RunCreateRequest{
@@ -130,6 +171,18 @@ type RunTaskActionsRequest struct {
 }
 
 func (h *ActionHandler) RunTaskAction(ctx context.Context, req *RunTaskActionsRequest) error {
+	runResp, resp, err := h.runserviceClient.GetRun(ctx, req.RunID)
+	if err != nil {
+		return ErrFromRemote(resp, err)
+	}
+	canGetRun, err := h.CanDoRunActions(ctx, runResp.RunConfig.Group)
+	if err != nil {
+		return errors.Wrapf(err, "failed to determine permissions")
+	}
+	if !canGetRun {
+		return util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	switch req.ActionType {
 	case RunTaskActionTypeApprove:
 		rsreq := &rsapi.RunTaskActionsRequest{

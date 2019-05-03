@@ -27,8 +27,11 @@ import (
 type GroupType string
 
 const (
-	GroupTypeProject     GroupType = "project"
-	GroupTypeUser        GroupType = "user"
+	// base groups
+	GroupTypeProject GroupType = "project"
+	GroupTypeUser    GroupType = "user"
+
+	// sub groups
 	GroupTypeBranch      GroupType = "branch"
 	GroupTypeTag         GroupType = "tag"
 	GroupTypePullRequest GroupType = "pr"
@@ -49,10 +52,10 @@ func GenRunGroup(baseGroupType GroupType, baseGroupID string, webhookData *types
 	panic(fmt.Errorf("invalid webhook event type: %q", webhookData.Event))
 }
 
-func ProjectIDFromRunGroup(group string) (string, error) {
+func GroupTypeIDFromRunGroup(group string) (GroupType, string, error) {
 	pl := util.PathList(group)
 	if len(pl) < 2 {
-		return "", errors.Errorf("cannot determine group project id, wrong group path %q", group)
+		return "", "", errors.Errorf("cannot determine group project id, wrong group path %q", group)
 	}
-	return pl[1], nil
+	return GroupType(pl[0]), pl[1], nil
 }

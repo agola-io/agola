@@ -52,6 +52,10 @@ type CreateOrgRequest struct {
 }
 
 func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*types.Organization, error) {
+	if !h.IsUserLoggedOrAdmin(ctx) {
+		return nil, errors.Errorf("user not logged in")
+	}
+
 	if req.Name == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("organization name required"))
 	}
@@ -77,7 +81,20 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*
 }
 
 func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
-	resp, err := h.configstoreClient.DeleteOrg(ctx, orgRef)
+	org, resp, err := h.configstoreClient.GetOrg(ctx, orgRef)
+	if err != nil {
+		return ErrFromRemote(resp, err)
+	}
+
+	isOrgOwner, err := h.IsOrgOwner(ctx, org.ID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to determine ownership")
+	}
+	if !isOrgOwner {
+		return util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
+	resp, err = h.configstoreClient.DeleteOrg(ctx, orgRef)
 	if err != nil {
 		return ErrFromRemote(resp, errors.Wrapf(err, "failed to delete org"))
 	}

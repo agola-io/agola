@@ -80,6 +80,14 @@ type CreateVariableRequest struct {
 }
 
 func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateVariableRequest) (*csapi.Variable, []*csapi.Secret, error) {
+	isVariableOwner, err := h.IsVariableOwner(ctx, req.ParentType, req.ParentRef)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "failed to determine ownership")
+	}
+	if !isVariableOwner {
+		return nil, nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	if !util.ValidateName(req.Name) {
 		return nil, nil, util.NewErrBadRequest(errors.Errorf("invalid variable name %q", req.Name))
 	}
@@ -134,7 +142,14 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateVariableR
 }
 
 func (h *ActionHandler) DeleteVariable(ctx context.Context, parentType types.ConfigType, parentRef, name string) error {
-	var err error
+	isVariableOwner, err := h.IsVariableOwner(ctx, parentType, parentRef)
+	if err != nil {
+		return errors.Wrapf(err, "failed to determine ownership")
+	}
+	if !isVariableOwner {
+		return util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	var resp *http.Response
 	switch parentType {
 	case types.ConfigTypeProjectGroup:

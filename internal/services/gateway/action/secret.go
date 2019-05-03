@@ -72,6 +72,14 @@ type CreateSecretHandler struct {
 }
 
 func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretRequest) (*csapi.Secret, error) {
+	isVariableOwner, err := h.IsVariableOwner(ctx, req.ParentType, req.ParentRef)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to determine ownership")
+	}
+	if !isVariableOwner {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	if !util.ValidateName(req.Name) {
 		return nil, util.NewErrBadRequest(errors.Errorf("invalid secret name %q", req.Name))
 	}
@@ -84,7 +92,6 @@ func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretReque
 
 	var resp *http.Response
 	var rs *csapi.Secret
-	var err error
 	switch req.ParentType {
 	case types.ConfigTypeProjectGroup:
 		h.log.Infof("creating project group secret")
@@ -102,8 +109,15 @@ func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretReque
 }
 
 func (h *ActionHandler) DeleteSecret(ctx context.Context, parentType types.ConfigType, parentRef, name string) error {
+	isVariableOwner, err := h.IsVariableOwner(ctx, parentType, parentRef)
+	if err != nil {
+		return errors.Wrapf(err, "failed to determine ownership")
+	}
+	if !isVariableOwner {
+		return util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	var resp *http.Response
-	var err error
 	switch parentType {
 	case types.ConfigTypeProjectGroup:
 		h.log.Infof("deleting project group secret")

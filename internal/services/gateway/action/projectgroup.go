@@ -61,6 +61,19 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProje
 		return nil, util.NewErrBadRequest(errors.Errorf("invalid projectGroup name %q", req.Name))
 	}
 
+	pg, resp, err := h.configstoreClient.GetProjectGroup(ctx, req.ParentRef)
+	if err != nil {
+		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get project group %q", req.ParentRef))
+	}
+
+	isProjectOwner, err := h.IsProjectOwner(ctx, pg.OwnerType, pg.OwnerID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to determine ownership")
+	}
+	if !isProjectOwner {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	user, resp, err := h.configstoreClient.GetUser(ctx, req.CurrentUserID)
 	if err != nil {
 		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get user %q", req.CurrentUserID))
