@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-package command
+package action
 
 import (
 	"context"
@@ -31,7 +31,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-func (s *CommandHandler) CreateProjectGroup(ctx context.Context, projectGroup *types.ProjectGroup) (*types.ProjectGroup, error) {
+func (h *ActionHandler) CreateProjectGroup(ctx context.Context, projectGroup *types.ProjectGroup) (*types.ProjectGroup, error) {
 	if projectGroup.Name == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("project group name required"))
 	}
@@ -48,8 +48,8 @@ func (s *CommandHandler) CreateProjectGroup(ctx context.Context, projectGroup *t
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := s.readDB.Do(func(tx *db.Tx) error {
-		parentProjectGroup, err := s.readDB.GetProjectGroup(tx, projectGroup.Parent.ID)
+	err := h.readDB.Do(func(tx *db.Tx) error {
+		parentProjectGroup, err := h.readDB.GetProjectGroup(tx, projectGroup.Parent.ID)
 		if err != nil {
 			return err
 		}
@@ -58,7 +58,7 @@ func (s *CommandHandler) CreateProjectGroup(ctx context.Context, projectGroup *t
 		}
 		projectGroup.Parent.ID = parentProjectGroup.ID
 
-		groupPath, err := s.readDB.GetProjectGroupPath(tx, parentProjectGroup)
+		groupPath, err := h.readDB.GetProjectGroupPath(tx, parentProjectGroup)
 		if err != nil {
 			return err
 		}
@@ -67,13 +67,13 @@ func (s *CommandHandler) CreateProjectGroup(ctx context.Context, projectGroup *t
 		// changegroup is the projectgroup path. Use "projectpath" prefix as it must
 		// cover both projects and projectgroups
 		cgNames := []string{util.EncodeSha256Hex("projectpath-" + pp)}
-		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
 			return err
 		}
 
 		// check duplicate project name
-		p, err := s.readDB.GetProjectByName(tx, projectGroup.Parent.ID, projectGroup.Name)
+		p, err := h.readDB.GetProjectByName(tx, projectGroup.Parent.ID, projectGroup.Name)
 		if err != nil {
 			return err
 		}
@@ -81,7 +81,7 @@ func (s *CommandHandler) CreateProjectGroup(ctx context.Context, projectGroup *t
 			return util.NewErrBadRequest(errors.Errorf("project with name %q, path %q already exists", p.Name, pp))
 		}
 		// check duplicate project group name
-		pg, err := s.readDB.GetProjectGroupByName(tx, projectGroup.Parent.ID, projectGroup.Name)
+		pg, err := h.readDB.GetProjectGroupByName(tx, projectGroup.Parent.ID, projectGroup.Name)
 		if err != nil {
 			return err
 		}
@@ -110,6 +110,6 @@ func (s *CommandHandler) CreateProjectGroup(ctx context.Context, projectGroup *t
 		},
 	}
 
-	_, err = s.dm.WriteWal(ctx, actions, cgt)
+	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return projectGroup, err
 }

@@ -22,7 +22,7 @@ import (
 	"net/http"
 
 	"github.com/sorintlab/agola/internal/db"
-	"github.com/sorintlab/agola/internal/services/configstore/command"
+	"github.com/sorintlab/agola/internal/services/configstore/action"
 	"github.com/sorintlab/agola/internal/services/configstore/readdb"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
@@ -106,12 +106,12 @@ func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 type CreateVariableHandler struct {
 	log    *zap.SugaredLogger
-	ch     *command.CommandHandler
+	ah     *action.ActionHandler
 	readDB *readdb.ReadDB
 }
 
-func NewCreateVariableHandler(logger *zap.Logger, ch *command.CommandHandler) *CreateVariableHandler {
-	return &CreateVariableHandler{log: logger.Sugar(), ch: ch}
+func NewCreateVariableHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateVariableHandler {
+	return &CreateVariableHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -132,7 +132,7 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	variable.Parent.Type = parentType
 	variable.Parent.ID = parentRef
 
-	variable, err = h.ch.CreateVariable(ctx, variable)
+	variable, err = h.ah.CreateVariable(ctx, variable)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
@@ -145,11 +145,11 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 type DeleteVariableHandler struct {
 	log *zap.SugaredLogger
-	ch  *command.CommandHandler
+	ah  *action.ActionHandler
 }
 
-func NewDeleteVariableHandler(logger *zap.Logger, ch *command.CommandHandler) *DeleteVariableHandler {
-	return &DeleteVariableHandler{log: logger.Sugar(), ch: ch}
+func NewDeleteVariableHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteVariableHandler {
+	return &DeleteVariableHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *DeleteVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -163,7 +163,7 @@ func (h *DeleteVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	err = h.ch.DeleteVariable(ctx, parentType, parentRef, variableName)
+	err = h.ah.DeleteVariable(ctx, parentType, parentRef, variableName)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 	}

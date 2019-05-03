@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-package command
+package action
 
 import (
 	"github.com/sorintlab/agola/internal/datamanager"
@@ -24,14 +24,14 @@ import (
 	"go.uber.org/zap"
 )
 
-type CommandHandler struct {
+type ActionHandler struct {
 	log    *zap.SugaredLogger
 	readDB *readdb.ReadDB
 	dm     *datamanager.DataManager
 }
 
-func NewCommandHandler(logger *zap.Logger, readDB *readdb.ReadDB, dm *datamanager.DataManager) *CommandHandler {
-	return &CommandHandler{
+func NewActionHandler(logger *zap.Logger, readDB *readdb.ReadDB, dm *datamanager.DataManager) *ActionHandler {
+	return &ActionHandler{
 		log:    logger.Sugar(),
 		readDB: readDB,
 		dm:     dm,

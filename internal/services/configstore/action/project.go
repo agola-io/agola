@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-package command
+package action
 
 import (
 	"context"
@@ -31,7 +31,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Project) (*types.Project, error) {
+func (h *ActionHandler) CreateProject(ctx context.Context, project *types.Project) (*types.Project, error) {
 	if project.Name == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("project name required"))
 	}
@@ -68,9 +68,9 @@ func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Proje
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := s.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		group, err := s.readDB.GetProjectGroup(tx, project.Parent.ID)
+		group, err := h.readDB.GetProjectGroup(tx, project.Parent.ID)
 		if err != nil {
 			return err
 		}
@@ -79,7 +79,7 @@ func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Proje
 		}
 		project.Parent.ID = group.ID
 
-		groupPath, err := s.readDB.GetProjectGroupPath(tx, group)
+		groupPath, err := h.readDB.GetProjectGroupPath(tx, group)
 		if err != nil {
 			return err
 		}
@@ -88,13 +88,13 @@ func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Proje
 		// changegroup is the project path. Use "projectpath" prefix as it must
 		// cover both projects and projectgroups
 		cgNames := []string{util.EncodeSha256Hex("projectpath-" + pp)}
-		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
 			return err
 		}
 
 		// check duplicate project name
-		p, err := s.readDB.GetProjectByName(tx, project.Parent.ID, project.Name)
+		p, err := h.readDB.GetProjectByName(tx, project.Parent.ID, project.Name)
 		if err != nil {
 			return err
 		}
@@ -102,7 +102,7 @@ func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Proje
 			return util.NewErrBadRequest(errors.Errorf("project with name %q, path %q already exists", p.Name, pp))
 		}
 		// check duplicate project group name
-		pg, err := s.readDB.GetProjectGroupByName(tx, project.Parent.ID, project.Name)
+		pg, err := h.readDB.GetProjectGroupByName(tx, project.Parent.ID, project.Name)
 		if err != nil {
 			return err
 		}
@@ -112,7 +112,7 @@ func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Proje
 
 		if project.RemoteRepositoryConfigType == types.RemoteRepositoryConfigTypeRemoteSource {
 			// check that the linked account matches the remote source
-			user, err := s.readDB.GetUserByLinkedAccount(tx, project.LinkedAccountID)
+			user, err := h.readDB.GetUserByLinkedAccount(tx, project.LinkedAccountID)
 			if err != nil {
 				return errors.Wrapf(err, "failed to get user with linked account id %q", project.LinkedAccountID)
 			}
@@ -150,21 +150,21 @@ func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Proje
 		},
 	}
 
-	_, err = s.dm.WriteWal(ctx, actions, cgt)
+	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return project, err
 }
 
-func (s *CommandHandler) DeleteProject(ctx context.Context, projectRef string) error {
+func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) error {
 	var project *types.Project
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := s.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(func(tx *db.Tx) error {
 		var err error
 
 		// check project existance
-		project, err = s.readDB.GetProject(tx, projectRef)
+		project, err = h.readDB.GetProject(tx, projectRef)
 		if err != nil {
 			return err
 		}
@@ -174,7 +174,7 @@ func (s *CommandHandler) DeleteProject(ctx context.Context, projectRef string) e
 
 		// changegroup is the project id.
 		cgNames := []string{util.EncodeSha256Hex(project.ID)}
-		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
 			return err
 		}
@@ -194,6 +194,6 @@ func (s *CommandHandler) DeleteProject(ctx context.Context, projectRef string) e
 		},
 	}
 
-	_, err = s.dm.WriteWal(ctx, actions, cgt)
+	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return err
 }
