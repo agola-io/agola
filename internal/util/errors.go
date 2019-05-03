@@ -93,3 +93,22 @@ func IsErrNotFound(err error) bool {
 	_, ok := err.(*ErrNotFound)
 	return ok
 }
+
+// ErrForbidden represent an error caused by an forbidden operation
+// it's used to differentiate an internal error from an user error
+type ErrForbidden struct {
+	Err error
+}
+
+func (e *ErrForbidden) Error() string {
+	return e.Err.Error()
+}
+
+func NewErrForbidden(err error) *ErrForbidden {
+	return &ErrForbidden{Err: err}
+}
+
+func IsErrForbidden(err error) bool {
+	_, ok := err.(*ErrForbidden)
+	return ok
+}
