@@ -69,7 +69,6 @@ func (r *ReadDB) GetProjectPath(tx *db.Tx, project *types.Project) (string, erro
 	}
 	if pgroup == nil {
 		return "", errors.Errorf("parent group %q for project %q doesn't exist", project.Parent.ID, project.ID)
-
 	}
 	p, err := r.GetProjectGroupPath(tx, pgroup)
 	if err != nil {
@@ -79,6 +78,17 @@ func (r *ReadDB) GetProjectPath(tx *db.Tx, project *types.Project) (string, erro
 	p = path.Join(p, project.Name)
 
 	return p, nil
+}
+
+func (r *ReadDB) GetProjectOwnerID(tx *db.Tx, project *types.Project) (types.ConfigType, string, error) {
+	pgroup, err := r.GetProjectGroup(tx, project.Parent.ID)
+	if err != nil {
+		return "", "", err
+	}
+	if pgroup == nil {
+		return "", "", errors.Errorf("parent group %q for project %q doesn't exist", project.Parent.ID, project.ID)
+	}
+	return r.GetProjectGroupOwnerID(tx, pgroup)
 }
 
 func (r *ReadDB) GetProject(tx *db.Tx, projectRef string) (*types.Project, error) {
