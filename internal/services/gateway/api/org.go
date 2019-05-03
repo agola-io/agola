@@ -48,6 +48,13 @@ func NewCreateOrgHandler(logger *zap.Logger, ch *command.CommandHandler) *Create
 func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	var userID string
+	userIDVal := ctx.Value("userid")
+	if userIDVal != nil {
+		userID = userIDVal.(string)
+	}
+	h.log.Infof("userID: %q", userID)
+
 	var req CreateOrgRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
@@ -56,7 +63,8 @@ func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	creq := &command.CreateOrgRequest{
-		Name: req.Name,
+		Name:          req.Name,
+		CreatorUserID: userID,
 	}
 
 	org, err := h.ch.CreateOrg(ctx, creq)

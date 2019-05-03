@@ -20,6 +20,7 @@ package command
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/sorintlab/agola/internal/datamanager"
 	"github.com/sorintlab/agola/internal/db"
@@ -58,6 +59,17 @@ func (s *CommandHandler) CreateOrg(ctx context.Context, org *types.Organization)
 		if u != nil {
 			return util.NewErrBadRequest(errors.Errorf("org %q already exists", u.Name))
 		}
+
+		if org.CreatorUserID != "" {
+			user, err := s.readDB.GetUser(tx, org.CreatorUserID)
+			if err != nil {
+				return err
+			}
+			if user == nil {
+				return util.NewErrBadRequest(errors.Errorf("creator user %q doesn't exist", org.CreatorUserID))
+			}
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -65,6 +77,7 @@ func (s *CommandHandler) CreateOrg(ctx context.Context, org *types.Organization)
 	}
 
 	org.ID = uuid.NewV4().String()
+	org.CreatedAt = time.Now()
 	orgj, err := json.Marshal(org)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to marshal org")
