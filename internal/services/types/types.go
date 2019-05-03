@@ -71,6 +71,9 @@ type User struct {
 	Password string `json:"password,omitempty"`
 
 	Tokens map[string]string `json:"tokens,omitempty"`
+
+	// Admin defines if the user is a global admin
+	Admin bool `json:"admin,omitempty"`
 }
 
 type Organization struct {
