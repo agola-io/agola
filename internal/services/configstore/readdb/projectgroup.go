@@ -134,6 +134,17 @@ func (r *ReadDB) GetProjectGroupPath(tx *db.Tx, group *types.ProjectGroup) (stri
 	return p, nil
 }
 
+func (r *ReadDB) GetProjectGroupOwnerID(tx *db.Tx, group *types.ProjectGroup) (types.ConfigType, string, error) {
+	groups, err := r.GetProjectGroupHierarchy(tx, group)
+	if err != nil {
+		return "", "", err
+	}
+
+	rootGroupType := groups[0].ParentType
+	rootGroupID := groups[0].ParentID
+	return rootGroupType, rootGroupID, nil
+}
+
 func (r *ReadDB) GetProjectGroup(tx *db.Tx, projectGroupRef string) (*types.ProjectGroup, error) {
 	groupRef, err := common.ParsePathRef(projectGroupRef)
 	if err != nil {

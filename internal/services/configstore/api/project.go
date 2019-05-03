@@ -36,6 +36,8 @@ type Project struct {
 	*types.Project
 
 	// dynamic data
+	OwnerType        types.ConfigType
+	OwnerID          string
 	Path             string
 	ParentPath       string
 	GlobalVisibility types.Visibility
@@ -59,6 +61,11 @@ func projectsResponse(readDB *readdb.ReadDB, projects []*types.Project) ([]*Proj
 				return err
 			}
 
+			ownerType, ownerID, err := readDB.GetProjectOwnerID(tx, project)
+			if err != nil {
+				return err
+			}
+
 			// calculate global visibility
 			visibility, err := getGlobalVisibility(readDB, tx, project.Visibility, &project.Parent)
 			if err != nil {
@@ -69,6 +76,8 @@ func projectsResponse(readDB *readdb.ReadDB, projects []*types.Project) ([]*Proj
 			// updated on create
 			resProjects[i] = &Project{
 				Project:          project,
+				OwnerType:        ownerType,
+				OwnerID:          ownerID,
 				Path:             path.Join(pp, project.Name),
 				ParentPath:       pp,
 				GlobalVisibility: visibility,
