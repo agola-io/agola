@@ -83,9 +83,9 @@ func NewDeleteOrgHandler(logger *zap.Logger, configstoreClient *csapi.Client) *D
 func (h *DeleteOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	orgName := vars["orgname"]
+	orgRef := vars["orgref"]
 
-	resp, err := h.configstoreClient.DeleteOrg(ctx, orgName)
+	resp, err := h.configstoreClient.DeleteOrg(ctx, orgRef)
 	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
 		return
@@ -108,35 +108,9 @@ func NewOrgHandler(logger *zap.Logger, configstoreClient *csapi.Client) *OrgHand
 func (h *OrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	orgID := vars["orgid"]
+	orgRef := vars["orgref"]
 
-	org, resp, err := h.configstoreClient.GetOrg(ctx, orgID)
-	if httpErrorFromRemote(w, resp, err) {
-		h.log.Errorf("err: %+v", err)
-		return
-	}
-
-	res := createOrgResponse(org)
-	if err := httpResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
-	}
-}
-
-type OrgByNameHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
-}
-
-func NewOrgByNameHandler(logger *zap.Logger, configstoreClient *csapi.Client) *OrgByNameHandler {
-	return &OrgByNameHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
-}
-
-func (h *OrgByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	vars := mux.Vars(r)
-	orgName := vars["orgname"]
-
-	org, resp, err := h.configstoreClient.GetOrgByName(ctx, orgName)
+	org, resp, err := h.configstoreClient.GetOrg(ctx, orgRef)
 	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
 		return
