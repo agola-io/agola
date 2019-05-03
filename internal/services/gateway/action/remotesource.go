@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package command
+package action
 
 import (
 	"context"
@@ -32,7 +32,7 @@ type CreateRemoteSourceRequest struct {
 	Oauth2ClientSecret string
 }
 
-func (c *CommandHandler) CreateRemoteSource(ctx context.Context, req *CreateRemoteSourceRequest) (*types.RemoteSource, error) {
+func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemoteSourceRequest) (*types.RemoteSource, error) {
 	if !util.ValidateName(req.Name) {
 		return nil, util.NewErrBadRequest(errors.Errorf("invalid remotesource name %q", req.Name))
 	}
@@ -73,12 +73,12 @@ func (c *CommandHandler) CreateRemoteSource(ctx context.Context, req *CreateRemo
 		Oauth2ClientSecret: req.Oauth2ClientSecret,
 	}
 
-	c.log.Infof("creating remotesource")
-	rs, resp, err := c.configstoreClient.CreateRemoteSource(ctx, rs)
+	h.log.Infof("creating remotesource")
+	rs, resp, err := h.configstoreClient.CreateRemoteSource(ctx, rs)
 	if err != nil {
 		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to create remotesource"))
 	}
-	c.log.Infof("remotesource %s created, ID: %s", rs.Name, rs.ID)
+	h.log.Infof("remotesource %s created, ID: %s", rs.Name, rs.ID)
 
 	return rs, nil
 }

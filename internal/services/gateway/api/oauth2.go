@@ -18,7 +18,7 @@ import (
 	"net/http"
 
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
-	"github.com/sorintlab/agola/internal/services/gateway/command"
+	"github.com/sorintlab/agola/internal/services/gateway/action"
 	"github.com/sorintlab/agola/internal/util"
 
 	"go.uber.org/zap"
@@ -26,7 +26,7 @@ import (
 
 type OAuth2CallbackHandler struct {
 	log               *zap.SugaredLogger
-	ch                *command.CommandHandler
+	ah                *action.ActionHandler
 	configstoreClient *csapi.Client
 }
 
@@ -35,8 +35,8 @@ type RemoteSourceAuthResult struct {
 	Response    interface{} `json:"response,omitempty"`
 }
 
-func NewOAuth2CallbackHandler(logger *zap.Logger, ch *command.CommandHandler, configstoreClient *csapi.Client) *OAuth2CallbackHandler {
-	return &OAuth2CallbackHandler{log: logger.Sugar(), ch: ch, configstoreClient: configstoreClient}
+func NewOAuth2CallbackHandler(logger *zap.Logger, ah *action.ActionHandler, configstoreClient *csapi.Client) *OAuth2CallbackHandler {
+	return &OAuth2CallbackHandler{log: logger.Sugar(), ah: ah, configstoreClient: configstoreClient}
 }
 
 func (h *OAuth2CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -45,7 +45,7 @@ func (h *OAuth2CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	code := query.Get("code")
 	state := query.Get("state")
 
-	cresp, err := h.ch.HandleOauth2Callback(ctx, code, state)
+	cresp, err := h.ah.HandleOauth2Callback(ctx, code, state)
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
 		httpError(w, util.NewErrBadRequest(err))
@@ -54,27 +54,27 @@ func (h *OAuth2CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 	var response interface{}
 	switch cresp.RequestType {
-	case command.RemoteSourceRequestTypeCreateUserLA:
-		authresp := cresp.Response.(*command.CreateUserLAResponse)
+	case action.RemoteSourceRequestTypeCreateUserLA:
+		authresp := cresp.Response.(*action.CreateUserLAResponse)
 		response = &CreateUserLAResponse{
 			LinkedAccount: authresp.LinkedAccount,
 		}
 
-	case command.RemoteSourceRequestTypeLoginUser:
-		authresp := cresp.Response.(*command.LoginUserResponse)
+	case action.RemoteSourceRequestTypeLoginUser:
+		authresp := cresp.Response.(*action.LoginUserResponse)
 		response = &LoginUserResponse{
 			Token: authresp.Token,
 			User:  createUserResponse(authresp.User),
 		}
 
-	case command.RemoteSourceRequestTypeAuthorize:
-		authresp := cresp.Response.(*command.AuthorizeResponse)
+	case action.RemoteSourceRequestTypeAuthorize:
+		authresp := cresp.Response.(*action.AuthorizeResponse)
 		response = &AuthorizeResponse{
 			RemoteUserInfo:   authresp.RemoteUserInfo,
 			RemoteSourceName: authresp.RemoteSourceName,
 		}
 
-	case command.RemoteSourceRequestTypeRegisterUser:
+	case action.RemoteSourceRequestTypeRegisterUser:
 		response = &RegisterUserResponse{}
 	}
 

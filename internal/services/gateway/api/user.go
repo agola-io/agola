@@ -24,7 +24,7 @@ import (
 	"github.com/pkg/errors"
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
-	"github.com/sorintlab/agola/internal/services/gateway/command"
+	"github.com/sorintlab/agola/internal/services/gateway/action"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 	"go.uber.org/zap"
@@ -38,11 +38,11 @@ type CreateUserRequest struct {
 
 type CreateUserHandler struct {
 	log *zap.SugaredLogger
-	ch  *command.CommandHandler
+	ah  *action.ActionHandler
 }
 
-func NewCreateUserHandler(logger *zap.Logger, ch *command.CommandHandler) *CreateUserHandler {
-	return &CreateUserHandler{log: logger.Sugar(), ch: ch}
+func NewCreateUserHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateUserHandler {
+	return &CreateUserHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -55,11 +55,11 @@ func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	creq := &command.CreateUserRequest{
+	creq := &action.CreateUserRequest{
 		UserName: req.UserName,
 	}
 
-	u, err := h.ch.CreateUser(ctx, creq)
+	u, err := h.ah.CreateUser(ctx, creq)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
@@ -252,11 +252,11 @@ type CreateUserLAResponse struct {
 
 type CreateUserLAHandler struct {
 	log *zap.SugaredLogger
-	ch  *command.CommandHandler
+	ah  *action.ActionHandler
 }
 
-func NewCreateUserLAHandler(logger *zap.Logger, ch *command.CommandHandler) *CreateUserLAHandler {
-	return &CreateUserLAHandler{log: logger.Sugar(), ch: ch}
+func NewCreateUserLAHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateUserLAHandler {
+	return &CreateUserLAHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -283,13 +283,13 @@ func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *CreateUserLAHandler) createUserLA(ctx context.Context, userRef string, req *CreateUserLARequest) (*CreateUserLAResponse, error) {
-	creq := &command.CreateUserLARequest{
+	creq := &action.CreateUserLARequest{
 		UserRef:          userRef,
 		RemoteSourceName: req.RemoteSourceName,
 	}
 
 	h.log.Infof("creating linked account")
-	cresp, err := h.ch.HandleRemoteSourceAuth(ctx, req.RemoteSourceName, req.RemoteSourceLoginName, req.RemoteSourceLoginPassword, command.RemoteSourceRequestTypeCreateUserLA, creq)
+	cresp, err := h.ah.HandleRemoteSourceAuth(ctx, req.RemoteSourceName, req.RemoteSourceLoginName, req.RemoteSourceLoginPassword, action.RemoteSourceRequestTypeCreateUserLA, creq)
 	if err != nil {
 		return nil, err
 	}
@@ -298,7 +298,7 @@ func (h *CreateUserLAHandler) createUserLA(ctx context.Context, userRef string, 
 			Oauth2Redirect: cresp.Oauth2Redirect,
 		}, nil
 	}
-	authresp := cresp.Response.(*command.CreateUserLAResponse)
+	authresp := cresp.Response.(*action.CreateUserLAResponse)
 
 	resp := &CreateUserLAResponse{
 		LinkedAccount: authresp.LinkedAccount,
@@ -343,11 +343,11 @@ type CreateUserTokenResponse struct {
 
 type CreateUserTokenHandler struct {
 	log *zap.SugaredLogger
-	ch  *command.CommandHandler
+	ah  *action.ActionHandler
 }
 
-func NewCreateUserTokenHandler(logger *zap.Logger, ch *command.CommandHandler) *CreateUserTokenHandler {
-	return &CreateUserTokenHandler{log: logger.Sugar(), ch: ch}
+func NewCreateUserTokenHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateUserTokenHandler {
+	return &CreateUserTokenHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -362,12 +362,12 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	creq := &command.CreateUserTokenRequest{
+	creq := &action.CreateUserTokenRequest{
 		UserRef:   userRef,
 		TokenName: req.TokenName,
 	}
 	h.log.Infof("creating user %q token", userRef)
-	token, err := h.ch.CreateUserToken(ctx, creq)
+	token, err := h.ah.CreateUserToken(ctx, creq)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
@@ -416,15 +416,15 @@ type RegisterUserRequest struct {
 
 type RegisterUserHandler struct {
 	log *zap.SugaredLogger
-	ch  *command.CommandHandler
+	ah  *action.ActionHandler
 }
 
 type RegisterUserResponse struct {
 	Oauth2Redirect string `json:"oauth2_redirect"`
 }
 
-func NewRegisterUserHandler(logger *zap.Logger, ch *command.CommandHandler) *RegisterUserHandler {
-	return &RegisterUserHandler{log: logger.Sugar(), ch: ch}
+func NewRegisterUserHandler(logger *zap.Logger, ah *action.ActionHandler) *RegisterUserHandler {
+	return &RegisterUserHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *RegisterUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -449,12 +449,12 @@ func (h *RegisterUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *RegisterUserHandler) registerUser(ctx context.Context, req *RegisterUserRequest) (*RegisterUserResponse, error) {
-	creq := &command.RegisterUserRequest{
+	creq := &action.RegisterUserRequest{
 		UserName:         req.CreateUserRequest.UserName,
 		RemoteSourceName: req.CreateUserLARequest.RemoteSourceName,
 	}
 
-	cresp, err := h.ch.HandleRemoteSourceAuth(ctx, req.CreateUserLARequest.RemoteSourceName, req.CreateUserLARequest.RemoteSourceLoginName, req.CreateUserLARequest.RemoteSourceLoginPassword, command.RemoteSourceRequestTypeRegisterUser, creq)
+	cresp, err := h.ah.HandleRemoteSourceAuth(ctx, req.CreateUserLARequest.RemoteSourceName, req.CreateUserLARequest.RemoteSourceLoginName, req.CreateUserLARequest.RemoteSourceLoginPassword, action.RemoteSourceRequestTypeRegisterUser, creq)
 	if err != nil {
 		return nil, err
 	}
@@ -463,7 +463,7 @@ func (h *RegisterUserHandler) registerUser(ctx context.Context, req *RegisterUse
 			Oauth2Redirect: cresp.Oauth2Redirect,
 		}, nil
 	}
-	//authresp := cresp.Response.(*command.RegisterUserResponse)
+	//authresp := cresp.Response.(*action.RegisterUserResponse)
 
 	resp := &RegisterUserResponse{}
 	return resp, nil
@@ -471,7 +471,7 @@ func (h *RegisterUserHandler) registerUser(ctx context.Context, req *RegisterUse
 
 type AuthorizeHandler struct {
 	log *zap.SugaredLogger
-	ch  *command.CommandHandler
+	ah  *action.ActionHandler
 }
 
 type AuthorizeResponse struct {
@@ -480,8 +480,8 @@ type AuthorizeResponse struct {
 	RemoteSourceName string              `json:"remote_source_name"`
 }
 
-func NewAuthorizeHandler(logger *zap.Logger, ch *command.CommandHandler) *AuthorizeHandler {
-	return &AuthorizeHandler{log: logger.Sugar(), ch: ch}
+func NewAuthorizeHandler(logger *zap.Logger, ah *action.ActionHandler) *AuthorizeHandler {
+	return &AuthorizeHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *AuthorizeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -506,11 +506,11 @@ func (h *AuthorizeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthorizeHandler) authorize(ctx context.Context, req *LoginUserRequest) (*AuthorizeResponse, error) {
-	creq := &command.LoginUserRequest{
+	creq := &action.LoginUserRequest{
 		RemoteSourceName: req.RemoteSourceName,
 	}
 
-	cresp, err := h.ch.HandleRemoteSourceAuth(ctx, req.RemoteSourceName, req.LoginName, req.LoginPassword, command.RemoteSourceRequestTypeAuthorize, creq)
+	cresp, err := h.ah.HandleRemoteSourceAuth(ctx, req.RemoteSourceName, req.LoginName, req.LoginPassword, action.RemoteSourceRequestTypeAuthorize, creq)
 	if err != nil {
 		return nil, err
 	}
@@ -519,7 +519,7 @@ func (h *AuthorizeHandler) authorize(ctx context.Context, req *LoginUserRequest)
 			Oauth2Redirect: cresp.Oauth2Redirect,
 		}, nil
 	}
-	authresp := cresp.Response.(*command.AuthorizeResponse)
+	authresp := cresp.Response.(*action.AuthorizeResponse)
 
 	resp := &AuthorizeResponse{
 		RemoteUserInfo:   authresp.RemoteUserInfo,
@@ -542,11 +542,11 @@ type LoginUserResponse struct {
 
 type LoginUserHandler struct {
 	log *zap.SugaredLogger
-	ch  *command.CommandHandler
+	ah  *action.ActionHandler
 }
 
-func NewLoginUserHandler(logger *zap.Logger, ch *command.CommandHandler) *LoginUserHandler {
-	return &LoginUserHandler{log: logger.Sugar(), ch: ch}
+func NewLoginUserHandler(logger *zap.Logger, ah *action.ActionHandler) *LoginUserHandler {
+	return &LoginUserHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *LoginUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -571,12 +571,12 @@ func (h *LoginUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *LoginUserHandler) loginUser(ctx context.Context, req *LoginUserRequest) (*LoginUserResponse, error) {
-	creq := &command.LoginUserRequest{
+	creq := &action.LoginUserRequest{
 		RemoteSourceName: req.RemoteSourceName,
 	}
 
 	h.log.Infof("logging in user")
-	cresp, err := h.ch.HandleRemoteSourceAuth(ctx, req.RemoteSourceName, req.LoginName, req.LoginPassword, command.RemoteSourceRequestTypeLoginUser, creq)
+	cresp, err := h.ah.HandleRemoteSourceAuth(ctx, req.RemoteSourceName, req.LoginName, req.LoginPassword, action.RemoteSourceRequestTypeLoginUser, creq)
 	if err != nil {
 		return nil, err
 	}
@@ -585,7 +585,7 @@ func (h *LoginUserHandler) loginUser(ctx context.Context, req *LoginUserRequest)
 			Oauth2Redirect: cresp.Oauth2Redirect,
 		}, nil
 	}
-	authresp := cresp.Response.(*command.LoginUserResponse)
+	authresp := cresp.Response.(*action.LoginUserResponse)
 
 	resp := &LoginUserResponse{
 		Token: authresp.Token,

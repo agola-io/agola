@@ -26,7 +26,7 @@ import (
 	"github.com/sorintlab/agola/internal/gitsources/agolagit"
 	"github.com/sorintlab/agola/internal/runconfig"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
-	"github.com/sorintlab/agola/internal/services/gateway/command"
+	"github.com/sorintlab/agola/internal/services/gateway/action"
 	"github.com/sorintlab/agola/internal/services/gateway/common"
 	rsapi "github.com/sorintlab/agola/internal/services/runservice/scheduler/api"
 	rstypes "github.com/sorintlab/agola/internal/services/runservice/types"
@@ -108,7 +108,7 @@ func genGroup(baseGroupType GroupType, baseGroupID string, webhookData *types.We
 
 type webhooksHandler struct {
 	log               *zap.SugaredLogger
-	ch                *command.CommandHandler
+	ah                *action.ActionHandler
 	configstoreClient *csapi.Client
 	runserviceClient  *rsapi.Client
 	apiExposedURL     string
@@ -167,7 +167,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 			return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to get remote source %q", la.RemoteSourceID)
 		}
 
-		gitSource, err = h.ch.GetGitSource(ctx, rs, user.Name, la)
+		gitSource, err = h.ah.GetGitSource(ctx, rs, user.Name, la)
 		if err != nil {
 			return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to create gitea client")
 		}

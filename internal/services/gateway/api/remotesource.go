@@ -21,7 +21,7 @@ import (
 
 	"github.com/pkg/errors"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
-	"github.com/sorintlab/agola/internal/services/gateway/command"
+	"github.com/sorintlab/agola/internal/services/gateway/action"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 	"go.uber.org/zap"
@@ -40,11 +40,11 @@ type CreateRemoteSourceRequest struct {
 
 type CreateRemoteSourceHandler struct {
 	log *zap.SugaredLogger
-	ch  *command.CommandHandler
+	ah  *action.ActionHandler
 }
 
-func NewCreateRemoteSourceHandler(logger *zap.Logger, ch *command.CommandHandler) *CreateRemoteSourceHandler {
-	return &CreateRemoteSourceHandler{log: logger.Sugar(), ch: ch}
+func NewCreateRemoteSourceHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateRemoteSourceHandler {
+	return &CreateRemoteSourceHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -57,7 +57,7 @@ func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	creq := &command.CreateRemoteSourceRequest{
+	creq := &action.CreateRemoteSourceRequest{
 		Name:               req.Name,
 		APIURL:             req.APIURL,
 		Type:               req.Type,
@@ -65,7 +65,7 @@ func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		Oauth2ClientID:     req.Oauth2ClientID,
 		Oauth2ClientSecret: req.Oauth2ClientSecret,
 	}
-	rs, err := h.ch.CreateRemoteSource(ctx, creq)
+	rs, err := h.ah.CreateRemoteSource(ctx, creq)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return

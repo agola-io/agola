@@ -25,8 +25,8 @@ import (
 	"github.com/sorintlab/agola/internal/objectstorage"
 	"github.com/sorintlab/agola/internal/services/config"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
+	"github.com/sorintlab/agola/internal/services/gateway/action"
 	"github.com/sorintlab/agola/internal/services/gateway/api"
-	"github.com/sorintlab/agola/internal/services/gateway/command"
 	"github.com/sorintlab/agola/internal/services/gateway/common"
 	"github.com/sorintlab/agola/internal/services/gateway/handlers"
 	rsapi "github.com/sorintlab/agola/internal/services/runservice/scheduler/api"
@@ -54,7 +54,7 @@ type Gateway struct {
 	ost               *objectstorage.ObjStorage
 	runserviceClient  *rsapi.Client
 	configstoreClient *csapi.Client
-	ch                *command.CommandHandler
+	ah                *action.ActionHandler
 	sd                *common.TokenSigningData
 }
 
@@ -123,14 +123,14 @@ func NewGateway(gc *config.Config) (*Gateway, error) {
 
 	configstoreClient := csapi.NewClient(c.ConfigStoreURL)
 
-	ch := command.NewCommandHandler(logger, sd, configstoreClient, gc.ID, c.APIExposedURL, c.WebExposedURL)
+	ah := action.NewActionHandler(logger, sd, configstoreClient, gc.ID, c.APIExposedURL, c.WebExposedURL)
 
 	return &Gateway{
 		c:                 c,
 		ost:               ost,
 		runserviceClient:  rsapi.NewClient(c.RunServiceURL),
 		configstoreClient: configstoreClient,
-		ch:                ch,
+		ah:                ah,
 		sd:                sd,
 	}, nil
 }
@@ -146,17 +146,17 @@ func (g *Gateway) Run(ctx context.Context) error {
 	corsAllowedOriginsOptions := ghandlers.AllowedOrigins([]string{"*"})
 	corsHandler = ghandlers.CORS(corsAllowedMethodsOptions, corsAllowedHeadersOptions, corsAllowedOriginsOptions)
 
-	webhooksHandler := &webhooksHandler{log: log, ch: g.ch, configstoreClient: g.configstoreClient, runserviceClient: g.runserviceClient, apiExposedURL: g.c.APIExposedURL}
+	webhooksHandler := &webhooksHandler{log: log, ah: g.ah, configstoreClient: g.configstoreClient, runserviceClient: g.runserviceClient, apiExposedURL: g.c.APIExposedURL}
 
 	projectGroupHandler := api.NewProjectGroupHandler(logger, g.configstoreClient)
 	projectGroupSubgroupsHandler := api.NewProjectGroupSubgroupsHandler(logger, g.configstoreClient)
 	projectGroupProjectsHandler := api.NewProjectGroupProjectsHandler(logger, g.configstoreClient)
-	createProjectGroupHandler := api.NewCreateProjectGroupHandler(logger, g.ch, g.configstoreClient, g.c.APIExposedURL)
+	createProjectGroupHandler := api.NewCreateProjectGroupHandler(logger, g.ah, g.configstoreClient, g.c.APIExposedURL)
 
 	projectHandler := api.NewProjectHandler(logger, g.configstoreClient)
-	createProjectHandler := api.NewCreateProjectHandler(logger, g.ch, g.configstoreClient, g.c.APIExposedURL)
+	createProjectHandler := api.NewCreateProjectHandler(logger, g.ah, g.configstoreClient, g.c.APIExposedURL)
 	deleteProjectHandler := api.NewDeleteProjectHandler(logger, g.configstoreClient)
-	projectReconfigHandler := api.NewProjectReconfigHandler(logger, g.ch, g.configstoreClient, g.c.APIExposedURL)
+	projectReconfigHandler := api.NewProjectReconfigHandler(logger, g.ah, g.configstoreClient, g.c.APIExposedURL)
 
 	secretHandler := api.NewSecretHandler(logger, g.configstoreClient)
 	createSecretHandler := api.NewCreateSecretHandler(logger, g.configstoreClient)
@@ -169,21 +169,21 @@ func (g *Gateway) Run(ctx context.Context) error {
 	currentUserHandler := api.NewCurrentUserHandler(logger, g.configstoreClient)
 	userHandler := api.NewUserHandler(logger, g.configstoreClient)
 	usersHandler := api.NewUsersHandler(logger, g.configstoreClient)
-	createUserHandler := api.NewCreateUserHandler(logger, g.ch)
+	createUserHandler := api.NewCreateUserHandler(logger, g.ah)
 	deleteUserHandler := api.NewDeleteUserHandler(logger, g.configstoreClient)
 
-	createUserLAHandler := api.NewCreateUserLAHandler(logger, g.ch)
+	createUserLAHandler := api.NewCreateUserLAHandler(logger, g.ah)
 	deleteUserLAHandler := api.NewDeleteUserLAHandler(logger, g.configstoreClient)
-	createUserTokenHandler := api.NewCreateUserTokenHandler(logger, g.ch)
+	createUserTokenHandler := api.NewCreateUserTokenHandler(logger, g.ah)
 	deleteUserTokenHandler := api.NewDeleteUserTokenHandler(logger, g.configstoreClient)
 
 	remoteSourceHandler := api.NewRemoteSourceHandler(logger, g.configstoreClient)
-	createRemoteSourceHandler := api.NewCreateRemoteSourceHandler(logger, g.ch)
+	createRemoteSourceHandler := api.NewCreateRemoteSourceHandler(logger, g.ah)
 	remoteSourcesHandler := api.NewRemoteSourcesHandler(logger, g.configstoreClient)
 
 	orgHandler := api.NewOrgHandler(logger, g.configstoreClient)
 	orgsHandler := api.NewOrgsHandler(logger, g.configstoreClient)
-	createOrgHandler := api.NewCreateOrgHandler(logger, g.ch)
+	createOrgHandler := api.NewCreateOrgHandler(logger, g.ah)
 	deleteOrgHandler := api.NewDeleteOrgHandler(logger, g.configstoreClient)
 
 	runHandler := api.NewRunHandler(logger, g.runserviceClient)
@@ -195,12 +195,12 @@ func (g *Gateway) Run(ctx context.Context) error {
 	logsHandler := api.NewLogsHandler(logger, g.runserviceClient)
 
 	reposHandler := api.NewReposHandler(logger, g.c.GitServerURL)
-	userRemoteReposHandler := api.NewUserRemoteReposHandler(logger, g.ch, g.configstoreClient)
+	userRemoteReposHandler := api.NewUserRemoteReposHandler(logger, g.ah, g.configstoreClient)
 
-	loginUserHandler := api.NewLoginUserHandler(logger, g.ch)
-	authorizeHandler := api.NewAuthorizeHandler(logger, g.ch)
-	registerHandler := api.NewRegisterUserHandler(logger, g.ch)
-	oauth2callbackHandler := api.NewOAuth2CallbackHandler(logger, g.ch, g.configstoreClient)
+	loginUserHandler := api.NewLoginUserHandler(logger, g.ah)
+	authorizeHandler := api.NewAuthorizeHandler(logger, g.ah)
+	registerHandler := api.NewRegisterUserHandler(logger, g.ah)
+	oauth2callbackHandler := api.NewOAuth2CallbackHandler(logger, g.ah, g.configstoreClient)
 
 	router := mux.NewRouter()
 

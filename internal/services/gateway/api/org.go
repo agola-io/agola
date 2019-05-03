@@ -21,7 +21,7 @@ import (
 
 	"github.com/pkg/errors"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
-	"github.com/sorintlab/agola/internal/services/gateway/command"
+	"github.com/sorintlab/agola/internal/services/gateway/action"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 	"go.uber.org/zap"
@@ -35,11 +35,11 @@ type CreateOrgRequest struct {
 
 type CreateOrgHandler struct {
 	log *zap.SugaredLogger
-	ch  *command.CommandHandler
+	ah  *action.ActionHandler
 }
 
-func NewCreateOrgHandler(logger *zap.Logger, ch *command.CommandHandler) *CreateOrgHandler {
-	return &CreateOrgHandler{log: logger.Sugar(), ch: ch}
+func NewCreateOrgHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateOrgHandler {
+	return &CreateOrgHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -59,12 +59,12 @@ func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	creq := &command.CreateOrgRequest{
+	creq := &action.CreateOrgRequest{
 		Name:          req.Name,
 		CreatorUserID: userID,
 	}
 
-	org, err := h.ch.CreateOrg(ctx, creq)
+	org, err := h.ah.CreateOrg(ctx, creq)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return

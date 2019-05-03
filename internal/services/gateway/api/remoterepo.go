@@ -19,7 +19,7 @@ import (
 
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
-	"github.com/sorintlab/agola/internal/services/gateway/command"
+	"github.com/sorintlab/agola/internal/services/gateway/action"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
@@ -44,12 +44,12 @@ func createRemoteRepoResponse(r *gitsource.RepoInfo) *RemoteRepoResponse {
 
 type UserRemoteReposHandler struct {
 	log               *zap.SugaredLogger
-	ch                *command.CommandHandler
+	ah                *action.ActionHandler
 	configstoreClient *csapi.Client
 }
 
-func NewUserRemoteReposHandler(logger *zap.Logger, ch *command.CommandHandler, configstoreClient *csapi.Client) *UserRemoteReposHandler {
-	return &UserRemoteReposHandler{log: logger.Sugar(), ch: ch, configstoreClient: configstoreClient}
+func NewUserRemoteReposHandler(logger *zap.Logger, ah *action.ActionHandler, configstoreClient *csapi.Client) *UserRemoteReposHandler {
+	return &UserRemoteReposHandler{log: logger.Sugar(), ah: ah, configstoreClient: configstoreClient}
 }
 
 func (h *UserRemoteReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -91,7 +91,7 @@ func (h *UserRemoteReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	gitsource, err := h.ch.GetGitSource(ctx, rs, user.Name, la)
+	gitsource, err := h.ah.GetGitSource(ctx, rs, user.Name, la)
 	if err != nil {
 		httpError(w, util.NewErrBadRequest(errors.Wrapf(err, "failed to create gitsource client")))
 		return

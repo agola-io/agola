@@ -21,7 +21,7 @@ import (
 
 	"github.com/pkg/errors"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
-	"github.com/sorintlab/agola/internal/services/gateway/command"
+	"github.com/sorintlab/agola/internal/services/gateway/action"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
@@ -40,13 +40,13 @@ type CreateProjectRequest struct {
 
 type CreateProjectHandler struct {
 	log               *zap.SugaredLogger
-	ch                *command.CommandHandler
+	ah                *action.ActionHandler
 	configstoreClient *csapi.Client
 	exposedURL        string
 }
 
-func NewCreateProjectHandler(logger *zap.Logger, ch *command.CommandHandler, configstoreClient *csapi.Client, exposedURL string) *CreateProjectHandler {
-	return &CreateProjectHandler{log: logger.Sugar(), ch: ch, configstoreClient: configstoreClient, exposedURL: exposedURL}
+func NewCreateProjectHandler(logger *zap.Logger, ah *action.ActionHandler, configstoreClient *csapi.Client, exposedURL string) *CreateProjectHandler {
+	return &CreateProjectHandler{log: logger.Sugar(), ah: ah, configstoreClient: configstoreClient, exposedURL: exposedURL}
 }
 
 func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -67,7 +67,7 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	userID := userIDVal.(string)
 	h.log.Infof("userID: %q", userID)
 
-	creq := &command.CreateProjectRequest{
+	areq := &action.CreateProjectRequest{
 		Name:                req.Name,
 		ParentID:            req.ParentID,
 		Visibility:          req.Visibility,
@@ -77,7 +77,7 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		SkipSSHHostKeyCheck: req.SkipSSHHostKeyCheck,
 	}
 
-	project, err := h.ch.CreateProject(ctx, creq)
+	project, err := h.ah.CreateProject(ctx, areq)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
@@ -91,13 +91,13 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 
 type ProjectReconfigHandler struct {
 	log               *zap.SugaredLogger
-	ch                *command.CommandHandler
+	ah                *action.ActionHandler
 	configstoreClient *csapi.Client
 	exposedURL        string
 }
 
-func NewProjectReconfigHandler(logger *zap.Logger, ch *command.CommandHandler, configstoreClient *csapi.Client, exposedURL string) *ProjectReconfigHandler {
-	return &ProjectReconfigHandler{log: logger.Sugar(), ch: ch, configstoreClient: configstoreClient, exposedURL: exposedURL}
+func NewProjectReconfigHandler(logger *zap.Logger, ah *action.ActionHandler, configstoreClient *csapi.Client, exposedURL string) *ProjectReconfigHandler {
+	return &ProjectReconfigHandler{log: logger.Sugar(), ah: ah, configstoreClient: configstoreClient, exposedURL: exposedURL}
 }
 
 func (h *ProjectReconfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -109,7 +109,7 @@ func (h *ProjectReconfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if err := h.ch.ReconfigProject(ctx, projectRef); err != nil {
+	if err := h.ah.ReconfigProject(ctx, projectRef); err != nil {
 		httpError(w, err)
 		return
 	}

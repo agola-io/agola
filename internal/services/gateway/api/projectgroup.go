@@ -21,7 +21,7 @@ import (
 
 	"github.com/pkg/errors"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
-	"github.com/sorintlab/agola/internal/services/gateway/command"
+	"github.com/sorintlab/agola/internal/services/gateway/action"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
@@ -37,13 +37,13 @@ type CreateProjectGroupRequest struct {
 
 type CreateProjectGroupHandler struct {
 	log               *zap.SugaredLogger
-	ch                *command.CommandHandler
+	ah                *action.ActionHandler
 	configstoreClient *csapi.Client
 	exposedURL        string
 }
 
-func NewCreateProjectGroupHandler(logger *zap.Logger, ch *command.CommandHandler, configstoreClient *csapi.Client, exposedURL string) *CreateProjectGroupHandler {
-	return &CreateProjectGroupHandler{log: logger.Sugar(), ch: ch, configstoreClient: configstoreClient, exposedURL: exposedURL}
+func NewCreateProjectGroupHandler(logger *zap.Logger, ah *action.ActionHandler, configstoreClient *csapi.Client, exposedURL string) *CreateProjectGroupHandler {
+	return &CreateProjectGroupHandler{log: logger.Sugar(), ah: ah, configstoreClient: configstoreClient, exposedURL: exposedURL}
 }
 
 func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -64,14 +64,14 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	userID := userIDVal.(string)
 	h.log.Infof("userID: %q", userID)
 
-	creq := &command.CreateProjectGroupRequest{
+	creq := &action.CreateProjectGroupRequest{
 		Name:          req.Name,
 		ParentID:      req.ParentID,
 		Visibility:    req.Visibility,
 		CurrentUserID: userID,
 	}
 
-	projectGroup, err := h.ch.CreateProjectGroup(ctx, creq)
+	projectGroup, err := h.ah.CreateProjectGroup(ctx, creq)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return

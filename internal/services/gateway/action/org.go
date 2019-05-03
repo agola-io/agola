@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package command
+package action
 
 import (
 	"context"
@@ -29,7 +29,7 @@ type CreateOrgRequest struct {
 	CreatorUserID string
 }
 
-func (c *CommandHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*types.Organization, error) {
+func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*types.Organization, error) {
 	if req.Name == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("organization name required"))
 	}
@@ -44,12 +44,12 @@ func (c *CommandHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (
 		org.CreatorUserID = req.CreatorUserID
 	}
 
-	c.log.Infof("creating organization")
-	org, resp, err := c.configstoreClient.CreateOrg(ctx, org)
+	h.log.Infof("creating organization")
+	org, resp, err := h.configstoreClient.CreateOrg(ctx, org)
 	if err != nil {
 		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to create organization"))
 	}
-	c.log.Infof("organization %s created, ID: %s", org.Name, org.ID)
+	h.log.Infof("organization %s created, ID: %s", org.Name, org.ID)
 
 	return org, nil
 }

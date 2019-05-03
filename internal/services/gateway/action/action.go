@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package command
+package action
 
 import (
 	"net/http"
@@ -25,7 +25,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type CommandHandler struct {
+type ActionHandler struct {
 	log               *zap.SugaredLogger
 	sd                *common.TokenSigningData
 	configstoreClient *csapi.Client
@@ -34,8 +34,8 @@ type CommandHandler struct {
 	webExposedURL     string
 }
 
-func NewCommandHandler(logger *zap.Logger, sd *common.TokenSigningData, configstoreClient *csapi.Client, agolaID, apiExposedURL, webExposedURL string) *CommandHandler {
-	return &CommandHandler{
+func NewActionHandler(logger *zap.Logger, sd *common.TokenSigningData, configstoreClient *csapi.Client, agolaID, apiExposedURL, webExposedURL string) *ActionHandler {
+	return &ActionHandler{
 		log:               logger.Sugar(),
 		sd:                sd,
 		configstoreClient: configstoreClient,
