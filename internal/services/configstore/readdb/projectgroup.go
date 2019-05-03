@@ -116,23 +116,15 @@ func (r *ReadDB) GetProjectGroupPath(tx *db.Tx, group *types.ProjectGroup) (stri
 	rootGroupID := groups[0].ParentID
 	switch rootGroupType {
 	case types.ConfigTypeOrg:
-		org, err := r.GetOrg(tx, rootGroupID)
-		if err != nil {
-			return "", errors.Wrapf(err, "failed to get org %q", rootGroupID)
-		}
-		if org == nil {
-			return "", errors.Errorf("cannot find org with id %q", rootGroupID)
-		}
-		p = path.Join("org", org.Name)
+		fallthrough
 	case types.ConfigTypeUser:
-		user, err := r.GetUser(tx, rootGroupID)
+		var err error
+		p, err = r.GetPath(tx, rootGroupType, rootGroupID)
 		if err != nil {
-			return "", errors.Wrapf(err, "failed to get user %q", rootGroupID)
+			return "", err
 		}
-		if user == nil {
-			return "", errors.Errorf("cannot find user with id %q", rootGroupID)
-		}
-		p = path.Join("user", user.Name)
+	default:
+		return "", errors.Errorf("invalid root group type %q", rootGroupType)
 	}
 
 	for _, group := range groups {

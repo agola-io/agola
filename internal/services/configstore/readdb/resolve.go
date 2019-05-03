@@ -15,6 +15,8 @@
 package readdb
 
 import (
+	"path"
+
 	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/db"
 	"github.com/sorintlab/agola/internal/services/types"
@@ -75,6 +77,24 @@ func (r *ReadDB) GetPath(tx *db.Tx, configType types.ConfigType, id string) (str
 		if err != nil {
 			return "", err
 		}
+	case types.ConfigTypeOrg:
+		org, err := r.GetOrg(tx, id)
+		if err != nil {
+			return "", errors.Wrapf(err, "failed to get org %q", id)
+		}
+		if org == nil {
+			return "", errors.Errorf("cannot find org with id %q", id)
+		}
+		p = path.Join("org", org.Name)
+	case types.ConfigTypeUser:
+		user, err := r.GetUser(tx, id)
+		if err != nil {
+			return "", errors.Wrapf(err, "failed to get user %q", id)
+		}
+		if user == nil {
+			return "", errors.Errorf("cannot find user with id %q", id)
+		}
+		p = path.Join("user", user.Name)
 	default:
 		return "", errors.Errorf("config type %q doesn't provide a path", configType)
 	}
