@@ -98,13 +98,14 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 			Type: types.ConfigTypeProjectGroup,
 			ID:   parentID,
 		},
-		Visibility:          req.Visibility,
-		RemoteSourceID:      rs.ID,
-		LinkedAccountID:     la.ID,
-		RepositoryID:        repo.ID,
-		RepositoryPath:      req.RepoPath,
-		SkipSSHHostKeyCheck: req.SkipSSHHostKeyCheck,
-		SSHPrivateKey:       string(privateKey),
+		Visibility:                 req.Visibility,
+		RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeRemoteSource,
+		RemoteSourceID:             rs.ID,
+		LinkedAccountID:            la.ID,
+		RepositoryID:               repo.ID,
+		RepositoryPath:             req.RepoPath,
+		SkipSSHHostKeyCheck:        req.SkipSSHHostKeyCheck,
+		SSHPrivateKey:              string(privateKey),
 	}
 
 	c.log.Infof("creating project")

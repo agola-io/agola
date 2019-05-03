@@ -148,6 +148,27 @@ type LinkedAccount struct {
 	Oauth2AccessTokenExpiresAt time.Time `json:"oauth_2_access_token_expires_at,omitempty"`
 }
 
+// RemoteRepositoryConfigType defines how a remote repository is configured and
+// managed. Currently only "remotesource" is supported.
+// In future other config types (like a fully manual config) could be supported.
+type RemoteRepositoryConfigType string
+
+const (
+	// RemoteRepositoryConfigTypeManual is currently only used for tests and not available for direct usage
+	RemoteRepositoryConfigTypeManual       RemoteRepositoryConfigType = "manual"
+	RemoteRepositoryConfigTypeRemoteSource RemoteRepositoryConfigType = "remotesource"
+)
+
+func IsValidRemoteRepositoryConfigType(t RemoteRepositoryConfigType) bool {
+	switch t {
+	case RemoteRepositoryConfigTypeManual:
+	case RemoteRepositoryConfigTypeRemoteSource:
+	default:
+		return false
+	}
+	return true
+}
+
 type Project struct {
 	// The type version. Increase when a breaking change is done. Usually not
 	// needed when adding fields.
@@ -161,6 +182,8 @@ type Project struct {
 	Visibility Visibility `json:"visibility,omitempty"`
 
 	// Remote Repository fields
+	RemoteRepositoryConfigType RemoteRepositoryConfigType `json:"remote_repository_config_type,omitempty"`
+
 	RemoteSourceID  string `json:"remote_source_id,omitempty"`
 	LinkedAccountID string `json:"linked_account_id,omitempty"`
 

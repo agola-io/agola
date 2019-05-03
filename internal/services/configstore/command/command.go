@@ -135,6 +135,9 @@ func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Proje
 	if !types.IsValidVisibility(project.Visibility) {
 		return nil, util.NewErrBadRequest(errors.Errorf("invalid project visibility"))
 	}
+	if !types.IsValidRemoteRepositoryConfigType(project.RemoteRepositoryConfigType) {
+		return nil, util.NewErrBadRequest(errors.Errorf("invalid project remote repository config type %q", project.RemoteRepositoryConfigType))
+	}
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
@@ -181,17 +184,22 @@ func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Proje
 			return util.NewErrBadRequest(errors.Errorf("project group with name %q, path %q already exists", pg.Name, pp))
 		}
 
-		// check that the linked account matches the remote source
-		user, err := s.readDB.GetUserByLinkedAccount(tx, project.LinkedAccountID)
-		if err != nil {
-			return errors.Wrapf(err, "failed to get user with linked account id %q", project.LinkedAccountID)
-		}
-		la, ok := user.LinkedAccounts[project.LinkedAccountID]
-		if !ok {
-			return util.NewErrBadRequest(errors.Errorf("linked account id %q for user %q doesn't exist", project.LinkedAccountID, user.Name))
-		}
-		if la.RemoteSourceID != project.RemoteSourceID {
-			return util.NewErrBadRequest(errors.Errorf("linked account id %q remote source %q different than project remote source %q", project.LinkedAccountID, la.RemoteSourceID, project.RemoteSourceID))
+		if project.RemoteRepositoryConfigType == types.RemoteRepositoryConfigTypeRemoteSource {
+			// check that the linked account matches the remote source
+			user, err := s.readDB.GetUserByLinkedAccount(tx, project.LinkedAccountID)
+			if err != nil {
+				return errors.Wrapf(err, "failed to get user with linked account id %q", project.LinkedAccountID)
+			}
+			if user == nil {
+				return util.NewErrBadRequest(errors.Errorf("user for linked account %q doesn't exist", project.LinkedAccountID))
+			}
+			la, ok := user.LinkedAccounts[project.LinkedAccountID]
+			if !ok {
+				return util.NewErrBadRequest(errors.Errorf("linked account id %q for user %q doesn't exist", project.LinkedAccountID, user.Name))
+			}
+			if la.RemoteSourceID != project.RemoteSourceID {
+				return util.NewErrBadRequest(errors.Errorf("linked account id %q remote source %q different than project remote source %q", project.LinkedAccountID, la.RemoteSourceID, project.RemoteSourceID))
+			}
 		}
 
 		return nil
