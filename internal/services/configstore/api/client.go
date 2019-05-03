@@ -323,6 +323,17 @@ func (c *Client) CreateUser(ctx context.Context, req *CreateUserRequest) (*types
 	return user, resp, err
 }
 
+func (c *Client) UpdateUser(ctx context.Context, userID string, req *UpdateUserRequest) (*types.User, *http.Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	user := new(types.User)
+	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/users/%s", userID), nil, jsonContent, bytes.NewReader(reqj), user)
+	return user, resp, err
+}
+
 func (c *Client) DeleteUser(ctx context.Context, userName string) (*http.Response, error) {
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/users/%s", userName), nil, jsonContent, nil)
 }

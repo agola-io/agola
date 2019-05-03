@@ -152,6 +152,50 @@ func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type UpdateUserRequest struct {
+	UserName string `json:"user_name"`
+
+	UpdateUserLARequest *UpdateUserLARequest `json:"create_user_la_request"`
+}
+
+type UpdateUserHandler struct {
+	log *zap.SugaredLogger
+	ch  *command.CommandHandler
+}
+
+func NewUpdateUserHandler(logger *zap.Logger, ch *command.CommandHandler) *UpdateUserHandler {
+	return &UpdateUserHandler{log: logger.Sugar(), ch: ch}
+}
+
+func (h *UpdateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	vars := mux.Vars(r)
+	userID := vars["userid"]
+
+	var req *UpdateUserRequest
+	d := json.NewDecoder(r.Body)
+	if err := d.Decode(&req); err != nil {
+		httpError(w, util.NewErrBadRequest(err))
+		return
+	}
+
+	creq := &command.UpdateUserRequest{
+		UserID:   userID,
+		UserName: req.UserName,
+	}
+
+	user, err := h.ch.UpdateUser(ctx, creq)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	if err := httpResponse(w, http.StatusCreated, user); err != nil {
+		h.log.Errorf("err: %+v", err)
+	}
+}
+
 type DeleteUserHandler struct {
 	log *zap.SugaredLogger
 	ch  *command.CommandHandler

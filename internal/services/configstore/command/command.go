@@ -180,6 +180,20 @@ func (s *CommandHandler) CreateProject(ctx context.Context, project *types.Proje
 		if pg != nil {
 			return util.NewErrBadRequest(errors.Errorf("project group with name %q, path %q already exists", pg.Name, pp))
 		}
+
+		// check that the linked account matches the remote source
+		user, err := s.readDB.GetUserByLinkedAccount(tx, project.LinkedAccountID)
+		if err != nil {
+			return errors.Wrapf(err, "failed to get user with linked account id %q", project.LinkedAccountID)
+		}
+		la, ok := user.LinkedAccounts[project.LinkedAccountID]
+		if !ok {
+			return util.NewErrBadRequest(errors.Errorf("linked account id %q for user %q doesn't exist", project.LinkedAccountID, user.Name))
+		}
+		if la.RemoteSourceID != project.RemoteSourceID {
+			return util.NewErrBadRequest(errors.Errorf("linked account id %q remote source %q different than project remote source %q", project.LinkedAccountID, la.RemoteSourceID, project.RemoteSourceID))
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -405,6 +419,76 @@ func (s *CommandHandler) DeleteUser(ctx context.Context, userName string) error 
 
 	_, err = s.dm.WriteWal(ctx, actions, cgt)
 	return err
+}
+
+type UpdateUserRequest struct {
+	UserID string
+
+	UserName string
+}
+
+func (s *CommandHandler) UpdateUser(ctx context.Context, req *UpdateUserRequest) (*types.User, error) {
+	var cgt *datamanager.ChangeGroupsUpdateToken
+
+	cgNames := []string{}
+	var user *types.User
+
+	// must do all the check in a single transaction to avoid concurrent changes
+	err := s.readDB.Do(func(tx *db.Tx) error {
+		var err error
+		user, err = s.readDB.GetUserByName(tx, req.UserName)
+		if err != nil {
+			return err
+		}
+		if user == nil {
+			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", req.UserName))
+		}
+
+		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		if err != nil {
+			return err
+		}
+
+		if req.UserName != "" {
+			// check duplicate user name
+			u, err := s.readDB.GetUserByName(tx, req.UserName)
+			if err != nil {
+				return err
+			}
+			if u != nil {
+				return util.NewErrBadRequest(errors.Errorf("user with name %q already exists", u.Name))
+			}
+			// changegroup is the username (and in future the email) to ensure no
+			// concurrent user creation/modification using the same name
+			cgNames = append(cgNames, util.EncodeSha256Hex("username-"+req.UserName))
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if req.UserName != "" {
+		user.Name = req.UserName
+	}
+
+	userj, err := json.Marshal(user)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to marshal user")
+	}
+
+	actions := []*datamanager.Action{
+		{
+			ActionType: datamanager.ActionTypePut,
+			DataType:   string(types.ConfigTypeUser),
+			ID:         user.ID,
+			Data:       userj,
+		},
+	}
+
+	_, err = s.dm.WriteWal(ctx, actions, cgt)
+	return user, err
 }
 
 type CreateUserLARequest struct {

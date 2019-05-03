@@ -145,6 +145,7 @@ func (s *ConfigStore) Run(ctx context.Context) error {
 	usersHandler := api.NewUsersHandler(logger, s.readDB)
 	userByNameHandler := api.NewUserByNameHandler(logger, s.readDB)
 	createUserHandler := api.NewCreateUserHandler(logger, s.ch)
+	updateUserHandler := api.NewUpdateUserHandler(logger, s.ch)
 	deleteUserHandler := api.NewDeleteUserHandler(logger, s.ch)
 
 	createUserLAHandler := api.NewCreateUserLAHandler(logger, s.ch)
@@ -196,6 +197,7 @@ func (s *ConfigStore) Run(ctx context.Context) error {
 	apirouter.Handle("/users", usersHandler).Methods("GET")
 	apirouter.Handle("/users", createUserHandler).Methods("POST")
 	apirouter.Handle("/users/{username}", userByNameHandler).Methods("GET")
+	apirouter.Handle("/users/{userid}", updateUserHandler).Methods("PUT")
 	apirouter.Handle("/users/{username}", deleteUserHandler).Methods("DELETE")
 
 	apirouter.Handle("/users/{username}/linkedaccounts", createUserLAHandler).Methods("POST")
