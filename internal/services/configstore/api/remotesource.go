@@ -41,12 +41,12 @@ func NewRemoteSourceHandler(logger *zap.Logger, readDB *readdb.ReadDB) *RemoteSo
 
 func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	remoteSourceID := vars["id"]
+	rsRef := vars["remotesourceref"]
 
 	var remoteSource *types.RemoteSource
 	err := h.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		remoteSource, err = h.readDB.GetRemoteSource(tx, remoteSourceID)
+		remoteSource, err = h.readDB.GetRemoteSource(tx, rsRef)
 		return err
 	})
 	if err != nil {
@@ -56,42 +56,7 @@ func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if remoteSource == nil {
-		httpError(w, util.NewErrNotFound(errors.Errorf("remote source %q doesn't exist", remoteSourceID)))
-		return
-	}
-
-	if err := httpResponse(w, http.StatusOK, remoteSource); err != nil {
-		h.log.Errorf("err: %+v", err)
-	}
-}
-
-type RemoteSourceByNameHandler struct {
-	log    *zap.SugaredLogger
-	readDB *readdb.ReadDB
-}
-
-func NewRemoteSourceByNameHandler(logger *zap.Logger, readDB *readdb.ReadDB) *RemoteSourceByNameHandler {
-	return &RemoteSourceByNameHandler{log: logger.Sugar(), readDB: readDB}
-}
-
-func (h *RemoteSourceByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	remoteSourceName := vars["name"]
-
-	var remoteSource *types.RemoteSource
-	err := h.readDB.Do(func(tx *db.Tx) error {
-		var err error
-		remoteSource, err = h.readDB.GetRemoteSourceByName(tx, remoteSourceName)
-		return err
-	})
-	if err != nil {
-		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
-	}
-
-	if remoteSource == nil {
-		httpError(w, util.NewErrNotFound(errors.Errorf("remote source %q doesn't exist", remoteSourceName)))
+		httpError(w, util.NewErrNotFound(errors.Errorf("remote source %q doesn't exist", rsRef)))
 		return
 	}
 
@@ -144,9 +109,9 @@ func (h *DeleteRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	ctx := r.Context()
 
 	vars := mux.Vars(r)
-	remoteSourceName := vars["name"]
+	rsRef := vars["remotesourceref"]
 
-	err := h.ch.DeleteRemoteSource(ctx, remoteSourceName)
+	err := h.ch.DeleteRemoteSource(ctx, rsRef)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 	}

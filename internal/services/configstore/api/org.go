@@ -41,12 +41,12 @@ func NewOrgHandler(logger *zap.Logger, readDB *readdb.ReadDB) *OrgHandler {
 
 func (h *OrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	orgID := vars["orgid"]
+	orgRef := vars["orgref"]
 
 	var org *types.Organization
 	err := h.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		org, err = h.readDB.GetOrg(tx, orgID)
+		org, err = h.readDB.GetOrg(tx, orgRef)
 		return err
 	})
 	if err != nil {
@@ -56,42 +56,7 @@ func (h *OrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if org == nil {
-		httpError(w, util.NewErrNotFound(errors.Errorf("org %q doesn't exist", orgID)))
-		return
-	}
-
-	if err := httpResponse(w, http.StatusOK, org); err != nil {
-		h.log.Errorf("err: %+v", err)
-	}
-}
-
-type OrgByNameHandler struct {
-	log    *zap.SugaredLogger
-	readDB *readdb.ReadDB
-}
-
-func NewOrgByNameHandler(logger *zap.Logger, readDB *readdb.ReadDB) *OrgByNameHandler {
-	return &OrgByNameHandler{log: logger.Sugar(), readDB: readDB}
-}
-
-func (h *OrgByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	orgName := vars["orgname"]
-
-	var org *types.Organization
-	err := h.readDB.Do(func(tx *db.Tx) error {
-		var err error
-		org, err = h.readDB.GetOrgByName(tx, orgName)
-		return err
-	})
-	if err != nil {
-		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
-	}
-
-	if org == nil {
-		httpError(w, util.NewErrNotFound(errors.Errorf("org %q doesn't exist", orgName)))
+		httpError(w, util.NewErrNotFound(errors.Errorf("org %q doesn't exist", orgRef)))
 		return
 	}
 
@@ -144,9 +109,9 @@ func (h *DeleteOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	vars := mux.Vars(r)
-	orgName := vars["orgname"]
+	orgRef := vars["orgref"]
 
-	err := h.ch.DeleteOrg(ctx, orgName)
+	err := h.ch.DeleteOrg(ctx, orgRef)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 	}

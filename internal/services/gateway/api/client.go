@@ -229,9 +229,9 @@ func (c *Client) GetCurrentUser(ctx context.Context) (*UserResponse, *http.Respo
 	return user, resp, err
 }
 
-func (c *Client) GetUser(ctx context.Context, userID string) (*UserResponse, *http.Response, error) {
+func (c *Client) GetUser(ctx context.Context, userRef string) (*UserResponse, *http.Response, error) {
 	user := new(UserResponse)
-	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/user/%s", userID), nil, jsonContent, nil, user)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/users/%s", userRef), nil, jsonContent, nil, user)
 	return user, resp, err
 }
 
@@ -263,23 +263,23 @@ func (c *Client) CreateUser(ctx context.Context, req *CreateUserRequest) (*UserR
 	return user, resp, err
 }
 
-func (c *Client) DeleteUser(ctx context.Context, userName string) (*http.Response, error) {
-	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/users/%s", userName), nil, jsonContent, nil)
+func (c *Client) DeleteUser(ctx context.Context, userRef string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/users/%s", userRef), nil, jsonContent, nil)
 }
 
-func (c *Client) CreateUserLA(ctx context.Context, userName string, req *CreateUserLARequest) (*CreateUserLAResponse, *http.Response, error) {
+func (c *Client) CreateUserLA(ctx context.Context, userRef string, req *CreateUserLARequest) (*CreateUserLAResponse, *http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	la := new(CreateUserLAResponse)
-	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/users/%s/linkedaccounts", userName), nil, jsonContent, bytes.NewReader(reqj), la)
+	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/users/%s/linkedaccounts", userRef), nil, jsonContent, bytes.NewReader(reqj), la)
 	return la, resp, err
 }
 
-func (c *Client) DeleteUserLA(ctx context.Context, userName, laID string) (*http.Response, error) {
-	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/users/%s/linkedaccounts/%s", userName, laID), nil, jsonContent, nil)
+func (c *Client) DeleteUserLA(ctx context.Context, userRef, laID string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/users/%s/linkedaccounts/%s", userRef, laID), nil, jsonContent, nil)
 }
 
 func (c *Client) RegisterUser(ctx context.Context, req *RegisterUserRequest) (*RegisterUserResponse, *http.Response, error) {
@@ -293,19 +293,19 @@ func (c *Client) RegisterUser(ctx context.Context, req *RegisterUserRequest) (*R
 	return res, resp, err
 }
 
-func (c *Client) CreateUserToken(ctx context.Context, userName string, req *CreateUserTokenRequest) (*CreateUserTokenResponse, *http.Response, error) {
+func (c *Client) CreateUserToken(ctx context.Context, userRef string, req *CreateUserTokenRequest) (*CreateUserTokenResponse, *http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	tresp := new(CreateUserTokenResponse)
-	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/users/%s/tokens", userName), nil, jsonContent, bytes.NewReader(reqj), tresp)
+	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/users/%s/tokens", userRef), nil, jsonContent, bytes.NewReader(reqj), tresp)
 	return tresp, resp, err
 }
 
-func (c *Client) DeleteUserToken(ctx context.Context, userName, tokenName string) (*http.Response, error) {
-	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/users/%s/tokens/%s", userName, tokenName), nil, jsonContent, nil)
+func (c *Client) DeleteUserToken(ctx context.Context, userRef, tokenName string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/users/%s/tokens/%s", userRef, tokenName), nil, jsonContent, nil)
 }
 
 func (c *Client) GetRun(ctx context.Context, runID string) (*RunResponse, *http.Response, error) {
@@ -340,9 +340,9 @@ func (c *Client) GetRuns(ctx context.Context, phaseFilter, groups, runGroups []s
 	return getRunsResponse, resp, err
 }
 
-func (c *Client) GetRemoteSource(ctx context.Context, rsID string) (*RemoteSourceResponse, *http.Response, error) {
+func (c *Client) GetRemoteSource(ctx context.Context, rsRef string) (*RemoteSourceResponse, *http.Response, error) {
 	rs := new(RemoteSourceResponse)
-	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/remotesource/%s", rsID), nil, jsonContent, nil, rs)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/remotesources/%s", rsRef), nil, jsonContent, nil, rs)
 	return rs, resp, err
 }
 
@@ -374,8 +374,8 @@ func (c *Client) CreateRemoteSource(ctx context.Context, req *CreateRemoteSource
 	return rs, resp, err
 }
 
-func (c *Client) DeleteRemoteSource(ctx context.Context, name string) (*http.Response, error) {
-	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/remotesources/%s", name), nil, jsonContent, nil)
+func (c *Client) DeleteRemoteSource(ctx context.Context, rsRef string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/remotesources/%s", rsRef), nil, jsonContent, nil)
 }
 
 func (c *Client) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*OrgResponse, *http.Response, error) {
@@ -389,6 +389,6 @@ func (c *Client) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*OrgResp
 	return org, resp, err
 }
 
-func (c *Client) DeleteOrg(ctx context.Context, orgName string) (*http.Response, error) {
-	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/orgs/%s", orgName), nil, jsonContent, nil)
+func (c *Client) DeleteOrg(ctx context.Context, orgRef string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/orgs/%s", orgRef), nil, jsonContent, nil)
 }

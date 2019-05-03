@@ -83,9 +83,9 @@ func NewDeleteUserHandler(logger *zap.Logger, configstoreClient *csapi.Client) *
 func (h *DeleteUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	userName := vars["username"]
+	userRef := vars["userref"]
 
-	resp, err := h.configstoreClient.DeleteUser(ctx, userName)
+	resp, err := h.configstoreClient.DeleteUser(ctx, userRef)
 	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
 		return
@@ -139,35 +139,9 @@ func NewUserHandler(logger *zap.Logger, configstoreClient *csapi.Client) *UserHa
 func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	userID := vars["userid"]
+	userRef := vars["userref"]
 
-	user, resp, err := h.configstoreClient.GetUser(ctx, userID)
-	if httpErrorFromRemote(w, resp, err) {
-		h.log.Errorf("err: %+v", err)
-		return
-	}
-
-	res := createUserResponse(user)
-	if err := httpResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
-	}
-}
-
-type UserByNameHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
-}
-
-func NewUserByNameHandler(logger *zap.Logger, configstoreClient *csapi.Client) *UserByNameHandler {
-	return &UserByNameHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
-}
-
-func (h *UserByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	vars := mux.Vars(r)
-	userName := vars["username"]
-
-	user, resp, err := h.configstoreClient.GetUserByName(ctx, userName)
+	user, resp, err := h.configstoreClient.GetUser(ctx, userRef)
 	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
 		return
@@ -288,7 +262,7 @@ func NewCreateUserLAHandler(logger *zap.Logger, ch *command.CommandHandler) *Cre
 func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	userName := vars["username"]
+	userRef := vars["userref"]
 
 	var req *CreateUserLARequest
 	d := json.NewDecoder(r.Body)
@@ -297,7 +271,7 @@ func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	res, err := h.createUserLA(ctx, userName, req)
+	res, err := h.createUserLA(ctx, userRef, req)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
@@ -308,9 +282,9 @@ func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-func (h *CreateUserLAHandler) createUserLA(ctx context.Context, userName string, req *CreateUserLARequest) (*CreateUserLAResponse, error) {
+func (h *CreateUserLAHandler) createUserLA(ctx context.Context, userRef string, req *CreateUserLARequest) (*CreateUserLAResponse, error) {
 	creq := &command.CreateUserLARequest{
-		UserName:         userName,
+		UserRef:          userRef,
 		RemoteSourceName: req.RemoteSourceName,
 	}
 
@@ -329,7 +303,7 @@ func (h *CreateUserLAHandler) createUserLA(ctx context.Context, userName string,
 	resp := &CreateUserLAResponse{
 		LinkedAccount: authresp.LinkedAccount,
 	}
-	h.log.Infof("linked account %q for user %q created", resp.LinkedAccount.ID, userName)
+	h.log.Infof("linked account %q for user %q created", resp.LinkedAccount.ID, userRef)
 	return resp, nil
 }
 
@@ -345,10 +319,10 @@ func NewDeleteUserLAHandler(logger *zap.Logger, configstoreClient *csapi.Client)
 func (h *DeleteUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	userName := vars["username"]
+	userRef := vars["userref"]
 	laID := vars["laid"]
 
-	resp, err := h.configstoreClient.DeleteUserLA(ctx, userName, laID)
+	resp, err := h.configstoreClient.DeleteUserLA(ctx, userRef, laID)
 	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
 		return
@@ -379,7 +353,7 @@ func NewCreateUserTokenHandler(logger *zap.Logger, ch *command.CommandHandler) *
 func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	userName := vars["username"]
+	userRef := vars["userref"]
 
 	var req CreateUserTokenRequest
 	d := json.NewDecoder(r.Body)
@@ -389,10 +363,10 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	}
 
 	creq := &command.CreateUserTokenRequest{
-		UserName:  userName,
+		UserRef:   userRef,
 		TokenName: req.TokenName,
 	}
-	h.log.Infof("creating user %q token", userName)
+	h.log.Infof("creating user %q token", userRef)
 	token, err := h.ch.CreateUserToken(ctx, creq)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
@@ -420,11 +394,11 @@ func NewDeleteUserTokenHandler(logger *zap.Logger, configstoreClient *csapi.Clie
 func (h *DeleteUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	userName := vars["username"]
+	userRef := vars["userref"]
 	tokenName := vars["tokenname"]
 
-	h.log.Infof("deleting user %q token %q", userName, tokenName)
-	resp, err := h.configstoreClient.DeleteUserToken(ctx, userName, tokenName)
+	h.log.Infof("deleting user %q token %q", userRef, tokenName)
+	resp, err := h.configstoreClient.DeleteUserToken(ctx, userRef, tokenName)
 	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
 		return

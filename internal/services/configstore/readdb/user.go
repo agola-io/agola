@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 
 	"github.com/sorintlab/agola/internal/db"
+	"github.com/sorintlab/agola/internal/services/configstore/common"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
@@ -146,7 +147,23 @@ func (r *ReadDB) deleteUserToken(tx *db.Tx, tokenValue string) error {
 	return nil
 }
 
-func (r *ReadDB) GetUser(tx *db.Tx, userID string) (*types.User, error) {
+func (r *ReadDB) GetUser(tx *db.Tx, userRef string) (*types.User, error) {
+	refType, err := common.ParseNameRef(userRef)
+	if err != nil {
+		return nil, err
+	}
+
+	var user *types.User
+	switch refType {
+	case common.RefTypeID:
+		user, err = r.GetUserByID(tx, userRef)
+	case common.RefTypeName:
+		user, err = r.GetUserByName(tx, userRef)
+	}
+	return user, err
+}
+
+func (r *ReadDB) GetUserByID(tx *db.Tx, userID string) (*types.User, error) {
 	q, args, err := userSelect.Where(sq.Eq{"id": userID}).ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {

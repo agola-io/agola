@@ -104,9 +104,9 @@ func NewRemoteSourceHandler(logger *zap.Logger, configstoreClient *csapi.Client)
 func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	rsID := vars["id"]
+	rsRef := vars["remotesourceref"]
 
-	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, rsID)
+	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, rsRef)
 	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
 		return

@@ -23,7 +23,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/db"
 	"github.com/sorintlab/agola/internal/services/configstore/command"
-	"github.com/sorintlab/agola/internal/services/configstore/common"
 	"github.com/sorintlab/agola/internal/services/configstore/readdb"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
@@ -121,21 +120,10 @@ func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	projectRefType, err := common.ParseRef(projectRef)
-	if err != nil {
-		httpError(w, util.NewErrBadRequest(err))
-		return
-	}
-
 	var project *types.Project
 	err = h.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		switch projectRefType {
-		case common.RefTypeID:
-			project, err = h.readDB.GetProject(tx, projectRef)
-		case common.RefTypePath:
-			project, err = h.readDB.GetProjectByPath(tx, projectRef)
-		}
+		project, err = h.readDB.GetProject(tx, projectRef)
 		return err
 	})
 	if err != nil {

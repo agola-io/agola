@@ -53,7 +53,7 @@ func (c *CommandHandler) CreateProject(ctx context.Context, req *CreateProjectRe
 		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get user %q", req.CurrentUserID))
 	}
 
-	rs, resp, err := c.configstoreClient.GetRemoteSourceByName(ctx, req.RemoteSourceName)
+	rs, resp, err := c.configstoreClient.GetRemoteSource(ctx, req.RemoteSourceName)
 	if err != nil {
 		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get remote source %q", req.RemoteSourceName))
 	}

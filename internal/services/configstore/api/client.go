@@ -260,15 +260,9 @@ func (c *Client) DeleteProjectVariable(ctx context.Context, projectRef, variable
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/projects/%s/variables/%s", url.PathEscape(projectRef), variableName), nil, jsonContent, nil)
 }
 
-func (c *Client) GetUser(ctx context.Context, userID string) (*types.User, *http.Response, error) {
+func (c *Client) GetUser(ctx context.Context, userRef string) (*types.User, *http.Response, error) {
 	user := new(types.User)
-	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/user/%s", userID), nil, jsonContent, nil, user)
-	return user, resp, err
-}
-
-func (c *Client) GetUserByName(ctx context.Context, userName string) (*types.User, *http.Response, error) {
-	user := new(types.User)
-	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/users/%s", userName), nil, jsonContent, nil, user)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/users/%s", userRef), nil, jsonContent, nil, user)
 	return user, resp, err
 }
 
@@ -323,19 +317,19 @@ func (c *Client) CreateUser(ctx context.Context, req *CreateUserRequest) (*types
 	return user, resp, err
 }
 
-func (c *Client) UpdateUser(ctx context.Context, userID string, req *UpdateUserRequest) (*types.User, *http.Response, error) {
+func (c *Client) UpdateUser(ctx context.Context, userRef string, req *UpdateUserRequest) (*types.User, *http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	user := new(types.User)
-	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/users/%s", userID), nil, jsonContent, bytes.NewReader(reqj), user)
+	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/users/%s", userRef), nil, jsonContent, bytes.NewReader(reqj), user)
 	return user, resp, err
 }
 
-func (c *Client) DeleteUser(ctx context.Context, userName string) (*http.Response, error) {
-	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/users/%s", userName), nil, jsonContent, nil)
+func (c *Client) DeleteUser(ctx context.Context, userRef string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/users/%s", userRef), nil, jsonContent, nil)
 }
 
 func (c *Client) GetUsers(ctx context.Context, start string, limit int, asc bool) ([]*types.User, *http.Response, error) {
@@ -355,56 +349,50 @@ func (c *Client) GetUsers(ctx context.Context, start string, limit int, asc bool
 	return users, resp, err
 }
 
-func (c *Client) CreateUserLA(ctx context.Context, userName string, req *CreateUserLARequest) (*types.LinkedAccount, *http.Response, error) {
+func (c *Client) CreateUserLA(ctx context.Context, userRef string, req *CreateUserLARequest) (*types.LinkedAccount, *http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	la := new(types.LinkedAccount)
-	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/users/%s/linkedaccounts", userName), nil, jsonContent, bytes.NewReader(reqj), la)
+	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/users/%s/linkedaccounts", userRef), nil, jsonContent, bytes.NewReader(reqj), la)
 	return la, resp, err
 }
 
-func (c *Client) DeleteUserLA(ctx context.Context, userName, laID string) (*http.Response, error) {
-	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/users/%s/linkedaccounts/%s", userName, laID), nil, jsonContent, nil)
+func (c *Client) DeleteUserLA(ctx context.Context, userRef, laID string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/users/%s/linkedaccounts/%s", userRef, laID), nil, jsonContent, nil)
 }
 
-func (c *Client) UpdateUserLA(ctx context.Context, userName, laID string, req *UpdateUserLARequest) (*types.LinkedAccount, *http.Response, error) {
+func (c *Client) UpdateUserLA(ctx context.Context, userRef, laID string, req *UpdateUserLARequest) (*types.LinkedAccount, *http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	la := new(types.LinkedAccount)
-	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/users/%s/linkedaccounts/%s", userName, laID), nil, jsonContent, bytes.NewReader(reqj), la)
+	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/users/%s/linkedaccounts/%s", userRef, laID), nil, jsonContent, bytes.NewReader(reqj), la)
 	return la, resp, err
 }
 
-func (c *Client) CreateUserToken(ctx context.Context, userName string, req *CreateUserTokenRequest) (*CreateUserTokenResponse, *http.Response, error) {
+func (c *Client) CreateUserToken(ctx context.Context, userRef string, req *CreateUserTokenRequest) (*CreateUserTokenResponse, *http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	tresp := new(CreateUserTokenResponse)
-	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/users/%s/tokens", userName), nil, jsonContent, bytes.NewReader(reqj), tresp)
+	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/users/%s/tokens", userRef), nil, jsonContent, bytes.NewReader(reqj), tresp)
 	return tresp, resp, err
 }
 
-func (c *Client) DeleteUserToken(ctx context.Context, userName, tokenName string) (*http.Response, error) {
-	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/users/%s/tokens/%s", userName, tokenName), nil, jsonContent, nil)
+func (c *Client) DeleteUserToken(ctx context.Context, userRef, tokenName string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/users/%s/tokens/%s", userRef, tokenName), nil, jsonContent, nil)
 }
 
-func (c *Client) GetRemoteSource(ctx context.Context, rsID string) (*types.RemoteSource, *http.Response, error) {
+func (c *Client) GetRemoteSource(ctx context.Context, rsRef string) (*types.RemoteSource, *http.Response, error) {
 	rs := new(types.RemoteSource)
-	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/remotesource/%s", rsID), nil, jsonContent, nil, rs)
-	return rs, resp, err
-}
-
-func (c *Client) GetRemoteSourceByName(ctx context.Context, rsName string) (*types.RemoteSource, *http.Response, error) {
-	rs := new(types.RemoteSource)
-	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/remotesources/%s", rsName), nil, jsonContent, nil, rs)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/remotesources/%s", rsRef), nil, jsonContent, nil, rs)
 	return rs, resp, err
 }
 
@@ -436,8 +424,8 @@ func (c *Client) CreateRemoteSource(ctx context.Context, rs *types.RemoteSource)
 	return rs, resp, err
 }
 
-func (c *Client) DeleteRemoteSource(ctx context.Context, name string) (*http.Response, error) {
-	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/remotesources/%s", name), nil, jsonContent, nil)
+func (c *Client) DeleteRemoteSource(ctx context.Context, rsRef string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/remotesources/%s", rsRef), nil, jsonContent, nil)
 }
 
 func (c *Client) CreateOrg(ctx context.Context, org *types.Organization) (*types.Organization, *http.Response, error) {
@@ -451,8 +439,8 @@ func (c *Client) CreateOrg(ctx context.Context, org *types.Organization) (*types
 	return org, resp, err
 }
 
-func (c *Client) DeleteOrg(ctx context.Context, orgname string) (*http.Response, error) {
-	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/orgs/%s", orgname), nil, jsonContent, nil)
+func (c *Client) DeleteOrg(ctx context.Context, orgRef string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/orgs/%s", orgRef), nil, jsonContent, nil)
 }
 
 func (c *Client) GetOrgs(ctx context.Context, start string, limit int, asc bool) ([]*types.Organization, *http.Response, error) {
@@ -472,14 +460,8 @@ func (c *Client) GetOrgs(ctx context.Context, start string, limit int, asc bool)
 	return orgs, resp, err
 }
 
-func (c *Client) GetOrg(ctx context.Context, orgID string) (*types.Organization, *http.Response, error) {
+func (c *Client) GetOrg(ctx context.Context, orgRef string) (*types.Organization, *http.Response, error) {
 	org := new(types.Organization)
-	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/org/%s", orgID), nil, jsonContent, nil, org)
-	return org, resp, err
-}
-
-func (c *Client) GetOrgByName(ctx context.Context, orgname string) (*types.Organization, *http.Response, error) {
-	org := new(types.Organization)
-	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s", orgname), nil, jsonContent, nil, org)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s", orgRef), nil, jsonContent, nil, org)
 	return org, resp, err
 }

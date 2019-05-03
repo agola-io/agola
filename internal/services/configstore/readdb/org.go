@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 
 	"github.com/sorintlab/agola/internal/db"
+	"github.com/sorintlab/agola/internal/services/configstore/common"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
@@ -59,7 +60,23 @@ func (r *ReadDB) deleteOrg(tx *db.Tx, orgID string) error {
 	return nil
 }
 
-func (r *ReadDB) GetOrg(tx *db.Tx, orgID string) (*types.Organization, error) {
+func (r *ReadDB) GetOrg(tx *db.Tx, orgRef string) (*types.Organization, error) {
+	refType, err := common.ParseNameRef(orgRef)
+	if err != nil {
+		return nil, err
+	}
+
+	var org *types.Organization
+	switch refType {
+	case common.RefTypeID:
+		org, err = r.GetOrgByID(tx, orgRef)
+	case common.RefTypeName:
+		org, err = r.GetOrgByName(tx, orgRef)
+	}
+	return org, err
+}
+
+func (r *ReadDB) GetOrgByID(tx *db.Tx, orgID string) (*types.Organization, error) {
 	q, args, err := orgSelect.Where(sq.Eq{"id": orgID}).ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {

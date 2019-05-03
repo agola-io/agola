@@ -135,7 +135,7 @@ func (r *ReadDB) GetProjectGroupPath(tx *db.Tx, group *types.ProjectGroup) (stri
 }
 
 func (r *ReadDB) GetProjectGroup(tx *db.Tx, projectGroupRef string) (*types.ProjectGroup, error) {
-	groupRef, err := common.ParseRef(projectGroupRef)
+	groupRef, err := common.ParsePathRef(projectGroupRef)
 	if err != nil {
 		return nil, err
 	}

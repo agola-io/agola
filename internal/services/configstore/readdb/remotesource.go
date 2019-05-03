@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 
 	"github.com/sorintlab/agola/internal/db"
+	"github.com/sorintlab/agola/internal/services/configstore/common"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
@@ -56,7 +57,23 @@ func (r *ReadDB) deleteRemoteSource(tx *db.Tx, id string) error {
 	return nil
 }
 
-func (r *ReadDB) GetRemoteSource(tx *db.Tx, remoteSourceID string) (*types.RemoteSource, error) {
+func (r *ReadDB) GetRemoteSource(tx *db.Tx, rsRef string) (*types.RemoteSource, error) {
+	refType, err := common.ParseNameRef(rsRef)
+	if err != nil {
+		return nil, err
+	}
+
+	var rs *types.RemoteSource
+	switch refType {
+	case common.RefTypeID:
+		rs, err = r.GetRemoteSourceByID(tx, rsRef)
+	case common.RefTypeName:
+		rs, err = r.GetRemoteSourceByName(tx, rsRef)
+	}
+	return rs, err
+}
+
+func (r *ReadDB) GetRemoteSourceByID(tx *db.Tx, remoteSourceID string) (*types.RemoteSource, error) {
 	q, args, err := remotesourceSelect.Where(sq.Eq{"id": remoteSourceID}).ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {

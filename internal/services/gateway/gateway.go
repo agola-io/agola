@@ -168,7 +168,6 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	currentUserHandler := api.NewCurrentUserHandler(logger, g.configstoreClient)
 	userHandler := api.NewUserHandler(logger, g.configstoreClient)
-	userByNameHandler := api.NewUserByNameHandler(logger, g.configstoreClient)
 	usersHandler := api.NewUsersHandler(logger, g.configstoreClient)
 	createUserHandler := api.NewCreateUserHandler(logger, g.ch)
 	deleteUserHandler := api.NewDeleteUserHandler(logger, g.configstoreClient)
@@ -183,7 +182,6 @@ func (g *Gateway) Run(ctx context.Context) error {
 	remoteSourcesHandler := api.NewRemoteSourcesHandler(logger, g.configstoreClient)
 
 	orgHandler := api.NewOrgHandler(logger, g.configstoreClient)
-	orgByNameHandler := api.NewOrgByNameHandler(logger, g.configstoreClient)
 	orgsHandler := api.NewOrgsHandler(logger, g.configstoreClient)
 	createOrgHandler := api.NewCreateOrgHandler(logger, g.ch)
 	deleteOrgHandler := api.NewDeleteOrgHandler(logger, g.configstoreClient)
@@ -242,26 +240,24 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/projects/{projectref}/variables/{variablename}", authForcedHandler(deleteVariableHandler)).Methods("DELETE")
 
 	apirouter.Handle("/user", authForcedHandler(currentUserHandler)).Methods("GET")
-	apirouter.Handle("/user/{userid}", authForcedHandler(userHandler)).Methods("GET")
+	apirouter.Handle("/users/{userref}", authForcedHandler(userHandler)).Methods("GET")
 	apirouter.Handle("/users", authForcedHandler(usersHandler)).Methods("GET")
 	apirouter.Handle("/users", authForcedHandler(createUserHandler)).Methods("POST")
-	apirouter.Handle("/users/{username}", authForcedHandler(userByNameHandler)).Methods("GET")
-	apirouter.Handle("/users/{username}", authForcedHandler(deleteUserHandler)).Methods("DELETE")
+	apirouter.Handle("/users/{userref}", authForcedHandler(deleteUserHandler)).Methods("DELETE")
 
-	apirouter.Handle("/users/{username}/linkedaccounts", authForcedHandler(createUserLAHandler)).Methods("POST")
-	apirouter.Handle("/users/{username}/linkedaccounts/{laid}", authForcedHandler(deleteUserLAHandler)).Methods("DELETE")
-	apirouter.Handle("/users/{username}/tokens", authForcedHandler(createUserTokenHandler)).Methods("POST")
-	apirouter.Handle("/users/{username}/tokens/{tokenname}", authForcedHandler(deleteUserTokenHandler)).Methods("DELETE")
+	apirouter.Handle("/users/{userref}/linkedaccounts", authForcedHandler(createUserLAHandler)).Methods("POST")
+	apirouter.Handle("/users/{userref}/linkedaccounts/{laid}", authForcedHandler(deleteUserLAHandler)).Methods("DELETE")
+	apirouter.Handle("/users/{userref}/tokens", authForcedHandler(createUserTokenHandler)).Methods("POST")
+	apirouter.Handle("/users/{userref}/tokens/{tokenname}", authForcedHandler(deleteUserTokenHandler)).Methods("DELETE")
 
-	apirouter.Handle("/remotesource/{id}", authForcedHandler(remoteSourceHandler)).Methods("GET")
+	apirouter.Handle("/remotesources/{remotesourceref}", authForcedHandler(remoteSourceHandler)).Methods("GET")
 	apirouter.Handle("/remotesources", authForcedHandler(createRemoteSourceHandler)).Methods("POST")
 	apirouter.Handle("/remotesources", authOptionalHandler(remoteSourcesHandler)).Methods("GET")
 
-	apirouter.Handle("/org/{orgid}", authForcedHandler(orgHandler)).Methods("GET")
+	apirouter.Handle("/orgs/{orgref}", authForcedHandler(orgHandler)).Methods("GET")
 	apirouter.Handle("/orgs", authForcedHandler(orgsHandler)).Methods("GET")
 	apirouter.Handle("/orgs", authForcedHandler(createOrgHandler)).Methods("POST")
-	apirouter.Handle("/orgs/{orgname}", authForcedHandler(orgByNameHandler)).Methods("GET")
-	apirouter.Handle("/orgs/{orgname}", authForcedHandler(deleteOrgHandler)).Methods("DELETE")
+	apirouter.Handle("/orgs/{orgref}", authForcedHandler(deleteOrgHandler)).Methods("DELETE")
 
 	apirouter.Handle("/runs/{runid}", authForcedHandler(runHandler)).Methods("GET")
 	apirouter.Handle("/runs/{runid}/actions", authForcedHandler(runActionsHandler)).Methods("PUT")
@@ -269,9 +265,10 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/runs/{runid}/tasks/{taskid}/actions", runTaskActionsHandler).Methods("PUT")
 	apirouter.Handle("/runs", authForcedHandler(runsHandler)).Methods("GET")
 
+	// TODO(sgotti) add auth to these requests
 	router.Handle("/repos/{rest:.*}", reposHandler).Methods("GET", "POST")
 
-	apirouter.Handle("/user/remoterepos/{remotesourceid}", authForcedHandler(userRemoteReposHandler)).Methods("GET")
+	apirouter.Handle("/user/remoterepos/{remotesourceref}", authForcedHandler(userRemoteReposHandler)).Methods("GET")
 
 	router.Handle("/login", loginUserHandler).Methods("POST")
 	router.Handle("/authorize", authorizeHandler).Methods("POST")

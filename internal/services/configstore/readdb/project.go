@@ -79,7 +79,7 @@ func (r *ReadDB) GetProjectPath(tx *db.Tx, project *types.Project) (string, erro
 }
 
 func (r *ReadDB) GetProject(tx *db.Tx, projectRef string) (*types.Project, error) {
-	projectRefType, err := common.ParseRef(projectRef)
+	projectRefType, err := common.ParsePathRef(projectRef)
 	if err != nil {
 		return nil, err
 	}

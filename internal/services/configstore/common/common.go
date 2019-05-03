@@ -17,6 +17,8 @@ package common
 import (
 	"net/url"
 	"strings"
+
+	uuid "github.com/satori/go.uuid"
 )
 
 const (
@@ -28,17 +30,27 @@ type RefType int
 const (
 	RefTypeID RefType = iota
 	RefTypePath
+	RefTypeName
 )
 
 // ParseRef parses the api call to determine if the provided ref is
 // an ID or a path
-func ParseRef(projectRef string) (RefType, error) {
-	projectRef, err := url.PathUnescape(projectRef)
+func ParsePathRef(ref string) (RefType, error) {
+	ref, err := url.PathUnescape(ref)
 	if err != nil {
 		return -1, err
 	}
-	if strings.Contains(projectRef, "/") {
+	if strings.Contains(ref, "/") {
 		return RefTypePath, nil
 	}
 	return RefTypeID, nil
+}
+
+// ParseRef parses the api call to determine if the provided ref is
+// an ID or a name
+func ParseNameRef(ref string) (RefType, error) {
+	if _, err := uuid.FromString(ref); err == nil {
+		return RefTypeID, nil
+	}
+	return RefTypeName, nil
 }

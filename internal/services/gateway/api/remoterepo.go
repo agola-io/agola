@@ -55,7 +55,7 @@ func NewUserRemoteReposHandler(logger *zap.Logger, ch *command.CommandHandler, c
 func (h *UserRemoteReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	remoteSourceID := vars["remotesourceid"]
+	remoteSourceRef := vars["remotesourceref"]
 
 	userIDVal := ctx.Value("userid")
 	if userIDVal == nil {
@@ -71,7 +71,7 @@ func (h *UserRemoteReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, remoteSourceID)
+	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, remoteSourceRef)
 	if httpErrorFromRemote(w, resp, err) {
 		h.log.Errorf("err: %+v", err)
 		return

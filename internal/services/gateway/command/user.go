@@ -67,7 +67,7 @@ func (c *CommandHandler) CreateUser(ctx context.Context, req *CreateUserRequest)
 }
 
 type CreateUserTokenRequest struct {
-	UserName  string
+	UserRef   string
 	TokenName string
 }
 
@@ -84,8 +84,8 @@ func (c *CommandHandler) CreateUserToken(ctx context.Context, req *CreateUserTok
 		isAdmin = isAdminVal.(bool)
 	}
 
-	userName := req.UserName
-	user, resp, err := c.configstoreClient.GetUserByName(ctx, userName)
+	userRef := req.UserRef
+	user, resp, err := c.configstoreClient.GetUser(ctx, userRef)
 	if err != nil {
 		return "", ErrFromRemote(resp, errors.Wrapf(err, "failed to get user"))
 	}
@@ -95,24 +95,25 @@ func (c *CommandHandler) CreateUserToken(ctx context.Context, req *CreateUserTok
 		return "", util.NewErrBadRequest(errors.Errorf("logged in user cannot create token for another user"))
 	}
 	if _, ok := user.Tokens[req.TokenName]; ok {
-		return "", util.NewErrBadRequest(errors.Errorf("user %q already have a token with name %q", userName, req.TokenName))
+		return "", util.NewErrBadRequest(errors.Errorf("user %q already have a token with name %q", userRef, req.TokenName))
 	}
 
 	c.log.Infof("creating user token")
 	creq := &csapi.CreateUserTokenRequest{
 		TokenName: req.TokenName,
 	}
-	res, resp, err := c.configstoreClient.CreateUserToken(ctx, userName, creq)
+	res, resp, err := c.configstoreClient.CreateUserToken(ctx, userRef, creq)
 	if err != nil {
 		return "", ErrFromRemote(resp, errors.Wrapf(err, "failed to create user token"))
 	}
-	c.log.Infof("token %q for user %q created", req.TokenName, userName)
+	c.log.Infof("token %q for user %q created", req.TokenName, userRef)
 
 	return res.Token, nil
 }
 
 type CreateUserLARequest struct {
-	UserName                   string
+	UserRef string
+
 	RemoteSourceName           string
 	UserAccessToken            string
 	Oauth2AccessToken          string
@@ -121,12 +122,12 @@ type CreateUserLARequest struct {
 }
 
 func (c *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequest) (*types.LinkedAccount, error) {
-	userName := req.UserName
-	user, resp, err := c.configstoreClient.GetUserByName(ctx, userName)
+	userRef := req.UserRef
+	user, resp, err := c.configstoreClient.GetUser(ctx, userRef)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get user %q", userName))
+		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get user %q", userRef))
 	}
-	rs, resp, err := c.configstoreClient.GetRemoteSourceByName(ctx, req.RemoteSourceName)
+	rs, resp, err := c.configstoreClient.GetRemoteSource(ctx, req.RemoteSourceName)
 	if err != nil {
 		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get remote source %q", req.RemoteSourceName))
 	}
@@ -140,7 +141,7 @@ func (c *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequ
 	}
 	c.log.Infof("la: %s", util.Dump(la))
 	if la != nil {
-		return nil, util.NewErrBadRequest(errors.Errorf("user %q already have a linked account for remote source %q", userName, rs.Name))
+		return nil, util.NewErrBadRequest(errors.Errorf("user %q already have a linked account for remote source %q", userRef, rs.Name))
 	}
 
 	accessToken, err := common.GetAccessToken(rs, req.UserAccessToken, req.Oauth2AccessToken)
@@ -171,19 +172,19 @@ func (c *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequ
 	}
 
 	c.log.Infof("creating linked account")
-	la, resp, err = c.configstoreClient.CreateUserLA(ctx, userName, creq)
+	la, resp, err = c.configstoreClient.CreateUserLA(ctx, userRef, creq)
 	if err != nil {
 		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to create linked account"))
 	}
-	c.log.Infof("linked account %q for user %q created", la.ID, userName)
+	c.log.Infof("linked account %q for user %q created", la.ID, userRef)
 
 	return la, nil
 }
 
-func (c *CommandHandler) UpdateUserLA(ctx context.Context, userName string, la *types.LinkedAccount) error {
-	user, resp, err := c.configstoreClient.GetUserByName(ctx, userName)
+func (c *CommandHandler) UpdateUserLA(ctx context.Context, userRef string, la *types.LinkedAccount) error {
+	user, resp, err := c.configstoreClient.GetUser(ctx, userRef)
 	if err != nil {
-		return ErrFromRemote(resp, errors.Wrapf(err, "failed to get user %q", userName))
+		return ErrFromRemote(resp, errors.Wrapf(err, "failed to get user %q", userRef))
 	}
 	laFound := false
 	for _, ula := range user.LinkedAccounts {
@@ -194,7 +195,7 @@ func (c *CommandHandler) UpdateUserLA(ctx context.Context, userName string, la *
 	}
 	c.log.Infof("la: %s", util.Dump(la))
 	if !laFound {
-		return util.NewErrBadRequest(errors.Errorf("user %q doesn't have a linked account with id %q", userName, la.ID))
+		return util.NewErrBadRequest(errors.Errorf("user %q doesn't have a linked account with id %q", userRef, la.ID))
 	}
 
 	creq := &csapi.UpdateUserLARequest{
@@ -206,12 +207,12 @@ func (c *CommandHandler) UpdateUserLA(ctx context.Context, userName string, la *
 		Oauth2AccessTokenExpiresAt: la.Oauth2AccessTokenExpiresAt,
 	}
 
-	c.log.Infof("updating user %q linked account", userName)
-	la, resp, err = c.configstoreClient.UpdateUserLA(ctx, userName, la.ID, creq)
+	c.log.Infof("updating user %q linked account", userRef)
+	la, resp, err = c.configstoreClient.UpdateUserLA(ctx, userRef, la.ID, creq)
 	if err != nil {
 		return ErrFromRemote(resp, errors.Wrapf(err, "failed to update user"))
 	}
-	c.log.Infof("linked account %q for user %q updated", la.ID, userName)
+	c.log.Infof("linked account %q for user %q updated", la.ID, userRef)
 
 	return nil
 }
@@ -272,7 +273,7 @@ func (c *CommandHandler) RegisterUser(ctx context.Context, req *RegisterUserRequ
 		return nil, util.NewErrBadRequest(errors.Errorf("invalid user name %q", req.UserName))
 	}
 
-	rs, resp, err := c.configstoreClient.GetRemoteSourceByName(ctx, req.RemoteSourceName)
+	rs, resp, err := c.configstoreClient.GetRemoteSource(ctx, req.RemoteSourceName)
 	if err != nil {
 		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get remote source %q", req.RemoteSourceName))
 	}
@@ -332,7 +333,7 @@ type LoginUserResponse struct {
 }
 
 func (c *CommandHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (*LoginUserResponse, error) {
-	rs, resp, err := c.configstoreClient.GetRemoteSourceByName(ctx, req.RemoteSourceName)
+	rs, resp, err := c.configstoreClient.GetRemoteSource(ctx, req.RemoteSourceName)
 	if err != nil {
 		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get remote source %q", req.RemoteSourceName))
 	}
@@ -423,7 +424,7 @@ type AuthorizeResponse struct {
 }
 
 func (c *CommandHandler) Authorize(ctx context.Context, req *AuthorizeRequest) (*AuthorizeResponse, error) {
-	rs, resp, err := c.configstoreClient.GetRemoteSourceByName(ctx, req.RemoteSourceName)
+	rs, resp, err := c.configstoreClient.GetRemoteSource(ctx, req.RemoteSourceName)
 	if err != nil {
 		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get remote source %q", req.RemoteSourceName))
 	}
@@ -458,7 +459,7 @@ type RemoteSourceAuthResponse struct {
 }
 
 func (c *CommandHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSourceName, loginName, loginPassword string, requestType RemoteSourceRequestType, req interface{}) (*RemoteSourceAuthResponse, error) {
-	rs, resp, err := c.configstoreClient.GetRemoteSourceByName(ctx, remoteSourceName)
+	rs, resp, err := c.configstoreClient.GetRemoteSource(ctx, remoteSourceName)
 	if err != nil {
 		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get remote source %q", remoteSourceName))
 	}
@@ -467,9 +468,9 @@ func (c *CommandHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSourc
 	switch requestType {
 	case RemoteSourceRequestTypeCreateUserLA:
 		req := req.(*CreateUserLARequest)
-		user, resp, err := c.configstoreClient.GetUserByName(ctx, req.UserName)
+		user, resp, err := c.configstoreClient.GetUser(ctx, req.UserRef)
 		if err != nil {
-			return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get user %q", req.UserName))
+			return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get user %q", req.UserRef))
 		}
 		var la *types.LinkedAccount
 		for _, v := range user.LinkedAccounts {
@@ -480,7 +481,7 @@ func (c *CommandHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSourc
 		}
 		c.log.Infof("la: %s", util.Dump(la))
 		if la != nil {
-			return nil, util.NewErrBadRequest(errors.Errorf("user %q already have a linked account for remote source %q", req.UserName, rs.Name))
+			return nil, util.NewErrBadRequest(errors.Errorf("user %q already have a linked account for remote source %q", req.UserRef, rs.Name))
 		}
 
 	case RemoteSourceRequestTypeLoginUser:
@@ -568,7 +569,7 @@ func (c *CommandHandler) HandleRemoteSourceAuthRequest(ctx context.Context, requ
 		}
 
 		creq := &CreateUserLARequest{
-			UserName:                   req.UserName,
+			UserRef:                    req.UserRef,
 			RemoteSourceName:           req.RemoteSourceName,
 			UserAccessToken:            userAccessToken,
 			Oauth2AccessToken:          oauth2AccessToken,
@@ -686,7 +687,7 @@ func (c *CommandHandler) HandleOauth2Callback(ctx context.Context, code, state s
 	requestType := RemoteSourceRequestType(claims["request_type"].(string))
 	requestString := claims["request"].(string)
 
-	rs, resp, err := c.configstoreClient.GetRemoteSourceByName(ctx, remoteSourceName)
+	rs, resp, err := c.configstoreClient.GetRemoteSource(ctx, remoteSourceName)
 	if err != nil {
 		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get remote source %q", remoteSourceName))
 	}
