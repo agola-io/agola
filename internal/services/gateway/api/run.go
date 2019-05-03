@@ -316,9 +316,10 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	q := r.URL.Query()
 
-	groups := q["group"]
+	// we currently accept only one group
+	group := q.Get("group")
 	// we require that groups are specified to not return all runs
-	if len(groups) == 0 {
+	if group == "" {
 		httpError(w, util.NewErrBadRequest(errors.Errorf("no groups specified")))
 		return
 	}
@@ -353,7 +354,7 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	areq := &action.GetRunsRequest{
 		PhaseFilter:  phaseFilter,
-		Groups:       groups,
+		Group:        group,
 		LastRun:      lastRun,
 		ChangeGroups: changeGroups,
 		StartRunID:   start,
