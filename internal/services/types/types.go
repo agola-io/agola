@@ -160,6 +160,10 @@ type Project struct {
 
 	Visibility Visibility `json:"visibility,omitempty"`
 
+	// Remote Repository fields
+	RemoteSourceID  string `json:"remote_source_id,omitempty"`
+	LinkedAccountID string `json:"linked_account_id,omitempty"`
+
 	// The remote repository id
 	RepositoryID string `json:"repository_id,omitempty"`
 
@@ -170,8 +174,6 @@ type Project struct {
 	// * auto update it if the remote let us query by repository id (gitea cannot
 	// do this but gitlab can and github has an hidden api to do this)
 	RepositoryPath string `json:"repository_path,omitempty"`
-
-	LinkedAccountID string `json:"linked_account_id,omitempty"`
 
 	SSHPrivateKey string `json:"ssh_private_key,omitempty"` // PEM Encoded private key
 
