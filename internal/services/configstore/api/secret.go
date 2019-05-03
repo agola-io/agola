@@ -20,7 +20,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/db"
-	"github.com/sorintlab/agola/internal/services/configstore/command"
+	"github.com/sorintlab/agola/internal/services/configstore/action"
 	"github.com/sorintlab/agola/internal/services/configstore/readdb"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
@@ -140,12 +140,12 @@ func (h *SecretsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 type CreateSecretHandler struct {
 	log    *zap.SugaredLogger
-	ch     *command.CommandHandler
+	ah     *action.ActionHandler
 	readDB *readdb.ReadDB
 }
 
-func NewCreateSecretHandler(logger *zap.Logger, ch *command.CommandHandler) *CreateSecretHandler {
-	return &CreateSecretHandler{log: logger.Sugar(), ch: ch}
+func NewCreateSecretHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateSecretHandler {
+	return &CreateSecretHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -166,7 +166,7 @@ func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	secret.Parent.Type = parentType
 	secret.Parent.ID = parentRef
 
-	secret, err = h.ch.CreateSecret(ctx, secret)
+	secret, err = h.ah.CreateSecret(ctx, secret)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
@@ -179,11 +179,11 @@ func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 type DeleteSecretHandler struct {
 	log *zap.SugaredLogger
-	ch  *command.CommandHandler
+	ah  *action.ActionHandler
 }
 
-func NewDeleteSecretHandler(logger *zap.Logger, ch *command.CommandHandler) *DeleteSecretHandler {
-	return &DeleteSecretHandler{log: logger.Sugar(), ch: ch}
+func NewDeleteSecretHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteSecretHandler {
+	return &DeleteSecretHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *DeleteSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -197,7 +197,7 @@ func (h *DeleteSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	err = h.ch.DeleteSecret(ctx, parentType, parentRef, secretName)
+	err = h.ah.DeleteSecret(ctx, parentType, parentRef, secretName)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 	}

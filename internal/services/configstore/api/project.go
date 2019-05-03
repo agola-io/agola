@@ -22,7 +22,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/db"
-	"github.com/sorintlab/agola/internal/services/configstore/command"
+	"github.com/sorintlab/agola/internal/services/configstore/action"
 	"github.com/sorintlab/agola/internal/services/configstore/readdb"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
@@ -159,12 +159,12 @@ func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 type CreateProjectHandler struct {
 	log    *zap.SugaredLogger
-	ch     *command.CommandHandler
+	ah     *action.ActionHandler
 	readDB *readdb.ReadDB
 }
 
-func NewCreateProjectHandler(logger *zap.Logger, ch *command.CommandHandler, readDB *readdb.ReadDB) *CreateProjectHandler {
-	return &CreateProjectHandler{log: logger.Sugar(), ch: ch, readDB: readDB}
+func NewCreateProjectHandler(logger *zap.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *CreateProjectHandler {
+	return &CreateProjectHandler{log: logger.Sugar(), ah: ah, readDB: readDB}
 }
 
 func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -177,7 +177,7 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	project, err := h.ch.CreateProject(ctx, &req)
+	project, err := h.ah.CreateProject(ctx, &req)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
@@ -196,11 +196,11 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 
 type DeleteProjectHandler struct {
 	log *zap.SugaredLogger
-	ch  *command.CommandHandler
+	ah  *action.ActionHandler
 }
 
-func NewDeleteProjectHandler(logger *zap.Logger, ch *command.CommandHandler) *DeleteProjectHandler {
-	return &DeleteProjectHandler{log: logger.Sugar(), ch: ch}
+func NewDeleteProjectHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteProjectHandler {
+	return &DeleteProjectHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *DeleteProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -213,7 +213,7 @@ func (h *DeleteProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	err = h.ch.DeleteProject(ctx, projectRef)
+	err = h.ah.DeleteProject(ctx, projectRef)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 	}

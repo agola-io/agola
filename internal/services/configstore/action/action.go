@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package command
+package action
 
 import (
 	"github.com/sorintlab/agola/internal/datamanager"
@@ -21,14 +21,14 @@ import (
 	"go.uber.org/zap"
 )
 
-type CommandHandler struct {
+type ActionHandler struct {
 	log    *zap.SugaredLogger
 	readDB *readdb.ReadDB
 	dm     *datamanager.DataManager
 }
 
-func NewCommandHandler(logger *zap.Logger, readDB *readdb.ReadDB, dm *datamanager.DataManager) *CommandHandler {
-	return &CommandHandler{
+func NewActionHandler(logger *zap.Logger, readDB *readdb.ReadDB, dm *datamanager.DataManager) *ActionHandler {
+	return &ActionHandler{
 		log:    logger.Sugar(),
 		readDB: readDB,
 		dm:     dm,

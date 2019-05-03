@@ -27,7 +27,7 @@ import (
 	"github.com/sorintlab/agola/internal/objectstorage"
 	"github.com/sorintlab/agola/internal/services/config"
 	"github.com/sorintlab/agola/internal/services/configstore/api"
-	"github.com/sorintlab/agola/internal/services/configstore/command"
+	action "github.com/sorintlab/agola/internal/services/configstore/action"
 	"github.com/sorintlab/agola/internal/services/configstore/readdb"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
@@ -48,7 +48,7 @@ type ConfigStore struct {
 	dm            *datamanager.DataManager
 	readDB        *readdb.ReadDB
 	ost           *objectstorage.ObjStorage
-	ch            *command.CommandHandler
+	ah            *action.ActionHandler
 	listenAddress string
 }
 
@@ -98,8 +98,8 @@ func NewConfigStore(ctx context.Context, c *config.ConfigStore) (*ConfigStore, e
 	cs.dm = dm
 	cs.readDB = readDB
 
-	ch := command.NewCommandHandler(logger, readDB, dm)
-	cs.ch = ch
+	ah := action.NewActionHandler(logger, readDB, dm)
+	cs.ah = ah
 
 	return cs, nil
 }
@@ -128,44 +128,44 @@ func (s *ConfigStore) Run(ctx context.Context) error {
 	projectGroupHandler := api.NewProjectGroupHandler(logger, s.readDB)
 	projectGroupSubgroupsHandler := api.NewProjectGroupSubgroupsHandler(logger, s.readDB)
 	projectGroupProjectsHandler := api.NewProjectGroupProjectsHandler(logger, s.readDB)
-	createProjectGroupHandler := api.NewCreateProjectGroupHandler(logger, s.ch, s.readDB)
+	createProjectGroupHandler := api.NewCreateProjectGroupHandler(logger, s.ah, s.readDB)
 
 	projectHandler := api.NewProjectHandler(logger, s.readDB)
-	createProjectHandler := api.NewCreateProjectHandler(logger, s.ch, s.readDB)
-	deleteProjectHandler := api.NewDeleteProjectHandler(logger, s.ch)
+	createProjectHandler := api.NewCreateProjectHandler(logger, s.ah, s.readDB)
+	deleteProjectHandler := api.NewDeleteProjectHandler(logger, s.ah)
 
 	secretsHandler := api.NewSecretsHandler(logger, s.readDB)
-	createSecretHandler := api.NewCreateSecretHandler(logger, s.ch)
-	deleteSecretHandler := api.NewDeleteSecretHandler(logger, s.ch)
+	createSecretHandler := api.NewCreateSecretHandler(logger, s.ah)
+	deleteSecretHandler := api.NewDeleteSecretHandler(logger, s.ah)
 
 	variablesHandler := api.NewVariablesHandler(logger, s.readDB)
-	createVariableHandler := api.NewCreateVariableHandler(logger, s.ch)
-	deleteVariableHandler := api.NewDeleteVariableHandler(logger, s.ch)
+	createVariableHandler := api.NewCreateVariableHandler(logger, s.ah)
+	deleteVariableHandler := api.NewDeleteVariableHandler(logger, s.ah)
 
 	userHandler := api.NewUserHandler(logger, s.readDB)
 	usersHandler := api.NewUsersHandler(logger, s.readDB)
-	createUserHandler := api.NewCreateUserHandler(logger, s.ch)
-	updateUserHandler := api.NewUpdateUserHandler(logger, s.ch)
-	deleteUserHandler := api.NewDeleteUserHandler(logger, s.ch)
+	createUserHandler := api.NewCreateUserHandler(logger, s.ah)
+	updateUserHandler := api.NewUpdateUserHandler(logger, s.ah)
+	deleteUserHandler := api.NewDeleteUserHandler(logger, s.ah)
 
-	createUserLAHandler := api.NewCreateUserLAHandler(logger, s.ch)
-	deleteUserLAHandler := api.NewDeleteUserLAHandler(logger, s.ch)
-	updateUserLAHandler := api.NewUpdateUserLAHandler(logger, s.ch)
+	createUserLAHandler := api.NewCreateUserLAHandler(logger, s.ah)
+	deleteUserLAHandler := api.NewDeleteUserLAHandler(logger, s.ah)
+	updateUserLAHandler := api.NewUpdateUserLAHandler(logger, s.ah)
 
-	createUserTokenHandler := api.NewCreateUserTokenHandler(logger, s.ch)
-	deleteUserTokenHandler := api.NewDeleteUserTokenHandler(logger, s.ch)
+	createUserTokenHandler := api.NewCreateUserTokenHandler(logger, s.ah)
+	deleteUserTokenHandler := api.NewDeleteUserTokenHandler(logger, s.ah)
 
-	userOrgsHandler := api.NewUserOrgsHandler(logger, s.ch)
+	userOrgsHandler := api.NewUserOrgsHandler(logger, s.ah)
 
 	orgHandler := api.NewOrgHandler(logger, s.readDB)
 	orgsHandler := api.NewOrgsHandler(logger, s.readDB)
-	createOrgHandler := api.NewCreateOrgHandler(logger, s.ch)
-	deleteOrgHandler := api.NewDeleteOrgHandler(logger, s.ch)
+	createOrgHandler := api.NewCreateOrgHandler(logger, s.ah)
+	deleteOrgHandler := api.NewDeleteOrgHandler(logger, s.ah)
 
 	remoteSourceHandler := api.NewRemoteSourceHandler(logger, s.readDB)
 	remoteSourcesHandler := api.NewRemoteSourcesHandler(logger, s.readDB)
-	createRemoteSourceHandler := api.NewCreateRemoteSourceHandler(logger, s.ch)
-	deleteRemoteSourceHandler := api.NewDeleteRemoteSourceHandler(logger, s.ch)
+	createRemoteSourceHandler := api.NewCreateRemoteSourceHandler(logger, s.ah)
+	deleteRemoteSourceHandler := api.NewDeleteRemoteSourceHandler(logger, s.ah)
 
 	router := mux.NewRouter()
 	apirouter := router.PathPrefix("/api/v1alpha").Subrouter().UseEncodedPath()

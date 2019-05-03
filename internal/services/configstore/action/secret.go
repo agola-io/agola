@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package command
+package action
 
 import (
 	"context"
@@ -27,7 +27,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-func (s *CommandHandler) CreateSecret(ctx context.Context, secret *types.Secret) (*types.Secret, error) {
+func (h *ActionHandler) CreateSecret(ctx context.Context, secret *types.Secret) (*types.Secret, error) {
 	if secret.Name == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("secret name required"))
 	}
@@ -58,21 +58,21 @@ func (s *CommandHandler) CreateSecret(ctx context.Context, secret *types.Secret)
 	cgNames := []string{util.EncodeSha256Hex("secretname-" + secret.Name)}
 
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := s.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
 			return err
 		}
 
-		parentID, err := s.readDB.ResolveConfigID(tx, secret.Parent.Type, secret.Parent.ID)
+		parentID, err := h.readDB.ResolveConfigID(tx, secret.Parent.Type, secret.Parent.ID)
 		if err != nil {
 			return err
 		}
 		secret.Parent.ID = parentID
 
 		// check duplicate secret name
-		s, err := s.readDB.GetSecretByName(tx, secret.Parent.ID, secret.Name)
+		s, err := h.readDB.GetSecretByName(tx, secret.Parent.ID, secret.Name)
 		if err != nil {
 			return err
 		}
@@ -101,25 +101,25 @@ func (s *CommandHandler) CreateSecret(ctx context.Context, secret *types.Secret)
 		},
 	}
 
-	_, err = s.dm.WriteWal(ctx, actions, cgt)
+	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return secret, err
 }
 
-func (s *CommandHandler) DeleteSecret(ctx context.Context, parentType types.ConfigType, parentRef, secretName string) error {
+func (h *ActionHandler) DeleteSecret(ctx context.Context, parentType types.ConfigType, parentRef, secretName string) error {
 	var secret *types.Secret
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := s.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		parentID, err := s.readDB.ResolveConfigID(tx, parentType, parentRef)
+		parentID, err := h.readDB.ResolveConfigID(tx, parentType, parentRef)
 		if err != nil {
 			return err
 		}
 
 		// check secret existance
-		secret, err = s.readDB.GetSecretByName(tx, parentID, secretName)
+		secret, err = h.readDB.GetSecretByName(tx, parentID, secretName)
 		if err != nil {
 			return err
 		}
@@ -129,7 +129,7 @@ func (s *CommandHandler) DeleteSecret(ctx context.Context, parentType types.Conf
 
 		// changegroup is the secret id
 		cgNames := []string{util.EncodeSha256Hex("secretid-" + secret.ID)}
-		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
 			return err
 		}
@@ -148,6 +148,6 @@ func (s *CommandHandler) DeleteSecret(ctx context.Context, parentType types.Conf
 		},
 	}
 
-	_, err = s.dm.WriteWal(ctx, actions, cgt)
+	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return err
 }

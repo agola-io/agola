@@ -22,7 +22,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/db"
-	"github.com/sorintlab/agola/internal/services/configstore/command"
+	"github.com/sorintlab/agola/internal/services/configstore/action"
 	"github.com/sorintlab/agola/internal/services/configstore/readdb"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
@@ -249,12 +249,12 @@ func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.
 
 type CreateProjectGroupHandler struct {
 	log    *zap.SugaredLogger
-	ch     *command.CommandHandler
+	ah     *action.ActionHandler
 	readDB *readdb.ReadDB
 }
 
-func NewCreateProjectGroupHandler(logger *zap.Logger, ch *command.CommandHandler, readDB *readdb.ReadDB) *CreateProjectGroupHandler {
-	return &CreateProjectGroupHandler{log: logger.Sugar(), ch: ch, readDB: readDB}
+func NewCreateProjectGroupHandler(logger *zap.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *CreateProjectGroupHandler {
+	return &CreateProjectGroupHandler{log: logger.Sugar(), ah: ah, readDB: readDB}
 }
 
 func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -267,7 +267,7 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	projectGroup, err := h.ch.CreateProjectGroup(ctx, &req)
+	projectGroup, err := h.ah.CreateProjectGroup(ctx, &req)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return

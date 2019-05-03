@@ -21,7 +21,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/db"
-	"github.com/sorintlab/agola/internal/services/configstore/command"
+	"github.com/sorintlab/agola/internal/services/configstore/action"
 	"github.com/sorintlab/agola/internal/services/configstore/readdb"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
@@ -67,11 +67,11 @@ func (h *OrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 type CreateOrgHandler struct {
 	log *zap.SugaredLogger
-	ch  *command.CommandHandler
+	ah  *action.ActionHandler
 }
 
-func NewCreateOrgHandler(logger *zap.Logger, ch *command.CommandHandler) *CreateOrgHandler {
-	return &CreateOrgHandler{log: logger.Sugar(), ch: ch}
+func NewCreateOrgHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateOrgHandler {
+	return &CreateOrgHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -84,7 +84,7 @@ func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	org, err := h.ch.CreateOrg(ctx, &req)
+	org, err := h.ah.CreateOrg(ctx, &req)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
@@ -97,11 +97,11 @@ func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 type DeleteOrgHandler struct {
 	log *zap.SugaredLogger
-	ch  *command.CommandHandler
+	ah  *action.ActionHandler
 }
 
-func NewDeleteOrgHandler(logger *zap.Logger, ch *command.CommandHandler) *DeleteOrgHandler {
-	return &DeleteOrgHandler{log: logger.Sugar(), ch: ch}
+func NewDeleteOrgHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteOrgHandler {
+	return &DeleteOrgHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *DeleteOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -111,7 +111,7 @@ func (h *DeleteOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	orgRef := vars["orgref"]
 
-	err := h.ch.DeleteOrg(ctx, orgRef)
+	err := h.ah.DeleteOrg(ctx, orgRef)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 	}

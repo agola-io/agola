@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package command
+package action
 
 import (
 	"context"
@@ -28,7 +28,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-func (s *CommandHandler) CreateOrg(ctx context.Context, org *types.Organization) (*types.Organization, error) {
+func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) (*types.Organization, error) {
 	if org.Name == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("organization name required"))
 	}
@@ -41,15 +41,15 @@ func (s *CommandHandler) CreateOrg(ctx context.Context, org *types.Organization)
 	cgNames := []string{util.EncodeSha256Hex("orgname-" + org.Name)}
 
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := s.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
 			return err
 		}
 
 		// check duplicate org name
-		u, err := s.readDB.GetOrgByName(tx, org.Name)
+		u, err := h.readDB.GetOrgByName(tx, org.Name)
 		if err != nil {
 			return err
 		}
@@ -58,7 +58,7 @@ func (s *CommandHandler) CreateOrg(ctx context.Context, org *types.Organization)
 		}
 
 		if org.CreatorUserID != "" {
-			user, err := s.readDB.GetUser(tx, org.CreatorUserID)
+			user, err := h.readDB.GetUser(tx, org.CreatorUserID)
 			if err != nil {
 				return err
 			}
@@ -126,20 +126,20 @@ func (s *CommandHandler) CreateOrg(ctx context.Context, org *types.Organization)
 		Data:       pgj,
 	})
 
-	_, err = s.dm.WriteWal(ctx, actions, cgt)
+	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return org, err
 }
 
-func (s *CommandHandler) DeleteOrg(ctx context.Context, orgRef string) error {
+func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 	var org *types.Organization
 	var projects []*types.Project
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := s.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(func(tx *db.Tx) error {
 		var err error
 		// check org existance
-		org, err = s.readDB.GetOrgByName(tx, orgRef)
+		org, err = h.readDB.GetOrgByName(tx, orgRef)
 		if err != nil {
 			return err
 		}
@@ -149,7 +149,7 @@ func (s *CommandHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 
 		// changegroup is the org id
 		cgNames := []string{util.EncodeSha256Hex("orgid-" + org.ID)}
-		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
 			return err
 		}
@@ -177,6 +177,6 @@ func (s *CommandHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 		})
 	}
 
-	_, err = s.dm.WriteWal(ctx, actions, cgt)
+	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return err
 }

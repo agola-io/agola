@@ -29,7 +29,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/sorintlab/agola/internal/db"
 	"github.com/sorintlab/agola/internal/services/config"
-	"github.com/sorintlab/agola/internal/services/configstore/command"
+	action "github.com/sorintlab/agola/internal/services/configstore/action"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/testutil"
 	"github.com/sorintlab/agola/internal/util"
@@ -186,7 +186,7 @@ func TestResync(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	for i := 0; i < 10; i++ {
-		if _, err := cs1.ch.CreateUser(ctx, &command.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)}); err != nil {
+		if _, err := cs1.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)}); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 		time.Sleep(200 * time.Millisecond)
@@ -200,7 +200,7 @@ func TestResync(t *testing.T) {
 
 	// Do some more changes
 	for i := 11; i < 20; i++ {
-		if _, err := cs1.ch.CreateUser(ctx, &command.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)}); err != nil {
+		if _, err := cs1.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)}); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 		time.Sleep(200 * time.Millisecond)
@@ -314,7 +314,7 @@ func TestUser(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	t.Run("create user", func(t *testing.T) {
-		_, err := cs.ch.CreateUser(ctx, &command.CreateUserRequest{UserName: "user01"})
+		_, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -325,7 +325,7 @@ func TestUser(t *testing.T) {
 
 	t.Run("create duplicated user", func(t *testing.T) {
 		expectedErr := fmt.Sprintf("user with name %q already exists", "user01")
-		_, err := cs.ch.CreateUser(ctx, &command.CreateUserRequest{UserName: "user01"})
+		_, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"})
 		if err == nil {
 			t.Fatalf("expected error %v, got nil err", expectedErr)
 		}
@@ -342,7 +342,7 @@ func TestUser(t *testing.T) {
 		wg := sync.WaitGroup{}
 		for i := 0; i < 10; i++ {
 			wg.Add(1)
-			go cs.ch.CreateUser(ctx, &command.CreateUserRequest{UserName: "user02"})
+			go cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user02"})
 			wg.Done()
 		}
 		wg.Wait()
@@ -382,11 +382,11 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 	// TODO(sgotti) change the sleep with a real check that all is ready
 	time.Sleep(2 * time.Second)
 
-	user, err := cs.ch.CreateUser(ctx, &command.CreateUserRequest{UserName: "user01"})
+	user, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	org, err := cs.ch.CreateOrg(ctx, &types.Organization{Name: "org01"})
+	org, err := cs.ah.CreateOrg(ctx, &types.Organization{Name: "org01"})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -395,37 +395,37 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	t.Run("create a project in user root project group", func(t *testing.T) {
-		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
 	})
 	t.Run("create a project in org root project group", func(t *testing.T) {
-		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
 	})
 	t.Run("create a projectgroup in user root project group", func(t *testing.T) {
-		_, err := cs.ch.CreateProjectGroup(ctx, &types.ProjectGroup{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic})
+		_, err := cs.ah.CreateProjectGroup(ctx, &types.ProjectGroup{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
 	})
 	t.Run("create a projectgroup in org root project group", func(t *testing.T) {
-		_, err := cs.ch.CreateProjectGroup(ctx, &types.ProjectGroup{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
+		_, err := cs.ah.CreateProjectGroup(ctx, &types.ProjectGroup{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
 	})
 	t.Run("create a project in user non root project group with same name as a root project", func(t *testing.T) {
-		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
 	})
 	t.Run("create a project in org non root project group with same name as a root project", func(t *testing.T) {
-		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -434,7 +434,7 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 	t.Run("create duplicated project in user root project group", func(t *testing.T) {
 		projectName := "project01"
 		expectedErr := fmt.Sprintf("project with name %q, path %q already exists", projectName, path.Join("user", user.Name, projectName))
-		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &types.Project{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
@@ -442,7 +442,7 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 	t.Run("create duplicated project in org root project group", func(t *testing.T) {
 		projectName := "project01"
 		expectedErr := fmt.Sprintf("project with name %q, path %q already exists", projectName, path.Join("org", org.Name, projectName))
-		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &types.Project{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
@@ -451,7 +451,7 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 	t.Run("create duplicated project in user non root project group", func(t *testing.T) {
 		projectName := "project01"
 		expectedErr := fmt.Sprintf("project with name %q, path %q already exists", projectName, path.Join("user", user.Name, "projectgroup01", projectName))
-		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &types.Project{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
@@ -459,7 +459,7 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 	t.Run("create duplicated project in org non root project group", func(t *testing.T) {
 		projectName := "project01"
 		expectedErr := fmt.Sprintf("project with name %q, path %q already exists", projectName, path.Join("org", org.Name, "projectgroup01", projectName))
-		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &types.Project{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
@@ -467,14 +467,14 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 
 	t.Run("create project in unexistent project group", func(t *testing.T) {
 		expectedErr := `project group with id "unexistentid" doesn't exist`
-		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: "unexistentid"}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: "unexistentid"}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
 	})
 	t.Run("create project without parent id specified", func(t *testing.T) {
 		expectedErr := "project parent id required"
-		_, err := cs.ch.CreateProject(ctx, &types.Project{Name: "project01", Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &types.Project{Name: "project01", Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
@@ -489,7 +489,7 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 		wg := sync.WaitGroup{}
 		for i := 0; i < 10; i++ {
 			wg.Add(1)
-			go cs.ch.CreateProject(ctx, &types.Project{Name: "project02", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+			go cs.ah.CreateProject(ctx, &types.Project{Name: "project02", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 			wg.Done()
 		}
 		wg.Wait()
@@ -529,11 +529,11 @@ func TestOrgMembers(t *testing.T) {
 	// TODO(sgotti) change the sleep with a real check that all is ready
 	time.Sleep(2 * time.Second)
 
-	user, err := cs.ch.CreateUser(ctx, &command.CreateUserRequest{UserName: "user01"})
+	user, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	org, err := cs.ch.CreateOrg(ctx, &types.Organization{Name: "org01", CreatorUserID: user.ID})
+	org, err := cs.ah.CreateOrg(ctx, &types.Organization{Name: "org01", CreatorUserID: user.ID})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -542,13 +542,13 @@ func TestOrgMembers(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	t.Run("test user org creator is org member with owner role", func(t *testing.T) {
-		expectedResponse := []*command.UserOrgsResponse{
+		expectedResponse := []*action.UserOrgsResponse{
 			{
 				Organization: org,
 				Role:         types.MemberRoleOwner,
 			},
 		}
-		res, err := cs.ch.GetUserOrgs(ctx, user.ID)
+		res, err := cs.ah.GetUserOrgs(ctx, user.ID)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -559,7 +559,7 @@ func TestOrgMembers(t *testing.T) {
 
 	orgs := []*types.Organization{}
 	for i := 0; i < 10; i++ {
-		org, err := cs.ch.CreateOrg(ctx, &types.Organization{Name: fmt.Sprintf("org%d", i), CreatorUserID: user.ID})
+		org, err := cs.ah.CreateOrg(ctx, &types.Organization{Name: fmt.Sprintf("org%d", i), CreatorUserID: user.ID})
 		if err != nil {
 			t.Fatalf("err: %v", err)
 		}
@@ -568,26 +568,26 @@ func TestOrgMembers(t *testing.T) {
 	}
 
 	for i := 0; i < 5; i++ {
-		if err := cs.ch.DeleteOrg(ctx, fmt.Sprintf("org%d", i)); err != nil {
+		if err := cs.ah.DeleteOrg(ctx, fmt.Sprintf("org%d", i)); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 	}
 
 	// delete some org and check that if also orgmembers aren't yet cleaned only the existing orgs are reported
 	t.Run("test only existing orgs are reported", func(t *testing.T) {
-		expectedResponse := []*command.UserOrgsResponse{
+		expectedResponse := []*action.UserOrgsResponse{
 			{
 				Organization: org,
 				Role:         types.MemberRoleOwner,
 			},
 		}
 		for i := 5; i < 10; i++ {
-			expectedResponse = append(expectedResponse, &command.UserOrgsResponse{
+			expectedResponse = append(expectedResponse, &action.UserOrgsResponse{
 				Organization: orgs[i],
 				Role:         types.MemberRoleOwner,
 			})
 		}
-		res, err := cs.ch.GetUserOrgs(ctx, user.ID)
+		res, err := cs.ah.GetUserOrgs(ctx, user.ID)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}

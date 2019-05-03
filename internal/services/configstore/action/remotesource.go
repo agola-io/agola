@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package command
+package action
 
 import (
 	"context"
@@ -27,7 +27,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-func (s *CommandHandler) CreateRemoteSource(ctx context.Context, remoteSource *types.RemoteSource) (*types.RemoteSource, error) {
+func (h *ActionHandler) CreateRemoteSource(ctx context.Context, remoteSource *types.RemoteSource) (*types.RemoteSource, error) {
 	if remoteSource.Name == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("remotesource name required"))
 	}
@@ -66,15 +66,15 @@ func (s *CommandHandler) CreateRemoteSource(ctx context.Context, remoteSource *t
 	cgNames := []string{util.EncodeSha256Hex("remotesourcename-" + remoteSource.Name)}
 
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := s.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
 			return err
 		}
 
 		// check duplicate remoteSource name
-		u, err := s.readDB.GetRemoteSourceByName(tx, remoteSource.Name)
+		u, err := h.readDB.GetRemoteSourceByName(tx, remoteSource.Name)
 		if err != nil {
 			return err
 		}
@@ -102,11 +102,11 @@ func (s *CommandHandler) CreateRemoteSource(ctx context.Context, remoteSource *t
 		},
 	}
 
-	_, err = s.dm.WriteWal(ctx, actions, cgt)
+	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return remoteSource, err
 }
 
-func (s *CommandHandler) DeleteRemoteSource(ctx context.Context, remoteSourceName string) error {
+func (h *ActionHandler) DeleteRemoteSource(ctx context.Context, remoteSourceName string) error {
 	var remoteSource *types.RemoteSource
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
@@ -115,15 +115,15 @@ func (s *CommandHandler) DeleteRemoteSource(ctx context.Context, remoteSourceNam
 	cgNames := []string{util.EncodeSha256Hex("remotesourceid-" + remoteSource.ID)}
 
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := s.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
 			return err
 		}
 
 		// check remoteSource existance
-		remoteSource, err = s.readDB.GetRemoteSourceByName(tx, remoteSourceName)
+		remoteSource, err = h.readDB.GetRemoteSourceByName(tx, remoteSourceName)
 		if err != nil {
 			return err
 		}
@@ -145,6 +145,6 @@ func (s *CommandHandler) DeleteRemoteSource(ctx context.Context, remoteSourceNam
 	}
 
 	// changegroup is all the remote sources
-	_, err = s.dm.WriteWal(ctx, actions, cgt)
+	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return err
 }

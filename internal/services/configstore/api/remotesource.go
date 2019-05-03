@@ -21,7 +21,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/db"
-	"github.com/sorintlab/agola/internal/services/configstore/command"
+	"github.com/sorintlab/agola/internal/services/configstore/action"
 	"github.com/sorintlab/agola/internal/services/configstore/readdb"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
@@ -67,12 +67,12 @@ func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 type CreateRemoteSourceHandler struct {
 	log    *zap.SugaredLogger
-	ch     *command.CommandHandler
+	ah     *action.ActionHandler
 	readDB *readdb.ReadDB
 }
 
-func NewCreateRemoteSourceHandler(logger *zap.Logger, ch *command.CommandHandler) *CreateRemoteSourceHandler {
-	return &CreateRemoteSourceHandler{log: logger.Sugar(), ch: ch}
+func NewCreateRemoteSourceHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateRemoteSourceHandler {
+	return &CreateRemoteSourceHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -85,7 +85,7 @@ func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	remoteSource, err := h.ch.CreateRemoteSource(ctx, &req)
+	remoteSource, err := h.ah.CreateRemoteSource(ctx, &req)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
@@ -98,11 +98,11 @@ func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 
 type DeleteRemoteSourceHandler struct {
 	log *zap.SugaredLogger
-	ch  *command.CommandHandler
+	ah  *action.ActionHandler
 }
 
-func NewDeleteRemoteSourceHandler(logger *zap.Logger, ch *command.CommandHandler) *DeleteRemoteSourceHandler {
-	return &DeleteRemoteSourceHandler{log: logger.Sugar(), ch: ch}
+func NewDeleteRemoteSourceHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteRemoteSourceHandler {
+	return &DeleteRemoteSourceHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *DeleteRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -111,7 +111,7 @@ func (h *DeleteRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	vars := mux.Vars(r)
 	rsRef := vars["remotesourceref"]
 
-	err := h.ch.DeleteRemoteSource(ctx, rsRef)
+	err := h.ah.DeleteRemoteSource(ctx, rsRef)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 	}

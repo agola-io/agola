@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package command
+package action
 
 import (
 	"context"
@@ -27,7 +27,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-func (s *CommandHandler) CreateVariable(ctx context.Context, variable *types.Variable) (*types.Variable, error) {
+func (h *ActionHandler) CreateVariable(ctx context.Context, variable *types.Variable) (*types.Variable, error) {
 	if variable.Name == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("variable name required"))
 	}
@@ -52,21 +52,21 @@ func (s *CommandHandler) CreateVariable(ctx context.Context, variable *types.Var
 	cgNames := []string{util.EncodeSha256Hex("variablename-" + variable.Name)}
 
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := s.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
 			return err
 		}
 
-		parentID, err := s.readDB.ResolveConfigID(tx, variable.Parent.Type, variable.Parent.ID)
+		parentID, err := h.readDB.ResolveConfigID(tx, variable.Parent.Type, variable.Parent.ID)
 		if err != nil {
 			return err
 		}
 		variable.Parent.ID = parentID
 
 		// check duplicate variable name
-		s, err := s.readDB.GetVariableByName(tx, variable.Parent.ID, variable.Name)
+		s, err := h.readDB.GetVariableByName(tx, variable.Parent.ID, variable.Name)
 		if err != nil {
 			return err
 		}
@@ -95,25 +95,25 @@ func (s *CommandHandler) CreateVariable(ctx context.Context, variable *types.Var
 		},
 	}
 
-	_, err = s.dm.WriteWal(ctx, actions, cgt)
+	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return variable, err
 }
 
-func (s *CommandHandler) DeleteVariable(ctx context.Context, parentType types.ConfigType, parentRef, variableName string) error {
+func (h *ActionHandler) DeleteVariable(ctx context.Context, parentType types.ConfigType, parentRef, variableName string) error {
 	var variable *types.Variable
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := s.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		parentID, err := s.readDB.ResolveConfigID(tx, parentType, parentRef)
+		parentID, err := h.readDB.ResolveConfigID(tx, parentType, parentRef)
 		if err != nil {
 			return err
 		}
 
 		// check variable existance
-		variable, err = s.readDB.GetVariableByName(tx, parentID, variableName)
+		variable, err = h.readDB.GetVariableByName(tx, parentID, variableName)
 		if err != nil {
 			return err
 		}
@@ -123,7 +123,7 @@ func (s *CommandHandler) DeleteVariable(ctx context.Context, parentType types.Co
 
 		// changegroup is the variable id
 		cgNames := []string{util.EncodeSha256Hex("variableid-" + variable.ID)}
-		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
 			return err
 		}
@@ -141,6 +141,6 @@ func (s *CommandHandler) DeleteVariable(ctx context.Context, parentType types.Co
 		},
 	}
 
-	_, err = s.dm.WriteWal(ctx, actions, cgt)
+	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return err
 }
