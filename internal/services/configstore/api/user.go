@@ -45,12 +45,12 @@ func NewUserHandler(logger *zap.Logger, readDB *readdb.ReadDB) *UserHandler {
 
 func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	userID := vars["userid"]
+	userRef := vars["userref"]
 
 	var user *types.User
 	err := h.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		user, err = h.readDB.GetUser(tx, userID)
+		user, err = h.readDB.GetUser(tx, userRef)
 		return err
 	})
 	if err != nil {
@@ -60,42 +60,7 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if user == nil {
-		httpError(w, util.NewErrNotFound(errors.Errorf("user %q doesn't exist", userID)))
-		return
-	}
-
-	if err := httpResponse(w, http.StatusOK, user); err != nil {
-		h.log.Errorf("err: %+v", err)
-	}
-}
-
-type UserByNameHandler struct {
-	log    *zap.SugaredLogger
-	readDB *readdb.ReadDB
-}
-
-func NewUserByNameHandler(logger *zap.Logger, readDB *readdb.ReadDB) *UserByNameHandler {
-	return &UserByNameHandler{log: logger.Sugar(), readDB: readDB}
-}
-
-func (h *UserByNameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	userName := vars["username"]
-
-	var user *types.User
-	err := h.readDB.Do(func(tx *db.Tx) error {
-		var err error
-		user, err = h.readDB.GetUserByName(tx, userName)
-		return err
-	})
-	if err != nil {
-		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
-	}
-
-	if user == nil {
-		httpError(w, util.NewErrNotFound(errors.Errorf("user %q doesn't exist", userName)))
+		httpError(w, util.NewErrNotFound(errors.Errorf("user %q doesn't exist", userRef)))
 		return
 	}
 
@@ -157,8 +122,6 @@ func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 type UpdateUserRequest struct {
 	UserName string `json:"user_name"`
-
-	UpdateUserLARequest *UpdateUserLARequest `json:"create_user_la_request"`
 }
 
 type UpdateUserHandler struct {
@@ -174,7 +137,7 @@ func (h *UpdateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	vars := mux.Vars(r)
-	userID := vars["userid"]
+	userRef := vars["userref"]
 
 	var req *UpdateUserRequest
 	d := json.NewDecoder(r.Body)
@@ -184,7 +147,7 @@ func (h *UpdateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	creq := &command.UpdateUserRequest{
-		UserID:   userID,
+		UserRef:  userRef,
 		UserName: req.UserName,
 	}
 
@@ -212,9 +175,9 @@ func (h *DeleteUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	vars := mux.Vars(r)
-	userName := vars["username"]
+	userRef := vars["userref"]
 
-	err := h.ch.DeleteUser(ctx, userName)
+	err := h.ch.DeleteUser(ctx, userRef)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 	}
@@ -369,7 +332,7 @@ func NewCreateUserLAHandler(logger *zap.Logger, ch *command.CommandHandler) *Cre
 func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	userName := vars["username"]
+	userRef := vars["userref"]
 
 	var req CreateUserLARequest
 	d := json.NewDecoder(r.Body)
@@ -379,7 +342,7 @@ func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 
 	creq := &command.CreateUserLARequest{
-		UserName:                   userName,
+		UserRef:                    userRef,
 		RemoteSourceName:           req.RemoteSourceName,
 		RemoteUserID:               req.RemoteUserID,
 		RemoteUserName:             req.RemoteUserName,
@@ -411,10 +374,10 @@ func NewDeleteUserLAHandler(logger *zap.Logger, ch *command.CommandHandler) *Del
 func (h *DeleteUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	userName := vars["username"]
+	userRef := vars["userref"]
 	laID := vars["laid"]
 
-	err := h.ch.DeleteUserLA(ctx, userName, laID)
+	err := h.ch.DeleteUserLA(ctx, userRef, laID)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 	}
@@ -444,7 +407,7 @@ func NewUpdateUserLAHandler(logger *zap.Logger, ch *command.CommandHandler) *Upd
 func (h *UpdateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	userName := vars["username"]
+	userRef := vars["userref"]
 	linkedAccountID := vars["laid"]
 
 	var req UpdateUserLARequest
@@ -455,7 +418,7 @@ func (h *UpdateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 
 	creq := &command.UpdateUserLARequest{
-		UserName:                   userName,
+		UserRef:                    userRef,
 		LinkedAccountID:            linkedAccountID,
 		RemoteUserID:               req.RemoteUserID,
 		RemoteUserName:             req.RemoteUserName,
@@ -495,7 +458,7 @@ func NewCreateUserTokenHandler(logger *zap.Logger, ch *command.CommandHandler) *
 func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	userName := vars["username"]
+	userRef := vars["userref"]
 
 	var req CreateUserTokenRequest
 	d := json.NewDecoder(r.Body)
@@ -504,7 +467,7 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	token, err := h.ch.CreateUserToken(ctx, userName, req.TokenName)
+	token, err := h.ch.CreateUserToken(ctx, userRef, req.TokenName)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
@@ -530,10 +493,10 @@ func NewDeleteUserTokenHandler(logger *zap.Logger, ch *command.CommandHandler) *
 func (h *DeleteUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	userName := vars["username"]
+	userRef := vars["userref"]
 	tokenName := vars["tokenname"]
 
-	err := h.ch.DeleteUserToken(ctx, userName, tokenName)
+	err := h.ch.DeleteUserToken(ctx, userRef, tokenName)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 	}

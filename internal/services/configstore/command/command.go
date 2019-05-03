@@ -382,7 +382,7 @@ func (s *CommandHandler) CreateUser(ctx context.Context, req *CreateUserRequest)
 	return user, err
 }
 
-func (s *CommandHandler) DeleteUser(ctx context.Context, userName string) error {
+func (s *CommandHandler) DeleteUser(ctx context.Context, userRef string) error {
 	var user *types.User
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
@@ -391,12 +391,12 @@ func (s *CommandHandler) DeleteUser(ctx context.Context, userName string) error 
 		var err error
 
 		// check user existance
-		user, err = s.readDB.GetUserByName(tx, userName)
+		user, err = s.readDB.GetUser(tx, userRef)
 		if err != nil {
 			return err
 		}
 		if user == nil {
-			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", userName))
+			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", userRef))
 		}
 
 		// changegroup is the userid
@@ -425,7 +425,7 @@ func (s *CommandHandler) DeleteUser(ctx context.Context, userName string) error 
 }
 
 type UpdateUserRequest struct {
-	UserID string
+	UserRef string
 
 	UserName string
 }
@@ -439,12 +439,12 @@ func (s *CommandHandler) UpdateUser(ctx context.Context, req *UpdateUserRequest)
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		user, err = s.readDB.GetUserByName(tx, req.UserName)
+		user, err = s.readDB.GetUser(tx, req.UserRef)
 		if err != nil {
 			return err
 		}
 		if user == nil {
-			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", req.UserName))
+			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", req.UserRef))
 		}
 
 		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
@@ -495,7 +495,8 @@ func (s *CommandHandler) UpdateUser(ctx context.Context, req *UpdateUserRequest)
 }
 
 type CreateUserLARequest struct {
-	UserName                   string
+	UserRef string
+
 	RemoteSourceName           string
 	RemoteUserID               string
 	RemoteUserName             string
@@ -506,8 +507,8 @@ type CreateUserLARequest struct {
 }
 
 func (s *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequest) (*types.LinkedAccount, error) {
-	if req.UserName == "" {
-		return nil, util.NewErrBadRequest(errors.Errorf("user name required"))
+	if req.UserRef == "" {
+		return nil, util.NewErrBadRequest(errors.Errorf("user ref required"))
 	}
 	if req.RemoteSourceName == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("remote source name required"))
@@ -521,12 +522,12 @@ func (s *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequ
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		user, err = s.readDB.GetUserByName(tx, req.UserName)
+		user, err = s.readDB.GetUser(tx, req.UserRef)
 		if err != nil {
 			return err
 		}
 		if user == nil {
-			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", req.UserName))
+			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", req.UserRef))
 		}
 
 		// changegroup is the userid
@@ -591,9 +592,9 @@ func (s *CommandHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequ
 	return la, err
 }
 
-func (s *CommandHandler) DeleteUserLA(ctx context.Context, userName, laID string) error {
-	if userName == "" {
-		return util.NewErrBadRequest(errors.Errorf("user name required"))
+func (s *CommandHandler) DeleteUserLA(ctx context.Context, userRef, laID string) error {
+	if userRef == "" {
+		return util.NewErrBadRequest(errors.Errorf("user ref  required"))
 	}
 	if laID == "" {
 		return util.NewErrBadRequest(errors.Errorf("user linked account id required"))
@@ -606,12 +607,12 @@ func (s *CommandHandler) DeleteUserLA(ctx context.Context, userName, laID string
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		user, err = s.readDB.GetUserByName(tx, userName)
+		user, err = s.readDB.GetUser(tx, userRef)
 		if err != nil {
 			return err
 		}
 		if user == nil {
-			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", userName))
+			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", userRef))
 		}
 
 		// changegroup is the userid
@@ -629,7 +630,7 @@ func (s *CommandHandler) DeleteUserLA(ctx context.Context, userName, laID string
 
 	_, ok := user.LinkedAccounts[laID]
 	if !ok {
-		return util.NewErrBadRequest(errors.Errorf("linked account id %q for user %q doesn't exist", laID, userName))
+		return util.NewErrBadRequest(errors.Errorf("linked account id %q for user %q doesn't exist", laID, userRef))
 	}
 
 	delete(user.LinkedAccounts, laID)
@@ -652,7 +653,8 @@ func (s *CommandHandler) DeleteUserLA(ctx context.Context, userName, laID string
 }
 
 type UpdateUserLARequest struct {
-	UserName                   string
+	UserRef string
+
 	LinkedAccountID            string
 	RemoteUserID               string
 	RemoteUserName             string
@@ -663,8 +665,8 @@ type UpdateUserLARequest struct {
 }
 
 func (s *CommandHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLARequest) (*types.LinkedAccount, error) {
-	if req.UserName == "" {
-		return nil, util.NewErrBadRequest(errors.Errorf("user name required"))
+	if req.UserRef == "" {
+		return nil, util.NewErrBadRequest(errors.Errorf("user ref required"))
 	}
 
 	var user *types.User
@@ -675,12 +677,12 @@ func (s *CommandHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLARequ
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		user, err = s.readDB.GetUserByName(tx, req.UserName)
+		user, err = s.readDB.GetUser(tx, req.UserRef)
 		if err != nil {
 			return err
 		}
 		if user == nil {
-			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", req.UserName))
+			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", req.UserRef))
 		}
 
 		// changegroup is the userid
@@ -734,9 +736,9 @@ func (s *CommandHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLARequ
 	return la, err
 }
 
-func (s *CommandHandler) CreateUserToken(ctx context.Context, userName, tokenName string) (string, error) {
-	if userName == "" {
-		return "", util.NewErrBadRequest(errors.Errorf("user name required"))
+func (s *CommandHandler) CreateUserToken(ctx context.Context, userRef, tokenName string) (string, error) {
+	if userRef == "" {
+		return "", util.NewErrBadRequest(errors.Errorf("user ref required"))
 	}
 	if tokenName == "" {
 		return "", util.NewErrBadRequest(errors.Errorf("token name required"))
@@ -749,12 +751,12 @@ func (s *CommandHandler) CreateUserToken(ctx context.Context, userName, tokenNam
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		user, err = s.readDB.GetUserByName(tx, userName)
+		user, err = s.readDB.GetUser(tx, userRef)
 		if err != nil {
 			return err
 		}
 		if user == nil {
-			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", userName))
+			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", userRef))
 		}
 
 		// changegroup is the userid
@@ -771,7 +773,7 @@ func (s *CommandHandler) CreateUserToken(ctx context.Context, userName, tokenNam
 	}
 	if user.Tokens != nil {
 		if _, ok := user.Tokens[tokenName]; ok {
-			return "", util.NewErrBadRequest(errors.Errorf("token %q for user %q already exists", tokenName, userName))
+			return "", util.NewErrBadRequest(errors.Errorf("token %q for user %q already exists", tokenName, userRef))
 		}
 	}
 
@@ -799,9 +801,9 @@ func (s *CommandHandler) CreateUserToken(ctx context.Context, userName, tokenNam
 	return token, err
 }
 
-func (s *CommandHandler) DeleteUserToken(ctx context.Context, userName, tokenName string) error {
-	if userName == "" {
-		return util.NewErrBadRequest(errors.Errorf("user name required"))
+func (s *CommandHandler) DeleteUserToken(ctx context.Context, userRef, tokenName string) error {
+	if userRef == "" {
+		return util.NewErrBadRequest(errors.Errorf("user ref required"))
 	}
 	if tokenName == "" {
 		return util.NewErrBadRequest(errors.Errorf("token name required"))
@@ -814,12 +816,12 @@ func (s *CommandHandler) DeleteUserToken(ctx context.Context, userName, tokenNam
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		user, err = s.readDB.GetUserByName(tx, userName)
+		user, err = s.readDB.GetUser(tx, userRef)
 		if err != nil {
 			return err
 		}
 		if user == nil {
-			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", userName))
+			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", userRef))
 		}
 
 		// changegroup is the userid
@@ -837,7 +839,7 @@ func (s *CommandHandler) DeleteUserToken(ctx context.Context, userName, tokenNam
 
 	_, ok := user.Tokens[tokenName]
 	if !ok {
-		return util.NewErrBadRequest(errors.Errorf("token %q for user %q doesn't exist", tokenName, userName))
+		return util.NewErrBadRequest(errors.Errorf("token %q for user %q doesn't exist", tokenName, userRef))
 	}
 
 	delete(user.Tokens, tokenName)
@@ -1019,37 +1021,38 @@ func (s *CommandHandler) CreateOrg(ctx context.Context, org *types.Organization)
 	return org, err
 }
 
-func (s *CommandHandler) DeleteOrg(ctx context.Context, orgName string) error {
+func (s *CommandHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 	var org *types.Organization
 	var projects []*types.Project
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
-	// changegroup is the org id
-	cgNames := []string{util.EncodeSha256Hex("orgid-" + org.ID)}
 
 	// must do all the check in a single transaction to avoid concurrent changes
 	err := s.readDB.Do(func(tx *db.Tx) error {
 		var err error
+		// check org existance
+		org, err = s.readDB.GetOrgByName(tx, orgRef)
+		if err != nil {
+			return err
+		}
+		if org == nil {
+			return util.NewErrBadRequest(errors.Errorf("org %q doesn't exist", orgRef))
+		}
+
+		// changegroup is the org id
+		cgNames := []string{util.EncodeSha256Hex("orgid-" + org.ID)}
 		cgt, err = s.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
 			return err
 		}
 
-		// check org existance
-		org, err = s.readDB.GetOrgByName(tx, orgName)
-		if err != nil {
-			return err
-		}
-		if org == nil {
-			return util.NewErrBadRequest(errors.Errorf("org %q doesn't exist", orgName))
-		}
-		// TODO(sgotti) delete all project groups, projects etc...
 		return nil
 	})
 	if err != nil {
 		return err
 	}
 
+	// TODO(sgotti) delete all project groups, projects etc...
 	actions := []*datamanager.Action{
 		{
 			ActionType: datamanager.ActionTypeDelete,
