@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-package command
+package action
 
 import (
 	"net/http"
@@ -28,7 +28,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type CommandHandler struct {
+type ActionHandler struct {
 	log               *zap.SugaredLogger
 	sd                *common.TokenSigningData
 	configstoreClient *csapi.Client
@@ -37,8 +37,8 @@ type CommandHandler struct {
 	webExposedURL     string
 }
 
-func NewCommandHandler(logger *zap.Logger, sd *common.TokenSigningData, configstoreClient *csapi.Client, agolaID, apiExposedURL, webExposedURL string) *CommandHandler {
-	return &CommandHandler{
+func NewActionHandler(logger *zap.Logger, sd *common.TokenSigningData, configstoreClient *csapi.Client, agolaID, apiExposedURL, webExposedURL string) *ActionHandler {
+	return &ActionHandler{
 		log:               logger.Sugar(),
 		sd:                sd,
 		configstoreClient: configstoreClient,

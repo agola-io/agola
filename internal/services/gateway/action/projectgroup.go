@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-package command
+package action
 
 import (
 	"context"
@@ -35,12 +35,12 @@ type CreateProjectGroupRequest struct {
 	Visibility    types.Visibility
 }
 
-func (c *CommandHandler) CreateProjectGroup(ctx context.Context, req *CreateProjectGroupRequest) (*csapi.ProjectGroup, error) {
+func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProjectGroupRequest) (*csapi.ProjectGroup, error) {
 	if !util.ValidateName(req.Name) {
 		return nil, util.NewErrBadRequest(errors.Errorf("invalid projectGroup name %q", req.Name))
 	}
 
-	user, resp, err := c.configstoreClient.GetUser(ctx, req.CurrentUserID)
+	user, resp, err := h.configstoreClient.GetUser(ctx, req.CurrentUserID)
 	if err != nil {
 		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get user %q", req.CurrentUserID))
 	}
@@ -60,12 +60,12 @@ func (c *CommandHandler) CreateProjectGroup(ctx context.Context, req *CreateProj
 		Visibility: req.Visibility,
 	}
 
-	c.log.Infof("creating projectGroup")
-	rp, resp, err := c.configstoreClient.CreateProjectGroup(ctx, p)
+	h.log.Infof("creating projectGroup")
+	rp, resp, err := h.configstoreClient.CreateProjectGroup(ctx, p)
 	if err != nil {
 		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to create projectGroup"))
 	}
-	c.log.Infof("projectGroup %s created, ID: %s", rp.Name, rp.ID)
+	h.log.Infof("projectGroup %s created, ID: %s", rp.Name, rp.ID)
 
 	return rp, nil
 }
