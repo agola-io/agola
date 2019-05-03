@@ -18,8 +18,6 @@
 package common
 
 import (
-	"fmt"
-
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
 	"github.com/sorintlab/agola/internal/gitsources/gitea"
 	"github.com/sorintlab/agola/internal/gitsources/gitlab"
@@ -27,30 +25,6 @@ import (
 
 	"github.com/pkg/errors"
 )
-
-func SourceSupportedAuthTypes(rsType types.RemoteSourceType) []types.RemoteSourceAuthType {
-	switch rsType {
-	case types.RemoteSourceTypeGitea:
-		return []types.RemoteSourceAuthType{types.RemoteSourceAuthTypePassword}
-	case types.RemoteSourceTypeGithub:
-		fallthrough
-	case types.RemoteSourceTypeGitlab:
-		return []types.RemoteSourceAuthType{types.RemoteSourceAuthTypeOauth2}
-
-	default:
-		panic(fmt.Errorf("unsupported remote source type: %q", rsType))
-	}
-}
-
-func SourceSupportsAuthType(rsType types.RemoteSourceType, authType types.RemoteSourceAuthType) bool {
-	supportedAuthTypes := SourceSupportedAuthTypes(rsType)
-	for _, st := range supportedAuthTypes {
-		if st == authType {
-			return true
-		}
-	}
-	return false
-}
 
 func newGitea(rs *types.RemoteSource, accessToken string) (*gitea.Client, error) {
 	return gitea.New(gitea.Opts{
