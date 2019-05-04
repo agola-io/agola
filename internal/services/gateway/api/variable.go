@@ -19,13 +19,13 @@ import (
 	"net/http"
 
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
+	"github.com/sorintlab/agola/internal/services/gateway/action"
 	"github.com/sorintlab/agola/internal/services/gateway/common"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 	"go.uber.org/zap"
 
 	"github.com/gorilla/mux"
-	"github.com/pkg/errors"
 )
 
 type VariableValue struct {
@@ -68,19 +68,19 @@ func createVariableResponse(v *csapi.Variable, secrets []*csapi.Secret) *Variabl
 }
 
 type VariableHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewVariableHandler(logger *zap.Logger, configstoreClient *csapi.Client) *VariableHandler {
-	return &VariableHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewVariableHandler(logger *zap.Logger, ah *action.ActionHandler) *VariableHandler {
+	return &VariableHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *VariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	query := r.URL.Query()
 	_, tree := query["tree"]
-	_, removeoverriden := query["removeoverriden"]
+	_, removeoverridden := query["removeoverridden"]
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
 	if httpError(w, err) {
@@ -88,41 +88,16 @@ func (h *VariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var csvars []*csapi.Variable
-	var cssecrets []*csapi.Secret
-
-	switch parentType {
-	case types.ConfigTypeProjectGroup:
-		var err error
-		var resp *http.Response
-		csvars, resp, err = h.configstoreClient.GetProjectGroupVariables(ctx, parentRef, tree)
-		if httpErrorFromRemote(w, resp, err) {
-			h.log.Errorf("err: %+v", err)
-			return
-		}
-		cssecrets, resp, err = h.configstoreClient.GetProjectGroupSecrets(ctx, parentRef, true)
-		if httpErrorFromRemote(w, resp, err) {
-			h.log.Errorf("err: %+v", err)
-			return
-		}
-	case types.ConfigTypeProject:
-		var err error
-		var resp *http.Response
-		csvars, resp, err = h.configstoreClient.GetProjectVariables(ctx, parentRef, tree)
-		if httpErrorFromRemote(w, resp, err) {
-			h.log.Errorf("err: %+v", err)
-			return
-		}
-		cssecrets, resp, err = h.configstoreClient.GetProjectSecrets(ctx, parentRef, true)
-		if httpErrorFromRemote(w, resp, err) {
-			h.log.Errorf("err: %+v", err)
-			return
-		}
+	areq := &action.GetVariablesRequest{
+		ParentType:       parentType,
+		ParentRef:        parentRef,
+		Tree:             tree,
+		RemoveOverridden: removeoverridden,
 	}
-
-	if removeoverriden {
-		// remove overriden variables
-		csvars = common.FilterOverridenVariables(csvars)
+	csvars, cssecrets, err := h.ah.GetVariables(ctx, areq)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
 	}
 
 	variables := make([]*VariableResponse, len(csvars))
@@ -142,12 +117,12 @@ type CreateVariableRequest struct {
 }
 
 type CreateVariableHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewCreateVariableHandler(logger *zap.Logger, configstoreClient *csapi.Client) *CreateVariableHandler {
-	return &CreateVariableHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewCreateVariableHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateVariableHandler {
+	return &CreateVariableHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -164,76 +139,31 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
-
-	if !util.ValidateName(req.Name) {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("invalid secret name %q", req.Name)))
+	areq := &action.CreateVariableRequest{
+		Name:       req.Name,
+		ParentType: parentType,
+		ParentRef:  parentRef,
+		Values:     req.Values,
+	}
+	csvar, cssecrets, err := h.ah.CreateVariable(ctx, areq)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
 		return
 	}
 
-	if len(req.Values) == 0 {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("empty variable values")))
-		return
-	}
-
-	v := &types.Variable{
-		Name: req.Name,
-		Parent: types.Parent{
-			Type: parentType,
-			ID:   parentRef,
-		},
-		Values: req.Values,
-	}
-
-	var cssecrets []*csapi.Secret
-	var rv *csapi.Variable
-
-	switch parentType {
-	case types.ConfigTypeProjectGroup:
-		var err error
-		var resp *http.Response
-		cssecrets, resp, err = h.configstoreClient.GetProjectGroupSecrets(ctx, parentRef, true)
-		if httpErrorFromRemote(w, resp, err) {
-			h.log.Errorf("err: %+v", err)
-			return
-		}
-
-		h.log.Infof("creating project group variable")
-		rv, resp, err = h.configstoreClient.CreateProjectGroupVariable(ctx, parentRef, v)
-		if httpErrorFromRemote(w, resp, err) {
-			h.log.Errorf("err: %+v", err)
-			return
-		}
-	case types.ConfigTypeProject:
-		var err error
-		var resp *http.Response
-		cssecrets, resp, err = h.configstoreClient.GetProjectSecrets(ctx, parentRef, true)
-		if httpErrorFromRemote(w, resp, err) {
-			h.log.Errorf("err: %+v", err)
-			return
-		}
-
-		h.log.Infof("creating project variable")
-		rv, resp, err = h.configstoreClient.CreateProjectVariable(ctx, parentRef, v)
-		if httpErrorFromRemote(w, resp, err) {
-			h.log.Errorf("err: %+v", err)
-			return
-		}
-	}
-	h.log.Infof("variable %s created, ID: %s", rv.Name, rv.ID)
-
-	res := createVariableResponse(rv, cssecrets)
+	res := createVariableResponse(csvar, cssecrets)
 	if err := httpResponse(w, http.StatusCreated, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
 
 type DeleteVariableHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewDeleteVariableHandler(logger *zap.Logger, configstoreClient *csapi.Client) *DeleteVariableHandler {
-	return &DeleteVariableHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewDeleteVariableHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteVariableHandler {
+	return &DeleteVariableHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *DeleteVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -247,16 +177,8 @@ func (h *DeleteVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	var resp *http.Response
-	switch parentType {
-	case types.ConfigTypeProjectGroup:
-		h.log.Infof("deleting project group variable")
-		resp, err = h.configstoreClient.DeleteProjectGroupVariable(ctx, parentRef, variableName)
-	case types.ConfigTypeProject:
-		h.log.Infof("deleting project variable")
-		resp, err = h.configstoreClient.DeleteProjectVariable(ctx, parentRef, variableName)
-	}
-	if httpErrorFromRemote(w, resp, err) {
+	err = h.ah.DeleteVariable(ctx, parentType, parentRef, variableName)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}

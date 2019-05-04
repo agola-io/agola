@@ -22,7 +22,7 @@ import (
 	"github.com/sorintlab/agola/internal/services/types"
 )
 
-func TestFilterOverridenVariables(t *testing.T) {
+func TestFilterOverriddenVariables(t *testing.T) {
 	tests := []struct {
 		name      string
 		variables []*csapi.Variable
@@ -106,7 +106,7 @@ func TestFilterOverridenVariables(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			out := FilterOverridenVariables(tt.variables)
+			out := FilterOverriddenVariables(tt.variables)
 
 			if diff := cmp.Diff(tt.out, out); diff != "" {
 				t.Error(diff)

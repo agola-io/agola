@@ -198,7 +198,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		h.log.Infof("pvars: %v", util.Dump(pvars))
 
 		// remove overriden variables
-		pvars = common.FilterOverridenVariables(pvars)
+		pvars = common.FilterOverriddenVariables(pvars)
 		h.log.Infof("pvars: %v", util.Dump(pvars))
 
 		// get project secrets

@@ -20,7 +20,7 @@ import (
 	"github.com/sorintlab/agola/internal/util"
 )
 
-func FilterOverridenVariables(variables []*csapi.Variable) []*csapi.Variable {
+func FilterOverriddenVariables(variables []*csapi.Variable) []*csapi.Variable {
 	variablesMap := map[string]*csapi.Variable{}
 	for _, v := range variables {
 		if _, ok := variablesMap[v.Name]; !ok {

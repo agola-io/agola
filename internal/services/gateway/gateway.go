@@ -162,9 +162,9 @@ func (g *Gateway) Run(ctx context.Context) error {
 	createSecretHandler := api.NewCreateSecretHandler(logger, g.configstoreClient)
 	deleteSecretHandler := api.NewDeleteSecretHandler(logger, g.configstoreClient)
 
-	variableHandler := api.NewVariableHandler(logger, g.configstoreClient)
-	createVariableHandler := api.NewCreateVariableHandler(logger, g.configstoreClient)
-	deleteVariableHandler := api.NewDeleteVariableHandler(logger, g.configstoreClient)
+	variableHandler := api.NewVariableHandler(logger, g.ah)
+	createVariableHandler := api.NewCreateVariableHandler(logger, g.ah)
+	deleteVariableHandler := api.NewDeleteVariableHandler(logger, g.ah)
 
 	currentUserHandler := api.NewCurrentUserHandler(logger, g.configstoreClient)
 	userHandler := api.NewUserHandler(logger, g.configstoreClient)
