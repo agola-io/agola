@@ -76,6 +76,11 @@ func (h *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			// pass userid to handlers via context
 			ctx = context.WithValue(ctx, "userid", user.ID)
 			ctx = context.WithValue(ctx, "username", user.Name)
+
+			if user.Admin {
+				ctx = context.WithValue(ctx, "admin", true)
+			}
+
 			h.next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
@@ -122,9 +127,14 @@ func (h *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// pass userid to handlers via context
+		// pass userid and username to handlers via context
 		ctx = context.WithValue(ctx, "userid", user.ID)
 		ctx = context.WithValue(ctx, "username", user.Name)
+
+		if user.Admin {
+			ctx = context.WithValue(ctx, "admin", true)
+		}
+
 		h.next.ServeHTTP(w, r.WithContext(ctx))
 		return
 	}
