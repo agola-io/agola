@@ -52,7 +52,7 @@ func (h *ActionHandler) GetProjectGroupProjects(ctx context.Context, projectGrou
 type CreateProjectGroupRequest struct {
 	CurrentUserID string
 	Name          string
-	ParentID      string
+	ParentRef     string
 	Visibility    types.Visibility
 }
 
@@ -66,17 +66,17 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProje
 		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get user %q", req.CurrentUserID))
 	}
 
-	parentID := req.ParentID
-	if parentID == "" {
+	parentRef := req.ParentRef
+	if parentRef == "" {
 		// create projectGroup in current user namespace
-		parentID = path.Join("user", user.Name)
+		parentRef = path.Join("user", user.Name)
 	}
 
 	p := &types.ProjectGroup{
 		Name: req.Name,
 		Parent: types.Parent{
 			Type: types.ConfigTypeProjectGroup,
-			ID:   parentID,
+			ID:   parentRef,
 		},
 		Visibility: req.Visibility,
 	}

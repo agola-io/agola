@@ -39,7 +39,7 @@ func (h *ActionHandler) GetProject(ctx context.Context, projectRef string) (*csa
 type CreateProjectRequest struct {
 	CurrentUserID       string
 	Name                string
-	ParentID            string
+	ParentRef           string
 	Visibility          types.Visibility
 	RemoteSourceName    string
 	RepoPath            string
@@ -57,7 +57,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 		return nil, util.NewErrBadRequest(errors.Errorf("empty remote repo path"))
 	}
 
-	pg, resp, err := h.configstoreClient.GetProjectGroup(ctx, req.ParentID)
+	pg, resp, err := h.configstoreClient.GetProjectGroup(ctx, req.ParentRef)
 	if err != nil {
 		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get project group %q", req.Name))
 	}
@@ -110,17 +110,17 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 		return nil, errors.Wrapf(err, "failed to generate ssh key pair")
 	}
 
-	parentID := req.ParentID
-	if parentID == "" {
+	parentRef := req.ParentRef
+	if parentRef == "" {
 		// create project in current user namespace
-		parentID = path.Join("user", user.Name)
+		parentRef = path.Join("user", user.Name)
 	}
 
 	p := &types.Project{
 		Name: req.Name,
 		Parent: types.Parent{
 			Type: types.ConfigTypeProjectGroup,
-			ID:   parentID,
+			ID:   parentRef,
 		},
 		Visibility:                 req.Visibility,
 		RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeRemoteSource,

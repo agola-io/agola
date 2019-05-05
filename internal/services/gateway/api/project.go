@@ -31,7 +31,7 @@ import (
 
 type CreateProjectRequest struct {
 	Name                string           `json:"name,omitempty"`
-	ParentID            string           `json:"parent_id,omitempty"`
+	ParentRef           string           `json:"parent_ref,omitempty"`
 	Visibility          types.Visibility `json:"visibility,omitempty"`
 	RepoPath            string           `json:"repo_path,omitempty"`
 	RemoteSourceName    string           `json:"remote_source_name,omitempty"`
@@ -68,7 +68,7 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 
 	areq := &action.CreateProjectRequest{
 		Name:                req.Name,
-		ParentID:            req.ParentID,
+		ParentRef:           req.ParentRef,
 		Visibility:          req.Visibility,
 		RepoPath:            req.RepoPath,
 		RemoteSourceName:    req.RemoteSourceName,

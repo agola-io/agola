@@ -73,7 +73,7 @@ func projectCreate(cmd *cobra.Command, args []string) error {
 
 	req := &api.CreateProjectRequest{
 		Name:                projectCreateOpts.name,
-		ParentID:            projectCreateOpts.parentPath,
+		ParentRef:           projectCreateOpts.parentPath,
 		Visibility:          types.Visibility(projectCreateOpts.visibility),
 		RepoPath:            projectCreateOpts.repoPath,
 		RemoteSourceName:    projectCreateOpts.remoteSourceName,

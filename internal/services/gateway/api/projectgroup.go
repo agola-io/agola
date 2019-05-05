@@ -31,7 +31,7 @@ import (
 
 type CreateProjectGroupRequest struct {
 	Name       string           `json:"name,omitempty"`
-	ParentID   string           `json:"parent_id,omitempty"`
+	ParentRef  string           `json:"parent_ref,omitempty"`
 	Visibility types.Visibility `json:"visibility,omitempty"`
 }
 
@@ -65,7 +65,7 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 
 	creq := &action.CreateProjectGroupRequest{
 		Name:          req.Name,
-		ParentID:      req.ParentID,
+		ParentRef:     req.ParentRef,
 		Visibility:    req.Visibility,
 		CurrentUserID: userID,
 	}

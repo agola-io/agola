@@ -65,7 +65,7 @@ func projectGroupCreate(cmd *cobra.Command, args []string) error {
 
 	req := &api.CreateProjectGroupRequest{
 		Name:       projectGroupCreateOpts.name,
-		ParentID:   projectGroupCreateOpts.parentPath,
+		ParentRef:  projectGroupCreateOpts.parentPath,
 		Visibility: types.Visibility(projectCreateOpts.visibility),
 	}
 
