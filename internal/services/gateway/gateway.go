@@ -181,10 +181,10 @@ func (g *Gateway) Run(ctx context.Context) error {
 	createRemoteSourceHandler := api.NewCreateRemoteSourceHandler(logger, g.ah)
 	remoteSourcesHandler := api.NewRemoteSourcesHandler(logger, g.configstoreClient)
 
-	orgHandler := api.NewOrgHandler(logger, g.configstoreClient)
-	orgsHandler := api.NewOrgsHandler(logger, g.configstoreClient)
+	orgHandler := api.NewOrgHandler(logger, g.ah)
+	orgsHandler := api.NewOrgsHandler(logger, g.ah)
 	createOrgHandler := api.NewCreateOrgHandler(logger, g.ah)
-	deleteOrgHandler := api.NewDeleteOrgHandler(logger, g.configstoreClient)
+	deleteOrgHandler := api.NewDeleteOrgHandler(logger, g.ah)
 
 	runHandler := api.NewRunHandler(logger, g.runserviceClient)
 	runsHandler := api.NewRunsHandler(logger, g.runserviceClient)

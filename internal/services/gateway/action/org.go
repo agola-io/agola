@@ -23,6 +23,28 @@ import (
 	"github.com/pkg/errors"
 )
 
+func (h *ActionHandler) GetOrg(ctx context.Context, orgRef string) (*types.Organization, error) {
+	org, resp, err := h.configstoreClient.GetOrg(ctx, orgRef)
+	if err != nil {
+		return nil, ErrFromRemote(resp, err)
+	}
+	return org, nil
+}
+
+type GetOrgsRequest struct {
+	Start string
+	Limit int
+	Asc   bool
+}
+
+func (h *ActionHandler) GetOrgs(ctx context.Context, req *GetOrgsRequest) ([]*types.Organization, error) {
+	orgs, resp, err := h.configstoreClient.GetOrgs(ctx, req.Start, req.Limit, req.Asc)
+	if err != nil {
+		return nil, ErrFromRemote(resp, err)
+	}
+	return orgs, nil
+}
+
 type CreateOrgRequest struct {
 	Name string
 
@@ -52,4 +74,12 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*
 	h.log.Infof("organization %s created, ID: %s", org.Name, org.ID)
 
 	return org, nil
+}
+
+func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
+	resp, err := h.configstoreClient.DeleteOrg(ctx, orgRef)
+	if err != nil {
+		return ErrFromRemote(resp, errors.Wrapf(err, "failed to delete org"))
+	}
+	return nil
 }

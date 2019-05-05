@@ -20,7 +20,6 @@ import (
 	"strconv"
 
 	"github.com/pkg/errors"
-	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/gateway/action"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
@@ -77,12 +76,12 @@ func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type DeleteOrgHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewDeleteOrgHandler(logger *zap.Logger, configstoreClient *csapi.Client) *DeleteOrgHandler {
-	return &DeleteOrgHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewDeleteOrgHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteOrgHandler {
+	return &DeleteOrgHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *DeleteOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -90,8 +89,8 @@ func (h *DeleteOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	orgRef := vars["orgref"]
 
-	resp, err := h.configstoreClient.DeleteOrg(ctx, orgRef)
-	if httpErrorFromRemote(w, resp, err) {
+	err := h.ah.DeleteOrg(ctx, orgRef)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -102,12 +101,12 @@ func (h *DeleteOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type OrgHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewOrgHandler(logger *zap.Logger, configstoreClient *csapi.Client) *OrgHandler {
-	return &OrgHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewOrgHandler(logger *zap.Logger, ah *action.ActionHandler) *OrgHandler {
+	return &OrgHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *OrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -115,8 +114,8 @@ func (h *OrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	orgRef := vars["orgref"]
 
-	org, resp, err := h.configstoreClient.GetOrg(ctx, orgRef)
-	if httpErrorFromRemote(w, resp, err) {
+	org, err := h.ah.GetOrg(ctx, orgRef)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -141,17 +140,16 @@ func createOrgResponse(o *types.Organization) *OrgResponse {
 }
 
 type OrgsHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewOrgsHandler(logger *zap.Logger, configstoreClient *csapi.Client) *OrgsHandler {
-	return &OrgsHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewOrgsHandler(logger *zap.Logger, ah *action.ActionHandler) *OrgsHandler {
+	return &OrgsHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-
 	query := r.URL.Query()
 
 	limitS := query.Get("limit")
@@ -178,8 +176,13 @@ func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	start := query.Get("start")
 
-	csorgs, resp, err := h.configstoreClient.GetOrgs(ctx, start, limit, asc)
-	if httpErrorFromRemote(w, resp, err) {
+	areq := &action.GetOrgsRequest{
+		Start: start,
+		Limit: limit,
+		Asc:   asc,
+	}
+	csorgs, err := h.ah.GetOrgs(ctx, areq)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
