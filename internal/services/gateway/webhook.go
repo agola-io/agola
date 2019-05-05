@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"net/url"
 	"path"
 
 	"github.com/sorintlab/agola/internal/config"
@@ -68,16 +67,6 @@ const (
 	AnnotationPullRequestLink = "pull_request_link"
 )
 
-type GroupType string
-
-const (
-	GroupTypeProject     GroupType = "project"
-	GroupTypeUser        GroupType = "user"
-	GroupTypeBranch      GroupType = "branch"
-	GroupTypeTag         GroupType = "tag"
-	GroupTypePullRequest GroupType = "pr"
-)
-
 func genAnnotationVirtualBranch(webhookData *types.WebhookData) string {
 	switch webhookData.Event {
 	case types.WebhookEventPush:
@@ -86,21 +75,6 @@ func genAnnotationVirtualBranch(webhookData *types.WebhookData) string {
 		return "tag-" + webhookData.Tag
 	case types.WebhookEventPullRequest:
 		return "pr-" + webhookData.PullRequestID
-	}
-
-	panic(fmt.Errorf("invalid webhook event type: %q", webhookData.Event))
-}
-
-func genGroup(baseGroupType GroupType, baseGroupID string, webhookData *types.WebhookData) string {
-	// we pathescape the branch name to handle branches with slashes and make the
-	// branch a single path entry
-	switch webhookData.Event {
-	case types.WebhookEventPush:
-		return path.Join("/", string(baseGroupType), baseGroupID, string(GroupTypeBranch), url.PathEscape(webhookData.Branch))
-	case types.WebhookEventTag:
-		return path.Join("/", string(baseGroupType), baseGroupID, string(GroupTypeTag), url.PathEscape(webhookData.Tag))
-	case types.WebhookEventPullRequest:
-		return path.Join("/", string(baseGroupType), baseGroupID, string(GroupTypePullRequest), url.PathEscape(webhookData.PullRequestID))
 	}
 
 	panic(fmt.Errorf("invalid webhook event type: %q", webhookData.Event))
@@ -321,9 +295,9 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 
 	var group string
 	if !isUserBuild {
-		group = genGroup(GroupTypeProject, webhookData.ProjectID, webhookData)
+		group = common.GenRunGroup(common.GroupTypeProject, webhookData.ProjectID, webhookData)
 	} else {
-		group = genGroup(GroupTypeUser, userID, webhookData)
+		group = common.GenRunGroup(common.GroupTypeUser, userID, webhookData)
 	}
 
 	if err := h.createRuns(ctx, filename, data, group, annotations, env, variables, webhookData); err != nil {
