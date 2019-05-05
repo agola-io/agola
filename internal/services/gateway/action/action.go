@@ -20,6 +20,7 @@ import (
 	"github.com/pkg/errors"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/gateway/common"
+	rsapi "github.com/sorintlab/agola/internal/services/runservice/scheduler/api"
 	"github.com/sorintlab/agola/internal/util"
 
 	"go.uber.org/zap"
@@ -29,16 +30,18 @@ type ActionHandler struct {
 	log               *zap.SugaredLogger
 	sd                *common.TokenSigningData
 	configstoreClient *csapi.Client
+	runserviceClient  *rsapi.Client
 	agolaID           string
 	apiExposedURL     string
 	webExposedURL     string
 }
 
-func NewActionHandler(logger *zap.Logger, sd *common.TokenSigningData, configstoreClient *csapi.Client, agolaID, apiExposedURL, webExposedURL string) *ActionHandler {
+func NewActionHandler(logger *zap.Logger, sd *common.TokenSigningData, configstoreClient *csapi.Client, runserviceClient *rsapi.Client, agolaID, apiExposedURL, webExposedURL string) *ActionHandler {
 	return &ActionHandler{
 		log:               logger.Sugar(),
 		sd:                sd,
 		configstoreClient: configstoreClient,
+		runserviceClient:  runserviceClient,
 		agolaID:           agolaID,
 		apiExposedURL:     apiExposedURL,
 		webExposedURL:     webExposedURL,

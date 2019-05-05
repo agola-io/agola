@@ -122,13 +122,14 @@ func NewGateway(gc *config.Config) (*Gateway, error) {
 	}
 
 	configstoreClient := csapi.NewClient(c.ConfigStoreURL)
+	runserviceClient := rsapi.NewClient(c.RunServiceURL)
 
-	ah := action.NewActionHandler(logger, sd, configstoreClient, gc.ID, c.APIExposedURL, c.WebExposedURL)
+	ah := action.NewActionHandler(logger, sd, configstoreClient, runserviceClient, gc.ID, c.APIExposedURL, c.WebExposedURL)
 
 	return &Gateway{
 		c:                 c,
 		ost:               ost,
-		runserviceClient:  rsapi.NewClient(c.RunServiceURL),
+		runserviceClient:  runserviceClient,
 		configstoreClient: configstoreClient,
 		ah:                ah,
 		sd:                sd,
@@ -186,13 +187,13 @@ func (g *Gateway) Run(ctx context.Context) error {
 	createOrgHandler := api.NewCreateOrgHandler(logger, g.ah)
 	deleteOrgHandler := api.NewDeleteOrgHandler(logger, g.ah)
 
-	runHandler := api.NewRunHandler(logger, g.runserviceClient)
-	runsHandler := api.NewRunsHandler(logger, g.runserviceClient)
-	runtaskHandler := api.NewRuntaskHandler(logger, g.runserviceClient)
-	runActionsHandler := api.NewRunActionsHandler(logger, g.runserviceClient)
-	runTaskActionsHandler := api.NewRunTaskActionsHandler(logger, g.runserviceClient)
+	runHandler := api.NewRunHandler(logger, g.ah)
+	runsHandler := api.NewRunsHandler(logger, g.ah)
+	runtaskHandler := api.NewRuntaskHandler(logger, g.ah)
+	runActionsHandler := api.NewRunActionsHandler(logger, g.ah)
+	runTaskActionsHandler := api.NewRunTaskActionsHandler(logger, g.ah)
 
-	logsHandler := api.NewLogsHandler(logger, g.runserviceClient)
+	logsHandler := api.NewLogsHandler(logger, g.ah)
 
 	reposHandler := api.NewReposHandler(logger, g.c.GitServerURL)
 	userRemoteReposHandler := api.NewUserRemoteReposHandler(logger, g.ah, g.configstoreClient)

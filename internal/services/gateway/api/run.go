@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	rsapi "github.com/sorintlab/agola/internal/services/runservice/scheduler/api"
+	"github.com/sorintlab/agola/internal/services/gateway/action"
 	rstypes "github.com/sorintlab/agola/internal/services/runservice/types"
 	"github.com/sorintlab/agola/internal/util"
 	"go.uber.org/zap"
@@ -213,12 +213,12 @@ func createRunTaskResponse(rt *rstypes.RunTask, rct *rstypes.RunConfigTask) *Run
 }
 
 type RunHandler struct {
-	log              *zap.SugaredLogger
-	runserviceClient *rsapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewRunHandler(logger *zap.Logger, runserviceClient *rsapi.Client) *RunHandler {
-	return &RunHandler{log: logger.Sugar(), runserviceClient: runserviceClient}
+func NewRunHandler(logger *zap.Logger, ah *action.ActionHandler) *RunHandler {
+	return &RunHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -226,8 +226,8 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	runID := vars["runid"]
 
-	runResp, resp, err := h.runserviceClient.GetRun(ctx, runID)
-	if httpErrorFromRemote(w, resp, err) {
+	runResp, err := h.ah.GetRun(ctx, runID)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -239,12 +239,12 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type RuntaskHandler struct {
-	log              *zap.SugaredLogger
-	runserviceClient *rsapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewRuntaskHandler(logger *zap.Logger, runserviceClient *rsapi.Client) *RuntaskHandler {
-	return &RuntaskHandler{log: logger.Sugar(), runserviceClient: runserviceClient}
+func NewRuntaskHandler(logger *zap.Logger, ah *action.ActionHandler) *RuntaskHandler {
+	return &RuntaskHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *RuntaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -253,8 +253,8 @@ func (h *RuntaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	runID := vars["runid"]
 	taskID := vars["taskid"]
 
-	runResp, resp, err := h.runserviceClient.GetRun(ctx, runID)
-	if httpErrorFromRemote(w, resp, err) {
+	runResp, err := h.ah.GetRun(ctx, runID)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -300,12 +300,12 @@ func createRunsResponse(r *rstypes.Run) *RunsResponse {
 }
 
 type RunsHandler struct {
-	log              *zap.SugaredLogger
-	runserviceClient *rsapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewRunsHandler(logger *zap.Logger, runserviceClient *rsapi.Client) *RunsHandler {
-	return &RunsHandler{log: logger.Sugar(), runserviceClient: runserviceClient}
+func NewRunsHandler(logger *zap.Logger, ah *action.ActionHandler) *RunsHandler {
+	return &RunsHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -348,8 +348,17 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	start := q.Get("start")
 
-	runsResp, resp, err := h.runserviceClient.GetRuns(ctx, phaseFilter, groups, lastRun, changeGroups, start, limit, asc)
-	if httpErrorFromRemote(w, resp, err) {
+	areq := &action.GetRunsRequest{
+		PhaseFilter:  phaseFilter,
+		Groups:       groups,
+		LastRun:      lastRun,
+		ChangeGroups: changeGroups,
+		StartRunID:   start,
+		Limit:        limit,
+		Asc:          asc,
+	}
+	runsResp, err := h.ah.GetRuns(ctx, areq)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -363,27 +372,20 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type RunActionType string
-
-const (
-	RunActionTypeRestart RunActionType = "restart"
-	RunActionTypeStop    RunActionType = "stop"
-)
-
 type RunActionsRequest struct {
-	ActionType RunActionType `json:"action_type"`
+	ActionType action.RunActionType `json:"action_type"`
 
 	// Restart
 	FromStart bool `json:"from_start"`
 }
 
 type RunActionsHandler struct {
-	log              *zap.SugaredLogger
-	runserviceClient *rsapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewRunActionsHandler(logger *zap.Logger, runserviceClient *rsapi.Client) *RunActionsHandler {
-	return &RunActionsHandler{log: logger.Sugar(), runserviceClient: runserviceClient}
+func NewRunActionsHandler(logger *zap.Logger, ah *action.ActionHandler) *RunActionsHandler {
+	return &RunActionsHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -398,50 +400,31 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	switch req.ActionType {
-	case RunActionTypeRestart:
-		rsreq := &rsapi.RunCreateRequest{
-			RunID:     runID,
-			FromStart: req.FromStart,
-		}
+	areq := &action.RunActionsRequest{
+		RunID:      runID,
+		ActionType: req.ActionType,
+		FromStart:  req.FromStart,
+	}
 
-		resp, err := h.runserviceClient.CreateRun(ctx, rsreq)
-		if httpErrorFromRemote(w, resp, err) {
-			h.log.Errorf("err: %+v", err)
-			return
-		}
-
-	case RunActionTypeStop:
-		rsreq := &rsapi.RunActionsRequest{
-			ActionType: rsapi.RunActionTypeStop,
-		}
-
-		resp, err := h.runserviceClient.RunActions(ctx, runID, rsreq)
-		if httpErrorFromRemote(w, resp, err) {
-			h.log.Errorf("err: %+v", err)
-			return
-		}
+	err := h.ah.RunAction(ctx, areq)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
 	}
 }
 
-type RunTaskActionType string
-
-const (
-	RunTaskActionTypeApprove RunTaskActionType = "approve"
-)
-
 type RunTaskActionsRequest struct {
-	ActionType          RunTaskActionType `json:"action_type"`
-	ApprovalAnnotations map[string]string `json:"approval_annotations,omitempty"`
+	ActionType          action.RunTaskActionType `json:"action_type"`
+	ApprovalAnnotations map[string]string        `json:"approval_annotations,omitempty"`
 }
 
 type RunTaskActionsHandler struct {
-	log              *zap.SugaredLogger
-	runserviceClient *rsapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewRunTaskActionsHandler(logger *zap.Logger, runserviceClient *rsapi.Client) *RunTaskActionsHandler {
-	return &RunTaskActionsHandler{log: logger.Sugar(), runserviceClient: runserviceClient}
+func NewRunTaskActionsHandler(logger *zap.Logger, ah *action.ActionHandler) *RunTaskActionsHandler {
+	return &RunTaskActionsHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -457,32 +440,27 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	switch req.ActionType {
-	case RunTaskActionTypeApprove:
-		rsreq := &rsapi.RunTaskActionsRequest{
-			ActionType:          rsapi.RunTaskActionTypeApprove,
-			ApprovalAnnotations: req.ApprovalAnnotations,
-		}
+	areq := &action.RunTaskActionsRequest{
+		RunID:               runID,
+		TaskID:              taskID,
+		ActionType:          req.ActionType,
+		ApprovalAnnotations: req.ApprovalAnnotations,
+	}
 
-		resp, err := h.runserviceClient.RunTaskActions(ctx, runID, taskID, rsreq)
-		if httpErrorFromRemote(w, resp, err) {
-			h.log.Errorf("err: %+v", err)
-			return
-		}
-
-	default:
-		httpError(w, util.NewErrBadRequest(errors.Errorf("wrong action type %q", req.ActionType)))
+	err := h.ah.RunTaskAction(ctx, areq)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
 		return
 	}
 }
 
 type LogsHandler struct {
-	log              *zap.SugaredLogger
-	runserviceClient *rsapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewLogsHandler(logger *zap.Logger, runserviceClient *rsapi.Client) *LogsHandler {
-	return &LogsHandler{log: logger.Sugar(), runserviceClient: runserviceClient}
+func NewLogsHandler(logger *zap.Logger, ah *action.ActionHandler) *LogsHandler {
+	return &LogsHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -534,8 +512,17 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		stream = true
 	}
 
-	resp, err := h.runserviceClient.GetLogs(ctx, runID, taskID, setup, step, follow, stream)
-	if httpErrorFromRemote(w, resp, err) {
+	areq := &action.GetLogsRequest{
+		RunID:  runID,
+		TaskID: taskID,
+		Setup:  setup,
+		Step:   step,
+		Follow: follow,
+		Stream: stream,
+	}
+
+	resp, err := h.ah.GetLogs(ctx, areq)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
