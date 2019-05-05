@@ -23,7 +23,6 @@ import (
 
 	"github.com/pkg/errors"
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
-	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/gateway/action"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
@@ -72,12 +71,12 @@ func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type DeleteUserHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewDeleteUserHandler(logger *zap.Logger, configstoreClient *csapi.Client) *DeleteUserHandler {
-	return &DeleteUserHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewDeleteUserHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteUserHandler {
+	return &DeleteUserHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *DeleteUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -85,8 +84,8 @@ func (h *DeleteUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userRef := vars["userref"]
 
-	resp, err := h.configstoreClient.DeleteUser(ctx, userRef)
-	if httpErrorFromRemote(w, resp, err) {
+	err := h.ah.DeleteUser(ctx, userRef)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -97,12 +96,12 @@ func (h *DeleteUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type CurrentUserHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewCurrentUserHandler(logger *zap.Logger, configstoreClient *csapi.Client) *CurrentUserHandler {
-	return &CurrentUserHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewCurrentUserHandler(logger *zap.Logger, ah *action.ActionHandler) *CurrentUserHandler {
+	return &CurrentUserHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *CurrentUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -115,8 +114,8 @@ func (h *CurrentUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	userID := userIDVal.(string)
 
-	user, resp, err := h.configstoreClient.GetUser(ctx, userID)
-	if httpErrorFromRemote(w, resp, err) {
+	user, err := h.ah.GetUser(ctx, userID)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -128,12 +127,12 @@ func (h *CurrentUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type UserHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewUserHandler(logger *zap.Logger, configstoreClient *csapi.Client) *UserHandler {
-	return &UserHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewUserHandler(logger *zap.Logger, ah *action.ActionHandler) *UserHandler {
+	return &UserHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -141,8 +140,8 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userRef := vars["userref"]
 
-	user, resp, err := h.configstoreClient.GetUser(ctx, userRef)
-	if httpErrorFromRemote(w, resp, err) {
+	user, err := h.ah.GetUser(ctx, userRef)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -186,12 +185,12 @@ func createUserResponse(u *types.User) *UserResponse {
 }
 
 type UsersHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewUsersHandler(logger *zap.Logger, configstoreClient *csapi.Client) *UsersHandler {
-	return &UsersHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewUsersHandler(logger *zap.Logger, ah *action.ActionHandler) *UsersHandler {
+	return &UsersHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -223,8 +222,13 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	start := query.Get("start")
 
-	csusers, resp, err := h.configstoreClient.GetUsers(ctx, start, limit, asc)
-	if httpErrorFromRemote(w, resp, err) {
+	areq := &action.GetUsersRequest{
+		Start: start,
+		Limit: limit,
+		Asc:   asc,
+	}
+	csusers, err := h.ah.GetUsers(ctx, areq)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -308,12 +312,12 @@ func (h *CreateUserLAHandler) createUserLA(ctx context.Context, userRef string, 
 }
 
 type DeleteUserLAHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewDeleteUserLAHandler(logger *zap.Logger, configstoreClient *csapi.Client) *DeleteUserLAHandler {
-	return &DeleteUserLAHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewDeleteUserLAHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteUserLAHandler {
+	return &DeleteUserLAHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *DeleteUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -322,8 +326,8 @@ func (h *DeleteUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	userRef := vars["userref"]
 	laID := vars["laid"]
 
-	resp, err := h.configstoreClient.DeleteUserLA(ctx, userRef, laID)
-	if httpErrorFromRemote(w, resp, err) {
+	err := h.ah.DeleteUserLA(ctx, userRef, laID)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -383,12 +387,12 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 }
 
 type DeleteUserTokenHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewDeleteUserTokenHandler(logger *zap.Logger, configstoreClient *csapi.Client) *DeleteUserTokenHandler {
-	return &DeleteUserTokenHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewDeleteUserTokenHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteUserTokenHandler {
+	return &DeleteUserTokenHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *DeleteUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -398,8 +402,8 @@ func (h *DeleteUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	tokenName := vars["tokenname"]
 
 	h.log.Infof("deleting user %q token %q", userRef, tokenName)
-	resp, err := h.configstoreClient.DeleteUserToken(ctx, userRef, tokenName)
-	if httpErrorFromRemote(w, resp, err) {
+	err := h.ah.DeleteUserToken(ctx, userRef, tokenName)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}

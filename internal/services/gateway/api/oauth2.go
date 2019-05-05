@@ -17,7 +17,6 @@ package api
 import (
 	"net/http"
 
-	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/gateway/action"
 	"github.com/sorintlab/agola/internal/util"
 
@@ -25,9 +24,8 @@ import (
 )
 
 type OAuth2CallbackHandler struct {
-	log               *zap.SugaredLogger
-	ah                *action.ActionHandler
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
 type RemoteSourceAuthResult struct {
@@ -35,8 +33,8 @@ type RemoteSourceAuthResult struct {
 	Response    interface{} `json:"response,omitempty"`
 }
 
-func NewOAuth2CallbackHandler(logger *zap.Logger, ah *action.ActionHandler, configstoreClient *csapi.Client) *OAuth2CallbackHandler {
-	return &OAuth2CallbackHandler{log: logger.Sugar(), ah: ah, configstoreClient: configstoreClient}
+func NewOAuth2CallbackHandler(logger *zap.Logger, ah *action.ActionHandler) *OAuth2CallbackHandler {
+	return &OAuth2CallbackHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *OAuth2CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

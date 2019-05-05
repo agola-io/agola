@@ -166,16 +166,16 @@ func (g *Gateway) Run(ctx context.Context) error {
 	createVariableHandler := api.NewCreateVariableHandler(logger, g.ah)
 	deleteVariableHandler := api.NewDeleteVariableHandler(logger, g.ah)
 
-	currentUserHandler := api.NewCurrentUserHandler(logger, g.configstoreClient)
-	userHandler := api.NewUserHandler(logger, g.configstoreClient)
-	usersHandler := api.NewUsersHandler(logger, g.configstoreClient)
+	currentUserHandler := api.NewCurrentUserHandler(logger, g.ah)
+	userHandler := api.NewUserHandler(logger, g.ah)
+	usersHandler := api.NewUsersHandler(logger, g.ah)
 	createUserHandler := api.NewCreateUserHandler(logger, g.ah)
-	deleteUserHandler := api.NewDeleteUserHandler(logger, g.configstoreClient)
+	deleteUserHandler := api.NewDeleteUserHandler(logger, g.ah)
 
 	createUserLAHandler := api.NewCreateUserLAHandler(logger, g.ah)
-	deleteUserLAHandler := api.NewDeleteUserLAHandler(logger, g.configstoreClient)
+	deleteUserLAHandler := api.NewDeleteUserLAHandler(logger, g.ah)
 	createUserTokenHandler := api.NewCreateUserTokenHandler(logger, g.ah)
-	deleteUserTokenHandler := api.NewDeleteUserTokenHandler(logger, g.configstoreClient)
+	deleteUserTokenHandler := api.NewDeleteUserTokenHandler(logger, g.ah)
 
 	remoteSourceHandler := api.NewRemoteSourceHandler(logger, g.configstoreClient)
 	createRemoteSourceHandler := api.NewCreateRemoteSourceHandler(logger, g.ah)
@@ -200,7 +200,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	loginUserHandler := api.NewLoginUserHandler(logger, g.ah)
 	authorizeHandler := api.NewAuthorizeHandler(logger, g.ah)
 	registerHandler := api.NewRegisterUserHandler(logger, g.ah)
-	oauth2callbackHandler := api.NewOAuth2CallbackHandler(logger, g.ah, g.configstoreClient)
+	oauth2callbackHandler := api.NewOAuth2CallbackHandler(logger, g.ah)
 
 	router := mux.NewRouter()
 

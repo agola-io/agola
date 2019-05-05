@@ -40,6 +40,28 @@ func isAccessTokenExpired(expiresAt time.Time) bool {
 	return expiresAt.Add(-expireTimeRange).Before(time.Now())
 }
 
+func (h *ActionHandler) GetUser(ctx context.Context, userRef string) (*types.User, error) {
+	user, resp, err := h.configstoreClient.GetUser(ctx, userRef)
+	if err != nil {
+		return nil, ErrFromRemote(resp, err)
+	}
+	return user, nil
+}
+
+type GetUsersRequest struct {
+	Start string
+	Limit int
+	Asc   bool
+}
+
+func (h *ActionHandler) GetUsers(ctx context.Context, req *GetUsersRequest) ([]*types.User, error) {
+	users, resp, err := h.configstoreClient.GetUsers(ctx, req.Start, req.Limit, req.Asc)
+	if err != nil {
+		return nil, ErrFromRemote(resp, err)
+	}
+	return users, nil
+}
+
 type CreateUserRequest struct {
 	UserName string
 }
@@ -704,4 +726,28 @@ func (h *ActionHandler) HandleOauth2Callback(ctx context.Context, code, state st
 	}
 
 	return h.HandleRemoteSourceAuthRequest(ctx, requestType, requestString, "", oauth2Token.AccessToken, oauth2Token.RefreshToken, oauth2Token.Expiry)
+}
+
+func (h *ActionHandler) DeleteUser(ctx context.Context, userRef string) error {
+	resp, err := h.configstoreClient.DeleteUser(ctx, userRef)
+	if err != nil {
+		return ErrFromRemote(resp, errors.Wrapf(err, "failed to delete user"))
+	}
+	return nil
+}
+
+func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) error {
+	resp, err := h.configstoreClient.DeleteUserLA(ctx, userRef, laID)
+	if err != nil {
+		return ErrFromRemote(resp, errors.Wrapf(err, "failed to delete user linked account"))
+	}
+	return nil
+}
+
+func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName string) error {
+	resp, err := h.configstoreClient.DeleteUserToken(ctx, userRef, tokenName)
+	if err != nil {
+		return ErrFromRemote(resp, errors.Wrapf(err, "failed to delete user token"))
+	}
+	return nil
 }
