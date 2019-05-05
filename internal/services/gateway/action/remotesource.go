@@ -23,6 +23,28 @@ import (
 	"github.com/pkg/errors"
 )
 
+func (h *ActionHandler) GetRemoteSource(ctx context.Context, rsRef string) (*types.RemoteSource, error) {
+	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, rsRef)
+	if err != nil {
+		return nil, ErrFromRemote(resp, err)
+	}
+	return rs, nil
+}
+
+type GetRemoteSourcesRequest struct {
+	Start string
+	Limit int
+	Asc   bool
+}
+
+func (h *ActionHandler) GetRemoteSources(ctx context.Context, req *GetRemoteSourcesRequest) ([]*types.RemoteSource, error) {
+	remoteSources, resp, err := h.configstoreClient.GetRemoteSources(ctx, req.Start, req.Limit, req.Asc)
+	if err != nil {
+		return nil, ErrFromRemote(resp, err)
+	}
+	return remoteSources, nil
+}
+
 type CreateRemoteSourceRequest struct {
 	Name               string
 	APIURL             string
@@ -81,4 +103,12 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemot
 	h.log.Infof("remotesource %s created, ID: %s", rs.Name, rs.ID)
 
 	return rs, nil
+}
+
+func (h *ActionHandler) DeleteRemoteSource(ctx context.Context, rsRef string) error {
+	resp, err := h.configstoreClient.DeleteRemoteSource(ctx, rsRef)
+	if err != nil {
+		return ErrFromRemote(resp, errors.Wrapf(err, "failed to delete remote source"))
+	}
+	return nil
 }

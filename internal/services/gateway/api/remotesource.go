@@ -20,7 +20,6 @@ import (
 	"strconv"
 
 	"github.com/pkg/errors"
-	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/gateway/action"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
@@ -93,12 +92,12 @@ func createRemoteSourceResponse(r *types.RemoteSource) *RemoteSourceResponse {
 }
 
 type RemoteSourceHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewRemoteSourceHandler(logger *zap.Logger, configstoreClient *csapi.Client) *RemoteSourceHandler {
-	return &RemoteSourceHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewRemoteSourceHandler(logger *zap.Logger, ah *action.ActionHandler) *RemoteSourceHandler {
+	return &RemoteSourceHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -106,8 +105,8 @@ func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	vars := mux.Vars(r)
 	rsRef := vars["remotesourceref"]
 
-	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, rsRef)
-	if httpErrorFromRemote(w, resp, err) {
+	rs, err := h.ah.GetRemoteSource(ctx, rsRef)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -119,17 +118,16 @@ func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 }
 
 type RemoteSourcesHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewRemoteSourcesHandler(logger *zap.Logger, configstoreClient *csapi.Client) *RemoteSourcesHandler {
-	return &RemoteSourcesHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewRemoteSourcesHandler(logger *zap.Logger, ah *action.ActionHandler) *RemoteSourcesHandler {
+	return &RemoteSourcesHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-
 	query := r.URL.Query()
 
 	limitS := query.Get("limit")
@@ -156,8 +154,13 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 
 	start := query.Get("start")
 
-	csRemoteSources, resp, err := h.configstoreClient.GetRemoteSources(ctx, start, limit, asc)
-	if httpErrorFromRemote(w, resp, err) {
+	areq := &action.GetRemoteSourcesRequest{
+		Start: start,
+		Limit: limit,
+		Asc:   asc,
+	}
+	csRemoteSources, err := h.ah.GetRemoteSources(ctx, areq)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
