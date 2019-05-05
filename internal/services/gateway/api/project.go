@@ -39,14 +39,13 @@ type CreateProjectRequest struct {
 }
 
 type CreateProjectHandler struct {
-	log               *zap.SugaredLogger
-	ah                *action.ActionHandler
-	configstoreClient *csapi.Client
-	exposedURL        string
+	log        *zap.SugaredLogger
+	ah         *action.ActionHandler
+	exposedURL string
 }
 
-func NewCreateProjectHandler(logger *zap.Logger, ah *action.ActionHandler, configstoreClient *csapi.Client, exposedURL string) *CreateProjectHandler {
-	return &CreateProjectHandler{log: logger.Sugar(), ah: ah, configstoreClient: configstoreClient, exposedURL: exposedURL}
+func NewCreateProjectHandler(logger *zap.Logger, ah *action.ActionHandler, exposedURL string) *CreateProjectHandler {
+	return &CreateProjectHandler{log: logger.Sugar(), ah: ah, exposedURL: exposedURL}
 }
 
 func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -90,14 +89,13 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 }
 
 type ProjectReconfigHandler struct {
-	log               *zap.SugaredLogger
-	ah                *action.ActionHandler
-	configstoreClient *csapi.Client
-	exposedURL        string
+	log        *zap.SugaredLogger
+	ah         *action.ActionHandler
+	exposedURL string
 }
 
-func NewProjectReconfigHandler(logger *zap.Logger, ah *action.ActionHandler, configstoreClient *csapi.Client, exposedURL string) *ProjectReconfigHandler {
-	return &ProjectReconfigHandler{log: logger.Sugar(), ah: ah, configstoreClient: configstoreClient, exposedURL: exposedURL}
+func NewProjectReconfigHandler(logger *zap.Logger, ah *action.ActionHandler, exposedURL string) *ProjectReconfigHandler {
+	return &ProjectReconfigHandler{log: logger.Sugar(), ah: ah, exposedURL: exposedURL}
 }
 
 func (h *ProjectReconfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -119,12 +117,12 @@ func (h *ProjectReconfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 }
 
 type DeleteProjectHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewDeleteProjectHandler(logger *zap.Logger, configstoreClient *csapi.Client) *DeleteProjectHandler {
-	return &DeleteProjectHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewDeleteProjectHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteProjectHandler {
+	return &DeleteProjectHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *DeleteProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -136,14 +134,8 @@ func (h *DeleteProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	project, resp, err := h.configstoreClient.GetProject(ctx, projectRef)
-	if httpErrorFromRemote(w, resp, err) {
-		h.log.Errorf("err: %+v", err)
-		return
-	}
-
-	resp, err = h.configstoreClient.DeleteProject(ctx, project.ID)
-	if httpErrorFromRemote(w, resp, err) {
+	err = h.ah.DeleteProject(ctx, projectRef)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -154,12 +146,12 @@ func (h *DeleteProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 }
 
 type ProjectHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewProjectHandler(logger *zap.Logger, configstoreClient *csapi.Client) *ProjectHandler {
-	return &ProjectHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewProjectHandler(logger *zap.Logger, ah *action.ActionHandler) *ProjectHandler {
+	return &ProjectHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -171,8 +163,8 @@ func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	project, resp, err := h.configstoreClient.GetProject(ctx, projectRef)
-	if httpErrorFromRemote(w, resp, err) {
+	project, err := h.ah.GetProject(ctx, projectRef)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}

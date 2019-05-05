@@ -36,14 +36,13 @@ type CreateProjectGroupRequest struct {
 }
 
 type CreateProjectGroupHandler struct {
-	log               *zap.SugaredLogger
-	ah                *action.ActionHandler
-	configstoreClient *csapi.Client
-	exposedURL        string
+	log        *zap.SugaredLogger
+	ah         *action.ActionHandler
+	exposedURL string
 }
 
-func NewCreateProjectGroupHandler(logger *zap.Logger, ah *action.ActionHandler, configstoreClient *csapi.Client, exposedURL string) *CreateProjectGroupHandler {
-	return &CreateProjectGroupHandler{log: logger.Sugar(), ah: ah, configstoreClient: configstoreClient, exposedURL: exposedURL}
+func NewCreateProjectGroupHandler(logger *zap.Logger, ah *action.ActionHandler, exposedURL string) *CreateProjectGroupHandler {
+	return &CreateProjectGroupHandler{log: logger.Sugar(), ah: ah, exposedURL: exposedURL}
 }
 
 func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -84,12 +83,12 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 }
 
 type ProjectGroupHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewProjectGroupHandler(logger *zap.Logger, configstoreClient *csapi.Client) *ProjectGroupHandler {
-	return &ProjectGroupHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewProjectGroupHandler(logger *zap.Logger, ah *action.ActionHandler) *ProjectGroupHandler {
+	return &ProjectGroupHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -101,8 +100,8 @@ func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	projectGroup, resp, err := h.configstoreClient.GetProjectGroup(ctx, projectGroupRef)
-	if httpErrorFromRemote(w, resp, err) {
+	projectGroup, err := h.ah.GetProjectGroup(ctx, projectGroupRef)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -114,12 +113,12 @@ func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 }
 
 type ProjectGroupProjectsHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewProjectGroupProjectsHandler(logger *zap.Logger, configstoreClient *csapi.Client) *ProjectGroupProjectsHandler {
-	return &ProjectGroupProjectsHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewProjectGroupProjectsHandler(logger *zap.Logger, ah *action.ActionHandler) *ProjectGroupProjectsHandler {
+	return &ProjectGroupProjectsHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -131,8 +130,8 @@ func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	csprojects, resp, err := h.configstoreClient.GetProjectGroupProjects(ctx, projectGroupRef)
-	if httpErrorFromRemote(w, resp, err) {
+	csprojects, err := h.ah.GetProjectGroupProjects(ctx, projectGroupRef)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -148,12 +147,12 @@ func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 }
 
 type ProjectGroupSubgroupsHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewProjectGroupSubgroupsHandler(logger *zap.Logger, configstoreClient *csapi.Client) *ProjectGroupSubgroupsHandler {
-	return &ProjectGroupSubgroupsHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewProjectGroupSubgroupsHandler(logger *zap.Logger, ah *action.ActionHandler) *ProjectGroupSubgroupsHandler {
+	return &ProjectGroupSubgroupsHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -165,8 +164,8 @@ func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.
 		return
 	}
 
-	cssubgroups, resp, err := h.configstoreClient.GetProjectGroupSubgroups(ctx, projectGroupRef)
-	if httpErrorFromRemote(w, resp, err) {
+	cssubgroups, err := h.ah.GetProjectGroupSubgroups(ctx, projectGroupRef)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}

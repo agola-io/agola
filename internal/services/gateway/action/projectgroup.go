@@ -25,6 +25,30 @@ import (
 	"github.com/pkg/errors"
 )
 
+func (h *ActionHandler) GetProjectGroup(ctx context.Context, projectGroupRef string) (*csapi.ProjectGroup, error) {
+	projectGroup, resp, err := h.configstoreClient.GetProjectGroup(ctx, projectGroupRef)
+	if err != nil {
+		return nil, ErrFromRemote(resp, err)
+	}
+	return projectGroup, nil
+}
+
+func (h *ActionHandler) GetProjectGroupSubgroups(ctx context.Context, projectGroupRef string) ([]*csapi.ProjectGroup, error) {
+	projectGroups, resp, err := h.configstoreClient.GetProjectGroupSubgroups(ctx, projectGroupRef)
+	if err != nil {
+		return nil, ErrFromRemote(resp, err)
+	}
+	return projectGroups, nil
+}
+
+func (h *ActionHandler) GetProjectGroupProjects(ctx context.Context, projectGroupRef string) ([]*csapi.Project, error) {
+	projects, resp, err := h.configstoreClient.GetProjectGroupProjects(ctx, projectGroupRef)
+	if err != nil {
+		return nil, ErrFromRemote(resp, err)
+	}
+	return projects, nil
+}
+
 type CreateProjectGroupRequest struct {
 	CurrentUserID string
 	Name          string

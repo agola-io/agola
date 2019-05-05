@@ -148,15 +148,15 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	webhooksHandler := &webhooksHandler{log: log, ah: g.ah, configstoreClient: g.configstoreClient, runserviceClient: g.runserviceClient, apiExposedURL: g.c.APIExposedURL}
 
-	projectGroupHandler := api.NewProjectGroupHandler(logger, g.configstoreClient)
-	projectGroupSubgroupsHandler := api.NewProjectGroupSubgroupsHandler(logger, g.configstoreClient)
-	projectGroupProjectsHandler := api.NewProjectGroupProjectsHandler(logger, g.configstoreClient)
-	createProjectGroupHandler := api.NewCreateProjectGroupHandler(logger, g.ah, g.configstoreClient, g.c.APIExposedURL)
+	projectGroupHandler := api.NewProjectGroupHandler(logger, g.ah)
+	projectGroupSubgroupsHandler := api.NewProjectGroupSubgroupsHandler(logger, g.ah)
+	projectGroupProjectsHandler := api.NewProjectGroupProjectsHandler(logger, g.ah)
+	createProjectGroupHandler := api.NewCreateProjectGroupHandler(logger, g.ah, g.c.APIExposedURL)
 
-	projectHandler := api.NewProjectHandler(logger, g.configstoreClient)
-	createProjectHandler := api.NewCreateProjectHandler(logger, g.ah, g.configstoreClient, g.c.APIExposedURL)
-	deleteProjectHandler := api.NewDeleteProjectHandler(logger, g.configstoreClient)
-	projectReconfigHandler := api.NewProjectReconfigHandler(logger, g.ah, g.configstoreClient, g.c.APIExposedURL)
+	projectHandler := api.NewProjectHandler(logger, g.ah)
+	createProjectHandler := api.NewCreateProjectHandler(logger, g.ah, g.c.APIExposedURL)
+	deleteProjectHandler := api.NewDeleteProjectHandler(logger, g.ah)
+	projectReconfigHandler := api.NewProjectReconfigHandler(logger, g.ah, g.c.APIExposedURL)
 
 	secretHandler := api.NewSecretHandler(logger, g.ah)
 	createSecretHandler := api.NewCreateSecretHandler(logger, g.ah)

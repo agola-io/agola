@@ -28,6 +28,14 @@ import (
 	"github.com/pkg/errors"
 )
 
+func (h *ActionHandler) GetProject(ctx context.Context, projectRef string) (*csapi.Project, error) {
+	project, resp, err := h.configstoreClient.GetProject(ctx, projectRef)
+	if err != nil {
+		return nil, ErrFromRemote(resp, err)
+	}
+	return project, nil
+}
+
 type CreateProjectRequest struct {
 	CurrentUserID       string
 	Name                string
@@ -199,4 +207,12 @@ func (h *ActionHandler) ReconfigProject(ctx context.Context, projectRef string) 
 	// TODO(sgotti) update project repo path if the remote let us query by repository id
 
 	return h.SetupProject(ctx, rs, user, la, p)
+}
+
+func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) error {
+	resp, err := h.configstoreClient.DeleteProject(ctx, projectRef)
+	if err != nil {
+		return ErrFromRemote(resp, err)
+	}
+	return nil
 }
