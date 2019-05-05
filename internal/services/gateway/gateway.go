@@ -158,9 +158,9 @@ func (g *Gateway) Run(ctx context.Context) error {
 	deleteProjectHandler := api.NewDeleteProjectHandler(logger, g.configstoreClient)
 	projectReconfigHandler := api.NewProjectReconfigHandler(logger, g.ah, g.configstoreClient, g.c.APIExposedURL)
 
-	secretHandler := api.NewSecretHandler(logger, g.configstoreClient)
-	createSecretHandler := api.NewCreateSecretHandler(logger, g.configstoreClient)
-	deleteSecretHandler := api.NewDeleteSecretHandler(logger, g.configstoreClient)
+	secretHandler := api.NewSecretHandler(logger, g.ah)
+	createSecretHandler := api.NewCreateSecretHandler(logger, g.ah)
+	deleteSecretHandler := api.NewDeleteSecretHandler(logger, g.ah)
 
 	variableHandler := api.NewVariableHandler(logger, g.ah)
 	createVariableHandler := api.NewCreateVariableHandler(logger, g.ah)

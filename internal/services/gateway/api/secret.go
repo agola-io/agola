@@ -19,12 +19,12 @@ import (
 	"net/http"
 
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
+	"github.com/sorintlab/agola/internal/services/gateway/action"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 	"go.uber.org/zap"
 
 	"github.com/gorilla/mux"
-	"github.com/pkg/errors"
 )
 
 type SecretResponse struct {
@@ -42,12 +42,12 @@ func createSecretResponse(s *csapi.Secret) *SecretResponse {
 }
 
 type SecretHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewSecretHandler(logger *zap.Logger, configstoreClient *csapi.Client) *SecretHandler {
-	return &SecretHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewSecretHandler(logger *zap.Logger, ah *action.ActionHandler) *SecretHandler {
+	return &SecretHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -61,15 +61,13 @@ func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var cssecrets []*csapi.Secret
-	var resp *http.Response
-	switch parentType {
-	case types.ConfigTypeProjectGroup:
-		cssecrets, resp, err = h.configstoreClient.GetProjectGroupSecrets(ctx, parentRef, tree)
-	case types.ConfigTypeProject:
-		cssecrets, resp, err = h.configstoreClient.GetProjectSecrets(ctx, parentRef, tree)
+	areq := &action.GetSecretsRequest{
+		ParentType: parentType,
+		ParentRef:  parentRef,
+		Tree:       tree,
 	}
-	if httpErrorFromRemote(w, resp, err) {
+	cssecrets, err := h.ah.GetSecrets(ctx, areq)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -98,12 +96,12 @@ type CreateSecretRequest struct {
 }
 
 type CreateSecretHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewCreateSecretHandler(logger *zap.Logger, configstoreClient *csapi.Client) *CreateSecretHandler {
-	return &CreateSecretHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewCreateSecretHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateSecretHandler {
+	return &CreateSecretHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -120,46 +118,34 @@ func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if !util.ValidateName(req.Name) {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("invalid secret name %q", req.Name)))
-		return
+	areq := &action.CreateSecretRequest{
+		Name:             req.Name,
+		ParentType:       parentType,
+		ParentRef:        parentRef,
+		Type:             req.Type,
+		Data:             req.Data,
+		SecretProviderID: req.SecretProviderID,
+		Path:             req.Path,
 	}
-
-	s := &types.Secret{
-		Name: req.Name,
-		Type: req.Type,
-		Data: req.Data,
-	}
-
-	var resp *http.Response
-	var rs *csapi.Secret
-	switch parentType {
-	case types.ConfigTypeProjectGroup:
-		h.log.Infof("creating project group secret")
-		rs, resp, err = h.configstoreClient.CreateProjectGroupSecret(ctx, parentRef, s)
-	case types.ConfigTypeProject:
-		h.log.Infof("creating project secret")
-		rs, resp, err = h.configstoreClient.CreateProjectSecret(ctx, parentRef, s)
-	}
-	if httpErrorFromRemote(w, resp, err) {
+	cssecret, err := h.ah.CreateSecret(ctx, areq)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
-	h.log.Infof("secret %s created, ID: %s", rs.Name, rs.ID)
 
-	res := createSecretResponse(rs)
+	res := createSecretResponse(cssecret)
 	if err := httpResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
 
 type DeleteSecretHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewDeleteSecretHandler(logger *zap.Logger, configstoreClient *csapi.Client) *DeleteSecretHandler {
-	return &DeleteSecretHandler{log: logger.Sugar(), configstoreClient: configstoreClient}
+func NewDeleteSecretHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteSecretHandler {
+	return &DeleteSecretHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *DeleteSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -172,16 +158,8 @@ func (h *DeleteSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var resp *http.Response
-	switch parentType {
-	case types.ConfigTypeProjectGroup:
-		h.log.Infof("deleting project group secret")
-		resp, err = h.configstoreClient.DeleteProjectGroupSecret(ctx, parentRef, secretName)
-	case types.ConfigTypeProject:
-		h.log.Infof("deleting project secret")
-		resp, err = h.configstoreClient.DeleteProjectSecret(ctx, parentRef, secretName)
-	}
-	if httpErrorFromRemote(w, resp, err) {
+	err = h.ah.DeleteSecret(ctx, parentType, parentRef, secretName)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
