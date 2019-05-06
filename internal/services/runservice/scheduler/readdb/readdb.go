@@ -1288,35 +1288,68 @@ func (r *ReadDB) GetRunsFilteredOST(tx *db.Tx, groups []string, lastRun bool, ph
 	return fetchRuns(tx, q, args...)
 }
 
-func (r *ReadDB) GetRun(runID string) (*types.Run, error) {
-	var run *types.Run
+func (r *ReadDB) GetRun(tx *db.Tx, runID string) (*types.Run, error) {
+	run, err := r.getRun(tx, runID, false)
+	if err != nil {
+		return nil, err
+	}
+	if run != nil {
+		return run, nil
+	}
 
-	err := r.rdb.Do(func(tx *db.Tx) error {
-		var err error
-		run, err = r.getRun(tx, runID)
-		return err
-	})
-	return run, err
+	// try to fetch from ost
+	return r.getRun(tx, runID, true)
 }
 
-func (r *ReadDB) getRun(tx *db.Tx, runID string) (*types.Run, error) {
-	q, args, err := runSelect.Where(sq.Eq{"id": runID}).ToSql()
+func (r *ReadDB) getRun(tx *db.Tx, runID string, ost bool) (*types.Run, error) {
+	s := r.getRunQuery(runID, ost)
+
+	q, args, err := s.ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to build query")
 	}
 
-	runs, err := fetchRuns(tx, q, args...)
+	runsData, err := fetchRuns(tx, q, args...)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	if len(runs) > 1 {
+	if len(runsData) > 1 {
 		return nil, errors.Errorf("too many rows returned")
 	}
-	if len(runs) == 0 {
+	if len(runsData) == 0 {
 		return nil, nil
 	}
-	return runs[0].Run, nil
+
+	run := runsData[0].Run
+	if run == nil {
+		var err error
+		if !ost {
+			return nil, errors.Errorf("nil active run data. This should never happen")
+		}
+		// get run from objectstorage
+		run, err = store.OSTGetRun(r.dm, runID)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+	}
+
+	return run, nil
+}
+
+func (r *ReadDB) getRunQuery(runID string, objectstorage bool) sq.SelectBuilder {
+	runt := "run"
+	rundatat := "rundata"
+	fields := []string{"run.id", "run.grouppath", "run.phase", "rundata.data"}
+	if objectstorage {
+		runt = "run_ost"
+		rundatat = "rundata_ost"
+	}
+
+	s := sb.Select(fields...).From(runt + " as run").Where(sq.Eq{"run.id": runID})
+	s = s.Join(fmt.Sprintf("%s as rundata on rundata.id = run.id", rundatat))
+
+	return s
 }
 
 type RunData struct {
