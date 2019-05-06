@@ -333,8 +333,9 @@ func (h *ChangeGroupsUpdateTokensHandler) ServeHTTP(w http.ResponseWriter, r *ht
 }
 
 type RunResponse struct {
-	Run       *types.Run       `json:"run"`
-	RunConfig *types.RunConfig `json:"run_config"`
+	Run                     *types.Run       `json:"run"`
+	RunConfig               *types.RunConfig `json:"run_config"`
+	ChangeGroupsUpdateToken string           `json:"change_groups_update_tokens"`
 }
 
 type RunHandler struct {
@@ -354,24 +355,34 @@ func NewRunHandler(logger *zap.Logger, e *etcd.Store, dm *datamanager.DataManage
 }
 
 func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	vars := mux.Vars(r)
 	runID := vars["runid"]
 
-	run, _, err := store.GetRun(ctx, h.e, runID)
-	if err != nil && err != etcd.ErrKeyNotFound {
+	query := r.URL.Query()
+	changeGroups := query["changegroup"]
+
+	var run *types.Run
+	var cgt *types.ChangeGroupsUpdateToken
+
+	err := h.readDB.Do(func(tx *db.Tx) error {
+		var err error
+		run, err = h.readDB.GetRun(tx, runID)
+		if err != nil {
+			h.log.Errorf("err: %+v", err)
+			return err
+		}
+
+		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, changeGroups)
+		return err
+	})
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if run == nil {
-		run, err = store.OSTGetRun(h.dm, runID)
-		if err != nil && err != objectstorage.ErrNotExist {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
-	if run == nil {
-		http.Error(w, "", http.StatusNotFound)
+
+	cgts, err := types.MarshalChangeGroupsUpdateToken(cgt)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -382,8 +393,9 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res := &RunResponse{
-		Run:       run,
-		RunConfig: rc,
+		Run:                     run,
+		RunConfig:               rc,
+		ChangeGroupsUpdateToken: cgts,
 	}
 
 	if err := httpResponse(w, http.StatusOK, res); err != nil {
