@@ -35,6 +35,8 @@ const (
 	GroupTypeBranch      GroupType = "branch"
 	GroupTypeTag         GroupType = "tag"
 	GroupTypePullRequest GroupType = "pr"
+
+	ApproversAnnotation = "approvers"
 )
 
 func GenRunGroup(baseGroupType GroupType, baseGroupID string, webhookData *types.WebhookData) string {

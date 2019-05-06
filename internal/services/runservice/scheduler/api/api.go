@@ -635,13 +635,18 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 type RunTaskActionType string
 
 const (
-	RunTaskActionTypeApprove RunTaskActionType = "approve"
+	RunTaskActionTypeSetAnnotations RunTaskActionType = "setannotations"
+	RunTaskActionTypeApprove        RunTaskActionType = "approve"
 )
 
 type RunTaskActionsRequest struct {
-	ActionType              RunTaskActionType `json:"action_type"`
-	ApprovalAnnotations     map[string]string `json:"approval_annotations,omitempty"`
-	ChangeGroupsUpdateToken string            `json:"change_groups_update_tokens"`
+	ActionType RunTaskActionType `json:"action_type"`
+
+	// set Annotations fields
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// global fields
+	ChangeGroupsUpdateToken string `json:"change_groups_update_tokens"`
 }
 
 type RunTaskActionsHandler struct {
@@ -671,6 +676,19 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	}
 
 	switch req.ActionType {
+	case RunTaskActionTypeSetAnnotations:
+		creq := &action.RunTaskSetAnnotationsRequest{
+			RunID:                   runID,
+			TaskID:                  taskID,
+			Annotations:             req.Annotations,
+			ChangeGroupsUpdateToken: req.ChangeGroupsUpdateToken,
+		}
+		if err := h.ah.RunTaskSetAnnotations(ctx, creq); err != nil {
+			h.log.Errorf("err: %+v", err)
+			httpError(w, err)
+			return
+		}
+
 	case RunTaskActionTypeApprove:
 		creq := &action.RunTaskApproveRequest{
 			RunID:                   runID,
@@ -682,6 +700,7 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 			httpError(w, err)
 			return
 		}
+
 	default:
 		http.Error(w, "", http.StatusBadRequest)
 		return

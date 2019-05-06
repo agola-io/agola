@@ -469,10 +469,38 @@ func genRun(rc *types.RunConfig) *types.Run {
 	return r
 }
 
+type RunTaskSetAnnotationsRequest struct {
+	RunID                   string
+	TaskID                  string
+	Annotations             map[string]string
+	ChangeGroupsUpdateToken string
+}
+
+func (h *ActionHandler) RunTaskSetAnnotations(ctx context.Context, req *RunTaskSetAnnotationsRequest) error {
+	cgt, err := types.UnmarshalChangeGroupsUpdateToken(req.ChangeGroupsUpdateToken)
+	if err != nil {
+		return err
+	}
+
+	r, _, err := store.GetRun(ctx, h.e, req.RunID)
+	if err != nil {
+		return err
+	}
+
+	task, ok := r.Tasks[req.TaskID]
+	if !ok {
+		return util.NewErrBadRequest(errors.Errorf("run %q doesn't have task %q", r.ID, req.TaskID))
+	}
+
+	task.Annotations = req.Annotations
+
+	_, err = store.AtomicPutRun(ctx, h.e, r, nil, cgt)
+	return err
+}
+
 type RunTaskApproveRequest struct {
 	RunID                   string
 	TaskID                  string
-	ApprovalAnnotations     map[string]string
 	ChangeGroupsUpdateToken string
 }
 
@@ -502,7 +530,6 @@ func (h *ActionHandler) ApproveRunTask(ctx context.Context, req *RunTaskApproveR
 
 	task.WaitingApproval = false
 	task.Approved = true
-	task.ApprovalAnnotations = req.ApprovalAnnotations
 
 	_, err = store.AtomicPutRun(ctx, h.e, r, nil, cgt)
 	return err

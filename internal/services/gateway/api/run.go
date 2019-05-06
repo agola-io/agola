@@ -153,7 +153,7 @@ func createRunResponseTask(r *rstypes.Run, rt *rstypes.RunTask, rct *rstypes.Run
 
 		WaitingApproval:     rt.WaitingApproval,
 		Approved:            rt.Approved,
-		ApprovalAnnotations: rt.ApprovalAnnotations,
+		ApprovalAnnotations: rt.Annotations,
 
 		Level:   rct.Level,
 		Depends: rct.Depends,
@@ -170,7 +170,7 @@ func createRunTaskResponse(rt *rstypes.RunTask, rct *rstypes.RunConfigTask) *Run
 
 		WaitingApproval:     rt.WaitingApproval,
 		Approved:            rt.Approved,
-		ApprovalAnnotations: rt.ApprovalAnnotations,
+		ApprovalAnnotations: rt.Annotations,
 
 		Steps: make([]*RunTaskResponseStep, len(rt.Steps)),
 
@@ -415,8 +415,7 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type RunTaskActionsRequest struct {
-	ActionType          action.RunTaskActionType `json:"action_type"`
-	ApprovalAnnotations map[string]string        `json:"approval_annotations,omitempty"`
+	ActionType action.RunTaskActionType `json:"action_type"`
 }
 
 type RunTaskActionsHandler struct {
@@ -442,10 +441,9 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	}
 
 	areq := &action.RunTaskActionsRequest{
-		RunID:               runID,
-		TaskID:              taskID,
-		ActionType:          req.ActionType,
-		ApprovalAnnotations: req.ApprovalAnnotations,
+		RunID:      runID,
+		TaskID:     taskID,
+		ActionType: req.ActionType,
 	}
 
 	err := h.ah.RunTaskAction(ctx, areq)

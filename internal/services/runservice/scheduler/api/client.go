@@ -194,8 +194,12 @@ func (c *Client) GetRuns(ctx context.Context, phaseFilter, groups []string, last
 	return getRunsResponse, resp, err
 }
 
-func (c *Client) GetQueuedRuns(ctx context.Context, start string, limit int) (*GetRunsResponse, *http.Response, error) {
-	return c.GetRuns(ctx, []string{"queued"}, []string{}, false, nil, start, limit, true)
+func (c *Client) GetQueuedRuns(ctx context.Context, start string, limit int, changeGroups []string) (*GetRunsResponse, *http.Response, error) {
+	return c.GetRuns(ctx, []string{"queued"}, []string{}, false, changeGroups, start, limit, true)
+}
+
+func (c *Client) GetRunningRuns(ctx context.Context, start string, limit int, changeGroups []string) (*GetRunsResponse, *http.Response, error) {
+	return c.GetRuns(ctx, []string{"running"}, []string{}, false, changeGroups, start, limit, true)
 }
 
 func (c *Client) GetGroupQueuedRuns(ctx context.Context, group string, limit int, changeGroups []string) (*GetRunsResponse, *http.Response, error) {
@@ -245,19 +249,33 @@ func (c *Client) RunTaskActions(ctx context.Context, runID, taskID string, req *
 	return c.getResponse(ctx, "PUT", fmt.Sprintf("/runs/%s/tasks/%s/actions", runID, taskID), nil, -1, jsonContent, bytes.NewReader(reqj))
 }
 
-func (c *Client) ApproveRunTask(ctx context.Context, runID, taskID string, approvalAnnotations map[string]string, changeGroupsUpdateToken string) (*http.Response, error) {
+func (c *Client) RunTaskSetAnnotations(ctx context.Context, runID, taskID string, annotations map[string]string, changeGroupsUpdateToken string) (*http.Response, error) {
 	req := &RunTaskActionsRequest{
-		ActionType:              RunTaskActionTypeApprove,
-		ApprovalAnnotations:     approvalAnnotations,
+		ActionType:              RunTaskActionTypeSetAnnotations,
+		Annotations:             annotations,
 		ChangeGroupsUpdateToken: changeGroupsUpdateToken,
 	}
 
 	return c.RunTaskActions(ctx, runID, taskID, req)
 }
 
-func (c *Client) GetRun(ctx context.Context, runID string) (*RunResponse, *http.Response, error) {
+func (c *Client) ApproveRunTask(ctx context.Context, runID, taskID string, changeGroupsUpdateToken string) (*http.Response, error) {
+	req := &RunTaskActionsRequest{
+		ActionType:              RunTaskActionTypeApprove,
+		ChangeGroupsUpdateToken: changeGroupsUpdateToken,
+	}
+
+	return c.RunTaskActions(ctx, runID, taskID, req)
+}
+
+func (c *Client) GetRun(ctx context.Context, runID string, changeGroups []string) (*RunResponse, *http.Response, error) {
+	q := url.Values{}
+	for _, changeGroup := range changeGroups {
+		q.Add("changegroup", changeGroup)
+	}
+
 	runResponse := new(RunResponse)
-	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/runs/%s", runID), nil, jsonContent, nil, runResponse)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/runs/%s", runID), q, jsonContent, nil, runResponse)
 	return runResponse, resp, err
 }
 

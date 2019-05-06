@@ -263,7 +263,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/runs/{runid}", authForcedHandler(runHandler)).Methods("GET")
 	apirouter.Handle("/runs/{runid}/actions", authForcedHandler(runActionsHandler)).Methods("PUT")
 	apirouter.Handle("/runs/{runid}/tasks/{taskid}", authForcedHandler(runtaskHandler)).Methods("GET")
-	apirouter.Handle("/runs/{runid}/tasks/{taskid}/actions", runTaskActionsHandler).Methods("PUT")
+	apirouter.Handle("/runs/{runid}/tasks/{taskid}/actions", authForcedHandler(runTaskActionsHandler)).Methods("PUT")
 	apirouter.Handle("/runs", authForcedHandler(runsHandler)).Methods("GET")
 
 	// TODO(sgotti) add auth to these requests

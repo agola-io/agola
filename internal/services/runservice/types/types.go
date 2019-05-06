@@ -95,7 +95,7 @@ type Run struct {
 	//      /project/$projectid/pr/$prid
 	Group string `json:"group,omitempty"`
 
-	// Annotations contain custom run properties
+	// Annotations contain custom run annotations
 	Annotations map[string]string `json:"annotations,omitempty"`
 
 	// Phase represent the current run status. A run could be running but already
@@ -219,14 +219,15 @@ type RunTask struct {
 	// there're no executor tasks scheduled
 	Status RunTaskStatus `json:"status,omitempty"`
 
+	// Annotations contain custom task annotations
+	// these are opaque to the runservice and used for multiple pourposes. For
+	// example to stores task approval metadata.
+	Annotations map[string]string `json:"annotations,omitempty"`
+
 	Skip bool `json:"skip,omitempty"`
 
 	WaitingApproval bool `json:"waiting_approval,omitempty"`
 	Approved        bool `json:"approved,omitempty"`
-	// ApprovalAnnotations stores data that the user can set on the approval. Useful
-	// to save approval information like the user who approved the task.
-	// This data is opaque to the run service
-	ApprovalAnnotations map[string]string `json:"approval_annotations,omitempty"`
 
 	SetupStep RunTaskStep    `json:"setup_step,omitempty"`
 	Steps     []*RunTaskStep `json:"steps,omitempty"`
@@ -291,7 +292,7 @@ type RunConfig struct {
 	// A list of setup errors when the run is in phase setuperror
 	SetupErrors []string `json:"setup_errors,omitempty"`
 
-	// Annotations contain custom run properties
+	// Annotations contain custom run annotations
 	// Note: Annotations are currently both saved in a Run and in RunConfig to
 	// easily return them without loading RunConfig from the lts
 	Annotations map[string]string `json:"annotations,omitempty"`

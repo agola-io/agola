@@ -16,8 +16,10 @@ package action
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
+	"github.com/sorintlab/agola/internal/services/gateway/common"
 	rsapi "github.com/sorintlab/agola/internal/services/runservice/scheduler/api"
 	"github.com/sorintlab/agola/internal/util"
 
@@ -25,11 +27,10 @@ import (
 )
 
 func (h *ActionHandler) GetRun(ctx context.Context, runID string) (*rsapi.RunResponse, error) {
-	runResp, resp, err := h.runserviceClient.GetRun(ctx, runID)
+	runResp, resp, err := h.runserviceClient.GetRun(ctx, runID, nil)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
 	}
-
 	canGetRun, err := h.CanGetRun(ctx, runResp.RunConfig.Group)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to determine permissions")
@@ -79,7 +80,7 @@ type GetLogsRequest struct {
 }
 
 func (h *ActionHandler) GetLogs(ctx context.Context, req *GetLogsRequest) (*http.Response, error) {
-	runResp, resp, err := h.runserviceClient.GetRun(ctx, req.RunID)
+	runResp, resp, err := h.runserviceClient.GetRun(ctx, req.RunID, nil)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
 	}
@@ -115,7 +116,7 @@ type RunActionsRequest struct {
 }
 
 func (h *ActionHandler) RunAction(ctx context.Context, req *RunActionsRequest) error {
-	runResp, resp, err := h.runserviceClient.GetRun(ctx, req.RunID)
+	runResp, resp, err := h.runserviceClient.GetRun(ctx, req.RunID, nil)
 	if err != nil {
 		return ErrFromRemote(resp, err)
 	}
@@ -166,28 +167,63 @@ type RunTaskActionsRequest struct {
 	RunID  string
 	TaskID string
 
-	ActionType          RunTaskActionType
-	ApprovalAnnotations map[string]string
+	ActionType RunTaskActionType
 }
 
 func (h *ActionHandler) RunTaskAction(ctx context.Context, req *RunTaskActionsRequest) error {
-	runResp, resp, err := h.runserviceClient.GetRun(ctx, req.RunID)
+	runResp, resp, err := h.runserviceClient.GetRun(ctx, req.RunID, nil)
 	if err != nil {
 		return ErrFromRemote(resp, err)
 	}
-	canGetRun, err := h.CanDoRunActions(ctx, runResp.RunConfig.Group)
+	canDoRunAction, err := h.CanDoRunActions(ctx, runResp.RunConfig.Group)
 	if err != nil {
 		return errors.Wrapf(err, "failed to determine permissions")
 	}
-	if !canGetRun {
+	if !canDoRunAction {
 		return util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+	curUserID := h.CurrentUserID(ctx)
+	if curUserID == "" {
+		return util.NewErrBadRequest(errors.Errorf("no logged in user"))
 	}
 
 	switch req.ActionType {
 	case RunTaskActionTypeApprove:
+		rt, ok := runResp.Run.Tasks[req.TaskID]
+		if !ok {
+			return util.NewErrBadRequest(errors.Errorf("run %q doesn't have task %q", req.RunID, req.TaskID))
+		}
+
+		approvers := []string{}
+		annotations := map[string]string{}
+		if rt.Annotations != nil {
+			annotations = rt.Annotations
+		}
+		approversAnnotation, ok := annotations[common.ApproversAnnotation]
+		if ok {
+			if err := json.Unmarshal([]byte(approversAnnotation), &approvers); err != nil {
+				return errors.Wrapf(err, "failed to unmarshal run task approvers annotation")
+			}
+		}
+
+		for _, approver := range approvers {
+			if approver == curUserID {
+				return util.NewErrBadRequest(errors.Errorf("user %q alredy approved the task", approver))
+			}
+		}
+		approvers = append(approvers, curUserID)
+
+		approversj, err := json.Marshal(approvers)
+		if err != nil {
+			return errors.Wrapf(err, "failed to marshal run task approvers annotation")
+		}
+
+		annotations[common.ApproversAnnotation] = string(approversj)
+
 		rsreq := &rsapi.RunTaskActionsRequest{
-			ActionType:          rsapi.RunTaskActionTypeApprove,
-			ApprovalAnnotations: req.ApprovalAnnotations,
+			ActionType:              rsapi.RunTaskActionTypeSetAnnotations,
+			Annotations:             annotations,
+			ChangeGroupsUpdateToken: runResp.ChangeGroupsUpdateToken,
 		}
 
 		resp, err := h.runserviceClient.RunTaskActions(ctx, req.RunID, req.TaskID, rsreq)
