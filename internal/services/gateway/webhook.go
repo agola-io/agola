@@ -370,7 +370,7 @@ func (h *webhooksHandler) createRuns(ctx context.Context, filename string, confi
 			Annotations:       annotations,
 		}
 
-		if _, err := h.runserviceClient.CreateRun(ctx, createRunReq); err != nil {
+		if _, _, err := h.runserviceClient.CreateRun(ctx, createRunReq); err != nil {
 			log.Errorf("failed to create run: %+v", err)
 			return err
 		}
@@ -391,7 +391,7 @@ func (h *webhooksHandler) createRuns(ctx context.Context, filename string, confi
 			Annotations:       annotations,
 		}
 
-		if _, err := h.runserviceClient.CreateRun(ctx, createRunReq); err != nil {
+		if _, _, err := h.runserviceClient.CreateRun(ctx, createRunReq); err != nil {
 			log.Errorf("failed to create run: %+v", err)
 			return err
 		}

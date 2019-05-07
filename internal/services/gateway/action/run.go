@@ -115,17 +115,17 @@ type RunActionsRequest struct {
 	FromStart bool
 }
 
-func (h *ActionHandler) RunAction(ctx context.Context, req *RunActionsRequest) error {
+func (h *ActionHandler) RunAction(ctx context.Context, req *RunActionsRequest) (*rsapi.RunResponse, error) {
 	runResp, resp, err := h.runserviceClient.GetRun(ctx, req.RunID, nil)
 	if err != nil {
-		return ErrFromRemote(resp, err)
+		return nil, ErrFromRemote(resp, err)
 	}
 	canGetRun, err := h.CanDoRunActions(ctx, runResp.RunConfig.Group)
 	if err != nil {
-		return errors.Wrapf(err, "failed to determine permissions")
+		return nil, errors.Wrapf(err, "failed to determine permissions")
 	}
 	if !canGetRun {
-		return util.NewErrForbidden(errors.Errorf("user not authorized"))
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
 	switch req.ActionType {
@@ -135,9 +135,9 @@ func (h *ActionHandler) RunAction(ctx context.Context, req *RunActionsRequest) e
 			FromStart: req.FromStart,
 		}
 
-		resp, err := h.runserviceClient.CreateRun(ctx, rsreq)
+		runResp, resp, err = h.runserviceClient.CreateRun(ctx, rsreq)
 		if err != nil {
-			return ErrFromRemote(resp, err)
+			return nil, ErrFromRemote(resp, err)
 		}
 
 	case RunActionTypeStop:
@@ -145,16 +145,16 @@ func (h *ActionHandler) RunAction(ctx context.Context, req *RunActionsRequest) e
 			ActionType: rsapi.RunActionTypeStop,
 		}
 
-		resp, err := h.runserviceClient.RunActions(ctx, req.RunID, rsreq)
+		resp, err = h.runserviceClient.RunActions(ctx, req.RunID, rsreq)
 		if err != nil {
-			return ErrFromRemote(resp, err)
+			return nil, ErrFromRemote(resp, err)
 		}
 
 	default:
-		return util.NewErrBadRequest(errors.Errorf("wrong run action type %q", req.ActionType))
+		return nil, util.NewErrBadRequest(errors.Errorf("wrong run action type %q", req.ActionType))
 	}
 
-	return nil
+	return runResp, nil
 }
 
 type RunTaskActionType string

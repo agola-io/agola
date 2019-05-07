@@ -407,10 +407,15 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		FromStart:  req.FromStart,
 	}
 
-	err := h.ah.RunAction(ctx, areq)
+	runResp, err := h.ah.RunAction(ctx, areq)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
+	}
+
+	res := createRunResponse(runResp.Run, runResp.RunConfig)
+	if err := httpResponse(w, http.StatusOK, res); err != nil {
+		h.log.Errorf("err: %+v", err)
 	}
 }
 

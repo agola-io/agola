@@ -214,13 +214,15 @@ func (c *Client) GetGroupFirstQueuedRuns(ctx context.Context, group string, chan
 	return c.GetRuns(ctx, []string{"queued"}, []string{group}, false, changeGroups, "", 1, true)
 }
 
-func (c *Client) CreateRun(ctx context.Context, req *RunCreateRequest) (*http.Response, error) {
+func (c *Client) CreateRun(ctx context.Context, req *RunCreateRequest) (*RunResponse, *http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return c.getResponse(ctx, "POST", "/runs", nil, -1, jsonContent, bytes.NewReader(reqj))
+	res := new(RunResponse)
+	resp, err := c.getParsedResponse(ctx, "POST", "/runs", nil, jsonContent, bytes.NewReader(reqj), res)
+	return res, resp, err
 }
 
 func (c *Client) RunActions(ctx context.Context, runID string, req *RunActionsRequest) (*http.Response, error) {
