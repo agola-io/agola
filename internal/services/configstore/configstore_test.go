@@ -55,7 +55,7 @@ func shutdownEtcd(tetcd *testutil.TestEmbeddedEtcd) {
 	}
 }
 
-func setupConfigstore(t *testing.T, ctx context.Context, dir string) (*ConfigStore, *testutil.TestEmbeddedEtcd) {
+func setupConfigstore(t *testing.T, ctx context.Context, dir string) (*Configstore, *testutil.TestEmbeddedEtcd) {
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	tetcd := setupEtcd(t, etcdDir)
 
@@ -67,7 +67,7 @@ func setupConfigstore(t *testing.T, ctx context.Context, dir string) (*ConfigSto
 	ostDir, err := ioutil.TempDir(dir, "ost")
 	csDir, err := ioutil.TempDir(dir, "cs")
 
-	baseConfig := config.ConfigStore{
+	baseConfig := config.Configstore{
 		Etcd: config.Etcd{
 			Endpoints: tetcd.Endpoint,
 		},
@@ -81,7 +81,7 @@ func setupConfigstore(t *testing.T, ctx context.Context, dir string) (*ConfigSto
 	csConfig.DataDir = csDir
 	csConfig.Web.ListenAddress = net.JoinHostPort(listenAddress, port)
 
-	cs, err := NewConfigStore(ctx, &csConfig)
+	cs, err := NewConfigstore(ctx, &csConfig)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -89,7 +89,7 @@ func setupConfigstore(t *testing.T, ctx context.Context, dir string) (*ConfigSto
 	return cs, tetcd
 }
 
-func getProjects(cs *ConfigStore) ([]*types.Project, error) {
+func getProjects(cs *Configstore) ([]*types.Project, error) {
 	var projects []*types.Project
 	err := cs.readDB.Do(func(tx *db.Tx) error {
 		var err error
@@ -99,7 +99,7 @@ func getProjects(cs *ConfigStore) ([]*types.Project, error) {
 	return projects, err
 }
 
-func getUsers(cs *ConfigStore) ([]*types.User, error) {
+func getUsers(cs *Configstore) ([]*types.User, error) {
 	var users []*types.User
 	err := cs.readDB.Do(func(tx *db.Tx) error {
 		var err error
@@ -140,7 +140,7 @@ func TestResync(t *testing.T) {
 	csDir2, err := ioutil.TempDir(dir, "cs2")
 	csDir3, err := ioutil.TempDir(dir, "cs3")
 
-	baseConfig := config.ConfigStore{
+	baseConfig := config.Configstore{
 		Etcd: config.Etcd{
 			Endpoints: tetcd.Endpoint,
 		},
@@ -158,11 +158,11 @@ func TestResync(t *testing.T) {
 	cs2Config.DataDir = csDir2
 	cs2Config.Web.ListenAddress = net.JoinHostPort(listenAddress2, port2)
 
-	cs1, err := NewConfigStore(ctx, &cs1Config)
+	cs1, err := NewConfigstore(ctx, &cs1Config)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	cs2, err := NewConfigStore(ctx, &cs2Config)
+	cs2, err := NewConfigstore(ctx, &cs2Config)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -215,7 +215,7 @@ func TestResync(t *testing.T) {
 
 	// start cs2
 	// it should resync from wals since the etcd revision as been compacted
-	cs2, err = NewConfigStore(ctx, &cs2Config)
+	cs2, err = NewConfigstore(ctx, &cs2Config)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -249,7 +249,7 @@ func TestResync(t *testing.T) {
 	cs3Config.Web.ListenAddress = net.JoinHostPort(listenAddress3, port3)
 
 	log.Infof("starting cs3")
-	cs3, err := NewConfigStore(ctx, &cs3Config)
+	cs3, err := NewConfigstore(ctx, &cs3Config)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}

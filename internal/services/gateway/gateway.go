@@ -121,7 +121,7 @@ func NewGateway(gc *config.Config) (*Gateway, error) {
 		return nil, err
 	}
 
-	configstoreClient := csapi.NewClient(c.ConfigStoreURL)
+	configstoreClient := csapi.NewClient(c.ConfigstoreURL)
 	runserviceClient := rsapi.NewClient(c.RunServiceURL)
 
 	ah := action.NewActionHandler(logger, sd, configstoreClient, runserviceClient, gc.ID, c.APIExposedURL, c.WebExposedURL)
