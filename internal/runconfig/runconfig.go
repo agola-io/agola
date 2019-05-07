@@ -62,6 +62,13 @@ mkdir ~/.ssh
 chmod 700 ~/.ssh
 touch ~/.ssh/id_rsa
 chmod 600 ~/.ssh/id_rsa
+touch ~/.ssh/known_hosts
+chmod 600 ~/.ssh/known_hosts
+
+# Add public ssh host key
+if [ -n "$AGOLA_SSHHOSTKEY" ]; then
+    echo "$AGOLA_SSHHOSTKEY" >> ~/.ssh/known_hosts
+fi
 
 # Add repository deploy key
 (cat <<EOF > ~/.ssh/id_rsa
@@ -69,17 +76,20 @@ $AGOLA_SSHPRIVKEY
 EOF
 )
 
+STRICT_HOST_KEY_CHECKING="yes"
+
 if [ -n "$AGOLA_SKIPSSHHOSTKEYCHECK" ]; then
 	# Disable git host key verification
-	(cat <<EOF > ~/.ssh/config
+	STRICT_HOST_KEY_CHECKING="no"
+fi
+
+(cat <<EOF > ~/.ssh/config
 Host $AGOLA_GIT_HOST
 	HostName $AGOLA_GIT_HOST
 	Port $AGOLA_GIT_PORT
-	StrictHostKeyChecking no
-	UserKnownHostsFile /dev/null
+	StrictHostKeyChecking ${STRICT_HOST_KEY_CHECKING}
 EOF
-	)
-fi
+)
 
 git clone $AGOLA_REPOSITORY_URL .
 git fetch origin $AGOLA_GIT_REF

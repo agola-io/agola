@@ -155,6 +155,10 @@ type RemoteSource struct {
 	// Oauth2 data
 	Oauth2ClientID     string `json:"client_id,omitempty"`
 	Oauth2ClientSecret string `json:"client_secret,omitempty"`
+
+	SSHHostKey string `json:"ssh_host_key,omitempty"` // Public ssh host key of the remote source
+
+	SkipSSHHostKeyCheck bool `json:"skip_ssh_host_key_check,omitempty"`
 }
 
 func SourceSupportedAuthTypes(rsType RemoteSourceType) []RemoteSourceAuthType {

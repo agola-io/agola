@@ -34,12 +34,14 @@ var cmdRemoteSourceCreate = &cobra.Command{
 }
 
 type remoteSourceCreateOptions struct {
-	name               string
-	rsType             string
-	authType           string
-	apiURL             string
-	oauth2ClientID     string
-	oauth2ClientSecret string
+	name                string
+	rsType              string
+	authType            string
+	apiURL              string
+	oauth2ClientID      string
+	oauth2ClientSecret  string
+	sshHostKey          string
+	skipSSHHostKeyCheck bool
 }
 
 var remoteSourceCreateOpts remoteSourceCreateOptions
@@ -53,6 +55,8 @@ func init() {
 	flags.StringVar(&remoteSourceCreateOpts.apiURL, "api-url", "", "remotesource api url")
 	flags.StringVar(&remoteSourceCreateOpts.oauth2ClientID, "clientid", "", "remotesource oauth2 client id")
 	flags.StringVar(&remoteSourceCreateOpts.oauth2ClientSecret, "secret", "", "remotesource oauth2 secret")
+	flags.StringVar(&remoteSourceCreateOpts.sshHostKey, "ssh-host-key", "", "remotesource ssh public host key")
+	flags.BoolVarP(&remoteSourceCreateOpts.skipSSHHostKeyCheck, "skip-ssh-host-key-check", "s", false, "skip ssh host key check")
 
 	cmdRemoteSourceCreate.MarkFlagRequired("name")
 	cmdRemoteSourceCreate.MarkFlagRequired("type")
@@ -66,12 +70,14 @@ func remoteSourceCreate(cmd *cobra.Command, args []string) error {
 	gwclient := api.NewClient(gatewayURL, token)
 
 	req := &api.CreateRemoteSourceRequest{
-		Name:               remoteSourceCreateOpts.name,
-		Type:               remoteSourceCreateOpts.rsType,
-		AuthType:           remoteSourceCreateOpts.authType,
-		APIURL:             remoteSourceCreateOpts.apiURL,
-		Oauth2ClientID:     remoteSourceCreateOpts.oauth2ClientID,
-		Oauth2ClientSecret: remoteSourceCreateOpts.oauth2ClientSecret,
+		Name:                remoteSourceCreateOpts.name,
+		Type:                remoteSourceCreateOpts.rsType,
+		AuthType:            remoteSourceCreateOpts.authType,
+		APIURL:              remoteSourceCreateOpts.apiURL,
+		Oauth2ClientID:      remoteSourceCreateOpts.oauth2ClientID,
+		Oauth2ClientSecret:  remoteSourceCreateOpts.oauth2ClientSecret,
+		SSHHostKey:          remoteSourceCreateOpts.sshHostKey,
+		SkipSSHHostKeyCheck: remoteSourceCreateOpts.skipSSHHostKeyCheck,
 	}
 
 	log.Infof("creating remotesource")

@@ -115,6 +115,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 	var webhookData *types.WebhookData
 	var sshPrivKey string
 	var cloneURL string
+	var sshHostKey string
 	var skipSSHHostKeyCheck bool
 	var runType types.RunType
 	variables := map[string]string{}
@@ -147,7 +148,12 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		}
 
 		sshPrivKey = project.SSHPrivateKey
-		skipSSHHostKeyCheck = project.SkipSSHHostKeyCheck
+		sshHostKey = rs.SSHHostKey
+		// use remotesource skipSSHHostKeyCheck config and override with project config if set to true there
+		skipSSHHostKeyCheck = rs.SkipSSHHostKeyCheck
+		if project.SkipSSHHostKeyCheck {
+			skipSSHHostKeyCheck = project.SkipSSHHostKeyCheck
+		}
 		runType = types.RunTypeProject
 		webhookData, err = gitSource.ParseWebhook(r)
 		if err != nil {
@@ -258,6 +264,9 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		"AGOLA_GIT_COMMITSHA":  webhookData.CommitSHA,
 	}
 
+	if sshHostKey != "" {
+		env["AGOLA_SSHHOSTKEY"] = sshHostKey
+	}
 	if skipSSHHostKeyCheck {
 		env["AGOLA_SKIPSSHHOSTKEYCHECK"] = "1"
 	}

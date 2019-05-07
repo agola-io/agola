@@ -46,12 +46,14 @@ func (h *ActionHandler) GetRemoteSources(ctx context.Context, req *GetRemoteSour
 }
 
 type CreateRemoteSourceRequest struct {
-	Name               string
-	APIURL             string
-	Type               string
-	AuthType           string
-	Oauth2ClientID     string
-	Oauth2ClientSecret string
+	Name                string
+	APIURL              string
+	Type                string
+	AuthType            string
+	Oauth2ClientID      string
+	Oauth2ClientSecret  string
+	SSHHostKey          string
+	SkipSSHHostKeyCheck bool
 }
 
 func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemoteSourceRequest) (*types.RemoteSource, error) {
@@ -91,12 +93,14 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemot
 	}
 
 	rs := &types.RemoteSource{
-		Name:               req.Name,
-		Type:               types.RemoteSourceType(req.Type),
-		AuthType:           types.RemoteSourceAuthType(req.AuthType),
-		APIURL:             req.APIURL,
-		Oauth2ClientID:     req.Oauth2ClientID,
-		Oauth2ClientSecret: req.Oauth2ClientSecret,
+		Name:                req.Name,
+		Type:                types.RemoteSourceType(req.Type),
+		AuthType:            types.RemoteSourceAuthType(req.AuthType),
+		APIURL:              req.APIURL,
+		Oauth2ClientID:      req.Oauth2ClientID,
+		Oauth2ClientSecret:  req.Oauth2ClientSecret,
+		SSHHostKey:          req.SSHHostKey,
+		SkipSSHHostKeyCheck: req.SkipSSHHostKeyCheck,
 	}
 
 	h.log.Infof("creating remotesource")

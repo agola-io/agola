@@ -29,12 +29,14 @@ import (
 )
 
 type CreateRemoteSourceRequest struct {
-	Name               string `json:"name"`
-	APIURL             string `json:"apiurl"`
-	Type               string `json:"type"`
-	AuthType           string `json:"auth_type"`
-	Oauth2ClientID     string `json:"oauth_2_client_id"`
-	Oauth2ClientSecret string `json:"oauth_2_client_secret"`
+	Name                string `json:"name"`
+	APIURL              string `json:"apiurl"`
+	Type                string `json:"type"`
+	AuthType            string `json:"auth_type"`
+	Oauth2ClientID      string `json:"oauth_2_client_id"`
+	Oauth2ClientSecret  string `json:"oauth_2_client_secret"`
+	SSHHostKey          string `json:"ssh_host_key"`
+	SkipSSHHostKeyCheck bool   `json:"skip_ssh_host_key_check"`
 }
 
 type CreateRemoteSourceHandler struct {
@@ -57,12 +59,14 @@ func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	}
 
 	creq := &action.CreateRemoteSourceRequest{
-		Name:               req.Name,
-		APIURL:             req.APIURL,
-		Type:               req.Type,
-		AuthType:           req.AuthType,
-		Oauth2ClientID:     req.Oauth2ClientID,
-		Oauth2ClientSecret: req.Oauth2ClientSecret,
+		Name:                req.Name,
+		APIURL:              req.APIURL,
+		Type:                req.Type,
+		AuthType:            req.AuthType,
+		Oauth2ClientID:      req.Oauth2ClientID,
+		Oauth2ClientSecret:  req.Oauth2ClientSecret,
+		SSHHostKey:          req.SSHHostKey,
+		SkipSSHHostKeyCheck: req.SkipSSHHostKeyCheck,
 	}
 	rs, err := h.ah.CreateRemoteSource(ctx, creq)
 	if httpError(w, err) {
