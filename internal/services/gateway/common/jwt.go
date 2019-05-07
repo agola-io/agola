@@ -31,18 +31,8 @@ type TokenSigningData struct {
 	Key        []byte
 }
 
-func GenerateJWTToken(sd *TokenSigningData, remoteSourceName, requestType string, request interface{}) (string, error) {
-	requestj, err := json.Marshal(request)
-	if err != nil {
-		return "", err
-	}
-
-	token := jwt.NewWithClaims(sd.Method, jwt.MapClaims{
-		"exp":                time.Now().Add(sd.Duration).Unix(),
-		"remote_source_name": remoteSourceName,
-		"request_type":       requestType,
-		"request":            string(requestj),
-	})
+func GenerateGenericJWTToken(sd *TokenSigningData, claims jwt.Claims) (string, error) {
+	token := jwt.NewWithClaims(sd.Method, claims)
 
 	var key interface{}
 	switch sd.Method {
@@ -51,27 +41,29 @@ func GenerateJWTToken(sd *TokenSigningData, remoteSourceName, requestType string
 	case jwt.SigningMethodHS256:
 		key = sd.Key
 	default:
-		errors.Errorf("unsupported signing method %q", sd.Method.Alg())
+		return "", errors.Errorf("unsupported signing method %q", sd.Method.Alg())
 	}
 	// Sign and get the complete encoded token as a string
 	return token.SignedString(key)
 }
 
+func GenerateOauth2JWTToken(sd *TokenSigningData, remoteSourceName, requestType string, request interface{}) (string, error) {
+	requestj, err := json.Marshal(request)
+	if err != nil {
+		return "", err
+	}
+
+	return GenerateGenericJWTToken(sd, jwt.MapClaims{
+		"exp":                time.Now().Add(sd.Duration).Unix(),
+		"remote_source_name": remoteSourceName,
+		"request_type":       requestType,
+		"request":            string(requestj),
+	})
+}
+
 func GenerateLoginJWTToken(sd *TokenSigningData, userID string) (string, error) {
-	token := jwt.NewWithClaims(sd.Method, jwt.MapClaims{
+	return GenerateGenericJWTToken(sd, jwt.MapClaims{
 		"sub": userID,
 		"exp": time.Now().Add(sd.Duration).Unix(),
 	})
-
-	var key interface{}
-	switch sd.Method {
-	case jwt.SigningMethodRS256:
-		key = sd.PrivateKey
-	case jwt.SigningMethodHS256:
-		key = sd.Key
-	default:
-		errors.Errorf("unsupported signing method %q", sd.Method.Alg())
-	}
-	// Sign and get the complete encoded token as a string
-	return token.SignedString(key)
 }

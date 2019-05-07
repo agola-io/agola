@@ -544,7 +544,7 @@ func (h *ActionHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSource
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create git source")
 		}
-		token, err := common.GenerateJWTToken(h.sd, rs.Name, string(requestType), req)
+		token, err := common.GenerateOauth2JWTToken(h.sd, rs.Name, string(requestType), req)
 		if err != nil {
 			return nil, err
 		}
