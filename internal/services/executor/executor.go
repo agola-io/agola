@@ -38,9 +38,9 @@ import (
 	"github.com/sorintlab/agola/internal/common"
 	slog "github.com/sorintlab/agola/internal/log"
 	"github.com/sorintlab/agola/internal/services/config"
-	"github.com/sorintlab/agola/internal/services/runservice/executor/driver"
-	"github.com/sorintlab/agola/internal/services/runservice/executor/registry"
-	rsapi "github.com/sorintlab/agola/internal/services/runservice/scheduler/api"
+	"github.com/sorintlab/agola/internal/services/executor/driver"
+	"github.com/sorintlab/agola/internal/services/executor/registry"
+	rsapi "github.com/sorintlab/agola/internal/services/runservice/api"
 	"github.com/sorintlab/agola/internal/services/runservice/types"
 	"github.com/sorintlab/agola/internal/util"
 
@@ -1230,7 +1230,7 @@ func (e *Executor) saveExecutorID(id string) error {
 }
 
 type Executor struct {
-	c                *config.RunServiceExecutor
+	c                *config.Executor
 	runserviceClient *rsapi.Client
 	id               string
 	runningTasks     *runningTasks
@@ -1239,7 +1239,7 @@ type Executor struct {
 	dynamic          bool
 }
 
-func NewExecutor(c *config.RunServiceExecutor) (*Executor, error) {
+func NewExecutor(c *config.Executor) (*Executor, error) {
 	if c.Debug {
 		level.SetLevel(zapcore.DebugLevel)
 	}
@@ -1259,7 +1259,7 @@ func NewExecutor(c *config.RunServiceExecutor) (*Executor, error) {
 
 	e := &Executor{
 		c:                c,
-		runserviceClient: rsapi.NewClient(c.RunServiceURL),
+		runserviceClient: rsapi.NewClient(c.RunserviceURL),
 		runningTasks: &runningTasks{
 			tasks: make(map[string]*runningTask),
 		},
