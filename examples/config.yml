@@ -1,7 +1,7 @@
 gateway:
   apiExposedURL: "http://172.17.0.1:8000"
   webExposedURL: "http://172.17.0.1:8080"
-  runServiceURL: "http://localhost:4000"
+  runserviceURL: "http://localhost:4000"
   configstoreURL: "http://localhost:4002"
   gitServerURL: "http://172.17.0.1:4003"
 
@@ -18,7 +18,7 @@ gateway:
   adminToken: "admintoken"
 
 scheduler:
-  runServiceURL: "http://localhost:4000"
+  runserviceURL: "http://localhost:4000"
 
 configstore:
   dataDir: /tmp/agola/configstore
@@ -30,9 +30,9 @@ configstore:
   web:
     listenAddress: ":4002"
 
-runServiceScheduler:
+runservice:
   #debug: true
-  dataDir: /tmp/agola/runservice/scheduler
+  dataDir: /tmp/agola/runservice
   objectStorage:
     type: posix
     path: /tmp/agola/runservice/ost
@@ -41,10 +41,10 @@ runServiceScheduler:
   web:
     listenAddress: ":4000"
 
-runServiceExecutor:
-  dataDir: /tmp/agola/runservice/executor
+executor:
+  dataDir: /tmp/agola/executor
   toolboxPath: ./bin/agola-toolbox
-  runServiceURL: "http://localhost:4000"
+  runserviceURL: "http://localhost:4000"
   web:
     listenAddress: ":4001"
   activeTasksLimit: 2
