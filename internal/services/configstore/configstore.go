@@ -29,8 +29,8 @@ import (
 	slog "github.com/sorintlab/agola/internal/log"
 	"github.com/sorintlab/agola/internal/objectstorage"
 	"github.com/sorintlab/agola/internal/services/config"
-	"github.com/sorintlab/agola/internal/services/configstore/api"
 	action "github.com/sorintlab/agola/internal/services/configstore/action"
+	"github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/configstore/readdb"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
@@ -45,8 +45,8 @@ var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
 var logger = slog.New(level)
 var log = logger.Sugar()
 
-type ConfigStore struct {
-	c             *config.ConfigStore
+type Configstore struct {
+	c             *config.Configstore
 	e             *etcd.Store
 	dm            *datamanager.DataManager
 	readDB        *readdb.ReadDB
@@ -55,7 +55,7 @@ type ConfigStore struct {
 	listenAddress string
 }
 
-func NewConfigStore(ctx context.Context, c *config.ConfigStore) (*ConfigStore, error) {
+func NewConfigstore(ctx context.Context, c *config.Configstore) (*Configstore, error) {
 	if c.Debug {
 		level.SetLevel(zapcore.DebugLevel)
 	}
@@ -69,7 +69,7 @@ func NewConfigStore(ctx context.Context, c *config.ConfigStore) (*ConfigStore, e
 		return nil, err
 	}
 
-	cs := &ConfigStore{
+	cs := &Configstore{
 		c:   c,
 		e:   e,
 		ost: ost,
@@ -107,7 +107,7 @@ func NewConfigStore(ctx context.Context, c *config.ConfigStore) (*ConfigStore, e
 	return cs, nil
 }
 
-func (s *ConfigStore) Run(ctx context.Context) error {
+func (s *Configstore) Run(ctx context.Context) error {
 	errCh := make(chan error)
 	dmReadyCh := make(chan struct{})
 

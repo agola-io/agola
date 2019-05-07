@@ -23,7 +23,7 @@ type Config struct {
 	Scheduler           Scheduler           `yaml:"scheduler"`
 	RunServiceScheduler RunServiceScheduler `yaml:"runServiceScheduler"`
 	RunServiceExecutor  RunServiceExecutor  `yaml:"runServiceExecutor"`
-	ConfigStore         ConfigStore         `yaml:"configStore"`
+	Configstore         Configstore         `yaml:"configstore"`
 	GitServer           GitServer           `yaml:"gitServer"`
 }
 
@@ -38,7 +38,7 @@ type Gateway struct {
 	WebExposedURL string `yaml:"webExposedURL"`
 
 	RunServiceURL  string `yaml:"runServiceURL"`
-	ConfigStoreURL string `yaml:"configStoreURL"`
+	ConfigstoreURL string `yaml:"configstoreURL"`
 	GitServerURL   string `yaml:"gitServerURL"`
 
 	Web           Web           `yaml:"web"`
@@ -86,7 +86,7 @@ type RunServiceExecutor struct {
 	ActiveTasksLimit int `yaml:"active_tasks_limit"`
 }
 
-type ConfigStore struct {
+type Configstore struct {
 	Debug bool `yaml:"debug"`
 
 	DataDir string `yaml:"dataDir"`
@@ -251,8 +251,8 @@ func Validate(c *Config) error {
 	if c.Gateway.WebExposedURL == "" {
 		return errors.Errorf("gateway webExposedURL is empty")
 	}
-	if c.Gateway.ConfigStoreURL == "" {
-		return errors.Errorf("gateway configStoreURL is empty")
+	if c.Gateway.ConfigstoreURL == "" {
+		return errors.Errorf("gateway configstoreURL is empty")
 	}
 	if c.Gateway.RunServiceURL == "" {
 		return errors.Errorf("gateway runServiceURL is empty")
@@ -262,10 +262,10 @@ func Validate(c *Config) error {
 	}
 
 	// Configstore
-	if c.ConfigStore.DataDir == "" {
+	if c.Configstore.DataDir == "" {
 		return errors.Errorf("configstore dataDir is empty")
 	}
-	if err := validateWeb(&c.ConfigStore.Web); err != nil {
+	if err := validateWeb(&c.Configstore.Web); err != nil {
 		return errors.Wrapf(err, "configstore web configuration error")
 	}
 
