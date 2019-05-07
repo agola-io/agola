@@ -133,6 +133,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, project *types.Projec
 
 	project.ID = uuid.NewV4().String()
 	project.Parent.Type = types.ConfigTypeProjectGroup
+	project.Secret = util.EncodeSha1Hex(uuid.NewV4().String())
 
 	pcj, err := json.Marshal(project)
 	if err != nil {

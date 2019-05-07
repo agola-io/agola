@@ -73,6 +73,9 @@ type User struct {
 
 	Name string `json:"name,omitempty"`
 
+	// A secret string that could be used for signing or other purposes
+	Secret string `json:"secret,omitempty"`
+
 	LinkedAccounts map[string]*LinkedAccount `json:"linked_accounts,omitempty"`
 
 	// Optional local auth
@@ -232,6 +235,9 @@ type Project struct {
 
 	ID   string `json:"id,omitempty"`
 	Name string `json:"name,omitempty"`
+
+	// A secret string that could be used for signing or other purposes
+	Secret string `json:"secret,omitempty"`
 
 	Parent Parent `json:"parent,omitempty"`
 

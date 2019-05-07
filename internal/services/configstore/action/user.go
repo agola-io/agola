@@ -89,8 +89,9 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 	}
 
 	user := &types.User{
-		ID:   uuid.NewV4().String(),
-		Name: req.UserName,
+		ID:     uuid.NewV4().String(),
+		Name:   req.UserName,
+		Secret: util.EncodeSha1Hex(uuid.NewV4().String()),
 	}
 	if req.CreateUserLARequest != nil {
 		if user.LinkedAccounts == nil {
