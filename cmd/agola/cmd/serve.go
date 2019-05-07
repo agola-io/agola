@@ -158,9 +158,9 @@ func serve(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	var cs *configstore.ConfigStore
+	var cs *configstore.Configstore
 	if isComponentEnabled("configstore") {
-		cs, err = configstore.NewConfigStore(ctx, &c.ConfigStore)
+		cs, err = configstore.NewConfigstore(ctx, &c.Configstore)
 		if err != nil {
 			return errors.Wrapf(err, "failed to start config store")
 		}
