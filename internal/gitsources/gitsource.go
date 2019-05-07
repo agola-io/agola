@@ -37,7 +37,7 @@ type GitSource interface {
 	UpdateDeployKey(repopath, title, pubKey string, readonly bool) error
 	DeleteRepoWebhook(repopath, url string) error
 	CreateRepoWebhook(repopath, url, secret string) error
-	ParseWebhook(r *http.Request) (*types.WebhookData, error)
+	ParseWebhook(r *http.Request, secret string) (*types.WebhookData, error)
 	CreateCommitStatus(repopath, commitSHA string, status CommitStatus, targetURL, description, context string) error
 	ListUserRepos() ([]*RepoInfo, error)
 }

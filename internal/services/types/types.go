@@ -73,7 +73,8 @@ type User struct {
 
 	Name string `json:"name,omitempty"`
 
-	// A secret string that could be used for signing or other purposes
+	// Secret is a secret that could be used for signing or other purposes. It
+	// should never be directly exposed to external services
 	Secret string `json:"secret,omitempty"`
 
 	LinkedAccounts map[string]*LinkedAccount `json:"linked_accounts,omitempty"`
@@ -236,7 +237,8 @@ type Project struct {
 	ID   string `json:"id,omitempty"`
 	Name string `json:"name,omitempty"`
 
-	// A secret string that could be used for signing or other purposes
+	// Secret is a secret that could be used for signing or other purposes. It
+	// should never be directly exposed to external services
 	Secret string `json:"secret,omitempty"`
 
 	Parent Parent `json:"parent,omitempty"`
@@ -263,6 +265,10 @@ type Project struct {
 	SSHPrivateKey string `json:"ssh_private_key,omitempty"` // PEM Encoded private key
 
 	SkipSSHHostKeyCheck bool `json:"skip_ssh_host_key_check,omitempty"`
+
+	// Webhooksecret is the secret passed to git sources that support a
+	// secret/token for signing or verifying the webhook payload
+	WebhookSecret string `json:"webhook_secret,omitempty"`
 }
 
 type SecretType string

@@ -219,6 +219,7 @@ func (c *Client) CreateRepoWebhook(repopath, url, secret string) error {
 		PushEvents:          gitlab.Bool(true),
 		TagPushEvents:       gitlab.Bool(true),
 		MergeRequestsEvents: gitlab.Bool(true),
+		Token:               gitlab.String(secret),
 	}
 	_, _, err := c.client.Projects.AddProjectHook(repopath, opts)
 

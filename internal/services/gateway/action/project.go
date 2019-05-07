@@ -194,7 +194,7 @@ func (h *ActionHandler) SetupProject(ctx context.Context, rs *types.RemoteSource
 		return errors.Wrapf(err, "failed to delete repository webhook")
 	}
 	h.log.Infof("creating webhook to url: %s", webhookURL)
-	if err := gitsource.CreateRepoWebhook(project.RepositoryPath, webhookURL.String(), ""); err != nil {
+	if err := gitsource.CreateRepoWebhook(project.RepositoryPath, webhookURL.String(), project.WebhookSecret); err != nil {
 		return errors.Wrapf(err, "failed to create repository webhook")
 	}
 

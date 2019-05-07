@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"path"
 	"strconv"
@@ -40,31 +41,25 @@ const (
 	prActionSync = "synchronized"
 )
 
-func parseWebhook(r *http.Request) (*types.WebhookData, error) {
+func (c *Client) ParseWebhook(r *http.Request, secret string) (*types.WebhookData, error) {
+	data, err := ioutil.ReadAll(io.LimitReader(r.Body, 10*1024*1024))
+	if err != nil {
+		return nil, err
+	}
+
 	switch r.Header.Get(hookEvent) {
 	case hookPush:
-		return parsePushHook(r.Body)
+		return parsePushHook(data)
 	case hookPullRequest:
-		return parsePullRequestHook(r.Body)
+		return parsePullRequestHook(data)
 	default:
 		return nil, errors.Errorf("unknown webhook event type: %q", r.Header.Get(hookEvent))
 	}
 }
 
-func parsePush(r io.Reader) (*pushHook, error) {
+func parsePushHook(data []byte) (*types.WebhookData, error) {
 	push := new(pushHook)
-	err := json.NewDecoder(r).Decode(push)
-	return push, err
-}
-
-func parsePullRequest(r io.Reader) (*pullRequestHook, error) {
-	pr := new(pullRequestHook)
-	err := json.NewDecoder(r).Decode(pr)
-	return pr, err
-}
-
-func parsePushHook(payload io.Reader) (*types.WebhookData, error) {
-	push, err := parsePush(payload)
+	err := json.Unmarshal(data, push)
 	if err != nil {
 		return nil, err
 	}
@@ -72,8 +67,9 @@ func parsePushHook(payload io.Reader) (*types.WebhookData, error) {
 	return webhookDataFromPush(push)
 }
 
-func parsePullRequestHook(payload io.Reader) (*types.WebhookData, error) {
-	prhook, err := parsePullRequest(payload)
+func parsePullRequestHook(data []byte) (*types.WebhookData, error) {
+	prhook := new(pullRequestHook)
+	err := json.Unmarshal(data, prhook)
 	if err != nil {
 		return nil, err
 	}

@@ -155,7 +155,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 			skipSSHHostKeyCheck = project.SkipSSHHostKeyCheck
 		}
 		runType = types.RunTypeProject
-		webhookData, err = gitSource.ParseWebhook(r)
+		webhookData, err = gitSource.ParseWebhook(r, project.WebhookSecret)
 		if err != nil {
 			return http.StatusBadRequest, "", errors.Wrapf(err, "failed to parse webhook")
 		}
@@ -213,7 +213,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 	} else {
 		gitSource = agolagit.New(h.apiExposedURL + "/repos")
 		var err error
-		webhookData, err = gitSource.ParseWebhook(r)
+		webhookData, err = gitSource.ParseWebhook(r, "")
 		if err != nil {
 			return http.StatusBadRequest, "", errors.Wrapf(err, "failed to parse webhook")
 		}
