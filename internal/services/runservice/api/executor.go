@@ -26,9 +26,9 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/sorintlab/agola/internal/etcd"
 	"github.com/sorintlab/agola/internal/objectstorage"
-	"github.com/sorintlab/agola/internal/services/runservice/scheduler/action"
-	"github.com/sorintlab/agola/internal/services/runservice/scheduler/common"
-	"github.com/sorintlab/agola/internal/services/runservice/scheduler/store"
+	"github.com/sorintlab/agola/internal/services/runservice/action"
+	"github.com/sorintlab/agola/internal/services/runservice/common"
+	"github.com/sorintlab/agola/internal/services/runservice/store"
 	"github.com/sorintlab/agola/internal/services/runservice/types"
 	"go.uber.org/zap"
 )

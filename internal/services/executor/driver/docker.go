@@ -29,7 +29,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/common"
-	"github.com/sorintlab/agola/internal/services/runservice/executor/registry"
+	"github.com/sorintlab/agola/internal/services/executor/registry"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"

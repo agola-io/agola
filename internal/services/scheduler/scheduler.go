@@ -23,7 +23,7 @@ import (
 	slog "github.com/sorintlab/agola/internal/log"
 	"github.com/sorintlab/agola/internal/services/config"
 	"github.com/sorintlab/agola/internal/services/gateway/common"
-	rsapi "github.com/sorintlab/agola/internal/services/runservice/scheduler/api"
+	rsapi "github.com/sorintlab/agola/internal/services/runservice/api"
 	"github.com/sorintlab/agola/internal/util"
 
 	"github.com/pkg/errors"
@@ -194,7 +194,7 @@ func NewScheduler(c *config.Scheduler) (*Scheduler, error) {
 	}
 
 	return &Scheduler{
-		runserviceClient: rsapi.NewClient(c.RunServiceURL),
+		runserviceClient: rsapi.NewClient(c.RunserviceURL),
 	}, nil
 }
 

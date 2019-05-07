@@ -26,9 +26,9 @@ import (
 	"github.com/sorintlab/agola/internal/objectstorage"
 	"github.com/sorintlab/agola/internal/runconfig"
 	"github.com/sorintlab/agola/internal/sequence"
-	"github.com/sorintlab/agola/internal/services/runservice/scheduler/common"
-	"github.com/sorintlab/agola/internal/services/runservice/scheduler/readdb"
-	"github.com/sorintlab/agola/internal/services/runservice/scheduler/store"
+	"github.com/sorintlab/agola/internal/services/runservice/common"
+	"github.com/sorintlab/agola/internal/services/runservice/readdb"
+	"github.com/sorintlab/agola/internal/services/runservice/store"
 	"github.com/sorintlab/agola/internal/services/runservice/types"
 	"github.com/sorintlab/agola/internal/util"
 

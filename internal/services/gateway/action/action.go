@@ -20,7 +20,7 @@ import (
 	"github.com/pkg/errors"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/gateway/common"
-	rsapi "github.com/sorintlab/agola/internal/services/runservice/scheduler/api"
+	rsapi "github.com/sorintlab/agola/internal/services/runservice/api"
 	"github.com/sorintlab/agola/internal/util"
 
 	"go.uber.org/zap"

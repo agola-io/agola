@@ -29,7 +29,7 @@ import (
 	"github.com/sorintlab/agola/internal/services/gateway/api"
 	"github.com/sorintlab/agola/internal/services/gateway/common"
 	"github.com/sorintlab/agola/internal/services/gateway/handlers"
-	rsapi "github.com/sorintlab/agola/internal/services/runservice/scheduler/api"
+	rsapi "github.com/sorintlab/agola/internal/services/runservice/api"
 	"github.com/sorintlab/agola/internal/util"
 
 	jwt "github.com/dgrijalva/jwt-go"
@@ -122,7 +122,7 @@ func NewGateway(gc *config.Config) (*Gateway, error) {
 	}
 
 	configstoreClient := csapi.NewClient(c.ConfigstoreURL)
-	runserviceClient := rsapi.NewClient(c.RunServiceURL)
+	runserviceClient := rsapi.NewClient(c.RunserviceURL)
 
 	ah := action.NewActionHandler(logger, sd, configstoreClient, runserviceClient, gc.ID, c.APIExposedURL, c.WebExposedURL)
 

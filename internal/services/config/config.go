@@ -33,12 +33,12 @@ type Config struct {
 	// Defaults to "agola"
 	ID string `yaml:"id"`
 
-	Gateway             Gateway             `yaml:"gateway"`
-	Scheduler           Scheduler           `yaml:"scheduler"`
-	RunServiceScheduler RunServiceScheduler `yaml:"runServiceScheduler"`
-	RunServiceExecutor  RunServiceExecutor  `yaml:"runServiceExecutor"`
-	Configstore         Configstore         `yaml:"configstore"`
-	GitServer           GitServer           `yaml:"gitServer"`
+	Gateway     Gateway     `yaml:"gateway"`
+	Scheduler   Scheduler   `yaml:"scheduler"`
+	Runservice  Runservice  `yaml:"runservice"`
+	Executor    Executor    `yaml:"executor"`
+	Configstore Configstore `yaml:"configstore"`
+	GitServer   GitServer   `yaml:"gitServer"`
 }
 
 type Gateway struct {
@@ -51,7 +51,7 @@ type Gateway struct {
 	// This is used for generating the redirect_url in oauth2 redirects
 	WebExposedURL string `yaml:"webExposedURL"`
 
-	RunServiceURL  string `yaml:"runServiceURL"`
+	RunserviceURL  string `yaml:"runserviceURL"`
 	ConfigstoreURL string `yaml:"configstoreURL"`
 	GitServerURL   string `yaml:"gitServerURL"`
 
@@ -67,10 +67,10 @@ type Gateway struct {
 type Scheduler struct {
 	Debug bool `yaml:"debug"`
 
-	RunServiceURL string `yaml:"runServiceURL"`
+	RunserviceURL string `yaml:"runserviceURL"`
 }
 
-type RunServiceScheduler struct {
+type Runservice struct {
 	Debug bool `yaml:"debug"`
 
 	DataDir       string        `yaml:"dataDir"`
@@ -81,12 +81,12 @@ type RunServiceScheduler struct {
 	RunCacheExpireInterval time.Duration `yaml:"runCacheExpireInterval"`
 }
 
-type RunServiceExecutor struct {
+type Executor struct {
 	Debug bool `yaml:"debug"`
 
 	DataDir string `yaml:"dataDir"`
 
-	RunServiceURL string `yaml:"runServiceURL"`
+	RunserviceURL string `yaml:"runserviceURL"`
 	ToolboxPath   string `yaml:"toolboxPath"`
 
 	Web Web `yaml:"web"`
@@ -208,10 +208,10 @@ var defaultConfig = Config{
 			Duration: 12 * time.Hour,
 		},
 	},
-	RunServiceScheduler: RunServiceScheduler{
+	Runservice: Runservice{
 		RunCacheExpireInterval: 7 * 24 * time.Hour,
 	},
-	RunServiceExecutor: RunServiceExecutor{
+	Executor: Executor{
 		ActiveTasksLimit: 2,
 	},
 }
@@ -266,8 +266,8 @@ func Validate(c *Config) error {
 	if c.Gateway.ConfigstoreURL == "" {
 		return errors.Errorf("gateway configstoreURL is empty")
 	}
-	if c.Gateway.RunServiceURL == "" {
-		return errors.Errorf("gateway runServiceURL is empty")
+	if c.Gateway.RunserviceURL == "" {
+		return errors.Errorf("gateway runserviceURL is empty")
 	}
 	if err := validateWeb(&c.Gateway.Web); err != nil {
 		return errors.Wrapf(err, "gateway web configuration error")
@@ -281,37 +281,37 @@ func Validate(c *Config) error {
 		return errors.Wrapf(err, "configstore web configuration error")
 	}
 
-	// Runservice Scheduler
-	if c.RunServiceScheduler.DataDir == "" {
-		return errors.Errorf("runservice scheduler dataDir is empty")
+	// Runservice
+	if c.Runservice.DataDir == "" {
+		return errors.Errorf("runservice dataDir is empty")
 	}
-	if err := validateWeb(&c.RunServiceScheduler.Web); err != nil {
-		return errors.Wrapf(err, "runservice scheduler web configuration error")
+	if err := validateWeb(&c.Runservice.Web); err != nil {
+		return errors.Wrapf(err, "runservice web configuration error")
 	}
 
-	// Runservice Executor
-	if c.RunServiceExecutor.DataDir == "" {
-		return errors.Errorf("runservice executor dataDir is empty")
+	// Executor
+	if c.Executor.DataDir == "" {
+		return errors.Errorf("executor dataDir is empty")
 	}
-	if c.RunServiceExecutor.ToolboxPath == "" {
+	if c.Executor.ToolboxPath == "" {
 		return errors.Errorf("git server toolboxPath is empty")
 	}
-	if c.RunServiceExecutor.RunServiceURL == "" {
-		return errors.Errorf("runservice executor runServiceURL is empty")
+	if c.Executor.RunserviceURL == "" {
+		return errors.Errorf("executor runserviceURL is empty")
 	}
-	if c.RunServiceExecutor.Driver.Type == "" {
-		return errors.Errorf("runservice executor driver type is empty")
+	if c.Executor.Driver.Type == "" {
+		return errors.Errorf("executor driver type is empty")
 	}
-	switch c.RunServiceExecutor.Driver.Type {
+	switch c.Executor.Driver.Type {
 	case DriverTypeDocker:
 	case DriverTypeK8s:
 	default:
-		return errors.Errorf("runservice executor driver type %q unknown", c.RunServiceExecutor.Driver.Type)
+		return errors.Errorf("executor driver type %q unknown", c.Executor.Driver.Type)
 	}
 
 	// Scheduler
-	if c.Scheduler.RunServiceURL == "" {
-		return errors.Errorf("scheduler runServiceURL is empty")
+	if c.Scheduler.RunserviceURL == "" {
+		return errors.Errorf("scheduler runserviceURL is empty")
 	}
 
 	// Git server

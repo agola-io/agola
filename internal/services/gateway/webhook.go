@@ -27,7 +27,7 @@ import (
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/gateway/action"
 	"github.com/sorintlab/agola/internal/services/gateway/common"
-	rsapi "github.com/sorintlab/agola/internal/services/runservice/scheduler/api"
+	rsapi "github.com/sorintlab/agola/internal/services/runservice/api"
 	rstypes "github.com/sorintlab/agola/internal/services/runservice/types"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"

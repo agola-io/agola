@@ -21,11 +21,11 @@ import (
 	"github.com/sorintlab/agola/cmd"
 	"github.com/sorintlab/agola/internal/services/config"
 	"github.com/sorintlab/agola/internal/services/configstore"
+	"github.com/sorintlab/agola/internal/services/executor"
+	rsexecutor "github.com/sorintlab/agola/internal/services/executor"
 	"github.com/sorintlab/agola/internal/services/gateway"
 	"github.com/sorintlab/agola/internal/services/gitserver"
-	"github.com/sorintlab/agola/internal/services/runservice/executor"
-	rsexecutor "github.com/sorintlab/agola/internal/services/runservice/executor"
-	rsscheduler "github.com/sorintlab/agola/internal/services/runservice/scheduler"
+	rsscheduler "github.com/sorintlab/agola/internal/services/runservice"
 	"github.com/sorintlab/agola/internal/services/scheduler"
 	"github.com/sorintlab/agola/internal/util"
 
@@ -139,17 +139,17 @@ func serve(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	var rssched *rsscheduler.Scheduler
+	var rs *rsscheduler.Runservice
 	if isComponentEnabled("runservicescheduler") {
-		rssched, err = rsscheduler.NewScheduler(ctx, &c.RunServiceScheduler)
+		rs, err = rsscheduler.NewRunservice(ctx, &c.Runservice)
 		if err != nil {
 			return errors.Wrapf(err, "failed to start run service scheduler")
 		}
 	}
 
-	var rsex *rsexecutor.Executor
+	var ex *rsexecutor.Executor
 	if isComponentEnabled("runserviceexecutor") {
-		rsex, err = executor.NewExecutor(&c.RunServiceExecutor)
+		ex, err = executor.NewExecutor(&c.Executor)
 		if err != nil {
 			return errors.Wrapf(err, "failed to start run service executor")
 		}
@@ -189,11 +189,11 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	errCh := make(chan error)
 
-	if rssched != nil {
-		go func() { errCh <- rssched.Run(ctx) }()
+	if rs != nil {
+		go func() { errCh <- rs.Run(ctx) }()
 	}
-	if rsex != nil {
-		go func() { errCh <- rsex.Run(ctx) }()
+	if ex != nil {
+		go func() { errCh <- ex.Run(ctx) }()
 	}
 	if cs != nil {
 		go func() { errCh <- cs.Run(ctx) }()

@@ -20,7 +20,7 @@ import (
 	"net/http"
 
 	"github.com/sorintlab/agola/internal/services/gateway/common"
-	rsapi "github.com/sorintlab/agola/internal/services/runservice/scheduler/api"
+	rsapi "github.com/sorintlab/agola/internal/services/runservice/api"
 	"github.com/sorintlab/agola/internal/util"
 
 	"github.com/pkg/errors"
