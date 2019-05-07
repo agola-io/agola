@@ -31,7 +31,6 @@ import (
 
 	"github.com/pkg/errors"
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
-	"github.com/sorintlab/agola/internal/services/types"
 )
 
 var jsonContent = http.Header{"content-type": []string{"application/json"}}
@@ -167,10 +166,6 @@ func (c *Client) DeleteRepoWebhook(repopath, u string) error {
 
 func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource.CommitStatus, targetURL, description, context string) error {
 	return nil
-}
-
-func (c *Client) ParseWebhook(r *http.Request) (*types.WebhookData, error) {
-	return parseWebhook(r)
 }
 
 func (c *Client) ListUserRepos() ([]*gitsource.RepoInfo, error) {

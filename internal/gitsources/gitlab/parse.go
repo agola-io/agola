@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"strconv"
@@ -33,7 +34,8 @@ import (
 )
 
 const (
-	hookEvent = "X-Gitlab-Event"
+	hookEvent   = "X-Gitlab-Event"
+	tokenHeader = "X-Gitlab-Token"
 
 	hookPush        = "Push Hook"
 	hookTagPush     = "Tag Push Hook"
@@ -45,33 +47,39 @@ const (
 	prActionSync = "synchronized"
 )
 
-func (c *Client) ParseWebhook(r *http.Request) (*types.WebhookData, error) {
+func (c *Client) ParseWebhook(r *http.Request, secret string) (*types.WebhookData, error) {
+	data, err := ioutil.ReadAll(io.LimitReader(r.Body, 10*1024*1024))
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("r: %s", util.Dump(r))
+	log.Printf("data: %s", data)
+
+	// verify token (gitlab doesn't sign the payload but just returns the provided
+	// secret)
+	if secret != "" {
+		token := r.Header.Get(tokenHeader)
+		if token != secret {
+			return nil, errors.Errorf("wrong webhook token")
+		}
+	}
+
 	switch r.Header.Get(hookEvent) {
 	case hookPush:
-		return parsePushHook(r.Body)
+		return parsePushHook(data)
 	case hookTagPush:
-		return parsePushHook(r.Body)
+		return parsePushHook(data)
 	case hookPullRequest:
-		return parsePullRequestHook(r.Body)
+		return parsePullRequestHook(data)
 	default:
 		return nil, errors.Errorf("unknown webhook event type: %q", r.Header.Get(hookEvent))
 	}
 }
 
-func parsePush(r io.Reader) (*pushHook, error) {
+func parsePushHook(data []byte) (*types.WebhookData, error) {
 	push := new(pushHook)
-	err := json.NewDecoder(r).Decode(push)
-	return push, err
-}
-
-func parsePullRequest(r io.Reader) (*pullRequestHook, error) {
-	pr := new(pullRequestHook)
-	err := json.NewDecoder(r).Decode(pr)
-	return pr, err
-}
-
-func parsePushHook(payload io.Reader) (*types.WebhookData, error) {
-	push, err := parsePush(payload)
+	err := json.Unmarshal(data, push)
 	if err != nil {
 		return nil, err
 	}
@@ -84,20 +92,15 @@ func parsePushHook(payload io.Reader) (*types.WebhookData, error) {
 	return webhookDataFromPush(push)
 }
 
-func parsePullRequestHook(payload io.Reader) (*types.WebhookData, error) {
-	prhook, err := parsePullRequest(payload)
+func parsePullRequestHook(data []byte) (*types.WebhookData, error) {
+	prhook := new(pullRequestHook)
+	err := json.Unmarshal(data, prhook)
 	if err != nil {
 		return nil, err
 	}
 
-	//	// skip non open pull requests
-	//	if prhook.PullRequest.State != prStateOpen {
-	//		return nil, nil
-	//	}
-	//	// only accept actions that have new commits
-	//	if prhook.Action != prActionOpen && prhook.Action != prActionSync {
-	//		return nil, nil
-	//	}
+	// TODO(sgotti) skip non open pull requests
+	// TODO(sgotti) only accept actions that have new commits
 
 	return webhookDataFromPullRequest(prhook), nil
 }
