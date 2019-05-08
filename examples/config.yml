@@ -3,7 +3,7 @@ gateway:
   webExposedURL: "http://172.17.0.1:8080"
   runserviceURL: "http://localhost:4000"
   configstoreURL: "http://localhost:4002"
-  gitServerURL: "http://172.17.0.1:4003"
+  gitserverURL: "http://172.17.0.1:4003"
 
   web:
     listenAddress: ":8000"
@@ -33,11 +33,11 @@ configstore:
 runservice:
   #debug: true
   dataDir: /tmp/agola/runservice
+  etcd:
+    endpoints: "http://localhost:2379"
   objectStorage:
     type: posix
     path: /tmp/agola/runservice/ost
-  etcd:
-    endpoints: "http://localhost:2379"
   web:
     listenAddress: ":4000"
 
@@ -51,7 +51,7 @@ executor:
   driver:
     type: docker
 
-gitServer:
+gitserver:
   dataDir: /tmp/agola/gitserver
   githookPath: ./bin/agola-git-hook
   gatewayURL: "http://localhost:8000"
