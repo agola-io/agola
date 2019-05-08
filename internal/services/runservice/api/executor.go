@@ -242,7 +242,7 @@ func (h *ArchivesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ArchivesHandler) readArchive(rtID string, step int, w io.Writer) error {
-	archivePath := store.OSTRunArchivePath(rtID, step)
+	archivePath := store.OSTRunTaskArchivePath(rtID, step)
 	f, err := h.ost.ReadObject(archivePath)
 	if err != nil {
 		if err == objectstorage.ErrNotExist {

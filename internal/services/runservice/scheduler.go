@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"sort"
 	"strconv"
 	"time"
@@ -861,12 +860,12 @@ func (s *Runservice) runTasksUpdater(ctx context.Context) error {
 	return nil
 }
 
-func (s *Runservice) fileExists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err != nil && !os.IsNotExist(err) {
+func (s *Runservice) OSTFileExists(path string) (bool, error) {
+	_, err := s.ost.Stat(path)
+	if err != nil && err != objectstorage.ErrNotExist {
 		return false, err
 	}
-	return !os.IsNotExist(err), nil
+	return err == nil, nil
 }
 
 func (s *Runservice) fetchLog(ctx context.Context, rt *types.RunTask, setup bool, stepnum int) error {
@@ -895,7 +894,7 @@ func (s *Runservice) fetchLog(ctx context.Context, rt *types.RunTask, setup bool
 	} else {
 		logPath = store.OSTRunTaskStepLogPath(rt.ID, stepnum)
 	}
-	ok, err := s.fileExists(logPath)
+	ok, err := s.OSTFileExists(logPath)
 	if err != nil {
 		return err
 	}
@@ -1049,8 +1048,8 @@ func (s *Runservice) fetchArchive(ctx context.Context, rt *types.RunTask, stepnu
 		return nil
 	}
 
-	path := store.OSTRunArchivePath(rt.ID, stepnum)
-	ok, err := s.fileExists(path)
+	path := store.OSTRunTaskArchivePath(rt.ID, stepnum)
+	ok, err := s.OSTFileExists(path)
 	if err != nil {
 		return err
 	}
@@ -1088,6 +1087,7 @@ func (s *Runservice) fetchArchive(ctx context.Context, rt *types.RunTask, stepnu
 
 func (s *Runservice) fetchTaskArchives(ctx context.Context, runID string, rt *types.RunTask) {
 	log.Debugf("fetchTaskArchives")
+
 	for i, stepnum := range rt.WorkspaceArchives {
 		phase := rt.WorkspaceArchivesPhase[i]
 		if phase == types.RunTaskFetchPhaseNotStarted {
@@ -1132,15 +1132,32 @@ func (s *Runservice) fetcher(ctx context.Context) error {
 		for _, rt := range r.Tasks {
 			log.Debugf("rt: %s", util.Dump(rt))
 			if rt.Status.IsFinished() {
+				// write related logs runID
+				runIDPath := store.OSTRunTaskLogsRunPath(rt.ID, r.ID)
+				exists, err := s.OSTFileExists(runIDPath)
+				if err != nil {
+					log.Errorf("err: %+v", err)
+				} else if !exists {
+					if err := s.ost.WriteObject(runIDPath, bytes.NewReader([]byte{}), 0, false); err != nil {
+						log.Errorf("err: %+v", err)
+					}
+				}
+
+				// write related archives runID
+				runIDPath = store.OSTRunTaskArchivesRunPath(rt.ID, r.ID)
+				exists, err = s.OSTFileExists(runIDPath)
+				if err != nil {
+					log.Errorf("err: %+v", err)
+				} else if !exists {
+					if err := s.ost.WriteObject(runIDPath, bytes.NewReader([]byte{}), 0, false); err != nil {
+						log.Errorf("err: %+v", err)
+					}
+				}
+
 				s.fetchTaskLogs(ctx, r.ID, rt)
 				s.fetchTaskArchives(ctx, r.ID, rt)
 			}
 		}
-
-		// We don't update the fetch phases and atomic put the run since fetching may
-		// take a lot of time and the run will be already updated in the meantime
-		// causing the atomic put will fail
-		// Another loop will check if the fetched file exists and update the run
 	}
 	return nil
 

@@ -111,20 +111,48 @@ func OSTUpdateRunCounterAction(ctx context.Context, c uint64, group string) (*da
 	return action, nil
 }
 
-func OSTRunTaskLogsDir(rtID string) string {
+func OSTRunTaskLogsBaseDir(rtID string) string {
 	return path.Join("logs", rtID)
 }
 
+func OSTRunTaskLogsDataDir(rtID string) string {
+	return path.Join(OSTRunTaskLogsBaseDir(rtID), "data")
+}
+
+func OSTRunTaskLogsRunsDir(rtID string) string {
+	return path.Join(OSTRunTaskLogsBaseDir(rtID), "runs")
+}
+
 func OSTRunTaskSetupLogPath(rtID string) string {
-	return path.Join(OSTRunTaskLogsDir(rtID), "setup.log")
+	return path.Join(OSTRunTaskLogsDataDir(rtID), "setup.log")
 }
 
 func OSTRunTaskStepLogPath(rtID string, step int) string {
-	return path.Join(OSTRunTaskLogsDir(rtID), "steps", fmt.Sprintf("%d.log", step))
+	return path.Join(OSTRunTaskLogsDataDir(rtID), "steps", fmt.Sprintf("%d.log", step))
 }
 
-func OSTRunArchivePath(rtID string, step int) string {
-	return path.Join("workspacearchives", fmt.Sprintf("%s/%d.tar", rtID, step))
+func OSTRunTaskLogsRunPath(rtID, runID string) string {
+	return path.Join(OSTRunTaskLogsRunsDir(rtID), runID)
+}
+
+func OSTRunTaskArchivesBaseDir(rtID string) string {
+	return path.Join("workspacearchives", rtID)
+}
+
+func OSTRunTaskArchivesDataDir(rtID string) string {
+	return path.Join(OSTRunTaskArchivesBaseDir(rtID), "data")
+}
+
+func OSTRunTaskArchivesRunsDir(rtID string) string {
+	return path.Join(OSTRunTaskArchivesBaseDir(rtID), "runs")
+}
+
+func OSTRunTaskArchivePath(rtID string, step int) string {
+	return path.Join(OSTRunTaskArchivesDataDir(rtID), fmt.Sprintf("%d.tar", step))
+}
+
+func OSTRunTaskArchivesRunPath(rtID, runID string) string {
+	return path.Join(OSTRunTaskArchivesRunsDir(rtID), runID)
 }
 
 func OSTCacheDir() string {
