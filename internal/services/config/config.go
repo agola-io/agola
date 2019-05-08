@@ -38,7 +38,7 @@ type Config struct {
 	Runservice  Runservice  `yaml:"runservice"`
 	Executor    Executor    `yaml:"executor"`
 	Configstore Configstore `yaml:"configstore"`
-	GitServer   GitServer   `yaml:"gitServer"`
+	Gitserver   Gitserver   `yaml:"gitserver"`
 }
 
 type Gateway struct {
@@ -53,7 +53,7 @@ type Gateway struct {
 
 	RunserviceURL  string `yaml:"runserviceURL"`
 	ConfigstoreURL string `yaml:"configstoreURL"`
-	GitServerURL   string `yaml:"gitServerURL"`
+	GitserverURL   string `yaml:"gitserverURL"`
 
 	Web           Web           `yaml:"web"`
 	Etcd          Etcd          `yaml:"etcd"`
@@ -108,7 +108,7 @@ type Configstore struct {
 	ObjectStorage ObjectStorage `yaml:"objectStorage"`
 }
 
-type GitServer struct {
+type Gitserver struct {
 	Debug bool `yaml:"debug"`
 
 	DataDir string `yaml:"dataDir"`
@@ -315,13 +315,13 @@ func Validate(c *Config) error {
 	}
 
 	// Git server
-	if c.GitServer.DataDir == "" {
+	if c.Gitserver.DataDir == "" {
 		return errors.Errorf("git server dataDir is empty")
 	}
-	if c.GitServer.GithookPath == "" {
+	if c.Gitserver.GithookPath == "" {
 		return errors.Errorf("git server githookPath is empty")
 	}
-	if c.GitServer.GatewayURL == "" {
+	if c.Gitserver.GatewayURL == "" {
 		return errors.Errorf("git server gatewayURL is empty")
 	}
 

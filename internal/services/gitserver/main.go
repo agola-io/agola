@@ -127,7 +127,7 @@ func Matcher(matchRegexp *regexp.Regexp) mux.MatcherFunc {
 	}
 }
 
-func (s *GitServer) repoPostCreateFunc(githookPath, gatewayURL string) handlers.RepoPostCreateFunc {
+func (s *Gitserver) repoPostCreateFunc(githookPath, gatewayURL string) handlers.RepoPostCreateFunc {
 	return func(repoPath, repoAbsPath string) error {
 		f, err := os.OpenFile(filepath.Join(repoAbsPath, "hooks/post-receive"), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0760)
 		if err != nil {
@@ -154,11 +154,11 @@ func (s *GitServer) repoPostCreateFunc(githookPath, gatewayURL string) handlers.
 	}
 }
 
-type GitServer struct {
-	c *config.GitServer
+type Gitserver struct {
+	c *config.Gitserver
 }
 
-func NewGitServer(c *config.GitServer) (*GitServer, error) {
+func NewGitserver(c *config.Gitserver) (*Gitserver, error) {
 	if c.Debug {
 		level.SetLevel(zapcore.DebugLevel)
 	}
@@ -176,12 +176,12 @@ func NewGitServer(c *config.GitServer) (*GitServer, error) {
 		c.GithookPath = path
 	}
 
-	return &GitServer{
+	return &Gitserver{
 		c: c,
 	}, nil
 }
 
-func (s *GitServer) Run(ctx context.Context) error {
+func (s *Gitserver) Run(ctx context.Context) error {
 	gitSmartHandler := handlers.NewGitSmartHandler(logger, s.c.DataDir, true, repoAbsPath, s.repoPostCreateFunc(s.c.GithookPath, s.c.GatewayURL))
 	fetchFileHandler := handlers.NewFetchFileHandler(logger, s.c.DataDir, repoAbsPath)
 

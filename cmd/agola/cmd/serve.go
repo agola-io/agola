@@ -43,8 +43,8 @@ var componentsNames = []string{
 	"all",
 	"gateway",
 	"scheduler",
-	"runservicescheduler",
-	"runserviceexecutor",
+	"runservice",
+	"executor",
 	"configstore",
 	"gitserver",
 }
@@ -140,7 +140,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	}
 
 	var rs *rsscheduler.Runservice
-	if isComponentEnabled("runservicescheduler") {
+	if isComponentEnabled("runservice") {
 		rs, err = rsscheduler.NewRunservice(ctx, &c.Runservice)
 		if err != nil {
 			return errors.Wrapf(err, "failed to start run service scheduler")
@@ -148,7 +148,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	}
 
 	var ex *rsexecutor.Executor
-	if isComponentEnabled("runserviceexecutor") {
+	if isComponentEnabled("executor") {
 		ex, err = executor.NewExecutor(&c.Executor)
 		if err != nil {
 			return errors.Wrapf(err, "failed to start run service executor")
@@ -179,9 +179,9 @@ func serve(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	var gs *gitserver.GitServer
+	var gs *gitserver.Gitserver
 	if isComponentEnabled("gitserver") {
-		gs, err = gitserver.NewGitServer(&c.GitServer)
+		gs, err = gitserver.NewGitserver(&c.Gitserver)
 		if err != nil {
 			return errors.Wrapf(err, "failed to start git server")
 		}
