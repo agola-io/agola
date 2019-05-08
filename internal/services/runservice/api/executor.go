@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"net/url"
 	"strconv"
 
 	"github.com/gorilla/mux"
@@ -273,11 +272,9 @@ func NewCacheHandler(logger *zap.Logger, ost *objectstorage.ObjStorage) *CacheHa
 func (h *CacheHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	// TODO(sgotti) Check authorized call from executors
-	key, err := url.PathUnescape(vars["key"])
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+
+	// keep and use the escaped path
+	key := vars["key"]
 	if key == "" {
 		http.Error(w, "empty cache key", http.StatusBadRequest)
 		return
@@ -384,11 +381,9 @@ func NewCacheCreateHandler(logger *zap.Logger, ost *objectstorage.ObjStorage) *C
 func (h *CacheCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	// TODO(sgotti) Check authorized call from executors
-	key, err := url.PathUnescape(vars["key"])
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+
+	// keep and use the escaped path
+	key := vars["key"]
 	if key == "" {
 		http.Error(w, "empty cache key", http.StatusBadRequest)
 		return
