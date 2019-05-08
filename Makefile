@@ -64,3 +64,11 @@ tools/bin/gocovmerge:
 
 webbundle/bindata.go: tools/bin/go-bindata $(WEBDISTPATH)
 	./tools/bin/go-bindata -o webbundle/bindata.go -tags webbundle -pkg webbundle -prefix "$(WEBDISTPATH)" -nocompress=true "$(WEBDISTPATH)/..."
+
+.PHONY: docker-agola
+docker-agola:
+	docker build --target agola . -t agola
+
+.PHONY: docker-agolademo
+docker-agolademo:
+	docker build . -t agolademo
