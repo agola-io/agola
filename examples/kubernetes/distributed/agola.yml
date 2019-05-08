@@ -1,0 +1,356 @@
+
+# The client service. It's a node port for easier testing on minikube. Change
+# it to become a LoadBalancer if needed.
+apiVersion: v1
+kind: Service
+metadata:
+  name: agola-gateway
+spec:
+  ports:
+    - port: 8000
+      nodePort: 30002
+  selector:
+    app: agola
+    component: gateway-scheduler
+  type: NodePort
+
+---
+
+# The service for internal components communication with the runservice.
+apiVersion: v1
+kind: Service
+metadata:
+  name: agola-runservice
+spec:
+  ports:
+    - port: 4000
+  selector:
+    app: agola
+    component: runservice
+
+---
+
+# The service for internal components communication with the configstore.
+apiVersion: v1
+kind: Service
+metadata:
+  name: agola-configstore
+spec:
+  ports:
+    - port: 4002
+  selector:
+    app: agola
+    component: configstore
+
+---
+
+# The service for internal components communication with the gitserver.
+apiVersion: v1
+kind: Service
+metadata:
+  name: agola-gitserver
+spec:
+  ports:
+    - port: 4003
+  selector:
+    app: agola
+    component: gitserver
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agola
+data:
+  config.yml: |
+    gateway:
+      # The api url that clients will call
+      # Change this to the exposed "agola" service IP or dns name
+      apiExposedURL: "http://192.168.39.188:30002"
+      # The web interface url that clients will use
+      # Change this to the exposed "agola" service IP or dns name
+      webExposedURL: "http://192.168.39.188:30002"
+      runserviceURL: "http://agola-runservice:4000"
+      configstoreURL: "http://agola-configstore:4002"
+      gitserverURL: "http://agola-gitserver:4003"
+
+      web:
+        listenAddress: ":8000"
+      tokenSigning:
+        # hmac or rsa (it possible use rsa)
+        method: hmac
+        # key to use when signing with hmac
+        key: supersecretsigningkey
+        # paths to the private and public keys in pem encoding when using rsa signing
+        #privateKeyPath: /path/to/privatekey.pem
+        #publicKeyPath: /path/to/public.pem
+      adminToken: "admintoken"
+
+    scheduler:
+      runserviceURL: "http://agola-runservice:4000"
+
+    configstore:
+      dataDir: /mnt/agola/local/configstore
+      etcd:
+        endpoints: "http://etcd:2379"
+      objectStorage:
+        type: s3
+        # example with minio
+        endpoint: "http://minio-service:9000"
+        bucket: configstore
+        accessKey: minio
+        secretAccessKey: minio123
+      web:
+        listenAddress: ":4002"
+
+    runservice:
+      #debug: true
+      dataDir: /mnt/agola/local/runservice
+      etcd:
+        endpoints: "http://etcd:2379"
+      objectStorage:
+        type: s3
+        # example with minio
+        endpoint: "http://minio-service:9000"
+        bucket: runservice
+        accessKey: minio
+        secretAccessKey: minio123
+      web:
+        listenAddress: ":4000"
+
+    executor:
+      dataDir: /mnt/agola/local/executor
+      toolboxPath: ./bin/agola-toolbox
+      runserviceURL: "http://agola-runservice:4000"
+      web:
+        listenAddress: ":4001"
+      activeTasksLimit: 2
+      driver:
+        type: kubernetes
+
+    gitserver:
+      dataDir: /mnt/agola/local/gitserver
+      githookPath: ./bin/agola-git-hook
+      gatewayURL: "http://agola-gateway:8000"
+      web:
+        listenAddress: ":4003"
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agola-gateway-scheduler
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: agola
+      component: gateway-scheduler
+  template:
+    metadata:
+      labels:
+        app: agola
+        component: gateway-scheduler
+    spec:
+      containers:
+      - name: agola
+        image: agola
+        command:
+          - /bin/agola
+          - serve
+          - "--config"
+          - /mnt/agola/config/config.yml
+          - "--components"
+          - gateway,scheduler
+        env:
+        ports:
+          - containerPort: 8000
+        volumeMounts:
+          - name: config-volume
+            mountPath: /mnt/agola/config
+          - name: agola-localdata
+            mountPath: /mnt/agola/local
+      volumes:
+          - name: config-volume
+            configMap:
+              name: agola
+          - name: agola-localdata
+            emptyDir: {}
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agola-runservice
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: agola
+      component: runservice
+  template:
+    metadata:
+      labels:
+        app: agola
+        component: runservice
+    spec:
+      containers:
+      - name: agola
+        image: agola
+        command:
+          - /bin/agola
+          - serve
+          - "--config"
+          - /mnt/agola/config/config.yml
+          - "--components"
+          - runservice
+        env:
+        ports:
+          - containerPort: 4000
+        volumeMounts:
+          - name: config-volume
+            mountPath: /mnt/agola/config
+          - name: agola-localdata
+            mountPath: /mnt/agola/local
+      volumes:
+          - name: config-volume
+            configMap:
+              name: agola
+          - name: agola-localdata
+            emptyDir: {}
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agola-executor
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: agola
+      component: executor
+  template:
+    metadata:
+      labels:
+        app: agola
+        component: executor
+    spec:
+      containers:
+      - name: agola
+        image: agola
+        command:
+          - /bin/agola
+          - serve
+          - "--config"
+          - /mnt/agola/config/config.yml
+          - "--components"
+          - executor
+        env:
+        ports:
+          - containerPort: 4001
+        volumeMounts:
+          - name: config-volume
+            mountPath: /mnt/agola/config
+          - name: agola-localdata
+            mountPath: /mnt/agola/local
+      volumes:
+          - name: config-volume
+            configMap:
+              name: agola
+          - name: agola-localdata
+            emptyDir: {}
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agola-configstore
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: agola
+      component: configstore
+  template:
+    metadata:
+      labels:
+        app: agola
+        component: configstore
+    spec:
+      containers:
+      - name: agola
+        image: agola
+        command:
+          - /bin/agola
+          - serve
+          - "--config"
+          - /mnt/agola/config/config.yml
+          - "--components"
+          - configstore
+        env:
+        ports:
+          - containerPort: 4002
+        volumeMounts:
+          - name: config-volume
+            mountPath: /mnt/agola/config
+          - name: agola-localdata
+            mountPath: /mnt/agola/local
+      volumes:
+          - name: config-volume
+            configMap:
+              name: agola
+          - name: agola-localdata
+            emptyDir: {}
+
+---
+
+# The gitserver. Since it'll primarily store temporary git build data the
+# simple way to deploy it is to use a deployment with 1 replica and an emptyDir
+# volume. A statefulset with 1 replica and a persistent volume will be a better
+# alternative.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agola-gitserver
+spec:
+  # Don't increase the replicas
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agola
+      component: gitserver
+  template:
+    metadata:
+      labels:
+        app: agola
+        component: gitserver
+    spec:
+      containers:
+      - name: agola
+        image: agola
+        command:
+          - /bin/agola
+          - serve
+          - "--config"
+          - /mnt/agola/config/config.yml
+          - "--components"
+          - gitserver
+        env:
+        ports:
+          - containerPort: 4003
+        volumeMounts:
+          - name: config-volume
+            mountPath: /mnt/agola/config
+          - name: agola-localdata
+            mountPath: /mnt/agola/local
+      volumes:
+          - name: config-volume
+            configMap:
+              name: agola
+          - name: agola-localdata
+            emptyDir: {}

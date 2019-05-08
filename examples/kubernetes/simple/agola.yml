@@ -1,0 +1,178 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: agola-vol
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: standard
+
+---
+
+# The client service. It's a node port for easier testing on minikube. Change
+# it to become a LoadBalancer if needed.
+apiVersion: v1
+kind: Service
+metadata:
+  name: agola
+spec:
+  ports:
+    - port: 8000
+      name: api
+      nodePort: 30002
+  selector:
+    app: agola
+  type: NodePort
+
+---
+
+# The service for internal components communication.
+# We are using an headless service since some k8s deployment doesn't have
+# hairpin mode enabled and pods cannot communicate with themself via a
+# service
+apiVersion: v1
+kind: Service
+metadata:
+  name: agola-internal
+spec:
+  ports:
+    - port: 8000
+      name: api
+    - port: 4000
+      name: runservice
+    - port: 4002
+      name: configstore
+    - port: 4003
+      name: gitserver
+  selector:
+    app: agola
+  clusterIP: None
+
+---
+
+# The agola config
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agola
+data:
+  config.yml: |
+    gateway:
+      # The api url that clients will call
+      # Change this to the exposed "agola" service IP
+      apiExposedURL: "http://192.168.39.188:30002"
+      # The web interface url that clients will use
+      # Change this to the exposed "agola" service IP
+      webExposedURL: "http://192.168.39.188:30002"
+      runserviceURL: "http://agola-internal:4000"
+      configstoreURL: "http://agola-internal:4002"
+      gitserverURL: "http://agola-internal:4003"
+
+      web:
+        listenAddress: ":8000"
+      tokenSigning:
+        # hmac or rsa (it possible use rsa)
+        method: hmac
+        # key to use when signing with hmac
+        key: supersecretsigningkey
+        # paths to the private and public keys in pem encoding when using rsa signing
+        #privateKeyPath: /path/to/privatekey.pem
+        #publicKeyPath: /path/to/public.pem
+      adminToken: "admintoken"
+
+    scheduler:
+      runserviceURL: "http://agola-internal:4000"
+
+    configstore:
+      dataDir: /mnt/agola/local/configstore
+      etcd:
+        endpoints: "http://localhost:2379"
+      objectStorage:
+        type: posix
+        path: /mnt/agola/objectstorage/configstore/ost
+      web:
+        listenAddress: ":4002"
+
+    runservice:
+      #debug: true
+      dataDir: /mnt/agola/local/runservice
+      etcd:
+        endpoints: "http://localhost:2379"
+      objectStorage:
+        type: posix
+        path: /mnt/agola/objectstorage/runservice/ost
+      web:
+        listenAddress: ":4000"
+
+    executor:
+      dataDir: /mnt/agola/local/executor
+      toolboxPath: ./bin/agola-toolbox
+      runserviceURL: "http://agola-internal:4000"
+      web:
+        listenAddress: ":4001"
+      activeTasksLimit: 2
+      driver:
+        type: kubernetes
+
+    gitserver:
+      dataDir: /mnt/agola/local/gitserver
+      githookPath: ./bin/agola-git-hook
+      gatewayURL: "http://agola-internal:8000"
+      web:
+        listenAddress: ":4003"
+---
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agola
+spec:
+  # Do not increase replica count or everything will break since every pod will
+  # have its own etcd instance
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agola
+  template:
+    metadata:
+      labels:
+        app: agola
+    spec:
+      containers:
+      - name: agola
+        image: agola
+        command:
+          - /bin/agola
+          - serve
+          - --embedded-etcd
+          - "--config"
+          - /mnt/agola/config/config.yml
+          - "--components"
+          - all
+        env:
+        ports:
+          - containerPort: 8000
+          - containerPort: 4000
+          - containerPort: 4002
+          - containerPort: 4003
+        volumeMounts:
+          - name: config-volume
+            mountPath: /mnt/agola/config
+          - name: agola-localdata
+            mountPath: /mnt/agola/local
+          - name: agola-objectstorage
+            mountPath: /mnt/agola/objectstorage
+      volumes:
+          - name: config-volume
+            configMap:
+              name: agola
+          - name: agola-localdata
+            emptyDir: {}
+          - name: agola-objectstorage
+            persistentVolumeClaim:
+              claimName: agola-vol
