@@ -31,12 +31,30 @@ RUN make WEBBUNDLE=1 WEBDISTPATH=/agola-web/dist
 #######
 ####### Build the final image
 #######
-FROM debian:stable
+FROM debian:stable AS agola
 
 WORKDIR /
 
 # Finally we copy the statically compiled Go binary.
 COPY --from=server_builder /agola/bin/agola /agola/bin/agola-toolbox /bin/
+
+ENTRYPOINT ["/bin/agola"]
+
+
+#######
+####### Build the demo image
+#######
+
+FROM agola as agolademo
+
+WORKDIR /
+
+# Install git needed by gitserver
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the example config
 COPY examples/config.yml .
 
 ENTRYPOINT ["/bin/agola"]
