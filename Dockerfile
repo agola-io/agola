@@ -55,6 +55,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the example config
-COPY examples/config.yml .
+COPY examples/agolademo/config.yml .
 
 ENTRYPOINT ["/bin/agola"]
