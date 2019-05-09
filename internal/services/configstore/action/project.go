@@ -28,38 +28,45 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-func (h *ActionHandler) CreateProject(ctx context.Context, project *types.Project) (*types.Project, error) {
+func (h *ActionHandler) ValidateProject(ctx context.Context, project *types.Project) error {
 	if project.Name == "" {
-		return nil, util.NewErrBadRequest(errors.Errorf("project name required"))
+		return util.NewErrBadRequest(errors.Errorf("project name required"))
 	}
 	if !util.ValidateName(project.Name) {
-		return nil, util.NewErrBadRequest(errors.Errorf("invalid project name %q", project.Name))
+		return util.NewErrBadRequest(errors.Errorf("invalid project name %q", project.Name))
 	}
 	if project.Parent.ID == "" {
-		return nil, util.NewErrBadRequest(errors.Errorf("project parent id required"))
+		return util.NewErrBadRequest(errors.Errorf("project parent id required"))
 	}
 	if project.Parent.Type != types.ConfigTypeProjectGroup {
-		return nil, util.NewErrBadRequest(errors.Errorf("invalid project parent type %q", project.Parent.Type))
+		return util.NewErrBadRequest(errors.Errorf("invalid project parent type %q", project.Parent.Type))
 	}
 	if !types.IsValidVisibility(project.Visibility) {
-		return nil, util.NewErrBadRequest(errors.Errorf("invalid project visibility"))
+		return util.NewErrBadRequest(errors.Errorf("invalid project visibility"))
 	}
 	if !types.IsValidRemoteRepositoryConfigType(project.RemoteRepositoryConfigType) {
-		return nil, util.NewErrBadRequest(errors.Errorf("invalid project remote repository config type %q", project.RemoteRepositoryConfigType))
+		return util.NewErrBadRequest(errors.Errorf("invalid project remote repository config type %q", project.RemoteRepositoryConfigType))
 	}
 	if project.RemoteRepositoryConfigType == types.RemoteRepositoryConfigTypeRemoteSource {
 		if project.RemoteSourceID == "" {
-			return nil, util.NewErrBadRequest(errors.Errorf("empty remote source id"))
+			return util.NewErrBadRequest(errors.Errorf("empty remote source id"))
 		}
 		if project.LinkedAccountID == "" {
-			return nil, util.NewErrBadRequest(errors.Errorf("empty linked account id"))
+			return util.NewErrBadRequest(errors.Errorf("empty linked account id"))
 		}
 		if project.RepositoryID == "" {
-			return nil, util.NewErrBadRequest(errors.Errorf("empty remote repository id"))
+			return util.NewErrBadRequest(errors.Errorf("empty remote repository id"))
 		}
 		if project.RepositoryPath == "" {
-			return nil, util.NewErrBadRequest(errors.Errorf("empty remote repository path"))
+			return util.NewErrBadRequest(errors.Errorf("empty remote repository path"))
 		}
+	}
+	return nil
+}
+
+func (h *ActionHandler) CreateProject(ctx context.Context, project *types.Project) (*types.Project, error) {
+	if err := h.ValidateProject(ctx, project); err != nil {
+		return nil, err
 	}
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
@@ -97,14 +104,6 @@ func (h *ActionHandler) CreateProject(ctx context.Context, project *types.Projec
 		}
 		if p != nil {
 			return util.NewErrBadRequest(errors.Errorf("project with name %q, path %q already exists", p.Name, pp))
-		}
-		// check duplicate project group name
-		pg, err := h.readDB.GetProjectGroupByName(tx, project.Parent.ID, project.Name)
-		if err != nil {
-			return err
-		}
-		if pg != nil {
-			return util.NewErrBadRequest(errors.Errorf("project group with name %q, path %q already exists", pg.Name, pp))
 		}
 
 		if project.RemoteRepositoryConfigType == types.RemoteRepositoryConfigTypeRemoteSource {
