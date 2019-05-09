@@ -49,7 +49,6 @@ func (h *ActionHandler) GetProject(ctx context.Context, projectRef string) (*csa
 }
 
 type CreateProjectRequest struct {
-	CurrentUserID       string
 	Name                string
 	ParentRef           string
 	Visibility          types.Visibility
@@ -59,9 +58,11 @@ type CreateProjectRequest struct {
 }
 
 func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectRequest) (*csapi.Project, error) {
-	user, resp, err := h.configstoreClient.GetUser(ctx, req.CurrentUserID)
+	curUserID := h.CurrentUserID(ctx)
+
+	user, resp, err := h.configstoreClient.GetUser(ctx, curUserID)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get user %q", req.CurrentUserID))
+		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get user %q", curUserID))
 	}
 	parentRef := req.ParentRef
 	if parentRef == "" {
