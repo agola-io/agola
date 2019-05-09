@@ -153,10 +153,10 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type UserResponse struct {
-	ID             string                   `json:"id,omitempty"`
-	UserName       string                   `json:"username,omitempty"`
-	Tokens         []string                 `json:"tokens,omitempty"`
-	LinkedAccounts []*LinkedAccountResponse `json:"linked_accounts,omitempty"`
+	ID             string                   `json:"id"`
+	UserName       string                   `json:"username"`
+	Tokens         []string                 `json:"tokens"`
+	LinkedAccounts []*LinkedAccountResponse `json:"linked_accounts"`
 }
 
 type LinkedAccountResponse struct {
