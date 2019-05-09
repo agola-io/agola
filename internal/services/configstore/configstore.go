@@ -132,6 +132,7 @@ func (s *Configstore) Run(ctx context.Context) error {
 
 	projectHandler := api.NewProjectHandler(logger, s.readDB)
 	createProjectHandler := api.NewCreateProjectHandler(logger, s.ah, s.readDB)
+	updateProjectHandler := api.NewUpdateProjectHandler(logger, s.ah, s.readDB)
 	deleteProjectHandler := api.NewDeleteProjectHandler(logger, s.ah)
 
 	secretsHandler := api.NewSecretsHandler(logger, s.readDB)
@@ -177,6 +178,7 @@ func (s *Configstore) Run(ctx context.Context) error {
 
 	apirouter.Handle("/projects/{projectref}", projectHandler).Methods("GET")
 	apirouter.Handle("/projects", createProjectHandler).Methods("POST")
+	apirouter.Handle("/projects/{projectref}", updateProjectHandler).Methods("PUT")
 	apirouter.Handle("/projects/{projectref}", deleteProjectHandler).Methods("DELETE")
 
 	apirouter.Handle("/projectgroups/{projectgroupref}/secrets", secretsHandler).Methods("GET")

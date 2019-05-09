@@ -153,6 +153,113 @@ func (h *ActionHandler) CreateProject(ctx context.Context, project *types.Projec
 	return project, err
 }
 
+type UpdateProjectRequest struct {
+	ProjectRef string
+
+	Project *types.Project
+}
+
+func (h *ActionHandler) UpdateProject(ctx context.Context, req *UpdateProjectRequest) (*types.Project, error) {
+	if err := h.ValidateProject(ctx, req.Project); err != nil {
+		return nil, err
+	}
+
+	var cgt *datamanager.ChangeGroupsUpdateToken
+
+	// must do all the checks in a single transaction to avoid concurrent changes
+	err := h.readDB.Do(func(tx *db.Tx) error {
+		var err error
+		// check project exists
+		p, err := h.readDB.GetProject(tx, req.ProjectRef)
+		if err != nil {
+			return err
+		}
+		if p == nil {
+			return util.NewErrBadRequest(errors.Errorf("project with ref %q doesn't exist", req.ProjectRef))
+		}
+		// check that the project.ID matches
+		if p.ID != req.Project.ID {
+			return util.NewErrBadRequest(errors.Errorf("project with ref %q has a different id", req.ProjectRef))
+		}
+
+		// check parent project group exists
+		group, err := h.readDB.GetProjectGroup(tx, req.Project.Parent.ID)
+		if err != nil {
+			return err
+		}
+		if group == nil {
+			return util.NewErrBadRequest(errors.Errorf("project group with id %q doesn't exist", req.Project.Parent.ID))
+		}
+
+		// currently we don't support changing parent
+		// TODO(sgotti) handle project move (changed parent project group)
+		if p.Parent.ID != req.Project.Parent.ID {
+			return util.NewErrBadRequest(errors.Errorf("changing project parent isn't supported"))
+		}
+
+		pp, err := h.readDB.GetProjectPath(tx, p)
+		if err != nil {
+			return err
+		}
+
+		// check duplicate project name
+		ap, err := h.readDB.GetProjectByName(tx, req.Project.Parent.ID, req.Project.Name)
+		if err != nil {
+			return err
+		}
+		if ap != nil {
+			return util.NewErrBadRequest(errors.Errorf("project with name %q, path %q already exists", p.Name, pp))
+		}
+
+		// changegroup is the project path. Use "projectpath" prefix as it must
+		// cover both projects and projectgroups
+		cgNames := []string{util.EncodeSha256Hex("projectpath-" + pp)}
+		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		if err != nil {
+			return err
+		}
+
+		if req.Project.RemoteRepositoryConfigType == types.RemoteRepositoryConfigTypeRemoteSource {
+			// check that the linked account matches the remote source
+			user, err := h.readDB.GetUserByLinkedAccount(tx, req.Project.LinkedAccountID)
+			if err != nil {
+				return errors.Wrapf(err, "failed to get user with linked account id %q", req.Project.LinkedAccountID)
+			}
+			if user == nil {
+				return util.NewErrBadRequest(errors.Errorf("user for linked account %q doesn't exist", req.Project.LinkedAccountID))
+			}
+			la, ok := user.LinkedAccounts[req.Project.LinkedAccountID]
+			if !ok {
+				return util.NewErrBadRequest(errors.Errorf("linked account id %q for user %q doesn't exist", req.Project.LinkedAccountID, user.Name))
+			}
+			if la.RemoteSourceID != req.Project.RemoteSourceID {
+				return util.NewErrBadRequest(errors.Errorf("linked account id %q remote source %q different than project remote source %q", req.Project.LinkedAccountID, la.RemoteSourceID, req.Project.RemoteSourceID))
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	pcj, err := json.Marshal(req.Project)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to marshal project")
+	}
+	actions := []*datamanager.Action{
+		{
+			ActionType: datamanager.ActionTypePut,
+			DataType:   string(types.ConfigTypeProject),
+			ID:         req.Project.ID,
+			Data:       pcj,
+		},
+	}
+
+	_, err = h.dm.WriteWal(ctx, actions, cgt)
+	return req.Project, err
+}
+
 func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) error {
 	var project *types.Project
 

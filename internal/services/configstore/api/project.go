@@ -194,6 +194,54 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	}
 }
 
+type UpdateProjectHandler struct {
+	log    *zap.SugaredLogger
+	ah     *action.ActionHandler
+	readDB *readdb.ReadDB
+}
+
+func NewUpdateProjectHandler(logger *zap.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *UpdateProjectHandler {
+	return &UpdateProjectHandler{log: logger.Sugar(), ah: ah, readDB: readDB}
+}
+
+func (h *UpdateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	vars := mux.Vars(r)
+	projectRef, err := url.PathUnescape(vars["projectref"])
+	if err != nil {
+		httpError(w, util.NewErrBadRequest(err))
+		return
+	}
+
+	var project *types.Project
+	d := json.NewDecoder(r.Body)
+	if err := d.Decode(&project); err != nil {
+		httpError(w, util.NewErrBadRequest(err))
+		return
+	}
+
+	areq := &action.UpdateProjectRequest{
+		ProjectRef: projectRef,
+		Project:    project,
+	}
+	project, err = h.ah.UpdateProject(ctx, areq)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	resProject, err := projectResponse(h.readDB, project)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	if err := httpResponse(w, http.StatusCreated, resProject); err != nil {
+		h.log.Errorf("err: %+v", err)
+	}
+}
+
 type DeleteProjectHandler struct {
 	log *zap.SugaredLogger
 	ah  *action.ActionHandler

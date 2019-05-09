@@ -152,6 +152,17 @@ func (c *Client) CreateProject(ctx context.Context, project *types.Project) (*Pr
 	return resProject, resp, err
 }
 
+func (c *Client) UpdateProject(ctx context.Context, projectRef string, project *types.Project) (*Project, *http.Response, error) {
+	pj, err := json.Marshal(project)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	resProject := new(Project)
+	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/projects/%s", url.PathEscape(projectRef)), nil, jsonContent, bytes.NewReader(pj), resProject)
+	return resProject, resp, err
+}
+
 func (c *Client) DeleteProject(ctx context.Context, projectRef string) (*http.Response, error) {
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/projects/%s", url.PathEscape(projectRef)), nil, jsonContent, nil)
 }
