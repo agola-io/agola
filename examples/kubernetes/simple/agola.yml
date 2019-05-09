@@ -110,7 +110,8 @@ data:
 
     executor:
       dataDir: /mnt/agola/local/executor
-      toolboxPath: ./bin/agola-toolbox
+      # The directory containing the toolbox compiled for the various supported architectures
+      toolboxPath: ./bin
       runserviceURL: "http://agola-internal:4000"
       web:
         listenAddress: ":4001"
