@@ -44,7 +44,7 @@ import (
 )
 
 type DockerDriver struct {
-	logger            *zap.Logger
+	log               *zap.SugaredLogger
 	client            *client.Client
 	initVolumeHostDir string
 	toolboxPath       string
@@ -59,7 +59,7 @@ func NewDockerDriver(logger *zap.Logger, executorID, initVolumeHostDir, toolboxP
 	}
 
 	return &DockerDriver{
-		logger:            logger,
+		log:               logger.Sugar(),
 		client:            cli,
 		initVolumeHostDir: initVolumeHostDir,
 		toolboxPath:       toolboxPath,
