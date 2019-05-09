@@ -460,6 +460,20 @@ func (c *Client) DeleteOrg(ctx context.Context, orgRef string) (*http.Response, 
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/orgs/%s", orgRef), nil, jsonContent, nil)
 }
 
+func (c *Client) AddOrgMember(ctx context.Context, orgRef, userRef string, role types.MemberRole) (*types.OrganizationMember, *http.Response, error) {
+	req := &AddOrgMemberRequest{
+		Role: role,
+	}
+	omj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	orgmember := new(types.OrganizationMember)
+	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/orgs/%s/members/%s", orgRef, userRef), nil, jsonContent, bytes.NewReader(omj), orgmember)
+	return orgmember, resp, err
+}
+
 func (c *Client) GetOrgs(ctx context.Context, start string, limit int, asc bool) ([]*types.Organization, *http.Response, error) {
 	q := url.Values{}
 	if start != "" {

@@ -177,3 +177,41 @@ func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.log.Errorf("err: %+v", err)
 	}
 }
+
+type AddOrgMemberRequest struct {
+	Role types.MemberRole
+}
+
+type AddOrgMemberHandler struct {
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
+}
+
+func NewAddOrgMemberHandler(logger *zap.Logger, ah *action.ActionHandler) *AddOrgMemberHandler {
+	return &AddOrgMemberHandler{log: logger.Sugar(), ah: ah}
+}
+
+func (h *AddOrgMemberHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	vars := mux.Vars(r)
+	orgRef := vars["orgref"]
+	userRef := vars["userref"]
+
+	var req AddOrgMemberRequest
+	d := json.NewDecoder(r.Body)
+	if err := d.Decode(&req); err != nil {
+		httpError(w, util.NewErrBadRequest(err))
+		return
+	}
+
+	org, err := h.ah.AddOrgMember(ctx, orgRef, userRef, req.Role)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	if err := httpResponse(w, http.StatusCreated, org); err != nil {
+		h.log.Errorf("err: %+v", err)
+	}
+}

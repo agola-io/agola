@@ -17,6 +17,7 @@ package action
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/sorintlab/agola/internal/datamanager"
@@ -49,12 +50,12 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) 
 		}
 
 		// check duplicate org name
-		u, err := h.readDB.GetOrgByName(tx, org.Name)
+		o, err := h.readDB.GetOrgByName(tx, org.Name)
 		if err != nil {
 			return err
 		}
-		if u != nil {
-			return util.NewErrBadRequest(errors.Errorf("org %q already exists", u.Name))
+		if o != nil {
+			return util.NewErrBadRequest(errors.Errorf("org %q already exists", o.Name))
 		}
 
 		if org.CreatorUserID != "" {
@@ -179,4 +180,85 @@ func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 
 	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return err
+}
+
+// AddOrgMember add/updates an org member.
+// TODO(sgotti) handle invitation when implemented
+func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string, role types.MemberRole) (*types.OrganizationMember, error) {
+	if !types.IsValidMemberRole(role) {
+		return nil, util.NewErrBadRequest(errors.Errorf("invalid role %q", role))
+	}
+
+	var org *types.Organization
+	var user *types.User
+	var orgmember *types.OrganizationMember
+	var cgt *datamanager.ChangeGroupsUpdateToken
+
+	// must do all the checks in a single transaction to avoid concurrent changes
+	err := h.readDB.Do(func(tx *db.Tx) error {
+		var err error
+		// check existing org
+		org, err = h.readDB.GetOrg(tx, orgRef)
+		if err != nil {
+			return err
+		}
+		if org == nil {
+			return util.NewErrBadRequest(errors.Errorf("org %q doesn't exists", orgRef))
+		}
+		// check existing user
+		user, err = h.readDB.GetUser(tx, userRef)
+		if err != nil {
+			return err
+		}
+		if user == nil {
+			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exists", userRef))
+		}
+
+		// fetch org member if it already exist
+		orgmember, err = h.readDB.GetOrgMemberByOrgUserID(tx, org.ID, user.ID)
+		if err != nil {
+			return err
+		}
+
+		cgNames := []string{util.EncodeSha256Hex(fmt.Sprintf("orgmember-%s-%s", org.ID, user.ID))}
+		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// update if role changed
+	if orgmember != nil {
+		if orgmember.MemberRole == role {
+			return orgmember, nil
+		}
+		orgmember.MemberRole = role
+	} else {
+		orgmember = &types.OrganizationMember{
+			ID:             uuid.NewV4().String(),
+			OrganizationID: org.ID,
+			UserID:         user.ID,
+			MemberRole:     role,
+		}
+	}
+
+	actions := []*datamanager.Action{}
+	orgmemberj, err := json.Marshal(orgmember)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to marshal project group")
+	}
+	actions = append(actions, &datamanager.Action{
+		ActionType: datamanager.ActionTypePut,
+		DataType:   string(types.ConfigTypeOrgMember),
+		ID:         orgmember.ID,
+		Data:       orgmemberj,
+	})
+
+	_, err = h.dm.WriteWal(ctx, actions, cgt)
+	return orgmember, err
 }

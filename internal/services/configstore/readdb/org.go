@@ -232,6 +232,26 @@ func (r *ReadDB) deleteOrgMember(tx *db.Tx, orgmemberID string) error {
 	return nil
 }
 
+func (r *ReadDB) GetOrgMemberByOrgUserID(tx *db.Tx, orgID, userID string) (*types.OrganizationMember, error) {
+	q, args, err := orgmemberSelect.Where(sq.Eq{"orgmember.orgid": orgID, "orgmember.userid": userID}).ToSql()
+	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to build query")
+	}
+
+	oms, _, err := fetchOrgMembers(tx, q, args...)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	if len(oms) > 1 {
+		return nil, errors.Errorf("too many rows returned")
+	}
+	if len(oms) == 0 {
+		return nil, nil
+	}
+	return oms[0], nil
+}
+
 func fetchOrgMembers(tx *db.Tx, q string, args ...interface{}) ([]*types.OrganizationMember, []string, error) {
 	rows, err := tx.Query(q, args...)
 	if err != nil {

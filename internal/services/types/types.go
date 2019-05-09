@@ -59,6 +59,16 @@ const (
 	MemberRoleMember MemberRole = "member"
 )
 
+func IsValidMemberRole(r MemberRole) bool {
+	switch r {
+	case MemberRoleOwner:
+	case MemberRoleMember:
+	default:
+		return false
+	}
+	return true
+}
+
 type Parent struct {
 	Type ConfigType `json:"type,omitempty"`
 	ID   string     `json:"id,omitempty"`

@@ -100,3 +100,39 @@ func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 	}
 	return nil
 }
+
+type AddOrgMemberResponse struct {
+	OrganizationMember *types.OrganizationMember
+	Org                *types.Organization
+	User               *types.User
+}
+
+func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string, role types.MemberRole) (*AddOrgMemberResponse, error) {
+	org, resp, err := h.configstoreClient.GetOrg(ctx, orgRef)
+	if err != nil {
+		return nil, ErrFromRemote(resp, err)
+	}
+	user, resp, err := h.configstoreClient.GetUser(ctx, userRef)
+	if err != nil {
+		return nil, ErrFromRemote(resp, err)
+	}
+
+	isOrgOwner, err := h.IsOrgOwner(ctx, org.ID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to determine ownership")
+	}
+	if !isOrgOwner {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
+	orgmember, resp, err := h.configstoreClient.AddOrgMember(ctx, orgRef, userRef, role)
+	if err != nil {
+		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to add/update organization member"))
+	}
+
+	return &AddOrgMemberResponse{
+		OrganizationMember: orgmember,
+		Org:                org,
+		User:               user,
+	}, nil
+}
