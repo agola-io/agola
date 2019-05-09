@@ -108,19 +108,11 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, remoteSource *ty
 
 func (h *ActionHandler) DeleteRemoteSource(ctx context.Context, remoteSourceName string) error {
 	var remoteSource *types.RemoteSource
-
 	var cgt *datamanager.ChangeGroupsUpdateToken
-
-	// changegroup is the remotesource id
-	cgNames := []string{util.EncodeSha256Hex("remotesourceid-" + remoteSource.ID)}
 
 	// must do all the checks in a single transaction to avoid concurrent changes
 	err := h.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
-		if err != nil {
-			return err
-		}
 
 		// check remoteSource existance
 		remoteSource, err = h.readDB.GetRemoteSourceByName(tx, remoteSourceName)
@@ -130,6 +122,14 @@ func (h *ActionHandler) DeleteRemoteSource(ctx context.Context, remoteSourceName
 		if remoteSource == nil {
 			return util.NewErrBadRequest(errors.Errorf("remotesource %q doesn't exist", remoteSourceName))
 		}
+
+		// changegroup is the remotesource id
+		cgNames := []string{util.EncodeSha256Hex("remotesourceid-" + remoteSource.ID)}
+		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		if err != nil {
+			return err
+		}
+
 		return nil
 	})
 	if err != nil {
