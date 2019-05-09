@@ -168,7 +168,7 @@ type RemoteSource struct {
 func SourceSupportedAuthTypes(rsType RemoteSourceType) []RemoteSourceAuthType {
 	switch rsType {
 	case RemoteSourceTypeGitea:
-		return []RemoteSourceAuthType{RemoteSourceAuthTypePassword}
+		return []RemoteSourceAuthType{RemoteSourceAuthTypeOauth2, RemoteSourceAuthTypePassword}
 	case RemoteSourceTypeGithub:
 		fallthrough
 	case RemoteSourceTypeGitlab:

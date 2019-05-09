@@ -15,6 +15,7 @@
 package gitea
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -25,6 +26,7 @@ import (
 	"time"
 
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
+	"golang.org/x/oauth2"
 
 	"code.gitea.io/sdk/gitea"
 	"github.com/pkg/errors"
@@ -37,14 +39,24 @@ const (
 	ClientNotFound = "404 Not Found"
 )
 
+var (
+	// gitea corrently doesn't have any auth scope
+	GiteaOauth2Scopes = []string{""}
+)
+
 type Opts struct {
-	URL        string
-	Token      string
-	SkipVerify bool
+	URL            string
+	Token          string
+	SkipVerify     bool
+	Oauth2ClientID string
+	Oauth2Secret   string
 }
 
 type Client struct {
-	client *gitea.Client
+	client         *gitea.Client
+	URL            string
+	oauth2ClientID string
+	oauth2Secret   string
 }
 
 // fromCommitStatus converts a gitsource commit status to a gitea commit status
@@ -90,8 +102,45 @@ func New(opts Opts) (*Client, error) {
 	client.SetHTTPClient(httpClient)
 
 	return &Client{
-		client: client,
+		client:         client,
+		URL:            opts.URL,
+		oauth2ClientID: opts.Oauth2ClientID,
+		oauth2Secret:   opts.Oauth2Secret,
 	}, nil
+}
+
+func (c *Client) oauth2Config(callbackURL string) *oauth2.Config {
+	return &oauth2.Config{
+		ClientID:     c.oauth2ClientID,
+		ClientSecret: c.oauth2Secret,
+		Scopes:       GiteaOauth2Scopes,
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  fmt.Sprintf("%s/login/oauth/authorize", c.URL),
+			TokenURL: fmt.Sprintf("%s/login/oauth/access_token", c.URL),
+		},
+		RedirectURL: callbackURL,
+	}
+}
+
+func (c *Client) GetOauth2AuthorizationURL(callbackURL, state string) (string, error) {
+	var config = c.oauth2Config(callbackURL)
+	return config.AuthCodeURL(state), nil
+}
+
+func (c *Client) RequestOauth2Token(callbackURL, code string) (*oauth2.Token, error) {
+	var config = c.oauth2Config(callbackURL)
+	token, err := config.Exchange(context.TODO(), code)
+	if err != nil {
+		return nil, errors.Wrapf(err, "cannot get oauth2 token")
+	}
+	return token, nil
+}
+
+func (c *Client) RefreshOauth2Token(refreshToken string) (*oauth2.Token, error) {
+	var config = c.oauth2Config("")
+	token := &oauth2.Token{RefreshToken: refreshToken}
+	ts := config.TokenSource(context.TODO(), token)
+	return ts.Token()
 }
 
 func (c *Client) LoginPassword(username, password, tokenName string) (string, error) {

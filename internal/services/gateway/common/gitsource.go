@@ -25,9 +25,11 @@ import (
 
 func newGitea(rs *types.RemoteSource, accessToken string) (*gitea.Client, error) {
 	return gitea.New(gitea.Opts{
-		URL:        rs.APIURL,
-		SkipVerify: rs.SkipVerify,
-		Token:      accessToken,
+		URL:            rs.APIURL,
+		SkipVerify:     rs.SkipVerify,
+		Token:          accessToken,
+		Oauth2ClientID: rs.Oauth2ClientID,
+		Oauth2Secret:   rs.Oauth2ClientSecret,
 	})
 }
 
@@ -95,6 +97,8 @@ func GetOauth2Source(rs *types.RemoteSource, accessToken string) (gitsource.Oaut
 	var oauth2Source gitsource.Oauth2Source
 	var err error
 	switch rs.Type {
+	case types.RemoteSourceTypeGitea:
+		oauth2Source, err = newGitea(rs, accessToken)
 	case types.RemoteSourceTypeGitlab:
 		oauth2Source, err = newGitlab(rs, accessToken)
 	default:
