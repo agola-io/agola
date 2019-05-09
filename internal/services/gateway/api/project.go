@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/pkg/errors"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/gateway/action"
 	"github.com/sorintlab/agola/internal/services/types"
@@ -61,21 +60,12 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	userIDVal := ctx.Value("userid")
-	if userIDVal == nil {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("user not authenticated")))
-		return
-	}
-	userID := userIDVal.(string)
-	h.log.Infof("userID: %q", userID)
-
 	areq := &action.CreateProjectRequest{
 		Name:                req.Name,
 		ParentRef:           req.ParentRef,
 		Visibility:          req.Visibility,
 		RepoPath:            req.RepoPath,
 		RemoteSourceName:    req.RemoteSourceName,
-		CurrentUserID:       userID,
 		SkipSSHHostKeyCheck: req.SkipSSHHostKeyCheck,
 	}
 
