@@ -178,3 +178,28 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		h.log.Errorf("err: %+v", err)
 	}
 }
+
+type DeleteRemoteSourceHandler struct {
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
+}
+
+func NewDeleteRemoteSourceHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteRemoteSourceHandler {
+	return &DeleteRemoteSourceHandler{log: logger.Sugar(), ah: ah}
+}
+
+func (h *DeleteRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	rsRef := vars["remotesourceref"]
+
+	err := h.ah.DeleteRemoteSource(ctx, rsRef)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Errorf("err: %+v", err)
+	}
+}
