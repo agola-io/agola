@@ -262,3 +262,62 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return orgmember, err
 }
+
+// DeleteOrgMember deletes an org member.
+func (h *ActionHandler) DeleteOrgMember(ctx context.Context, orgRef, userRef string) error {
+	var org *types.Organization
+	var user *types.User
+	var orgmember *types.OrganizationMember
+	var cgt *datamanager.ChangeGroupsUpdateToken
+
+	// must do all the checks in a single transaction to avoid concurrent changes
+	err := h.readDB.Do(func(tx *db.Tx) error {
+		var err error
+		// check existing org
+		org, err = h.readDB.GetOrg(tx, orgRef)
+		if err != nil {
+			return err
+		}
+		if org == nil {
+			return util.NewErrBadRequest(errors.Errorf("org %q doesn't exists", orgRef))
+		}
+		// check existing user
+		user, err = h.readDB.GetUser(tx, userRef)
+		if err != nil {
+			return err
+		}
+		if user == nil {
+			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exists", userRef))
+		}
+
+		// check that org member exists
+		orgmember, err = h.readDB.GetOrgMemberByOrgUserID(tx, org.ID, user.ID)
+		if err != nil {
+			return err
+		}
+		if orgmember == nil {
+			return util.NewErrBadRequest(errors.Errorf("orgmember for org %q, user %q doesn't exists", orgRef, userRef))
+		}
+
+		cgNames := []string{util.EncodeSha256Hex(fmt.Sprintf("orgmember-%s-%s", org.ID, user.ID))}
+		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	actions := []*datamanager.Action{}
+	actions = append(actions, &datamanager.Action{
+		ActionType: datamanager.ActionTypeDelete,
+		DataType:   string(types.ConfigTypeOrgMember),
+		ID:         orgmember.ID,
+	})
+
+	_, err = h.dm.WriteWal(ctx, actions, cgt)
+	return err
+}

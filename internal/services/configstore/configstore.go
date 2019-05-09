@@ -164,6 +164,7 @@ func (s *Configstore) Run(ctx context.Context) error {
 	deleteOrgHandler := api.NewDeleteOrgHandler(logger, s.ah)
 
 	addOrgMemberHandler := api.NewAddOrgMemberHandler(logger, s.ah)
+	deleteOrgMemberHandler := api.NewDeleteOrgMemberHandler(logger, s.ah)
 
 	remoteSourceHandler := api.NewRemoteSourceHandler(logger, s.readDB)
 	remoteSourcesHandler := api.NewRemoteSourcesHandler(logger, s.readDB)
@@ -216,6 +217,7 @@ func (s *Configstore) Run(ctx context.Context) error {
 	apirouter.Handle("/orgs", createOrgHandler).Methods("POST")
 	apirouter.Handle("/orgs/{orgref}", deleteOrgHandler).Methods("DELETE")
 	apirouter.Handle("/orgs/{orgref}/members/{userref}", addOrgMemberHandler).Methods("PUT")
+	apirouter.Handle("/orgs/{orgref}/members/{userref}", deleteOrgMemberHandler).Methods("DELETE")
 
 	apirouter.Handle("/remotesources/{remotesourceref}", remoteSourceHandler).Methods("GET")
 	apirouter.Handle("/remotesources", remoteSourcesHandler).Methods("GET")

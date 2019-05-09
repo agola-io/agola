@@ -136,3 +136,25 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 		User:               user,
 	}, nil
 }
+
+func (h *ActionHandler) DeleteOrgMember(ctx context.Context, orgRef, userRef string) error {
+	org, resp, err := h.configstoreClient.GetOrg(ctx, orgRef)
+	if err != nil {
+		return ErrFromRemote(resp, err)
+	}
+
+	isOrgOwner, err := h.IsOrgOwner(ctx, org.ID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to determine ownership")
+	}
+	if !isOrgOwner {
+		return util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
+	resp, err = h.configstoreClient.DeleteOrgMember(ctx, orgRef, userRef)
+	if err != nil {
+		return ErrFromRemote(resp, errors.Wrapf(err, "failed to add/update organization member"))
+	}
+
+	return nil
+}
