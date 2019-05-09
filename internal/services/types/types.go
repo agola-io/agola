@@ -206,8 +206,9 @@ type LinkedAccount struct {
 
 	ID string `json:"id,omitempty"`
 
-	RemoteUserID   string `json:"remote_user_id,omitempty"`
-	RemoteUserName string `json:"remote_username,omitempty"`
+	RemoteUserID        string `json:"remote_user_id,omitempty"`
+	RemoteUserName      string `json:"remote_username,omitempty"`
+	RemoteUserAvatarURL string `json:"remote_user_avatar_url,omitempty"`
 
 	RemoteSourceID string `json:"remote_source_id,omitempty"`
 
