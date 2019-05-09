@@ -106,6 +106,37 @@ func (h *ProjectReconfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	}
 }
 
+type ProjectUpdateRepoLinkedAccountHandler struct {
+	log        *zap.SugaredLogger
+	ah         *action.ActionHandler
+	exposedURL string
+}
+
+func NewProjectUpdateRepoLinkedAccountHandler(logger *zap.Logger, ah *action.ActionHandler, exposedURL string) *ProjectUpdateRepoLinkedAccountHandler {
+	return &ProjectUpdateRepoLinkedAccountHandler{log: logger.Sugar(), ah: ah, exposedURL: exposedURL}
+}
+
+func (h *ProjectUpdateRepoLinkedAccountHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	projectRef, err := url.PathUnescape(vars["projectref"])
+	if err != nil {
+		httpError(w, util.NewErrBadRequest(err))
+		return
+	}
+
+	project, err := h.ah.ProjectUpdateRepoLinkedAccount(ctx, projectRef)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	res := createProjectResponse(project)
+	if err := httpResponse(w, http.StatusOK, res); err != nil {
+		h.log.Errorf("err: %+v", err)
+	}
+}
+
 type DeleteProjectHandler struct {
 	log *zap.SugaredLogger
 	ah  *action.ActionHandler

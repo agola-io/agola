@@ -162,6 +162,67 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 	return rp, h.SetupProject(ctx, rs, user, la, rp)
 }
 
+func (h *ActionHandler) ProjectUpdateRepoLinkedAccount(ctx context.Context, projectRef string) (*csapi.Project, error) {
+	curUserID := h.CurrentUserID(ctx)
+
+	user, resp, err := h.configstoreClient.GetUser(ctx, curUserID)
+	if err != nil {
+		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get user %q", curUserID))
+	}
+
+	p, resp, err := h.configstoreClient.GetProject(ctx, projectRef)
+	if err != nil {
+		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get project %q", projectRef))
+	}
+
+	isProjectOwner, err := h.IsProjectOwner(ctx, p.OwnerType, p.OwnerID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to determine ownership")
+	}
+	if !isProjectOwner {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
+	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, p.RemoteSourceID)
+	if err != nil {
+		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get remote source %q", p.RemoteSourceID))
+	}
+	h.log.Infof("rs: %s", util.Dump(rs))
+	var la *types.LinkedAccount
+	for _, v := range user.LinkedAccounts {
+		if v.RemoteSourceID == rs.ID {
+			la = v
+			break
+		}
+	}
+	h.log.Infof("la: %s", util.Dump(la))
+	if la == nil {
+		return nil, util.NewErrBadRequest(errors.Errorf("user doesn't have a linked account for remote source %q", rs.Name))
+	}
+
+	gitsource, err := h.GetGitSource(ctx, rs, user.Name, la)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create gitsource client")
+	}
+
+	// check user has access to the repository
+	_, err = gitsource.GetRepoInfo(p.RepositoryPath)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get repository info from gitsource")
+	}
+
+	p.LinkedAccountID = la.ID
+
+	h.log.Infof("updating project")
+	rp, resp, err := h.configstoreClient.UpdateProject(ctx, p.ID, p.Project)
+	if err != nil {
+		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to update project"))
+	}
+	h.log.Infof("project %s updated, ID: %s", p.Name, p.ID)
+
+	return rp, nil
+}
+
 func (h *ActionHandler) SetupProject(ctx context.Context, rs *types.RemoteSource, user *types.User, la *types.LinkedAccount, project *csapi.Project) error {
 	gitsource, err := h.GetGitSource(ctx, rs, user.Name, la)
 	if err != nil {
