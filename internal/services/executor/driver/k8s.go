@@ -15,6 +15,7 @@
 package driver
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -424,10 +425,61 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 
 	fmt.Fprintf(out, "init container ready\n")
 
-	srcInfo, err := archive.CopyInfoSourcePath(d.toolboxPath, false)
+	coreclient, err := corev1client.NewForConfig(d.restconfig)
 	if err != nil {
 		return nil, err
 	}
+
+	// get the pod arch
+	req := coreclient.RESTClient().
+		Post().
+		Namespace(pod.Namespace).
+		Resource("pods").
+		Name(pod.Name).
+		SubResource("exec").
+		VersionedParams(&corev1.PodExecOptions{
+			Container: "initcontainer",
+			Command:   []string{"uname", "-m"},
+			Stdout:    true,
+			Stderr:    true,
+			TTY:       false,
+		}, scheme.ParameterCodec)
+
+	exec, err := remotecommand.NewSPDYExecutor(d.restconfig, "POST", req.URL())
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to generate k8s client spdy executor for url %q, method: POST", req.URL())
+	}
+
+	stdout := bytes.Buffer{}
+	err = exec.Stream(remotecommand.StreamOptions{
+		Stdout: &stdout,
+		Stderr: out,
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to execute command on initcontainer")
+	}
+	osArch := strings.TrimSpace(stdout.String())
+
+	var arch common.Arch
+	switch osArch {
+	case "x86_64":
+		arch = common.ArchAMD64
+	case "aarch64":
+		arch = common.ArchARM64
+	default:
+		return nil, errors.Errorf("unsupported pod arch %q", osArch)
+	}
+
+	// copy the toolbox for the pod arch
+	toolboxExecPath, err := toolboxExecPath(d.toolboxPath, arch)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get toolbox path for arch %q", arch)
+	}
+	srcInfo, err := archive.CopyInfoSourcePath(toolboxExecPath, false)
+	if err != nil {
+		return nil, err
+	}
+	srcInfo.RebaseName = "agola-toolbox"
 
 	srcArchive, err := archive.TarResource(srcInfo)
 	if err != nil {
@@ -435,12 +487,7 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 	}
 	defer srcArchive.Close()
 
-	coreclient, err := corev1client.NewForConfig(d.restconfig)
-	if err != nil {
-		return nil, err
-	}
-
-	req := coreclient.RESTClient().
+	req = coreclient.RESTClient().
 		Post().
 		Namespace(pod.Namespace).
 		Resource("pods").
@@ -455,11 +502,12 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 			TTY:       false,
 		}, scheme.ParameterCodec)
 
-	exec, err := remotecommand.NewSPDYExecutor(d.restconfig, "POST", req.URL())
+	exec, err = remotecommand.NewSPDYExecutor(d.restconfig, "POST", req.URL())
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to generate k8s client spdy executor for url %q, method: POST", req.URL())
 	}
 
+	fmt.Fprintf(out, "extracting toolbox\n")
 	err = exec.Stream(remotecommand.StreamOptions{
 		Stdin:  srcArchive,
 		Stdout: out,
@@ -468,6 +516,7 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to execute command on initcontainer")
 	}
+	fmt.Fprintf(out, "extracting toolbox done\n")
 
 	req = coreclient.RESTClient().
 		Post().

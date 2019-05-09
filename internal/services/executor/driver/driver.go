@@ -16,13 +16,18 @@ package driver
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 
 	"github.com/sorintlab/agola/internal/common"
 	"github.com/sorintlab/agola/internal/services/executor/registry"
 )
 
 const (
+	toolboxPrefix = "agola-toolbox"
+
 	labelPrefix = "agola.io/"
 
 	agolaLabelKey   = labelPrefix + "agola"
@@ -98,4 +103,13 @@ type ExecConfig struct {
 	Stdout     io.Writer
 	Stderr     io.Writer
 	Tty        bool
+}
+
+func toolboxExecPath(toolboxDir string, arch common.Arch) (string, error) {
+	toolboxPath := filepath.Join(toolboxDir, fmt.Sprintf("%s-linux-%s", toolboxPrefix, arch))
+	_, err := os.Stat(toolboxPath)
+	if err != nil {
+		return "", err
+	}
+	return toolboxPath, nil
 }

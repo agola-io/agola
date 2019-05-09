@@ -46,6 +46,7 @@ type DockerDriver struct {
 	initVolumeHostDir string
 	toolboxPath       string
 	executorID        string
+	arch              common.Arch
 }
 
 func NewDockerDriver(logger *zap.Logger, executorID, initVolumeHostDir, toolboxPath string) (*DockerDriver, error) {
@@ -53,12 +54,14 @@ func NewDockerDriver(logger *zap.Logger, executorID, initVolumeHostDir, toolboxP
 	if err != nil {
 		return nil, err
 	}
+
 	return &DockerDriver{
 		logger:            logger,
 		client:            cli,
 		initVolumeHostDir: initVolumeHostDir,
 		toolboxPath:       toolboxPath,
 		executorID:        executorID,
+		arch:              common.ArchFromString(runtime.GOARCH),
 	}, nil
 }
 
@@ -95,10 +98,15 @@ func (d *DockerDriver) CopyToolbox(ctx context.Context) error {
 		return err
 	}
 
-	srcInfo, err := archive.CopyInfoSourcePath(d.toolboxPath, false)
+	toolboxExecPath, err := toolboxExecPath(d.toolboxPath, d.arch)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get toolbox path for arch %q", d.arch)
+	}
+	srcInfo, err := archive.CopyInfoSourcePath(toolboxExecPath, false)
 	if err != nil {
 		return err
 	}
+	srcInfo.RebaseName = "agola-toolbox"
 
 	srcArchive, err := archive.TarResource(srcInfo)
 	if err != nil {
@@ -123,7 +131,7 @@ func (d *DockerDriver) CopyToolbox(ctx context.Context) error {
 
 func (d *DockerDriver) Archs(ctx context.Context) ([]common.Arch, error) {
 	// since we are using the local docker driver we can return our go arch information
-	return []common.Arch{common.ArchFromString(runtime.GOARCH)}, nil
+	return []common.Arch{d.arch}, nil
 }
 
 func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Writer) (Pod, error) {

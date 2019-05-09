@@ -25,7 +25,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -1244,14 +1243,7 @@ func NewExecutor(c *config.Executor) (*Executor, error) {
 	var err error
 	c.ToolboxPath, err = filepath.Abs(c.ToolboxPath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot find \"agola-toolbox\" absolute path")
-	}
-	if c.ToolboxPath == "" {
-		path, err := exec.LookPath("agola-toolbox")
-		if err != nil {
-			return nil, errors.Errorf("cannot find \"agola-toolbox\" binaries in PATH, agola-toolbox path must be explicitly provided")
-		}
-		c.ToolboxPath = path
+		return nil, errors.Wrapf(err, "cannot determine \"agola-toolbox\" absolute path")
 	}
 
 	e := &Executor{

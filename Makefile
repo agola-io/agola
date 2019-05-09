@@ -29,40 +29,43 @@ AGOLA_DEPS = $(AGOLA_WEBBUNDLE_DEPS)
 AGOLA_TAGS += $(AGOLA_WEBBUNDLE_TAGS)
 endif
 
+TOOLBOX_OSES=linux
+TOOLBOX_ARCHS=amd64 arm64
+
 .PHONY: all
 all: build
 
 .PHONY: build
-build: bin/agola bin/agola-toolbox bin/agola-git-hook
+build: agola agola-toolbox agola-git-hook
 
 .PHONY: test
-test: tools/bin/gocovmerge
+test: gocovmerge
 	@scripts/test.sh
 
 # don't use existing file names and track go sources, let's do this to the go tool
-.PHONY: bin/agola
-bin/agola: $(AGOLA_DEPS)
+.PHONY: agola
+agola: $(AGOLA_DEPS)
 	GO111MODULE=on go build $(if $(AGOLA_TAGS),-tags "$(AGOLA_TAGS)") -ldflags $(LD_FLAGS) -o $(PROJDIR)/bin/agola $(REPO_PATH)/cmd/agola
 
 # toolbox MUST be statically compiled so it can be used in any image for that arch
-# TODO(sgotti) cross compile to multiple archs
-.PHONY: bin/agola-toolbox
-bin/agola-toolbox: 
-	CGO_ENABLED=0 GO111MODULE=on go build $(if $(AGOLA_TAGS),-tags "$(AGOLA_TAGS)") -ldflags $(LD_FLAGS) -o $(PROJDIR)/bin/agola-toolbox $(REPO_PATH)/cmd/toolbox
+.PHONY: agola-toolbox
+agola-toolbox:
+	$(foreach GOOS, $(TOOLBOX_OSES),\
+	$(foreach GOARCH, $(TOOLBOX_ARCHS), $(shell GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=0 GO111MODULE=on go build $(if $(AGOLA_TAGS),-tags "$(AGOLA_TAGS)") -ldflags $(LD_FLAGS) -o $(PROJDIR)/bin/agola-toolbox-$(GOOS)-$(GOARCH) $(REPO_PATH)/cmd/toolbox)))
 
-.PHONY: tools/bin/go-bindata
-tools/bin/go-bindata:
+.PHONY: go-bindata
+go-bindata:
 	GOBIN=$(PROJDIR)/tools/bin go install github.com/go-bindata/go-bindata/go-bindata
 
-.PHONY: bin/agola-git-hook
-bin/agola-git-hook:
+.PHONY: agola-git-hook
+agola-git-hook:
 	CGO_ENABLED=0 GO111MODULE=on go build $(if $(AGOLA_TAGS),-tags "$(AGOLA_TAGS)") -ldflags $(LD_FLAGS) -o $(PROJDIR)/bin/agola-git-hook $(REPO_PATH)/cmd/agola-git-hook
 
-.PHONY: tools/bin/gocovmerge
-tools/bin/gocovmerge:
+.PHONY: gocovmerge
+gocovmerge:
 	GOBIN=$(PROJDIR)/tools/bin go install github.com/wadey/gocovmerge
 
-webbundle/bindata.go: tools/bin/go-bindata $(WEBDISTPATH)
+webbundle/bindata.go: go-bindata $(WEBDISTPATH)
 	./tools/bin/go-bindata -o webbundle/bindata.go -tags webbundle -pkg webbundle -prefix "$(WEBDISTPATH)" -nocompress=true "$(WEBDISTPATH)/..."
 
 .PHONY: docker-agola
