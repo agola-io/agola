@@ -670,7 +670,7 @@ func (p *K8sPod) Exec(ctx context.Context, execConfig *ExecConfig) (ContainerExe
 		VersionedParams(&corev1.PodExecOptions{
 			Container: mainContainerName,
 			Command:   cmd,
-			Stdin:     true,
+			Stdin:     execConfig.AttachStdin,
 			Stdout:    execConfig.Stdout != nil,
 			Stderr:    execConfig.Stderr != nil,
 			TTY:       execConfig.Tty,
@@ -683,9 +683,14 @@ func (p *K8sPod) Exec(ctx context.Context, execConfig *ExecConfig) (ContainerExe
 
 	reader, writer := io.Pipe()
 
+	var stdin io.Reader
+	if execConfig.AttachStdin {
+		stdin = reader
+	}
+
 	go func() {
 		err := exec.Stream(remotecommand.StreamOptions{
-			Stdin:  reader,
+			Stdin:  stdin,
 			Stdout: execConfig.Stdout,
 			Stderr: execConfig.Stderr,
 			Tty:    execConfig.Tty,

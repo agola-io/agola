@@ -81,14 +81,15 @@ func TestK8sPod(t *testing.T) {
 		}
 		defer pod.Remove(ctx)
 
+		var buf bytes.Buffer
 		ce, err := pod.Exec(ctx, &ExecConfig{
-			Cmd: []string{"ls"},
+			Cmd:    []string{"ls"},
+			Stdout: &buf,
 		})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
 
-		ce.Stdin().Close()
 		code, err := ce.Wait(ctx)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
@@ -131,7 +132,6 @@ func TestK8sPod(t *testing.T) {
 			t.Fatalf("unexpected err: %v", err)
 		}
 
-		ce.Stdin().Close()
 		code, err := ce.Wait(ctx)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)

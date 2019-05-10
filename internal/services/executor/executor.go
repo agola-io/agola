@@ -70,10 +70,11 @@ func (e *Executor) createFile(ctx context.Context, pod driver.Pod, command, user
 
 	var buf bytes.Buffer
 	execConfig := &driver.ExecConfig{
-		Cmd:    cmd,
-		Stdout: &buf,
-		Stderr: outf,
-		User:   user,
+		Cmd:         cmd,
+		AttachStdin: true,
+		Stdout:      &buf,
+		Stderr:      outf,
+		User:        user,
 	}
 
 	ce, err := pod.Exec(ctx, execConfig)
@@ -161,13 +162,14 @@ func (e *Executor) doRunStep(ctx context.Context, s *types.RunStep, t *types.Exe
 	}
 
 	execConfig := &driver.ExecConfig{
-		Cmd:        cmd,
-		Env:        environment,
-		WorkingDir: workingDir,
-		User:       user,
-		Stdout:     outf,
-		Stderr:     outf,
-		Tty:        true,
+		Cmd:         cmd,
+		Env:         environment,
+		WorkingDir:  workingDir,
+		User:        user,
+		AttachStdin: true,
+		Stdout:      outf,
+		Stderr:      outf,
+		Tty:         true,
 	}
 
 	ce, err := pod.Exec(ctx, execConfig)
@@ -211,11 +213,12 @@ func (e *Executor) doSaveToWorkspaceStep(ctx context.Context, s *types.SaveToWor
 	}
 
 	execConfig := &driver.ExecConfig{
-		Cmd:        cmd,
-		Env:        t.Environment,
-		WorkingDir: workingDir,
-		Stdout:     archivef,
-		Stderr:     logf,
+		Cmd:         cmd,
+		Env:         t.Environment,
+		WorkingDir:  workingDir,
+		AttachStdin: true,
+		Stdout:      archivef,
+		Stderr:      logf,
 	}
 
 	ce, err := pod.Exec(ctx, execConfig)
@@ -271,10 +274,11 @@ func (e *Executor) expandDir(ctx context.Context, t *types.ExecutorTask, pod dri
 	stdout := &bytes.Buffer{}
 
 	execConfig := &driver.ExecConfig{
-		Cmd:    cmd,
-		Env:    t.Environment,
-		Stdout: stdout,
-		Stderr: logf,
+		Cmd:         cmd,
+		Env:         t.Environment,
+		AttachStdin: true,
+		Stdout:      stdout,
+		Stderr:      logf,
 	}
 
 	ce, err := pod.Exec(ctx, execConfig)
@@ -298,10 +302,11 @@ func (e *Executor) mkdir(ctx context.Context, t *types.ExecutorTask, pod driver.
 	cmd := append([]string{toolboxContainerPath, "mkdir"}, args...)
 
 	execConfig := &driver.ExecConfig{
-		Cmd:    cmd,
-		Env:    t.Environment,
-		Stdout: logf,
-		Stderr: logf,
+		Cmd:         cmd,
+		Env:         t.Environment,
+		AttachStdin: true,
+		Stdout:      logf,
+		Stderr:      logf,
 	}
 
 	ce, err := pod.Exec(ctx, execConfig)
@@ -333,11 +338,12 @@ func (e *Executor) template(ctx context.Context, t *types.ExecutorTask, pod driv
 	}
 
 	execConfig := &driver.ExecConfig{
-		Cmd:        cmd,
-		Env:        t.Environment,
-		WorkingDir: workingDir,
-		Stdout:     stdout,
-		Stderr:     logf,
+		Cmd:         cmd,
+		Env:         t.Environment,
+		WorkingDir:  workingDir,
+		AttachStdin: true,
+		Stdout:      stdout,
+		Stderr:      logf,
 	}
 
 	ce, err := pod.Exec(ctx, execConfig)
@@ -379,11 +385,12 @@ func (e *Executor) unarchive(ctx context.Context, t *types.ExecutorTask, source 
 	}
 
 	execConfig := &driver.ExecConfig{
-		Cmd:        cmd,
-		Env:        t.Environment,
-		WorkingDir: workingDir,
-		Stdout:     logf,
-		Stderr:     logf,
+		Cmd:         cmd,
+		Env:         t.Environment,
+		WorkingDir:  workingDir,
+		AttachStdin: true,
+		Stdout:      logf,
+		Stderr:      logf,
 	}
 
 	ce, err := pod.Exec(ctx, execConfig)
@@ -496,11 +503,12 @@ func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, 
 	}
 
 	execConfig := &driver.ExecConfig{
-		Cmd:        cmd,
-		Env:        t.Environment,
-		WorkingDir: workingDir,
-		Stdout:     archivef,
-		Stderr:     logf,
+		Cmd:         cmd,
+		Env:         t.Environment,
+		WorkingDir:  workingDir,
+		AttachStdin: true,
+		Stdout:      archivef,
+		Stderr:      logf,
 	}
 
 	ce, err := pod.Exec(ctx, execConfig)

@@ -96,13 +96,14 @@ type ContainerConfig struct {
 }
 
 type ExecConfig struct {
-	Cmd        []string
-	Env        map[string]string
-	WorkingDir string
-	User       string
-	Stdout     io.Writer
-	Stderr     io.Writer
-	Tty        bool
+	Cmd         []string
+	Env         map[string]string
+	WorkingDir  string
+	User        string
+	AttachStdin bool
+	Stdout      io.Writer
+	Stderr      io.Writer
+	Tty         bool
 }
 
 func toolboxExecPath(toolboxDir string, arch common.Arch) (string, error) {

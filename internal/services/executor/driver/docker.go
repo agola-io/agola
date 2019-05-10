@@ -395,7 +395,7 @@ func (dp *DockerPod) Exec(ctx context.Context, execConfig *ExecConfig) (Containe
 		Env:          makeEnvSlice(execConfig.Env),
 		Tty:          execConfig.Tty,
 		WorkingDir:   execConfig.WorkingDir,
-		AttachStdin:  true,
+		AttachStdin:  execConfig.AttachStdin,
 		AttachStdout: execConfig.Stdout != nil,
 		AttachStderr: execConfig.Stderr != nil,
 		User:         execConfig.User,
@@ -451,11 +451,18 @@ func (e *DockerContainerExec) Wait(ctx context.Context) (int, error) {
 	// ignore error, we'll use the exit code of the exec
 	<-e.endCh
 
-	resp, err := e.client.ContainerExecInspect(ctx, e.execID)
-	if err != nil {
-		return -1, err
+	var exitCode int
+	for {
+		resp, err := e.client.ContainerExecInspect(ctx, e.execID)
+		if err != nil {
+			return -1, err
+		}
+		if !resp.Running {
+			exitCode = resp.ExitCode
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
 	}
-	exitCode := resp.ExitCode
 
 	e.hresp.Close()
 
