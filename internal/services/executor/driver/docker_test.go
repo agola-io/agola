@@ -140,7 +140,6 @@ func TestDockerPod(t *testing.T) {
 			t.Fatalf("unexpected err: %v", err)
 		}
 
-		ce.Stdin().Close()
 		code, err := ce.Wait(ctx)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
@@ -183,7 +182,6 @@ func TestDockerPod(t *testing.T) {
 			t.Fatalf("unexpected err: %v", err)
 		}
 
-		ce.Stdin().Close()
 		code, err := ce.Wait(ctx)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
