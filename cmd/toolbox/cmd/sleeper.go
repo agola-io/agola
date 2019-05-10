@@ -15,6 +15,9 @@
 package cmd
 
 import (
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -30,7 +33,26 @@ func init() {
 	CmdToolbox.AddCommand(cmdSleeper)
 }
 
+func childsReaper() {
+	var sigs = make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGCHLD)
+
+	for {
+		for range sigs {
+			for {
+				var wstatus syscall.WaitStatus
+				if _, err := syscall.Wait4(-1, &wstatus, syscall.WNOHANG|syscall.WUNTRACED|syscall.WCONTINUED, nil); err == syscall.EINTR {
+					continue
+				}
+				break
+			}
+		}
+	}
+}
+
 func sleeperRun(cmd *cobra.Command, args []string) {
+	go childsReaper()
+
 	time.Sleep(100 * time.Hour)
 	//c := make(chan struct{})
 	//<-c
