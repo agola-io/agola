@@ -206,6 +206,17 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string
 			DockerRegistriesAuth: make(map[string]rstypes.DockerRegistryAuth),
 		}
 
+		if c.DockerRegistriesAuth != nil {
+			for regname, auth := range c.DockerRegistriesAuth {
+				t.DockerRegistriesAuth[regname] = rstypes.DockerRegistryAuth{
+					Type:     rstypes.DockerRegistryAuthType(auth.Type),
+					Username: genValue(auth.Username, variables),
+					Password: genValue(auth.Password, variables),
+				}
+			}
+		}
+
+		// override with per run docker registry auth
 		if cr.DockerRegistriesAuth != nil {
 			for regname, auth := range cr.DockerRegistriesAuth {
 				t.DockerRegistriesAuth[regname] = rstypes.DockerRegistryAuth{
