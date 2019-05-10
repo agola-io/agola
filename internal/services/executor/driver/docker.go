@@ -139,67 +139,30 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 		return nil, errors.Errorf("empty container config")
 	}
 
-	containerConfig := podConfig.Containers[0]
+	var mainContainerID string
+	for cindex := range podConfig.Containers {
+		resp, err := d.createContainer(ctx, cindex, podConfig, mainContainerID, out)
+		if err != nil {
+			return nil, err
+		}
 
-	regName, err := registry.GetRegistry(containerConfig.Image)
-	if err != nil {
-		return nil, err
-	}
-	var registryAuth registry.DockerConfigAuth
-	if podConfig.DockerConfig != nil {
-		if regauth, ok := podConfig.DockerConfig.Auths[regName]; ok {
-			registryAuth = regauth
+		containerID := resp.ID
+		if cindex == 0 {
+			// save the maincontainerid
+			mainContainerID = containerID
+		}
+
+		if err := d.client.ContainerStart(ctx, containerID, types.ContainerStartOptions{}); err != nil {
+			return nil, err
 		}
 	}
-	buf, err := json.Marshal(registryAuth)
-	if err != nil {
-		return nil, err
-	}
-	registryAuthEnc := base64.URLEncoding.EncodeToString(buf)
 
-	// by default always try to pull the image so we are sure only authorized users can fetch them
-	// see https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#alwayspullimages
-	reader, err := d.client.ImagePull(ctx, containerConfig.Image, types.ImagePullOptions{RegistryAuth: registryAuthEnc})
-	if err != nil {
-		return nil, err
-	}
-	io.Copy(out, reader)
-
-	labels := map[string]string{}
-	labels[agolaLabelKey] = agolaLabelValue
-	labels[podIDKey] = podConfig.ID
-	labels[taskIDKey] = podConfig.TaskID
-
-	containerLabels := map[string]string{}
-	for k, v := range labels {
-		containerLabels[k] = v
-	}
-	containerLabels[containerIndexKey] = "0"
-
-	resp, err := d.client.ContainerCreate(ctx, &container.Config{
-		Entrypoint: containerConfig.Cmd,
-		Env:        makeEnvSlice(containerConfig.Env),
-		WorkingDir: containerConfig.WorkingDir,
-		Image:      containerConfig.Image,
-		Tty:        true,
-		Labels:     containerLabels,
-	}, &container.HostConfig{
-		Binds:         []string{fmt.Sprintf("%s:%s", d.initVolumeHostDir, podConfig.InitVolumeDir)},
-		ReadonlyPaths: []string{fmt.Sprintf("%s:%s", d.initVolumeHostDir, podConfig.InitVolumeDir)},
-		Privileged:    containerConfig.Privileged,
-	}, nil, "")
-	if err != nil {
-		return nil, err
-	}
-
-	containerID := resp.ID
-
-	if err := d.client.ContainerStart(ctx, containerID, types.ContainerStartOptions{}); err != nil {
-		return nil, err
-	}
-
+	searchLabels := map[string]string{}
+	searchLabels[agolaLabelKey] = agolaLabelValue
+	searchLabels[podIDKey] = podConfig.ID
+	searchLabels[taskIDKey] = podConfig.TaskID
 	args := filters.NewArgs()
-	for k, v := range labels {
+	for k, v := range searchLabels {
 		args.Add("label", fmt.Sprintf("%s=%s", k, v))
 	}
 
@@ -211,15 +174,114 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 		return nil, err
 	}
 	if len(containers) == 0 {
-		return nil, errors.Errorf("no container with id %s", containerID)
+		return nil, errors.Errorf("no container with labels %s", searchLabels)
 	}
 
-	return &DockerPod{
+	pod := &DockerPod{
 		id:         podConfig.ID,
 		client:     d.client,
-		containers: containers,
 		executorID: d.executorID,
-	}, nil
+		containers: make([]types.Container, len(containers)),
+	}
+
+	// Put the containers in the right order based on their containerIndexKey label value
+	count := 0
+	seenIndexes := map[int]struct{}{}
+	for _, container := range containers {
+		cIndexStr, ok := container.Labels[containerIndexKey]
+		if !ok {
+			// ignore container
+			continue
+		}
+		cIndex, err := strconv.Atoi(cIndexStr)
+		if err != nil {
+			// ignore container
+			continue
+		}
+		if _, ok := seenIndexes[cIndex]; ok {
+			return nil, errors.Errorf("duplicate container with index %d", cIndex)
+		}
+		pod.containers[cIndex] = container
+
+		seenIndexes[cIndex] = struct{}{}
+		count++
+	}
+	if count != len(containers) {
+		return nil, errors.Errorf("expected %d containers but got %d", len(containers), count)
+	}
+
+	return pod, nil
+}
+
+func (d *DockerDriver) fetchImage(ctx context.Context, image string, registryConfig *registry.DockerConfig, out io.Writer) error {
+	regName, err := registry.GetRegistry(image)
+	if err != nil {
+		return err
+	}
+	var registryAuth registry.DockerConfigAuth
+	if registryConfig != nil {
+		if regauth, ok := registryConfig.Auths[regName]; ok {
+			registryAuth = regauth
+		}
+	}
+	buf, err := json.Marshal(registryAuth)
+	if err != nil {
+		return err
+	}
+	registryAuthEnc := base64.URLEncoding.EncodeToString(buf)
+
+	// by default always try to pull the image so we are sure only authorized users can fetch them
+	// see https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#alwayspullimages
+	reader, err := d.client.ImagePull(ctx, image, types.ImagePullOptions{RegistryAuth: registryAuthEnc})
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(out, reader)
+	return err
+}
+
+func (d *DockerDriver) createContainer(ctx context.Context, index int, podConfig *PodConfig, maincontainerID string, out io.Writer) (*container.ContainerCreateCreatedBody, error) {
+	containerConfig := podConfig.Containers[index]
+
+	if err := d.fetchImage(ctx, containerConfig.Image, podConfig.DockerConfig, out); err != nil {
+		return nil, err
+	}
+
+	labels := map[string]string{}
+	labels[agolaLabelKey] = agolaLabelValue
+	labels[podIDKey] = podConfig.ID
+	labels[taskIDKey] = podConfig.TaskID
+
+	containerLabels := map[string]string{}
+	for k, v := range labels {
+		containerLabels[k] = v
+	}
+	containerLabels[containerIndexKey] = strconv.Itoa(index)
+
+	cliContainerConfig := &container.Config{
+		Entrypoint: containerConfig.Cmd,
+		Env:        makeEnvSlice(containerConfig.Env),
+		WorkingDir: containerConfig.WorkingDir,
+		Image:      containerConfig.Image,
+		Tty:        true,
+		Labels:     containerLabels,
+	}
+
+	cliHostConfig := &container.HostConfig{
+		Privileged: containerConfig.Privileged,
+	}
+	if index == 0 {
+		// main container requires the initvolume containing the toolbox
+		cliHostConfig.Binds = []string{fmt.Sprintf("%s:%s", d.initVolumeHostDir, podConfig.InitVolumeDir)}
+		cliHostConfig.ReadonlyPaths = []string{fmt.Sprintf("%s:%s", d.initVolumeHostDir, podConfig.InitVolumeDir)}
+	} else {
+		// attach other containers to maincontainer network
+		cliHostConfig.NetworkMode = container.NetworkMode(fmt.Sprintf("container:%s", maincontainerID))
+	}
+
+	resp, err := d.client.ContainerCreate(ctx, cliContainerConfig, cliHostConfig, nil, "")
+	return &resp, err
 }
 
 func (d *DockerDriver) ExecutorGroup(ctx context.Context) (string, error) {

@@ -292,8 +292,6 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 		return nil, errors.Errorf("empty container config")
 	}
 
-	containerConfig := podConfig.Containers[0]
-
 	secretClient := d.client.CoreV1().Secrets(d.namespace)
 	podClient := d.client.CoreV1().Pods(d.namespace)
 
@@ -355,30 +353,7 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 					},
 				},
 			},
-			Containers: []corev1.Container{
-				{
-					Name:       mainContainerName,
-					Image:      containerConfig.Image,
-					Command:    containerConfig.Cmd[0:1],
-					Args:       containerConfig.Cmd[1:],
-					Env:        genEnvVars(containerConfig.Env),
-					Stdin:      true,
-					WorkingDir: containerConfig.WorkingDir,
-					VolumeMounts: []corev1.VolumeMount{
-						{
-							Name:      "agolavolume",
-							MountPath: podConfig.InitVolumeDir,
-							ReadOnly:  true,
-						},
-					},
-					// by default always try to pull the image so we are sure only authorized users can fetch them
-					// see https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#alwayspullimages
-					ImagePullPolicy: corev1.PullAlways,
-					SecurityContext: &corev1.SecurityContext{
-						Privileged: &containerConfig.Privileged,
-					},
-				},
-			},
+			Containers: []corev1.Container{},
 			Volumes: []corev1.Volume{
 				{
 					Name: "agolavolume",
@@ -388,6 +363,41 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 				},
 			},
 		},
+	}
+
+	// define containers
+	for cIndex, containerConfig := range podConfig.Containers {
+		var containerName string
+		if cIndex == 0 {
+			containerName = mainContainerName
+		} else {
+			containerName = fmt.Sprintf("service%d", cIndex)
+		}
+		c := corev1.Container{
+			Name:       containerName,
+			Image:      containerConfig.Image,
+			Command:    containerConfig.Cmd,
+			Env:        genEnvVars(containerConfig.Env),
+			Stdin:      true,
+			WorkingDir: containerConfig.WorkingDir,
+			// by default always try to pull the image so we are sure only authorized users can fetch them
+			// see https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#alwayspullimages
+			ImagePullPolicy: corev1.PullAlways,
+			SecurityContext: &corev1.SecurityContext{
+				Privileged: &containerConfig.Privileged,
+			},
+		}
+		if cIndex == 0 {
+			// main container requires the initvolume containing the toolbox
+			c.VolumeMounts = []corev1.VolumeMount{
+				{
+					Name:      "agolavolume",
+					MountPath: podConfig.InitVolumeDir,
+					ReadOnly:  true,
+				},
+			}
+		}
+		pod.Spec.Containers = append(pod.Spec.Containers, c)
 	}
 
 	if podConfig.Arch != "" {

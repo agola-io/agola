@@ -822,12 +822,6 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 		return err
 	}
 
-	cmd := []string{toolboxContainerPath, "sleeper"}
-	if et.Containers[0].Entrypoint != "" {
-		cmd = strings.Split(et.Containers[0].Entrypoint, " ")
-		log.Infof("cmd: %v", cmd)
-	}
-
 	log.Debugf("starting pod")
 
 	dockerConfig, err := registry.GenDockerConfig(et.DockerRegistriesAuth, []string{et.Containers[0].Image})
@@ -843,15 +837,24 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 		Arch:          et.Arch,
 		InitVolumeDir: toolboxContainerDir,
 		DockerConfig:  dockerConfig,
-		Containers: []*driver.ContainerConfig{
-			{
-				Image:      et.Containers[0].Image,
-				Cmd:        cmd,
-				Env:        et.Containers[0].Environment,
-				User:       et.Containers[0].User,
-				Privileged: et.Containers[0].Privileged,
-			},
-		},
+		Containers:    make([]*driver.ContainerConfig, len(et.Containers)),
+	}
+	for i, c := range et.Containers {
+		var cmd []string
+		if i == 0 {
+			cmd = []string{toolboxContainerPath, "sleeper"}
+		}
+		if c.Entrypoint != "" {
+			cmd = strings.Split(c.Entrypoint, " ")
+		}
+
+		podConfig.Containers[i] = &driver.ContainerConfig{
+			Image:      c.Image,
+			Cmd:        cmd,
+			Env:        c.Environment,
+			User:       c.User,
+			Privileged: c.Privileged,
+		}
 	}
 
 	setupLogPath := e.setupLogPath(et.ID)

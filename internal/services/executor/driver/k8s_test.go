@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
+	"time"
 
 	uuid "github.com/satori/go.uuid"
 )
@@ -153,6 +154,68 @@ func TestK8sPod(t *testing.T) {
 					t.Fatalf("different env var %s value, want: %q, got %q", n, e, ce)
 				}
 			}
+		}
+	})
+
+	t.Run("create a pod with two containers", func(t *testing.T) {
+		pod, err := d.NewPod(ctx, &PodConfig{
+			ID:     uuid.NewV4().String(),
+			TaskID: uuid.NewV4().String(),
+			Containers: []*ContainerConfig{
+				&ContainerConfig{
+					Cmd:   []string{"cat"},
+					Image: "busybox",
+				},
+				&ContainerConfig{
+					Image: "nginx:1.16",
+				},
+			},
+			InitVolumeDir: "/tmp/agola",
+		}, ioutil.Discard)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		defer pod.Remove(ctx)
+	})
+
+	t.Run("test communication between two containers", func(t *testing.T) {
+		pod, err := d.NewPod(ctx, &PodConfig{
+			ID:     uuid.NewV4().String(),
+			TaskID: uuid.NewV4().String(),
+			Containers: []*ContainerConfig{
+				&ContainerConfig{
+					Cmd:   []string{"cat"},
+					Image: "busybox",
+				},
+				&ContainerConfig{
+					Image: "nginx:1.16",
+				},
+			},
+			InitVolumeDir: "/tmp/agola",
+		}, ioutil.Discard)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		defer pod.Remove(ctx)
+
+		// wait for nginx up
+		time.Sleep(1 * time.Second)
+
+		var buf bytes.Buffer
+		ce, err := pod.Exec(ctx, &ExecConfig{
+			Cmd:    []string{"nc", "-z", "localhost", "80"},
+			Stdout: &buf,
+		})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		code, err := ce.Wait(ctx)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if code != 0 {
+			t.Fatalf("unexpected exit code: %d", code)
 		}
 	})
 

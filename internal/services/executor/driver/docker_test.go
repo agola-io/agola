@@ -24,6 +24,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 	"unicode"
 
 	uuid "github.com/satori/go.uuid"
@@ -203,7 +204,67 @@ func TestDockerPod(t *testing.T) {
 		}
 	})
 
-	t.Run("test get pods", func(t *testing.T) {
+	t.Run("create a pod with two containers", func(t *testing.T) {
+		pod, err := d.NewPod(ctx, &PodConfig{
+			ID:     uuid.NewV4().String(),
+			TaskID: uuid.NewV4().String(),
+			Containers: []*ContainerConfig{
+				&ContainerConfig{
+					Cmd:   []string{"cat"},
+					Image: "busybox",
+				},
+				&ContainerConfig{
+					Image: "nginx:1.16",
+				},
+			},
+			InitVolumeDir: "/tmp/agola",
+		}, ioutil.Discard)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		defer pod.Remove(ctx)
+	})
+
+	t.Run("test communication between two containers", func(t *testing.T) {
+		pod, err := d.NewPod(ctx, &PodConfig{
+			ID:     uuid.NewV4().String(),
+			TaskID: uuid.NewV4().String(),
+			Containers: []*ContainerConfig{
+				&ContainerConfig{
+					Cmd:   []string{"cat"},
+					Image: "busybox",
+				},
+				&ContainerConfig{
+					Image: "nginx:1.16",
+				},
+			},
+			InitVolumeDir: "/tmp/agola",
+		}, ioutil.Discard)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		defer pod.Remove(ctx)
+
+		// wait for nginx up
+		time.Sleep(1 * time.Second)
+
+		ce, err := pod.Exec(ctx, &ExecConfig{
+			Cmd: []string{"nc", "-z", "localhost", "80"},
+		})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		code, err := ce.Wait(ctx)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if code != 0 {
+			t.Fatalf("unexpected exit code: %d", code)
+		}
+	})
+
+	t.Run("test get pods single container", func(t *testing.T) {
 		pod, err := d.NewPod(ctx, &PodConfig{
 			ID:     uuid.NewV4().String(),
 			TaskID: uuid.NewV4().String(),
@@ -246,4 +307,49 @@ func TestDockerPod(t *testing.T) {
 		}
 	})
 
+	t.Run("test get pods two containers", func(t *testing.T) {
+		pod, err := d.NewPod(ctx, &PodConfig{
+			ID:     uuid.NewV4().String(),
+			TaskID: uuid.NewV4().String(),
+			Containers: []*ContainerConfig{
+				&ContainerConfig{
+					Cmd:   []string{"cat"},
+					Image: "busybox",
+				},
+				&ContainerConfig{
+					Image: "nginx:1.16",
+				},
+			},
+			InitVolumeDir: "/tmp/agola",
+		}, ioutil.Discard)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		defer pod.Remove(ctx)
+
+		pods, err := d.GetPods(ctx, true)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		ok := false
+		for _, p := range pods {
+			if p.ID() == pod.ID() {
+				ok = true
+				ip := pod.(*DockerPod)
+				dp := p.(*DockerPod)
+				for i, c := range dp.containers {
+					if c.ID != ip.containers[i].ID {
+						t.Fatalf("different pod id, want: %s, got: %s", ip.id, dp.id)
+					}
+					if diff := cmp.Diff(ip.containers[i], c); diff != "" {
+						t.Error(diff)
+					}
+				}
+			}
+		}
+		if !ok {
+			t.Fatalf("pod with id %q not found", pod.ID())
+		}
+	})
 }
