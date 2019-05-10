@@ -54,6 +54,8 @@ var (
 
 type Config struct {
 	Runs []*Run `json:"runs"`
+
+	DockerRegistriesAuth map[string]*DockerRegistryAuth `json:"docker_registries_auth"`
 }
 
 type RuntimeType string
@@ -774,6 +776,12 @@ func checkConfig(config *Config) error {
 	}
 
 	// Set defaults
+	for _, registryAuth := range config.DockerRegistriesAuth {
+		if registryAuth.Type == "" {
+			registryAuth.Type = DockerRegistryAuthTypeBasic
+		}
+	}
+
 	for _, run := range config.Runs {
 		// set auth type to basic if not specified
 		for _, registryAuth := range run.DockerRegistriesAuth {
