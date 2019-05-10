@@ -200,8 +200,11 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	logsHandler := api.NewLogsHandler(logger, g.ah)
 
-	reposHandler := api.NewReposHandler(logger, g.c.GitserverURL)
 	userRemoteReposHandler := api.NewUserRemoteReposHandler(logger, g.ah, g.configstoreClient)
+
+	badgeHandler := api.NewBadgeHandler(logger, g.ah)
+
+	reposHandler := api.NewReposHandler(logger, g.c.GitserverURL)
 
 	loginUserHandler := api.NewLoginUserHandler(logger, g.ah)
 	authorizeHandler := api.NewAuthorizeHandler(logger, g.ah)
@@ -275,10 +278,12 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/runs/{runid}/tasks/{taskid}/actions", authForcedHandler(runTaskActionsHandler)).Methods("PUT")
 	apirouter.Handle("/runs", authForcedHandler(runsHandler)).Methods("GET")
 
+	apirouter.Handle("/user/remoterepos/{remotesourceref}", authForcedHandler(userRemoteReposHandler)).Methods("GET")
+
+	apirouter.Handle("/badges/{projectref}", badgeHandler).Methods("GET")
+
 	// TODO(sgotti) add auth to these requests
 	router.Handle("/repos/{rest:.*}", reposHandler).Methods("GET", "POST")
-
-	apirouter.Handle("/user/remoterepos/{remotesourceref}", authForcedHandler(userRemoteReposHandler)).Methods("GET")
 
 	router.Handle("/login", loginUserHandler).Methods("POST")
 	router.Handle("/authorize", authorizeHandler).Methods("POST")

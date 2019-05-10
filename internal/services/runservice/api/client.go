@@ -214,6 +214,10 @@ func (c *Client) GetGroupFirstQueuedRuns(ctx context.Context, group string, chan
 	return c.GetRuns(ctx, []string{"queued"}, []string{group}, false, changeGroups, "", 1, true)
 }
 
+func (c *Client) GetGroupLastRun(ctx context.Context, group string, changeGroups []string) (*GetRunsResponse, *http.Response, error) {
+	return c.GetRuns(ctx, nil, []string{group}, false, changeGroups, "", 1, false)
+}
+
 func (c *Client) CreateRun(ctx context.Context, req *RunCreateRequest) (*RunResponse, *http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
