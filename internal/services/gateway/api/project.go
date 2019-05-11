@@ -38,13 +38,12 @@ type CreateProjectRequest struct {
 }
 
 type CreateProjectHandler struct {
-	log        *zap.SugaredLogger
-	ah         *action.ActionHandler
-	exposedURL string
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewCreateProjectHandler(logger *zap.Logger, ah *action.ActionHandler, exposedURL string) *CreateProjectHandler {
-	return &CreateProjectHandler{log: logger.Sugar(), ah: ah, exposedURL: exposedURL}
+func NewCreateProjectHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateProjectHandler {
+	return &CreateProjectHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -79,13 +78,12 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 }
 
 type ProjectReconfigHandler struct {
-	log        *zap.SugaredLogger
-	ah         *action.ActionHandler
-	exposedURL string
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewProjectReconfigHandler(logger *zap.Logger, ah *action.ActionHandler, exposedURL string) *ProjectReconfigHandler {
-	return &ProjectReconfigHandler{log: logger.Sugar(), ah: ah, exposedURL: exposedURL}
+func NewProjectReconfigHandler(logger *zap.Logger, ah *action.ActionHandler) *ProjectReconfigHandler {
+	return &ProjectReconfigHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *ProjectReconfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -107,13 +105,12 @@ func (h *ProjectReconfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 }
 
 type ProjectUpdateRepoLinkedAccountHandler struct {
-	log        *zap.SugaredLogger
-	ah         *action.ActionHandler
-	exposedURL string
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewProjectUpdateRepoLinkedAccountHandler(logger *zap.Logger, ah *action.ActionHandler, exposedURL string) *ProjectUpdateRepoLinkedAccountHandler {
-	return &ProjectUpdateRepoLinkedAccountHandler{log: logger.Sugar(), ah: ah, exposedURL: exposedURL}
+func NewProjectUpdateRepoLinkedAccountHandler(logger *zap.Logger, ah *action.ActionHandler) *ProjectUpdateRepoLinkedAccountHandler {
+	return &ProjectUpdateRepoLinkedAccountHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *ProjectUpdateRepoLinkedAccountHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

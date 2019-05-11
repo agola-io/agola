@@ -152,13 +152,13 @@ func (g *Gateway) Run(ctx context.Context) error {
 	projectGroupHandler := api.NewProjectGroupHandler(logger, g.ah)
 	projectGroupSubgroupsHandler := api.NewProjectGroupSubgroupsHandler(logger, g.ah)
 	projectGroupProjectsHandler := api.NewProjectGroupProjectsHandler(logger, g.ah)
-	createProjectGroupHandler := api.NewCreateProjectGroupHandler(logger, g.ah, g.c.APIExposedURL)
+	createProjectGroupHandler := api.NewCreateProjectGroupHandler(logger, g.ah)
 
 	projectHandler := api.NewProjectHandler(logger, g.ah)
-	createProjectHandler := api.NewCreateProjectHandler(logger, g.ah, g.c.APIExposedURL)
+	createProjectHandler := api.NewCreateProjectHandler(logger, g.ah)
 	deleteProjectHandler := api.NewDeleteProjectHandler(logger, g.ah)
-	projectReconfigHandler := api.NewProjectReconfigHandler(logger, g.ah, g.c.APIExposedURL)
-	projectUpdateRepoLinkedAccountHandler := api.NewProjectUpdateRepoLinkedAccountHandler(logger, g.ah, g.c.APIExposedURL)
+	projectReconfigHandler := api.NewProjectReconfigHandler(logger, g.ah)
+	projectUpdateRepoLinkedAccountHandler := api.NewProjectUpdateRepoLinkedAccountHandler(logger, g.ah)
 
 	secretHandler := api.NewSecretHandler(logger, g.ah)
 	createSecretHandler := api.NewCreateSecretHandler(logger, g.ah)

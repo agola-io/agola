@@ -36,13 +36,12 @@ type CreateProjectGroupRequest struct {
 }
 
 type CreateProjectGroupHandler struct {
-	log        *zap.SugaredLogger
-	ah         *action.ActionHandler
-	exposedURL string
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewCreateProjectGroupHandler(logger *zap.Logger, ah *action.ActionHandler, exposedURL string) *CreateProjectGroupHandler {
-	return &CreateProjectGroupHandler{log: logger.Sugar(), ah: ah, exposedURL: exposedURL}
+func NewCreateProjectGroupHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateProjectGroupHandler {
+	return &CreateProjectGroupHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
