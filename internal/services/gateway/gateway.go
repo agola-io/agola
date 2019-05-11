@@ -220,7 +220,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	router.PathPrefix("/api/v1alpha").Handler(apirouter)
 
-	apirouter.Handle("/logs", logsHandler).Methods("GET")
+	apirouter.Handle("/logs", authOptionalHandler(logsHandler)).Methods("GET")
 
 	//apirouter.Handle("/projectgroups", authForcedHandler(projectsHandler)).Methods("GET")
 	apirouter.Handle("/projectgroups/{projectgroupref}", authForcedHandler(projectGroupHandler)).Methods("GET")
