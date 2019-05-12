@@ -153,6 +153,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	projectGroupSubgroupsHandler := api.NewProjectGroupSubgroupsHandler(logger, g.ah)
 	projectGroupProjectsHandler := api.NewProjectGroupProjectsHandler(logger, g.ah)
 	createProjectGroupHandler := api.NewCreateProjectGroupHandler(logger, g.ah)
+	deleteProjectGroupHandler := api.NewDeleteProjectGroupHandler(logger, g.ah)
 
 	projectHandler := api.NewProjectHandler(logger, g.ah)
 	createProjectHandler := api.NewCreateProjectHandler(logger, g.ah)
@@ -228,7 +229,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/projectgroups/{projectgroupref}/subgroups", authForcedHandler(projectGroupSubgroupsHandler)).Methods("GET")
 	apirouter.Handle("/projectgroups/{projectgroupref}/projects", authForcedHandler(projectGroupProjectsHandler)).Methods("GET")
 	apirouter.Handle("/projectgroups", authForcedHandler(createProjectGroupHandler)).Methods("POST")
-	//apirouter.Handle("/projectgroups/{projectgroupref}", authForcedHandler(deleteProjectGroupHandler)).Methods("DELETE")
+	apirouter.Handle("/projectgroups/{projectgroupref}", authForcedHandler(deleteProjectGroupHandler)).Methods("DELETE")
 
 	apirouter.Handle("/projects/{projectref}", authForcedHandler(projectHandler)).Methods("GET")
 	apirouter.Handle("/projects", authForcedHandler(createProjectHandler)).Methods("POST")

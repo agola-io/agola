@@ -103,3 +103,24 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProje
 
 	return rp, nil
 }
+
+func (h *ActionHandler) DeleteProjectGroup(ctx context.Context, projectRef string) error {
+	p, resp, err := h.configstoreClient.GetProjectGroup(ctx, projectRef)
+	if err != nil {
+		return ErrFromRemote(resp, errors.Wrapf(err, "failed to get project %q", projectRef))
+	}
+
+	isProjectOwner, err := h.IsProjectOwner(ctx, p.OwnerType, p.OwnerID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to determine ownership")
+	}
+	if !isProjectOwner {
+		return util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
+	resp, err = h.configstoreClient.DeleteProjectGroup(ctx, projectRef)
+	if err != nil {
+		return ErrFromRemote(resp, err)
+	}
+	return nil
+}
