@@ -139,9 +139,7 @@ func (h *ActionHandler) IsProjectMember(ctx context.Context, ownerType types.Con
 			if userOrg.Organization.ID != ownerID {
 				continue
 			}
-			if userOrg.Role == types.MemberRoleMember {
-				return true, nil
-			}
+			return true, nil
 		}
 	}
 
