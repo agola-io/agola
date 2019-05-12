@@ -38,16 +38,17 @@ type Variable struct {
 
 type VariablesHandler struct {
 	log    *zap.SugaredLogger
+	ah     *action.ActionHandler
 	readDB *readdb.ReadDB
 }
 
-func NewVariablesHandler(logger *zap.Logger, readDB *readdb.ReadDB) *VariablesHandler {
-	return &VariablesHandler{log: logger.Sugar(), readDB: readDB}
+func NewVariablesHandler(logger *zap.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *VariablesHandler {
+	return &VariablesHandler{log: logger.Sugar(), ah: ah, readDB: readDB}
 }
 
 func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	query := r.URL.Query()
-
 	_, tree := query["tree"]
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
@@ -56,22 +57,9 @@ func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var variables []*types.Variable
-	err = h.readDB.Do(func(tx *db.Tx) error {
-		parentID, err := h.readDB.ResolveConfigID(tx, parentType, parentRef)
-		if err != nil {
-			return err
-		}
-		if tree {
-			variables, err = h.readDB.GetVariablesTree(tx, parentType, parentID)
-		} else {
-			variables, err = h.readDB.GetVariables(tx, parentID)
-		}
-		return err
-	})
-	if err != nil {
+	variables, err := h.ah.GetVariables(ctx, parentType, parentRef, tree)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
 		return
 	}
 

@@ -139,7 +139,7 @@ func (s *Configstore) Run(ctx context.Context) error {
 	createSecretHandler := api.NewCreateSecretHandler(logger, s.ah)
 	deleteSecretHandler := api.NewDeleteSecretHandler(logger, s.ah)
 
-	variablesHandler := api.NewVariablesHandler(logger, s.readDB)
+	variablesHandler := api.NewVariablesHandler(logger, s.ah, s.readDB)
 	createVariableHandler := api.NewCreateVariableHandler(logger, s.ah)
 	deleteVariableHandler := api.NewDeleteVariableHandler(logger, s.ah)
 

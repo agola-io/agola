@@ -27,6 +27,27 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
+func (h *ActionHandler) GetVariables(ctx context.Context, parentType types.ConfigType, parentRef string, tree bool) ([]*types.Variable, error) {
+	var variables []*types.Variable
+	err := h.readDB.Do(func(tx *db.Tx) error {
+		parentID, err := h.readDB.ResolveConfigID(tx, parentType, parentRef)
+		if err != nil {
+			return err
+		}
+		if tree {
+			variables, err = h.readDB.GetVariablesTree(tx, parentType, parentID)
+		} else {
+			variables, err = h.readDB.GetVariables(tx, parentID)
+		}
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return variables, nil
+}
+
 func (h *ActionHandler) CreateVariable(ctx context.Context, variable *types.Variable) (*types.Variable, error) {
 	if variable.Name == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("variable name required"))
