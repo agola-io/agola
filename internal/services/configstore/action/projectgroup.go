@@ -147,3 +147,47 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, projectGroup *ty
 	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return projectGroup, err
 }
+
+func (h *ActionHandler) DeleteProjectGroup(ctx context.Context, projectGroupRef string) error {
+	var projectGroup *types.ProjectGroup
+
+	var cgt *datamanager.ChangeGroupsUpdateToken
+
+	// must do all the checks in a single transaction to avoid concurrent changes
+	err := h.readDB.Do(func(tx *db.Tx) error {
+		var err error
+
+		// check project group existance
+		projectGroup, err = h.readDB.GetProjectGroup(tx, projectGroupRef)
+		if err != nil {
+			return err
+		}
+		if projectGroup == nil {
+			return util.NewErrBadRequest(errors.Errorf("project group %q doesn't exist", projectGroupRef))
+		}
+
+		// changegroup is the project group id.
+		cgNames := []string{util.EncodeSha256Hex(projectGroup.ID)}
+		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// TODO(sgotti) implement childs garbage collection
+	actions := []*datamanager.Action{
+		{
+			ActionType: datamanager.ActionTypeDelete,
+			DataType:   string(types.ConfigTypeProjectGroup),
+			ID:         projectGroup.ID,
+		},
+	}
+
+	_, err = h.dm.WriteWal(ctx, actions, cgt)
+	return err
+}

@@ -135,6 +135,10 @@ func (c *Client) CreateProjectGroup(ctx context.Context, projectGroup *types.Pro
 	return resProjectGroup, resp, err
 }
 
+func (c *Client) DeleteProjectGroup(ctx context.Context, projectGroupRef string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/projectgroups/%s", url.PathEscape(projectGroupRef)), nil, jsonContent, nil)
+}
+
 func (c *Client) GetProject(ctx context.Context, projectRef string) (*Project, *http.Response, error) {
 	project := new(Project)
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s", url.PathEscape(projectRef)), nil, jsonContent, nil, project)

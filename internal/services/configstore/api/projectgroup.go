@@ -243,3 +243,31 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		h.log.Errorf("err: %+v", err)
 	}
 }
+
+type DeleteProjectGroupHandler struct {
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
+}
+
+func NewDeleteProjectGroupHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteProjectGroupHandler {
+	return &DeleteProjectGroupHandler{log: logger.Sugar(), ah: ah}
+}
+
+func (h *DeleteProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	vars := mux.Vars(r)
+	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
+	if err != nil {
+		httpError(w, util.NewErrBadRequest(err))
+		return
+	}
+
+	err = h.ah.DeleteProjectGroup(ctx, projectGroupRef)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+	}
+	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Errorf("err: %+v", err)
+	}
+}

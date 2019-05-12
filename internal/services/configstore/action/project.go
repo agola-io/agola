@@ -291,7 +291,7 @@ func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) er
 		return err
 	}
 
-	// TODO(sgotti) delete project secrets/variables
+	// TODO(sgotti) implement childs garbage collection
 	actions := []*datamanager.Action{
 		{
 			ActionType: datamanager.ActionTypeDelete,

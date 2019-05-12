@@ -507,6 +507,147 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 	})
 }
 
+func TestProjectGroupDelete(t *testing.T) {
+	dir, err := ioutil.TempDir("", "agola")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	ctx := context.Background()
+
+	cs, tetcd := setupConfigstore(t, ctx, dir)
+	defer shutdownEtcd(tetcd)
+
+	t.Logf("starting cs")
+	go func() {
+		if err := cs.Run(ctx); err != nil {
+			t.Fatalf("err: %v", err)
+		}
+	}()
+
+	// TODO(sgotti) change the sleep with a real check that all is ready
+	time.Sleep(2 * time.Second)
+
+	//user, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"})
+	//if err != nil {
+	//	t.Fatalf("unexpected err: %v", err)
+	//}
+	org, err := cs.ah.CreateOrg(ctx, &types.Organization{Name: "org01"})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// TODO(sgotti) change the sleep with a real check that user is in readdb
+	time.Sleep(2 * time.Second)
+
+	// create a projectgroup in org root project group
+	pg01, err := cs.ah.CreateProjectGroup(ctx, &types.ProjectGroup{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	//create a child projectgroup in org root project group
+	spg01, err := cs.ah.CreateProjectGroup(ctx, &types.ProjectGroup{Name: "subprojectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: pg01.ID}, Visibility: types.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// create a project inside child projectgroup
+	project, err := cs.ah.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: spg01.ID}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// create project secret
+	_, err = cs.ah.CreateSecret(ctx, &types.Secret{Name: "secret01", Parent: types.Parent{Type: types.ConfigTypeProject, ID: project.ID}, Type: types.SecretTypeInternal, Data: map[string]string{"secret01": "secretvar01"}})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	// create project variable
+	_, err = cs.ah.CreateVariable(ctx, &types.Variable{Name: "variable01", Parent: types.Parent{Type: types.ConfigTypeProject, ID: project.ID}, Values: []types.VariableValue{{SecretName: "secret01", SecretVar: "secretvar01"}}})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// delete root projectgroup
+	if err = cs.ah.DeleteProjectGroup(ctx, pg01.ID); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// recreate the same hierarchj using the paths
+	pg01, err = cs.ah.CreateProjectGroup(ctx, &types.ProjectGroup{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	spg01, err = cs.ah.CreateProjectGroup(ctx, &types.ProjectGroup{Name: "subprojectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name, pg01.Name)}, Visibility: types.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	project, err = cs.ah.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name, pg01.Name, spg01.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	secret, err := cs.ah.CreateSecret(ctx, &types.Secret{Name: "secret01", Parent: types.Parent{Type: types.ConfigTypeProject, ID: path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name)}, Type: types.SecretTypeInternal, Data: map[string]string{"secret01": "secretvar01"}})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	variable, err := cs.ah.CreateVariable(ctx, &types.Variable{Name: "variable01", Parent: types.Parent{Type: types.ConfigTypeProject, ID: path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name)}, Values: []types.VariableValue{{SecretName: "secret01", SecretVar: "secretvar01"}}})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// Get by projectgroup id
+	projects, err := cs.ah.GetProjectGroupProjects(ctx, spg01.ID)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if diff := cmp.Diff(projects, []*types.Project{project}); diff != "" {
+		t.Error(diff)
+	}
+
+	// Get by projectgroup path
+	projects, err = cs.ah.GetProjectGroupProjects(ctx, path.Join("org", org.Name, pg01.Name, spg01.Name))
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if diff := cmp.Diff(projects, []*types.Project{project}); diff != "" {
+		t.Error(diff)
+	}
+
+	secrets, err := cs.ah.GetSecrets(ctx, types.ConfigTypeProject, project.ID, false)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if diff := cmp.Diff(secrets, []*types.Secret{secret}); diff != "" {
+		t.Error(diff)
+	}
+
+	secrets, err = cs.ah.GetSecrets(ctx, types.ConfigTypeProject, path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name), false)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if diff := cmp.Diff(secrets, []*types.Secret{secret}); diff != "" {
+		t.Error(diff)
+	}
+
+	variables, err := cs.ah.GetVariables(ctx, types.ConfigTypeProject, project.ID, false)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if diff := cmp.Diff(variables, []*types.Variable{variable}); diff != "" {
+		t.Error(diff)
+	}
+
+	variables, err = cs.ah.GetVariables(ctx, types.ConfigTypeProject, path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name), false)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if diff := cmp.Diff(variables, []*types.Variable{variable}); diff != "" {
+		t.Error(diff)
+	}
+}
+
 func TestOrgMembers(t *testing.T) {
 	dir, err := ioutil.TempDir("", "agola")
 	if err != nil {
