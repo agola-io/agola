@@ -243,11 +243,12 @@ func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type ProjectResponse struct {
-	ID               string `json:"id,omitempty"`
-	Name             string `json:"name,omitempty"`
-	Path             string `json:"path,omitempty"`
-	ParentPath       string `json:"parent_path,omitempty"`
-	GlobalVisibility string `json:"global_visibility,omitempty"`
+	ID               string           `json:"id,omitempty"`
+	Name             string           `json:"name,omitempty"`
+	Path             string           `json:"path,omitempty"`
+	ParentPath       string           `json:"parent_path,omitempty"`
+	Visibility       types.Visibility `json:"visibility,omitempty"`
+	GlobalVisibility string           `json:"global_visibility,omitempty"`
 }
 
 func createProjectResponse(r *csapi.Project) *ProjectResponse {
@@ -256,6 +257,7 @@ func createProjectResponse(r *csapi.Project) *ProjectResponse {
 		Name:             r.Name,
 		Path:             r.Path,
 		ParentPath:       r.ParentPath,
+		Visibility:       r.Visibility,
 		GlobalVisibility: string(r.GlobalVisibility),
 	}
 
