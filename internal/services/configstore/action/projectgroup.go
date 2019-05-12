@@ -28,6 +28,51 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
+func (h *ActionHandler) GetProjectGroupSubgroups(ctx context.Context, projectGroupRef string) ([]*types.ProjectGroup, error) {
+	var projectGroups []*types.ProjectGroup
+	err := h.readDB.Do(func(tx *db.Tx) error {
+		var err error
+		projectGroup, err := h.readDB.GetProjectGroup(tx, projectGroupRef)
+		if err != nil {
+			return err
+		}
+
+		if projectGroup == nil {
+			return util.NewErrNotFound(errors.Errorf("project group %q doesn't exist", projectGroupRef))
+		}
+
+		projectGroups, err = h.readDB.GetProjectGroupSubgroups(tx, projectGroup.ID)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return projectGroups, nil
+}
+
+func (h *ActionHandler) GetProjectGroupProjects(ctx context.Context, projectGroupRef string) ([]*types.Project, error) {
+	var projects []*types.Project
+	err := h.readDB.Do(func(tx *db.Tx) error {
+		var err error
+		projectGroup, err := h.readDB.GetProjectGroup(tx, projectGroupRef)
+		if err != nil {
+			return err
+		}
+
+		if projectGroup == nil {
+			return util.NewErrNotFound(errors.Errorf("project group %q doesn't exist", projectGroupRef))
+		}
+
+		projects, err = h.readDB.GetProjectGroupProjects(tx, projectGroup.ID)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return projects, nil
+}
+
 func (h *ActionHandler) CreateProjectGroup(ctx context.Context, projectGroup *types.ProjectGroup) (*types.ProjectGroup, error) {
 	if projectGroup.Name == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("project group name required"))

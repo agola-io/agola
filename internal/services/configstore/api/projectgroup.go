@@ -137,14 +137,16 @@ func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 type ProjectGroupProjectsHandler struct {
 	log    *zap.SugaredLogger
+	ah     *action.ActionHandler
 	readDB *readdb.ReadDB
 }
 
-func NewProjectGroupProjectsHandler(logger *zap.Logger, readDB *readdb.ReadDB) *ProjectGroupProjectsHandler {
-	return &ProjectGroupProjectsHandler{log: logger.Sugar(), readDB: readDB}
+func NewProjectGroupProjectsHandler(logger *zap.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *ProjectGroupProjectsHandler {
+	return &ProjectGroupProjectsHandler{log: logger.Sugar(), ah: ah, readDB: readDB}
 }
 
 func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	vars := mux.Vars(r)
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
@@ -152,31 +154,9 @@ func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	var projectGroup *types.ProjectGroup
-	err = h.readDB.Do(func(tx *db.Tx) error {
-		projectGroup, err = h.readDB.GetProjectGroup(tx, projectGroupRef)
-		return err
-	})
-	if err != nil {
+	projects, err := h.ah.GetProjectGroupProjects(ctx, projectGroupRef)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
-	}
-
-	if projectGroup == nil {
-		httpError(w, util.NewErrNotFound(errors.Errorf("project group %q doesn't exist", projectGroupRef)))
-		return
-	}
-
-	var projects []*types.Project
-	err = h.readDB.Do(func(tx *db.Tx) error {
-		var err error
-		projects, err = h.readDB.GetProjectGroupProjects(tx, projectGroup.ID)
-		return err
-	})
-	if err != nil {
-		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
 		return
 	}
 
@@ -193,14 +173,16 @@ func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 
 type ProjectGroupSubgroupsHandler struct {
 	log    *zap.SugaredLogger
+	ah     *action.ActionHandler
 	readDB *readdb.ReadDB
 }
 
-func NewProjectGroupSubgroupsHandler(logger *zap.Logger, readDB *readdb.ReadDB) *ProjectGroupSubgroupsHandler {
-	return &ProjectGroupSubgroupsHandler{log: logger.Sugar(), readDB: readDB}
+func NewProjectGroupSubgroupsHandler(logger *zap.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *ProjectGroupSubgroupsHandler {
+	return &ProjectGroupSubgroupsHandler{log: logger.Sugar(), ah: ah, readDB: readDB}
 }
 
 func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	vars := mux.Vars(r)
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
@@ -208,31 +190,9 @@ func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.
 		return
 	}
 
-	var projectGroup *types.ProjectGroup
-	err = h.readDB.Do(func(tx *db.Tx) error {
-		projectGroup, err = h.readDB.GetProjectGroup(tx, projectGroupRef)
-		return err
-	})
-	if err != nil {
+	projectGroups, err := h.ah.GetProjectGroupSubgroups(ctx, projectGroupRef)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
-	}
-
-	if projectGroup == nil {
-		httpError(w, util.NewErrNotFound(errors.Errorf("project group %q doesn't exist", projectGroupRef)))
-		return
-	}
-
-	var projectGroups []*types.ProjectGroup
-	err = h.readDB.Do(func(tx *db.Tx) error {
-		var err error
-		projectGroups, err = h.readDB.GetProjectGroupSubgroups(tx, projectGroup.ID)
-		return err
-	})
-	if err != nil {
-		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
 		return
 	}
 

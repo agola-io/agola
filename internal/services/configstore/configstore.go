@@ -126,8 +126,8 @@ func (s *Configstore) Run(ctx context.Context) error {
 	corsHandler = ghandlers.CORS(corsAllowedMethodsOptions, corsAllowedHeadersOptions, corsAllowedOriginsOptions)
 
 	projectGroupHandler := api.NewProjectGroupHandler(logger, s.readDB)
-	projectGroupSubgroupsHandler := api.NewProjectGroupSubgroupsHandler(logger, s.readDB)
-	projectGroupProjectsHandler := api.NewProjectGroupProjectsHandler(logger, s.readDB)
+	projectGroupSubgroupsHandler := api.NewProjectGroupSubgroupsHandler(logger, s.ah, s.readDB)
+	projectGroupProjectsHandler := api.NewProjectGroupProjectsHandler(logger, s.ah, s.readDB)
 	createProjectGroupHandler := api.NewCreateProjectGroupHandler(logger, s.ah, s.readDB)
 
 	projectHandler := api.NewProjectHandler(logger, s.readDB)
