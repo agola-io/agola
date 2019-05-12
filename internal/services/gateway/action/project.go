@@ -162,6 +162,38 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 	return rp, h.SetupProject(ctx, rs, user, la, rp)
 }
 
+type UpdateProjectRequest struct {
+	Name       string
+	Visibility types.Visibility
+}
+
+func (h *ActionHandler) UpdateProject(ctx context.Context, projectRef string, req *UpdateProjectRequest) (*csapi.Project, error) {
+	p, resp, err := h.configstoreClient.GetProject(ctx, projectRef)
+	if err != nil {
+		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get project %q", projectRef))
+	}
+
+	isProjectOwner, err := h.IsProjectOwner(ctx, p.OwnerType, p.OwnerID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to determine ownership")
+	}
+	if !isProjectOwner {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
+	p.Name = req.Name
+	p.Visibility = req.Visibility
+
+	h.log.Infof("updating project")
+	rp, resp, err := h.configstoreClient.UpdateProject(ctx, p.ID, p.Project)
+	if err != nil {
+		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to update project"))
+	}
+	h.log.Infof("project %s updated, ID: %s", p.Name, p.ID)
+
+	return rp, nil
+}
+
 func (h *ActionHandler) ProjectUpdateRepoLinkedAccount(ctx context.Context, projectRef string) (*csapi.Project, error) {
 	curUserID := h.CurrentUserID(ctx)
 

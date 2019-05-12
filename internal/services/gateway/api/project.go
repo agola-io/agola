@@ -77,6 +77,52 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	}
 }
 
+type UpdateProjectRequest struct {
+	Name       string           `json:"name,omitempty"`
+	Visibility types.Visibility `json:"visibility,omitempty"`
+}
+
+type UpdateProjectHandler struct {
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
+}
+
+func NewUpdateProjectHandler(logger *zap.Logger, ah *action.ActionHandler) *UpdateProjectHandler {
+	return &UpdateProjectHandler{log: logger.Sugar(), ah: ah}
+}
+
+func (h *UpdateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	projectRef, err := url.PathUnescape(vars["projectref"])
+	if err != nil {
+		httpError(w, util.NewErrBadRequest(err))
+		return
+	}
+
+	var req UpdateProjectRequest
+	d := json.NewDecoder(r.Body)
+	if err := d.Decode(&req); err != nil {
+		httpError(w, util.NewErrBadRequest(err))
+		return
+	}
+
+	areq := &action.UpdateProjectRequest{
+		Name:       req.Name,
+		Visibility: req.Visibility,
+	}
+	project, err := h.ah.UpdateProject(ctx, projectRef, areq)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	res := createProjectResponse(project)
+	if err := httpResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Errorf("err: %+v", err)
+	}
+}
+
 type ProjectReconfigHandler struct {
 	log *zap.SugaredLogger
 	ah  *action.ActionHandler

@@ -156,6 +156,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	projectHandler := api.NewProjectHandler(logger, g.ah)
 	createProjectHandler := api.NewCreateProjectHandler(logger, g.ah)
+	updateProjectHandler := api.NewUpdateProjectHandler(logger, g.ah)
 	deleteProjectHandler := api.NewDeleteProjectHandler(logger, g.ah)
 	projectReconfigHandler := api.NewProjectReconfigHandler(logger, g.ah)
 	projectUpdateRepoLinkedAccountHandler := api.NewProjectUpdateRepoLinkedAccountHandler(logger, g.ah)
@@ -231,6 +232,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	apirouter.Handle("/projects/{projectref}", authForcedHandler(projectHandler)).Methods("GET")
 	apirouter.Handle("/projects", authForcedHandler(createProjectHandler)).Methods("POST")
+	apirouter.Handle("/projects/{projectref}", authForcedHandler(updateProjectHandler)).Methods("PUT")
 	apirouter.Handle("/projects/{projectref}", authForcedHandler(deleteProjectHandler)).Methods("DELETE")
 	apirouter.Handle("/projects/{projectref}/reconfig", authForcedHandler(projectReconfigHandler)).Methods("PUT")
 	apirouter.Handle("/projects/{projectref}/updaterepolinkedaccount", authForcedHandler(projectUpdateRepoLinkedAccountHandler)).Methods("PUT")
