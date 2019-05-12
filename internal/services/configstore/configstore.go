@@ -135,7 +135,7 @@ func (s *Configstore) Run(ctx context.Context) error {
 	updateProjectHandler := api.NewUpdateProjectHandler(logger, s.ah, s.readDB)
 	deleteProjectHandler := api.NewDeleteProjectHandler(logger, s.ah)
 
-	secretsHandler := api.NewSecretsHandler(logger, s.readDB)
+	secretsHandler := api.NewSecretsHandler(logger, s.ah, s.readDB)
 	createSecretHandler := api.NewCreateSecretHandler(logger, s.ah)
 	deleteSecretHandler := api.NewDeleteSecretHandler(logger, s.ah)
 

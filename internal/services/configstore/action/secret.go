@@ -27,6 +27,45 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
+func (h *ActionHandler) GetSecret(ctx context.Context, secretID string) (*types.Secret, error) {
+	var secret *types.Secret
+	err := h.readDB.Do(func(tx *db.Tx) error {
+		var err error
+		secret, err = h.readDB.GetSecretByID(tx, secretID)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if secret == nil {
+		return nil, util.NewErrNotFound(errors.Errorf("secret %q doesn't exist", secretID))
+	}
+
+	return secret, nil
+}
+
+func (h *ActionHandler) GetSecrets(ctx context.Context, parentType types.ConfigType, parentRef string, tree bool) ([]*types.Secret, error) {
+	var secrets []*types.Secret
+	err := h.readDB.Do(func(tx *db.Tx) error {
+		parentID, err := h.readDB.ResolveConfigID(tx, parentType, parentRef)
+		if err != nil {
+			return err
+		}
+		if tree {
+			secrets, err = h.readDB.GetSecretsTree(tx, parentType, parentID)
+		} else {
+			secrets, err = h.readDB.GetSecrets(tx, parentID)
+		}
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return secrets, nil
+}
+
 func (h *ActionHandler) CreateSecret(ctx context.Context, secret *types.Secret) (*types.Secret, error) {
 	if secret.Name == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("secret name required"))

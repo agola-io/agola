@@ -18,7 +18,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/db"
 	"github.com/sorintlab/agola/internal/services/configstore/action"
 	"github.com/sorintlab/agola/internal/services/configstore/readdb"
@@ -39,31 +38,22 @@ type Secret struct {
 
 type SecretHandler struct {
 	log    *zap.SugaredLogger
+	ah     *action.ActionHandler
 	readDB *readdb.ReadDB
 }
 
-func NewSecretHandler(logger *zap.Logger, readDB *readdb.ReadDB) *SecretHandler {
-	return &SecretHandler{log: logger.Sugar(), readDB: readDB}
+func NewSecretHandler(logger *zap.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *SecretHandler {
+	return &SecretHandler{log: logger.Sugar(), ah: ah, readDB: readDB}
 }
 
 func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	vars := mux.Vars(r)
 	secretID := vars["secretid"]
 
-	var secret *types.Secret
-	err := h.readDB.Do(func(tx *db.Tx) error {
-		var err error
-		secret, err = h.readDB.GetSecretByID(tx, secretID)
-		return err
-	})
-	if err != nil {
+	secret, err := h.ah.GetSecret(ctx, secretID)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
-	}
-
-	if secret == nil {
-		httpError(w, util.NewErrNotFound(errors.Errorf("secret %q doesn't exist", secretID)))
 		return
 	}
 
@@ -74,16 +64,17 @@ func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 type SecretsHandler struct {
 	log    *zap.SugaredLogger
+	ah     *action.ActionHandler
 	readDB *readdb.ReadDB
 }
 
-func NewSecretsHandler(logger *zap.Logger, readDB *readdb.ReadDB) *SecretsHandler {
-	return &SecretsHandler{log: logger.Sugar(), readDB: readDB}
+func NewSecretsHandler(logger *zap.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *SecretsHandler {
+	return &SecretsHandler{log: logger.Sugar(), ah: ah, readDB: readDB}
 }
 
 func (h *SecretsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	query := r.URL.Query()
-
 	_, tree := query["tree"]
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
@@ -92,22 +83,9 @@ func (h *SecretsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var secrets []*types.Secret
-	err = h.readDB.Do(func(tx *db.Tx) error {
-		parentID, err := h.readDB.ResolveConfigID(tx, parentType, parentRef)
-		if err != nil {
-			return err
-		}
-		if tree {
-			secrets, err = h.readDB.GetSecretsTree(tx, parentType, parentID)
-		} else {
-			secrets, err = h.readDB.GetSecrets(tx, parentID)
-		}
-		return err
-	})
-	if err != nil {
+	secrets, err := h.ah.GetSecrets(ctx, parentType, parentRef, tree)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
 		return
 	}
 
