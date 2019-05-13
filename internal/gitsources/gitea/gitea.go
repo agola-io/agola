@@ -17,6 +17,8 @@ package gitea
 import (
 	"context"
 	"crypto/tls"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -54,6 +56,7 @@ type Opts struct {
 
 type Client struct {
 	client         *gitea.Client
+	httpClient     *http.Client
 	URL            string
 	oauth2ClientID string
 	oauth2Secret   string
@@ -103,6 +106,7 @@ func New(opts Opts) (*Client, error) {
 
 	return &Client{
 		client:         client,
+		httpClient:     httpClient,
 		URL:            opts.URL,
 		oauth2ClientID: opts.Oauth2ClientID,
 		oauth2Secret:   opts.Oauth2Secret,
@@ -145,14 +149,37 @@ func (c *Client) RefreshOauth2Token(refreshToken string) (*oauth2.Token, error) 
 
 func (c *Client) LoginPassword(username, password, tokenName string) (string, error) {
 	// try to get agola access token if it already exists
+	// use custom http call since gitea api client doesn't provide an easy way to
+	// guess if the username/password login failed
 	var accessToken string
-	tokens, err := c.client.ListAccessTokens(username, password)
-	if err == nil {
-		for _, token := range tokens {
-			if token.Name == tokenName {
-				accessToken = token.Sha1
-				break
-			}
+
+	tokens := make([]*gitea.AccessToken, 0, 10)
+	req, err := http.NewRequest("GET", c.URL+"/api/v1"+fmt.Sprintf("/users/%s/tokens", username), nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(username+":"+password)))
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	if resp.StatusCode == http.StatusUnauthorized {
+		return "", gitsource.ErrUnauthorized
+	}
+	if resp.StatusCode/100 != 2 {
+		return "", errors.Errorf("gitea api status code %d", resp.StatusCode)
+	}
+	defer resp.Body.Close()
+
+	dec := json.NewDecoder(resp.Body)
+	if err := dec.Decode(&tokens); err != nil {
+		return "", err
+	}
+	for _, token := range tokens {
+		if token.Name == tokenName {
+			accessToken = token.Sha1
+			break
 		}
 	}
 
