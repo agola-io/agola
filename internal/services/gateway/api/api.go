@@ -36,6 +36,8 @@ func ErrorResponseFromError(err error) *ErrorResponse {
 	case util.IsErrNotFound(err):
 		fallthrough
 	case util.IsErrForbidden(err):
+		fallthrough
+	case util.IsErrUnauthorized(err):
 		return &ErrorResponse{Message: err.Error()}
 	}
 
@@ -63,6 +65,9 @@ func httpError(w http.ResponseWriter, err error) bool {
 		w.Write(resj)
 	case util.IsErrForbidden(err):
 		w.WriteHeader(http.StatusForbidden)
+		w.Write(resj)
+	case util.IsErrUnauthorized(err):
+		w.WriteHeader(http.StatusUnauthorized)
 		w.Write(resj)
 	default:
 		w.WriteHeader(http.StatusInternalServerError)
