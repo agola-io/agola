@@ -18,6 +18,7 @@
 package gitsource
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/sorintlab/agola/internal/services/types"
@@ -31,6 +32,8 @@ const (
 	CommitStatusSuccess CommitStatus = "success"
 	CommitStatusFailed  CommitStatus = "failed"
 )
+
+var ErrUnauthorized = errors.New("unauthorized")
 
 type GitSource interface {
 	GetRepoInfo(repopath string) (*RepoInfo, error)
