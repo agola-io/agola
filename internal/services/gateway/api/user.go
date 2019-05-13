@@ -163,6 +163,7 @@ type UserResponse struct {
 }
 
 type LinkedAccountResponse struct {
+	ID                  string `json:"id"`
 	RemoteSourceID      string `json:"remote_source_id"`
 	RemoteUserName      string `json:"remote_user_name"`
 	RemoteUserAvatarURL string `json:"remote_user_avatar_url"`
@@ -182,6 +183,7 @@ func createUserResponse(u *types.User) *UserResponse {
 
 	for _, la := range u.LinkedAccounts {
 		user.LinkedAccounts = append(user.LinkedAccounts, &LinkedAccountResponse{
+			ID:                  la.ID,
 			RemoteSourceID:      la.RemoteSourceID,
 			RemoteUserName:      la.RemoteUserName,
 			RemoteUserAvatarURL: la.RemoteUserAvatarURL,
