@@ -112,3 +112,22 @@ func IsErrForbidden(err error) bool {
 	_, ok := err.(*ErrForbidden)
 	return ok
 }
+
+// ErrUnauthorized represent an error caused by an unauthorized request
+// it's used to differentiate an internal error from an user error
+type ErrUnauthorized struct {
+	Err error
+}
+
+func (e *ErrUnauthorized) Error() string {
+	return e.Err.Error()
+}
+
+func NewErrUnauthorized(err error) *ErrUnauthorized {
+	return &ErrUnauthorized{Err: err}
+}
+
+func IsErrUnauthorized(err error) bool {
+	_, ok := err.(*ErrUnauthorized)
+	return ok
+}
