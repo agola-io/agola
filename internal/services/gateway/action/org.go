@@ -142,7 +142,7 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 	}, nil
 }
 
-func (h *ActionHandler) DeleteOrgMember(ctx context.Context, orgRef, userRef string) error {
+func (h *ActionHandler) RemoveOrgMember(ctx context.Context, orgRef, userRef string) error {
 	org, resp, err := h.configstoreClient.GetOrg(ctx, orgRef)
 	if err != nil {
 		return ErrFromRemote(resp, err)
@@ -156,9 +156,9 @@ func (h *ActionHandler) DeleteOrgMember(ctx context.Context, orgRef, userRef str
 		return util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
-	resp, err = h.configstoreClient.DeleteOrgMember(ctx, orgRef, userRef)
+	resp, err = h.configstoreClient.RemoveOrgMember(ctx, orgRef, userRef)
 	if err != nil {
-		return ErrFromRemote(resp, errors.Wrapf(err, "failed to add/update organization member"))
+		return ErrFromRemote(resp, errors.Wrapf(err, "failed to remove organization member"))
 	}
 
 	return nil
