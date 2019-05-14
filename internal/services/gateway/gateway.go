@@ -191,6 +191,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	createOrgHandler := api.NewCreateOrgHandler(logger, g.ah)
 	deleteOrgHandler := api.NewDeleteOrgHandler(logger, g.ah)
 
+	orgMembersHandler := api.NewOrgMembersHandler(logger, g.ah)
 	addOrgMemberHandler := api.NewAddOrgMemberHandler(logger, g.ah)
 	removeOrgMemberHandler := api.NewRemoveOrgMemberHandler(logger, g.ah)
 
@@ -272,6 +273,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/orgs", authForcedHandler(orgsHandler)).Methods("GET")
 	apirouter.Handle("/orgs", authForcedHandler(createOrgHandler)).Methods("POST")
 	apirouter.Handle("/orgs/{orgref}", authForcedHandler(deleteOrgHandler)).Methods("DELETE")
+	apirouter.Handle("/orgs/{orgref}/members", authForcedHandler(orgMembersHandler)).Methods("GET")
 	apirouter.Handle("/orgs/{orgref}/members/{userref}", authForcedHandler(addOrgMemberHandler)).Methods("PUT")
 	apirouter.Handle("/orgs/{orgref}/members/{userref}", authForcedHandler(removeOrgMemberHandler)).Methods("DELETE")
 

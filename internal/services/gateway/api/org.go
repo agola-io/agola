@@ -217,6 +217,39 @@ func createOrgMemberResponse(user *types.User, role types.MemberRole) *OrgMember
 	}
 }
 
+type OrgMembersHandler struct {
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
+}
+
+func NewOrgMembersHandler(logger *zap.Logger, ah *action.ActionHandler) *OrgMembersHandler {
+	return &OrgMembersHandler{log: logger.Sugar(), ah: ah}
+}
+
+func (h *OrgMembersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	vars := mux.Vars(r)
+	orgRef := vars["orgref"]
+
+	ares, err := h.ah.GetOrgMembers(ctx, orgRef)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	res := &OrgMembersResponse{
+		Organization: createOrgResponse(ares.Organization),
+		Members:      make([]*OrgMemberResponse, len(ares.Members)),
+	}
+	for i, m := range ares.Members {
+		res.Members[i] = createOrgMemberResponse(m.User, m.Role)
+	}
+	if err := httpResponse(w, http.StatusOK, res); err != nil {
+		h.log.Errorf("err: %+v", err)
+	}
+}
+
 type AddOrgMemberResponse struct {
 	Organization *OrgResponse `json:"organization"`
 	OrgMemberResponse

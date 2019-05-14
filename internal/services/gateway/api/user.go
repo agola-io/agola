@@ -21,14 +21,14 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/pkg/errors"
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
 	"github.com/sorintlab/agola/internal/services/gateway/action"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
-	"go.uber.org/zap"
 
 	"github.com/gorilla/mux"
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
 )
 
 type CreateUserRequest struct {

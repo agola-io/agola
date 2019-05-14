@@ -416,3 +416,9 @@ func (c *Client) AddOrgMember(ctx context.Context, orgRef, userRef string, role 
 func (c *Client) RemoveOrgMember(ctx context.Context, orgRef, userRef string) (*http.Response, error) {
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/orgs/%s/members/%s", orgRef, userRef), nil, jsonContent, nil)
 }
+
+func (c *Client) GetOrgMembers(ctx context.Context, orgRef string) (*OrgMembersResponse, *http.Response, error) {
+	res := &OrgMembersResponse{}
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s/members", orgRef), nil, jsonContent, nil, &res)
+	return res, resp, err
+}

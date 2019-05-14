@@ -45,6 +45,40 @@ func (h *ActionHandler) GetOrgs(ctx context.Context, req *GetOrgsRequest) ([]*ty
 	return orgs, nil
 }
 
+type OrgMembersResponse struct {
+	Organization *types.Organization
+	Members      []*OrgMemberResponse
+}
+
+type OrgMemberResponse struct {
+	User *types.User
+	Role types.MemberRole
+}
+
+func (h *ActionHandler) GetOrgMembers(ctx context.Context, orgRef string) (*OrgMembersResponse, error) {
+	org, resp, err := h.configstoreClient.GetOrg(ctx, orgRef)
+	if err != nil {
+		return nil, ErrFromRemote(resp, err)
+	}
+
+	orgMembers, resp, err := h.configstoreClient.GetOrgMembers(ctx, orgRef)
+	if err != nil {
+		return nil, ErrFromRemote(resp, err)
+	}
+
+	res := &OrgMembersResponse{
+		Organization: org,
+		Members:      make([]*OrgMemberResponse, len(orgMembers)),
+	}
+	for i, orgMember := range orgMembers {
+		res.Members[i] = &OrgMemberResponse{
+			User: orgMember.User,
+			Role: orgMember.Role,
+		}
+	}
+	return res, nil
+}
+
 type CreateOrgRequest struct {
 	Name       string
 	Visibility types.Visibility
