@@ -46,7 +46,8 @@ func (h *ActionHandler) GetOrgs(ctx context.Context, req *GetOrgsRequest) ([]*ty
 }
 
 type CreateOrgRequest struct {
-	Name string
+	Name       string
+	Visibility types.Visibility
 
 	CreatorUserID string
 }
@@ -64,7 +65,8 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*
 	}
 
 	org := &types.Organization{
-		Name: req.Name,
+		Name:       req.Name,
+		Visibility: req.Visibility,
 	}
 	if req.CreatorUserID != "" {
 		org.CreatorUserID = req.CreatorUserID

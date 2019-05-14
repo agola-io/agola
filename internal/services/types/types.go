@@ -107,6 +107,8 @@ type Organization struct {
 
 	Name string `json:"name,omitempty"`
 
+	Visibility Visibility `json:"visibility,omitempty"`
+
 	// CreatorUserID is the user id that created the organization. It could be empty
 	// if the org was created by using the admin user or the user has been removed.
 	CreatorUserID string    `json:"creator_user_id,omitempty"`

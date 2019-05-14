@@ -117,8 +117,11 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 		return nil, errors.Wrapf(err, "failed to marshal user")
 	}
 
+	// create root user project group
 	pg := &types.ProjectGroup{
 		ID: uuid.NewV4().String(),
+		// use public visibility
+		Visibility: types.VisibilityPublic,
 		Parent: types.Parent{
 			Type: types.ConfigTypeUser,
 			ID:   user.ID,

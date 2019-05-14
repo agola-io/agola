@@ -386,7 +386,7 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	org, err := cs.ah.CreateOrg(ctx, &types.Organization{Name: "org01"})
+	org, err := cs.ah.CreateOrg(ctx, &types.Organization{Name: "org01", Visibility: types.VisibilityPublic})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -533,7 +533,7 @@ func TestProjectGroupDelete(t *testing.T) {
 	//if err != nil {
 	//	t.Fatalf("unexpected err: %v", err)
 	//}
-	org, err := cs.ah.CreateOrg(ctx, &types.Organization{Name: "org01"})
+	org, err := cs.ah.CreateOrg(ctx, &types.Organization{Name: "org01", Visibility: types.VisibilityPublic})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -674,7 +674,7 @@ func TestOrgMembers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	org, err := cs.ah.CreateOrg(ctx, &types.Organization{Name: "org01", CreatorUserID: user.ID})
+	org, err := cs.ah.CreateOrg(ctx, &types.Organization{Name: "org01", Visibility: types.VisibilityPublic, CreatorUserID: user.ID})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -700,7 +700,7 @@ func TestOrgMembers(t *testing.T) {
 
 	orgs := []*types.Organization{}
 	for i := 0; i < 10; i++ {
-		org, err := cs.ah.CreateOrg(ctx, &types.Organization{Name: fmt.Sprintf("org%d", i), CreatorUserID: user.ID})
+		org, err := cs.ah.CreateOrg(ctx, &types.Organization{Name: fmt.Sprintf("org%d", i), Visibility: types.VisibilityPublic, CreatorUserID: user.ID})
 		if err != nil {
 			t.Fatalf("err: %v", err)
 		}

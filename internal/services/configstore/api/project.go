@@ -102,11 +102,21 @@ func getGlobalVisibility(readDB *readdb.ReadDB, tx *db.Tx, curVisibility types.V
 			return "", err
 		}
 		if projectGroup.Visibility == types.VisibilityPrivate {
-			curVisibility = types.VisibilityPrivate
-			continue
+			return types.VisibilityPrivate, nil
 		}
 
 		curParent = &projectGroup.Parent
+	}
+
+	// check parent visibility
+	if curParent.Type == types.ConfigTypeOrg {
+		org, err := readDB.GetOrg(tx, curParent.ID)
+		if err != nil {
+			return "", err
+		}
+		if org.Visibility == types.VisibilityPrivate {
+			return types.VisibilityPrivate, nil
+		}
 	}
 
 	return curVisibility, nil

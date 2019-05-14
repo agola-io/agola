@@ -36,6 +36,9 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) 
 	if !util.ValidateName(org.Name) {
 		return nil, util.NewErrBadRequest(errors.Errorf("invalid organization name %q", org.Name))
 	}
+	if !types.IsValidVisibility(org.Visibility) {
+		return nil, util.NewErrBadRequest(errors.Errorf("invalid organization visibility"))
+	}
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
 	// changegroup is the org name
@@ -109,8 +112,11 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) 
 		})
 	}
 
+	// create root org project group
 	pg := &types.ProjectGroup{
 		ID: uuid.NewV4().String(),
+		// use same org visibility
+		Visibility: org.Visibility,
 		Parent: types.Parent{
 			Type: types.ConfigTypeOrg,
 			ID:   org.ID,
