@@ -269,8 +269,8 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 	return orgmember, err
 }
 
-// DeleteOrgMember deletes an org member.
-func (h *ActionHandler) DeleteOrgMember(ctx context.Context, orgRef, userRef string) error {
+// RemoveOrgMember removes an org member.
+func (h *ActionHandler) RemoveOrgMember(ctx context.Context, orgRef, userRef string) error {
 	var org *types.Organization
 	var user *types.User
 	var orgmember *types.OrganizationMember

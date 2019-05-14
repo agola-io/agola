@@ -253,23 +253,23 @@ func (h *AddOrgMemberHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-type DeleteOrgMemberHandler struct {
+type RemoveOrgMemberHandler struct {
 	log *zap.SugaredLogger
 	ah  *action.ActionHandler
 }
 
-func NewDeleteOrgMemberHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteOrgMemberHandler {
-	return &DeleteOrgMemberHandler{log: logger.Sugar(), ah: ah}
+func NewRemoveOrgMemberHandler(logger *zap.Logger, ah *action.ActionHandler) *RemoveOrgMemberHandler {
+	return &RemoveOrgMemberHandler{log: logger.Sugar(), ah: ah}
 }
 
-func (h *DeleteOrgMemberHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *RemoveOrgMemberHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	vars := mux.Vars(r)
 	orgRef := vars["orgref"]
 	userRef := vars["userref"]
 
-	err := h.ah.DeleteOrgMember(ctx, orgRef, userRef)
+	err := h.ah.RemoveOrgMember(ctx, orgRef, userRef)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return

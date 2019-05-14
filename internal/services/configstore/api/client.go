@@ -478,7 +478,7 @@ func (c *Client) AddOrgMember(ctx context.Context, orgRef, userRef string, role 
 	return orgmember, resp, err
 }
 
-func (c *Client) DeleteOrgMember(ctx context.Context, orgRef, userRef string) (*http.Response, error) {
+func (c *Client) RemoveOrgMember(ctx context.Context, orgRef, userRef string) (*http.Response, error) {
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/orgs/%s/members/%s", orgRef, userRef), nil, jsonContent, nil)
 }
 
