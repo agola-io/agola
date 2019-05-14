@@ -129,6 +129,7 @@ func (s *Configstore) Run(ctx context.Context) error {
 	projectGroupSubgroupsHandler := api.NewProjectGroupSubgroupsHandler(logger, s.ah, s.readDB)
 	projectGroupProjectsHandler := api.NewProjectGroupProjectsHandler(logger, s.ah, s.readDB)
 	createProjectGroupHandler := api.NewCreateProjectGroupHandler(logger, s.ah, s.readDB)
+	updateProjectGroupHandler := api.NewUpdateProjectGroupHandler(logger, s.ah, s.readDB)
 	deleteProjectGroupHandler := api.NewDeleteProjectGroupHandler(logger, s.ah)
 
 	projectHandler := api.NewProjectHandler(logger, s.readDB)
@@ -180,6 +181,7 @@ func (s *Configstore) Run(ctx context.Context) error {
 	apirouter.Handle("/projectgroups/{projectgroupref}/subgroups", projectGroupSubgroupsHandler).Methods("GET")
 	apirouter.Handle("/projectgroups/{projectgroupref}/projects", projectGroupProjectsHandler).Methods("GET")
 	apirouter.Handle("/projectgroups", createProjectGroupHandler).Methods("POST")
+	apirouter.Handle("/projectgroups/{projectgroupref}", updateProjectGroupHandler).Methods("PUT")
 	apirouter.Handle("/projectgroups/{projectgroupref}", deleteProjectGroupHandler).Methods("DELETE")
 
 	apirouter.Handle("/projects/{projectref}", projectHandler).Methods("GET")

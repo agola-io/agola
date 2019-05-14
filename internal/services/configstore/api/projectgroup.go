@@ -244,6 +244,54 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	}
 }
 
+type UpdateProjectGroupHandler struct {
+	log    *zap.SugaredLogger
+	ah     *action.ActionHandler
+	readDB *readdb.ReadDB
+}
+
+func NewUpdateProjectGroupHandler(logger *zap.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *UpdateProjectGroupHandler {
+	return &UpdateProjectGroupHandler{log: logger.Sugar(), ah: ah, readDB: readDB}
+}
+
+func (h *UpdateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	vars := mux.Vars(r)
+	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
+	if err != nil {
+		httpError(w, util.NewErrBadRequest(err))
+		return
+	}
+
+	var projectGroup *types.ProjectGroup
+	d := json.NewDecoder(r.Body)
+	if err := d.Decode(&projectGroup); err != nil {
+		httpError(w, util.NewErrBadRequest(err))
+		return
+	}
+
+	areq := &action.UpdateProjectGroupRequest{
+		ProjectGroupRef: projectGroupRef,
+		ProjectGroup:    projectGroup,
+	}
+	projectGroup, err = h.ah.UpdateProjectGroup(ctx, areq)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	resProjectGroup, err := projectGroupResponse(h.readDB, projectGroup)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	if err := httpResponse(w, http.StatusCreated, resProjectGroup); err != nil {
+		h.log.Errorf("err: %+v", err)
+	}
+}
+
 type DeleteProjectGroupHandler struct {
 	log *zap.SugaredLogger
 	ah  *action.ActionHandler

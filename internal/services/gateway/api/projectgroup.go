@@ -30,9 +30,9 @@ import (
 )
 
 type CreateProjectGroupRequest struct {
-	Name       string           `json:"name,omitempty"`
-	ParentRef  string           `json:"parent_ref,omitempty"`
-	Visibility types.Visibility `json:"visibility,omitempty"`
+	Name       string           `json:"name"`
+	ParentRef  string           `json:"parent_ref"`
+	Visibility types.Visibility `json:"visibility"`
 }
 
 type CreateProjectGroupHandler struct {
@@ -70,6 +70,52 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	}
 
 	projectGroup, err := h.ah.CreateProjectGroup(ctx, creq)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	res := createProjectGroupResponse(projectGroup)
+	if err := httpResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Errorf("err: %+v", err)
+	}
+}
+
+type UpdateProjectGroupRequest struct {
+	Name       string           `json:"name,omitempty"`
+	Visibility types.Visibility `json:"visibility,omitempty"`
+}
+
+type UpdateProjectGroupHandler struct {
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
+}
+
+func NewUpdateProjectGroupHandler(logger *zap.Logger, ah *action.ActionHandler) *UpdateProjectGroupHandler {
+	return &UpdateProjectGroupHandler{log: logger.Sugar(), ah: ah}
+}
+
+func (h *UpdateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
+	if err != nil {
+		httpError(w, util.NewErrBadRequest(err))
+		return
+	}
+
+	var req UpdateProjectGroupRequest
+	d := json.NewDecoder(r.Body)
+	if err := d.Decode(&req); err != nil {
+		httpError(w, util.NewErrBadRequest(err))
+		return
+	}
+
+	areq := &action.UpdateProjectGroupRequest{
+		Name:       req.Name,
+		Visibility: req.Visibility,
+	}
+	projectGroup, err := h.ah.UpdateProjectGroup(ctx, projectGroupRef, areq)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
@@ -209,12 +255,12 @@ func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.
 }
 
 type ProjectGroupResponse struct {
-	ID               string           `json:"id,omitempty"`
-	Name             string           `json:"name,omitempty"`
-	Path             string           `json:"path,omitempty"`
-	ParentPath       string           `json:"parent_path,omitempty"`
-	Visibility       types.Visibility `json:"visibility,omitempty"`
-	GlobalVisibility string           `json:"global_visibility,omitempty"`
+	ID               string           `json:"id"`
+	Name             string           `json:"name"`
+	Path             string           `json:"path"`
+	ParentPath       string           `json:"parent_path"`
+	Visibility       types.Visibility `json:"visibility"`
+	GlobalVisibility string           `json:"global_visibility"`
 }
 
 func createProjectGroupResponse(r *csapi.ProjectGroup) *ProjectGroupResponse {

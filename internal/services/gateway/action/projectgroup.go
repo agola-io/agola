@@ -104,6 +104,38 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProje
 	return rp, nil
 }
 
+type UpdateProjectGroupRequest struct {
+	Name       string
+	Visibility types.Visibility
+}
+
+func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, projectGroupRef string, req *UpdateProjectGroupRequest) (*csapi.ProjectGroup, error) {
+	pg, resp, err := h.configstoreClient.GetProjectGroup(ctx, projectGroupRef)
+	if err != nil {
+		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get project group %q", projectGroupRef))
+	}
+
+	isProjectOwner, err := h.IsProjectOwner(ctx, pg.OwnerType, pg.OwnerID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to determine ownership")
+	}
+	if !isProjectOwner {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
+	pg.Name = req.Name
+	pg.Visibility = req.Visibility
+
+	h.log.Infof("updating project group")
+	rp, resp, err := h.configstoreClient.UpdateProjectGroup(ctx, pg.ID, pg.ProjectGroup)
+	if err != nil {
+		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to update project group"))
+	}
+	h.log.Infof("project group %q updated, ID: %s", pg.Name, pg.ID)
+
+	return rp, nil
+}
+
 func (h *ActionHandler) DeleteProjectGroup(ctx context.Context, projectRef string) error {
 	p, resp, err := h.configstoreClient.GetProjectGroup(ctx, projectRef)
 	if err != nil {
