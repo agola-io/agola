@@ -504,3 +504,9 @@ func (c *Client) GetOrg(ctx context.Context, orgRef string) (*types.Organization
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s", orgRef), nil, jsonContent, nil, org)
 	return org, resp, err
 }
+
+func (c *Client) GetOrgMembers(ctx context.Context, orgRef string) ([]*OrgMemberResponse, *http.Response, error) {
+	orgMembers := []*OrgMemberResponse{}
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s/members", orgRef), nil, jsonContent, nil, &orgMembers)
+	return orgMembers, resp, err
+}

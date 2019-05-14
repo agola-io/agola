@@ -243,3 +243,45 @@ func (h *RemoveOrgMemberHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.log.Errorf("err: %+v", err)
 	}
 }
+
+type OrgMemberResponse struct {
+	User *types.User
+	Role types.MemberRole
+}
+
+func orgMemberResponse(orgUser *action.OrgMemberResponse) *OrgMemberResponse {
+	return &OrgMemberResponse{
+		User: orgUser.User,
+		Role: orgUser.Role,
+	}
+}
+
+type OrgMembersHandler struct {
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
+}
+
+func NewOrgMembersHandler(logger *zap.Logger, ah *action.ActionHandler) *OrgMembersHandler {
+	return &OrgMembersHandler{log: logger.Sugar(), ah: ah}
+}
+
+func (h *OrgMembersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	orgRef := vars["orgref"]
+
+	orgUsers, err := h.ah.GetOrgMembers(ctx, orgRef)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	res := make([]*OrgMemberResponse, len(orgUsers))
+	for i, orgUser := range orgUsers {
+		res[i] = orgMemberResponse(orgUser)
+	}
+
+	if err := httpResponse(w, http.StatusOK, res); err != nil {
+		h.log.Errorf("err: %+v", err)
+	}
+}

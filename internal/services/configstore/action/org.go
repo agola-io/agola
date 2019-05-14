@@ -22,12 +22,52 @@ import (
 
 	"github.com/sorintlab/agola/internal/datamanager"
 	"github.com/sorintlab/agola/internal/db"
+	"github.com/sorintlab/agola/internal/services/configstore/readdb"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 )
+
+type OrgMemberResponse struct {
+	User *types.User
+	Role types.MemberRole
+}
+
+func orgMemberResponse(orgUser *readdb.OrgUser) *OrgMemberResponse {
+	return &OrgMemberResponse{
+		User: orgUser.User,
+		Role: orgUser.Role,
+	}
+}
+
+func (h *ActionHandler) GetOrgMembers(ctx context.Context, orgRef string) ([]*OrgMemberResponse, error) {
+	var orgUsers []*readdb.OrgUser
+	err := h.readDB.Do(func(tx *db.Tx) error {
+		var err error
+		org, err := h.readDB.GetOrg(tx, orgRef)
+		if err != nil {
+			return err
+		}
+		if org == nil {
+			return util.NewErrNotFound(errors.Errorf("org %q doesn't exist", orgRef))
+		}
+
+		orgUsers, err = h.readDB.GetOrgUsers(tx, org.ID)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]*OrgMemberResponse, len(orgUsers))
+	for i, orgUser := range orgUsers {
+		res[i] = orgMemberResponse(orgUser)
+	}
+
+	return res, nil
+}
 
 func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) (*types.Organization, error) {
 	if org.Name == "" {
