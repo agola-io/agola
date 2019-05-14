@@ -27,6 +27,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/sorintlab/agola/internal/services/types"
+
 	"github.com/pkg/errors"
 )
 
@@ -395,4 +397,22 @@ func (c *Client) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*OrgResp
 
 func (c *Client) DeleteOrg(ctx context.Context, orgRef string) (*http.Response, error) {
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/orgs/%s", orgRef), nil, jsonContent, nil)
+}
+
+func (c *Client) AddOrgMember(ctx context.Context, orgRef, userRef string, role types.MemberRole) (*AddOrgMemberResponse, *http.Response, error) {
+	req := &AddOrgMemberRequest{
+		Role: role,
+	}
+	omj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	res := new(AddOrgMemberResponse)
+	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/orgs/%s/members/%s", orgRef, userRef), nil, jsonContent, bytes.NewReader(omj), res)
+	return res, resp, err
+}
+
+func (c *Client) RemoveOrgMember(ctx context.Context, orgRef, userRef string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/orgs/%s/members/%s", orgRef, userRef), nil, jsonContent, nil)
 }

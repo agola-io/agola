@@ -200,17 +200,35 @@ func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type OrgMemberResponse struct {
-	Organization *OrgResponse     `json:"organization,omitempty"`
-	User         *UserResponse    `json:"user,omitempty"`
-	Role         types.MemberRole `json:"role,omitempty"`
+type OrgMembersResponse struct {
+	Organization *OrgResponse         `json:"organization"`
+	Members      []*OrgMemberResponse `json:"members"`
 }
 
-func createOrgMemberResponse(org *types.Organization, user *types.User, role types.MemberRole) *OrgMemberResponse {
+type OrgMemberResponse struct {
+	User *UserResponse    `json:"user"`
+	Role types.MemberRole `json:"role"`
+}
+
+func createOrgMemberResponse(user *types.User, role types.MemberRole) *OrgMemberResponse {
 	return &OrgMemberResponse{
+		User: createUserResponse(user),
+		Role: role,
+	}
+}
+
+type AddOrgMemberResponse struct {
+	Organization *OrgResponse `json:"organization"`
+	OrgMemberResponse
+}
+
+func createAddOrgMemberResponse(org *types.Organization, user *types.User, role types.MemberRole) *AddOrgMemberResponse {
+	return &AddOrgMemberResponse{
 		Organization: createOrgResponse(org),
-		User:         createUserResponse(user),
-		Role:         role,
+		OrgMemberResponse: OrgMemberResponse{
+			User: createUserResponse(user),
+			Role: role,
+		},
 	}
 }
 
@@ -247,7 +265,7 @@ func (h *AddOrgMemberHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	res := createOrgMemberResponse(ares.Org, ares.User, ares.OrganizationMember.MemberRole)
+	res := createAddOrgMemberResponse(ares.Org, ares.User, ares.OrganizationMember.MemberRole)
 	if err := httpResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
