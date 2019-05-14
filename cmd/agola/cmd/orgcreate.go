@@ -22,6 +22,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/services/gateway/api"
+	"github.com/sorintlab/agola/internal/services/types"
 
 	"github.com/spf13/cobra"
 )
@@ -37,7 +38,8 @@ var cmdOrgCreate = &cobra.Command{
 }
 
 type orgCreateOptions struct {
-	name string
+	name       string
+	visibility string
 }
 
 var orgCreateOpts orgCreateOptions
@@ -46,6 +48,7 @@ func init() {
 	flags := cmdOrgCreate.Flags()
 
 	flags.StringVarP(&orgCreateOpts.name, "name", "n", "", "organization name")
+	flags.StringVar(&orgCreateOpts.visibility, "visibility", "public", `organization visibility (public or private)`)
 
 	cmdOrgCreate.MarkFlagRequired("name")
 
@@ -55,8 +58,14 @@ func init() {
 func orgCreate(cmd *cobra.Command, args []string) error {
 	gwclient := api.NewClient(gatewayURL, token)
 
+	// TODO(sgotti) make this a custom pflag Value?
+	if !types.IsValidVisibility(types.Visibility(orgCreateOpts.visibility)) {
+		return errors.Errorf("invalid visibility %q", orgCreateOpts.visibility)
+	}
+
 	req := &api.CreateOrgRequest{
-		Name: orgCreateOpts.name,
+		Name:       orgCreateOpts.name,
+		Visibility: types.Visibility(orgCreateOpts.visibility),
 	}
 
 	log.Infof("creating org")

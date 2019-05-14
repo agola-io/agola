@@ -32,7 +32,8 @@ import (
 )
 
 type CreateOrgRequest struct {
-	Name string `json:"name"`
+	Name       string           `json:"name"`
+	Visibility types.Visibility `json:"visibility"`
 }
 
 type CreateOrgHandler struct {
@@ -63,6 +64,7 @@ func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	creq := &action.CreateOrgRequest{
 		Name:          req.Name,
+		Visibility:    req.Visibility,
 		CreatorUserID: userID,
 	}
 
@@ -130,14 +132,16 @@ func (h *OrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type OrgResponse struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID         string           `json:"id"`
+	Name       string           `json:"name"`
+	Visibility types.Visibility `json:"visibility,omitempty"`
 }
 
 func createOrgResponse(o *types.Organization) *OrgResponse {
 	org := &OrgResponse{
-		ID:   o.ID,
-		Name: o.Name,
+		ID:         o.ID,
+		Name:       o.Name,
+		Visibility: o.Visibility,
 	}
 	return org
 }
