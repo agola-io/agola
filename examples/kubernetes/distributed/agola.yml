@@ -11,7 +11,7 @@ spec:
       nodePort: 30002
   selector:
     app: agola
-    component: gateway-scheduler
+    component: gateway-others
   type: NodePort
 
 ---
@@ -90,6 +90,13 @@ data:
     scheduler:
       runserviceURL: "http://agola-runservice:4000"
 
+    notification:
+      webExposedURL: "http://192.168.39.188:30002"
+      runserviceURL: "http://agola-runservice:4000"
+      configstoreURL: "http://agola-configstore:4002"
+      etcd:
+        endpoints: "http://localhost:2379"
+
     configstore:
       dataDir: /mnt/agola/local/configstore
       etcd:
@@ -142,18 +149,18 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: agola-gateway-scheduler
+  name: agola-gateway-others
 spec:
   replicas: 2
   selector:
     matchLabels:
       app: agola
-      component: gateway-scheduler
+      component: gateway-others
   template:
     metadata:
       labels:
         app: agola
-        component: gateway-scheduler
+        component: gateway-others
     spec:
       containers:
       - name: agola
@@ -164,7 +171,7 @@ spec:
           - "--config"
           - /mnt/agola/config/config.yml
           - "--components"
-          - gateway,scheduler
+          - gateway,scheduler,notification
         env:
         ports:
           - containerPort: 8000
