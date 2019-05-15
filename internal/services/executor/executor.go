@@ -753,6 +753,13 @@ func (e *Executor) executeTask(ctx context.Context, et *types.ExecutorTask) {
 		return
 	}
 
+	activeTasks := e.runningTasks.len()
+	// don't start task if we have reached the active tasks limit
+	// they will be executed later
+	if activeTasks > e.c.ActiveTasksLimit {
+		return
+	}
+
 	rt := &runningTask{
 		et: et,
 	}
