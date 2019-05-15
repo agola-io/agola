@@ -21,6 +21,7 @@ import (
 
 	"github.com/sorintlab/agola/internal/services/common"
 	rsapi "github.com/sorintlab/agola/internal/services/runservice/api"
+	rstypes "github.com/sorintlab/agola/internal/services/runservice/types"
 	"github.com/sorintlab/agola/internal/util"
 
 	"github.com/pkg/errors"
@@ -104,6 +105,7 @@ type RunActionType string
 
 const (
 	RunActionTypeRestart RunActionType = "restart"
+	RunActionTypeCancel  RunActionType = "cancel"
 	RunActionTypeStop    RunActionType = "stop"
 )
 
@@ -136,6 +138,17 @@ func (h *ActionHandler) RunAction(ctx context.Context, req *RunActionsRequest) (
 		}
 
 		runResp, resp, err = h.runserviceClient.CreateRun(ctx, rsreq)
+		if err != nil {
+			return nil, ErrFromRemote(resp, err)
+		}
+
+	case RunActionTypeCancel:
+		rsreq := &rsapi.RunActionsRequest{
+			ActionType: rsapi.RunActionTypeChangePhase,
+			Phase:      rstypes.RunPhaseCancelled,
+		}
+
+		resp, err = h.runserviceClient.RunActions(ctx, req.RunID, rsreq)
 		if err != nil {
 			return nil, ErrFromRemote(resp, err)
 		}

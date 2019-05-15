@@ -76,18 +76,25 @@ func (h *ActionHandler) ChangeRunPhase(ctx context.Context, req *RunChangePhaseR
 	switch req.Phase {
 	case types.RunPhaseRunning:
 		if r.Phase != types.RunPhaseQueued {
-			return errors.Errorf("run %s is not queued but in %q phase", r.ID, r.Phase)
+			return errors.Errorf("run %q is not queued but in %q phase", r.ID, r.Phase)
 		}
 		r.ChangePhase(types.RunPhaseRunning)
 		runEvent, err = common.NewRunEvent(ctx, h.e, r.ID, r.Phase, r.Result)
 		if err != nil {
 			return err
 		}
-	case types.RunPhaseFinished:
-		if r.Phase != types.RunPhaseRunning {
-			return errors.Errorf("run %s is not running but in %q phase", r.ID, r.Phase)
+	case types.RunPhaseCancelled:
+		if r.Phase != types.RunPhaseQueued {
+			return errors.Errorf("run %q is not queued but in %q phase", r.ID, r.Phase)
 		}
-		r.Stop = true
+		r.ChangePhase(types.RunPhaseCancelled)
+		runEvent, err = common.NewRunEvent(ctx, h.e, r.ID, r.Phase, r.Result)
+		if err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("unsupport change phase %q", req.Phase)
+
 	}
 
 	_, err = store.AtomicPutRun(ctx, h.e, r, runEvent, cgt)
