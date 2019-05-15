@@ -301,6 +301,14 @@ func (s *Store) AtomicDelete(ctx context.Context, key string, revision int64) (*
 	return tresp, nil
 }
 
+func (s *Store) WatchKey(ctx context.Context, prefix string, revision int64) etcdclientv3.WatchChan {
+	etcdv3Options := []etcdclientv3.OpOption{}
+	if revision != 0 {
+		etcdv3Options = append(etcdv3Options, etcdclientv3.WithRev(revision))
+	}
+	return s.c.Watch(ctx, prefix, etcdv3Options...)
+}
+
 func (s *Store) Watch(ctx context.Context, prefix string, revision int64) etcdclientv3.WatchChan {
 	etcdv3Options := []etcdclientv3.OpOption{clientv3.WithPrefix()}
 	if revision != 0 {
