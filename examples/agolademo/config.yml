@@ -20,6 +20,13 @@ gateway:
 scheduler:
   runserviceURL: "http://localhost:4000"
 
+notification:
+  webExposedURL: "http://172.17.0.1:8080"
+  runserviceURL: "http://localhost:4000"
+  configstoreURL: "http://localhost:4002"
+  etcd:
+    endpoints: "http://localhost:2379"
+
 configstore:
   dataDir: /tmp/agola/configstore
   etcd:
