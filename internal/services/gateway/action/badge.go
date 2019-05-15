@@ -22,7 +22,7 @@ import (
 	"net/url"
 	"path"
 
-	"github.com/sorintlab/agola/internal/services/gateway/common"
+	"github.com/sorintlab/agola/internal/services/common"
 	rstypes "github.com/sorintlab/agola/internal/services/runservice/types"
 )
 
