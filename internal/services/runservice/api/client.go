@@ -303,3 +303,10 @@ func (c *Client) GetLogs(ctx context.Context, runID, taskID string, setup bool, 
 
 	return c.getResponse(ctx, "GET", "/logs", q, -1, nil, nil)
 }
+
+func (c *Client) GetRunEvents(ctx context.Context, startRunEventID string) (*http.Response, error) {
+	q := url.Values{}
+	q.Add("startruneventid", startRunEventID)
+
+	return c.getResponse(ctx, "GET", "/runs/events", q, -1, nil, nil)
+}

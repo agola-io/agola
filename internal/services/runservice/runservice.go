@@ -189,6 +189,8 @@ func (s *Runservice) Run(ctx context.Context) error {
 	runsHandler := api.NewRunsHandler(logger, s.readDB)
 	runActionsHandler := api.NewRunActionsHandler(logger, s.ah)
 	runCreateHandler := api.NewRunCreateHandler(logger, s.ah)
+	runEventsHandler := api.NewRunEventsHandler(logger, s.e, s.ost, s.dm)
+
 	changeGroupsUpdateTokensHandler := api.NewChangeGroupsUpdateTokensHandler(logger, s.readDB)
 
 	router := mux.NewRouter()
@@ -209,6 +211,7 @@ func (s *Runservice) Run(ctx context.Context) error {
 
 	apirouter.Handle("/logs", logsHandler).Methods("GET")
 
+	apirouter.Handle("/runs/events", runEventsHandler).Methods("GET")
 	apirouter.Handle("/runs/{runid}", runHandler).Methods("GET")
 	apirouter.Handle("/runs/{runid}/actions", runActionsHandler).Methods("PUT")
 	apirouter.Handle("/runs/{runid}/tasks/{taskid}/actions", runTaskActionsHandler).Methods("PUT")

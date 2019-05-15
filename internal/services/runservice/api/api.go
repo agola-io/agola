@@ -36,6 +36,9 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
+	etcdclientv3 "go.etcd.io/etcd/clientv3"
+	etcdclientv3rpc "go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
+	"go.etcd.io/etcd/mvcc/mvccpb"
 	"go.uber.org/zap"
 )
 
@@ -117,7 +120,6 @@ func NewLogsHandler(logger *zap.Logger, e *etcd.Store, ost *objectstorage.ObjSto
 func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// TODO(sgotti) Check authorized call from client
 	q := r.URL.Query()
 
 	runID := q.Get("runid")
@@ -705,4 +707,80 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
+}
+
+type RunEventsHandler struct {
+	log *zap.SugaredLogger
+	e   *etcd.Store
+	ost *objectstorage.ObjStorage
+	dm  *datamanager.DataManager
+}
+
+func NewRunEventsHandler(logger *zap.Logger, e *etcd.Store, ost *objectstorage.ObjStorage, dm *datamanager.DataManager) *RunEventsHandler {
+	return &RunEventsHandler{
+		log: logger.Sugar(),
+		e:   e,
+		ost: ost,
+		dm:  dm,
+	}
+}
+
+//
+func (h *RunEventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	q := r.URL.Query()
+
+	// TODO(sgotti) handle additional events filtering (by type, etc...)
+	startRunEventID := q.Get("startruneventid")
+
+	if err := h.sendRunEvents(ctx, startRunEventID, w); err != nil {
+		h.log.Errorf("err: %+v", err)
+	}
+}
+
+func (h *RunEventsHandler) sendRunEvents(ctx context.Context, startRunEventID string, w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	var flusher http.Flusher
+	if fl, ok := w.(http.Flusher); ok {
+		flusher = fl
+	}
+
+	// TODO(sgotti) fetch from previous events (handle startRunEventID).
+	// Use the readdb instead of etcd
+
+	wctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	wctx = etcdclientv3.WithRequireLeader(wctx)
+	wch := h.e.WatchKey(wctx, common.EtcdRunEventKey, 0)
+	for wresp := range wch {
+		if wresp.Canceled {
+			err := wresp.Err()
+			if err == etcdclientv3rpc.ErrCompacted {
+				h.log.Errorf("required events already compacted")
+			}
+			return errors.Wrapf(err, "watch error")
+		}
+
+		for _, ev := range wresp.Events {
+			switch ev.Type {
+			case mvccpb.PUT:
+				var runEvent *types.RunEvent
+				if err := json.Unmarshal(ev.Kv.Value, &runEvent); err != nil {
+					return errors.Wrap(err, "failed to unmarshal run")
+				}
+				if _, err := w.Write([]byte(fmt.Sprintf("data: %s\n\n", ev.Kv.Value))); err != nil {
+					return err
+				}
+			}
+		}
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}
+
+	return nil
 }
