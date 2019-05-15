@@ -71,12 +71,18 @@ func (h *ActionHandler) ChangeRunPhase(ctx context.Context, req *RunChangePhaseR
 		return err
 	}
 
+	var runEvent *types.RunEvent
+
 	switch req.Phase {
 	case types.RunPhaseRunning:
 		if r.Phase != types.RunPhaseQueued {
 			return errors.Errorf("run %s is not queued but in %q phase", r.ID, r.Phase)
 		}
 		r.ChangePhase(types.RunPhaseRunning)
+		runEvent, err = common.NewRunEvent(ctx, h.e, r.ID, r.Phase, r.Result)
+		if err != nil {
+			return err
+		}
 	case types.RunPhaseFinished:
 		if r.Phase != types.RunPhaseRunning {
 			return errors.Errorf("run %s is not running but in %q phase", r.ID, r.Phase)
@@ -84,7 +90,7 @@ func (h *ActionHandler) ChangeRunPhase(ctx context.Context, req *RunChangePhaseR
 		r.Stop = true
 	}
 
-	_, err = store.AtomicPutRun(ctx, h.e, r, nil, cgt)
+	_, err = store.AtomicPutRun(ctx, h.e, r, runEvent, cgt)
 	return err
 }
 
