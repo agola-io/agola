@@ -30,19 +30,12 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const (
-	// TODO(sgotti) The gitea client doesn't provide an easy way to detect http response codes...
-	// we should probably use our own client implementation
-
-	ClientNotFound = "404 Not Found"
-)
-
 var (
 	GitlabOauth2Scopes = []string{"api"}
 )
 
 type Opts struct {
-	URL            string
+	APIURL         string
 	Token          string
 	SkipVerify     bool
 	Oauth2ClientID string
@@ -51,7 +44,7 @@ type Opts struct {
 
 type Client struct {
 	client         *gitlab.Client
-	URL            string
+	APIURL         string
 	oauth2ClientID string
 	oauth2Secret   string
 }
@@ -89,11 +82,11 @@ func New(opts Opts) (*Client, error) {
 	}
 	httpClient := &http.Client{Transport: transport}
 	client := gitlab.NewOAuthClient(httpClient, opts.Token)
-	client.SetBaseURL(opts.URL)
+	client.SetBaseURL(opts.APIURL)
 
 	return &Client{
 		client:         client,
-		URL:            opts.URL,
+		APIURL:         opts.APIURL,
 		oauth2ClientID: opts.Oauth2ClientID,
 		oauth2Secret:   opts.Oauth2Secret,
 	}, nil
@@ -105,8 +98,8 @@ func (c *Client) oauth2Config(callbackURL string) *oauth2.Config {
 		ClientSecret: c.oauth2Secret,
 		Scopes:       GitlabOauth2Scopes,
 		Endpoint: oauth2.Endpoint{
-			AuthURL:  fmt.Sprintf("%s/oauth/authorize", c.URL),
-			TokenURL: fmt.Sprintf("%s/oauth/token", c.URL),
+			AuthURL:  fmt.Sprintf("%s/oauth/authorize", c.APIURL),
+			TokenURL: fmt.Sprintf("%s/oauth/token", c.APIURL),
 		},
 		RedirectURL: callbackURL,
 	}

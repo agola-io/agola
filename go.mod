@@ -23,6 +23,7 @@ require (
 	github.com/go-sql-driver/mysql v1.4.1 // indirect
 	github.com/google/go-cmp v0.3.0
 	github.com/google/go-containerregistry v0.0.0-20190412005658-1d38b9cfdb9d
+	github.com/google/go-github/v25 v25.0.4
 	github.com/google/go-jsonnet v0.12.1
 	github.com/google/gofuzz v1.0.0 // indirect
 	github.com/googleapis/gnostic v0.2.0 // indirect
@@ -58,7 +59,7 @@ require (
 	github.com/xanzy/go-gitlab v0.14.1
 	go.etcd.io/etcd v0.0.0-20181128220305-dedae6eb7c25
 	go.uber.org/zap v1.9.1
-	golang.org/x/crypto v0.0.0-20181203042331-505ab145d0a9
+	golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2
 	golang.org/x/oauth2 v0.0.0-20190220154721-9b3c75971fc9
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.42.0 // indirect
