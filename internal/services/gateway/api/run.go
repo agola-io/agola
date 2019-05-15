@@ -54,6 +54,7 @@ type RunResponse struct {
 	Phase       rstypes.RunPhase  `json:"phase"`
 	Result      rstypes.RunResult `json:"result"`
 	SetupErrors []string          `json:"setup_errors"`
+	Stopping    bool              `json:"stopping"`
 
 	Tasks                map[string]*RunResponseTask `json:"tasks"`
 	TasksWaitingApproval []string                    `json:"tasks_waiting_approval"`
@@ -116,13 +117,15 @@ type RunTaskResponseStep struct {
 
 func createRunResponse(r *rstypes.Run, rc *rstypes.RunConfig) *RunResponse {
 	run := &RunResponse{
-		ID:                   r.ID,
-		Counter:              r.Counter,
-		Name:                 r.Name,
-		Annotations:          r.Annotations,
-		Phase:                r.Phase,
-		Result:               r.Result,
-		SetupErrors:          rc.SetupErrors,
+		ID:          r.ID,
+		Counter:     r.Counter,
+		Name:        r.Name,
+		Annotations: r.Annotations,
+		Phase:       r.Phase,
+		Result:      r.Result,
+		Stopping:    r.Stop,
+		SetupErrors: rc.SetupErrors,
+
 		Tasks:                make(map[string]*RunResponseTask),
 		TasksWaitingApproval: r.TasksWaitingApproval(),
 
