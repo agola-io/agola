@@ -681,3 +681,10 @@ type Executor struct {
 	// internal values not saved
 	Revision int64 `json:"-"`
 }
+
+type RunEvent struct {
+	Sequence string
+	RunID    string
+	Phase    RunPhase
+	Result   RunResult
+}

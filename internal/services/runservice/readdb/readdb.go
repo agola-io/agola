@@ -465,7 +465,7 @@ func (r *ReadDB) handleRunEvent(tx *db.Tx, ev *etcdclientv3.Event, wresp *etcdcl
 func (r *ReadDB) handleRunsEventEvent(tx *db.Tx, ev *etcdclientv3.Event, wresp *etcdclientv3.WatchResponse) error {
 	switch ev.Type {
 	case mvccpb.PUT:
-		var runEvent *common.RunEvent
+		var runEvent *types.RunEvent
 		if err := json.Unmarshal(ev.Kv.Value, &runEvent); err != nil {
 			return errors.Wrap(err, "failed to unmarshal run")
 		}

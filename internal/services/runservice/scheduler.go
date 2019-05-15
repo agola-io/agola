@@ -475,7 +475,7 @@ func (s *Runservice) scheduleRun(ctx context.Context, r *types.Run, rc *types.Ru
 		return err
 	}
 
-	var runEvent *common.RunEvent
+	var runEvent *types.RunEvent
 	// detect changes to phase and result and set related events
 	if prevPhase != r.Phase || prevResult != r.Result {
 		var err error

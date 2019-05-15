@@ -419,7 +419,7 @@ func GetRun(ctx context.Context, e *etcd.Store, runID string) (*types.Run, int64
 	return r, resp.Header.Revision, nil
 }
 
-func AtomicPutRun(ctx context.Context, e *etcd.Store, r *types.Run, runEvent *common.RunEvent, cgt *types.ChangeGroupsUpdateToken) (*types.Run, error) {
+func AtomicPutRun(ctx context.Context, e *etcd.Store, r *types.Run, runEvent *types.RunEvent, cgt *types.ChangeGroupsUpdateToken) (*types.Run, error) {
 	// check changegroups name
 	if cgt != nil {
 		for cgName := range cgt.ChangeGroupsRevisions {
