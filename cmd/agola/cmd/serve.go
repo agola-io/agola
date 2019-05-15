@@ -25,6 +25,7 @@ import (
 	rsexecutor "github.com/sorintlab/agola/internal/services/executor"
 	"github.com/sorintlab/agola/internal/services/gateway"
 	"github.com/sorintlab/agola/internal/services/gitserver"
+	"github.com/sorintlab/agola/internal/services/notification"
 	rsscheduler "github.com/sorintlab/agola/internal/services/runservice"
 	"github.com/sorintlab/agola/internal/services/scheduler"
 	"github.com/sorintlab/agola/internal/util"
@@ -43,6 +44,7 @@ var componentsNames = []string{
 	"all",
 	"gateway",
 	"scheduler",
+	"notification",
 	"runservice",
 	"executor",
 	"configstore",
@@ -171,6 +173,14 @@ func serve(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	var ns *notification.NotificationService
+	if isComponentEnabled("notification") {
+		ns, err = notification.NewNotificationService(c)
+		if err != nil {
+			return errors.Wrapf(err, "failed to start notification service")
+		}
+	}
+
 	var gw *gateway.Gateway
 	if isComponentEnabled("gateway") {
 		gw, err = gateway.NewGateway(c)
@@ -200,6 +210,9 @@ func serve(cmd *cobra.Command, args []string) error {
 	}
 	if sched != nil {
 		go func() { errCh <- sched.Run(ctx) }()
+	}
+	if ns != nil {
+		go func() { errCh <- ns.Run(ctx) }()
 	}
 	if gw != nil {
 		go func() { errCh <- gw.Run(ctx) }()

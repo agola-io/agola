@@ -33,12 +33,13 @@ type Config struct {
 	// Defaults to "agola"
 	ID string `yaml:"id"`
 
-	Gateway     Gateway     `yaml:"gateway"`
-	Scheduler   Scheduler   `yaml:"scheduler"`
-	Runservice  Runservice  `yaml:"runservice"`
-	Executor    Executor    `yaml:"executor"`
-	Configstore Configstore `yaml:"configstore"`
-	Gitserver   Gitserver   `yaml:"gitserver"`
+	Gateway      Gateway      `yaml:"gateway"`
+	Scheduler    Scheduler    `yaml:"scheduler"`
+	Notification Notification `yaml:"notification"`
+	Runservice   Runservice   `yaml:"runservice"`
+	Executor     Executor     `yaml:"executor"`
+	Configstore  Configstore  `yaml:"configstore"`
+	Gitserver    Gitserver    `yaml:"gitserver"`
 }
 
 type Gateway struct {
@@ -47,7 +48,7 @@ type Gateway struct {
 	// APIExposedURL is the gateway API exposed url i.e. https://myagola.example.com
 	APIExposedURL string `yaml:"apiExposedURL"`
 
-	// ExposedURL is the web interface exposed url i.e. https://myagola.example.com
+	// WebExposedURL is the web interface exposed url i.e. https://myagola.example.com
 	// This is used for generating the redirect_url in oauth2 redirects
 	WebExposedURL string `yaml:"webExposedURL"`
 
@@ -68,6 +69,19 @@ type Scheduler struct {
 	Debug bool `yaml:"debug"`
 
 	RunserviceURL string `yaml:"runserviceURL"`
+}
+
+type Notification struct {
+	Debug bool `yaml:"debug"`
+
+	// WebExposedURL is the web interface exposed url i.e. https://myagola.example.com
+	// This is used for generating the redirect_url in oauth2 redirects
+	WebExposedURL string `yaml:"webExposedURL"`
+
+	RunserviceURL  string `yaml:"runserviceURL"`
+	ConfigstoreURL string `yaml:"configstoreURL"`
+
+	Etcd Etcd `yaml:"etcd"`
 }
 
 type Runservice struct {
@@ -312,6 +326,17 @@ func Validate(c *Config) error {
 	// Scheduler
 	if c.Scheduler.RunserviceURL == "" {
 		return errors.Errorf("scheduler runserviceURL is empty")
+	}
+
+	// Notification
+	if c.Notification.WebExposedURL == "" {
+		return errors.Errorf("notification webExposedURL is empty")
+	}
+	if c.Notification.ConfigstoreURL == "" {
+		return errors.Errorf("notification configstoreURL is empty")
+	}
+	if c.Notification.RunserviceURL == "" {
+		return errors.Errorf("notification runserviceURL is empty")
 	}
 
 	// Git server
