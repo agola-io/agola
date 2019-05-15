@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"os"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -181,10 +182,9 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 		id:         podConfig.ID,
 		client:     d.client,
 		executorID: d.executorID,
-		containers: make([]types.Container, len(containers)),
+		containers: []*DockerContainer{},
 	}
 
-	// Put the containers in the right order based on their containerIndexKey label value
 	count := 0
 	seenIndexes := map[int]struct{}{}
 	for _, container := range containers {
@@ -201,7 +201,11 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 		if _, ok := seenIndexes[cIndex]; ok {
 			return nil, errors.Errorf("duplicate container with index %d", cIndex)
 		}
-		pod.containers[cIndex] = container
+		dContainer := &DockerContainer{
+			Index:     cIndex,
+			Container: container,
+		}
+		pod.containers = append(pod.containers, dContainer)
 
 		seenIndexes[cIndex] = struct{}{}
 		count++
@@ -209,6 +213,8 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 	if count != len(containers) {
 		return nil, errors.Errorf("expected %d containers but got %d", len(containers), count)
 	}
+	// put the containers in the right order based on their container index
+	sort.Sort(ContainerSlice(pod.containers))
 
 	return pod, nil
 }
@@ -312,21 +318,17 @@ func (d *DockerDriver) GetPods(ctx context.Context, all bool) ([]Pod, error) {
 			// skip container
 			continue
 		}
-		if pod, ok := podsMap[podID]; !ok {
+		if _, ok := podsMap[podID]; !ok {
 			pod := &DockerPod{
 				id:         podID,
 				client:     d.client,
-				containers: []types.Container{container},
 				executorID: d.executorID,
+				containers: []*DockerContainer{},
 			}
 			podsMap[podID] = pod
-
-		} else {
-			pod.containers = append(pod.containers, container)
 		}
 	}
 
-	// Put the containers in the right order based on their containerIndexKey label value
 	for _, container := range containers {
 		podID, ok := container.Labels[podIDKey]
 		if !ok {
@@ -343,8 +345,13 @@ func (d *DockerDriver) GetPods(ctx context.Context, all bool) ([]Pod, error) {
 			// remove pod since some of its containers don't have the right labels
 			delete(podsMap, podID)
 		}
+
 		pod := podsMap[podID]
-		pod.containers[cIndex] = container
+		dContainer := &DockerContainer{
+			Index:     cIndex,
+			Container: container,
+		}
+		pod.containers = append(pod.containers, dContainer)
 
 		// overwrite containers with the right order
 
@@ -363,6 +370,8 @@ func (d *DockerDriver) GetPods(ctx context.Context, all bool) ([]Pod, error) {
 
 	pods := make([]Pod, 0, len(podsMap))
 	for _, pod := range podsMap {
+		// put the containers in the right order based on their container index
+		sort.Sort(ContainerSlice(pod.containers))
 		pods = append(pods, pod)
 	}
 	return pods, nil
@@ -383,9 +392,20 @@ type DockerPod struct {
 	id         string
 	client     *client.Client
 	labels     map[string]string
-	containers []types.Container
+	containers []*DockerContainer
 	executorID string
 }
+
+type DockerContainer struct {
+	Index int
+	types.Container
+}
+
+type ContainerSlice []*DockerContainer
+
+func (p ContainerSlice) Len() int           { return len(p) }
+func (p ContainerSlice) Less(i, j int) bool { return p[i].Index < p[j].Index }
+func (p ContainerSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
 func (dp *DockerPod) ID() string {
 	return dp.id

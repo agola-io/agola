@@ -27,6 +27,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/docker/docker/api/types"
 	uuid "github.com/satori/go.uuid"
 	slog "github.com/sorintlab/agola/internal/log"
 
@@ -294,7 +295,7 @@ func TestDockerPod(t *testing.T) {
 				dp := p.(*DockerPod)
 				for i, c := range dp.containers {
 					if c.ID != ip.containers[i].ID {
-						t.Fatalf("different pod id, want: %s, got: %s", ip.id, dp.id)
+						t.Fatalf("different container id, want: %q, got: %q", c.ID, ip.containers[i].ID)
 					}
 					if diff := cmp.Diff(ip.containers[i], c); diff != "" {
 						t.Error(diff)
@@ -340,11 +341,64 @@ func TestDockerPod(t *testing.T) {
 				dp := p.(*DockerPod)
 				for i, c := range dp.containers {
 					if c.ID != ip.containers[i].ID {
-						t.Fatalf("different pod id, want: %s, got: %s", ip.id, dp.id)
+						t.Fatalf("different container id, want: %q, got: %q", c.ID, ip.containers[i].ID)
 					}
 					if diff := cmp.Diff(ip.containers[i], c); diff != "" {
 						t.Error(diff)
 					}
+				}
+			}
+		}
+		if !ok {
+			t.Fatalf("pod with id %q not found", pod.ID())
+		}
+	})
+
+	t.Run("test get pods with two containers and the first already deleted", func(t *testing.T) {
+		pod, err := d.NewPod(ctx, &PodConfig{
+			ID:     uuid.NewV4().String(),
+			TaskID: uuid.NewV4().String(),
+			Containers: []*ContainerConfig{
+				&ContainerConfig{
+					Cmd:   []string{"cat"},
+					Image: "busybox",
+				},
+				&ContainerConfig{
+					Image: "nginx:1.16",
+				},
+			},
+			InitVolumeDir: "/tmp/agola",
+		}, ioutil.Discard)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		defer pod.Remove(ctx)
+
+		// delete the first container
+		dp := pod.(*DockerPod)
+		if err := dp.client.ContainerRemove(ctx, dp.containers[0].ID, types.ContainerRemoveOptions{Force: true}); err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		pods, err := d.GetPods(ctx, true)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		ok := false
+		for _, p := range pods {
+			if p.ID() == pod.ID() {
+				ok = true
+				ip := pod.(*DockerPod)
+				dp := p.(*DockerPod)
+				if len(dp.containers) != 1 {
+					t.Fatalf("expected 1 container, got %d containers", len(dp.containers))
+				}
+				if dp.containers[0].ID != ip.containers[1].ID {
+					t.Fatalf("different container id, want: %q, got: %q", dp.containers[0].ID, ip.containers[1].ID)
+				}
+				if diff := cmp.Diff(ip.containers[1], dp.containers[0]); diff != "" {
+					t.Error(diff)
 				}
 			}
 		}
