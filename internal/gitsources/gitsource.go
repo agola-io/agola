@@ -30,6 +30,7 @@ type CommitStatus string
 const (
 	CommitStatusPending CommitStatus = "pending"
 	CommitStatusSuccess CommitStatus = "success"
+	CommitStatusError   CommitStatus = "error"
 	CommitStatusFailed  CommitStatus = "failed"
 )
 
