@@ -742,7 +742,7 @@ func (h *ActionHandler) HandleOauth2Callback(ctx context.Context, code, state st
 
 	oauth2Source, err := common.GetOauth2Source(rs, "")
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create gitlab source")
+		return nil, errors.Wrapf(err, "failed to create oauth2 source")
 	}
 
 	oauth2Token, err := oauth2Source.RequestOauth2Token(h.webExposedURL+"/oauth2/callback", code)
