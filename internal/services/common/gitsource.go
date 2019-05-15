@@ -20,6 +20,7 @@ package common
 import (
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
 	"github.com/sorintlab/agola/internal/gitsources/gitea"
+	"github.com/sorintlab/agola/internal/gitsources/github"
 	"github.com/sorintlab/agola/internal/gitsources/gitlab"
 	"github.com/sorintlab/agola/internal/services/types"
 
@@ -28,7 +29,7 @@ import (
 
 func newGitea(rs *types.RemoteSource, accessToken string) (*gitea.Client, error) {
 	return gitea.New(gitea.Opts{
-		URL:            rs.APIURL,
+		APIURL:         rs.APIURL,
 		SkipVerify:     rs.SkipVerify,
 		Token:          accessToken,
 		Oauth2ClientID: rs.Oauth2ClientID,
@@ -38,7 +39,17 @@ func newGitea(rs *types.RemoteSource, accessToken string) (*gitea.Client, error)
 
 func newGitlab(rs *types.RemoteSource, accessToken string) (*gitlab.Client, error) {
 	return gitlab.New(gitlab.Opts{
-		URL:            rs.APIURL,
+		APIURL:         rs.APIURL,
+		SkipVerify:     rs.SkipVerify,
+		Token:          accessToken,
+		Oauth2ClientID: rs.Oauth2ClientID,
+		Oauth2Secret:   rs.Oauth2ClientSecret,
+	})
+}
+
+func newGithub(rs *types.RemoteSource, accessToken string) (*github.Client, error) {
+	return github.New(github.Opts{
+		APIURL:         rs.APIURL,
 		SkipVerify:     rs.SkipVerify,
 		Token:          accessToken,
 		Oauth2ClientID: rs.Oauth2ClientID,
@@ -74,6 +85,8 @@ func GetGitSource(rs *types.RemoteSource, la *types.LinkedAccount) (gitsource.Gi
 		gitSource, err = newGitea(rs, accessToken)
 	case types.RemoteSourceTypeGitlab:
 		gitSource, err = newGitlab(rs, accessToken)
+	case types.RemoteSourceTypeGithub:
+		gitSource, err = newGithub(rs, accessToken)
 	default:
 		return nil, errors.Errorf("remote source %s isn't a valid git source", rs.Name)
 	}
@@ -104,6 +117,8 @@ func GetOauth2Source(rs *types.RemoteSource, accessToken string) (gitsource.Oaut
 		oauth2Source, err = newGitea(rs, accessToken)
 	case types.RemoteSourceTypeGitlab:
 		oauth2Source, err = newGitlab(rs, accessToken)
+	case types.RemoteSourceTypeGithub:
+		oauth2Source, err = newGithub(rs, accessToken)
 	default:
 		return nil, errors.Errorf("remote source %s isn't a valid oauth2 source", rs.Name)
 	}

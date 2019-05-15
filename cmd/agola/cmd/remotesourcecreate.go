@@ -21,7 +21,9 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
+	"github.com/sorintlab/agola/internal/gitsources/github"
 	"github.com/sorintlab/agola/internal/services/gateway/api"
+	"github.com/sorintlab/agola/internal/services/types"
 
 	"github.com/spf13/cobra"
 )
@@ -71,6 +73,11 @@ func init() {
 
 func remoteSourceCreate(cmd *cobra.Command, args []string) error {
 	gwclient := api.NewClient(gatewayURL, token)
+
+	// for github remote source type, set defaults to github.com if no apiurl provided
+	if remoteSourceCreateOpts.rsType == string(types.RemoteSourceTypeGithub) {
+		remoteSourceCreateOpts.apiURL = github.GitHubAPIURL
+	}
 
 	req := &api.CreateRemoteSourceRequest{
 		Name:                remoteSourceCreateOpts.name,
