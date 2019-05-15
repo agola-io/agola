@@ -19,8 +19,8 @@ import (
 	"net/http"
 
 	"github.com/pkg/errors"
+	"github.com/sorintlab/agola/internal/services/common"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
-	"github.com/sorintlab/agola/internal/services/gateway/common"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 )

@@ -20,8 +20,8 @@ import (
 	"time"
 
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
+	"github.com/sorintlab/agola/internal/services/common"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
-	"github.com/sorintlab/agola/internal/services/gateway/common"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 

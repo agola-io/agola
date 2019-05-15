@@ -21,8 +21,8 @@ import (
 	"time"
 
 	slog "github.com/sorintlab/agola/internal/log"
+	"github.com/sorintlab/agola/internal/services/common"
 	"github.com/sorintlab/agola/internal/services/config"
-	"github.com/sorintlab/agola/internal/services/gateway/common"
 	rsapi "github.com/sorintlab/agola/internal/services/runservice/api"
 	"github.com/sorintlab/agola/internal/util"
 

@@ -19,7 +19,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/sorintlab/agola/internal/services/gateway/common"
+	"github.com/sorintlab/agola/internal/services/common"
 	rsapi "github.com/sorintlab/agola/internal/services/runservice/api"
 	"github.com/sorintlab/agola/internal/util"
 

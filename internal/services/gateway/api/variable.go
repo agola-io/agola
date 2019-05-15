@@ -18,9 +18,9 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/sorintlab/agola/internal/services/common"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/gateway/action"
-	"github.com/sorintlab/agola/internal/services/gateway/common"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 	"go.uber.org/zap"

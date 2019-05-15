@@ -17,7 +17,7 @@ package action
 import (
 	"context"
 
-	"github.com/sorintlab/agola/internal/services/gateway/common"
+	"github.com/sorintlab/agola/internal/services/common"
 	"github.com/sorintlab/agola/internal/services/types"
 
 	"github.com/pkg/errors"

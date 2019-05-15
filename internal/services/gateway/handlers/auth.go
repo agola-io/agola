@@ -19,8 +19,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/sorintlab/agola/internal/services/common"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
-	"github.com/sorintlab/agola/internal/services/gateway/common"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	jwtrequest "github.com/dgrijalva/jwt-go/request"
