@@ -63,6 +63,8 @@ func fromCommitStatus(status gitsource.CommitStatus) gitlab.BuildStateValue {
 		return gitlab.Pending
 	case gitsource.CommitStatusSuccess:
 		return gitlab.Success
+	case gitsource.CommitStatusError:
+		return gitlab.Failed
 	case gitsource.CommitStatusFailed:
 		return gitlab.Failed
 	default:

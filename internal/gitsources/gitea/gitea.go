@@ -69,6 +69,8 @@ func fromCommitStatus(status gitsource.CommitStatus) gitea.StatusState {
 		return gitea.StatusPending
 	case gitsource.CommitStatusSuccess:
 		return gitea.StatusSuccess
+	case gitsource.CommitStatusError:
+		return gitea.StatusError
 	case gitsource.CommitStatusFailed:
 		return gitea.StatusFailure
 	default:
