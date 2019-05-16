@@ -1,6 +1,6 @@
 gateway:
   apiExposedURL: "http://172.17.0.1:8000"
-  webExposedURL: "http://172.17.0.1:8080"
+  webExposedURL: "http://172.17.0.1:8000"
   runserviceURL: "http://localhost:4000"
   configstoreURL: "http://localhost:4002"
   gitserverURL: "http://172.17.0.1:4003"
@@ -21,7 +21,7 @@ scheduler:
   runserviceURL: "http://localhost:4000"
 
 notification:
-  webExposedURL: "http://172.17.0.1:8080"
+  webExposedURL: "http://172.17.0.1:8000"
   runserviceURL: "http://localhost:4000"
   configstoreURL: "http://localhost:4002"
   etcd:
