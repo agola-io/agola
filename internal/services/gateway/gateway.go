@@ -292,10 +292,10 @@ func (g *Gateway) Run(ctx context.Context) error {
 	// TODO(sgotti) add auth to these requests
 	router.Handle("/repos/{rest:.*}", reposHandler).Methods("GET", "POST")
 
-	router.Handle("/login", loginUserHandler).Methods("POST")
-	router.Handle("/authorize", authorizeHandler).Methods("POST")
-	router.Handle("/register", registerHandler).Methods("POST")
-	router.Handle("/oauth2/callback", oauth2callbackHandler).Methods("GET")
+	router.Handle("/api/login", loginUserHandler).Methods("POST")
+	router.Handle("/api/authorize", authorizeHandler).Methods("POST")
+	router.Handle("/api/register", registerHandler).Methods("POST")
+	router.Handle("/api/oauth2/callback", oauth2callbackHandler).Methods("GET")
 
 	router.Handle("/webhooks", webhooksHandler).Methods("POST")
 	router.PathPrefix("/").HandlerFunc(handlers.NewWebBundleHandlerFunc(g.c.APIExposedURL))
