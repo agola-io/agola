@@ -32,7 +32,6 @@ const configTplText = `
 const CONFIG = {
   API_URL: '{{.ApiURL}}',
   API_BASE_PATH: '{{.ApiBasePath}}',
-  authType: '{{.AuthType}}'
 }
 
 window.CONFIG = CONFIG
@@ -48,11 +47,9 @@ func NewWebBundleHandlerFunc(gatewayURL string) func(w http.ResponseWriter, r *h
 	configTplData := struct {
 		ApiURL      string
 		ApiBasePath string
-		AuthType    string
 	}{
 		gatewayURL,
 		"/api/v1alpha",
-		"local",
 	}
 	configTpl.Execute(&buf, configTplData)
 
@@ -66,11 +63,7 @@ func NewWebBundleHandlerFunc(gatewayURL string) func(w http.ResponseWriter, r *h
 			AssetDir:  webbundle.AssetDir,
 			AssetInfo: webbundle.AssetInfo,
 		})
-		// check if the required file is available in the webapp asset and serve it
-		if _, err := webbundle.Asset(r.URL.Path[1:]); err == nil {
-			fileServerHandler.ServeHTTP(w, r)
-			return
-		}
+
 		// config.js is the external webapp config file not provided by the
 		// asset and not needed when served from the api server
 		if r.URL.Path == "/config.js" {
@@ -78,6 +71,12 @@ func NewWebBundleHandlerFunc(gatewayURL string) func(w http.ResponseWriter, r *h
 			if err != nil {
 				http.Error(w, "", http.StatusInternalServerError)
 			}
+			return
+		}
+
+		// check if the required file is available in the webapp asset and serve it
+		if _, err := webbundle.Asset(r.URL.Path[1:]); err == nil {
+			fileServerHandler.ServeHTTP(w, r)
 			return
 		}
 
