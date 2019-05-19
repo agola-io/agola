@@ -15,7 +15,6 @@
 package api
 
 import (
-	"bufio"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -511,13 +510,6 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if _, ok := q["follow"]; ok {
 		follow = true
 	}
-	stream := false
-	if _, ok := q["stream"]; ok {
-		stream = true
-	}
-	if follow {
-		stream = true
-	}
 
 	areq := &action.GetLogsRequest{
 		RunID:  runID,
@@ -525,7 +517,6 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Setup:  setup,
 		Step:   step,
 		Follow: follow,
-		Stream: stream,
 	}
 
 	resp, err := h.ah.GetLogs(ctx, areq)
@@ -534,31 +525,19 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if stream {
-		w.Header().Set("Content-Type", "text/event-stream")
-	}
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
 	defer resp.Body.Close()
-	if stream {
-		if err := sendLogs(w, resp.Body); err != nil {
-			h.log.Errorf("err: %+v", err)
-			return
-		}
-	} else {
-		if _, err := io.Copy(w, resp.Body); err != nil {
-			h.log.Errorf("err: %+v", err)
-			return
-		}
+	if err := sendLogs(w, resp.Body); err != nil {
+		h.log.Errorf("err: %+v", err)
+		return
 	}
 }
 
-// sendLogs is used during streaming to flush logs lines
-// TODO(sgotti) there's no need to do br.ReadBytes since the response is
-// already flushed by the runservice.
+// sendLogs streams received logs lines and flushes them
 func sendLogs(w io.Writer, r io.Reader) error {
-	br := bufio.NewReader(r)
+	buf := make([]byte, 4096)
 
 	var flusher http.Flusher
 	if fl, ok := w.(http.Flusher); ok {
@@ -569,17 +548,17 @@ func sendLogs(w io.Writer, r io.Reader) error {
 		if stop {
 			return nil
 		}
-		data, err := br.ReadBytes('\n')
+		n, err := r.Read(buf)
 		if err != nil {
 			if err != io.EOF {
 				return err
 			}
-			if len(data) == 0 {
+			if n == 0 {
 				return nil
 			}
 			stop = true
 		}
-		if _, err := w.Write(data); err != nil {
+		if _, err := w.Write(buf[:n]); err != nil {
 			return err
 		}
 		if flusher != nil {

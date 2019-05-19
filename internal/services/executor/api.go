@@ -126,18 +126,15 @@ func (h *logsHandler) readLogs(taskID string, setup bool, step int, logPath stri
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
-	br := bufio.NewReader(f)
+	buf := make([]byte, 4096)
 
-	// if not following return the Content-Length and just do io.Copy
+	// if not following return the Content-Length
 	if !follow {
 		fi, err := f.Stat()
 		if err != nil {
 			return err
 		}
 		w.Header().Set("Content-Length", strconv.FormatInt(fi.Size(), 10))
-
-		_, err = io.Copy(w, br)
-		return err
 	}
 
 	var flusher http.Flusher
@@ -150,13 +147,13 @@ func (h *logsHandler) readLogs(taskID string, setup bool, step int, logPath stri
 		if stop {
 			return nil
 		}
-		data, err := br.ReadBytes('\n')
+		n, err := f.Read(buf)
 		if err != nil {
 			if err != io.EOF {
 				return err
 			}
 			if !flushstop && follow {
-				if _, err := f.Seek(-int64(len(data)), io.SeekCurrent); err != nil {
+				if _, err := f.Seek(-int64(n), io.SeekCurrent); err != nil {
 					return errors.Wrapf(err, "failed to seek in log file %q", logPath)
 				}
 				// check if the step is finished, if so flush until EOF and stop
@@ -177,7 +174,7 @@ func (h *logsHandler) readLogs(taskID string, setup bool, step int, logPath stri
 				stop = true
 			}
 		}
-		if _, err := w.Write(data); err != nil {
+		if _, err := w.Write(buf[:n]); err != nil {
 			return err
 		}
 		if flusher != nil {

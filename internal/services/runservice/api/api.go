@@ -15,7 +15,6 @@
 package api
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -158,15 +157,8 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if _, ok := q["follow"]; ok {
 		follow = true
 	}
-	stream := false
-	if _, ok := q["stream"]; ok {
-		stream = true
-	}
-	if follow {
-		stream = true
-	}
 
-	if err, sendError := h.readTaskLogs(ctx, runID, taskID, setup, step, w, follow, stream); err != nil {
+	if err, sendError := h.readTaskLogs(ctx, runID, taskID, setup, step, w, follow); err != nil {
 		h.log.Errorf("err: %+v", err)
 		if sendError {
 			switch err.(type) {
@@ -179,7 +171,7 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, setup bool, step int, w http.ResponseWriter, follow, stream bool) (error, bool) {
+func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, setup bool, step int, w http.ResponseWriter, follow bool) (error, bool) {
 	r, err := store.GetRunEtcdOrOST(ctx, h.e, h.dm, runID)
 	if err != nil {
 		return err, true
@@ -212,7 +204,7 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 			return err, true
 		}
 		defer f.Close()
-		return sendLogs(w, f, stream), false
+		return sendLogs(w, f), false
 	}
 
 	et, err := store.GetExecutorTask(ctx, h.e, task.ID)
@@ -248,18 +240,14 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 		return errors.Errorf("received http status: %d", req.StatusCode), true
 	}
 
-	return sendLogs(w, req.Body, stream), false
+	return sendLogs(w, req.Body), false
 }
 
-func sendLogs(w http.ResponseWriter, r io.Reader, stream bool) error {
-	if stream {
-		w.Header().Set("Content-Type", "text/event-stream")
-	}
-
+func sendLogs(w http.ResponseWriter, r io.Reader) error {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
-	br := bufio.NewReader(r)
+	buf := make([]byte, 406)
 
 	var flusher http.Flusher
 	if fl, ok := w.(http.Flusher); ok {
@@ -270,24 +258,19 @@ func sendLogs(w http.ResponseWriter, r io.Reader, stream bool) error {
 		if stop {
 			return nil
 		}
-		data, err := br.ReadBytes('\n')
+		n, err := r.Read(buf)
+		//data, err := br.ReadBytes('\n')
 		if err != nil {
 			if err != io.EOF {
 				return err
 			}
-			if len(data) == 0 {
+			if n == 0 {
 				return nil
 			}
 			stop = true
 		}
-		if stream {
-			if _, err := w.Write([]byte(fmt.Sprintf("data: %s\n", data))); err != nil {
-				return err
-			}
-		} else {
-			if _, err := w.Write(data); err != nil {
-				return err
-			}
+		if _, err := w.Write(buf[:n]); err != nil {
+			return err
 		}
 		if flusher != nil {
 			flusher.Flush()

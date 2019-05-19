@@ -77,7 +77,6 @@ type GetLogsRequest struct {
 	Setup  bool
 	Step   int
 	Follow bool
-	Stream bool
 }
 
 func (h *ActionHandler) GetLogs(ctx context.Context, req *GetLogsRequest) (*http.Response, error) {
@@ -93,7 +92,7 @@ func (h *ActionHandler) GetLogs(ctx context.Context, req *GetLogsRequest) (*http
 		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
-	resp, err = h.runserviceClient.GetLogs(ctx, req.RunID, req.TaskID, req.Setup, req.Step, req.Follow, req.Stream)
+	resp, err = h.runserviceClient.GetLogs(ctx, req.RunID, req.TaskID, req.Setup, req.Step, req.Follow)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
 	}
