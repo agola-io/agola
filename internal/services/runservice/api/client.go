@@ -288,7 +288,7 @@ func (c *Client) GetRun(ctx context.Context, runID string, changeGroups []string
 	return runResponse, resp, err
 }
 
-func (c *Client) GetLogs(ctx context.Context, runID, taskID string, setup bool, step int, follow, stream bool) (*http.Response, error) {
+func (c *Client) GetLogs(ctx context.Context, runID, taskID string, setup bool, step int, follow bool) (*http.Response, error) {
 	q := url.Values{}
 	q.Add("runid", runID)
 	q.Add("taskid", taskID)
@@ -299,9 +299,6 @@ func (c *Client) GetLogs(ctx context.Context, runID, taskID string, setup bool, 
 	}
 	if follow {
 		q.Add("follow", "")
-	}
-	if stream {
-		q.Add("stream", "")
 	}
 
 	return c.getResponse(ctx, "GET", "/logs", q, nil, nil)
