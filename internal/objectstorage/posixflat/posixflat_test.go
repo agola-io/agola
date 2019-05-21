@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-package objectstorage
+package posixflat
 
 import (
 	"bytes"
@@ -89,7 +89,7 @@ func TestDeleteObject(t *testing.T) {
 	}
 	//defer os.RemoveAll(dir)
 
-	ls, err := NewPosixStorage(dir)
+	ls, err := New(dir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}

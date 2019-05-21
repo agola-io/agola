@@ -27,6 +27,8 @@ import (
 
 	slog "github.com/sorintlab/agola/internal/log"
 	"github.com/sorintlab/agola/internal/objectstorage"
+	"github.com/sorintlab/agola/internal/objectstorage/posix"
+	ostypes "github.com/sorintlab/agola/internal/objectstorage/types"
 	"github.com/sorintlab/agola/internal/testutil"
 
 	"go.uber.org/zap"
@@ -79,7 +81,7 @@ func TestEtcdReset(t *testing.T) {
 
 	ostDir, err := ioutil.TempDir(dir, "ost")
 
-	ost, err := objectstorage.NewPosixStorage(ostDir)
+	ost, err := posix.New(ostDir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -178,7 +180,7 @@ func TestConcurrentUpdate(t *testing.T) {
 
 	ostDir, err := ioutil.TempDir(dir, "ost")
 
-	ost, err := objectstorage.NewPosixStorage(ostDir)
+	ost, err := posix.New(ostDir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -261,7 +263,7 @@ func TestWalCleaner(t *testing.T) {
 
 	ostDir, err := ioutil.TempDir(dir, "ost")
 
-	ost, err := objectstorage.NewPosixStorage(ostDir)
+	ost, err := posix.New(ostDir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -321,7 +323,7 @@ func TestReadObject(t *testing.T) {
 	ctx := context.Background()
 
 	ostDir, err := ioutil.TempDir(dir, "ost")
-	ost, err := objectstorage.NewPosixStorage(ostDir)
+	ost, err := posix.New(ostDir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -390,8 +392,8 @@ func TestReadObject(t *testing.T) {
 
 	// should not exists
 	_, _, err = dm.ReadObject("datatype01", "object1", nil)
-	if err != objectstorage.ErrNotExist {
-		t.Fatalf("expected err %v, got: %v", objectstorage.ErrNotExist, err)
+	if err != ostypes.ErrNotExist {
+		t.Fatalf("expected err %v, got: %v", ostypes.ErrNotExist, err)
 	}
 	// should exist
 	_, _, err = dm.ReadObject("datatype01", "object19", nil)
@@ -410,8 +412,8 @@ func TestReadObject(t *testing.T) {
 
 	// should not exists
 	_, _, err = dm.ReadObject("datatype01", "object1", nil)
-	if err != objectstorage.ErrNotExist {
-		t.Fatalf("expected err %v, got: %v", objectstorage.ErrNotExist, err)
+	if err != ostypes.ErrNotExist {
+		t.Fatalf("expected err %v, got: %v", ostypes.ErrNotExist, err)
 	}
 	// should exist
 	_, _, err = dm.ReadObject("datatype01", "object19", nil)
