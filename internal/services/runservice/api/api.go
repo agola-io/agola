@@ -26,6 +26,7 @@ import (
 	"github.com/sorintlab/agola/internal/db"
 	"github.com/sorintlab/agola/internal/etcd"
 	"github.com/sorintlab/agola/internal/objectstorage"
+	ostypes "github.com/sorintlab/agola/internal/objectstorage/types"
 	"github.com/sorintlab/agola/internal/services/runservice/action"
 	"github.com/sorintlab/agola/internal/services/runservice/common"
 	"github.com/sorintlab/agola/internal/services/runservice/readdb"
@@ -198,7 +199,7 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 		}
 		f, err := h.ost.ReadObject(logPath)
 		if err != nil {
-			if err == objectstorage.ErrNotExist {
+			if err == ostypes.ErrNotExist {
 				return common.NewErrNotExist(err), true
 			}
 			return err, true

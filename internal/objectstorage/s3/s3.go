@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package objectstorage
+package s3
 
 import (
 	"io"
@@ -20,6 +20,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/sorintlab/agola/internal/objectstorage/types"
 
 	minio "github.com/minio/minio-go"
 	"github.com/pkg/errors"
@@ -32,7 +34,7 @@ type S3Storage struct {
 	minioCore *minio.Core
 }
 
-func NewS3Storage(bucket, location, endpoint, accessKeyID, secretAccessKey string, secure bool) (*S3Storage, error) {
+func New(bucket, location, endpoint, accessKeyID, secretAccessKey string, secure bool) (*S3Storage, error) {
 	minioClient, err := minio.New(endpoint, accessKeyID, secretAccessKey, secure)
 	if err != nil {
 		return nil, err
@@ -60,24 +62,24 @@ func NewS3Storage(bucket, location, endpoint, accessKeyID, secretAccessKey strin
 	}, nil
 }
 
-func (s *S3Storage) Stat(p string) (*ObjectInfo, error) {
+func (s *S3Storage) Stat(p string) (*types.ObjectInfo, error) {
 	oi, err := s.minioClient.StatObject(s.bucket, p, minio.StatObjectOptions{})
 	if err != nil {
 		merr := minio.ToErrorResponse(err)
 		if merr.StatusCode == http.StatusNotFound {
-			return nil, ErrNotExist
+			return nil, types.ErrNotExist
 		}
 		return nil, merr
 	}
 
-	return &ObjectInfo{Path: p, LastModified: oi.LastModified}, nil
+	return &types.ObjectInfo{Path: p, LastModified: oi.LastModified}, nil
 }
 
-func (s *S3Storage) ReadObject(filepath string) (ReadSeekCloser, error) {
+func (s *S3Storage) ReadObject(filepath string) (types.ReadSeekCloser, error) {
 	if _, err := s.minioClient.StatObject(s.bucket, filepath, minio.StatObjectOptions{}); err != nil {
 		merr := minio.ToErrorResponse(err)
 		if merr.StatusCode == http.StatusNotFound {
-			return nil, ErrNotExist
+			return nil, types.ErrNotExist
 		}
 		return nil, merr
 	}
@@ -117,11 +119,11 @@ func (s *S3Storage) DeleteObject(filepath string) error {
 	return s.minioClient.RemoveObject(s.bucket, filepath)
 }
 
-func (s *S3Storage) List(prefix, startWith, delimiter string, doneCh <-chan struct{}) <-chan ObjectInfo {
-	objectCh := make(chan ObjectInfo, 1)
+func (s *S3Storage) List(prefix, startWith, delimiter string, doneCh <-chan struct{}) <-chan types.ObjectInfo {
+	objectCh := make(chan types.ObjectInfo, 1)
 
 	if len(delimiter) > 1 {
-		objectCh <- ObjectInfo{
+		objectCh <- types.ObjectInfo{
 			Err: errors.Errorf("wrong delimiter %q", delimiter),
 		}
 		return objectCh
@@ -136,7 +138,7 @@ func (s *S3Storage) List(prefix, startWith, delimiter string, doneCh <-chan stru
 	}
 
 	// Initiate list objects goroutine here.
-	go func(objectCh chan<- ObjectInfo) {
+	go func(objectCh chan<- types.ObjectInfo) {
 		defer close(objectCh)
 		// Save continuationToken for next request.
 		var continuationToken string
@@ -144,7 +146,7 @@ func (s *S3Storage) List(prefix, startWith, delimiter string, doneCh <-chan stru
 			// Get list of objects a maximum of 1000 per request.
 			result, err := s.minioCore.ListObjectsV2(s.bucket, prefix, continuationToken, false, delimiter, 1000, startWith)
 			if err != nil {
-				objectCh <- ObjectInfo{
+				objectCh <- types.ObjectInfo{
 					Err: err,
 				}
 				return
@@ -154,7 +156,7 @@ func (s *S3Storage) List(prefix, startWith, delimiter string, doneCh <-chan stru
 			for _, object := range result.Contents {
 				select {
 				// Send object content.
-				case objectCh <- ObjectInfo{Path: object.Key, LastModified: object.LastModified}:
+				case objectCh <- types.ObjectInfo{Path: object.Key, LastModified: object.LastModified}:
 				// If receives done from the caller, return here.
 				case <-doneCh:
 					return

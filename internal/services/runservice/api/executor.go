@@ -22,13 +22,15 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/gorilla/mux"
 	"github.com/sorintlab/agola/internal/etcd"
 	"github.com/sorintlab/agola/internal/objectstorage"
+	ostypes "github.com/sorintlab/agola/internal/objectstorage/types"
 	"github.com/sorintlab/agola/internal/services/runservice/action"
 	"github.com/sorintlab/agola/internal/services/runservice/common"
 	"github.com/sorintlab/agola/internal/services/runservice/store"
 	"github.com/sorintlab/agola/internal/services/runservice/types"
+
+	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 )
 
@@ -244,7 +246,7 @@ func (h *ArchivesHandler) readArchive(rtID string, step int, w io.Writer) error 
 	archivePath := store.OSTRunTaskArchivePath(rtID, step)
 	f, err := h.ost.ReadObject(archivePath)
 	if err != nil {
-		if err == objectstorage.ErrNotExist {
+		if err == ostypes.ErrNotExist {
 			return common.NewErrNotExist(err)
 		}
 		return err
@@ -321,7 +323,7 @@ func matchCache(ost *objectstorage.ObjStorage, key string, prefix bool) (string,
 		defer close(doneCh)
 
 		// get the latest modified object
-		var lastObject *objectstorage.ObjectInfo
+		var lastObject *ostypes.ObjectInfo
 		for object := range ost.List(store.OSTCacheDir()+"/"+key, "", false, doneCh) {
 			if object.Err != nil {
 				return "", object.Err
@@ -340,7 +342,7 @@ func matchCache(ost *objectstorage.ObjStorage, key string, prefix bool) (string,
 	}
 
 	_, err := ost.Stat(cachePath)
-	if err == objectstorage.ErrNotExist {
+	if err == ostypes.ErrNotExist {
 		return "", nil
 	}
 	if err != nil {
@@ -353,7 +355,7 @@ func (h *CacheHandler) readCache(key string, w io.Writer) error {
 	cachePath := store.OSTCachePath(key)
 	f, err := h.ost.ReadObject(cachePath)
 	if err != nil {
-		if err == objectstorage.ErrNotExist {
+		if err == ostypes.ErrNotExist {
 			return common.NewErrNotExist(err)
 		}
 		return err

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package objectstorage
+package posixflat
 
 import (
 	"bytes"
@@ -86,7 +86,7 @@ func TestDeleteObject(t *testing.T) {
 	}
 	//defer os.RemoveAll(dir)
 
-	ls, err := NewPosixStorage(dir)
+	ls, err := New(dir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}

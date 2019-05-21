@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/sorintlab/agola/internal/objectstorage"
+	ostypes "github.com/sorintlab/agola/internal/objectstorage/types"
 	"github.com/sorintlab/agola/internal/sequence"
 )
 
@@ -98,19 +98,19 @@ func (d *DataManager) writeData(ctx context.Context, wals []*WalData) error {
 
 func (d *DataManager) writeDataType(ctx context.Context, wals []*WalData, datatype, dataSequence string) error {
 	curDataStatus, err := d.GetLastDataStatus()
-	if err != nil && err != objectstorage.ErrNotExist {
+	if err != nil && err != ostypes.ErrNotExist {
 		return err
 	}
 
 	dataEntriesMap := map[string]*DataEntry{}
-	if err != objectstorage.ErrNotExist {
+	if err != ostypes.ErrNotExist {
 		curDataSequence := curDataStatus.DataSequence
 
 		oldDataf, err := d.ost.ReadObject(dataFilePath(datatype, curDataSequence))
-		if err != nil && err != objectstorage.ErrNotExist {
+		if err != nil && err != ostypes.ErrNotExist {
 			return err
 		}
-		if err != objectstorage.ErrNotExist {
+		if err != ostypes.ErrNotExist {
 			dec := json.NewDecoder(oldDataf)
 			for {
 				var de *DataEntry
@@ -240,7 +240,7 @@ func (d *DataManager) Read(dataType, id string) (io.Reader, error) {
 
 	pos, ok := dataFileIndex.Index[id]
 	if !ok {
-		return nil, objectstorage.ErrNotExist
+		return nil, ostypes.ErrNotExist
 	}
 
 	dataf, err := d.ost.ReadObject(dataFilePath(dataType, dataSequence))
@@ -276,7 +276,7 @@ func (d *DataManager) GetLastDataStatusPath() (string, error) {
 		}
 	}
 	if dataStatusPath == "" {
-		return "", objectstorage.ErrNotExist
+		return "", ostypes.ErrNotExist
 	}
 
 	return dataStatusPath, nil

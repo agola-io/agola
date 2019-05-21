@@ -18,10 +18,15 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/sorintlab/agola/internal/objectstorage/posix"
+	"github.com/sorintlab/agola/internal/objectstorage/posixflat"
+	"github.com/sorintlab/agola/internal/objectstorage/s3"
 )
 
 func TestList(t *testing.T) {
@@ -31,12 +36,16 @@ func TestList(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
-	ls, err := NewPosixStorage(dir)
+	ps, err := posix.New(path.Join(dir, "posix"))
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	pfs, err := posixflat.New(path.Join(dir, "posixflat"))
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	var s3 *S3Storage
+	var s3s *s3.S3Storage
 	minioEndpoint := os.Getenv("MINIO_ENDPOINT")
 	minioAccessKey := os.Getenv("MINIO_ACCESSKEY")
 	minioSecretKey := os.Getenv("MINIO_SECRETKEY")
@@ -44,7 +53,7 @@ func TestList(t *testing.T) {
 		t.Logf("missing MINIO_ENDPOINT env, skipping tests with minio storage")
 	} else {
 		var err error
-		s3, err = NewS3Storage(filepath.Base(dir), "", minioEndpoint, minioAccessKey, minioSecretKey, false)
+		s3s, err = s3.New(filepath.Base(dir), "", minioEndpoint, minioAccessKey, minioSecretKey, false)
 		if err != nil {
 			t.Fatalf("err: %v", err)
 		}
@@ -62,7 +71,7 @@ func TestList(t *testing.T) {
 		ops     []listop
 	}{
 		{
-			map[string]Storage{"local": ls},
+			map[string]Storage{"posixflat": pfs},
 			[]string{
 				// Minio (as of 20190201) IMHO is not real S3 since it tries to map to a
 				// file system and not a flat namespace like S3. For this reason this test
@@ -172,7 +181,7 @@ func TestList(t *testing.T) {
 			},
 		},
 		{
-			map[string]Storage{"local": ls, "minio": s3},
+			map[string]Storage{"posix": ps, "posixflat": pfs, "minio": s3s},
 			[]string{
 				// These are multiple of 8 chars on purpose to test the filemarker behavior to
 				// distinguish between a file or a directory when the files ends at the path
@@ -252,7 +261,7 @@ func TestList(t *testing.T) {
 		for sname, s := range tt.s {
 			t.Run(fmt.Sprintf("test with storage type %s", sname), func(t *testing.T) {
 				switch s := s.(type) {
-				case *S3Storage:
+				case *s3.S3Storage:
 					if s == nil {
 						t.SkipNow()
 					}

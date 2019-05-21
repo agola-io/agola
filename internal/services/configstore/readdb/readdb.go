@@ -28,6 +28,7 @@ import (
 	"github.com/sorintlab/agola/internal/db"
 	"github.com/sorintlab/agola/internal/etcd"
 	"github.com/sorintlab/agola/internal/objectstorage"
+	ostypes "github.com/sorintlab/agola/internal/objectstorage/types"
 	"github.com/sorintlab/agola/internal/sequence"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
@@ -125,10 +126,10 @@ func (r *ReadDB) ResetDB() error {
 
 func (r *ReadDB) SyncFromDump() (string, error) {
 	dumpIndex, err := r.dm.GetLastDataStatus()
-	if err != nil && err != objectstorage.ErrNotExist {
+	if err != nil && err != ostypes.ErrNotExist {
 		return "", errors.WithStack(err)
 	}
-	if err == objectstorage.ErrNotExist {
+	if err == ostypes.ErrNotExist {
 		return "", nil
 	}
 	for dataType, files := range dumpIndex.Files {

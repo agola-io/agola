@@ -26,12 +26,12 @@ import (
 	"strings"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
 	"github.com/sorintlab/agola/internal/etcd"
-	"github.com/sorintlab/agola/internal/objectstorage"
+	ostypes "github.com/sorintlab/agola/internal/objectstorage/types"
 	"github.com/sorintlab/agola/internal/sequence"
 
 	"github.com/pkg/errors"
+	uuid "github.com/satori/go.uuid"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/clientv3/concurrency"
 	etcdclientv3rpc "go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
@@ -163,7 +163,7 @@ func (d *DataManager) changesList(paths []string, prefix, startWith string, recu
 
 func (d *DataManager) HasOSTWal(walseq string) (bool, error) {
 	_, err := d.ost.Stat(d.storageWalStatusFile(walseq) + ".committed")
-	if err == objectstorage.ErrNotExist {
+	if err == ostypes.ErrNotExist {
 		return false, nil
 	}
 	if err != nil {

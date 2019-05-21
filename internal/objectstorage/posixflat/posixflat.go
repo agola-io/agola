@@ -12,17 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package objectstorage
+package posixflat
 
 import (
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/sorintlab/agola/internal/objectstorage/common"
+	"github.com/sorintlab/agola/internal/objectstorage/types"
 
 	"github.com/pkg/errors"
 )
@@ -204,12 +206,12 @@ func unescape(s string) (string, bool, error) {
 	return string(t), hasFileMarker, nil
 }
 
-type PosixStorage struct {
+type PosixFlatStorage struct {
 	dataDir string
 	tmpDir  string
 }
 
-func NewPosixStorage(baseDir string) (*PosixStorage, error) {
+func New(baseDir string) (*PosixFlatStorage, error) {
 	if err := os.MkdirAll(baseDir, 0770); err != nil {
 		return nil, err
 	}
@@ -221,20 +223,20 @@ func NewPosixStorage(baseDir string) (*PosixStorage, error) {
 	if err := os.MkdirAll(tmpDir, 0770); err != nil {
 		return nil, errors.Wrapf(err, "failed to create tmp dir")
 	}
-	return &PosixStorage{
+	return &PosixFlatStorage{
 		dataDir: dataDir,
 		tmpDir:  tmpDir,
 	}, nil
 }
 
-func (s *PosixStorage) fsPath(p string) (string, error) {
+func (s *PosixFlatStorage) fsPath(p string) (string, error) {
 	if p == "" {
 		return "", errors.Errorf("empty key name")
 	}
 	return filepath.Join(s.dataDir, escape(p)), nil
 }
 
-func (s *PosixStorage) Stat(p string) (*ObjectInfo, error) {
+func (s *PosixFlatStorage) Stat(p string) (*types.ObjectInfo, error) {
 	fspath, err := s.fsPath(p)
 	if err != nil {
 		return nil, err
@@ -243,15 +245,15 @@ func (s *PosixStorage) Stat(p string) (*ObjectInfo, error) {
 	fi, err := os.Stat(fspath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, ErrNotExist
+			return nil, types.ErrNotExist
 		}
 		return nil, err
 	}
 
-	return &ObjectInfo{Path: p, LastModified: fi.ModTime()}, nil
+	return &types.ObjectInfo{Path: p, LastModified: fi.ModTime()}, nil
 }
 
-func (s *PosixStorage) ReadObject(p string) (ReadSeekCloser, error) {
+func (s *PosixFlatStorage) ReadObject(p string) (types.ReadSeekCloser, error) {
 	fspath, err := s.fsPath(p)
 	if err != nil {
 		return nil, err
@@ -259,12 +261,12 @@ func (s *PosixStorage) ReadObject(p string) (ReadSeekCloser, error) {
 
 	f, err := os.Open(fspath)
 	if err != nil && os.IsNotExist(err) {
-		return nil, ErrNotExist
+		return nil, types.ErrNotExist
 	}
 	return f, err
 }
 
-func (s *PosixStorage) WriteObject(p string, data io.Reader, size int64, persist bool) error {
+func (s *PosixFlatStorage) WriteObject(p string, data io.Reader, size int64, persist bool) error {
 	fspath, err := s.fsPath(p)
 	if err != nil {
 		return err
@@ -273,13 +275,13 @@ func (s *PosixStorage) WriteObject(p string, data io.Reader, size int64, persist
 	if err := os.MkdirAll(path.Dir(fspath), 0770); err != nil {
 		return err
 	}
-	return s.WriteFileAtomicFunc(fspath, 0660, persist, func(f io.Writer) error {
+	return common.WriteFileAtomicFunc(fspath, s.dataDir, s.tmpDir, 0660, persist, func(f io.Writer) error {
 		_, err := io.Copy(f, data)
 		return err
 	})
 }
 
-func (s *PosixStorage) DeleteObject(p string) error {
+func (s *PosixFlatStorage) DeleteObject(p string) error {
 	fspath, err := s.fsPath(p)
 	if err != nil {
 		return err
@@ -287,7 +289,7 @@ func (s *PosixStorage) DeleteObject(p string) error {
 
 	if err := os.Remove(fspath); err != nil {
 		if os.IsNotExist(err) {
-			return ErrNotExist
+			return types.ErrNotExist
 		}
 		return err
 	}
@@ -321,16 +323,16 @@ func (s *PosixStorage) DeleteObject(p string) error {
 	return nil
 }
 
-func (s *PosixStorage) List(prefix, startWith, delimiter string, doneCh <-chan struct{}) <-chan ObjectInfo {
-	objectCh := make(chan ObjectInfo, 1)
+func (s *PosixFlatStorage) List(prefix, startWith, delimiter string, doneCh <-chan struct{}) <-chan types.ObjectInfo {
+	objectCh := make(chan types.ObjectInfo, 1)
 
 	if len(delimiter) > 1 {
-		objectCh <- ObjectInfo{Err: errors.Errorf("wrong delimiter %q", delimiter)}
+		objectCh <- types.ObjectInfo{Err: errors.Errorf("wrong delimiter %q", delimiter)}
 		return objectCh
 	}
 
 	if startWith != "" && !strings.Contains(startWith, prefix) {
-		objectCh <- ObjectInfo{Err: errors.Errorf("wrong startwith value %q for prefix %q", startWith, prefix)}
+		objectCh <- types.ObjectInfo{Err: errors.Errorf("wrong startwith value %q for prefix %q", startWith, prefix)}
 		return objectCh
 	}
 
@@ -352,7 +354,7 @@ func (s *PosixStorage) List(prefix, startWith, delimiter string, doneCh <-chan s
 		startWith = strings.TrimPrefix(startWith, "/")
 	}
 
-	go func(objectCh chan<- ObjectInfo) {
+	go func(objectCh chan<- types.ObjectInfo) {
 		var prevp string
 		defer close(objectCh)
 		err := filepath.Walk(root, func(ep string, info os.FileInfo, err error) error {
@@ -410,7 +412,7 @@ func (s *PosixStorage) List(prefix, startWith, delimiter string, doneCh <-chan s
 				if p > prevp {
 					select {
 					// Send object content.
-					case objectCh <- ObjectInfo{Path: p, LastModified: info.ModTime()}:
+					case objectCh <- types.ObjectInfo{Path: p, LastModified: info.ModTime()}:
 					// If receives done from the caller, return here.
 					case <-doneCh:
 						return io.EOF
@@ -422,7 +424,7 @@ func (s *PosixStorage) List(prefix, startWith, delimiter string, doneCh <-chan s
 			return nil
 		})
 		if err != nil && err != io.EOF {
-			objectCh <- ObjectInfo{
+			objectCh <- types.ObjectInfo{
 				Err: err,
 			}
 			return
@@ -430,65 +432,4 @@ func (s *PosixStorage) List(prefix, startWith, delimiter string, doneCh <-chan s
 	}(objectCh)
 
 	return objectCh
-}
-
-// WriteFileAtomicFunc atomically writes a file, it achieves this by creating a
-// temporary file and then moving it. writeFunc is the func that will write
-// data to the file.
-// TODO(sgotti) remove left over tmp files if process crashes before calling
-// os.Remove
-func (s *PosixStorage) WriteFileAtomicFunc(p string, perm os.FileMode, persist bool, writeFunc func(f io.Writer) error) error {
-	f, err := ioutil.TempFile(s.tmpDir, "tmpfile")
-	if err != nil {
-		return err
-	}
-	err = writeFunc(f)
-	if persist && err == nil {
-		err = f.Sync()
-	}
-	if closeErr := f.Close(); err == nil {
-		err = closeErr
-	}
-	if permErr := os.Chmod(f.Name(), perm); err == nil {
-		err = permErr
-	}
-	if err == nil {
-		err = os.Rename(f.Name(), p)
-	}
-	if err != nil {
-		os.Remove(f.Name())
-		return err
-	}
-
-	if !persist {
-		return nil
-	}
-	// sync parent dirs
-	pdir := filepath.Dir(p)
-	for {
-		if !strings.HasPrefix(pdir, s.dataDir) {
-			break
-		}
-		f, err := os.Open(pdir)
-		if err != nil {
-			f.Close()
-			return nil
-		}
-		if err := f.Sync(); err != nil {
-			f.Close()
-			return nil
-		}
-		f.Close()
-
-		pdir = filepath.Dir(pdir)
-	}
-	return nil
-}
-
-func (s *PosixStorage) WriteFileAtomic(filename string, perm os.FileMode, persist bool, data []byte) error {
-	return s.WriteFileAtomicFunc(filename, perm, persist,
-		func(f io.Writer) error {
-			_, err := f.Write(data)
-			return err
-		})
 }

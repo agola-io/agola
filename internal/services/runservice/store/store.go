@@ -24,7 +24,7 @@ import (
 
 	"github.com/sorintlab/agola/internal/datamanager"
 	"github.com/sorintlab/agola/internal/etcd"
-	"github.com/sorintlab/agola/internal/objectstorage"
+	ostypes "github.com/sorintlab/agola/internal/objectstorage/types"
 	"github.com/sorintlab/agola/internal/services/runservice/common"
 	"github.com/sorintlab/agola/internal/services/runservice/types"
 	"github.com/sorintlab/agola/internal/util"
@@ -540,7 +540,7 @@ func GetRunEtcdOrOST(ctx context.Context, e *etcd.Store, dm *datamanager.DataMan
 	}
 	if r == nil {
 		r, err = OSTGetRun(dm, runID)
-		if err != nil && err != objectstorage.ErrNotExist {
+		if err != nil && err != ostypes.ErrNotExist {
 			return nil, err
 		}
 	}

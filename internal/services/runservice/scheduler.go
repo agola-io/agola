@@ -27,7 +27,7 @@ import (
 	"github.com/sorintlab/agola/internal/datamanager"
 	"github.com/sorintlab/agola/internal/etcd"
 	slog "github.com/sorintlab/agola/internal/log"
-	"github.com/sorintlab/agola/internal/objectstorage"
+	ostypes "github.com/sorintlab/agola/internal/objectstorage/types"
 	"github.com/sorintlab/agola/internal/runconfig"
 	"github.com/sorintlab/agola/internal/services/runservice/common"
 	"github.com/sorintlab/agola/internal/services/runservice/store"
@@ -862,7 +862,7 @@ func (s *Runservice) runTasksUpdater(ctx context.Context) error {
 
 func (s *Runservice) OSTFileExists(path string) (bool, error) {
 	_, err := s.ost.Stat(path)
-	if err != nil && err != objectstorage.ErrNotExist {
+	if err != nil && err != ostypes.ErrNotExist {
 		return false, err
 	}
 	return err == nil, nil
@@ -1363,7 +1363,7 @@ func (s *Runservice) cacheCleaner(ctx context.Context, cacheExpireInterval time.
 		}
 		if object.LastModified.Add(cacheExpireInterval).Before(time.Now()) {
 			if err := s.ost.DeleteObject(object.Path); err != nil {
-				if err != objectstorage.ErrNotExist {
+				if err != ostypes.ErrNotExist {
 					log.Warnf("failed to delete cache object %q: %v", object.Path, err)
 				}
 			}

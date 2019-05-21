@@ -24,6 +24,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/etcd"
 	"github.com/sorintlab/agola/internal/objectstorage"
+	"github.com/sorintlab/agola/internal/objectstorage/posix"
+	"github.com/sorintlab/agola/internal/objectstorage/s3"
 	"github.com/sorintlab/agola/internal/services/config"
 	"go.uber.org/zap"
 )
@@ -81,7 +83,7 @@ func NewObjectStorage(c *config.ObjectStorage) (*objectstorage.ObjStorage, error
 
 	switch c.Type {
 	case config.ObjectStorageTypePosix:
-		ost, err = objectstorage.NewPosixStorage(c.Path)
+		ost, err = posix.New(c.Path)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create posix object storage")
 		}
@@ -100,7 +102,7 @@ func NewObjectStorage(c *config.ObjectStorage) (*objectstorage.ObjStorage, error
 				return nil, errors.Errorf("wrong s3 endpoint scheme %q (must be http or https)", u.Scheme)
 			}
 		}
-		ost, err = objectstorage.NewS3Storage(c.Bucket, c.Location, endpoint, c.AccessKey, c.SecretAccessKey, secure)
+		ost, err = s3.New(c.Bucket, c.Location, endpoint, c.AccessKey, c.SecretAccessKey, secure)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create s3 object storage")
 		}
