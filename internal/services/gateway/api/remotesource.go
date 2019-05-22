@@ -33,6 +33,7 @@ type CreateRemoteSourceRequest struct {
 	APIURL              string `json:"apiurl"`
 	Type                string `json:"type"`
 	AuthType            string `json:"auth_type"`
+	SkipVerify          bool   `json:"skip_verify"`
 	Oauth2ClientID      string `json:"oauth_2_client_id"`
 	Oauth2ClientSecret  string `json:"oauth_2_client_secret"`
 	SSHHostKey          string `json:"ssh_host_key"`
@@ -63,6 +64,7 @@ func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		APIURL:              req.APIURL,
 		Type:                req.Type,
 		AuthType:            req.AuthType,
+		SkipVerify:          req.SkipVerify,
 		Oauth2ClientID:      req.Oauth2ClientID,
 		Oauth2ClientSecret:  req.Oauth2ClientSecret,
 		SSHHostKey:          req.SSHHostKey,

@@ -40,6 +40,7 @@ type remoteSourceCreateOptions struct {
 	rsType              string
 	authType            string
 	apiURL              string
+	skipVerify          bool
 	oauth2ClientID      string
 	oauth2ClientSecret  string
 	sshHostKey          string
@@ -55,6 +56,7 @@ func init() {
 	flags.StringVar(&remoteSourceCreateOpts.rsType, "type", "", "remotesource type")
 	flags.StringVar(&remoteSourceCreateOpts.authType, "auth-type", "", "remote source auth type")
 	flags.StringVar(&remoteSourceCreateOpts.apiURL, "api-url", "", "remotesource api url")
+	flags.BoolVarP(&remoteSourceCreateOpts.skipVerify, "skip-verify", "", false, "skip remote source api tls certificate verification")
 	flags.StringVar(&remoteSourceCreateOpts.oauth2ClientID, "clientid", "", "remotesource oauth2 client id")
 	flags.StringVar(&remoteSourceCreateOpts.oauth2ClientSecret, "secret", "", "remotesource oauth2 secret")
 	flags.StringVar(&remoteSourceCreateOpts.sshHostKey, "ssh-host-key", "", "remotesource ssh public host key")
@@ -82,6 +84,7 @@ func remoteSourceCreate(cmd *cobra.Command, args []string) error {
 		Type:                remoteSourceCreateOpts.rsType,
 		AuthType:            remoteSourceCreateOpts.authType,
 		APIURL:              remoteSourceCreateOpts.apiURL,
+		SkipVerify:          remoteSourceCreateOpts.skipVerify,
 		Oauth2ClientID:      remoteSourceCreateOpts.oauth2ClientID,
 		Oauth2ClientSecret:  remoteSourceCreateOpts.oauth2ClientSecret,
 		SSHHostKey:          remoteSourceCreateOpts.sshHostKey,
