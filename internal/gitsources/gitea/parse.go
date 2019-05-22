@@ -52,8 +52,9 @@ func (c *Client) ParseWebhook(r *http.Request, secret string) (*types.WebhookDat
 	}
 
 	// verify signature
-	if secret != "" {
-		signature := r.Header.Get(signatureHeader)
+	signature := r.Header.Get(signatureHeader)
+	// old versions of gitea doesn't provide a signature
+	if secret != "" && signature != "" {
 		ds, err := hex.DecodeString(signature)
 		if err != nil {
 			return nil, errors.Errorf("wrong webhook signature")
