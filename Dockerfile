@@ -35,8 +35,14 @@ FROM debian:stable AS agola
 
 WORKDIR /
 
+# Install git needed by gitserver
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
 # copy to agola binaries
-COPY --from=server_builder /agola/bin/agola /agola/bin/agola-toolbox-* /bin/
+COPY --from=server_builder /agola/bin/agola /agola/bin/agola-toolbox-* /agola/bin/agola-git-hook /bin/
 
 ENTRYPOINT ["/bin/agola"]
 
@@ -48,11 +54,6 @@ ENTRYPOINT ["/bin/agola"]
 FROM agola as agolademo
 
 WORKDIR /
-
-# Install git needed by gitserver
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    && rm -rf /var/lib/apt/lists/*
 
 # copy the example config
 COPY examples/agolademo/config.yml .
