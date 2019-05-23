@@ -38,12 +38,12 @@ import (
 	"github.com/sorintlab/agola/internal/services/runservice/store"
 	"github.com/sorintlab/agola/internal/services/runservice/types"
 	"github.com/sorintlab/agola/internal/util"
-	"go.uber.org/zap"
 
 	sq "github.com/Masterminds/squirrel"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
 	etcdclientv3rpc "go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
 	"go.etcd.io/etcd/mvcc/mvccpb"
+	"go.uber.org/zap"
 	errors "golang.org/x/xerrors"
 )
 
@@ -1234,11 +1234,20 @@ func (r *ReadDB) getRunsFilteredQuery(phaseFilter []types.RunPhase, groups []str
 		s = s.Where(sq.Eq{"phase": phaseFilter})
 	}
 	if startRunID != "" {
-		switch sortOrder {
-		case types.SortOrderAsc:
-			s = s.Where(sq.Gt{"run.id": startRunID})
-		case types.SortOrderDesc:
-			s = s.Where(sq.Lt{"run.id": startRunID})
+		if lastRun {
+			switch sortOrder {
+			case types.SortOrderAsc:
+				s = s.Having(sq.Gt{"run.id": startRunID})
+			case types.SortOrderDesc:
+				s = s.Having(sq.Lt{"run.id": startRunID})
+			}
+		} else {
+			switch sortOrder {
+			case types.SortOrderAsc:
+				s = s.Where(sq.Gt{"run.id": startRunID})
+			case types.SortOrderDesc:
+				s = s.Where(sq.Lt{"run.id": startRunID})
+			}
 		}
 	}
 	if limit > 0 {
