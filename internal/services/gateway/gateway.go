@@ -187,6 +187,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	remoteSourceHandler := api.NewRemoteSourceHandler(logger, g.ah)
 	createRemoteSourceHandler := api.NewCreateRemoteSourceHandler(logger, g.ah)
+	updateRemoteSourceHandler := api.NewUpdateRemoteSourceHandler(logger, g.ah)
 	remoteSourcesHandler := api.NewRemoteSourcesHandler(logger, g.ah)
 	deleteRemoteSourceHandler := api.NewDeleteRemoteSourceHandler(logger, g.ah)
 
@@ -271,6 +272,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	apirouter.Handle("/remotesources/{remotesourceref}", authForcedHandler(remoteSourceHandler)).Methods("GET")
 	apirouter.Handle("/remotesources", authForcedHandler(createRemoteSourceHandler)).Methods("POST")
+	apirouter.Handle("/remotesources/{remotesourceref}", authForcedHandler(updateRemoteSourceHandler)).Methods("PUT")
 	apirouter.Handle("/remotesources", authOptionalHandler(remoteSourcesHandler)).Methods("GET")
 	apirouter.Handle("/remotesources/{remotesourceref}", authForcedHandler(deleteRemoteSourceHandler)).Methods("DELETE")
 
