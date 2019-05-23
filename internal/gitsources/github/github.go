@@ -33,8 +33,8 @@ import (
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
 
 	"github.com/google/go-github/v25/github"
-	errors "golang.org/x/xerrors"
 	"golang.org/x/oauth2"
+	errors "golang.org/x/xerrors"
 )
 
 var (
@@ -372,7 +372,13 @@ func (c *Client) ListUserRepos() ([]*gitsource.RepoInfo, error) {
 	repos := []*gitsource.RepoInfo{}
 
 	for _, rr := range remoteRepos {
-		repos = append(repos, fromGithubRepo(rr))
+		// keep only repos with admin permissions
+		if rr.Permissions != nil {
+			if !(*rr.Permissions)["admin"] {
+				continue
+			}
+			repos = append(repos, fromGithubRepo(rr))
+		}
 	}
 
 	return repos, nil
