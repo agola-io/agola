@@ -371,7 +371,13 @@ func (c *Client) ListUserRepos() ([]*gitsource.RepoInfo, error) {
 	repos := []*gitsource.RepoInfo{}
 
 	for _, rr := range remoteRepos {
-		repos = append(repos, fromGithubRepo(rr))
+		// keep only repos with admin permissions
+		if rr.Permissions != nil {
+			if !(*rr.Permissions)["admin"] {
+				continue
+			}
+			repos = append(repos, fromGithubRepo(rr))
+		}
 	}
 
 	return repos, nil

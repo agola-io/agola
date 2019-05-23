@@ -256,6 +256,7 @@ func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource
 }
 
 func (c *Client) ListUserRepos() ([]*gitsource.RepoInfo, error) {
+	// get only repos with permission greater or equal to maintainer
 	opts := &gitlab.ListProjectsOptions{MinAccessLevel: gitlab.AccessLevel(gitlab.MaintainerPermissions)}
 	remoteRepos, _, err := c.client.Projects.ListProjects(opts)
 	if err != nil {

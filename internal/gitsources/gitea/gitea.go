@@ -377,6 +377,10 @@ func (c *Client) ListUserRepos() ([]*gitsource.RepoInfo, error) {
 	repos := []*gitsource.RepoInfo{}
 
 	for _, rr := range remoteRepos {
+		// keep only repos with admin permissions
+		if !rr.Permissions.Admin {
+			continue
+		}
 		repos = append(repos, fromGiteaRepo(rr))
 	}
 

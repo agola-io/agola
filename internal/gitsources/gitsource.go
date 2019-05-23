@@ -43,6 +43,7 @@ type GitSource interface {
 	CreateRepoWebhook(repopath, url, secret string) error
 	ParseWebhook(r *http.Request, secret string) (*types.WebhookData, error)
 	CreateCommitStatus(repopath, commitSHA string, status CommitStatus, targetURL, description, context string) error
+	// ListUserRepos report repos where the user has the permission to create deploy keys and webhooks
 	ListUserRepos() ([]*RepoInfo, error)
 }
 
