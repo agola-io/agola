@@ -370,13 +370,24 @@ func (c *Client) GetRemoteSources(ctx context.Context, start string, limit int, 
 }
 
 func (c *Client) CreateRemoteSource(ctx context.Context, req *CreateRemoteSourceRequest) (*RemoteSourceResponse, *http.Response, error) {
-	uj, err := json.Marshal(req)
+	rsj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	rs := new(RemoteSourceResponse)
-	resp, err := c.getParsedResponse(ctx, "POST", "/remotesources", nil, jsonContent, bytes.NewReader(uj), rs)
+	resp, err := c.getParsedResponse(ctx, "POST", "/remotesources", nil, jsonContent, bytes.NewReader(rsj), rs)
+	return rs, resp, err
+}
+
+func (c *Client) UpdateRemoteSource(ctx context.Context, rsRef string, req *UpdateRemoteSourceRequest) (*RemoteSourceResponse, *http.Response, error) {
+	rsj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	rs := new(RemoteSourceResponse)
+	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/remotesources/%s", rsRef), nil, jsonContent, bytes.NewReader(rsj), rs)
 	return rs, resp, err
 }
 

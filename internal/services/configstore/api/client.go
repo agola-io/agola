@@ -446,14 +446,25 @@ func (c *Client) GetRemoteSources(ctx context.Context, start string, limit int, 
 }
 
 func (c *Client) CreateRemoteSource(ctx context.Context, rs *types.RemoteSource) (*types.RemoteSource, *http.Response, error) {
-	uj, err := json.Marshal(rs)
+	rsj, err := json.Marshal(rs)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	rs = new(types.RemoteSource)
-	resp, err := c.getParsedResponse(ctx, "POST", "/remotesources", nil, jsonContent, bytes.NewReader(uj), rs)
+	resp, err := c.getParsedResponse(ctx, "POST", "/remotesources", nil, jsonContent, bytes.NewReader(rsj), rs)
 	return rs, resp, err
+}
+
+func (c *Client) UpdateRemoteSource(ctx context.Context, remoteSourceRef string, remoteSource *types.RemoteSource) (*types.RemoteSource, *http.Response, error) {
+	rsj, err := json.Marshal(remoteSource)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	resRemoteSource := new(types.RemoteSource)
+	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/remotesources/%s", url.PathEscape(remoteSourceRef)), nil, jsonContent, bytes.NewReader(rsj), resRemoteSource)
+	return resRemoteSource, resp, err
 }
 
 func (c *Client) DeleteRemoteSource(ctx context.Context, rsRef string) (*http.Response, error) {

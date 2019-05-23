@@ -96,6 +96,44 @@ func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	}
 }
 
+type UpdateRemoteSourceHandler struct {
+	log    *zap.SugaredLogger
+	ah     *action.ActionHandler
+	readDB *readdb.ReadDB
+}
+
+func NewUpdateRemoteSourceHandler(logger *zap.Logger, ah *action.ActionHandler) *UpdateRemoteSourceHandler {
+	return &UpdateRemoteSourceHandler{log: logger.Sugar(), ah: ah}
+}
+
+func (h *UpdateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	vars := mux.Vars(r)
+	rsRef := vars["remotesourceref"]
+
+	var remoteSource *types.RemoteSource
+	d := json.NewDecoder(r.Body)
+	if err := d.Decode(&remoteSource); err != nil {
+		httpError(w, util.NewErrBadRequest(err))
+		return
+	}
+
+	areq := &action.UpdateRemoteSourceRequest{
+		RemoteSourceRef: rsRef,
+		RemoteSource:    remoteSource,
+	}
+	remoteSource, err := h.ah.UpdateRemoteSource(ctx, areq)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	if err := httpResponse(w, http.StatusCreated, remoteSource); err != nil {
+		h.log.Errorf("err: %+v", err)
+	}
+}
+
 type DeleteRemoteSourceHandler struct {
 	log *zap.SugaredLogger
 	ah  *action.ActionHandler

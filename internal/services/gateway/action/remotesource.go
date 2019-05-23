@@ -115,6 +115,60 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemot
 	return rs, nil
 }
 
+type UpdateRemoteSourceRequest struct {
+	RemoteSourceRef string
+
+	Name                *string
+	APIURL              *string
+	SkipVerify          *bool
+	Oauth2ClientID      *string
+	Oauth2ClientSecret  *string
+	SSHHostKey          *string
+	SkipSSHHostKeyCheck *bool
+}
+
+func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, req *UpdateRemoteSourceRequest) (*types.RemoteSource, error) {
+	if !h.IsUserAdmin(ctx) {
+		return nil, errors.Errorf("user not admin")
+	}
+
+	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, req.RemoteSourceRef)
+	if err != nil {
+		return nil, ErrFromRemote(resp, err)
+	}
+
+	if req.Name != nil {
+		rs.Name = *req.Name
+	}
+	if req.APIURL != nil {
+		rs.APIURL = *req.APIURL
+	}
+	if req.SkipVerify != nil {
+		rs.SkipVerify = *req.SkipVerify
+	}
+	if req.Oauth2ClientID != nil {
+		rs.Oauth2ClientID = *req.Oauth2ClientID
+	}
+	if req.Oauth2ClientSecret != nil {
+		rs.Oauth2ClientSecret = *req.Oauth2ClientSecret
+	}
+	if req.SSHHostKey != nil {
+		rs.SSHHostKey = *req.SSHHostKey
+	}
+	if req.SkipSSHHostKeyCheck != nil {
+		rs.SkipSSHHostKeyCheck = *req.SkipSSHHostKeyCheck
+	}
+
+	h.log.Infof("updating remotesource")
+	rs, resp, err = h.configstoreClient.UpdateRemoteSource(ctx, req.RemoteSourceRef, rs)
+	if err != nil {
+		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to update remotesource"))
+	}
+	h.log.Infof("remotesource %s updated", rs.Name)
+
+	return rs, nil
+}
+
 func (h *ActionHandler) DeleteRemoteSource(ctx context.Context, rsRef string) error {
 	if !h.IsUserAdmin(ctx) {
 		return errors.Errorf("user not admin")

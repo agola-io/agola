@@ -172,6 +172,7 @@ func (s *Configstore) Run(ctx context.Context) error {
 	remoteSourceHandler := api.NewRemoteSourceHandler(logger, s.readDB)
 	remoteSourcesHandler := api.NewRemoteSourcesHandler(logger, s.readDB)
 	createRemoteSourceHandler := api.NewCreateRemoteSourceHandler(logger, s.ah)
+	updateRemoteSourceHandler := api.NewUpdateRemoteSourceHandler(logger, s.ah)
 	deleteRemoteSourceHandler := api.NewDeleteRemoteSourceHandler(logger, s.ah)
 
 	router := mux.NewRouter()
@@ -228,6 +229,7 @@ func (s *Configstore) Run(ctx context.Context) error {
 	apirouter.Handle("/remotesources/{remotesourceref}", remoteSourceHandler).Methods("GET")
 	apirouter.Handle("/remotesources", remoteSourcesHandler).Methods("GET")
 	apirouter.Handle("/remotesources", createRemoteSourceHandler).Methods("POST")
+	apirouter.Handle("/remotesources/{remotesourceref}", updateRemoteSourceHandler).Methods("PUT")
 	apirouter.Handle("/remotesources/{remotesourceref}", deleteRemoteSourceHandler).Methods("DELETE")
 
 	mainrouter := mux.NewRouter()

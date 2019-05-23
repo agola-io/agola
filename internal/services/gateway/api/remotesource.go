@@ -82,6 +82,60 @@ func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	}
 }
 
+type UpdateRemoteSourceRequest struct {
+	Name                *string `json:"name"`
+	APIURL              *string `json:"apiurl"`
+	SkipVerify          *bool   `json:"skip_verify"`
+	Oauth2ClientID      *string `json:"oauth_2_client_id"`
+	Oauth2ClientSecret  *string `json:"oauth_2_client_secret"`
+	SSHHostKey          *string `json:"ssh_host_key"`
+	SkipSSHHostKeyCheck *bool   `json:"skip_ssh_host_key_check"`
+}
+
+type UpdateRemoteSourceHandler struct {
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
+}
+
+func NewUpdateRemoteSourceHandler(logger *zap.Logger, ah *action.ActionHandler) *UpdateRemoteSourceHandler {
+	return &UpdateRemoteSourceHandler{log: logger.Sugar(), ah: ah}
+}
+
+func (h *UpdateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	rsRef := vars["remotesourceref"]
+
+	var req UpdateRemoteSourceRequest
+	d := json.NewDecoder(r.Body)
+	if err := d.Decode(&req); err != nil {
+		httpError(w, util.NewErrBadRequest(err))
+		return
+	}
+
+	creq := &action.UpdateRemoteSourceRequest{
+		RemoteSourceRef: rsRef,
+
+		Name:                req.Name,
+		APIURL:              req.APIURL,
+		SkipVerify:          req.SkipVerify,
+		Oauth2ClientID:      req.Oauth2ClientID,
+		Oauth2ClientSecret:  req.Oauth2ClientSecret,
+		SSHHostKey:          req.SSHHostKey,
+		SkipSSHHostKeyCheck: req.SkipSSHHostKeyCheck,
+	}
+	rs, err := h.ah.UpdateRemoteSource(ctx, creq)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	res := createRemoteSourceResponse(rs)
+	if err := httpResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Errorf("err: %+v", err)
+	}
+}
+
 type RemoteSourceResponse struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
