@@ -685,8 +685,10 @@ func checkConfig(config *Config) error {
 			}
 
 			r := task.Runtime
-			if r.Type != RuntimeTypePod {
-				return errors.Errorf("task %q runtime: wrong type %q", task.Name, r.Type)
+			if r.Type != "" {
+				if r.Type != RuntimeTypePod {
+					return errors.Errorf("task %q runtime: wrong type %q", task.Name, r.Type)
+				}
 			}
 			if len(r.Containers) == 0 {
 				return errors.Errorf("task %q runtime: at least one container must be defined", task.Name)
@@ -799,6 +801,12 @@ func checkConfig(config *Config) error {
 			// set task default working dir
 			if task.WorkingDir == "" {
 				task.WorkingDir = defaultWorkingDir
+			}
+
+			// set task runtime type to pod if empty
+			r := task.Runtime
+			if r.Type == "" {
+				r.Type = RuntimeTypePod
 			}
 
 			// set steps defaults

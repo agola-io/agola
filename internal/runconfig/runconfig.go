@@ -22,6 +22,7 @@ import (
 	rstypes "github.com/sorintlab/agola/internal/services/runservice/types"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
+
 	errors "golang.org/x/xerrors"
 )
 
