@@ -23,8 +23,8 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"github.com/sorintlab/agola/internal/util"
 
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	errors "golang.org/x/xerrors"
 )
 
 const (

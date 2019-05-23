@@ -32,8 +32,8 @@ import (
 	"github.com/sorintlab/agola/internal/services/runservice/types"
 	"github.com/sorintlab/agola/internal/util"
 
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	errors "golang.org/x/xerrors"
 )
 
 type ActionHandler struct {
@@ -233,7 +233,7 @@ func (h *ActionHandler) recreateRun(ctx context.Context, req *RunCreateRequest) 
 	h.log.Infof("creating run from existing run")
 	rc, err := store.OSTGetRunConfig(h.dm, req.RunID)
 	if err != nil {
-		return nil, util.NewErrBadRequest(errors.Wrapf(err, "runconfig %q doens't exist", req.RunID))
+		return nil, util.NewErrBadRequest(errors.Errorf("runconfig %q doesn't exist: %w", req.RunID, err))
 	}
 
 	run, err := store.GetRunEtcdOrOST(ctx, h.e, h.dm, req.RunID)
@@ -241,7 +241,7 @@ func (h *ActionHandler) recreateRun(ctx context.Context, req *RunCreateRequest) 
 		return nil, err
 	}
 	if run == nil {
-		return nil, util.NewErrBadRequest(errors.Wrapf(err, "run %q doens't exist", req.RunID))
+		return nil, util.NewErrBadRequest(errors.Errorf("run %q doesn't exist: %w", req.RunID, err))
 	}
 
 	h.log.Infof("rc: %s", util.Dump(rc))

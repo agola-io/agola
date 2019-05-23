@@ -23,8 +23,8 @@ import (
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
-	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
+	errors "golang.org/x/xerrors"
 )
 
 func (h *ActionHandler) ValidateRemoteSource(ctx context.Context, remoteSource *types.RemoteSource) error {
@@ -99,7 +99,7 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, remoteSource *ty
 
 	rsj, err := json.Marshal(remoteSource)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal remotesource")
+		return nil, errors.Errorf("failed to marshal remotesource: %w", err)
 	}
 	actions := []*datamanager.Action{
 		{
@@ -154,7 +154,7 @@ func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, req *UpdateRemot
 
 	rsj, err := json.Marshal(req.RemoteSource)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal remotesource")
+		return nil, errors.Errorf("failed to marshal remotesource: %w", err)
 	}
 	actions := []*datamanager.Action{
 		{

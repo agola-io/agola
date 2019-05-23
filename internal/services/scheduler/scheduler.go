@@ -26,9 +26,9 @@ import (
 	rsapi "github.com/sorintlab/agola/internal/services/runservice/api"
 	"github.com/sorintlab/agola/internal/util"
 
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	errors "golang.org/x/xerrors"
 )
 
 var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
@@ -52,7 +52,7 @@ func (s *Scheduler) schedule(ctx context.Context) error {
 	for {
 		queuedRunsResponse, _, err := s.runserviceClient.GetQueuedRuns(ctx, lastRunID, 0, nil)
 		if err != nil {
-			return errors.Wrapf(err, "failed to get queued runs")
+			return errors.Errorf("failed to get queued runs: %w", err)
 		}
 		//log.Infof("queuedRuns: %s", util.Dump(queuedRunsResponse.Runs))
 
@@ -81,7 +81,7 @@ func (s *Scheduler) scheduleRun(ctx context.Context, groupID string) error {
 	queuedRunsResponse, _, err := s.runserviceClient.GetGroupFirstQueuedRuns(ctx, groupID, nil)
 	//log.Infof("first queuedRuns: %s", util.Dump(queuedRunsResponse.Runs))
 	if err != nil {
-		return errors.Wrapf(err, "failed to get the first project queued run")
+		return errors.Errorf("failed to get the first project queued run: %w", err)
 	}
 	if len(queuedRunsResponse.Runs) == 0 {
 		return nil
@@ -93,7 +93,7 @@ func (s *Scheduler) scheduleRun(ctx context.Context, groupID string) error {
 	changegroup := util.EncodeSha256Hex(fmt.Sprintf("changegroup-%s", groupID))
 	runningRunsResponse, _, err := s.runserviceClient.GetGroupRunningRuns(ctx, groupID, 1, []string{changegroup})
 	if err != nil {
-		return errors.Wrapf(err, "failed to get running runs")
+		return errors.Errorf("failed to get running runs: %w", err)
 	}
 	//log.Infof("running Runs: %s", util.Dump(runningRunsResponse.Runs))
 	if len(runningRunsResponse.Runs) == 0 {
@@ -121,7 +121,7 @@ func (s *Scheduler) approve(ctx context.Context) error {
 	for {
 		runningRunsResponse, _, err := s.runserviceClient.GetRunningRuns(ctx, lastRunID, 0, nil)
 		if err != nil {
-			return errors.Wrapf(err, "failed to get running runs")
+			return errors.Errorf("failed to get running runs: %w", err)
 		}
 
 		if len(runningRunsResponse.Runs) == 0 {
@@ -146,7 +146,7 @@ func (s *Scheduler) approveRunTasks(ctx context.Context, runID string) error {
 	changegroup := util.EncodeSha256Hex(fmt.Sprintf("approval-%s", runID))
 	runResp, _, err := s.runserviceClient.GetRun(ctx, runID, []string{changegroup})
 	if err != nil {
-		return errors.Wrapf(err, "failed to get run %q", runID)
+		return errors.Errorf("failed to get run %q: %w", runID, err)
 	}
 	run := runResp.Run
 
@@ -166,7 +166,7 @@ func (s *Scheduler) approveRunTasks(ctx context.Context, runID string) error {
 		}
 		var approvers []string
 		if err := json.Unmarshal([]byte(approversAnnotation), &approvers); err != nil {
-			return errors.Wrapf(err, "failed to unmarshal run task approvers annotation")
+			return errors.Errorf("failed to unmarshal run task approvers annotation: %w", err)
 		}
 		// TODO(sgotti) change when we introduce a config the set the minimum number of required approvers
 		if len(approvers) > 0 {
@@ -175,7 +175,7 @@ func (s *Scheduler) approveRunTasks(ctx context.Context, runID string) error {
 				ChangeGroupsUpdateToken: runResp.ChangeGroupsUpdateToken,
 			}
 			if _, err := s.runserviceClient.RunTaskActions(ctx, run.ID, rt.ID, rsreq); err != nil {
-				return errors.Wrapf(err, "failed to approve run")
+				return errors.Errorf("failed to approve run: %w", err)
 			}
 		}
 	}

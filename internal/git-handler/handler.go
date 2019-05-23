@@ -25,8 +25,8 @@ import (
 
 	"github.com/sorintlab/agola/internal/util"
 
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	errors "golang.org/x/xerrors"
 )
 
 var (

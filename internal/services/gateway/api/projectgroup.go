@@ -19,11 +19,11 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/pkg/errors"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/gateway/action"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
+	errors "golang.org/x/xerrors"
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"

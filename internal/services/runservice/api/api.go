@@ -35,11 +35,11 @@ import (
 	"github.com/sorintlab/agola/internal/util"
 
 	"github.com/gorilla/mux"
-	"github.com/pkg/errors"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
 	etcdclientv3rpc "go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
 	"go.etcd.io/etcd/mvcc/mvccpb"
 	"go.uber.org/zap"
+	errors "golang.org/x/xerrors"
 )
 
 type ErrorResponse struct {
@@ -746,7 +746,7 @@ func (h *RunEventsHandler) sendRunEvents(ctx context.Context, startRunEventID st
 			if err == etcdclientv3rpc.ErrCompacted {
 				h.log.Errorf("required events already compacted")
 			}
-			return errors.Wrapf(err, "watch error")
+			return errors.Errorf("watch error: %w", err)
 		}
 
 		for _, ev := range wresp.Events {
@@ -754,7 +754,7 @@ func (h *RunEventsHandler) sendRunEvents(ctx context.Context, startRunEventID st
 			case mvccpb.PUT:
 				var runEvent *types.RunEvent
 				if err := json.Unmarshal(ev.Kv.Value, &runEvent); err != nil {
-					return errors.Wrap(err, "failed to unmarshal run")
+					return errors.Errorf("failed to unmarshal run: %w", err)
 				}
 				if _, err := w.Write([]byte(fmt.Sprintf("data: %s\n\n", ev.Kv.Value))); err != nil {
 					return err

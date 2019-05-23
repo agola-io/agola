@@ -23,8 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/etcd"
+	errors "golang.org/x/xerrors"
 )
 
 type Sequence struct {
@@ -51,11 +51,11 @@ func Parse(s string) (*Sequence, error) {
 	}
 	epoch, err := strconv.ParseUint(parts[0], 32, 64)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot parse sequence epoch %q", epoch)
+		return nil, errors.Errorf("cannot parse sequence epoch %q: %w", epoch, err)
 	}
 	c, err := strconv.ParseUint(parts[1], 32, 64)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot parse sequence count %q", c)
+		return nil, errors.Errorf("cannot parse sequence count %q: %w", c, err)
 	}
 	return &Sequence{
 		Epoch: epoch,

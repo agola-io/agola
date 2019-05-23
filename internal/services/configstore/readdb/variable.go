@@ -23,7 +23,7 @@ import (
 	"github.com/sorintlab/agola/internal/util"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 )
 
 var (
@@ -34,7 +34,7 @@ var (
 func (r *ReadDB) insertVariable(tx *db.Tx, data []byte) error {
 	variable := types.Variable{}
 	if err := json.Unmarshal(data, &variable); err != nil {
-		return errors.Wrap(err, "failed to unmarshal variable")
+		return errors.Errorf("failed to unmarshal variable: %w", err)
 	}
 	// poor man insert or update...
 	if err := r.deleteVariable(tx, variable.ID); err != nil {
@@ -42,16 +42,19 @@ func (r *ReadDB) insertVariable(tx *db.Tx, data []byte) error {
 	}
 	q, args, err := variableInsert.Values(variable.ID, variable.Name, variable.Parent.ID, data).ToSql()
 	if err != nil {
-		return errors.Wrap(err, "failed to build query")
+		return errors.Errorf("failed to build query: %w", err)
 	}
-	_, err = tx.Exec(q, args...)
-	return errors.Wrap(err, "failed to insert variable")
+	if _, err = tx.Exec(q, args...); err != nil {
+		return errors.Errorf("failed to insert variable: %w", err)
+	}
+
+	return nil
 }
 
 func (r *ReadDB) deleteVariable(tx *db.Tx, id string) error {
 	// poor man insert or update...
 	if _, err := tx.Exec("delete from variable where id = $1", id); err != nil {
-		return errors.Wrap(err, "failed to delete variable")
+		return errors.Errorf("failed to delete variable: %w", err)
 	}
 	return nil
 }
@@ -60,12 +63,12 @@ func (r *ReadDB) GetVariableByID(tx *db.Tx, variableID string) (*types.Variable,
 	q, args, err := variableSelect.Where(sq.Eq{"id": variableID}).ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build query")
+		return nil, errors.Errorf("failed to build query: %w", err)
 	}
 
 	variables, _, err := fetchVariables(tx, q, args...)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	if len(variables) > 1 {
 		return nil, errors.Errorf("too many rows returned")
@@ -80,12 +83,12 @@ func (r *ReadDB) GetVariableByName(tx *db.Tx, parentID, name string) (*types.Var
 	q, args, err := variableSelect.Where(sq.Eq{"parentid": parentID, "name": name}).ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build query")
+		return nil, errors.Errorf("failed to build query: %w", err)
 	}
 
 	variables, _, err := fetchVariables(tx, q, args...)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	if len(variables) > 1 {
 		return nil, errors.Errorf("too many rows returned")
@@ -100,7 +103,7 @@ func (r *ReadDB) GetVariables(tx *db.Tx, parentID string) ([]*types.Variable, er
 	q, args, err := variableSelect.Where(sq.Eq{"parentid": parentID}).ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build query")
+		return nil, errors.Errorf("failed to build query: %w", err)
 	}
 
 	variables, _, err := fetchVariables(tx, q, args...)
@@ -113,7 +116,7 @@ func (r *ReadDB) GetVariablesTree(tx *db.Tx, parentType types.ConfigType, parent
 	for parentType == types.ConfigTypeProjectGroup || parentType == types.ConfigTypeProject {
 		vars, err := r.GetVariables(tx, parentID)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get variables for %s %q", parentType, parentID)
+			return nil, errors.Errorf("failed to get variables for %s %q: %w", parentType, parentID, err)
 		}
 		allVariables = append(allVariables, vars...)
 
@@ -157,12 +160,12 @@ func scanVariable(rows *sql.Rows, additionalFields ...interface{}) (*types.Varia
 	var id string
 	var data []byte
 	if err := rows.Scan(&id, &data); err != nil {
-		return nil, "", errors.Wrap(err, "failed to scan rows")
+		return nil, "", errors.Errorf("failed to scan rows: %w", err)
 	}
 	variable := types.Variable{}
 	if len(data) > 0 {
 		if err := json.Unmarshal(data, &variable); err != nil {
-			return nil, "", errors.Wrap(err, "failed to unmarshal variable")
+			return nil, "", errors.Errorf("failed to unmarshal variable: %w", err)
 		}
 	}
 

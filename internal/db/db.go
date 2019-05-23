@@ -21,7 +21,7 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 )
 
 type Type string
@@ -126,7 +126,7 @@ func NewDB(dbType Type, dbConnString string) (*DB, error) {
 
 	sqldb, err := sql.Open(driverName, dbConnString)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 
 	db := &DB{
@@ -191,12 +191,12 @@ func (db *DB) Do(f func(tx *Tx) error) error {
 func (tx *Tx) Start() error {
 	wtx, err := tx.db.db.Begin()
 	if err != nil {
-		return errors.WithStack(err)
+		return err
 	}
 	switch tx.db.data.t {
 	case Postgres:
 		if _, err := wtx.Exec("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ"); err != nil {
-			return errors.WithStack(err)
+			return err
 		}
 	}
 	tx.tx = wtx
@@ -220,13 +220,13 @@ func (tx *Tx) Rollback() error {
 func (tx *Tx) Exec(query string, args ...interface{}) (sql.Result, error) {
 	query = tx.db.data.translate(query)
 	r, err := tx.tx.Exec(query, tx.db.data.translateArgs(args)...)
-	return r, errors.WithStack(err)
+	return r, err
 }
 
 func (tx *Tx) Query(query string, args ...interface{}) (*sql.Rows, error) {
 	query = tx.db.data.translate(query)
 	r, err := tx.tx.Query(query, tx.db.data.translateArgs(args)...)
-	return r, errors.WithStack(err)
+	return r, err
 }
 
 func (tx *Tx) QueryRow(query string, args ...interface{}) *sql.Row {
@@ -239,13 +239,13 @@ func (tx *Tx) CurTime() (time.Time, error) {
 	case Sqlite3:
 		var timestring string
 		if err := tx.QueryRow("select now()").Scan(&timestring); err != nil {
-			return time.Time{}, errors.WithStack(err)
+			return time.Time{}, err
 		}
 		return time.ParseInLocation("2006-01-02 15:04:05.999999999", timestring, time.UTC)
 	case Postgres:
 		var now time.Time
 		if err := tx.QueryRow("select now()").Scan(&now); err != nil {
-			return time.Time{}, errors.WithStack(err)
+			return time.Time{}, err
 		}
 		return now, nil
 	}

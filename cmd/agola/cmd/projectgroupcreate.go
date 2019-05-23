@@ -17,11 +17,11 @@ package cmd
 import (
 	"context"
 
-	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/services/gateway/api"
 	"github.com/sorintlab/agola/internal/services/types"
 
 	"github.com/spf13/cobra"
+	errors "golang.org/x/xerrors"
 )
 
 var cmdProjectGroupCreate = &cobra.Command{
@@ -73,7 +73,7 @@ func projectGroupCreate(cmd *cobra.Command, args []string) error {
 
 	project, _, err := gwclient.CreateProjectGroup(context.TODO(), req)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create project group")
+		return errors.Errorf("failed to create project group: %w", err)
 	}
 	log.Infof("project group %s created, ID: %s", project.Name, project.ID)
 

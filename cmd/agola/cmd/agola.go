@@ -20,10 +20,10 @@ import (
 	"github.com/sorintlab/agola/cmd"
 	slog "github.com/sorintlab/agola/internal/log"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	errors "golang.org/x/xerrors"
 )
 
 var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)

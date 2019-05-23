@@ -25,7 +25,7 @@ import (
 
 	"github.com/sorintlab/agola/internal/services/types"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 )
 
 const (

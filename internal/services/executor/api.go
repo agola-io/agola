@@ -23,9 +23,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/services/runservice/types"
 	"go.uber.org/zap"
+	errors "golang.org/x/xerrors"
 )
 
 type taskSubmissionHandler struct {
@@ -154,7 +154,7 @@ func (h *logsHandler) readLogs(taskID string, setup bool, step int, logPath stri
 			}
 			if !flushstop && follow {
 				if _, err := f.Seek(-int64(n), io.SeekCurrent); err != nil {
-					return errors.Wrapf(err, "failed to seek in log file %q", logPath)
+					return errors.Errorf("failed to seek in log file %q: %w", logPath, err)
 				}
 				// check if the step is finished, if so flush until EOF and stop
 				rt, ok := h.e.runningTasks.get(taskID)

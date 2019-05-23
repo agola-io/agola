@@ -18,11 +18,11 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/services/common"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
+	errors "golang.org/x/xerrors"
 )
 
 type GetVariablesRequest struct {
@@ -82,7 +82,7 @@ type CreateVariableRequest struct {
 func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateVariableRequest) (*csapi.Variable, []*csapi.Secret, error) {
 	isVariableOwner, err := h.IsVariableOwner(ctx, req.ParentType, req.ParentRef)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "failed to determine ownership")
+		return nil, nil, errors.Errorf("failed to determine ownership: %w", err)
 	}
 	if !isVariableOwner {
 		return nil, nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
@@ -114,26 +114,26 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateVariableR
 		var resp *http.Response
 		cssecrets, resp, err = h.configstoreClient.GetProjectGroupSecrets(ctx, req.ParentRef, true)
 		if err != nil {
-			return nil, nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get project group %q secrets", req.ParentRef))
+			return nil, nil, ErrFromRemote(resp, errors.Errorf("failed to get project group %q secrets: %w", req.ParentRef, err))
 		}
 
 		h.log.Infof("creating project group variable")
 		rv, resp, err = h.configstoreClient.CreateProjectGroupVariable(ctx, req.ParentRef, v)
 		if err != nil {
-			return nil, nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to create variable"))
+			return nil, nil, ErrFromRemote(resp, errors.Errorf("failed to create variable: %w", err))
 		}
 	case types.ConfigTypeProject:
 		var err error
 		var resp *http.Response
 		cssecrets, resp, err = h.configstoreClient.GetProjectSecrets(ctx, req.ParentRef, true)
 		if err != nil {
-			return nil, nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get project %q secrets", req.ParentRef))
+			return nil, nil, ErrFromRemote(resp, errors.Errorf("failed to get project %q secrets: %w", req.ParentRef, err))
 		}
 
 		h.log.Infof("creating project variable")
 		rv, resp, err = h.configstoreClient.CreateProjectVariable(ctx, req.ParentRef, v)
 		if err != nil {
-			return nil, nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to create variable"))
+			return nil, nil, ErrFromRemote(resp, errors.Errorf("failed to create variable: %w", err))
 		}
 	}
 	h.log.Infof("variable %s created, ID: %s", rv.Name, rv.ID)
@@ -144,7 +144,7 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateVariableR
 func (h *ActionHandler) DeleteVariable(ctx context.Context, parentType types.ConfigType, parentRef, name string) error {
 	isVariableOwner, err := h.IsVariableOwner(ctx, parentType, parentRef)
 	if err != nil {
-		return errors.Wrapf(err, "failed to determine ownership")
+		return errors.Errorf("failed to determine ownership: %w", err)
 	}
 	if !isVariableOwner {
 		return util.NewErrForbidden(errors.Errorf("user not authorized"))
@@ -160,7 +160,7 @@ func (h *ActionHandler) DeleteVariable(ctx context.Context, parentType types.Con
 		resp, err = h.configstoreClient.DeleteProjectVariable(ctx, parentRef, name)
 	}
 	if err != nil {
-		return ErrFromRemote(resp, errors.Wrapf(err, "failed to delete variable"))
+		return ErrFromRemote(resp, errors.Errorf("failed to delete variable: %w", err))
 	}
 	return nil
 }

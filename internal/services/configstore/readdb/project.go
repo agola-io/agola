@@ -26,7 +26,7 @@ import (
 	"github.com/sorintlab/agola/internal/util"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 )
 
 var (
@@ -37,7 +37,7 @@ var (
 func (r *ReadDB) insertProject(tx *db.Tx, data []byte) error {
 	var project *types.Project
 	if err := json.Unmarshal(data, &project); err != nil {
-		return errors.Wrap(err, "failed to unmarshal project")
+		return errors.Errorf("failed to unmarshal project: %w", err)
 	}
 	// poor man insert or update...
 	if err := r.deleteProject(tx, project.ID); err != nil {
@@ -45,16 +45,19 @@ func (r *ReadDB) insertProject(tx *db.Tx, data []byte) error {
 	}
 	q, args, err := projectInsert.Values(project.ID, project.Name, project.Parent.ID, data).ToSql()
 	if err != nil {
-		return errors.Wrap(err, "failed to build query")
+		return errors.Errorf("failed to build query: %w", err)
 	}
-	_, err = tx.Exec(q, args...)
-	return errors.Wrap(err, "failed to insert project")
+	if _, err = tx.Exec(q, args...); err != nil {
+		return errors.Errorf("failed to insert project: %w", err)
+	}
+
+	return nil
 }
 
 func (r *ReadDB) deleteProject(tx *db.Tx, id string) error {
 	// poor man insert or update...
 	if _, err := tx.Exec("delete from project where id = $1", id); err != nil {
-		return errors.Wrap(err, "failed to delete project")
+		return errors.Errorf("failed to delete project: %w", err)
 	}
 	return nil
 }
@@ -108,12 +111,12 @@ func (r *ReadDB) GetProjectByID(tx *db.Tx, projectID string) (*types.Project, er
 	q, args, err := projectSelect.Where(sq.Eq{"id": projectID}).ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build query")
+		return nil, errors.Errorf("failed to build query: %w", err)
 	}
 
 	projects, _, err := fetchProjects(tx, q, args...)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	if len(projects) > 1 {
 		return nil, errors.Errorf("too many rows returned")
@@ -128,12 +131,12 @@ func (r *ReadDB) GetProjectByName(tx *db.Tx, parentID, name string) (*types.Proj
 	q, args, err := projectSelect.Where(sq.Eq{"parentid": parentID, "name": name}).ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build query")
+		return nil, errors.Errorf("failed to build query: %w", err)
 	}
 
 	projects, _, err := fetchProjects(tx, q, args...)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	if len(projects) > 1 {
 		return nil, errors.Errorf("too many rows returned")
@@ -153,7 +156,7 @@ func (r *ReadDB) GetProjectByPath(tx *db.Tx, projectPath string) (*types.Project
 	projectName := path.Base(projectPath)
 	projectGroup, err := r.GetProjectGroupByPath(tx, projectGroupPath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get project group %q", projectGroupPath)
+		return nil, errors.Errorf("failed to get project group %q: %w", projectGroupPath, err)
 	}
 	if projectGroup == nil {
 		return nil, nil
@@ -161,7 +164,7 @@ func (r *ReadDB) GetProjectByPath(tx *db.Tx, projectPath string) (*types.Project
 
 	project, err := r.GetProjectByName(tx, projectGroup.ID, projectName)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get project group %q", projectName)
+		return nil, errors.Errorf("failed to get project group %q: %w", projectName, err)
 	}
 	return project, nil
 }
@@ -172,7 +175,7 @@ func (r *ReadDB) GetProjectGroupProjects(tx *db.Tx, parentID string) ([]*types.P
 	q, args, err := projectSelect.Where(sq.Eq{"parentid": parentID}).ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build query")
+		return nil, errors.Errorf("failed to build query: %w", err)
 	}
 
 	projects, _, err = fetchProjects(tx, q, args...)
@@ -192,12 +195,12 @@ func scanProject(rows *sql.Rows, additionalFields ...interface{}) (*types.Projec
 	var id string
 	var data []byte
 	if err := rows.Scan(&id, &data); err != nil {
-		return nil, "", errors.Wrap(err, "failed to scan rows")
+		return nil, "", errors.Errorf("failed to scan rows: %w", err)
 	}
 	project := types.Project{}
 	if len(data) > 0 {
 		if err := json.Unmarshal(data, &project); err != nil {
-			return nil, "", errors.Wrap(err, "failed to unmarshal project")
+			return nil, "", errors.Errorf("failed to unmarshal project: %w", err)
 		}
 	}
 
@@ -230,7 +233,7 @@ func (r *ReadDB) GetAllProjects(tx *db.Tx) ([]*types.Project, error) {
 	q, args, err := projectSelect.ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build query")
+		return nil, errors.Errorf("failed to build query: %w", err)
 	}
 
 	projects, _, err = fetchProjects(tx, q, args...)

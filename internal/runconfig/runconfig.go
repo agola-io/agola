@@ -18,11 +18,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/config"
 	rstypes "github.com/sorintlab/agola/internal/services/runservice/types"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
+	errors "golang.org/x/xerrors"
 )
 
 func genRuntime(c *config.Config, ce *config.Runtime, variables map[string]string) *rstypes.Runtime {

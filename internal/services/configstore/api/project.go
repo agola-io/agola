@@ -20,12 +20,12 @@ import (
 	"net/url"
 	"path"
 
-	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/db"
 	"github.com/sorintlab/agola/internal/services/configstore/action"
 	"github.com/sorintlab/agola/internal/services/configstore/readdb"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
+	errors "golang.org/x/xerrors"
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"

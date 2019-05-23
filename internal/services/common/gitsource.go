@@ -21,7 +21,7 @@ import (
 	"github.com/sorintlab/agola/internal/gitsources/gitlab"
 	"github.com/sorintlab/agola/internal/services/types"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 )
 
 func newGitea(rs *types.RemoteSource, accessToken string) (*gitea.Client, error) {

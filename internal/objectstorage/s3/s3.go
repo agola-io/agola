@@ -24,7 +24,7 @@ import (
 	"github.com/sorintlab/agola/internal/objectstorage/types"
 
 	minio "github.com/minio/minio-go"
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 )
 
 type S3Storage struct {
@@ -47,11 +47,11 @@ func New(bucket, location, endpoint, accessKeyID, secretAccessKey string, secure
 
 	exists, err := minioClient.BucketExists(bucket)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot check if bucket %q in location %q exits", bucket, location)
+		return nil, errors.Errorf("cannot check if bucket %q in location %q exits: %w", bucket, location, err)
 	}
 	if !exists {
 		if err := minioClient.MakeBucket(bucket, location); err != nil {
-			return nil, errors.Wrapf(err, "cannot create bucket %q in location %q", bucket, location)
+			return nil, errors.Errorf("cannot create bucket %q in location %q: %w", bucket, location, err)
 		}
 	}
 

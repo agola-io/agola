@@ -17,10 +17,10 @@ package cmd
 import (
 	"context"
 
-	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/services/gateway/api"
 
 	"github.com/spf13/cobra"
+	errors "golang.org/x/xerrors"
 )
 
 var cmdProjectReconfig = &cobra.Command{
@@ -54,7 +54,7 @@ func projectReconfig(cmd *cobra.Command, args []string) error {
 
 	log.Infof("reconfiguring remote project")
 	if _, err := gwclient.ReconfigProject(context.TODO(), projectReconfigOpts.name); err != nil {
-		return errors.Wrapf(err, "failed to reconfigure remote project")
+		return errors.Errorf("failed to reconfigure remote project: %w", err)
 	}
 	log.Infof("project reconfigured")
 

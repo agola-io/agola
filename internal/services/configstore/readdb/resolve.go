@@ -17,10 +17,10 @@ package readdb
 import (
 	"path"
 
-	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/db"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
+	errors "golang.org/x/xerrors"
 )
 
 func (r *ReadDB) ResolveConfigID(tx *db.Tx, configType types.ConfigType, ref string) (string, error) {
@@ -80,7 +80,7 @@ func (r *ReadDB) GetPath(tx *db.Tx, configType types.ConfigType, id string) (str
 	case types.ConfigTypeOrg:
 		org, err := r.GetOrg(tx, id)
 		if err != nil {
-			return "", errors.Wrapf(err, "failed to get org %q", id)
+			return "", errors.Errorf("failed to get org %q: %w", id, err)
 		}
 		if org == nil {
 			return "", errors.Errorf("cannot find org with id %q", id)
@@ -89,7 +89,7 @@ func (r *ReadDB) GetPath(tx *db.Tx, configType types.ConfigType, id string) (str
 	case types.ConfigTypeUser:
 		user, err := r.GetUser(tx, id)
 		if err != nil {
-			return "", errors.Wrapf(err, "failed to get user %q", id)
+			return "", errors.Errorf("failed to get user %q: %w", id, err)
 		}
 		if user == nil {
 			return "", errors.Errorf("cannot find user with id %q", id)

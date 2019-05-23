@@ -24,7 +24,7 @@ import (
 	"github.com/sorintlab/agola/internal/services/gateway"
 	rstypes "github.com/sorintlab/agola/internal/services/runservice/types"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 )
 
 func (n *NotificationService) updateCommitStatus(ctx context.Context, ev *rstypes.RunEvent) error {
@@ -69,12 +69,12 @@ func (n *NotificationService) updateCommitStatus(ctx context.Context, ev *rstype
 
 	project, _, err := n.configstoreClient.GetProject(ctx, groupID)
 	if err != nil {
-		return errors.Wrapf(err, "failed to get project %s", groupID)
+		return errors.Errorf("failed to get project %s: %w", groupID, err)
 	}
 
 	user, _, err := n.configstoreClient.GetUserByLinkedAccount(ctx, project.LinkedAccountID)
 	if err != nil {
-		return errors.Wrapf(err, "failed to get user by linked account %q", project.LinkedAccountID)
+		return errors.Errorf("failed to get user by linked account %q: %w", project.LinkedAccountID, err)
 	}
 	la := user.LinkedAccounts[project.LinkedAccountID]
 	if la == nil {
@@ -82,18 +82,18 @@ func (n *NotificationService) updateCommitStatus(ctx context.Context, ev *rstype
 	}
 	rs, _, err := n.configstoreClient.GetRemoteSource(ctx, la.RemoteSourceID)
 	if err != nil {
-		return errors.Wrapf(err, "failed to get remote source %q", la.RemoteSourceID)
+		return errors.Errorf("failed to get remote source %q: %w", la.RemoteSourceID, err)
 	}
 
 	// TODO(sgotti) handle refreshing oauth2 tokens
 	gitSource, err := common.GetGitSource(rs, la)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create gitea client")
+		return errors.Errorf("failed to create gitea client: %w", err)
 	}
 
 	targetURL, err := webRunURL(n.c.WebExposedURL, project.ID, run.Run.ID)
 	if err != nil {
-		return errors.Wrapf(err, "failed to generate commit status target url")
+		return errors.Errorf("failed to generate commit status target url: %w", err)
 	}
 	description := statusDescription(commitStatus)
 	context := fmt.Sprintf("%s/%s/%s", n.gc.ID, project.Name, run.RunConfig.Name)

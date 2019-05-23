@@ -18,10 +18,11 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/services/gateway/api"
 	"github.com/sorintlab/agola/internal/services/types"
+
 	"github.com/spf13/cobra"
+	errors "golang.org/x/xerrors"
 )
 
 var cmdProjectVariableCreate = &cobra.Command{
@@ -73,14 +74,14 @@ func variableCreate(cmd *cobra.Command, ownertype string, args []string) error {
 		log.Infof("creating project variable")
 		variable, _, err := gwclient.CreateProjectVariable(context.TODO(), variableCreateOpts.parentRef, req)
 		if err != nil {
-			return errors.Wrapf(err, "failed to create project variable")
+			return errors.Errorf("failed to create project variable: %w", err)
 		}
 		log.Infof("project variable %q created, ID: %q", variable.Name, variable.ID)
 	case "projectgroup":
 		log.Infof("creating project group variable")
 		variable, _, err := gwclient.CreateProjectGroupVariable(context.TODO(), variableCreateOpts.parentRef, req)
 		if err != nil {
-			return errors.Wrapf(err, "failed to create project group variable")
+			return errors.Errorf("failed to create project group variable: %w", err)
 		}
 		log.Infof("project group variable %q created, ID: %q", variable.Name, variable.ID)
 	}

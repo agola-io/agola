@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/services/runservice/types"
+	errors "golang.org/x/xerrors"
 
 	"github.com/google/go-containerregistry/pkg/name"
 )
@@ -94,11 +94,11 @@ func ResolveAuth(auths map[string]types.DockerRegistryAuth, regname string) (str
 				case types.DockerRegistryAuthTypeEncodedAuth:
 					decoded, err := base64.StdEncoding.DecodeString(auth.Auth)
 					if err != nil {
-						return "", "", errors.Wrapf(err, "failed to decode docker auth")
+						return "", "", errors.Errorf("failed to decode docker auth: %w", err)
 					}
 					parts := strings.Split(string(decoded), ":")
 					if len(parts) != 2 {
-						return "", "", errors.Wrapf(err, "wrong docker auth")
+						return "", "", errors.Errorf("wrong docker auth: %w", err)
 					}
 					return parts[0], parts[1], nil
 				case types.DockerRegistryAuthTypeBasic:
@@ -128,7 +128,7 @@ func GenDockerConfig(auths map[string]types.DockerRegistryAuth, images []string)
 
 		username, password, err := ResolveAuth(auths, regName)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to resolve auth")
+			return nil, errors.Errorf("failed to resolve auth: %w", err)
 		}
 		delimited := fmt.Sprintf("%s:%s", username, password)
 		auth := base64.StdEncoding.EncodeToString([]byte(delimited))

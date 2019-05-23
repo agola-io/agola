@@ -42,9 +42,9 @@ import (
 
 	"github.com/gorilla/mux"
 	sockaddr "github.com/hashicorp/go-sockaddr"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	errors "golang.org/x/xerrors"
 )
 
 var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
@@ -962,7 +962,7 @@ func (e *Executor) executeTaskInternal(ctx context.Context, et *types.ExecutorTa
 			} else {
 				rt.et.Status.Steps[i].Phase = types.ExecutorTaskPhaseFailed
 			}
-			serr = errors.Wrapf(err, "failed to execute step")
+			serr = errors.Errorf("failed to execute step: %w", err)
 		} else if exitCode != 0 {
 			rt.et.Status.Steps[i].Phase = types.ExecutorTaskPhaseFailed
 			rt.et.Status.Steps[i].ExitCode = exitCode
@@ -1238,7 +1238,7 @@ func (e *Executor) getExecutorID() (string, error) {
 
 func (e *Executor) saveExecutorID(id string) error {
 	if err := common.WriteFileAtomic(e.executorIDPath(), []byte(id), 0660); err != nil {
-		return errors.Wrapf(err, "failed to write executor id file")
+		return errors.Errorf("failed to write executor id file: %w", err)
 	}
 	return nil
 }
@@ -1261,7 +1261,7 @@ func NewExecutor(c *config.Executor) (*Executor, error) {
 	var err error
 	c.ToolboxPath, err = filepath.Abs(c.ToolboxPath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot determine \"agola-toolbox\" absolute path")
+		return nil, errors.Errorf("cannot determine \"agola-toolbox\" absolute path: %w", err)
 	}
 
 	e := &Executor{
@@ -1291,7 +1291,7 @@ func NewExecutor(c *config.Executor) (*Executor, error) {
 
 	addr, err := sockaddr.GetPrivateIP()
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot discover executor listen address")
+		return nil, errors.Errorf("cannot discover executor listen address: %w", err)
 	}
 	if addr == "" {
 		return nil, errors.Errorf("cannot discover executor listen address")
@@ -1302,7 +1302,7 @@ func NewExecutor(c *config.Executor) (*Executor, error) {
 	}
 	_, port, err := net.SplitHostPort(c.Web.ListenAddress)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot get web listen port")
+		return nil, errors.Errorf("cannot get web listen port: %w", err)
 	}
 	u.Host = net.JoinHostPort(addr, port)
 	e.listenURL = u.String()
@@ -1312,12 +1312,12 @@ func NewExecutor(c *config.Executor) (*Executor, error) {
 	case config.DriverTypeDocker:
 		d, err = driver.NewDockerDriver(logger, e.id, "/tmp/agola/bin", e.c.ToolboxPath)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to create docker driver")
+			return nil, errors.Errorf("failed to create docker driver: %w", err)
 		}
 	case config.DriverTypeK8s:
 		d, err = driver.NewK8sDriver(logger, e.id, c.ToolboxPath)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to create kubernetes driver")
+			return nil, errors.Errorf("failed to create kubernetes driver: %w", err)
 		}
 		e.dynamic = true
 	default:

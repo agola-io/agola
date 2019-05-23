@@ -23,7 +23,7 @@ import (
 	"github.com/sorintlab/agola/internal/util"
 	"go.uber.org/zap"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 )
 
 type GetSecretsRequest struct {
@@ -74,7 +74,7 @@ type CreateSecretHandler struct {
 func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretRequest) (*csapi.Secret, error) {
 	isVariableOwner, err := h.IsVariableOwner(ctx, req.ParentType, req.ParentRef)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to determine ownership")
+		return nil, errors.Errorf("failed to determine ownership: %w", err)
 	}
 	if !isVariableOwner {
 		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
@@ -101,7 +101,7 @@ func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretReque
 		rs, resp, err = h.configstoreClient.CreateProjectSecret(ctx, req.ParentRef, s)
 	}
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to create secret"))
+		return nil, ErrFromRemote(resp, errors.Errorf("failed to create secret: %w", err))
 	}
 	h.log.Infof("secret %s created, ID: %s", rs.Name, rs.ID)
 
@@ -111,7 +111,7 @@ func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretReque
 func (h *ActionHandler) DeleteSecret(ctx context.Context, parentType types.ConfigType, parentRef, name string) error {
 	isVariableOwner, err := h.IsVariableOwner(ctx, parentType, parentRef)
 	if err != nil {
-		return errors.Wrapf(err, "failed to determine ownership")
+		return errors.Errorf("failed to determine ownership: %w", err)
 	}
 	if !isVariableOwner {
 		return util.NewErrForbidden(errors.Errorf("user not authorized"))
@@ -127,7 +127,7 @@ func (h *ActionHandler) DeleteSecret(ctx context.Context, parentType types.Confi
 		resp, err = h.configstoreClient.DeleteProjectSecret(ctx, parentRef, name)
 	}
 	if err != nil {
-		return ErrFromRemote(resp, errors.Wrapf(err, "failed to delete secret"))
+		return ErrFromRemote(resp, errors.Errorf("failed to delete secret: %w", err))
 	}
 	return nil
 }

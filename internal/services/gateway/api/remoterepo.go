@@ -24,8 +24,8 @@ import (
 	"github.com/sorintlab/agola/internal/util"
 
 	"github.com/gorilla/mux"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	errors "golang.org/x/xerrors"
 )
 
 type RemoteRepoResponse struct {
@@ -93,13 +93,13 @@ func (h *UserRemoteReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 
 	gitsource, err := h.ah.GetGitSource(ctx, rs, user.Name, la)
 	if err != nil {
-		httpError(w, util.NewErrBadRequest(errors.Wrapf(err, "failed to create gitsource client")))
+		httpError(w, util.NewErrBadRequest(errors.Errorf("failed to create gitsource client: %w", err)))
 		return
 	}
 
 	remoteRepos, err := gitsource.ListUserRepos()
 	if err != nil {
-		httpError(w, util.NewErrBadRequest(errors.Wrapf(err, "failed to get user repositories from gitsource")))
+		httpError(w, util.NewErrBadRequest(errors.Errorf("failed to get user repositories from gitsource: %w", err)))
 		return
 	}
 

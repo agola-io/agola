@@ -19,8 +19,8 @@ import (
 
 	"github.com/sorintlab/agola/internal/services/gateway/api"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	errors "golang.org/x/xerrors"
 )
 
 var cmdProjectVariableDelete = &cobra.Command{
@@ -60,14 +60,14 @@ func variableDelete(cmd *cobra.Command, ownertype string, args []string) error {
 		log.Infof("deleting project variable")
 		_, err := gwclient.DeleteProjectVariable(context.TODO(), variableDeleteOpts.parentRef, variableDeleteOpts.name)
 		if err != nil {
-			return errors.Wrapf(err, "failed to delete project variable")
+			return errors.Errorf("failed to delete project variable: %w", err)
 		}
 		log.Infof("project variable deleted")
 	case "projectgroup":
 		log.Infof("deleting project group variable")
 		_, err := gwclient.DeleteProjectGroupVariable(context.TODO(), variableDeleteOpts.parentRef, variableDeleteOpts.name)
 		if err != nil {
-			return errors.Wrapf(err, "failed to delete project group variable")
+			return errors.Errorf("failed to delete project group variable: %w", err)
 		}
 		log.Infof("project group variable deleted")
 	}

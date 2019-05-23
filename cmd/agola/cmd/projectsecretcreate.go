@@ -21,8 +21,8 @@ import (
 	"github.com/sorintlab/agola/internal/services/gateway/api"
 	"github.com/sorintlab/agola/internal/services/types"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	errors "golang.org/x/xerrors"
 )
 
 var cmdProjectSecretCreate = &cobra.Command{
@@ -75,14 +75,14 @@ func secretCreate(cmd *cobra.Command, ownertype string, args []string) error {
 		log.Infof("creating project secret")
 		secret, _, err := gwclient.CreateProjectSecret(context.TODO(), secretCreateOpts.parentRef, req)
 		if err != nil {
-			return errors.Wrapf(err, "failed to create project secret")
+			return errors.Errorf("failed to create project secret: %w", err)
 		}
 		log.Infof("project secret %q created, ID: %q", secret.Name, secret.ID)
 	case "projectgroup":
 		log.Infof("creating project group secret")
 		secret, _, err := gwclient.CreateProjectGroupSecret(context.TODO(), secretCreateOpts.parentRef, req)
 		if err != nil {
-			return errors.Wrapf(err, "failed to create project group secret")
+			return errors.Errorf("failed to create project group secret: %w", err)
 		}
 		log.Infof("project group secret %q created, ID: %q", secret.Name, secret.ID)
 	}

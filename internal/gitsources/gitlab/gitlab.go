@@ -24,10 +24,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pkg/errors"
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
+
 	gitlab "github.com/xanzy/go-gitlab"
 	"golang.org/x/oauth2"
+	errors "golang.org/x/xerrors"
 )
 
 var (
@@ -114,7 +115,7 @@ func (c *Client) RequestOauth2Token(callbackURL, code string) (*oauth2.Token, er
 	var config = c.oauth2Config(callbackURL)
 	token, err := config.Exchange(context.TODO(), code)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot get oauth2 token")
+		return nil, errors.Errorf("cannot get oauth2 token: %w", err)
 	}
 	return token, nil
 }
@@ -156,18 +157,20 @@ func (c *Client) GetFile(repopath, commit, file string) ([]byte, error) {
 }
 
 func (c *Client) CreateDeployKey(repopath, title, pubKey string, readonly bool) error {
-	_, _, err := c.client.DeployKeys.AddDeployKey(repopath, &gitlab.AddDeployKeyOptions{
+	if _, _, err := c.client.DeployKeys.AddDeployKey(repopath, &gitlab.AddDeployKeyOptions{
 		Title: gitlab.String(title),
 		Key:   gitlab.String(pubKey),
-	})
+	}); err != nil {
+		return errors.Errorf("error creating deploy key: %w", err)
+	}
 
-	return errors.Wrapf(err, "error creating deploy key")
+	return nil
 }
 
 func (c *Client) UpdateDeployKey(repopath, title, pubKey string, readonly bool) error {
 	keys, _, err := c.client.DeployKeys.ListProjectDeployKeys(repopath, nil)
 	if err != nil {
-		return errors.Wrapf(err, "error retrieving existing deploy keys")
+		return errors.Errorf("error retrieving existing deploy keys: %w", err)
 	}
 
 	for _, key := range keys {
@@ -176,7 +179,7 @@ func (c *Client) UpdateDeployKey(repopath, title, pubKey string, readonly bool) 
 				return nil
 			}
 			if _, err := c.client.DeployKeys.DeleteDeployKey(repopath, key.ID); err != nil {
-				return errors.Wrapf(err, "error removing existing deploy key")
+				return errors.Errorf("error removing existing deploy key: %w", err)
 			}
 		}
 	}
@@ -185,7 +188,7 @@ func (c *Client) UpdateDeployKey(repopath, title, pubKey string, readonly bool) 
 		Title: &title,
 		Key:   &pubKey,
 	}); err != nil {
-		return errors.Wrapf(err, "error creating deploy key")
+		return errors.Errorf("error creating deploy key: %w", err)
 	}
 
 	return nil
@@ -194,13 +197,13 @@ func (c *Client) UpdateDeployKey(repopath, title, pubKey string, readonly bool) 
 func (c *Client) DeleteDeployKey(repopath, title string) error {
 	keys, _, err := c.client.DeployKeys.ListProjectDeployKeys(repopath, nil)
 	if err != nil {
-		return errors.Wrapf(err, "error retrieving existing deploy keys")
+		return errors.Errorf("error retrieving existing deploy keys: %w", err)
 	}
 
 	for _, key := range keys {
 		if key.Title == title {
 			if _, err := c.client.DeployKeys.DeleteDeployKey(repopath, key.ID); err != nil {
-				return errors.Wrapf(err, "error removing existing deploy key")
+				return errors.Errorf("error removing existing deploy key: %w", err)
 			}
 		}
 	}
@@ -216,15 +219,17 @@ func (c *Client) CreateRepoWebhook(repopath, url, secret string) error {
 		MergeRequestsEvents: gitlab.Bool(true),
 		Token:               gitlab.String(secret),
 	}
-	_, _, err := c.client.Projects.AddProjectHook(repopath, opts)
+	if _, _, err := c.client.Projects.AddProjectHook(repopath, opts); err != nil {
+		return errors.Errorf("error creating repository webhook: %w", err)
+	}
 
-	return errors.Wrapf(err, "error creating repository webhook")
+	return nil
 }
 
 func (c *Client) DeleteRepoWebhook(repopath, u string) error {
 	hooks, _, err := c.client.Projects.ListProjectHooks(repopath, nil)
 	if err != nil {
-		return errors.Wrapf(err, "error retrieving repository webhooks")
+		return errors.Errorf("error retrieving repository webhooks: %w", err)
 	}
 
 	// match the full url so we can have multiple webhooks for different agola
@@ -232,7 +237,7 @@ func (c *Client) DeleteRepoWebhook(repopath, u string) error {
 	for _, hook := range hooks {
 		if hook.URL == u {
 			if _, err := c.client.Projects.DeleteProjectHook(repopath, hook.ID); err != nil {
-				return errors.Wrapf(err, "error deleting existing repository webhook")
+				return errors.Errorf("error deleting existing repository webhook: %w", err)
 			}
 		}
 	}

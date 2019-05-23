@@ -21,13 +21,13 @@ import (
 	"os"
 	"path"
 
-	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/etcd"
 	"github.com/sorintlab/agola/internal/objectstorage"
 	"github.com/sorintlab/agola/internal/objectstorage/posix"
 	"github.com/sorintlab/agola/internal/objectstorage/s3"
 	"github.com/sorintlab/agola/internal/services/config"
 	"go.uber.org/zap"
+	errors "golang.org/x/xerrors"
 )
 
 const (
@@ -85,7 +85,7 @@ func NewObjectStorage(c *config.ObjectStorage) (*objectstorage.ObjStorage, error
 	case config.ObjectStorageTypePosix:
 		ost, err = posix.New(c.Path)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to create posix object storage")
+			return nil, errors.Errorf("failed to create posix object storage: %w", err)
 		}
 	case config.ObjectStorageTypeS3:
 		// minio golang client doesn't accept an url as an endpoint
@@ -104,7 +104,7 @@ func NewObjectStorage(c *config.ObjectStorage) (*objectstorage.ObjStorage, error
 		}
 		ost, err = s3.New(c.Bucket, c.Location, endpoint, c.AccessKey, c.SecretAccessKey, secure)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to create s3 object storage")
+			return nil, errors.Errorf("failed to create s3 object storage: %w", err)
 		}
 	}
 
@@ -122,7 +122,7 @@ func NewEtcd(c *config.Etcd, logger *zap.Logger, prefix string) (*etcd.Store, er
 		SkipTLSVerify: c.TLSSkipVerify,
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create etcd store")
+		return nil, errors.Errorf("failed to create etcd store: %w", err)
 	}
 
 	return e, nil

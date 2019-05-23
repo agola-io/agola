@@ -17,7 +17,6 @@ package action
 import (
 	"net/http"
 
-	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/services/common"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	rsapi "github.com/sorintlab/agola/internal/services/runservice/api"
@@ -55,11 +54,10 @@ func ErrFromRemote(resp *http.Response, err error) error {
 
 	if resp != nil {
 		switch resp.StatusCode {
-		// remove wrapping from errors sent to client
 		case http.StatusBadRequest:
-			return util.NewErrBadRequest(errors.Cause(err))
+			return util.NewErrBadRequest(err)
 		case http.StatusNotFound:
-			return util.NewErrNotFound(errors.Cause(err))
+			return util.NewErrNotFound(err)
 		}
 	}
 

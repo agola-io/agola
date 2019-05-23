@@ -26,7 +26,7 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/google/go-jsonnet"
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 )
 
 const (
@@ -559,7 +559,7 @@ func parseWhenCondition(s string) (*types.WhenCondition, error) {
 
 	if isRegExp {
 		if _, err := regexp.Compile(s); err != nil {
-			return nil, errors.Wrapf(err, "wrong regular expression")
+			return nil, errors.Errorf("wrong regular expression: %w", err)
 		}
 		wc.Type = types.WhenConditionTypeRegExp
 	} else {
@@ -623,14 +623,14 @@ func ParseConfig(configData []byte, format ConfigFormat) (*Config, error) {
 		vm := jsonnet.MakeVM()
 		out, err := vm.EvaluateSnippet("", string(configData))
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to evaluate jsonnet config")
+			return nil, errors.Errorf("failed to evaluate jsonnet config: %w", err)
 		}
 		configData = []byte(out)
 	}
 
 	config := DefaultConfig
 	if err := yaml.Unmarshal(configData, &config); err != nil {
-		return nil, errors.Wrapf(err, "failed to unmarshal config")
+		return nil, errors.Errorf("failed to unmarshal config: %w", err)
 	}
 
 	return &config, checkConfig(&config)

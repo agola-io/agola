@@ -20,7 +20,7 @@ import (
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 )
 
 type TokenSigningData struct {

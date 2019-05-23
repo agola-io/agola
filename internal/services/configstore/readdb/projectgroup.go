@@ -26,7 +26,7 @@ import (
 	"github.com/sorintlab/agola/internal/util"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 )
 
 var (
@@ -37,7 +37,7 @@ var (
 func (r *ReadDB) insertProjectGroup(tx *db.Tx, data []byte) error {
 	var group *types.ProjectGroup
 	if err := json.Unmarshal(data, &group); err != nil {
-		return errors.Wrap(err, "failed to unmarshal group")
+		return errors.Errorf("failed to unmarshal group: %w", err)
 	}
 
 	// poor man insert or update...
@@ -46,16 +46,19 @@ func (r *ReadDB) insertProjectGroup(tx *db.Tx, data []byte) error {
 	}
 	q, args, err := projectgroupInsert.Values(group.ID, group.Name, group.Parent.ID, data).ToSql()
 	if err != nil {
-		return errors.Wrap(err, "failed to build query")
+		return errors.Errorf("failed to build query: %w", err)
 	}
-	_, err = tx.Exec(q, args...)
-	return errors.Wrap(err, "failed to insert group")
+	if _, err = tx.Exec(q, args...); err != nil {
+		errors.Errorf("failed to insert group: %w", err)
+	}
+
+	return nil
 }
 
 func (r *ReadDB) deleteProjectGroup(tx *db.Tx, id string) error {
 	// poor man insert or update...
 	if _, err := tx.Exec("delete from projectgroup where id = $1", id); err != nil {
-		return errors.Wrap(err, "failed to delete group")
+		return errors.Errorf("failed to delete group: %w", err)
 	}
 	return nil
 }
@@ -84,7 +87,7 @@ func (r *ReadDB) GetProjectGroupHierarchy(tx *db.Tx, projectGroup *types.Project
 		var err error
 		projectGroup, err = r.GetProjectGroup(tx, projectGroupID)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get project group %q", projectGroupID)
+			return nil, errors.Errorf("failed to get project group %q: %w", projectGroupID, err)
 		}
 		if projectGroup == nil {
 			return nil, errors.Errorf("project group %q doesn't exist", projectGroupID)
@@ -165,12 +168,12 @@ func (r *ReadDB) GetProjectGroupByID(tx *db.Tx, projectGroupID string) (*types.P
 	q, args, err := projectgroupSelect.Where(sq.Eq{"id": projectGroupID}).ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build query")
+		return nil, errors.Errorf("failed to build query: %w", err)
 	}
 
 	projectGroups, _, err := fetchProjectGroups(tx, q, args...)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	if len(projectGroups) > 1 {
 		return nil, errors.Errorf("too many rows returned")
@@ -185,12 +188,12 @@ func (r *ReadDB) GetProjectGroupByName(tx *db.Tx, parentID, name string) (*types
 	q, args, err := projectgroupSelect.Where(sq.Eq{"parentid": parentID, "name": name}).ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build query")
+		return nil, errors.Errorf("failed to build query: %w", err)
 	}
 
 	projectGroups, _, err := fetchProjectGroups(tx, q, args...)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	if len(projectGroups) > 1 {
 		return nil, errors.Errorf("too many rows returned")
@@ -211,7 +214,7 @@ func (r *ReadDB) GetProjectGroupByPath(tx *db.Tx, projectGroupPath string) (*typ
 	case "org":
 		org, err := r.GetOrgByName(tx, parts[1])
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get org %q", parts[1])
+			return nil, errors.Errorf("failed to get org %q: %w", parts[1], err)
 		}
 		if org == nil {
 			return nil, errors.Errorf("cannot find org with name %q", parts[1])
@@ -220,7 +223,7 @@ func (r *ReadDB) GetProjectGroupByPath(tx *db.Tx, projectGroupPath string) (*typ
 	case "user":
 		user, err := r.GetUserByName(tx, parts[1])
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get user %q", parts[1])
+			return nil, errors.Errorf("failed to get user %q: %w", parts[1], err)
 		}
 		if user == nil {
 			return nil, errors.Errorf("cannot find user with name %q", parts[1])
@@ -236,7 +239,7 @@ func (r *ReadDB) GetProjectGroupByPath(tx *db.Tx, projectGroupPath string) (*typ
 		var err error
 		projectGroup, err = r.GetProjectGroupByName(tx, parentID, projectGroupName)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get project group %q", projectGroupName)
+			return nil, errors.Errorf("failed to get project group %q: %w", projectGroupName, err)
 		}
 		if projectGroup == nil {
 			return nil, nil
@@ -253,7 +256,7 @@ func (r *ReadDB) GetProjectGroupSubgroups(tx *db.Tx, parentID string) ([]*types.
 	q, args, err := projectgroupSelect.Where(sq.Eq{"parentid": parentID}).ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build query")
+		return nil, errors.Errorf("failed to build query: %w", err)
 	}
 
 	projectGroups, _, err = fetchProjectGroups(tx, q, args...)
@@ -273,12 +276,12 @@ func scanProjectGroup(rows *sql.Rows, additionalFields ...interface{}) (*types.P
 	var id string
 	var data []byte
 	if err := rows.Scan(&id, &data); err != nil {
-		return nil, "", errors.Wrap(err, "failed to scan rows")
+		return nil, "", errors.Errorf("failed to scan rows: %w", err)
 	}
 	group := types.ProjectGroup{}
 	if len(data) > 0 {
 		if err := json.Unmarshal(data, &group); err != nil {
-			return nil, "", errors.Wrap(err, "failed to unmarshal group")
+			return nil, "", errors.Errorf("failed to unmarshal group: %w", err)
 		}
 	}
 

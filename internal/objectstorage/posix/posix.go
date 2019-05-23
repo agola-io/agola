@@ -21,9 +21,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/objectstorage/common"
 	"github.com/sorintlab/agola/internal/objectstorage/types"
+	errors "golang.org/x/xerrors"
 )
 
 const (
@@ -43,10 +43,10 @@ func New(baseDir string) (*PosixStorage, error) {
 	dataDir := filepath.Join(baseDir, dataDirName)
 	tmpDir := filepath.Join(baseDir, tmpDirName)
 	if err := os.MkdirAll(dataDir, 0770); err != nil {
-		return nil, errors.Wrapf(err, "failed to create data dir")
+		return nil, errors.Errorf("failed to create data dir: %w", err)
 	}
 	if err := os.MkdirAll(tmpDir, 0770); err != nil {
-		return nil, errors.Wrapf(err, "failed to create tmp dir")
+		return nil, errors.Errorf("failed to create tmp dir: %w", err)
 	}
 	return &PosixStorage{
 		dataDir: dataDir,

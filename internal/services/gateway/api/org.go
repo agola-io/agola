@@ -19,11 +19,11 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/services/gateway/action"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 	"go.uber.org/zap"
+	errors "golang.org/x/xerrors"
 
 	"github.com/gorilla/mux"
 )
@@ -162,7 +162,7 @@ func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		limit, err = strconv.Atoi(limitS)
 		if err != nil {
-			httpError(w, util.NewErrBadRequest(errors.Wrapf(err, "cannot parse limit")))
+			httpError(w, util.NewErrBadRequest(errors.Errorf("cannot parse limit: %w", err)))
 			return
 		}
 	}

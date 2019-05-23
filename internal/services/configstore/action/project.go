@@ -24,8 +24,8 @@ import (
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
-	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
+	errors "golang.org/x/xerrors"
 )
 
 func (h *ActionHandler) ValidateProject(ctx context.Context, project *types.Project) error {
@@ -110,7 +110,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, project *types.Projec
 			// check that the linked account matches the remote source
 			user, err := h.readDB.GetUserByLinkedAccount(tx, project.LinkedAccountID)
 			if err != nil {
-				return errors.Wrapf(err, "failed to get user with linked account id %q", project.LinkedAccountID)
+				return errors.Errorf("failed to get user with linked account id %q: %w", project.LinkedAccountID, err)
 			}
 			if user == nil {
 				return util.NewErrBadRequest(errors.Errorf("user for linked account %q doesn't exist", project.LinkedAccountID))
@@ -138,7 +138,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, project *types.Projec
 
 	pcj, err := json.Marshal(project)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal project")
+		return nil, errors.Errorf("failed to marshal project: %w", err)
 	}
 	actions := []*datamanager.Action{
 		{
@@ -223,7 +223,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, req *UpdateProjectReq
 			// check that the linked account matches the remote source
 			user, err := h.readDB.GetUserByLinkedAccount(tx, req.Project.LinkedAccountID)
 			if err != nil {
-				return errors.Wrapf(err, "failed to get user with linked account id %q", req.Project.LinkedAccountID)
+				return errors.Errorf("failed to get user with linked account id %q: %w", req.Project.LinkedAccountID, err)
 			}
 			if user == nil {
 				return util.NewErrBadRequest(errors.Errorf("user for linked account %q doesn't exist", req.Project.LinkedAccountID))
@@ -245,7 +245,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, req *UpdateProjectReq
 
 	pcj, err := json.Marshal(req.Project)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal project")
+		return nil, errors.Errorf("failed to marshal project: %w", err)
 	}
 	actions := []*datamanager.Action{
 		{

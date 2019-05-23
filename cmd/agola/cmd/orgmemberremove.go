@@ -17,10 +17,10 @@ package cmd
 import (
 	"context"
 
-	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/services/gateway/api"
 
 	"github.com/spf13/cobra"
+	errors "golang.org/x/xerrors"
 )
 
 var cmdOrgMemberRemove = &cobra.Command{
@@ -58,7 +58,7 @@ func orgMemberRemove(cmd *cobra.Command, args []string) error {
 	log.Infof("removing member %q from organization %q", orgMemberRemoveOpts.username, orgMemberRemoveOpts.orgname)
 	_, err := gwclient.RemoveOrgMember(context.TODO(), orgMemberRemoveOpts.orgname, orgMemberRemoveOpts.username)
 	if err != nil {
-		return errors.Wrapf(err, "failed to remove organization member")
+		return errors.Errorf("failed to remove organization member: %w", err)
 	}
 
 	return nil

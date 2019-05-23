@@ -34,11 +34,11 @@ import (
 	"github.com/sorintlab/agola/internal/services/runservice/types"
 	"github.com/sorintlab/agola/internal/util"
 
-	"github.com/pkg/errors"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/clientv3/concurrency"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	errors "golang.org/x/xerrors"
 )
 
 const (
@@ -614,7 +614,7 @@ func (s *Runservice) handleExecutorTaskUpdate(ctx context.Context, et *types.Exe
 	}
 	rc, err := store.OSTGetRunConfig(s.dm, r.ID)
 	if err != nil {
-		return errors.Wrapf(err, "cannot get run config %q", r.ID)
+		return errors.Errorf("cannot get run config %q: %w", r.ID, err)
 	}
 
 	if err := s.updateRunTaskStatus(ctx, et, r); err != nil {
@@ -1200,7 +1200,7 @@ func (s *Runservice) runScheduler(ctx context.Context, r *types.Run) error {
 	log.Debugf("runScheduler")
 	rc, err := store.OSTGetRunConfig(s.dm, r.ID)
 	if err != nil {
-		return errors.Wrapf(err, "cannot get run config %q", r.ID)
+		return errors.Errorf("cannot get run config %q: %w", r.ID, err)
 	}
 
 	return s.scheduleRun(ctx, r, rc)

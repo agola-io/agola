@@ -24,7 +24,7 @@ import (
 	"github.com/google/go-github/v25/github"
 	"github.com/sorintlab/agola/internal/services/types"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 )
 
 const (
@@ -40,12 +40,12 @@ const (
 func (c *Client) ParseWebhook(r *http.Request, secret string) (*types.WebhookData, error) {
 	payload, err := github.ValidatePayload(r, []byte(secret))
 	if err != nil {
-		return nil, errors.Wrapf(err, "wrong webhook signature")
+		return nil, errors.Errorf("wrong webhook signature: %w", err)
 	}
 	webHookType := github.WebHookType(r)
 	event, err := github.ParseWebHook(webHookType, payload)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse webhook")
+		return nil, errors.Errorf("failed to parse webhook: %w", err)
 	}
 	switch event := event.(type) {
 	case *github.PushEvent:

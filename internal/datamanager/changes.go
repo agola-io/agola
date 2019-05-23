@@ -26,9 +26,9 @@ import (
 
 	"github.com/sorintlab/agola/internal/etcd"
 
-	"github.com/pkg/errors"
 	etcdclientv3rpc "go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
 	"go.etcd.io/etcd/mvcc/mvccpb"
+	errors "golang.org/x/xerrors"
 )
 
 // TODO(sgotti) rewrite this to use a sqlite local cache
@@ -149,7 +149,7 @@ func (d *DataManager) applyWalChanges(ctx context.Context, walData *WalData, rev
 
 	walDataFile, err := d.ost.ReadObject(walDataFilePath)
 	if err != nil {
-		return errors.Wrapf(err, "failed to read waldata %q", walDataFilePath)
+		return errors.Errorf("failed to read waldata %q: %w", walDataFilePath, err)
 	}
 	defer walDataFile.Close()
 	dec := json.NewDecoder(walDataFile)
@@ -165,7 +165,7 @@ func (d *DataManager) applyWalChanges(ctx context.Context, walData *WalData, rev
 			break
 		}
 		if err != nil {
-			return errors.Wrapf(err, "failed to decode wal file")
+			return errors.Errorf("failed to decode wal file: %w", err)
 		}
 
 		d.applyWalChangesAction(ctx, action, walData.WalSequence, revision)
@@ -285,7 +285,7 @@ func (d *DataManager) watcher(ctx context.Context) error {
 				d.changes.initialized = false
 				d.changes.Unlock()
 			}
-			return errors.Wrapf(err, "watch error")
+			return errors.Errorf("watch error: %w", err)
 		}
 		revision := wresp.Header.Revision
 

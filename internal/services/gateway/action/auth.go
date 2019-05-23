@@ -20,7 +20,7 @@ import (
 	"github.com/sorintlab/agola/internal/services/common"
 	"github.com/sorintlab/agola/internal/services/types"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 )
 
 func (h *ActionHandler) CurrentUserID(ctx context.Context) string {
@@ -61,7 +61,7 @@ func (h *ActionHandler) IsOrgOwner(ctx context.Context, orgID string) (bool, err
 
 	userOrgs, resp, err := h.configstoreClient.GetUserOrgs(ctx, userID)
 	if err != nil {
-		return false, ErrFromRemote(resp, errors.Wrapf(err, "failed to get user orgs"))
+		return false, ErrFromRemote(resp, errors.Errorf("failed to get user orgs: %w", err))
 	}
 
 	for _, userOrg := range userOrgs {
@@ -96,7 +96,7 @@ func (h *ActionHandler) IsProjectOwner(ctx context.Context, ownerType types.Conf
 	if ownerType == types.ConfigTypeOrg {
 		userOrgs, resp, err := h.configstoreClient.GetUserOrgs(ctx, userID)
 		if err != nil {
-			return false, ErrFromRemote(resp, errors.Wrapf(err, "failed to get user orgs"))
+			return false, ErrFromRemote(resp, errors.Errorf("failed to get user orgs: %w", err))
 		}
 
 		for _, userOrg := range userOrgs {
@@ -132,7 +132,7 @@ func (h *ActionHandler) IsProjectMember(ctx context.Context, ownerType types.Con
 	if ownerType == types.ConfigTypeOrg {
 		userOrgs, resp, err := h.configstoreClient.GetUserOrgs(ctx, userID)
 		if err != nil {
-			return false, ErrFromRemote(resp, errors.Wrapf(err, "failed to get user orgs"))
+			return false, ErrFromRemote(resp, errors.Errorf("failed to get user orgs: %w", err))
 		}
 
 		for _, userOrg := range userOrgs {
@@ -153,14 +153,14 @@ func (h *ActionHandler) IsVariableOwner(ctx context.Context, parentType types.Co
 	case types.ConfigTypeProjectGroup:
 		pg, resp, err := h.configstoreClient.GetProjectGroup(ctx, parentRef)
 		if err != nil {
-			return false, ErrFromRemote(resp, errors.Wrapf(err, "failed to get project group %q", parentRef))
+			return false, ErrFromRemote(resp, errors.Errorf("failed to get project group %q: %w", parentRef, err))
 		}
 		ownerType = pg.OwnerType
 		ownerID = pg.OwnerID
 	case types.ConfigTypeProject:
 		p, resp, err := h.configstoreClient.GetProject(ctx, parentRef)
 		if err != nil {
-			return false, ErrFromRemote(resp, errors.Wrapf(err, "failed to get project  %q", parentRef))
+			return false, ErrFromRemote(resp, errors.Errorf("failed to get project  %q: %w", parentRef, err))
 		}
 		ownerType = p.OwnerType
 		ownerID = p.OwnerID
@@ -196,7 +196,7 @@ func (h *ActionHandler) CanGetRun(ctx context.Context, runGroup string) (bool, e
 
 	isProjectMember, err := h.IsProjectMember(ctx, ownerType, ownerID)
 	if err != nil {
-		return false, errors.Wrapf(err, "failed to determine ownership")
+		return false, errors.Errorf("failed to determine ownership: %w", err)
 	}
 	if visibility == types.VisibilityPublic {
 		return true, nil
@@ -231,7 +231,7 @@ func (h *ActionHandler) CanDoRunActions(ctx context.Context, runGroup string) (b
 
 	isProjectOwner, err := h.IsProjectOwner(ctx, ownerType, ownerID)
 	if err != nil {
-		return false, errors.Wrapf(err, "failed to determine ownership")
+		return false, errors.Errorf("failed to determine ownership: %w", err)
 	}
 	if !isProjectOwner {
 		return false, nil

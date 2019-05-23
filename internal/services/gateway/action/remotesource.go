@@ -20,7 +20,7 @@ import (
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 )
 
 func (h *ActionHandler) GetRemoteSource(ctx context.Context, rsRef string) (*types.RemoteSource, error) {
@@ -108,7 +108,7 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemot
 	h.log.Infof("creating remotesource")
 	rs, resp, err := h.configstoreClient.CreateRemoteSource(ctx, rs)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to create remotesource"))
+		return nil, ErrFromRemote(resp, errors.Errorf("failed to create remotesource: %w", err))
 	}
 	h.log.Infof("remotesource %s created, ID: %s", rs.Name, rs.ID)
 
@@ -162,7 +162,7 @@ func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, req *UpdateRemot
 	h.log.Infof("updating remotesource")
 	rs, resp, err = h.configstoreClient.UpdateRemoteSource(ctx, req.RemoteSourceRef, rs)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to update remotesource"))
+		return nil, ErrFromRemote(resp, errors.Errorf("failed to update remotesource: %w", err))
 	}
 	h.log.Infof("remotesource %s updated", rs.Name)
 
@@ -176,7 +176,7 @@ func (h *ActionHandler) DeleteRemoteSource(ctx context.Context, rsRef string) er
 
 	resp, err := h.configstoreClient.DeleteRemoteSource(ctx, rsRef)
 	if err != nil {
-		return ErrFromRemote(resp, errors.Wrapf(err, "failed to delete remote source"))
+		return ErrFromRemote(resp, errors.Errorf("failed to delete remote source: %w", err))
 	}
 	return nil
 }

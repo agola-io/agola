@@ -17,11 +17,11 @@ package cmd
 import (
 	"context"
 
-	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/services/gateway/api"
 	"github.com/sorintlab/agola/internal/services/types"
 
 	"github.com/spf13/cobra"
+	errors "golang.org/x/xerrors"
 )
 
 var cmdOrgCreate = &cobra.Command{
@@ -68,7 +68,7 @@ func orgCreate(cmd *cobra.Command, args []string) error {
 	log.Infof("creating org")
 	org, _, err := gwclient.CreateOrg(context.TODO(), req)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create org")
+		return errors.Errorf("failed to create org: %w", err)
 	}
 	log.Infof("org %q created, ID: %q", org.Name, org.ID)
 

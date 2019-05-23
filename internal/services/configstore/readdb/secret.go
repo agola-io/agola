@@ -23,7 +23,7 @@ import (
 	"github.com/sorintlab/agola/internal/util"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 )
 
 var (
@@ -34,7 +34,7 @@ var (
 func (r *ReadDB) insertSecret(tx *db.Tx, data []byte) error {
 	secret := types.Secret{}
 	if err := json.Unmarshal(data, &secret); err != nil {
-		return errors.Wrap(err, "failed to unmarshal secret")
+		return errors.Errorf("failed to unmarshal secret: %w", err)
 	}
 	// poor man insert or update...
 	if err := r.deleteSecret(tx, secret.ID); err != nil {
@@ -42,16 +42,19 @@ func (r *ReadDB) insertSecret(tx *db.Tx, data []byte) error {
 	}
 	q, args, err := secretInsert.Values(secret.ID, secret.Name, secret.Parent.ID, data).ToSql()
 	if err != nil {
-		return errors.Wrap(err, "failed to build query")
+		return errors.Errorf("failed to build query: %w", err)
 	}
-	_, err = tx.Exec(q, args...)
-	return errors.Wrap(err, "failed to insert secret")
+	if _, err = tx.Exec(q, args...); err != nil {
+		return errors.Errorf("failed to insert secret: %w", err)
+	}
+
+	return nil
 }
 
 func (r *ReadDB) deleteSecret(tx *db.Tx, id string) error {
 	// poor man insert or update...
 	if _, err := tx.Exec("delete from secret where id = $1", id); err != nil {
-		return errors.Wrap(err, "failed to delete secret")
+		return errors.Errorf("failed to delete secret: %w", err)
 	}
 	return nil
 }
@@ -60,12 +63,12 @@ func (r *ReadDB) GetSecretByID(tx *db.Tx, secretID string) (*types.Secret, error
 	q, args, err := secretSelect.Where(sq.Eq{"id": secretID}).ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build query")
+		return nil, errors.Errorf("failed to build query: %w", err)
 	}
 
 	secrets, _, err := fetchSecrets(tx, q, args...)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	if len(secrets) > 1 {
 		return nil, errors.Errorf("too many rows returned")
@@ -80,12 +83,12 @@ func (r *ReadDB) GetSecretByName(tx *db.Tx, parentID, name string) (*types.Secre
 	q, args, err := secretSelect.Where(sq.Eq{"parentid": parentID, "name": name}).ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build query")
+		return nil, errors.Errorf("failed to build query: %w", err)
 	}
 
 	secrets, _, err := fetchSecrets(tx, q, args...)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	if len(secrets) > 1 {
 		return nil, errors.Errorf("too many rows returned")
@@ -100,7 +103,7 @@ func (r *ReadDB) GetSecrets(tx *db.Tx, parentID string) ([]*types.Secret, error)
 	q, args, err := secretSelect.Where(sq.Eq{"parentid": parentID}).ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build query")
+		return nil, errors.Errorf("failed to build query: %w", err)
 	}
 
 	secrets, _, err := fetchSecrets(tx, q, args...)
@@ -111,7 +114,7 @@ func (r *ReadDB) GetSecretTree(tx *db.Tx, parentType types.ConfigType, parentID,
 	for parentType == types.ConfigTypeProjectGroup || parentType == types.ConfigTypeProject {
 		secret, err := r.GetSecretByName(tx, parentID, name)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get secret with name %q", name)
+			return nil, errors.Errorf("failed to get secret with name %q: %w", name, err)
 		}
 		if secret != nil {
 			return secret, nil
@@ -150,7 +153,7 @@ func (r *ReadDB) GetSecretsTree(tx *db.Tx, parentType types.ConfigType, parentID
 	for parentType == types.ConfigTypeProjectGroup || parentType == types.ConfigTypeProject {
 		secrets, err := r.GetSecrets(tx, parentID)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get secrets for %s %q", parentType, parentID)
+			return nil, errors.Errorf("failed to get secrets for %s %q: %w", parentType, parentID, err)
 		}
 		allSecrets = append(allSecrets, secrets...)
 
@@ -194,12 +197,12 @@ func scanSecret(rows *sql.Rows, additionalFields ...interface{}) (*types.Secret,
 	var id string
 	var data []byte
 	if err := rows.Scan(&id, &data); err != nil {
-		return nil, "", errors.Wrap(err, "failed to scan rows")
+		return nil, "", errors.Errorf("failed to scan rows: %w", err)
 	}
 	secret := types.Secret{}
 	if len(data) > 0 {
 		if err := json.Unmarshal(data, &secret); err != nil {
-			return nil, "", errors.Wrap(err, "failed to unmarshal secret")
+			return nil, "", errors.Errorf("failed to unmarshal secret: %w", err)
 		}
 	}
 

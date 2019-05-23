@@ -24,8 +24,8 @@ import (
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
-	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
+	errors "golang.org/x/xerrors"
 )
 
 func (h *ActionHandler) GetProjectGroupSubgroups(ctx context.Context, projectGroupRef string) ([]*types.ProjectGroup, error) {
@@ -155,7 +155,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, projectGroup *ty
 
 	pgj, err := json.Marshal(projectGroup)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal projectGroup")
+		return nil, errors.Errorf("failed to marshal projectGroup: %w", err)
 	}
 	actions := []*datamanager.Action{
 		{
@@ -247,7 +247,7 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, req *UpdateProje
 
 	pgj, err := json.Marshal(req.ProjectGroup)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal project")
+		return nil, errors.Errorf("failed to marshal project: %w", err)
 	}
 	actions := []*datamanager.Action{
 		{

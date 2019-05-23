@@ -19,8 +19,8 @@ import (
 
 	"github.com/sorintlab/agola/internal/services/gateway/api"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	errors "golang.org/x/xerrors"
 )
 
 var cmdProjectDelete = &cobra.Command{
@@ -55,7 +55,7 @@ func projectDelete(cmd *cobra.Command, args []string) error {
 	log.Infof("deleting project")
 
 	if _, err := gwclient.DeleteProject(context.TODO(), projectDeleteOpts.projectRef); err != nil {
-		return errors.Wrapf(err, "failed to delete project")
+		return errors.Errorf("failed to delete project: %w", err)
 	}
 
 	return nil

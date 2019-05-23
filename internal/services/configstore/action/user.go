@@ -25,8 +25,8 @@ import (
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
-	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
+	errors "golang.org/x/xerrors"
 )
 
 type CreateUserRequest struct {
@@ -76,7 +76,7 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 			}
 			user, err := h.readDB.GetUserByLinkedAccountRemoteUserIDandSource(tx, req.CreateUserLARequest.RemoteUserID, rs.ID)
 			if err != nil {
-				return errors.Wrapf(err, "failed to get user for remote user id %q and remote source %q", req.CreateUserLARequest.RemoteUserID, rs.ID)
+				return errors.Errorf("failed to get user for remote user id %q and remote source %q: %w", req.CreateUserLARequest.RemoteUserID, rs.ID, err)
 			}
 			if user != nil {
 				return util.NewErrBadRequest(errors.Errorf("user for remote user id %q for remote source %q already exists", req.CreateUserLARequest.RemoteUserID, req.CreateUserLARequest.RemoteSourceName))
@@ -114,7 +114,7 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 
 	userj, err := json.Marshal(user)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal user")
+		return nil, errors.Errorf("failed to marshal user: %w", err)
 	}
 
 	// create root user project group
@@ -129,7 +129,7 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 	}
 	pgj, err := json.Marshal(pg)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal project group")
+		return nil, errors.Errorf("failed to marshal project group: %w", err)
 	}
 
 	actions := []*datamanager.Action{
@@ -247,7 +247,7 @@ func (h *ActionHandler) UpdateUser(ctx context.Context, req *UpdateUserRequest) 
 
 	userj, err := json.Marshal(user)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal user")
+		return nil, errors.Errorf("failed to marshal user: %w", err)
 	}
 
 	actions := []*datamanager.Action{
@@ -316,7 +316,7 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 
 		user, err := h.readDB.GetUserByLinkedAccountRemoteUserIDandSource(tx, req.RemoteUserID, rs.ID)
 		if err != nil {
-			return errors.Wrapf(err, "failed to get user for remote user id %q and remote source %q", req.RemoteUserID, rs.ID)
+			return errors.Errorf("failed to get user for remote user id %q and remote source %q: %w", req.RemoteUserID, rs.ID, err)
 		}
 		if user != nil {
 			return util.NewErrBadRequest(errors.Errorf("user for remote user id %q for remote source %q already exists", req.RemoteUserID, req.RemoteSourceName))
@@ -346,7 +346,7 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 
 	userj, err := json.Marshal(user)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal user")
+		return nil, errors.Errorf("failed to marshal user: %w", err)
 	}
 	actions := []*datamanager.Action{
 		{
@@ -406,7 +406,7 @@ func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) 
 
 	userj, err := json.Marshal(user)
 	if err != nil {
-		return errors.Wrapf(err, "failed to marshal user")
+		return errors.Errorf("failed to marshal user: %w", err)
 	}
 	actions := []*datamanager.Action{
 		{
@@ -490,7 +490,7 @@ func (h *ActionHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLAReque
 
 	userj, err := json.Marshal(user)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal user")
+		return nil, errors.Errorf("failed to marshal user: %w", err)
 	}
 	actions := []*datamanager.Action{
 		{
@@ -555,7 +555,7 @@ func (h *ActionHandler) CreateUserToken(ctx context.Context, userRef, tokenName 
 
 	userj, err := json.Marshal(user)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to marshal user")
+		return "", errors.Errorf("failed to marshal user: %w", err)
 	}
 	actions := []*datamanager.Action{
 		{
@@ -615,7 +615,7 @@ func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName 
 
 	userj, err := json.Marshal(user)
 	if err != nil {
-		return errors.Wrapf(err, "failed to marshal user")
+		return errors.Errorf("failed to marshal user: %w", err)
 	}
 	actions := []*datamanager.Action{
 		{

@@ -22,7 +22,7 @@ import (
 	"github.com/sorintlab/agola/internal/util"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 )
 
 func TestParseConfig(t *testing.T) {

@@ -30,12 +30,12 @@ import (
 	ostypes "github.com/sorintlab/agola/internal/objectstorage/types"
 	"github.com/sorintlab/agola/internal/sequence"
 
-	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/clientv3/concurrency"
 	etcdclientv3rpc "go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
 	"go.etcd.io/etcd/mvcc/mvccpb"
+	errors "golang.org/x/xerrors"
 )
 
 func (d *DataManager) storageWalStatusFile(walSeq string) string {
@@ -724,7 +724,7 @@ func (d *DataManager) checkpoint(ctx context.Context) error {
 	}
 
 	if err := d.writeData(ctx, walsData); err != nil {
-		return errors.Wrapf(err, "checkpoint function error")
+		return errors.Errorf("checkpoint function error: %w", err)
 	}
 
 	for _, walData := range walsData {

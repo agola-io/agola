@@ -27,7 +27,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 )
 
 // scpSyntaxRe matches the SCP-like addresses used by Git to access repositories

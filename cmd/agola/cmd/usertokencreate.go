@@ -18,10 +18,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/services/gateway/api"
 
 	"github.com/spf13/cobra"
+	errors "golang.org/x/xerrors"
 )
 
 var cmdUserTokenCreate = &cobra.Command{
@@ -63,7 +63,7 @@ func userTokenCreate(cmd *cobra.Command, args []string) error {
 	log.Infof("creating token for user %q", userTokenCreateOpts.username)
 	resp, _, err := gwclient.CreateUserToken(context.TODO(), userTokenCreateOpts.username, req)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create token")
+		return errors.Errorf("failed to create token: %w", err)
 	}
 	log.Infof("token for user %q created: %s", userTokenCreateOpts.username, resp.Token)
 	fmt.Println(resp.Token)

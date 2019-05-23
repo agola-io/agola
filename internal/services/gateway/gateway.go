@@ -35,9 +35,9 @@ import (
 	jwt "github.com/dgrijalva/jwt-go"
 	ghandlers "github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	errors "golang.org/x/xerrors"
 )
 
 var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
@@ -96,19 +96,19 @@ func NewGateway(gc *config.Config) (*Gateway, error) {
 		sd.Method = jwt.SigningMethodRS256
 		privateKeyData, err := ioutil.ReadFile(c.TokenSigning.PrivateKeyPath)
 		if err != nil {
-			return nil, errors.Wrapf(err, "error reading token signing private key")
+			return nil, errors.Errorf("error reading token signing private key: %w", err)
 		}
 		sd.PrivateKey, err = jwt.ParseRSAPrivateKeyFromPEM(privateKeyData)
 		if err != nil {
-			return nil, errors.Wrapf(err, "error parsing token signing private key")
+			return nil, errors.Errorf("error parsing token signing private key: %w", err)
 		}
 		publicKeyData, err := ioutil.ReadFile(c.TokenSigning.PublicKeyPath)
 		if err != nil {
-			return nil, errors.Wrapf(err, "error reading token signing public key")
+			return nil, errors.Errorf("error reading token signing public key: %w", err)
 		}
 		sd.PublicKey, err = jwt.ParseRSAPublicKeyFromPEM(publicKeyData)
 		if err != nil {
-			return nil, errors.Wrapf(err, "error parsing token signing public key")
+			return nil, errors.Errorf("error parsing token signing public key: %w", err)
 		}
 	case "":
 		return nil, errors.Errorf("missing token signing method")
