@@ -73,7 +73,7 @@ func NewErrBadRequest(err error) *ErrBadRequest {
 	return &ErrBadRequest{Err: err}
 }
 
-func IsErrBadRequest(err error) bool {
+func (*ErrBadRequest) Is(err error) bool {
 	_, ok := err.(*ErrBadRequest)
 	return ok
 }
@@ -92,7 +92,7 @@ func NewErrNotFound(err error) *ErrNotFound {
 	return &ErrNotFound{Err: err}
 }
 
-func IsErrNotFound(err error) bool {
+func (*ErrNotFound) Is(err error) bool {
 	_, ok := err.(*ErrNotFound)
 	return ok
 }
@@ -111,7 +111,7 @@ func NewErrForbidden(err error) *ErrForbidden {
 	return &ErrForbidden{Err: err}
 }
 
-func IsErrForbidden(err error) bool {
+func (*ErrForbidden) Is(err error) bool {
 	_, ok := err.(*ErrForbidden)
 	return ok
 }
@@ -130,7 +130,7 @@ func NewErrUnauthorized(err error) *ErrUnauthorized {
 	return &ErrUnauthorized{Err: err}
 }
 
-func IsErrUnauthorized(err error) bool {
+func (*ErrUnauthorized) Is(err error) bool {
 	_, ok := err.(*ErrUnauthorized)
 	return ok
 }
