@@ -101,7 +101,7 @@ func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretReque
 		rs, resp, err = h.configstoreClient.CreateProjectSecret(ctx, req.ParentRef, s)
 	}
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Errorf("failed to create secret: %w", err))
+		return nil, errors.Errorf("failed to create secret: %w", ErrFromRemote(resp, err))
 	}
 	h.log.Infof("secret %s created, ID: %s", rs.Name, rs.ID)
 
@@ -127,7 +127,7 @@ func (h *ActionHandler) DeleteSecret(ctx context.Context, parentType types.Confi
 		resp, err = h.configstoreClient.DeleteProjectSecret(ctx, parentRef, name)
 	}
 	if err != nil {
-		return ErrFromRemote(resp, errors.Errorf("failed to delete secret: %w", err))
+		return errors.Errorf("failed to delete secret: %w", ErrFromRemote(resp, err))
 	}
 	return nil
 }

@@ -109,7 +109,7 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*
 	h.log.Infof("creating organization")
 	org, resp, err := h.configstoreClient.CreateOrg(ctx, org)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Errorf("failed to create organization: %w", err))
+		return nil, errors.Errorf("failed to create organization: %w", ErrFromRemote(resp, err))
 	}
 	h.log.Infof("organization %s created, ID: %s", org.Name, org.ID)
 
@@ -132,7 +132,7 @@ func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 
 	resp, err = h.configstoreClient.DeleteOrg(ctx, orgRef)
 	if err != nil {
-		return ErrFromRemote(resp, errors.Errorf("failed to delete org: %w", err))
+		return errors.Errorf("failed to delete org: %w", ErrFromRemote(resp, err))
 	}
 	return nil
 }
@@ -163,7 +163,7 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 
 	orgmember, resp, err := h.configstoreClient.AddOrgMember(ctx, orgRef, userRef, role)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Errorf("failed to add/update organization member: %w", err))
+		return nil, errors.Errorf("failed to add/update organization member: %w", ErrFromRemote(resp, err))
 	}
 
 	return &AddOrgMemberResponse{
@@ -189,7 +189,7 @@ func (h *ActionHandler) RemoveOrgMember(ctx context.Context, orgRef, userRef str
 
 	resp, err = h.configstoreClient.RemoveOrgMember(ctx, orgRef, userRef)
 	if err != nil {
-		return ErrFromRemote(resp, errors.Errorf("failed to remove organization member: %w", err))
+		return errors.Errorf("failed to remove organization member: %w", ErrFromRemote(resp, err))
 	}
 
 	return nil

@@ -61,7 +61,7 @@ func (h *ActionHandler) IsOrgOwner(ctx context.Context, orgID string) (bool, err
 
 	userOrgs, resp, err := h.configstoreClient.GetUserOrgs(ctx, userID)
 	if err != nil {
-		return false, ErrFromRemote(resp, errors.Errorf("failed to get user orgs: %w", err))
+		return false, errors.Errorf("failed to get user orgs: %w", ErrFromRemote(resp, err))
 	}
 
 	for _, userOrg := range userOrgs {
@@ -96,7 +96,7 @@ func (h *ActionHandler) IsProjectOwner(ctx context.Context, ownerType types.Conf
 	if ownerType == types.ConfigTypeOrg {
 		userOrgs, resp, err := h.configstoreClient.GetUserOrgs(ctx, userID)
 		if err != nil {
-			return false, ErrFromRemote(resp, errors.Errorf("failed to get user orgs: %w", err))
+			return false, errors.Errorf("failed to get user orgs: %w", ErrFromRemote(resp, err))
 		}
 
 		for _, userOrg := range userOrgs {
@@ -132,7 +132,7 @@ func (h *ActionHandler) IsProjectMember(ctx context.Context, ownerType types.Con
 	if ownerType == types.ConfigTypeOrg {
 		userOrgs, resp, err := h.configstoreClient.GetUserOrgs(ctx, userID)
 		if err != nil {
-			return false, ErrFromRemote(resp, errors.Errorf("failed to get user orgs: %w", err))
+			return false, errors.Errorf("failed to get user orgs: %w", ErrFromRemote(resp, err))
 		}
 
 		for _, userOrg := range userOrgs {
@@ -153,14 +153,14 @@ func (h *ActionHandler) IsVariableOwner(ctx context.Context, parentType types.Co
 	case types.ConfigTypeProjectGroup:
 		pg, resp, err := h.configstoreClient.GetProjectGroup(ctx, parentRef)
 		if err != nil {
-			return false, ErrFromRemote(resp, errors.Errorf("failed to get project group %q: %w", parentRef, err))
+			return false, errors.Errorf("failed to get project group %q: %w", parentRef, ErrFromRemote(resp, err))
 		}
 		ownerType = pg.OwnerType
 		ownerID = pg.OwnerID
 	case types.ConfigTypeProject:
 		p, resp, err := h.configstoreClient.GetProject(ctx, parentRef)
 		if err != nil {
-			return false, ErrFromRemote(resp, errors.Errorf("failed to get project  %q: %w", parentRef, err))
+			return false, errors.Errorf("failed to get project  %q: %w", parentRef, ErrFromRemote(resp, err))
 		}
 		ownerType = p.OwnerType
 		ownerID = p.OwnerID

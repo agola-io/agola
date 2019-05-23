@@ -62,7 +62,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 
 	user, resp, err := h.configstoreClient.GetUser(ctx, curUserID)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Errorf("failed to get user %q: %w", curUserID, err))
+		return nil, errors.Errorf("failed to get user %q: %w", curUserID, ErrFromRemote(resp, err))
 	}
 	parentRef := req.ParentRef
 	if parentRef == "" {
@@ -72,7 +72,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 
 	pg, resp, err := h.configstoreClient.GetProjectGroup(ctx, parentRef)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Errorf("failed to get project group %q: %w", parentRef, err))
+		return nil, errors.Errorf("failed to get project group %q: %w", parentRef, ErrFromRemote(resp, err))
 	}
 
 	isProjectOwner, err := h.IsProjectOwner(ctx, pg.OwnerType, pg.OwnerID)
@@ -97,7 +97,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 	_, resp, err = h.configstoreClient.GetProject(ctx, projectPath)
 	if err != nil {
 		if resp != nil && resp.StatusCode != http.StatusNotFound {
-			return nil, ErrFromRemote(resp, errors.Errorf("failed to get project %q: %w", req.Name, err))
+			return nil, errors.Errorf("failed to get project %q: %w", req.Name, ErrFromRemote(resp, err))
 		}
 	} else {
 		return nil, util.NewErrBadRequest(errors.Errorf("project %q already exists", projectPath))
@@ -105,7 +105,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 
 	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, req.RemoteSourceName)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Errorf("failed to get remote source %q: %w", req.RemoteSourceName, err))
+		return nil, errors.Errorf("failed to get remote source %q: %w", req.RemoteSourceName, ErrFromRemote(resp, err))
 	}
 	h.log.Infof("rs: %s", util.Dump(rs))
 	var la *types.LinkedAccount
@@ -155,7 +155,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 	h.log.Infof("creating project")
 	rp, resp, err := h.configstoreClient.CreateProject(ctx, p)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Errorf("failed to create project: %w", err))
+		return nil, errors.Errorf("failed to create project: %w", ErrFromRemote(resp, err))
 	}
 	h.log.Infof("project %s created, ID: %s", p.Name, p.ID)
 
@@ -170,7 +170,7 @@ type UpdateProjectRequest struct {
 func (h *ActionHandler) UpdateProject(ctx context.Context, projectRef string, req *UpdateProjectRequest) (*csapi.Project, error) {
 	p, resp, err := h.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Errorf("failed to get project %q: %w", projectRef, err))
+		return nil, errors.Errorf("failed to get project %q: %w", projectRef, ErrFromRemote(resp, err))
 	}
 
 	isProjectOwner, err := h.IsProjectOwner(ctx, p.OwnerType, p.OwnerID)
@@ -187,7 +187,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, projectRef string, re
 	h.log.Infof("updating project")
 	rp, resp, err := h.configstoreClient.UpdateProject(ctx, p.ID, p.Project)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Errorf("failed to update project: %w", err))
+		return nil, errors.Errorf("failed to update project: %w", ErrFromRemote(resp, err))
 	}
 	h.log.Infof("project %s updated, ID: %s", p.Name, p.ID)
 
@@ -199,12 +199,12 @@ func (h *ActionHandler) ProjectUpdateRepoLinkedAccount(ctx context.Context, proj
 
 	user, resp, err := h.configstoreClient.GetUser(ctx, curUserID)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Errorf("failed to get user %q: %w", curUserID, err))
+		return nil, errors.Errorf("failed to get user %q: %w", curUserID, ErrFromRemote(resp, err))
 	}
 
 	p, resp, err := h.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Errorf("failed to get project %q: %w", projectRef, err))
+		return nil, errors.Errorf("failed to get project %q: %w", projectRef, ErrFromRemote(resp, err))
 	}
 
 	isProjectOwner, err := h.IsProjectOwner(ctx, p.OwnerType, p.OwnerID)
@@ -217,7 +217,7 @@ func (h *ActionHandler) ProjectUpdateRepoLinkedAccount(ctx context.Context, proj
 
 	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, p.RemoteSourceID)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Errorf("failed to get remote source %q: %w", p.RemoteSourceID, err))
+		return nil, errors.Errorf("failed to get remote source %q: %w", p.RemoteSourceID, ErrFromRemote(resp, err))
 	}
 	h.log.Infof("rs: %s", util.Dump(rs))
 	var la *types.LinkedAccount
@@ -248,7 +248,7 @@ func (h *ActionHandler) ProjectUpdateRepoLinkedAccount(ctx context.Context, proj
 	h.log.Infof("updating project")
 	rp, resp, err := h.configstoreClient.UpdateProject(ctx, p.ID, p.Project)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Errorf("failed to update project: %w", err))
+		return nil, errors.Errorf("failed to update project: %w", ErrFromRemote(resp, err))
 	}
 	h.log.Infof("project %s updated, ID: %s", p.Name, p.ID)
 
@@ -298,7 +298,7 @@ func (h *ActionHandler) SetupProject(ctx context.Context, rs *types.RemoteSource
 func (h *ActionHandler) ReconfigProject(ctx context.Context, projectRef string) error {
 	p, resp, err := h.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
-		return ErrFromRemote(resp, errors.Errorf("failed to get project %q: %w", projectRef, err))
+		return errors.Errorf("failed to get project %q: %w", projectRef, ErrFromRemote(resp, err))
 	}
 
 	isProjectOwner, err := h.IsProjectOwner(ctx, p.OwnerType, p.OwnerID)
@@ -311,7 +311,7 @@ func (h *ActionHandler) ReconfigProject(ctx context.Context, projectRef string) 
 
 	user, resp, err := h.configstoreClient.GetUserByLinkedAccount(ctx, p.LinkedAccountID)
 	if err != nil {
-		return ErrFromRemote(resp, errors.Errorf("failed to get user with linked account id %q: %w", p.LinkedAccountID, err))
+		return errors.Errorf("failed to get user with linked account id %q: %w", p.LinkedAccountID, ErrFromRemote(resp, err))
 	}
 
 	la := user.LinkedAccounts[p.LinkedAccountID]
@@ -322,7 +322,7 @@ func (h *ActionHandler) ReconfigProject(ctx context.Context, projectRef string) 
 
 	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, la.RemoteSourceID)
 	if err != nil {
-		return ErrFromRemote(resp, errors.Errorf("failed to get remote source %q: %w", la.RemoteSourceID, err))
+		return errors.Errorf("failed to get remote source %q: %w", la.RemoteSourceID, ErrFromRemote(resp, err))
 	}
 
 	// TODO(sgotti) update project repo path if the remote let us query by repository id
@@ -333,7 +333,7 @@ func (h *ActionHandler) ReconfigProject(ctx context.Context, projectRef string) 
 func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) error {
 	p, resp, err := h.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
-		return ErrFromRemote(resp, errors.Errorf("failed to get project %q: %w", projectRef, err))
+		return errors.Errorf("failed to get project %q: %w", projectRef, ErrFromRemote(resp, err))
 	}
 
 	isProjectOwner, err := h.IsProjectOwner(ctx, p.OwnerType, p.OwnerID)

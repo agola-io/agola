@@ -114,26 +114,26 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateVariableR
 		var resp *http.Response
 		cssecrets, resp, err = h.configstoreClient.GetProjectGroupSecrets(ctx, req.ParentRef, true)
 		if err != nil {
-			return nil, nil, ErrFromRemote(resp, errors.Errorf("failed to get project group %q secrets: %w", req.ParentRef, err))
+			return nil, nil, errors.Errorf("failed to get project group %q secrets: %w", req.ParentRef, ErrFromRemote(resp, err))
 		}
 
 		h.log.Infof("creating project group variable")
 		rv, resp, err = h.configstoreClient.CreateProjectGroupVariable(ctx, req.ParentRef, v)
 		if err != nil {
-			return nil, nil, ErrFromRemote(resp, errors.Errorf("failed to create variable: %w", err))
+			return nil, nil, errors.Errorf("failed to create variable: %w", ErrFromRemote(resp, err))
 		}
 	case types.ConfigTypeProject:
 		var err error
 		var resp *http.Response
 		cssecrets, resp, err = h.configstoreClient.GetProjectSecrets(ctx, req.ParentRef, true)
 		if err != nil {
-			return nil, nil, ErrFromRemote(resp, errors.Errorf("failed to get project %q secrets: %w", req.ParentRef, err))
+			return nil, nil, errors.Errorf("failed to get project %q secrets: %w", req.ParentRef, ErrFromRemote(resp, err))
 		}
 
 		h.log.Infof("creating project variable")
 		rv, resp, err = h.configstoreClient.CreateProjectVariable(ctx, req.ParentRef, v)
 		if err != nil {
-			return nil, nil, ErrFromRemote(resp, errors.Errorf("failed to create variable: %w", err))
+			return nil, nil, errors.Errorf("failed to create variable: %w", ErrFromRemote(resp, err))
 		}
 	}
 	h.log.Infof("variable %s created, ID: %s", rv.Name, rv.ID)
@@ -160,7 +160,7 @@ func (h *ActionHandler) DeleteVariable(ctx context.Context, parentType types.Con
 		resp, err = h.configstoreClient.DeleteProjectVariable(ctx, parentRef, name)
 	}
 	if err != nil {
-		return ErrFromRemote(resp, errors.Errorf("failed to delete variable: %w", err))
+		return errors.Errorf("failed to delete variable: %w", ErrFromRemote(resp, err))
 	}
 	return nil
 }

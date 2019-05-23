@@ -31,15 +31,29 @@ type ErrorResponse struct {
 }
 
 func ErrorResponseFromError(err error) *ErrorResponse {
+	var aerr error
+	// use inner errors if of these types
 	switch {
-	case util.IsErrBadRequest(err):
-		fallthrough
-	case util.IsErrNotFound(err):
-		fallthrough
-	case util.IsErrForbidden(err):
-		fallthrough
-	case util.IsErrUnauthorized(err):
-		return &ErrorResponse{Message: err.Error()}
+	case errors.Is(err, &util.ErrBadRequest{}):
+		var cerr *util.ErrBadRequest
+		errors.As(err, &cerr)
+		aerr = cerr
+	case errors.Is(err, &util.ErrNotFound{}):
+		var cerr *util.ErrNotFound
+		errors.As(err, &cerr)
+		aerr = cerr
+	case errors.Is(err, &util.ErrForbidden{}):
+		var cerr *util.ErrForbidden
+		errors.As(err, &cerr)
+		aerr = cerr
+	case errors.Is(err, &util.ErrUnauthorized{}):
+		var cerr *util.ErrUnauthorized
+		errors.As(err, &cerr)
+		aerr = cerr
+	}
+
+	if aerr != nil {
+		return &ErrorResponse{Message: aerr.Error()}
 	}
 
 	// on generic error return an generic message to not leak the real error
@@ -58,16 +72,16 @@ func httpError(w http.ResponseWriter, err error) bool {
 		return true
 	}
 	switch {
-	case util.IsErrBadRequest(err):
+	case errors.Is(err, &util.ErrBadRequest{}):
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write(resj)
-	case util.IsErrNotFound(err):
+	case errors.Is(err, &util.ErrNotFound{}):
 		w.WriteHeader(http.StatusNotFound)
 		w.Write(resj)
-	case util.IsErrForbidden(err):
+	case errors.Is(err, &util.ErrForbidden{}):
 		w.WriteHeader(http.StatusForbidden)
 		w.Write(resj)
-	case util.IsErrUnauthorized(err):
+	case errors.Is(err, &util.ErrUnauthorized{}):
 		w.WriteHeader(http.StatusUnauthorized)
 		w.Write(resj)
 	default:
