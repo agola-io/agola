@@ -29,8 +29,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pkg/errors"
 	rstypes "github.com/sorintlab/agola/internal/services/runservice/types"
+	errors "golang.org/x/xerrors"
 )
 
 var jsonContent = http.Header{"Content-Type": []string{"application/json"}}

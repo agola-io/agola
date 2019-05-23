@@ -20,10 +20,10 @@ package cmd
 import (
 	"context"
 
-	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/services/gateway/api"
 
 	"github.com/spf13/cobra"
+	errors "golang.org/x/xerrors"
 )
 
 var cmdUserCreate = &cobra.Command{
@@ -62,7 +62,7 @@ func userCreate(cmd *cobra.Command, args []string) error {
 	log.Infof("creating user")
 	user, _, err := gwclient.CreateUser(context.TODO(), req)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create user")
+		return errors.Errorf("failed to create user: %w", err)
 	}
 	log.Infof("user %q created, ID: %q", user.UserName, user.ID)
 

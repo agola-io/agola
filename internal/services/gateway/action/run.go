@@ -27,7 +27,7 @@ import (
 	rstypes "github.com/sorintlab/agola/internal/services/runservice/types"
 	"github.com/sorintlab/agola/internal/util"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 )
 
 func (h *ActionHandler) GetRun(ctx context.Context, runID string) (*rsapi.RunResponse, error) {
@@ -37,7 +37,7 @@ func (h *ActionHandler) GetRun(ctx context.Context, runID string) (*rsapi.RunRes
 	}
 	canGetRun, err := h.CanGetRun(ctx, runResp.RunConfig.Group)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to determine permissions")
+		return nil, errors.Errorf("failed to determine permissions: %w", err)
 	}
 	if !canGetRun {
 		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
@@ -59,7 +59,7 @@ type GetRunsRequest struct {
 func (h *ActionHandler) GetRuns(ctx context.Context, req *GetRunsRequest) (*rsapi.GetRunsResponse, error) {
 	canGetRun, err := h.CanGetRun(ctx, req.Group)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to determine permissions")
+		return nil, errors.Errorf("failed to determine permissions: %w", err)
 	}
 	if !canGetRun {
 		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
@@ -89,7 +89,7 @@ func (h *ActionHandler) GetLogs(ctx context.Context, req *GetLogsRequest) (*http
 	}
 	canGetRun, err := h.CanGetRun(ctx, runResp.RunConfig.Group)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to determine permissions")
+		return nil, errors.Errorf("failed to determine permissions: %w", err)
 	}
 	if !canGetRun {
 		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
@@ -126,7 +126,7 @@ func (h *ActionHandler) RunAction(ctx context.Context, req *RunActionsRequest) (
 	}
 	canGetRun, err := h.CanDoRunActions(ctx, runResp.RunConfig.Group)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to determine permissions")
+		return nil, errors.Errorf("failed to determine permissions: %w", err)
 	}
 	if !canGetRun {
 		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
@@ -192,7 +192,7 @@ func (h *ActionHandler) RunTaskAction(ctx context.Context, req *RunTaskActionsRe
 	}
 	canDoRunAction, err := h.CanDoRunActions(ctx, runResp.RunConfig.Group)
 	if err != nil {
-		return errors.Wrapf(err, "failed to determine permissions")
+		return errors.Errorf("failed to determine permissions: %w", err)
 	}
 	if !canDoRunAction {
 		return util.NewErrForbidden(errors.Errorf("user not authorized"))
@@ -217,7 +217,7 @@ func (h *ActionHandler) RunTaskAction(ctx context.Context, req *RunTaskActionsRe
 		approversAnnotation, ok := annotations[common.ApproversAnnotation]
 		if ok {
 			if err := json.Unmarshal([]byte(approversAnnotation), &approvers); err != nil {
-				return errors.Wrapf(err, "failed to unmarshal run task approvers annotation")
+				return errors.Errorf("failed to unmarshal run task approvers annotation: %w", err)
 			}
 		}
 
@@ -230,7 +230,7 @@ func (h *ActionHandler) RunTaskAction(ctx context.Context, req *RunTaskActionsRe
 
 		approversj, err := json.Marshal(approvers)
 		if err != nil {
-			return errors.Wrapf(err, "failed to marshal run task approvers annotation")
+			return errors.Errorf("failed to marshal run task approvers annotation: %w", err)
 		}
 
 		annotations[common.ApproversAnnotation] = string(approversj)

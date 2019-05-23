@@ -29,8 +29,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
+	errors "golang.org/x/xerrors"
 )
 
 var jsonContent = http.Header{"content-type": []string{"application/json"}}

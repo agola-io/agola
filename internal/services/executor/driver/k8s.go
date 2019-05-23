@@ -29,10 +29,10 @@ import (
 
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/archive"
-	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sorintlab/agola/internal/common"
 	"go.uber.org/zap"
+	errors "golang.org/x/xerrors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -455,7 +455,7 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 
 	exec, err := remotecommand.NewSPDYExecutor(d.restconfig, "POST", req.URL())
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to generate k8s client spdy executor for url %q, method: POST", req.URL())
+		return nil, errors.Errorf("failed to generate k8s client spdy executor for url %q, method: POST: %w", req.URL(), err)
 	}
 
 	stdout := bytes.Buffer{}
@@ -464,7 +464,7 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 		Stderr: out,
 	})
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to execute command on initcontainer")
+		return nil, errors.Errorf("failed to execute command on initcontainer: %w", err)
 	}
 	osArch := strings.TrimSpace(stdout.String())
 
@@ -481,7 +481,7 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 	// copy the toolbox for the pod arch
 	toolboxExecPath, err := toolboxExecPath(d.toolboxPath, arch)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get toolbox path for arch %q", arch)
+		return nil, errors.Errorf("failed to get toolbox path for arch %q: %w", arch, err)
 	}
 	srcInfo, err := archive.CopyInfoSourcePath(toolboxExecPath, false)
 	if err != nil {
@@ -512,7 +512,7 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 
 	exec, err = remotecommand.NewSPDYExecutor(d.restconfig, "POST", req.URL())
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to generate k8s client spdy executor for url %q, method: POST", req.URL())
+		return nil, errors.Errorf("failed to generate k8s client spdy executor for url %q, method: POST: %w", req.URL(), err)
 	}
 
 	fmt.Fprintf(out, "extracting toolbox\n")
@@ -522,7 +522,7 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 		Stderr: out,
 	})
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to execute command on initcontainer")
+		return nil, errors.Errorf("failed to execute command on initcontainer: %w", err)
 	}
 	fmt.Fprintf(out, "extracting toolbox done\n")
 
@@ -542,7 +542,7 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 
 	exec, err = remotecommand.NewSPDYExecutor(d.restconfig, "POST", req.URL())
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to generate k8s client spdy executor for url %q, method: POST", req.URL())
+		return nil, errors.Errorf("failed to generate k8s client spdy executor for url %q, method: POST: %w", req.URL(), err)
 	}
 
 	err = exec.Stream(remotecommand.StreamOptions{
@@ -550,7 +550,7 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 		Stderr: out,
 	})
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to execute command on initcontainer")
+		return nil, errors.Errorf("failed to execute command on initcontainer: %w", err)
 	}
 
 	watcher, err = podClient.Watch(

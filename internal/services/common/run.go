@@ -22,9 +22,9 @@ import (
 	"net/url"
 	"path"
 
-	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
+	errors "golang.org/x/xerrors"
 )
 
 type GroupType string

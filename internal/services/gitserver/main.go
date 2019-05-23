@@ -33,9 +33,9 @@ import (
 	"github.com/sorintlab/agola/internal/util"
 
 	"github.com/gorilla/mux"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	errors "golang.org/x/xerrors"
 )
 
 var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
@@ -169,7 +169,7 @@ func NewGitserver(c *config.Gitserver) (*Gitserver, error) {
 	var err error
 	c.GithookPath, err = filepath.Abs(c.GithookPath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot find agola-git-hook absolute path")
+		return nil, errors.Errorf("cannot find agola-git-hook absolute path: %w", err)
 	}
 	if c.GithookPath == "" {
 		path, err := exec.LookPath("agola-git-hook")

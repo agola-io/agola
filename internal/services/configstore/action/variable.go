@@ -26,8 +26,8 @@ import (
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
-	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
+	errors "golang.org/x/xerrors"
 )
 
 func (h *ActionHandler) GetVariables(ctx context.Context, parentType types.ConfigType, parentRef string, tree bool) ([]*types.Variable, error) {
@@ -108,7 +108,7 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, variable *types.Vari
 
 	variablej, err := json.Marshal(variable)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal variable")
+		return nil, errors.Errorf("failed to marshal variable: %w", err)
 	}
 	actions := []*datamanager.Action{
 		{

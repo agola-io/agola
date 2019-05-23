@@ -25,9 +25,9 @@ import (
 	"io"
 	"strings"
 
-	"github.com/pkg/errors"
 	ostypes "github.com/sorintlab/agola/internal/objectstorage/types"
 	"github.com/sorintlab/agola/internal/sequence"
+	errors "golang.org/x/xerrors"
 )
 
 type DataStatus struct {
@@ -148,7 +148,7 @@ func (d *DataManager) writeDataType(ctx context.Context, wals []*WalData, dataty
 
 		walFile, err := d.ReadWalData(header.WalDataFileID)
 		if err != nil {
-			return errors.Wrapf(err, "cannot read wal data file %q", header.WalDataFileID)
+			return errors.Errorf("cannot read wal data file %q: %w", header.WalDataFileID, err)
 		}
 		defer walFile.Close()
 
@@ -162,7 +162,7 @@ func (d *DataManager) writeDataType(ctx context.Context, wals []*WalData, dataty
 				break
 			}
 			if err != nil {
-				return errors.Wrapf(err, "failed to decode wal file")
+				return errors.Errorf("failed to decode wal file: %w", err)
 			}
 			if action.DataType != datatype {
 				continue
@@ -237,7 +237,7 @@ func (d *DataManager) Read(dataType, id string) (io.Reader, error) {
 	err = dec.Decode(&dataFileIndex)
 	if err != nil {
 		dataFileIndexf.Close()
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	dataFileIndexf.Close()
 
@@ -248,11 +248,11 @@ func (d *DataManager) Read(dataType, id string) (io.Reader, error) {
 
 	dataf, err := d.ost.ReadObject(dataFilePath(dataType, dataSequence))
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	if _, err := dataf.Seek(int64(pos), io.SeekStart); err != nil {
 		dataf.Close()
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	var de *DataEntry
 	dec = json.NewDecoder(dataf)
