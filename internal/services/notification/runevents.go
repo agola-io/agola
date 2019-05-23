@@ -29,7 +29,7 @@ import (
 
 	rstypes "github.com/sorintlab/agola/internal/services/runservice/types"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	"go.etcd.io/etcd/clientv3/concurrency"
 )
 

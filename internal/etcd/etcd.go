@@ -27,7 +27,7 @@ import (
 
 	"github.com/sorintlab/agola/internal/util"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	"go.etcd.io/etcd/clientv3"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/clientv3/namespace"
@@ -95,7 +95,7 @@ func New(cfg Config) (*Store, error) {
 	for _, e := range endpoints {
 		u, err := url.Parse(e)
 		if err != nil {
-			return nil, errors.Wrapf(err, "cannot parse endpoint %q", e)
+			return nil, errors.Errorf("cannot parse endpoint %q: %w", e, err)
 		}
 		if scheme == "" {
 			scheme = u.Scheme
@@ -113,7 +113,7 @@ func New(cfg Config) (*Store, error) {
 		var err error
 		tlsConfig, err = util.NewTLSConfig(cfg.CertFile, cfg.KeyFile, cfg.CAFile, cfg.SkipTLSVerify)
 		if err != nil {
-			return nil, errors.Wrapf(err, "cannot create tls config")
+			return nil, errors.Errorf("cannot create tls config: %w", err)
 		}
 	}
 

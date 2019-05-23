@@ -30,7 +30,7 @@ import (
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 )
 
 const (

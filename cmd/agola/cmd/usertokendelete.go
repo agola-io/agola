@@ -22,7 +22,7 @@ import (
 
 	"github.com/sorintlab/agola/internal/services/gateway/api"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	"github.com/spf13/cobra"
 )
 
@@ -64,7 +64,7 @@ func userTokenDelete(cmd *cobra.Command, args []string) error {
 	log.Infof("deleting token %q for user %q", tokenName, userName)
 	_, err := gwclient.DeleteUserToken(context.TODO(), userName, tokenName)
 	if err != nil {
-		return errors.Wrapf(err, "failed to delete user token")
+		return errors.Errorf("failed to delete user token: %w", err)
 	}
 
 	log.Infof("token %q for user %q deleted", tokenName, userName)

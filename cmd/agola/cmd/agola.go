@@ -23,7 +23,7 @@ import (
 	"github.com/sorintlab/agola/cmd"
 	slog "github.com/sorintlab/agola/internal/log"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"

@@ -29,7 +29,7 @@ import (
 	"github.com/sorintlab/agola/internal/util"
 
 	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 )
 
 const (
@@ -96,7 +96,7 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 	h.log.Infof("creating user")
 	u, resp, err := h.configstoreClient.CreateUser(ctx, creq)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to create user"))
+		return nil, ErrFromRemote(resp, errors.Errorf("failed to create user: %w", err))
 	}
 	h.log.Infof("user %s created, ID: %s", u.Name, u.ID)
 
@@ -124,7 +124,7 @@ func (h *ActionHandler) CreateUserToken(ctx context.Context, req *CreateUserToke
 	userRef := req.UserRef
 	user, resp, err := h.configstoreClient.GetUser(ctx, userRef)
 	if err != nil {
-		return "", ErrFromRemote(resp, errors.Wrapf(err, "failed to get user"))
+		return "", ErrFromRemote(resp, errors.Errorf("failed to get user: %w", err))
 	}
 
 	// only admin or the same logged user can create a token
@@ -141,7 +141,7 @@ func (h *ActionHandler) CreateUserToken(ctx context.Context, req *CreateUserToke
 	}
 	res, resp, err := h.configstoreClient.CreateUserToken(ctx, userRef, creq)
 	if err != nil {
-		return "", ErrFromRemote(resp, errors.Wrapf(err, "failed to create user token"))
+		return "", ErrFromRemote(resp, errors.Errorf("failed to create user token: %w", err))
 	}
 	h.log.Infof("token %q for user %q created", req.TokenName, userRef)
 
@@ -162,11 +162,11 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 	userRef := req.UserRef
 	user, resp, err := h.configstoreClient.GetUser(ctx, userRef)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get user %q", userRef))
+		return nil, ErrFromRemote(resp, errors.Errorf("failed to get user %q: %w", userRef, err))
 	}
 	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, req.RemoteSourceName)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get remote source %q", req.RemoteSourceName))
+		return nil, ErrFromRemote(resp, errors.Errorf("failed to get remote source %q: %w", req.RemoteSourceName, err))
 	}
 	h.log.Infof("rs: %s", util.Dump(rs))
 	var la *types.LinkedAccount
@@ -192,7 +192,7 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 
 	remoteUserInfo, err := userSource.GetUserInfo()
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to retrieve remote user info for remote source %q", rs.ID)
+		return nil, errors.Errorf("failed to retrieve remote user info for remote source %q: %w", rs.ID, err)
 	}
 	if remoteUserInfo.ID == "" {
 		return nil, errors.Errorf("empty remote user id for remote source %q", rs.ID)
@@ -211,7 +211,7 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 	h.log.Infof("creating linked account")
 	la, resp, err = h.configstoreClient.CreateUserLA(ctx, userRef, creq)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to create linked account"))
+		return nil, ErrFromRemote(resp, errors.Errorf("failed to create linked account: %w", err))
 	}
 	h.log.Infof("linked account %q for user %q created", la.ID, userRef)
 
@@ -221,7 +221,7 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 func (h *ActionHandler) UpdateUserLA(ctx context.Context, userRef string, la *types.LinkedAccount) error {
 	user, resp, err := h.configstoreClient.GetUser(ctx, userRef)
 	if err != nil {
-		return ErrFromRemote(resp, errors.Wrapf(err, "failed to get user %q", userRef))
+		return ErrFromRemote(resp, errors.Errorf("failed to get user %q: %w", userRef, err))
 	}
 	laFound := false
 	for _, ula := range user.LinkedAccounts {
@@ -247,7 +247,7 @@ func (h *ActionHandler) UpdateUserLA(ctx context.Context, userRef string, la *ty
 	h.log.Infof("updating user %q linked account", userRef)
 	la, resp, err = h.configstoreClient.UpdateUserLA(ctx, userRef, la.ID, creq)
 	if err != nil {
-		return ErrFromRemote(resp, errors.Wrapf(err, "failed to update user"))
+		return ErrFromRemote(resp, errors.Errorf("failed to update user: %w", err))
 	}
 	h.log.Infof("linked account %q for user %q updated", la.ID, userRef)
 
@@ -275,7 +275,7 @@ func (h *ActionHandler) RefreshLinkedAccount(ctx context.Context, rs *types.Remo
 				la.Oauth2AccessTokenExpiresAt = token.Expiry
 
 				if err := h.UpdateUserLA(ctx, userName, la); err != nil {
-					return nil, errors.Wrapf(err, "failed to update linked account")
+					return nil, errors.Errorf("failed to update linked account: %w", err)
 				}
 			}
 		}
@@ -312,7 +312,7 @@ func (h *ActionHandler) RegisterUser(ctx context.Context, req *RegisterUserReque
 
 	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, req.RemoteSourceName)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get remote source %q", req.RemoteSourceName))
+		return nil, ErrFromRemote(resp, errors.Errorf("failed to get remote source %q: %w", req.RemoteSourceName, err))
 	}
 	h.log.Infof("rs: %s", util.Dump(rs))
 
@@ -327,7 +327,7 @@ func (h *ActionHandler) RegisterUser(ctx context.Context, req *RegisterUserReque
 
 	remoteUserInfo, err := userSource.GetUserInfo()
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to retrieve remote user info for remote source %q", rs.ID)
+		return nil, errors.Errorf("failed to retrieve remote user info for remote source %q: %w", rs.ID, err)
 	}
 	if remoteUserInfo.ID == "" {
 		return nil, errors.Errorf("empty remote user id for remote source %q", rs.ID)
@@ -349,7 +349,7 @@ func (h *ActionHandler) RegisterUser(ctx context.Context, req *RegisterUserReque
 	h.log.Infof("creating user account")
 	u, resp, err := h.configstoreClient.CreateUser(ctx, creq)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to create linked account"))
+		return nil, ErrFromRemote(resp, errors.Errorf("failed to create linked account: %w", err))
 	}
 	h.log.Infof("user %q created", req.UserName)
 
@@ -372,7 +372,7 @@ type LoginUserResponse struct {
 func (h *ActionHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (*LoginUserResponse, error) {
 	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, req.RemoteSourceName)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get remote source %q", req.RemoteSourceName))
+		return nil, ErrFromRemote(resp, errors.Errorf("failed to get remote source %q: %w", req.RemoteSourceName, err))
 	}
 	h.log.Infof("rs: %s", util.Dump(rs))
 
@@ -387,7 +387,7 @@ func (h *ActionHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (*
 
 	remoteUserInfo, err := userSource.GetUserInfo()
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to retrieve remote user info for remote source %q", rs.ID)
+		return nil, errors.Errorf("failed to retrieve remote user info for remote source %q: %w", rs.ID, err)
 	}
 	if remoteUserInfo.ID == "" {
 		return nil, errors.Errorf("empty remote user id for remote source %q", rs.ID)
@@ -395,7 +395,7 @@ func (h *ActionHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (*
 
 	user, resp, err := h.configstoreClient.GetUserByLinkedAccountRemoteUserAndSource(ctx, remoteUserInfo.ID, rs.ID)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get user for remote user id %q and remote source %q", remoteUserInfo.ID, rs.ID))
+		return nil, ErrFromRemote(resp, errors.Errorf("failed to get user for remote user id %q and remote source %q: %w", remoteUserInfo.ID, rs.ID, err))
 	}
 
 	var la *types.LinkedAccount
@@ -431,7 +431,7 @@ func (h *ActionHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (*
 		h.log.Infof("updating user %q linked account", user.Name)
 		la, resp, err = h.configstoreClient.UpdateUserLA(ctx, user.Name, la.ID, creq)
 		if err != nil {
-			return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to update user"))
+			return nil, ErrFromRemote(resp, errors.Errorf("failed to update user: %w", err))
 		}
 		h.log.Infof("linked account %q for user %q updated", la.ID, user.Name)
 	}
@@ -463,7 +463,7 @@ type AuthorizeResponse struct {
 func (h *ActionHandler) Authorize(ctx context.Context, req *AuthorizeRequest) (*AuthorizeResponse, error) {
 	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, req.RemoteSourceName)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get remote source %q", req.RemoteSourceName))
+		return nil, ErrFromRemote(resp, errors.Errorf("failed to get remote source %q: %w", req.RemoteSourceName, err))
 	}
 	h.log.Infof("rs: %s", util.Dump(rs))
 
@@ -478,7 +478,7 @@ func (h *ActionHandler) Authorize(ctx context.Context, req *AuthorizeRequest) (*
 
 	remoteUserInfo, err := userSource.GetUserInfo()
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to retrieve remote user info for remote source %q", rs.ID)
+		return nil, errors.Errorf("failed to retrieve remote user info for remote source %q: %w", rs.ID, err)
 	}
 	if remoteUserInfo.ID == "" {
 		return nil, errors.Errorf("empty remote user id for remote source %q", rs.ID)
@@ -498,7 +498,7 @@ type RemoteSourceAuthResponse struct {
 func (h *ActionHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSourceName, loginName, loginPassword string, requestType RemoteSourceRequestType, req interface{}) (*RemoteSourceAuthResponse, error) {
 	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, remoteSourceName)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get remote source %q", remoteSourceName))
+		return nil, ErrFromRemote(resp, errors.Errorf("failed to get remote source %q: %w", remoteSourceName, err))
 	}
 	h.log.Infof("rs: %s", util.Dump(rs))
 
@@ -508,7 +508,7 @@ func (h *ActionHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSource
 
 		user, resp, err := h.configstoreClient.GetUser(ctx, req.UserRef)
 		if err != nil {
-			return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get user %q", req.UserRef))
+			return nil, ErrFromRemote(resp, errors.Errorf("failed to get user %q: %w", req.UserRef, err))
 		}
 
 		curUserID := h.CurrentUserID(ctx)
@@ -545,7 +545,7 @@ func (h *ActionHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSource
 	case types.RemoteSourceAuthTypeOauth2:
 		oauth2Source, err := common.GetOauth2Source(rs, "")
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to create git source")
+			return nil, errors.Errorf("failed to create git source: %w", err)
 		}
 		token, err := common.GenerateOauth2JWTToken(h.sd, rs.Name, string(requestType), req)
 		if err != nil {
@@ -564,15 +564,15 @@ func (h *ActionHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSource
 	case types.RemoteSourceAuthTypePassword:
 		passwordSource, err := common.GetPasswordSource(rs, "")
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to create git source")
+			return nil, errors.Errorf("failed to create git source: %w", err)
 		}
 		tokenName := "agola-" + h.agolaID
 		accessToken, err := passwordSource.LoginPassword(loginName, loginPassword, tokenName)
 		if err != nil {
 			if err == gitsource.ErrUnauthorized {
-				return nil, util.NewErrUnauthorized(errors.Wrapf(err, "failed to login to remotesource %q", remoteSourceName))
+				return nil, util.NewErrUnauthorized(errors.Errorf("failed to login to remotesource %q: %w", remoteSourceName, err))
 			}
-			return nil, errors.Wrapf(err, "failed to login to remote source %q with login name %q", rs.Name, loginName)
+			return nil, errors.Errorf("failed to login to remote source %q with login name %q: %w", rs.Name, loginName, err)
 		}
 		h.log.Infof("access token: %s", accessToken)
 		requestj, err := json.Marshal(req)
@@ -726,7 +726,7 @@ func (h *ActionHandler) HandleOauth2Callback(ctx context.Context, code, state st
 		return key, nil
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse jwt")
+		return nil, errors.Errorf("failed to parse jwt: %w", err)
 	}
 	if !token.Valid {
 		return nil, errors.Errorf("invalid token")
@@ -739,13 +739,13 @@ func (h *ActionHandler) HandleOauth2Callback(ctx context.Context, code, state st
 
 	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, remoteSourceName)
 	if err != nil {
-		return nil, ErrFromRemote(resp, errors.Wrapf(err, "failed to get remote source %q", remoteSourceName))
+		return nil, ErrFromRemote(resp, errors.Errorf("failed to get remote source %q: %w", remoteSourceName, err))
 	}
 	h.log.Infof("rs: %s", util.Dump(rs))
 
 	oauth2Source, err := common.GetOauth2Source(rs, "")
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create oauth2 source")
+		return nil, errors.Errorf("failed to create oauth2 source: %w", err)
 	}
 
 	oauth2Token, err := oauth2Source.RequestOauth2Token(h.webExposedURL+"/oauth2/callback", code)
@@ -763,7 +763,7 @@ func (h *ActionHandler) DeleteUser(ctx context.Context, userRef string) error {
 
 	resp, err := h.configstoreClient.DeleteUser(ctx, userRef)
 	if err != nil {
-		return ErrFromRemote(resp, errors.Wrapf(err, "failed to delete user"))
+		return ErrFromRemote(resp, errors.Errorf("failed to delete user: %w", err))
 	}
 	return nil
 }
@@ -778,7 +778,7 @@ func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) 
 
 	user, resp, err := h.configstoreClient.GetUser(ctx, userRef)
 	if err != nil {
-		return ErrFromRemote(resp, errors.Wrapf(err, "failed to get user %q", userRef))
+		return ErrFromRemote(resp, errors.Errorf("failed to get user %q: %w", userRef, err))
 	}
 
 	// only admin or the same logged user can create a token
@@ -788,7 +788,7 @@ func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) 
 
 	resp, err = h.configstoreClient.DeleteUserLA(ctx, userRef, laID)
 	if err != nil {
-		return ErrFromRemote(resp, errors.Wrapf(err, "failed to delete user linked account"))
+		return ErrFromRemote(resp, errors.Errorf("failed to delete user linked account: %w", err))
 	}
 	return nil
 }
@@ -803,7 +803,7 @@ func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName 
 
 	user, resp, err := h.configstoreClient.GetUser(ctx, userRef)
 	if err != nil {
-		return ErrFromRemote(resp, errors.Wrapf(err, "failed to get user %q", userRef))
+		return ErrFromRemote(resp, errors.Errorf("failed to get user %q: %w", userRef, err))
 	}
 
 	// only admin or the same logged user can create a token
@@ -813,7 +813,7 @@ func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName 
 
 	resp, err = h.configstoreClient.DeleteUserToken(ctx, userRef, tokenName)
 	if err != nil {
-		return ErrFromRemote(resp, errors.Wrapf(err, "failed to delete user token"))
+		return ErrFromRemote(resp, errors.Errorf("failed to delete user token: %w", err))
 	}
 	return nil
 }

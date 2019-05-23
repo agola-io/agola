@@ -20,7 +20,7 @@ package cmd
 import (
 	"context"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	"github.com/sorintlab/agola/internal/gitsources/github"
 	"github.com/sorintlab/agola/internal/services/gateway/api"
 	"github.com/sorintlab/agola/internal/services/types"
@@ -96,7 +96,7 @@ func remoteSourceCreate(cmd *cobra.Command, args []string) error {
 	log.Infof("creating remotesource")
 	remoteSource, _, err := gwclient.CreateRemoteSource(context.TODO(), req)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create remotesource")
+		return errors.Errorf("failed to create remotesource: %w", err)
 	}
 	log.Infof("remotesource %s created, ID: %s", remoteSource.Name, remoteSource.ID)
 

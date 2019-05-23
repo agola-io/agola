@@ -11,7 +11,7 @@ import (
 
 	"github.com/sorintlab/agola/internal/util"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	"go.uber.org/zap"
 )
 

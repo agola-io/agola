@@ -20,7 +20,7 @@ package cmd
 import (
 	"context"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	"github.com/sorintlab/agola/internal/services/gateway/api"
 	"github.com/sorintlab/agola/internal/services/types"
 
@@ -87,7 +87,7 @@ func projectCreate(cmd *cobra.Command, args []string) error {
 
 	project, _, err := gwclient.CreateProject(context.TODO(), req)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create project")
+		return errors.Errorf("failed to create project: %w", err)
 	}
 	log.Infof("project %s created, ID: %s", project.Name, project.ID)
 

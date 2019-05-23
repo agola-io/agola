@@ -33,7 +33,7 @@ import (
 	"github.com/sorintlab/agola/internal/services/scheduler"
 	"github.com/sorintlab/agola/internal/util"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	"github.com/spf13/cobra"
 	"go.etcd.io/etcd/embed"
 )
@@ -135,12 +135,12 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	c, err := config.Parse(serveOpts.config)
 	if err != nil {
-		return errors.Wrapf(err, "config error")
+		return errors.Errorf("config error: %w", err)
 	}
 
 	if serveOpts.embeddedEtcd {
 		if err := embeddedEtcd(ctx); err != nil {
-			return errors.Wrapf(err, "failed to start run service scheduler")
+			return errors.Errorf("failed to start run service scheduler: %w", err)
 		}
 	}
 
@@ -148,7 +148,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	if isComponentEnabled("runservice") {
 		rs, err = rsscheduler.NewRunservice(ctx, &c.Runservice)
 		if err != nil {
-			return errors.Wrapf(err, "failed to start run service scheduler")
+			return errors.Errorf("failed to start run service scheduler: %w", err)
 		}
 	}
 
@@ -156,7 +156,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	if isComponentEnabled("executor") {
 		ex, err = executor.NewExecutor(&c.Executor)
 		if err != nil {
-			return errors.Wrapf(err, "failed to start run service executor")
+			return errors.Errorf("failed to start run service executor: %w", err)
 		}
 	}
 
@@ -164,7 +164,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	if isComponentEnabled("configstore") {
 		cs, err = configstore.NewConfigstore(ctx, &c.Configstore)
 		if err != nil {
-			return errors.Wrapf(err, "failed to start config store")
+			return errors.Errorf("failed to start config store: %w", err)
 		}
 	}
 
@@ -172,7 +172,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	if isComponentEnabled("scheduler") {
 		sched, err = scheduler.NewScheduler(&c.Scheduler)
 		if err != nil {
-			return errors.Wrapf(err, "failed to start scheduler")
+			return errors.Errorf("failed to start scheduler: %w", err)
 		}
 	}
 
@@ -180,7 +180,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	if isComponentEnabled("notification") {
 		ns, err = notification.NewNotificationService(c)
 		if err != nil {
-			return errors.Wrapf(err, "failed to start notification service")
+			return errors.Errorf("failed to start notification service: %w", err)
 		}
 	}
 
@@ -188,7 +188,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	if isComponentEnabled("gateway") {
 		gw, err = gateway.NewGateway(c)
 		if err != nil {
-			return errors.Wrapf(err, "failed to start gateway")
+			return errors.Errorf("failed to start gateway: %w", err)
 		}
 	}
 
@@ -196,7 +196,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	if isComponentEnabled("gitserver") {
 		gs, err = gitserver.NewGitserver(&c.Gitserver)
 		if err != nil {
-			return errors.Wrapf(err, "failed to start git server")
+			return errors.Errorf("failed to start git server: %w", err)
 		}
 	}
 

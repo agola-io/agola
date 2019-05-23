@@ -33,7 +33,7 @@ import (
 	ostypes "github.com/sorintlab/agola/internal/objectstorage/types"
 	"github.com/sorintlab/agola/internal/sequence"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	uuid "github.com/satori/go.uuid"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/clientv3/concurrency"
@@ -727,7 +727,7 @@ func (d *DataManager) checkpoint(ctx context.Context) error {
 	}
 
 	if err := d.writeData(ctx, walsData); err != nil {
-		return errors.Wrapf(err, "checkpoint function error")
+		return errors.Errorf("checkpoint function error: %w", err)
 	}
 
 	for _, walData := range walsData {

@@ -26,7 +26,7 @@ import (
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -132,7 +132,7 @@ func (h *ActionHandler) CreateSecret(ctx context.Context, secret *types.Secret) 
 
 	secretj, err := json.Marshal(secret)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal secret")
+		return nil, errors.Errorf("failed to marshal secret: %w", err)
 	}
 	actions := []*datamanager.Action{
 		{

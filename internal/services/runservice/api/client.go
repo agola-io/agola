@@ -29,7 +29,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	rstypes "github.com/sorintlab/agola/internal/services/runservice/types"
 )
 

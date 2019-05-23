@@ -22,7 +22,7 @@ import (
 	"net/url"
 	"path"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 )

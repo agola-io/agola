@@ -26,7 +26,7 @@ import (
 	"github.com/sorintlab/agola/internal/etcd"
 	"github.com/sorintlab/agola/internal/objectstorage"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	"go.uber.org/zap"
 )
 

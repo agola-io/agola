@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	"github.com/sorintlab/agola/internal/db"
 	action "github.com/sorintlab/agola/internal/services/configstore/action"
 	"github.com/sorintlab/agola/internal/services/configstore/readdb"
@@ -209,7 +209,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		limit, err = strconv.Atoi(limitS)
 		if err != nil {
-			httpError(w, util.NewErrBadRequest(errors.Wrapf(err, "cannot parse limit")))
+			httpError(w, util.NewErrBadRequest(errors.Errorf("cannot parse limit: %w", err)))
 			return
 		}
 	}

@@ -20,7 +20,7 @@ package cmd
 import (
 	"context"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	"github.com/sorintlab/agola/internal/services/gateway/api"
 
 	"github.com/spf13/cobra"
@@ -98,7 +98,7 @@ func remoteSourceUpdate(cmd *cobra.Command, args []string) error {
 	log.Infof("updating remotesource")
 	remoteSource, _, err := gwclient.UpdateRemoteSource(context.TODO(), remoteSourceUpdateOpts.ref, req)
 	if err != nil {
-		return errors.Wrapf(err, "failed to update remotesource")
+		return errors.Errorf("failed to update remotesource: %w", err)
 	}
 	log.Infof("remotesource %s updated, ID: %s", remoteSource.Name, remoteSource.ID)
 

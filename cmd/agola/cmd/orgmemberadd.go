@@ -20,7 +20,7 @@ package cmd
 import (
 	"context"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	"github.com/sorintlab/agola/internal/services/gateway/api"
 	"github.com/sorintlab/agola/internal/services/types"
 
@@ -64,7 +64,7 @@ func orgMemberAdd(cmd *cobra.Command, args []string) error {
 	log.Infof("adding/updating member %q to organization %q with role %q", orgMemberAddOpts.username, orgMemberAddOpts.orgname, orgMemberAddOpts.role)
 	_, _, err := gwclient.AddOrgMember(context.TODO(), orgMemberAddOpts.orgname, orgMemberAddOpts.username, types.MemberRole(orgMemberAddOpts.role))
 	if err != nil {
-		return errors.Wrapf(err, "failed to add/update organization member")
+		return errors.Errorf("failed to add/update organization member: %w", err)
 	}
 
 	return nil

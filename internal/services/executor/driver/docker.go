@@ -31,7 +31,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	"github.com/sorintlab/agola/internal/common"
 	"github.com/sorintlab/agola/internal/services/executor/registry"
 
@@ -104,7 +104,7 @@ func (d *DockerDriver) CopyToolbox(ctx context.Context) error {
 
 	toolboxExecPath, err := toolboxExecPath(d.toolboxPath, d.arch)
 	if err != nil {
-		return errors.Wrapf(err, "failed to get toolbox path for arch %q", d.arch)
+		return errors.Errorf("failed to get toolbox path for arch %q: %w", d.arch, err)
 	}
 	srcInfo, err := archive.CopyInfoSourcePath(toolboxExecPath, false)
 	if err != nil {

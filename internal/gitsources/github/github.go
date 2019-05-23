@@ -33,7 +33,7 @@ import (
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
 
 	"github.com/google/go-github/v25/github"
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	"golang.org/x/oauth2"
 )
 
@@ -160,7 +160,7 @@ func (c *Client) RequestOauth2Token(callbackURL, code string) (*oauth2.Token, er
 	var config = c.oauth2Config(callbackURL)
 	token, err := config.Exchange(context.TODO(), code)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot get oauth2 token")
+		return nil, errors.Errorf("cannot get oauth2 token: %w", err)
 	}
 	return token, nil
 }
@@ -220,7 +220,7 @@ func (c *Client) CreateDeployKey(repopath, title, pubKey string, readonly bool) 
 		Key:      github.String(pubKey),
 		ReadOnly: github.Bool(readonly),
 	}); err != nil {
-		return errors.Wrapf(err, "error creating deploy key")
+		return errors.Errorf("error creating deploy key: %w", err)
 	}
 	return nil
 }
@@ -236,7 +236,7 @@ func (c *Client) UpdateDeployKey(repopath, title, pubKey string, readonly bool) 
 	// when the public key value has changed
 	keys, _, err := c.client.Repositories.ListKeys(context.TODO(), owner, reponame, nil)
 	if err != nil {
-		return errors.Wrapf(err, "error retrieving existing deploy keys")
+		return errors.Errorf("error retrieving existing deploy keys: %w", err)
 	}
 
 	for _, key := range keys {
@@ -245,7 +245,7 @@ func (c *Client) UpdateDeployKey(repopath, title, pubKey string, readonly bool) 
 				return nil
 			}
 			if _, err := c.client.Repositories.DeleteKey(context.TODO(), owner, reponame, *key.ID); err != nil {
-				return errors.Wrapf(err, "error removing existing deploy key")
+				return errors.Errorf("error removing existing deploy key: %w", err)
 			}
 		}
 	}
@@ -255,7 +255,7 @@ func (c *Client) UpdateDeployKey(repopath, title, pubKey string, readonly bool) 
 		Key:      github.String(pubKey),
 		ReadOnly: github.Bool(readonly),
 	}); err != nil {
-		return errors.Wrapf(err, "error creating deploy key")
+		return errors.Errorf("error creating deploy key: %w", err)
 	}
 
 	return nil
@@ -268,13 +268,13 @@ func (c *Client) DeleteDeployKey(repopath, title string) error {
 	}
 	keys, _, err := c.client.Repositories.ListKeys(context.TODO(), owner, reponame, nil)
 	if err != nil {
-		return errors.Wrapf(err, "error retrieving existing deploy keys")
+		return errors.Errorf("error retrieving existing deploy keys: %w", err)
 	}
 
 	for _, key := range keys {
 		if *key.Title == title {
 			if _, err := c.client.Repositories.DeleteKey(context.TODO(), owner, reponame, *key.ID); err != nil {
-				return errors.Wrapf(err, "error removing existing deploy key")
+				return errors.Errorf("error removing existing deploy key: %w", err)
 			}
 		}
 	}
@@ -299,7 +299,7 @@ func (c *Client) CreateRepoWebhook(repopath, url, secret string) error {
 	}
 
 	if _, _, err = c.client.Repositories.CreateHook(context.TODO(), owner, reponame, hook); err != nil {
-		return errors.Wrapf(err, "error creating repository webhook")
+		return errors.Errorf("error creating repository webhook: %w", err)
 	}
 
 	return nil
@@ -317,7 +317,7 @@ func (c *Client) DeleteRepoWebhook(repopath, u string) error {
 	for {
 		pHooks, resp, err := c.client.Repositories.ListHooks(context.TODO(), owner, reponame, opt)
 		if err != nil {
-			return errors.Wrapf(err, "error retrieving repository webhooks")
+			return errors.Errorf("error retrieving repository webhooks: %w", err)
 		}
 		hooks = append(hooks, pHooks...)
 		if resp.NextPage == 0 {
@@ -331,7 +331,7 @@ func (c *Client) DeleteRepoWebhook(repopath, u string) error {
 	for _, hook := range hooks {
 		if hook.Config["url"] == u {
 			if _, err := c.client.Repositories.DeleteHook(context.TODO(), owner, reponame, *hook.ID); err != nil {
-				return errors.Wrapf(err, "error deleting existing repository webhook")
+				return errors.Errorf("error deleting existing repository webhook: %w", err)
 			}
 		}
 	}

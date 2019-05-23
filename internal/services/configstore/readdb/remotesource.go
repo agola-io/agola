@@ -27,7 +27,7 @@ import (
 	"github.com/sorintlab/agola/internal/util"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 )
 
 var (
@@ -38,7 +38,7 @@ var (
 func (r *ReadDB) insertRemoteSource(tx *db.Tx, data []byte) error {
 	remoteSource := types.RemoteSource{}
 	if err := json.Unmarshal(data, &remoteSource); err != nil {
-		return errors.Wrap(err, "failed to unmarshal remotesource")
+		return errors.Errorf("failed to unmarshal remotesource: %w", err)
 	}
 	// poor man insert or update...
 	if err := r.deleteRemoteSource(tx, remoteSource.ID); err != nil {
@@ -46,16 +46,19 @@ func (r *ReadDB) insertRemoteSource(tx *db.Tx, data []byte) error {
 	}
 	q, args, err := remotesourceInsert.Values(remoteSource.ID, remoteSource.Name, data).ToSql()
 	if err != nil {
-		return errors.Wrap(err, "failed to build query")
+		return errors.Errorf("failed to build query: %w", err)
 	}
-	_, err = tx.Exec(q, args...)
-	return errors.Wrap(err, "failed to insert remotesource")
+	if _, err = tx.Exec(q, args...); err != nil {
+		return errors.Errorf("failed to insert remotesource: %w", err)
+	}
+
+	return nil
 }
 
 func (r *ReadDB) deleteRemoteSource(tx *db.Tx, id string) error {
 	// poor man insert or update...
 	if _, err := tx.Exec("delete from remotesource where id = $1", id); err != nil {
-		return errors.Wrap(err, "failed to delete remotesource")
+		return errors.Errorf("failed to delete remotesource: %w", err)
 	}
 	return nil
 }
@@ -80,12 +83,12 @@ func (r *ReadDB) GetRemoteSourceByID(tx *db.Tx, remoteSourceID string) (*types.R
 	q, args, err := remotesourceSelect.Where(sq.Eq{"id": remoteSourceID}).ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build query")
+		return nil, errors.Errorf("failed to build query: %w", err)
 	}
 
 	remoteSources, _, err := fetchRemoteSources(tx, q, args...)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	if len(remoteSources) > 1 {
 		return nil, errors.Errorf("too many rows returned")
@@ -100,12 +103,12 @@ func (r *ReadDB) GetRemoteSourceByName(tx *db.Tx, name string) (*types.RemoteSou
 	q, args, err := remotesourceSelect.Where(sq.Eq{"name": name}).ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build query")
+		return nil, errors.Errorf("failed to build query: %w", err)
 	}
 
 	remoteSources, _, err := fetchRemoteSources(tx, q, args...)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	if len(remoteSources) > 1 {
 		return nil, errors.Errorf("too many rows returned")
@@ -138,6 +141,7 @@ func getRemoteSourcesFilteredQuery(startRemoteSourceName string, limit int, asc 
 
 	return s
 }
+
 func (r *ReadDB) GetRemoteSources(startRemoteSourceName string, limit int, asc bool) ([]*types.RemoteSource, error) {
 	var remoteSources []*types.RemoteSource
 
@@ -145,7 +149,7 @@ func (r *ReadDB) GetRemoteSources(startRemoteSourceName string, limit int, asc b
 	q, args, err := s.ToSql()
 	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build query")
+		return nil, errors.Errorf("failed to build query: %w", err)
 	}
 
 	err = r.rdb.Do(func(tx *db.Tx) error {
@@ -157,7 +161,7 @@ func (r *ReadDB) GetRemoteSources(startRemoteSourceName string, limit int, asc b
 		remoteSources, _, err = scanRemoteSources(rows)
 		return err
 	})
-	return remoteSources, errors.WithStack(err)
+	return remoteSources, err
 }
 
 func fetchRemoteSources(tx *db.Tx, q string, args ...interface{}) ([]*types.RemoteSource, []string, error) {
@@ -173,12 +177,12 @@ func scanRemoteSource(rows *sql.Rows, additionalFields ...interface{}) (*types.R
 	var id string
 	var data []byte
 	if err := rows.Scan(&id, &data); err != nil {
-		return nil, "", errors.Wrap(err, "failed to scan rows")
+		return nil, "", errors.Errorf("failed to scan rows: %w", err)
 	}
 	remoteSource := types.RemoteSource{}
 	if len(data) > 0 {
 		if err := json.Unmarshal(data, &remoteSource); err != nil {
-			return nil, "", errors.Wrap(err, "failed to unmarshal remotesource")
+			return nil, "", errors.Errorf("failed to unmarshal remotesource: %w", err)
 		}
 	}
 

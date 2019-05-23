@@ -20,7 +20,7 @@ package cmd
 import (
 	"context"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	"github.com/sorintlab/agola/internal/services/gateway/api"
 
 	"github.com/spf13/cobra"
@@ -71,7 +71,7 @@ func userLACreate(cmd *cobra.Command, args []string) error {
 	log.Infof("creating linked account for user %q", userLACreateOpts.username)
 	resp, _, err := gwclient.CreateUserLA(context.TODO(), userLACreateOpts.username, req)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create linked account")
+		return errors.Errorf("failed to create linked account: %w", err)
 	}
 	if resp.Oauth2Redirect != "" {
 		log.Infof("visit %s to continue", resp.Oauth2Redirect)

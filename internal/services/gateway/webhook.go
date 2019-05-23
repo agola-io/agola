@@ -35,7 +35,7 @@ import (
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	"go.uber.org/zap"
 )
 
@@ -127,13 +127,13 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 	if !isUserBuild {
 		project, _, err := h.configstoreClient.GetProject(ctx, projectID)
 		if err != nil {
-			return http.StatusBadRequest, "", errors.Wrapf(err, "failed to get project %s", projectID)
+			return http.StatusBadRequest, "", errors.Errorf("failed to get project %s: %w", projectID, err)
 		}
 		h.log.Infof("project: %s", util.Dump(project))
 
 		user, _, err := h.configstoreClient.GetUserByLinkedAccount(ctx, project.LinkedAccountID)
 		if err != nil {
-			return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to get user by linked account %q", project.LinkedAccountID)
+			return http.StatusInternalServerError, "", errors.Errorf("failed to get user by linked account %q: %w", project.LinkedAccountID, err)
 		}
 		la := user.LinkedAccounts[project.LinkedAccountID]
 		h.log.Infof("la: %s", util.Dump(la))
@@ -142,12 +142,12 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		}
 		rs, _, err := h.configstoreClient.GetRemoteSource(ctx, la.RemoteSourceID)
 		if err != nil {
-			return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to get remote source %q", la.RemoteSourceID)
+			return http.StatusInternalServerError, "", errors.Errorf("failed to get remote source %q: %w", la.RemoteSourceID, err)
 		}
 
 		gitSource, err = h.ah.GetGitSource(ctx, rs, user.Name, la)
 		if err != nil {
-			return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to create gitea client")
+			return http.StatusInternalServerError, "", errors.Errorf("failed to create gitea client: %w", err)
 		}
 
 		sshPrivKey = project.SSHPrivateKey
@@ -160,7 +160,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		runType = types.RunTypeProject
 		webhookData, err = gitSource.ParseWebhook(r, project.WebhookSecret)
 		if err != nil {
-			return http.StatusBadRequest, "", errors.Wrapf(err, "failed to parse webhook")
+			return http.StatusBadRequest, "", errors.Errorf("failed to parse webhook: %w", err)
 		}
 		// skip nil webhook data
 		// TODO(sgotti) report the reason of the skip
@@ -176,7 +176,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		// get project variables
 		pvars, _, err := h.configstoreClient.GetProjectVariables(ctx, project.ID, true)
 		if err != nil {
-			return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to get project variables")
+			return http.StatusInternalServerError, "", errors.Errorf("failed to get project variables: %w", err)
 		}
 		h.log.Infof("pvars: %v", util.Dump(pvars))
 
@@ -187,7 +187,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		// get project secrets
 		secrets, _, err := h.configstoreClient.GetProjectSecrets(ctx, project.ID, true)
 		if err != nil {
-			return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to get project secrets")
+			return http.StatusInternalServerError, "", errors.Errorf("failed to get project secrets: %w", err)
 		}
 		h.log.Infof("secrets: %v", util.Dump(secrets))
 		for _, pvar := range pvars {
@@ -218,7 +218,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		var err error
 		webhookData, err = gitSource.ParseWebhook(r, "")
 		if err != nil {
-			return http.StatusBadRequest, "", errors.Wrapf(err, "failed to parse webhook")
+			return http.StatusBadRequest, "", errors.Errorf("failed to parse webhook: %w", err)
 		}
 		// skip nil webhook data
 		// TODO(sgotti) report the reason of the skip
@@ -229,7 +229,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 
 		user, _, err := h.configstoreClient.GetUser(ctx, userID)
 		if err != nil {
-			return http.StatusBadRequest, "", errors.Wrapf(err, "failed to get user with id %q", userID)
+			return http.StatusBadRequest, "", errors.Errorf("failed to get user with id %q: %w", userID, err)
 		}
 		h.log.Debugf("user: %s", util.Dump(user))
 		userID = user.ID
@@ -242,13 +242,13 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 
 	data, filename, err := h.fetchConfigFiles(gitSource, webhookData)
 	if err != nil {
-		return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to fetch config file")
+		return http.StatusInternalServerError, "", errors.Errorf("failed to fetch config file: %w", err)
 	}
 	h.log.Debug("data: %s", data)
 
 	gitURL, err := util.ParseGitURL(cloneURL)
 	if err != nil {
-		return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to parse clone url")
+		return http.StatusInternalServerError, "", errors.Errorf("failed to parse clone url: %w", err)
 	}
 	gitHost := gitURL.Hostname()
 	gitPort := gitURL.Port()
@@ -313,7 +313,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 	}
 
 	if err := h.createRuns(ctx, filename, data, group, annotations, env, variables, webhookData); err != nil {
-		return http.StatusInternalServerError, "", errors.Wrapf(err, "failed to create run")
+		return http.StatusInternalServerError, "", errors.Errorf("failed to create run: %w", err)
 	}
 	//if err := gitSource.CreateStatus(webhookData.Repo.Owner, webhookData.Repo.Name, webhookData.CommitSHA, gitsource.CommitStatusPending, "localhost:8080", "build %s", "agola"); err != nil {
 	//	h.log.Errorf("failed to update commit status: %v", err)

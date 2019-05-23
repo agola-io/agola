@@ -21,7 +21,7 @@ import (
 	"database/sql"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 )
 
 const dbVersionTableDDLTmpl = `
@@ -35,7 +35,7 @@ func (db *DB) Create(stmts []string) error {
 
 	err := db.Do(func(tx *Tx) error {
 		if _, err := tx.Exec(dbVersionTableDDLTmpl); err != nil {
-			return errors.Wrap(err, "failed to create dbversion table")
+			return errors.Errorf("failed to create dbversion table: %w", err)
 		}
 		return nil
 	})
@@ -50,7 +50,7 @@ func (db *DB) Create(stmts []string) error {
 			return err
 		}
 		if err := tx.QueryRow(q, args...).Scan(&version); err != nil {
-			return errors.Wrap(err, "cannot get current db version")
+			return errors.Errorf("cannot get current db version: %w", err)
 		}
 		if version.Valid {
 			return nil
@@ -58,7 +58,7 @@ func (db *DB) Create(stmts []string) error {
 
 		for _, stmt := range stmts {
 			if _, err := tx.Exec(stmt); err != nil {
-				return errors.Wrapf(err, "creation failed")
+				return errors.Errorf("creation failed: %w", err)
 			}
 		}
 
@@ -67,7 +67,7 @@ func (db *DB) Create(stmts []string) error {
 			return err
 		}
 		if _, err := tx.Exec(q, args...); err != nil {
-			return errors.Wrap(err, "failed to update dbversion table")
+			return errors.Errorf("failed to update dbversion table: %w", err)
 		}
 		return nil
 	})

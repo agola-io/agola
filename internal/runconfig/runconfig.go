@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	"github.com/sorintlab/agola/internal/config"
 	rstypes "github.com/sorintlab/agola/internal/services/runservice/types"
 	"github.com/sorintlab/agola/internal/services/types"

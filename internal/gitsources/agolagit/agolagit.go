@@ -29,7 +29,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
 )
 

@@ -22,10 +22,11 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/gorilla/mux"
-	"github.com/pkg/errors"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
+
+	"github.com/gorilla/mux"
+	errors "golang.org/x/xerrors"
 )
 
 type ErrorResponse struct {
@@ -124,7 +125,7 @@ func GetConfigTypeRef(r *http.Request) (types.ConfigType, string, error) {
 	vars := mux.Vars(r)
 	projectRef, err := url.PathUnescape(vars["projectref"])
 	if err != nil {
-		return "", "", util.NewErrBadRequest(errors.Wrapf(err, "wrong projectref %q", vars["projectref"]))
+		return "", "", util.NewErrBadRequest(errors.Errorf("wrong projectref %q: %w", vars["projectref"], err))
 	}
 	if projectRef != "" {
 		return types.ConfigTypeProject, projectRef, nil
@@ -132,7 +133,7 @@ func GetConfigTypeRef(r *http.Request) (types.ConfigType, string, error) {
 
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
-		return "", "", util.NewErrBadRequest(errors.Wrapf(err, "wrong projectgroupref %q", vars["projectgroupref"]))
+		return "", "", util.NewErrBadRequest(errors.Errorf("wrong projectgroupref %q: %w", vars["projectgroupref"], err))
 	}
 	if projectGroupRef != "" {
 		return types.ConfigTypeProjectGroup, projectGroupRef, nil

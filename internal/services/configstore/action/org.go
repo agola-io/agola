@@ -29,7 +29,7 @@ import (
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -126,7 +126,7 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) 
 	org.CreatedAt = time.Now()
 	orgj, err := json.Marshal(org)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal org")
+		return nil, errors.Errorf("failed to marshal org: %w", err)
 	}
 	actions = append(actions, &datamanager.Action{
 		ActionType: datamanager.ActionTypePut,
@@ -145,7 +145,7 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) 
 		}
 		orgmemberj, err := json.Marshal(orgmember)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to marshal project group")
+			return nil, errors.Errorf("failed to marshal project group: %w", err)
 		}
 		actions = append(actions, &datamanager.Action{
 			ActionType: datamanager.ActionTypePut,
@@ -167,7 +167,7 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) 
 	}
 	pgj, err := json.Marshal(pg)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal project group")
+		return nil, errors.Errorf("failed to marshal project group: %w", err)
 	}
 	actions = append(actions, &datamanager.Action{
 		ActionType: datamanager.ActionTypePut,
@@ -299,7 +299,7 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 	actions := []*datamanager.Action{}
 	orgmemberj, err := json.Marshal(orgmember)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal project group")
+		return nil, errors.Errorf("failed to marshal project group: %w", err)
 	}
 	actions = append(actions, &datamanager.Action{
 		ActionType: datamanager.ActionTypePut,

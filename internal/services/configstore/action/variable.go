@@ -26,7 +26,7 @@ import (
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -108,7 +108,7 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, variable *types.Vari
 
 	variablej, err := json.Marshal(variable)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal variable")
+		return nil, errors.Errorf("failed to marshal variable: %w", err)
 	}
 	actions := []*datamanager.Action{
 		{

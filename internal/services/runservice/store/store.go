@@ -32,7 +32,7 @@ import (
 	"github.com/sorintlab/agola/internal/services/runservice/types"
 	"github.com/sorintlab/agola/internal/util"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
 )
 
