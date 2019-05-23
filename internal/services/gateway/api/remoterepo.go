@@ -63,7 +63,6 @@ func (h *UserRemoteReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	userID := userIDVal.(string)
-	h.log.Infof("userID: %q", userID)
 
 	user, resp, err := h.configstoreClient.GetUser(ctx, userID)
 	if httpErrorFromRemote(w, resp, err) {
@@ -76,7 +75,6 @@ func (h *UserRemoteReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.log.Errorf("err: %+v", err)
 		return
 	}
-	h.log.Infof("rs: %s", util.Dump(rs))
 
 	var la *types.LinkedAccount
 	for _, v := range user.LinkedAccounts {
@@ -85,21 +83,25 @@ func (h *UserRemoteReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 			break
 		}
 	}
-	h.log.Infof("la: %s", util.Dump(la))
 	if la == nil {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("user doesn't have a linked account for remote source %q", rs.Name)))
+		err := util.NewErrBadRequest(errors.Errorf("user doesn't have a linked account for remote source %q", rs.Name))
+		httpError(w, err)
+		h.log.Errorf("err: %+v", err)
 		return
 	}
 
 	gitsource, err := h.ah.GetGitSource(ctx, rs, user.Name, la)
 	if err != nil {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("failed to create gitsource client: %w", err)))
+		httpError(w, err)
+		h.log.Errorf("err: %+v", err)
 		return
 	}
 
 	remoteRepos, err := gitsource.ListUserRepos()
 	if err != nil {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("failed to get user repositories from gitsource: %w", err)))
+		err := util.NewErrBadRequest(errors.Errorf("failed to get user repositories from git source: %w", err))
+		httpError(w, err)
+		h.log.Errorf("err: %+v", err)
 		return
 	}
 
