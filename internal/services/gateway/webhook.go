@@ -35,8 +35,8 @@ import (
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
 
-	errors "golang.org/x/xerrors"
 	"go.uber.org/zap"
+	errors "golang.org/x/xerrors"
 )
 
 const (
@@ -263,6 +263,8 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		"AGOLA_REPOSITORY_URL": cloneURL,
 		"AGOLA_GIT_HOST":       gitHost,
 		"AGOLA_GIT_PORT":       gitPort,
+		"AGOLA_GIT_BRANCH":     webhookData.Branch,
+		"AGOLA_GIT_TAG":        webhookData.Tag,
 		"AGOLA_GIT_REF":        webhookData.Ref,
 		"AGOLA_GIT_COMMITSHA":  webhookData.CommitSHA,
 	}
