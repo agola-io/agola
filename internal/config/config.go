@@ -776,6 +776,32 @@ func checkConfig(config *Config) error {
 		}
 	}
 
+	for _, run := range config.Runs {
+		for _, task := range run.Tasks {
+			for i, s := range task.Steps {
+				switch step := s.(type) {
+				// TODO(sgotti) we could use the run step command as step name but when the
+				// command is very long or multi line it doesn't makes sense and will
+				// probably be quite unuseful/confusing from an UI point of view
+				case *RunStep:
+					if step.Command == "" {
+						return errors.Errorf("no command defined for step %d (run) in task %q", i, task.Name)
+					}
+
+				case *SaveCacheStep:
+					if step.Key == "" {
+						return errors.Errorf("no key defined for step %d (save_cache) in task %q", i, task.Name)
+					}
+
+				case *RestoreCacheStep:
+					if len(step.Keys) == 0 {
+						return errors.Errorf("no keys defined for step %d (restore_cache) in task %q", i, task.Name)
+					}
+				}
+			}
+		}
+	}
+
 	// Set defaults
 	for _, registryAuth := range config.DockerRegistriesAuth {
 		if registryAuth.Type == "" {
