@@ -16,16 +16,20 @@ package testutil
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/url"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"strconv"
 	"sync"
 	"testing"
+	"text/template"
 	"time"
 
 	"agola.io/agola/internal/etcd"
@@ -337,6 +341,185 @@ func (te *TestEtcd) WaitDown(timeout time.Duration) error {
 	}
 
 	return fmt.Errorf("timeout")
+}
+
+const (
+	giteaAppIniTmpl = `
+APP_NAME = Gitea: Git with a cup of tea
+RUN_MODE = prod
+RUN_USER = {{ .User }}
+
+[repository]
+ROOT = {{ .Data }}/git/repositories
+
+[repository.local]
+LOCAL_COPY_PATH = {{ .Data }}/gitea/tmp/local-repo
+
+[repository.upload]
+TEMP_PATH = {{ .Data }}/gitea/uploads
+
+[server]
+APP_DATA_PATH    = {{ .Data }}/gitea
+SSH_DOMAIN       = {{ .ListenAddress }}
+HTTP_PORT        = {{ .HTTPPort }}
+ROOT_URL         = http://{{ .ListenAddress }}:{{ .HTTPPort }}/
+DISABLE_SSH      = false
+# Use built-in ssh server
+START_SSH_SERVER = true
+SSH_PORT         = {{ .SSHPort }}
+LFS_CONTENT_PATH = {{ .Data }}/git/lfs
+DOMAIN           = localhost
+LFS_START_SERVER = true
+LFS_JWT_SECRET   = PI0Tfn0OcYpzpNb_u11JdoUfDbsMa2x6paWH2ckMVrw
+OFFLINE_MODE     = false
+
+[database]
+PATH     = {{ .Data }}/gitea/gitea.db
+DB_TYPE  = sqlite3
+HOST     =
+NAME     =
+USER     =
+PASSWD   =
+SSL_MODE = disable
+
+[indexer]
+ISSUE_INDEXER_PATH = {{ .Data }}/gitea/indexers/issues.bleve
+
+[session]
+PROVIDER_CONFIG = {{ .Data }}/gitea/sessions
+PROVIDER        = file
+
+[picture]
+AVATAR_UPLOAD_PATH      = {{ .Data }}/gitea/avatars
+DISABLE_GRAVATAR        = false
+ENABLE_FEDERATED_AVATAR = true
+
+[attachment]
+PATH = {{ .Data }}/gitea/attachments
+
+[log]
+ROOT_PATH = {{ .Data }}/gitea/log
+MODE      = file
+LEVEL     = info
+
+[security]
+INSTALL_LOCK   = true
+SECRET_KEY     = vRCH8usxWj6e8JGBPBaqycpfVyWm079xC3P3k76YsjKbrgBmyHhQD9UyzRFICKBT
+INTERNAL_TOKEN = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYmYiOjE1NTc0MDI0MDZ9.27f4bakIxBIOoO48ORyLmbvpQprsJMEHLM6PyXIqB5g
+
+[service]
+DISABLE_REGISTRATION              = false
+REQUIRE_SIGNIN_VIEW               = false
+REGISTER_EMAIL_CONFIRM            = false
+ENABLE_NOTIFY_MAIL                = false
+ALLOW_ONLY_EXTERNAL_REGISTRATION  = false
+ENABLE_CAPTCHA                    = false
+DEFAULT_KEEP_EMAIL_PRIVATE        = false
+DEFAULT_ALLOW_CREATE_ORGANIZATION = true
+DEFAULT_ENABLE_TIMETRACKING       = true
+NO_REPLY_ADDRESS                  = noreply.example.org
+
+[oauth2]
+JWT_SECRET = hQdtj6H6lsd8vG6V1vCPYcOn8uP2C3i_bbnDozfCcIY
+
+[mailer]
+ENABLED = false
+
+[openid]
+ENABLE_OPENID_SIGNIN = true
+ENABLE_OPENID_SIGNUP = true
+    `
+)
+
+type GiteaConfig struct {
+	Data          string
+	User          string
+	ListenAddress string
+	HTTPPort      string
+	SSHPort       string
+}
+
+type TestGitea struct {
+	Process
+
+	GiteaPath     string
+	ConfigPath    string
+	ListenAddress string
+	HTTPPort      string
+	SSHPort       string
+}
+
+func NewTestGitea(t *testing.T, logger *zap.Logger, dir string, a ...string) (*TestGitea, error) {
+	u := uuid.NewV4()
+	uid := fmt.Sprintf("%x", u[:4])
+
+	giteaPath := os.Getenv("GITEA_PATH")
+	if giteaPath == "" {
+		t.Fatalf("env var GITEA_PATH is undefined")
+	}
+
+	curUser, err := user.Current()
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	giteaDir := filepath.Join(dir, "gitea")
+
+	_, httpPort, err := GetFreePort(true, false)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	listenAddress, sshPort, err := GetFreePort(true, false)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	giteaConfig := &GiteaConfig{
+		Data:          giteaDir,
+		User:          curUser.Username,
+		ListenAddress: listenAddress,
+		HTTPPort:      httpPort,
+		SSHPort:       sshPort,
+	}
+	tmpl, err := template.New("gitea").Parse(giteaAppIniTmpl)
+	if err != nil {
+		return nil, err
+	}
+	conf := &bytes.Buffer{}
+	if err := tmpl.Execute(conf, giteaConfig); err != nil {
+		return nil, err
+	}
+
+	if err := os.MkdirAll(filepath.Join(dir, "gitea", "conf"), 0775); err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "gitea", "log"), 0775); err != nil {
+		return nil, err
+	}
+	configPath := filepath.Join(dir, "gitea", "conf", "app.ini")
+	if err := ioutil.WriteFile(configPath, conf.Bytes(), 0664); err != nil {
+		return nil, err
+	}
+
+	args := []string{}
+	args = append(args, "web", "--config", configPath)
+
+	tgitea := &TestGitea{
+		Process: Process{
+			t:    t,
+			uid:  uid,
+			name: "gitea",
+			bin:  giteaPath,
+			args: args,
+		},
+		GiteaPath:     giteaPath,
+		ConfigPath:    configPath,
+		ListenAddress: listenAddress,
+		HTTPPort:      httpPort,
+		SSHPort:       sshPort,
+	}
+
+	return tgitea, nil
 }
 
 func testFreeTCPPort(port int) error {

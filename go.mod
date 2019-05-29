@@ -60,6 +60,8 @@ require (
 	golang.org/x/xerrors v0.0.0-20190513163551-3ee3066db522
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.42.0 // indirect
+	gopkg.in/src-d/go-billy.v4 v4.3.0
+	gopkg.in/src-d/go-git.v4 v4.10.0
 	gopkg.in/yaml.v2 v2.2.2
 	gotest.tools v2.2.0+incompatible // indirect
 	k8s.io/api v0.0.0-20190313235455-40a48860b5ab
