@@ -149,6 +149,9 @@ func (c *Client) GetUserInfo() (*gitsource.UserInfo, error) {
 
 func (c *Client) GetFile(repopath, commit, file string) ([]byte, error) {
 	f, _, err := c.client.RepositoryFiles.GetFile(repopath, file, &gitlab.GetFileOptions{Ref: gitlab.String(commit)})
+	if err != nil {
+		return nil, err
+	}
 	data, err := base64.StdEncoding.DecodeString(f.Content)
 	if err != nil {
 		return nil, err
