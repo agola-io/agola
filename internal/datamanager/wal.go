@@ -723,7 +723,7 @@ func (d *DataManager) checkpoint(ctx context.Context) error {
 		return nil
 	}
 
-	if err := d.writeData(ctx, walsData); err != nil {
+	if err := d.writeDataSnapshot(ctx, walsData); err != nil {
 		return errors.Errorf("checkpoint function error: %w", err)
 	}
 

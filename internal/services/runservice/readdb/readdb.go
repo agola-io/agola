@@ -660,44 +660,46 @@ func (r *ReadDB) SyncFromDump() (string, error) {
 		return "", nil
 	}
 	for dataType, files := range dumpIndex.Files {
-		dumpf, err := r.ost.ReadObject(files[0])
-		if err != nil {
-			return "", err
-		}
-		dumpEntries := []*datamanager.DataEntry{}
-		dec := json.NewDecoder(dumpf)
-		for {
-			var de *datamanager.DataEntry
-
-			err := dec.Decode(&de)
-			if err == io.EOF {
-				// all done
-				break
-			}
+		for _, file := range files {
+			dumpf, err := r.ost.ReadObject(datamanager.DataFilePath(dataType, file.ID))
 			if err != nil {
-				dumpf.Close()
 				return "", err
 			}
-			dumpEntries = append(dumpEntries, de)
-		}
-		dumpf.Close()
+			dumpEntries := []*datamanager.DataEntry{}
+			dec := json.NewDecoder(dumpf)
+			for {
+				var de *datamanager.DataEntry
 
-		err = r.rdb.Do(func(tx *db.Tx) error {
-			for _, de := range dumpEntries {
-				action := &datamanager.Action{
-					ActionType: datamanager.ActionTypePut,
-					ID:         de.ID,
-					DataType:   dataType,
-					Data:       de.Data,
+				err := dec.Decode(&de)
+				if err == io.EOF {
+					// all done
+					break
 				}
-				if err := r.applyAction(tx, action); err != nil {
-					return err
+				if err != nil {
+					dumpf.Close()
+					return "", err
 				}
+				dumpEntries = append(dumpEntries, de)
 			}
-			return nil
-		})
-		if err != nil {
-			return "", err
+			dumpf.Close()
+
+			err = r.rdb.Do(func(tx *db.Tx) error {
+				for _, de := range dumpEntries {
+					action := &datamanager.Action{
+						ActionType: datamanager.ActionTypePut,
+						ID:         de.ID,
+						DataType:   dataType,
+						Data:       de.Data,
+					}
+					if err := r.applyAction(tx, action); err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+			if err != nil {
+				return "", err
+			}
 		}
 	}
 
