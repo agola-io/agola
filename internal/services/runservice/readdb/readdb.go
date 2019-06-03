@@ -622,6 +622,11 @@ func (r *ReadDB) SyncObjectStorage(ctx context.Context) error {
 				return err
 			}
 
+			// update readdb only when the wal has been committed to etcd
+			if walElement.WalData.WalStatus != datamanager.WalStatusCommitted {
+				return nil
+			}
+
 			r.log.Debugf("applying wal to db")
 			if err := r.applyWal(tx, walElement.WalData.WalDataFileID); err != nil {
 				return err
@@ -923,7 +928,7 @@ func (r *ReadDB) handleWalEvent(tx *db.Tx, we *datamanager.WatchElement) error {
 	}
 
 	if we.WalData != nil {
-		// update readdb only when the wal has been committed to objectstorage
+		// update readdb only when the wal has been committed to etcd
 		if we.WalData.WalStatus != datamanager.WalStatusCommitted {
 			return nil
 		}
