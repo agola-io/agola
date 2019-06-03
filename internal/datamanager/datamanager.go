@@ -41,7 +41,7 @@ import (
 // wals/{walSeq}
 
 const (
-	DefaultCheckpointInterval   = 1 * time.Minute
+	DefaultCheckpointInterval   = 10 * time.Second
 	DefaultEtcdWalsKeepNum      = 100
 	DefaultMinCheckpointWalsNum = 100
 )
@@ -65,6 +65,8 @@ var (
 	etcdWalsDataKey                   = path.Join(etcdWalBaseDir, "walsdata")
 	etcdWalSeqKey                     = path.Join(etcdWalBaseDir, "walseq")
 	etcdLastCommittedStorageWalSeqKey = path.Join(etcdWalBaseDir, "lastcommittedstoragewalseq")
+
+	etcdCheckpointSeqKey = path.Join(etcdWalBaseDir, "checkpointseq")
 
 	etcdSyncLockKey       = path.Join(etcdWalBaseDir, "synclock")
 	etcdCheckpointLockKey = path.Join(etcdWalBaseDir, "checkpointlock")
@@ -91,6 +93,7 @@ type DataManagerConfig struct {
 	CheckpointInterval time.Duration
 	// MinCheckpointWalsNum is the minimum number of wals required before doing a checkpoint
 	MinCheckpointWalsNum int
+	MaxDataFileSize      int64
 }
 
 type DataManager struct {
@@ -103,6 +106,7 @@ type DataManager struct {
 	etcdWalsKeepNum      int
 	checkpointInterval   time.Duration
 	minCheckpointWalsNum int
+	maxDataFileSize      int64
 }
 
 func NewDataManager(ctx context.Context, logger *zap.Logger, conf *DataManagerConfig) (*DataManager, error) {
@@ -121,6 +125,9 @@ func NewDataManager(ctx context.Context, logger *zap.Logger, conf *DataManagerCo
 	if conf.MinCheckpointWalsNum < 1 {
 		return nil, errors.New("minCheckpointWalsNum must be greater than 0")
 	}
+	if conf.MaxDataFileSize == 0 {
+		conf.MaxDataFileSize = DefaultMaxDataFileSize
+	}
 
 	d := &DataManager{
 		basePath:             conf.BasePath,
@@ -132,6 +139,7 @@ func NewDataManager(ctx context.Context, logger *zap.Logger, conf *DataManagerCo
 		etcdWalsKeepNum:      conf.EtcdWalsKeepNum,
 		checkpointInterval:   conf.CheckpointInterval,
 		minCheckpointWalsNum: conf.MinCheckpointWalsNum,
+		maxDataFileSize:      conf.MaxDataFileSize,
 	}
 
 	// add trailing slash the basepath
