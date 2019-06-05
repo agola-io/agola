@@ -23,6 +23,7 @@ import (
 
 	"github.com/sorintlab/agola/internal/objectstorage/common"
 	"github.com/sorintlab/agola/internal/objectstorage/types"
+
 	errors "golang.org/x/xerrors"
 )
 
@@ -97,8 +98,9 @@ func (s *PosixStorage) WriteObject(p string, data io.Reader, size int64, persist
 	if err := os.MkdirAll(path.Dir(fspath), 0770); err != nil {
 		return err
 	}
+	lr := io.LimitReader(data, size)
 	return common.WriteFileAtomicFunc(fspath, s.dataDir, s.tmpDir, 0660, persist, func(f io.Writer) error {
-		_, err := io.Copy(f, data)
+		_, err := io.Copy(f, lr)
 		return err
 	})
 }
