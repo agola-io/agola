@@ -217,6 +217,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	oauth2callbackHandler := api.NewOAuth2CallbackHandler(logger, g.ah)
 
 	router := mux.NewRouter()
+	reposRouter := mux.NewRouter()
 
 	apirouter := mux.NewRouter().PathPrefix("/api/v1alpha").Subrouter().UseEncodedPath()
 
@@ -292,7 +293,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/badges/{projectref}", badgeHandler).Methods("GET")
 
 	// TODO(sgotti) add auth to these requests
-	router.Handle("/repos/{rest:.*}", reposHandler).Methods("GET", "POST")
+	reposRouter.Handle("/repos/{rest:.*}", reposHandler).Methods("GET", "POST")
 
 	router.Handle("/api/login", loginUserHandler).Methods("POST")
 	router.Handle("/api/authorize", authorizeHandler).Methods("POST")
@@ -305,6 +306,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	maxBytesHandler := handlers.NewMaxBytesHandler(router, 1024*1024)
 
 	mainrouter := mux.NewRouter()
+	mainrouter.PathPrefix("/repos/").Handler(corsHandler(reposRouter))
 	mainrouter.PathPrefix("/").Handler(corsHandler(maxBytesHandler))
 
 	var tlsConfig *tls.Config
