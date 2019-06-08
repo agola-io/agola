@@ -310,24 +310,24 @@ func TestParseOutput(t *testing.T) {
 								WorkingDir: defaultWorkingDir,
 								Shell:      "",
 								User:       "",
-								Steps: []interface{}{
-									&CloneStep{Step: Step{Type: "clone"}},
+								Steps: Steps{
+									&CloneStep{BaseStep: BaseStep{Type: "clone"}},
 									&RunStep{
-										Step: Step{
+										BaseStep: BaseStep{
 											Type: "run",
 											Name: "command01",
 										},
 										Command: "command01",
 									},
 									&RunStep{
-										Step: Step{
+										BaseStep: BaseStep{
 											Type: "run",
 											Name: "name different than command",
 										},
 										Command: "command02",
 									},
 									&RunStep{
-										Step: Step{
+										BaseStep: BaseStep{
 											Type: "run",
 											Name: "command03",
 										},
@@ -338,27 +338,27 @@ func TestParseOutput(t *testing.T) {
 										},
 									},
 									&SaveCacheStep{
-										Step:     Step{Type: "save_cache"},
+										BaseStep: BaseStep{Type: "save_cache"},
 										Key:      "cache-{{ arch }}",
 										Contents: []*SaveContent{&SaveContent{SourceDir: "/go/pkg/mod/cache", Paths: []string{"**"}}},
 									},
-									&CloneStep{Step: Step{Type: "clone"}},
+									&CloneStep{BaseStep: BaseStep{Type: "clone"}},
 									&RunStep{
-										Step: Step{
+										BaseStep: BaseStep{
 											Type: "run",
 											Name: "command01",
 										},
 										Command: "command01",
 									},
 									&RunStep{
-										Step: Step{
+										BaseStep: BaseStep{
 											Type: "run",
 											Name: "name different than command",
 										},
 										Command: "command02",
 									},
 									&RunStep{
-										Step: Step{
+										BaseStep: BaseStep{
 											Type: "run",
 											Name: "command03",
 										},
@@ -369,14 +369,14 @@ func TestParseOutput(t *testing.T) {
 										},
 									},
 									&SaveCacheStep{
-										Step:     Step{Type: "save_cache"},
+										BaseStep: BaseStep{Type: "save_cache"},
 										Key:      "cache-{{ arch }}",
 										Contents: []*SaveContent{&SaveContent{SourceDir: "/go/pkg/mod/cache", Paths: []string{"**"}}},
 									},
 								},
 								IgnoreFailure: false,
 								Approval:      false,
-								When: &types.When{
+								When: &When{
 									Branch: &types.WhenConditions{Include: []types.WhenCondition{{Match: "master"}}},
 									Tag:    &types.WhenConditions{Include: []types.WhenCondition{{Match: "v1.x"}, {Match: "v2.x"}}},
 									Ref: &types.WhenConditions{
@@ -401,8 +401,8 @@ func TestParseOutput(t *testing.T) {
 									},
 								},
 								WorkingDir: defaultWorkingDir,
-								Steps:      []interface{}{},
-								Depends:    []*Depend{},
+								Steps:      nil,
+								Depends:    nil,
 							},
 							&Task{
 								Name: "task03",
@@ -416,8 +416,8 @@ func TestParseOutput(t *testing.T) {
 									},
 								},
 								WorkingDir: defaultWorkingDir,
-								Steps:      []interface{}{},
-								Depends:    []*Depend{},
+								Steps:      nil,
+								Depends:    nil,
 							},
 							&Task{
 								Name: "task04",
@@ -431,8 +431,8 @@ func TestParseOutput(t *testing.T) {
 									},
 								},
 								WorkingDir: defaultWorkingDir,
-								Steps:      []interface{}{},
-								Depends:    []*Depend{},
+								Steps:      nil,
+								Depends:    nil,
 							},
 						},
 					},
