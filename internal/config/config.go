@@ -108,11 +108,11 @@ type Task struct {
 	WorkingDir           string                         `json:"working_dir"`
 	Shell                string                         `json:"shell"`
 	User                 string                         `json:"user"`
-	Steps                []interface{}                  `json:"steps"`
-	Depends              []*Depend                      `json:"depends"`
+	Steps                Steps                          `json:"steps"`
+	Depends              Depends                        `json:"depends"`
 	IgnoreFailure        bool                           `json:"ignore_failure"`
 	Approval             bool                           `json:"approval"`
-	When                 *types.When                    `json:"when"`
+	When                 *When                          `json:"when"`
 	DockerRegistriesAuth map[string]*DockerRegistryAuth `json:"docker_registries_auth"`
 }
 
@@ -124,22 +124,29 @@ const (
 	DependConditionOnSkipped DependCondition = "on_skipped"
 )
 
+type Depends []*Depend
+
 type Depend struct {
 	TaskName   string            `json:"task"`
 	Conditions []DependCondition `json:"conditions"`
 }
 
-type Step struct {
+type Step interface{}
+
+type Steps []Step
+
+type BaseStep struct {
 	Type string `json:"type"`
 	Name string `json:"name"`
+	When *When  `json:"when"`
 }
 
 type CloneStep struct {
-	Step `json:",inline"`
+	BaseStep `json:",inline"`
 }
 
 type RunStep struct {
-	Step        `json:",inline"`
+	BaseStep    `json:",inline"`
 	Command     string           `json:"command"`
 	Environment map[string]Value `json:"environment,omitempty"`
 	WorkingDir  string           `json:"working_dir"`
@@ -147,16 +154,26 @@ type RunStep struct {
 	User        string           `json:"user"`
 }
 
-type ValueType int
+type SaveToWorkspaceStep struct {
+	BaseStep `json:",inline"`
+	Contents []*SaveContent `json:"contents"`
+}
 
-const (
-	ValueTypeString ValueType = iota
-	ValueTypeFromVariable
-)
+type RestoreWorkspaceStep struct {
+	BaseStep `json:",inline"`
+	DestDir  string `json:"dest_dir"`
+}
 
-type Value struct {
-	Type  ValueType
-	Value string
+type SaveCacheStep struct {
+	BaseStep `json:",inline"`
+	Key      string         `json:"key"`
+	Contents []*SaveContent `json:"contents"`
+}
+
+type RestoreCacheStep struct {
+	BaseStep `json:",inline"`
+	Keys     []string `json:"keys"`
+	DestDir  string   `json:"dest_dir"`
 }
 
 type SaveContent struct {
@@ -165,141 +182,101 @@ type SaveContent struct {
 	Paths     []string `json:"paths"`
 }
 
-type SaveToWorkspaceStep struct {
-	Step     `json:",inline"`
-	Contents []*SaveContent `json:"contents"`
-}
-
-type RestoreWorkspaceStep struct {
-	Step    `json:",inline"`
-	DestDir string `json:"dest_dir"`
-}
-
-type SaveCacheStep struct {
-	Step     `json:",inline"`
-	Key      string         `json:"key"`
-	Contents []*SaveContent `json:"contents"`
-}
-
-type RestoreCacheStep struct {
-	Step    `json:",inline"`
-	Keys    []string `json:"keys"`
-	DestDir string   `json:"dest_dir"`
-}
-
-func (t *Task) UnmarshalJSON(b []byte) error {
-	type when struct {
-		Branch interface{} `json:"branch"`
-		Tag    interface{} `json:"tag"`
-		Ref    interface{} `json:"ref"`
-	}
-
-	type runtask struct {
-		Name                 string                         `json:"name"`
-		Runtime              *Runtime                       `json:"runtime"`
-		Environment          map[string]Value               `json:"environment,omitempty"`
-		WorkingDir           string                         `json:"working_dir"`
-		Shell                string                         `json:"shell"`
-		User                 string                         `json:"user"`
-		Steps                []map[string]interface{}       `json:"steps"`
-		Depends              []interface{}                  `json:"depends"`
-		IgnoreFailure        bool                           `json:"ignore_failure"`
-		Approval             bool                           `json:"approval"`
-		When                 *when                          `json:"when"`
-		DockerRegistriesAuth map[string]*DockerRegistryAuth `json:"docker_registries_auth"`
-	}
-
-	var tr *runtask
-
-	if err := json.Unmarshal(b, &tr); err != nil {
+func (s *Steps) UnmarshalJSON(b []byte) error {
+	var stepsRaw []json.RawMessage
+	if err := json.Unmarshal(b, &stepsRaw); err != nil {
 		return err
 	}
 
-	t.Name = tr.Name
-	t.Runtime = tr.Runtime
-	t.Environment = tr.Environment
-	t.WorkingDir = tr.WorkingDir
-	t.Shell = tr.Shell
-	t.User = tr.User
-	t.IgnoreFailure = tr.IgnoreFailure
-	t.Approval = tr.Approval
-	t.DockerRegistriesAuth = tr.DockerRegistriesAuth
+	steps := make(Steps, len(stepsRaw))
+	for i, stepRaw := range stepsRaw {
+		var step interface{}
 
-	steps := make([]interface{}, len(tr.Steps))
-	for i, stepEntry := range tr.Steps {
-		if _, ok := stepEntry["type"]; ok {
-			// handle default step definition using format { type: "steptype", other steps fields }
-			stepType, ok := stepEntry["type"].(string)
+		var stepMap map[string]json.RawMessage
+		if err := json.Unmarshal(stepRaw, &stepMap); err != nil {
+			return err
+		}
+		// handle default step definition using format { type: "steptype", other steps fields }
+		if _, ok := stepMap["type"]; ok {
+			var stepTypeI interface{}
+			if err := json.Unmarshal(stepMap["type"], &stepTypeI); err != nil {
+				return err
+			}
+			stepType, ok := stepTypeI.(string)
 			if !ok {
 				return errors.Errorf("step type at index %d must be a string", i)
 			}
-			o, err := json.Marshal(stepEntry)
-			if err != nil {
-				return err
-			}
+
 			switch stepType {
 			case "clone":
 				var s CloneStep
+				if err := json.Unmarshal(stepRaw, &s); err != nil {
+					return err
+				}
 				s.Type = stepType
-				steps[i] = &s
+				step = &s
 
 			case "run":
 				var s RunStep
-				if err := json.Unmarshal(o, &s); err != nil {
+				if err := json.Unmarshal(stepRaw, &s); err != nil {
 					return err
 				}
 				s.Type = stepType
-				steps[i] = &s
+				step = &s
 
 			case "save_to_workspace":
 				var s SaveToWorkspaceStep
-				if err := json.Unmarshal(o, &s); err != nil {
+				if err := json.Unmarshal(stepRaw, &s); err != nil {
 					return err
 				}
 				s.Type = stepType
-				steps[i] = &s
+				step = &s
 
 			case "restore_workspace":
 				var s RestoreWorkspaceStep
-				if err := json.Unmarshal(o, &s); err != nil {
+				if err := json.Unmarshal(stepRaw, &s); err != nil {
 					return err
 				}
 				s.Type = stepType
-				steps[i] = &s
+				step = &s
 
 			case "save_cache":
 				var s SaveCacheStep
-				if err := json.Unmarshal(o, &s); err != nil {
+				if err := json.Unmarshal(stepRaw, &s); err != nil {
 					return err
 				}
 				s.Type = stepType
-				steps[i] = &s
+				step = &s
 
 			case "restore_cache":
 				var s RestoreCacheStep
-				if err := json.Unmarshal(o, &s); err != nil {
+				if err := json.Unmarshal(stepRaw, &s); err != nil {
 					return err
 				}
 				s.Type = stepType
-				steps[i] = &s
+				step = &s
 			default:
 				return errors.Errorf("unknown step type: %s", stepType)
 			}
 		} else {
 			// handle simpler (for yaml not for json) steps definition using format "steptype": { stepSpecification }
-			if len(stepEntry) > 1 {
+			if len(stepMap) > 1 {
 				return errors.Errorf("wrong steps description at index %d: more than one step name per list entry", i)
 			}
-			for stepType, stepSpec := range stepEntry {
-				o, err := json.Marshal(stepSpec)
-				if err != nil {
+			for stepType, stepSpecRaw := range stepMap {
+				var stepSpec interface{}
+				if err := json.Unmarshal(stepSpecRaw, &stepSpec); err != nil {
 					return err
 				}
+
 				switch stepType {
 				case "clone":
 					var s CloneStep
+					if err := json.Unmarshal(stepSpecRaw, &s); err != nil {
+						return err
+					}
 					s.Type = stepType
-					steps[i] = &s
+					step = &s
 
 				case "run":
 					var s RunStep
@@ -307,62 +284,78 @@ func (t *Task) UnmarshalJSON(b []byte) error {
 					case string:
 						s.Command = stepSpec.(string)
 					default:
-						if err := json.Unmarshal(o, &s); err != nil {
+						if err := json.Unmarshal(stepSpecRaw, &s); err != nil {
 							return err
 						}
 					}
 					s.Type = stepType
-					steps[i] = &s
+					step = &s
 
 				case "save_to_workspace":
 					var s SaveToWorkspaceStep
-					if err := json.Unmarshal(o, &s); err != nil {
+					if err := json.Unmarshal(stepSpecRaw, &s); err != nil {
 						return err
 					}
 					s.Type = stepType
-					steps[i] = &s
+					step = &s
 
 				case "restore_workspace":
 					var s RestoreWorkspaceStep
-					if err := json.Unmarshal(o, &s); err != nil {
+					if err := json.Unmarshal(stepSpecRaw, &s); err != nil {
 						return err
 					}
 					s.Type = stepType
-					steps[i] = &s
+					step = &s
 
 				case "save_cache":
 					var s SaveCacheStep
-					if err := json.Unmarshal(o, &s); err != nil {
+					if err := json.Unmarshal(stepSpecRaw, &s); err != nil {
 						return err
 					}
 					s.Type = stepType
-					steps[i] = &s
+					step = &s
 
 				case "restore_cache":
 					var s RestoreCacheStep
-					if err := json.Unmarshal(o, &s); err != nil {
+					if err := json.Unmarshal(stepSpecRaw, &s); err != nil {
 						return err
 					}
 					s.Type = stepType
-					steps[i] = &s
+					step = &s
 				default:
 					return errors.Errorf("unknown step type: %s", stepType)
 				}
 			}
 		}
+
+		steps[i] = step
 	}
 
-	t.Steps = steps
+	*s = steps
 
-	depends := make([]*Depend, len(tr.Depends))
-	for i, dependEntry := range tr.Depends {
+	return nil
+}
+
+func (d *Depends) UnmarshalJSON(b []byte) error {
+	var dependsRaw []json.RawMessage
+
+	if err := json.Unmarshal(b, &dependsRaw); err != nil {
+		return err
+	}
+
+	depends := make([]*Depend, len(dependsRaw))
+	for i, dependRaw := range dependsRaw {
+		var dependi interface{}
+		if err := json.Unmarshal(dependRaw, &dependi); err != nil {
+			return err
+		}
 		var depend *Depend
 		isSimpler := false
-		switch de := dependEntry.(type) {
+		switch de := dependi.(type) {
 		// handle simpler (for yaml) depends definition using format "taskname":
 		case string:
 			depend = &Depend{
-				TaskName: dependEntry.(string),
+				TaskName: dependi.(string),
 			}
 		case map[string]interface{}:
 			if len(de) == 1 {
@@ -378,11 +371,7 @@ func (t *Task) UnmarshalJSON(b []byte) error {
 			}
 			if !isSimpler {
 				// handle default depends definition using format "task": "taskname", conditions: [ list of conditions ]
-				o, err := json.Marshal(dependEntry)
-				if err != nil {
-					return err
-				}
-				if err := json.Unmarshal(o, &depend); err != nil {
+				if err := json.Unmarshal(dependRaw, &depend); err != nil {
 					return err
 				}
 			} else {
@@ -392,11 +381,7 @@ func (t *Task) UnmarshalJSON(b []byte) error {
 				}
 				type deplist map[string][]DependCondition
 				var dl deplist
-				o, err := json.Marshal(dependEntry)
-				if err != nil {
-					return err
-				}
-				if err := json.Unmarshal(o, &dl); err != nil {
+				if err := json.Unmarshal(dependRaw, &dl); err != nil {
 					return err
 				}
 				if len(dl) != 1 {
@@ -416,38 +401,21 @@ func (t *Task) UnmarshalJSON(b []byte) error {
 		depends[i] = depend
 	}
 
-	t.Depends = depends
-
-	if tr.When != nil {
-		w := &types.When{}
-
-		var err error
-
-		if tr.When.Branch != nil {
-			w.Branch, err = parseWhenConditions(tr.When.Branch)
-			if err != nil {
-				return err
-			}
-		}
-
-		if tr.When.Tag != nil {
-			w.Tag, err = parseWhenConditions(tr.When.Tag)
-			if err != nil {
-				return err
-			}
-		}
-
-		if tr.When.Ref != nil {
-			w.Ref, err = parseWhenConditions(tr.When.Ref)
-			if err != nil {
-				return err
-			}
-		}
-
-		t.When = w
-	}
+	*d = depends
 
 	return nil
+}
+
+type ValueType int
+
+const (
+	ValueTypeString ValueType = iota
+	ValueTypeFromVariable
+)
+
+type Value struct {
+	Type  ValueType
+	Value string
 }
 
 func (val *Value) UnmarshalJSON(b []byte) error {
@@ -474,6 +442,46 @@ func (val *Value) UnmarshalJSON(b []byte) error {
 	default:
 		return errors.Errorf("unknown value format: %v", ival)
 	}
+	return nil
+}
+
+type When types.When
+
+type when struct {
+	Branch interface{} `json:"branch"`
+	Tag    interface{} `json:"tag"`
+	Ref    interface{} `json:"ref"`
+}
+
+func (w *When) UnmarshalJSON(b []byte) error {
+	var wi *when
+	if err := json.Unmarshal(b, &wi); err != nil {
+		return err
+	}
+
+	var err error
+
+	if wi.Branch != nil {
+		w.Branch, err = parseWhenConditions(wi.Branch)
+		if err != nil {
+			return err
+		}
+	}
+
+	if wi.Tag != nil {
+		w.Tag, err = parseWhenConditions(wi.Tag)
+		if err != nil {
+			return err
+		}
+	}
+
+	if wi.Ref != nil {
+		w.Ref, err = parseWhenConditions(wi.Ref)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

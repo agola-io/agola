@@ -19,11 +19,12 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/sorintlab/agola/internal/config"
 	rstypes "github.com/sorintlab/agola/internal/services/runservice/types"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
+
+	"github.com/google/go-cmp/cmp"
 	errors "golang.org/x/xerrors"
 )
 
@@ -673,23 +674,23 @@ func TestGenRunConfig(t *testing.T) {
 								WorkingDir: "",
 								Shell:      "",
 								User:       "",
-								Steps: []interface{}{
+								Steps: config.Steps{
 									&config.RunStep{
-										Step: config.Step{
+										BaseStep: config.BaseStep{
 											Type: "run",
 											Name: "command01",
 										},
 										Command: "command01",
 									},
 									&config.RunStep{
-										Step: config.Step{
+										BaseStep: config.BaseStep{
 											Type: "run",
 											Name: "name different than command",
 										},
 										Command: "command02",
 									},
 									&config.RunStep{
-										Step: config.Step{
+										BaseStep: config.BaseStep{
 											Type: "run",
 											Name: "command03",
 										},
@@ -704,7 +705,7 @@ func TestGenRunConfig(t *testing.T) {
 								Depends:       []*config.Depend{},
 								IgnoreFailure: false,
 								Approval:      false,
-								When: &types.When{
+								When: &config.When{
 									Branch: &types.WhenConditions{Include: []types.WhenCondition{{Match: "master"}}},
 									Tag:    &types.WhenConditions{Include: []types.WhenCondition{{Match: "v1.x"}, {Match: "v2.x"}}},
 									Ref: &types.WhenConditions{
@@ -781,9 +782,9 @@ func TestGenRunConfig(t *testing.T) {
 										},
 									},
 								},
-								Steps: []interface{}{
+								Steps: config.Steps{
 									&config.RunStep{
-										Step: config.Step{
+										BaseStep: config.BaseStep{
 											Type: "run",
 											Name: "command01",
 										},
@@ -867,9 +868,9 @@ func TestGenRunConfig(t *testing.T) {
 										},
 									},
 								},
-								Steps: []interface{}{
+								Steps: config.Steps{
 									&config.RunStep{
-										Step: config.Step{
+										BaseStep: config.BaseStep{
 											Type: "run",
 											Name: "command01",
 										},
