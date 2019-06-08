@@ -46,7 +46,7 @@ func TestRecreateRun(t *testing.T) {
 					Containers: []*types.Container{{Image: "image01"}},
 				},
 				Environment: map[string]string{},
-				Steps:       []interface{}{},
+				Steps:       types.Steps{},
 				Skip:        false,
 			},
 			inuuid("task02"): &types.RunConfigTask{
@@ -59,7 +59,7 @@ func TestRecreateRun(t *testing.T) {
 					Containers: []*types.Container{{Image: "image01"}},
 				},
 				Environment: map[string]string{},
-				Steps:       []interface{}{},
+				Steps:       types.Steps{},
 				Skip:        false,
 			},
 			inuuid("task03"): &types.RunConfigTask{
@@ -70,7 +70,7 @@ func TestRecreateRun(t *testing.T) {
 					Containers: []*types.Container{{Image: "image01"}},
 				},
 				Environment: map[string]string{},
-				Steps:       []interface{}{},
+				Steps:       types.Steps{},
 				Skip:        false,
 			},
 			inuuid("task04"): &types.RunConfigTask{
@@ -80,7 +80,7 @@ func TestRecreateRun(t *testing.T) {
 					Containers: []*types.Container{{Image: "image01"}},
 				},
 				Environment: map[string]string{},
-				Steps:       []interface{}{},
+				Steps:       types.Steps{},
 				Skip:        false,
 			},
 			inuuid("task05"): &types.RunConfigTask{
@@ -94,7 +94,7 @@ func TestRecreateRun(t *testing.T) {
 					Containers: []*types.Container{{Image: "image01"}},
 				},
 				Environment: map[string]string{},
-				Steps:       []interface{}{},
+				Steps:       types.Steps{},
 				Skip:        false,
 			},
 		},
@@ -111,7 +111,7 @@ func TestRecreateRun(t *testing.T) {
 					Containers: []*types.Container{{Image: "image01"}},
 				},
 				Environment: map[string]string{},
-				Steps:       []interface{}{},
+				Steps:       types.Steps{},
 				Skip:        false,
 			},
 			outuuid("task02"): &types.RunConfigTask{
@@ -124,7 +124,7 @@ func TestRecreateRun(t *testing.T) {
 					Containers: []*types.Container{{Image: "image01"}},
 				},
 				Environment: map[string]string{},
-				Steps:       []interface{}{},
+				Steps:       types.Steps{},
 				Skip:        false,
 			},
 			outuuid("task03"): &types.RunConfigTask{
@@ -135,7 +135,7 @@ func TestRecreateRun(t *testing.T) {
 					Containers: []*types.Container{{Image: "image01"}},
 				},
 				Environment: map[string]string{},
-				Steps:       []interface{}{},
+				Steps:       types.Steps{},
 				Skip:        false,
 			},
 			outuuid("task04"): &types.RunConfigTask{
@@ -145,7 +145,7 @@ func TestRecreateRun(t *testing.T) {
 					Containers: []*types.Container{{Image: "image01"}},
 				},
 				Environment: map[string]string{},
-				Steps:       []interface{}{},
+				Steps:       types.Steps{},
 				Skip:        false,
 			},
 			outuuid("task05"): &types.RunConfigTask{
@@ -159,7 +159,7 @@ func TestRecreateRun(t *testing.T) {
 					Containers: []*types.Container{{Image: "image01"}},
 				},
 				Environment: map[string]string{},
-				Steps:       []interface{}{},
+				Steps:       types.Steps{},
 				Skip:        false,
 			},
 		},

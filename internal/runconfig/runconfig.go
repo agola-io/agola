@@ -196,7 +196,7 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string
 	for _, ct := range cr.Tasks {
 		include := types.MatchWhen(whenFromConfigWhen(ct.When), branch, tag, ref)
 
-		steps := make([]interface{}, len(ct.Steps))
+		steps := make(rstypes.Steps, len(ct.Steps))
 		for i, cpts := range ct.Steps {
 			steps[i] = stepFromConfigStep(cpts, variables)
 		}

@@ -748,10 +748,10 @@ func TestGenRunConfig(t *testing.T) {
 						"ENV01":             "ENV01",
 						"ENVFROMVARIABLE01": "VARVALUE01",
 					},
-					Steps: []interface{}{
-						&rstypes.RunStep{Step: rstypes.Step{Type: "run", Name: "command01"}, Command: "command01", Environment: map[string]string{}},
-						&rstypes.RunStep{Step: rstypes.Step{Type: "run", Name: "name different than command"}, Command: "command02", Environment: map[string]string{}},
-						&rstypes.RunStep{Step: rstypes.Step{Type: "run", Name: "command03"}, Command: "command03", Environment: map[string]string{"ENV01": "ENV01", "ENVFROMVARIABLE01": "VARVALUE01"}},
+					Steps: rstypes.Steps{
+						&rstypes.RunStep{BaseStep: rstypes.BaseStep{Type: "run", Name: "command01"}, Command: "command01", Environment: map[string]string{}},
+						&rstypes.RunStep{BaseStep: rstypes.BaseStep{Type: "run", Name: "name different than command"}, Command: "command02", Environment: map[string]string{}},
+						&rstypes.RunStep{BaseStep: rstypes.BaseStep{Type: "run", Name: "command03"}, Command: "command03", Environment: map[string]string{"ENV01": "ENV01", "ENVFROMVARIABLE01": "VARVALUE01"}},
 					},
 					Skip: true,
 				},
@@ -820,8 +820,8 @@ func TestGenRunConfig(t *testing.T) {
 						},
 					},
 					Environment: map[string]string{},
-					Steps: []interface{}{
-						&rstypes.RunStep{Step: rstypes.Step{Type: "run", Name: "command01"}, Command: "command01", Environment: map[string]string{}},
+					Steps: rstypes.Steps{
+						&rstypes.RunStep{BaseStep: rstypes.BaseStep{Type: "run", Name: "command01"}, Command: "command01", Environment: map[string]string{}},
 					},
 				},
 			},
@@ -917,8 +917,8 @@ func TestGenRunConfig(t *testing.T) {
 						},
 					},
 					Environment: map[string]string{},
-					Steps: []interface{}{
-						&rstypes.RunStep{Step: rstypes.Step{Type: "run", Name: "command01"}, Command: "command01", Environment: map[string]string{}},
+					Steps: rstypes.Steps{
+						&rstypes.RunStep{BaseStep: rstypes.BaseStep{Type: "run", Name: "command01"}, Command: "command01", Environment: map[string]string{}},
 					},
 				},
 			},

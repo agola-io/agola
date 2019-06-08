@@ -326,7 +326,7 @@ type RunConfigTask struct {
 	WorkingDir           string                          `json:"working_dir,omitempty"`
 	Shell                string                          `json:"shell,omitempty"`
 	User                 string                          `json:"user,omitempty"`
-	Steps                []interface{}                   `json:"steps,omitempty"`
+	Steps                Steps                           `json:"steps,omitempty"`
 	IgnoreFailure        bool                            `json:"ignore_failure,omitempty"`
 	NeedsApproval        bool                            `json:"needs_approval,omitempty"`
 	Skip                 bool                            `json:"skip,omitempty"`
@@ -378,75 +378,17 @@ type Runtime struct {
 	Containers []*Container `json:"containers,omitempty"`
 }
 
-func (rct *RunConfigTask) UnmarshalJSON(b []byte) error {
-	type rctask RunConfigTask
+type Step interface{}
 
-	type task struct {
-		Steps []json.RawMessage `json:"steps,omitempty"`
-	}
+type Steps []Step
 
-	rctt := (*rctask)(rct)
-	if err := json.Unmarshal(b, &rctt); err != nil {
-		return err
-	}
-
-	var st task
-	if err := json.Unmarshal(b, &st); err != nil {
-		return err
-	}
-
-	steps := make([]interface{}, len(st.Steps))
-	for i, step := range st.Steps {
-		var bs Step
-		if err := json.Unmarshal(step, &bs); err != nil {
-			return err
-		}
-		switch bs.Type {
-		case "run":
-			var s RunStep
-			if err := json.Unmarshal(step, &s); err != nil {
-				return err
-			}
-			steps[i] = &s
-		case "save_to_workspace":
-			var s SaveToWorkspaceStep
-			if err := json.Unmarshal(step, &s); err != nil {
-				return err
-			}
-			steps[i] = &s
-		case "restore_workspace":
-			var s RestoreWorkspaceStep
-			if err := json.Unmarshal(step, &s); err != nil {
-				return err
-			}
-			steps[i] = &s
-		case "save_cache":
-			var s SaveCacheStep
-			if err := json.Unmarshal(step, &s); err != nil {
-				return err
-			}
-			steps[i] = &s
-		case "restore_cache":
-			var s RestoreCacheStep
-			if err := json.Unmarshal(step, &s); err != nil {
-				return err
-			}
-			steps[i] = &s
-		}
-	}
-
-	rct.Steps = steps
-
-	return nil
-}
-
-type Step struct {
+type BaseStep struct {
 	Type string `json:"type,omitempty"`
 	Name string `json:"name,omitempty"`
 }
 
 type RunStep struct {
-	Step
+	BaseStep
 	Command     string            `json:"command,omitempty"`
 	Environment map[string]string `json:"environment,omitempty"`
 	WorkingDir  string            `json:"working_dir,omitempty"`
@@ -461,23 +403,23 @@ type SaveContent struct {
 }
 
 type SaveToWorkspaceStep struct {
-	Step
+	BaseStep
 	Contents []SaveContent `json:"contents,omitempty"`
 }
 
 type RestoreWorkspaceStep struct {
-	Step
+	BaseStep
 	DestDir string `json:"dest_dir,omitempty"`
 }
 
 type SaveCacheStep struct {
-	Step
+	BaseStep
 	Key      string        `json:"key,omitempty"`
 	Contents []SaveContent `json:"contents,omitempty"`
 }
 
 type RestoreCacheStep struct {
-	Step
+	BaseStep
 	Keys    []string `json:"keys,omitempty"`
 	DestDir string   `json:"dest_dir,omitempty"`
 }
@@ -512,7 +454,7 @@ type ExecutorTask struct {
 
 	DockerRegistriesAuth map[string]DockerRegistryAuth `json:"docker_registries_auth"`
 
-	Steps []interface{} `json:"steps,omitempty"`
+	Steps Steps `json:"steps,omitempty"`
 
 	Status     ExecutorTaskStatus `json:"status,omitempty"`
 	SetupError string             `fail_reason:"setup_error,omitempty"`
@@ -562,26 +504,17 @@ type WorkspaceOperation struct {
 	Overwrite bool   `json:"overwrite,omitempty"`
 }
 
-func (et *ExecutorTask) UnmarshalJSON(b []byte) error {
-	type etask ExecutorTask
+func (et *Steps) UnmarshalJSON(b []byte) error {
+	type rawSteps []json.RawMessage
 
-	type task struct {
-		Steps []json.RawMessage `json:"steps,omitempty"`
-	}
-
-	ett := (*etask)(et)
-	if err := json.Unmarshal(b, &ett); err != nil {
+	var rs rawSteps
+	if err := json.Unmarshal(b, &rs); err != nil {
 		return err
 	}
 
-	var st task
-	if err := json.Unmarshal(b, &st); err != nil {
-		return err
-	}
-
-	steps := make([]interface{}, len(ett.Steps))
-	for i, step := range st.Steps {
-		var bs Step
+	steps := make(Steps, len(rs))
+	for i, step := range rs {
+		var bs BaseStep
 		if err := json.Unmarshal(step, &bs); err != nil {
 			return err
 		}
@@ -619,7 +552,7 @@ func (et *ExecutorTask) UnmarshalJSON(b []byte) error {
 		}
 	}
 
-	et.Steps = steps
+	*et = steps
 
 	return nil
 }

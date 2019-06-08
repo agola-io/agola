@@ -35,7 +35,7 @@ func TestAdvanceRunTasks(t *testing.T) {
 					Containers: []*types.Container{{Image: "image01"}},
 				},
 				Environment: map[string]string{},
-				Steps:       []interface{}{},
+				Steps:       types.Steps{},
 				Skip:        false,
 			},
 			"task02": &types.RunConfigTask{
@@ -48,7 +48,7 @@ func TestAdvanceRunTasks(t *testing.T) {
 					Containers: []*types.Container{{Image: "image01"}},
 				},
 				Environment: map[string]string{},
-				Steps:       []interface{}{},
+				Steps:       types.Steps{},
 				Skip:        false,
 			},
 			"task03": &types.RunConfigTask{
@@ -59,7 +59,7 @@ func TestAdvanceRunTasks(t *testing.T) {
 					Containers: []*types.Container{{Image: "image01"}},
 				},
 				Environment: map[string]string{},
-				Steps:       []interface{}{},
+				Steps:       types.Steps{},
 				Skip:        false,
 			},
 			"task04": &types.RunConfigTask{
@@ -69,7 +69,7 @@ func TestAdvanceRunTasks(t *testing.T) {
 					Containers: []*types.Container{{Image: "image01"}},
 				},
 				Environment: map[string]string{},
-				Steps:       []interface{}{},
+				Steps:       types.Steps{},
 				Skip:        false,
 			},
 			"task05": &types.RunConfigTask{
@@ -83,7 +83,7 @@ func TestAdvanceRunTasks(t *testing.T) {
 					Containers: []*types.Container{{Image: "image01"}},
 				},
 				Environment: map[string]string{},
-				Steps:       []interface{}{},
+				Steps:       types.Steps{},
 				Skip:        false,
 			},
 		},
@@ -383,7 +383,7 @@ func TestGetTasksToRun(t *testing.T) {
 					Containers: []*types.Container{{Image: "image01"}},
 				},
 				Environment: map[string]string{},
-				Steps:       []interface{}{},
+				Steps:       types.Steps{},
 				Skip:        false,
 			},
 			"task02": &types.RunConfigTask{
@@ -396,7 +396,7 @@ func TestGetTasksToRun(t *testing.T) {
 					Containers: []*types.Container{{Image: "image01"}},
 				},
 				Environment: map[string]string{},
-				Steps:       []interface{}{},
+				Steps:       types.Steps{},
 				Skip:        false,
 			},
 			"task03": &types.RunConfigTask{
@@ -407,7 +407,7 @@ func TestGetTasksToRun(t *testing.T) {
 					Containers: []*types.Container{{Image: "image01"}},
 				},
 				Environment: map[string]string{},
-				Steps:       []interface{}{},
+				Steps:       types.Steps{},
 				Skip:        false,
 			},
 			"task04": &types.RunConfigTask{
@@ -417,7 +417,7 @@ func TestGetTasksToRun(t *testing.T) {
 					Containers: []*types.Container{{Image: "image01"}},
 				},
 				Environment: map[string]string{},
-				Steps:       []interface{}{},
+				Steps:       types.Steps{},
 				Skip:        false,
 			},
 			"task05": &types.RunConfigTask{
@@ -431,7 +431,7 @@ func TestGetTasksToRun(t *testing.T) {
 					Containers: []*types.Container{{Image: "image01"}},
 				},
 				Environment: map[string]string{},
-				Steps:       []interface{}{},
+				Steps:       types.Steps{},
 				Skip:        false,
 			},
 		},
