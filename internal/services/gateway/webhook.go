@@ -50,6 +50,8 @@ const (
 	AnnotationProjectID = "projectid"
 	AnnotationUserID    = "userid"
 
+	AnnotationRunCreationTrigger = "run_creation_trigger"
+
 	AnnotationCommitSHA   = "commit_sha"
 	AnnotationRef         = "ref"
 	AnnotationSender      = "sender"
@@ -262,14 +264,15 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 	refType := common.WebHookEventToRunRefType(webhookData.Event)
 
 	annotations := map[string]string{
-		AnnotationRunType:     string(runType),
-		AnnotationRefType:     string(refType),
-		AnnotationCommitSHA:   webhookData.CommitSHA,
-		AnnotationRef:         webhookData.Ref,
-		AnnotationSender:      webhookData.Sender,
-		AnnotationMessage:     webhookData.Message,
-		AnnotationCommitLink:  webhookData.CommitLink,
-		AnnotationCompareLink: webhookData.CompareLink,
+		AnnotationRunType:            string(runType),
+		AnnotationRefType:            string(refType),
+		AnnotationRunCreationTrigger: string(types.RunCreationTriggerTypeWebhook),
+		AnnotationCommitSHA:          webhookData.CommitSHA,
+		AnnotationRef:                webhookData.Ref,
+		AnnotationSender:             webhookData.Sender,
+		AnnotationMessage:            webhookData.Message,
+		AnnotationCommitLink:         webhookData.CommitLink,
+		AnnotationCompareLink:        webhookData.CompareLink,
 	}
 
 	if runType == types.RunTypeProject {

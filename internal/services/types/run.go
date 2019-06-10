@@ -28,3 +28,9 @@ const (
 	RunRefTypeTag         RunRefType = "tag"
 	RunRefTypePullRequest RunRefType = "pull_request"
 )
+
+type RunCreationTriggerType string
+
+const (
+	RunCreationTriggerTypeWebhook RunCreationTriggerType = "webhook"
+)
