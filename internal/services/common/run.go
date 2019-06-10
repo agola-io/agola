@@ -39,19 +39,23 @@ const (
 	ApproversAnnotation = "approvers"
 )
 
-func GenRunGroup(baseGroupType GroupType, baseGroupID string, webhookData *types.WebhookData) string {
-	// we pathescape the branch name to handle branches with slashes and make the
-	// branch a single path entry
-	switch webhookData.Event {
+func WebHookEventToRunRefType(we types.WebhookEvent) types.RunRefType {
+	switch we {
 	case types.WebhookEventPush:
-		return path.Join("/", string(baseGroupType), baseGroupID, string(GroupTypeBranch), url.PathEscape(webhookData.Branch))
+		return types.RunRefTypeBranch
 	case types.WebhookEventTag:
-		return path.Join("/", string(baseGroupType), baseGroupID, string(GroupTypeTag), url.PathEscape(webhookData.Tag))
+		return types.RunRefTypeTag
 	case types.WebhookEventPullRequest:
-		return path.Join("/", string(baseGroupType), baseGroupID, string(GroupTypePullRequest), url.PathEscape(webhookData.PullRequestID))
+		return types.RunRefTypePullRequest
 	}
 
-	panic(fmt.Errorf("invalid webhook event type: %q", webhookData.Event))
+	panic(fmt.Errorf("invalid webhook event type: %q", we))
+}
+
+func GenRunGroup(baseGroupType GroupType, baseGroupID string, groupType GroupType, group string) string {
+	// we pathescape the branch name to handle branches with slashes and make the
+	// branch a single path entry
+	return path.Join("/", string(baseGroupType), baseGroupID, string(groupType), url.PathEscape(group))
 }
 
 func GroupTypeIDFromRunGroup(group string) (GroupType, string, error) {

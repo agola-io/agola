@@ -22,13 +22,6 @@ const (
 	WebhookEventPullRequest WebhookEvent = "pull_request"
 )
 
-type RunType string
-
-const (
-	RunTypeProject RunType = "project"
-	RunTypeUser    RunType = "user"
-)
-
 type WebhookData struct {
 	Event     WebhookEvent `json:"event,omitempty"`
 	ProjectID string       `json:"project_id,omitempty"`

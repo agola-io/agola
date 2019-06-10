@@ -90,28 +90,30 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		return http.StatusBadRequest, "", errors.Errorf("bad webhook url %q. Missing projectid or userid", r.URL)
 	}
 
-	isUserBuild := false
+	runType := types.RunTypeProject
 	if projectID == "" {
-		isUserBuild = true
+		runType = types.RunTypeUser
 	}
 
 	defer r.Body.Close()
 
+	var project *types.Project
+	var user *types.User
 	var webhookData *types.WebhookData
 	var sshPrivKey string
 	var cloneURL string
 	var sshHostKey string
 	var skipSSHHostKeyCheck bool
-	var runType types.RunType
 	variables := map[string]string{}
 
 	var gitSource gitsource.GitSource
-	if !isUserBuild {
-		project, _, err := h.configstoreClient.GetProject(ctx, projectID)
+	if runType == types.RunTypeProject {
+		csProject, _, err := h.configstoreClient.GetProject(ctx, projectID)
 		if err != nil {
 			return http.StatusBadRequest, "", errors.Errorf("failed to get project %s: %w", projectID, err)
 		}
 		h.log.Infof("project: %s", util.Dump(project))
+		project = csProject.Project
 
 		user, _, err := h.configstoreClient.GetUserByLinkedAccount(ctx, project.LinkedAccountID)
 		if err != nil {
@@ -209,12 +211,11 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 			return 0, "", nil
 		}
 
-		user, _, err := h.configstoreClient.GetUser(ctx, userID)
+		user, _, err = h.configstoreClient.GetUser(ctx, userID)
 		if err != nil {
 			return http.StatusBadRequest, "", errors.Errorf("failed to get user with id %q: %w", userID, err)
 		}
 		h.log.Debugf("user: %s", util.Dump(user))
-		userID = user.ID
 
 		cloneURL = fmt.Sprintf("%s/%s", h.apiExposedURL+"/repos", webhookData.Repo.Path)
 		runType = types.RunTypeUser
@@ -269,7 +270,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		AnnotationCompareLink: webhookData.CompareLink,
 	}
 
-	if !isUserBuild {
+	if runType == types.RunTypeProject {
 		annotations[AnnotationProjectID] = webhookData.ProjectID
 	} else {
 		annotations[AnnotationUserID] = userID
@@ -288,14 +289,36 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		annotations[AnnotationPullRequestLink] = webhookData.PullRequestLink
 	}
 
+	var baseGroupType common.GroupType
+	var baseGroupID string
+	var groupType common.GroupType
 	var group string
-	if !isUserBuild {
-		group = common.GenRunGroup(common.GroupTypeProject, webhookData.ProjectID, webhookData)
+
+	refType := common.WebHookEventToRunRefType(webhookData.Event)
+
+	if runType == types.RunTypeProject {
+		baseGroupType = common.GroupTypeProject
+		baseGroupID = project.ID
 	} else {
-		group = common.GenRunGroup(common.GroupTypeUser, userID, webhookData)
+		baseGroupType = common.GroupTypeUser
+		baseGroupID = user.ID
 	}
 
-	if err := h.createRuns(ctx, filename, data, group, annotations, env, variables, webhookData); err != nil {
+	switch refType {
+	case types.RunRefTypeBranch:
+		groupType = common.GroupTypeBranch
+		group = webhookData.Branch
+	case types.RunRefTypeTag:
+		groupType = common.GroupTypeTag
+		group = webhookData.Tag
+	case types.RunRefTypePullRequest:
+		groupType = common.GroupTypePullRequest
+		group = webhookData.PullRequestID
+	}
+
+	runGroup := common.GenRunGroup(baseGroupType, baseGroupID, groupType, group)
+
+	if err := h.createRuns(ctx, filename, data, runGroup, annotations, env, variables, webhookData); err != nil {
 		return http.StatusInternalServerError, "", errors.Errorf("failed to create run: %w", err)
 	}
 	//if err := gitSource.CreateStatus(webhookData.Repo.Owner, webhookData.Repo.Name, webhookData.CommitSHA, gitsource.CommitStatusPending, "localhost:8080", "build %s", "agola"); err != nil {
@@ -327,7 +350,7 @@ func (h *webhooksHandler) fetchConfigFiles(gitSource gitsource.GitSource, webhoo
 	return data, filename, nil
 }
 
-func (h *webhooksHandler) createRuns(ctx context.Context, filename string, configData []byte, group string, annotations, staticEnv, variables map[string]string, webhookData *types.WebhookData) error {
+func (h *webhooksHandler) createRuns(ctx context.Context, filename string, configData []byte, runGroup string, annotations, staticEnv, variables map[string]string, webhookData *types.WebhookData) error {
 	setupErrors := []string{}
 
 	var configFormat config.ConfigFormat
@@ -349,7 +372,7 @@ func (h *webhooksHandler) createRuns(ctx context.Context, filename string, confi
 		setupErrors = append(setupErrors, err.Error())
 		createRunReq := &rsapi.RunCreateRequest{
 			RunConfigTasks:    nil,
-			Group:             group,
+			Group:             runGroup,
 			SetupErrors:       setupErrors,
 			Name:              rstypes.RunGenericSetupErrorName,
 			StaticEnvironment: staticEnv,
@@ -367,10 +390,10 @@ func (h *webhooksHandler) createRuns(ctx context.Context, filename string, confi
 		rcts := runconfig.GenRunConfigTasks(util.DefaultUUIDGenerator{}, config, run.Name, variables, webhookData.Branch, webhookData.Tag, webhookData.Ref)
 
 		h.log.Debugf("rcts: %s", util.Dump(rcts))
-		h.log.Infof("group: %s", group)
+		h.log.Infof("group: %s", runGroup)
 		createRunReq := &rsapi.RunCreateRequest{
 			RunConfigTasks:    rcts,
-			Group:             group,
+			Group:             runGroup,
 			SetupErrors:       setupErrors,
 			Name:              run.Name,
 			StaticEnvironment: staticEnv,
