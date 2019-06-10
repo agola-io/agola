@@ -52,8 +52,6 @@ const (
 	AnnotationRunType   = "runtype"
 	AnnotationProjectID = "projectid"
 	AnnotationUserID    = "userid"
-	// AnnotationVirtualBranch represent a "virtual branch": i.e a normal branch, a pr (with name pr-$prid), a tag (with name tag-tagname)
-	AnnotationVirtualBranch = "virtual_branch"
 
 	AnnotationCommitSHA   = "commit_sha"
 	AnnotationRef         = "ref"
@@ -69,19 +67,6 @@ const (
 	AnnotationPullRequestID   = "pull_request_id"
 	AnnotationPullRequestLink = "pull_request_link"
 )
-
-func genAnnotationVirtualBranch(webhookData *types.WebhookData) string {
-	switch webhookData.Event {
-	case types.WebhookEventPush:
-		return "branch-" + webhookData.Branch
-	case types.WebhookEventTag:
-		return "tag-" + webhookData.Tag
-	case types.WebhookEventPullRequest:
-		return "pr-" + webhookData.PullRequestID
-	}
-
-	panic(fmt.Errorf("invalid webhook event type: %q", webhookData.Event))
-}
 
 type webhooksHandler struct {
 	log               *zap.SugaredLogger
@@ -277,15 +262,14 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 	}
 
 	annotations := map[string]string{
-		AnnotationRunType:       string(runType),
-		AnnotationEventType:     string(webhookData.Event),
-		AnnotationVirtualBranch: genAnnotationVirtualBranch(webhookData),
-		AnnotationCommitSHA:     webhookData.CommitSHA,
-		AnnotationRef:           webhookData.Ref,
-		AnnotationSender:        webhookData.Sender,
-		AnnotationMessage:       webhookData.Message,
-		AnnotationCommitLink:    webhookData.CommitLink,
-		AnnotationCompareLink:   webhookData.CompareLink,
+		AnnotationRunType:     string(runType),
+		AnnotationEventType:   string(webhookData.Event),
+		AnnotationCommitSHA:   webhookData.CommitSHA,
+		AnnotationRef:         webhookData.Ref,
+		AnnotationSender:      webhookData.Sender,
+		AnnotationMessage:     webhookData.Message,
+		AnnotationCommitLink:  webhookData.CommitLink,
+		AnnotationCompareLink: webhookData.CompareLink,
 	}
 
 	if !isUserBuild {
