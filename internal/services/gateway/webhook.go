@@ -48,8 +48,8 @@ const (
 	agolaDefaultYamlConfigFile    = "config.yml"
 
 	// List of runs annotations
-	AnnotationEventType = "event_type"
-	AnnotationRunType   = "runtype"
+	AnnotationRunType   = "run_type"
+	AnnotationRefType   = "ref_type"
 	AnnotationProjectID = "projectid"
 	AnnotationUserID    = "userid"
 
@@ -262,9 +262,11 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 		env["AGOLA_SKIPSSHHOSTKEYCHECK"] = "1"
 	}
 
+	refType := common.WebHookEventToRunRefType(webhookData.Event)
+
 	annotations := map[string]string{
 		AnnotationRunType:     string(runType),
-		AnnotationEventType:   string(webhookData.Event),
+		AnnotationRefType:     string(refType),
 		AnnotationCommitSHA:   webhookData.CommitSHA,
 		AnnotationRef:         webhookData.Ref,
 		AnnotationSender:      webhookData.Sender,
@@ -296,8 +298,6 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) (int, string, error) {
 	var baseGroupID string
 	var groupType common.GroupType
 	var group string
-
-	refType := common.WebHookEventToRunRefType(webhookData.Event)
 
 	if runType == types.RunTypeProject {
 		baseGroupType = common.GroupTypeProject
