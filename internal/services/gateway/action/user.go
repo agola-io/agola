@@ -17,9 +17,12 @@ package action
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strings"
 	"time"
 
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
+	"github.com/sorintlab/agola/internal/gitsources/agolagit"
 	"github.com/sorintlab/agola/internal/services/common"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/types"
@@ -813,4 +816,50 @@ func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName 
 		return errors.Errorf("failed to delete user token: %w", ErrFromRemote(resp, err))
 	}
 	return nil
+}
+
+func (h *ActionHandler) UserCreateRun(ctx context.Context, repoPath, branch, commitSHA, message string) error {
+	curUserID := h.CurrentUserID(ctx)
+
+	user, resp, err := h.configstoreClient.GetUser(ctx, curUserID)
+	if err != nil {
+		return errors.Errorf("failed to get user %q: %w", curUserID, ErrFromRemote(resp, err))
+	}
+
+	// Verify that the repo is owned by the user
+	repoParts := strings.Split(repoPath, "/")
+	if len(repoParts) != 2 {
+		return util.NewErrBadRequest(errors.Errorf("wrong repo path: %q", repoPath))
+	}
+	if repoParts[0] != user.ID {
+		return util.NewErrUnauthorized(errors.Errorf("repo %q not owned", repoPath))
+	}
+
+	gitSource := agolagit.New(h.apiExposedURL + "/repos")
+	cloneURL := fmt.Sprintf("%s/%s.git", h.apiExposedURL+"/repos", repoPath)
+
+	req := &CreateRunRequest{
+		RunType:            types.RunTypeUser,
+		RefType:            types.RunRefTypeBranch,
+		RunCreationTrigger: types.RunCreationTriggerTypeManual,
+
+		Project:       nil,
+		User:          user,
+		RepoPath:      repoPath,
+		GitSource:     gitSource,
+		CommitSHA:     commitSHA,
+		Message:       message,
+		Branch:        branch,
+		Tag:           "",
+		PullRequestID: "",
+		Ref:           gitSource.BranchRef(branch),
+		CloneURL:      cloneURL,
+
+		CommitLink:      "",
+		BranchLink:      "",
+		TagLink:         "",
+		PullRequestLink: "",
+	}
+
+	return h.CreateRuns(ctx, req)
 }

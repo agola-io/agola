@@ -603,3 +603,40 @@ func (h *LoginUserHandler) loginUser(ctx context.Context, req *LoginUserRequest)
 	}
 	return resp, nil
 }
+
+type UserCreateRunRequest struct {
+	RepoPath  string `json:"repo_path,omitempty"`
+	Branch    string `json:"branch,omitempty"`
+	CommitSHA string `json:"commit_sha,omitempty"`
+	Message   string `json:"message,omitempty"`
+}
+
+type UserCreateRunHandler struct {
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
+}
+
+func NewUserCreateRunHandler(logger *zap.Logger, ah *action.ActionHandler) *UserCreateRunHandler {
+	return &UserCreateRunHandler{log: logger.Sugar(), ah: ah}
+}
+
+func (h *UserCreateRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var req UserCreateRunRequest
+	d := json.NewDecoder(r.Body)
+	if err := d.Decode(&req); err != nil {
+		httpError(w, util.NewErrBadRequest(err))
+		return
+	}
+
+	err := h.ah.UserCreateRun(ctx, req.RepoPath, req.Branch, req.CommitSHA, req.Message)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	if err := httpResponse(w, http.StatusCreated, nil); err != nil {
+		h.log.Errorf("err: %+v", err)
+	}
+}

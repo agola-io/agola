@@ -30,7 +30,10 @@ import (
 	errors "golang.org/x/xerrors"
 )
 
-var jsonContent = http.Header{"content-type": []string{"application/json"}}
+var (
+	branchRefPrefix = "refs/heads/"
+	tagRefPrefix    = "refs/tags/"
+)
 
 // Client represents a Gogs API client.
 type Client struct {
@@ -131,7 +134,7 @@ func (c *Client) GetRepoInfo(repopath string) (*gitsource.RepoInfo, error) {
 }
 
 func (c *Client) GetFile(repopath, commit, file string) ([]byte, error) {
-	resp, err := c.getResponse("GET", fmt.Sprintf("%s/raw/%s/%s", repopath, commit, file), nil, nil, nil)
+	resp, err := c.getResponse("GET", fmt.Sprintf("%s.git/raw/%s/%s", repopath, commit, file), nil, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -182,11 +185,11 @@ func (c *Client) GetCommit(repopath, commitSHA string) (*gitsource.Commit, error
 }
 
 func (c *Client) BranchRef(branch string) string {
-	return ""
+	return branchRefPrefix + branch
 }
 
 func (c *Client) TagRef(tag string) string {
-	return ""
+	return tagRefPrefix + tag
 }
 
 func (c *Client) PullRequestRef(prID string) string {

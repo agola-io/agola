@@ -282,6 +282,15 @@ func (c *Client) DeleteUser(ctx context.Context, userRef string) (*http.Response
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/users/%s", userRef), nil, jsonContent, nil)
 }
 
+func (c *Client) UserCreateRun(ctx context.Context, req *UserCreateRunRequest) (*http.Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.getResponse(ctx, "POST", "/user/createrun", nil, jsonContent, bytes.NewReader(reqj))
+}
+
 func (c *Client) CreateUserLA(ctx context.Context, userRef string, req *CreateUserLARequest) (*CreateUserLAResponse, *http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
