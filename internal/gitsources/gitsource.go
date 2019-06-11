@@ -73,6 +73,7 @@ type Oauth2Source interface {
 type RepoInfo struct {
 	ID           string
 	Path         string
+	HTMLURL      string
 	SSHCloneURL  string
 	HTTPCloneURL string
 }
