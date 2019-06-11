@@ -23,9 +23,8 @@ const (
 )
 
 type WebhookData struct {
-	Event     WebhookEvent `json:"event,omitempty"`
-	ProjectID string       `json:"project_id,omitempty"`
-	SSHURL    string       `json:"ssh_url"`
+	Event  WebhookEvent `json:"event,omitempty"`
+	SSHURL string       `json:"ssh_url"`
 
 	CompareLink string `json:"compare_link,omitempty"` // Compare link to remote git source
 	CommitLink  string `json:"commit_link,omitempty"`  // Commit link to remote git source
