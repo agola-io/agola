@@ -17,6 +17,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"path"
 
 	gitsave "github.com/sorintlab/agola/internal/git-save"
 	"github.com/sorintlab/agola/internal/services/gateway/api"
@@ -65,7 +66,7 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 
 	user, _, err := gwclient.GetCurrentUser(context.TODO())
 	if err != nil {
-		log.Fatalf("err: %v", err)
+		return err
 	}
 
 	// setup unique local git repo uuid
@@ -74,7 +75,7 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 	if repoUUID == "" {
 		repoUUID = uuid.NewV4().String()
 		if _, err := git.ConfigSet(context.Background(), "agola.repouuid", repoUUID); err != nil {
-			log.Fatalf("failed to set agola repo uid in git config: %v", err)
+			return fmt.Errorf("failed to set agola repo uid in git config: %v", err)
 		}
 	}
 
@@ -84,14 +85,30 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 	})
 
 	branch := "gitsavebranch-" + uuid.NewV4().String()
+	message := "agola direct run"
 
-	if _, err := gs.Save("agola direct run", branch); err != nil {
-		log.Fatalf("err: %v", err)
+	commitSHA, err := gs.Save(message, branch)
+	if err != nil {
+		return err
 	}
 
 	log.Infof("pushing branch")
+	repoPath := fmt.Sprintf("%s/%s", user.ID, repoUUID)
 	repoURL := fmt.Sprintf("%s/repos/%s/%s.git", gatewayURL, user.ID, repoUUID)
-	if err := gitsave.GitPush("", repoURL, "refs/gitsave/"+branch); err != nil {
+
+	// push to a branch with default branch refs "refs/heads/branch"
+	if err := gitsave.GitPush("", repoURL, fmt.Sprintf("%s:refs/heads/%s", path.Join(gs.RefsPrefix(), branch), branch)); err != nil {
+		return err
+	}
+
+	log.Infof("starting direct run")
+	req := &api.UserCreateRunRequest{
+		RepoPath:  repoPath,
+		Branch:    branch,
+		CommitSHA: commitSHA,
+		Message:   message,
+	}
+	if _, err := gwclient.UserCreateRun(context.TODO(), req); err != nil {
 		return err
 	}
 
