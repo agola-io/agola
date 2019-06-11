@@ -20,6 +20,7 @@ import (
 
 	gitsave "github.com/sorintlab/agola/internal/git-save"
 	"github.com/sorintlab/agola/internal/services/gateway/api"
+	"github.com/sorintlab/agola/internal/util"
 
 	uuid "github.com/satori/go.uuid"
 	"github.com/spf13/cobra"
@@ -67,6 +68,16 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 		log.Fatalf("err: %v", err)
 	}
 
+	// setup unique local git repo uuid
+	git := &util.Git{}
+	repoUUID, _ := git.ConfigGet(context.Background(), "agola.repouuid")
+	if repoUUID == "" {
+		repoUUID = uuid.NewV4().String()
+		if _, err := git.ConfigSet(context.Background(), "agola.repouuid", repoUUID); err != nil {
+			log.Fatalf("failed to set agola repo uid in git config: %v", err)
+		}
+	}
+
 	gs := gitsave.NewGitSave(logger, &gitsave.GitSaveConfig{
 		AddUntracked: directRunStartOpts.untracked,
 		AddIgnored:   directRunStartOpts.ignored,
@@ -79,7 +90,7 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 	}
 
 	log.Infof("pushing branch")
-	repoURL := fmt.Sprintf("%s/repos/%s/test.git", gatewayURL, user.ID)
+	repoURL := fmt.Sprintf("%s/repos/%s/%s.git", gatewayURL, user.ID, repoUUID)
 	if err := gitsave.GitPush("", repoURL, "refs/gitsave/"+branch); err != nil {
 		return err
 	}
