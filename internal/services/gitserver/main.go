@@ -19,7 +19,6 @@ import (
 	"crypto/tls"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -127,33 +126,6 @@ func Matcher(matchRegexp *regexp.Regexp) mux.MatcherFunc {
 	}
 }
 
-func (s *Gitserver) repoPostCreateFunc(githookPath, gatewayURL string) handlers.RepoPostCreateFunc {
-	return func(repoPath, repoAbsPath string) error {
-		f, err := os.OpenFile(filepath.Join(repoAbsPath, "hooks/post-receive"), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0760)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		log.Infof("creating post-receive hook: %s", repoAbsPath)
-		f.WriteString("#/bin/bash\n")
-		f.WriteString("while read oval nval ref; do\n")
-		f.WriteString(githookPath + " $oval $nval $ref\n")
-		f.WriteString("done\n")
-
-		parts := strings.Split(string(repoPath), "/")
-		if len(parts) != 2 {
-			return errors.Errorf("wrong repo path: %q", repoPath)
-		}
-		userID := parts[0]
-
-		git := &util.Git{GitDir: repoAbsPath}
-		git.ConfigSet(context.Background(), "agola.repo", repoPath)
-		git.ConfigSet(context.Background(), "agola.webhookURL", gatewayURL+"/webhooks?userid="+userID)
-
-		return nil
-	}
-}
-
 type Gitserver struct {
 	c *config.Gitserver
 }
@@ -163,26 +135,13 @@ func NewGitserver(c *config.Gitserver) (*Gitserver, error) {
 		level.SetLevel(zapcore.DebugLevel)
 	}
 
-	var err error
-	c.GithookPath, err = filepath.Abs(c.GithookPath)
-	if err != nil {
-		return nil, errors.Errorf("cannot find agola-git-hook absolute path: %w", err)
-	}
-	if c.GithookPath == "" {
-		path, err := exec.LookPath("agola-git-hook")
-		if err != nil {
-			return nil, errors.Errorf("cannot find \"agola-git-hook\" binaries in PATH, agola-githook path must be explicitly provided")
-		}
-		c.GithookPath = path
-	}
-
 	return &Gitserver{
 		c: c,
 	}, nil
 }
 
 func (s *Gitserver) Run(ctx context.Context) error {
-	gitSmartHandler := handlers.NewGitSmartHandler(logger, s.c.DataDir, true, repoAbsPath, s.repoPostCreateFunc(s.c.GithookPath, s.c.GatewayURL))
+	gitSmartHandler := handlers.NewGitSmartHandler(logger, s.c.DataDir, true, repoAbsPath, nil)
 	fetchFileHandler := handlers.NewFetchFileHandler(logger, s.c.DataDir, repoAbsPath)
 
 	router := mux.NewRouter()

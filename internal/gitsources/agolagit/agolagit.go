@@ -27,6 +27,7 @@ import (
 	"time"
 
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
+	"github.com/sorintlab/agola/internal/services/types"
 	errors "golang.org/x/xerrors"
 )
 
@@ -158,6 +159,10 @@ func (c *Client) UpdateDeployKey(repopath, title, pubKey string, readonly bool) 
 
 func (c *Client) CreateRepoWebhook(repopath, url, secret string) error {
 	return nil
+}
+
+func (c *Client) ParseWebhook(r *http.Request, secret string) (*types.WebhookData, error) {
+	return nil, nil
 }
 
 func (c *Client) DeleteRepoWebhook(repopath, u string) error {
