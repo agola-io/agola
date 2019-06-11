@@ -16,6 +16,7 @@ package githandler
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
@@ -173,6 +174,14 @@ func (h *GitSmartHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	git := &util.Git{GitDir: repoAbsPath}
 
+	body := r.Body
+	if r.Header.Get("Content-Encoding") == "gzip" {
+		body, err = gzip.NewReader(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
+	}
+
 	switch reqType {
 	case RequestTypeInfoRefs:
 		if h.createRepo && !exists {
@@ -206,7 +215,7 @@ func (h *GitSmartHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case RequestTypeUploadPack:
 		w.Header().Set("Content-Type", "application/x-git-upload-pack-result")
 
-		if err := gitService(ctx, w, r.Body, repoAbsPath, "upload-pack"); err != nil {
+		if err := gitService(ctx, w, body, repoAbsPath, "upload-pack"); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			// we cannot return any http error since the http header has already been written
 			h.log.Infof("git command error: %v", err)
@@ -214,7 +223,7 @@ func (h *GitSmartHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case RequestTypeReceivePack:
 		w.Header().Set("Content-Type", "application/x-git-receive-pack-result")
 
-		if err := gitService(ctx, w, r.Body, repoAbsPath, "receive-pack"); err != nil {
+		if err := gitService(ctx, w, body, repoAbsPath, "receive-pack"); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			// we cannot return any http error since the http header has already been written
 			h.log.Infof("git command error: %v", err)
