@@ -154,10 +154,12 @@ func (g *Git) ConfigGet(ctx context.Context, args ...string) (string, error) {
 	args = append([]string{"config", "--get", "--null"}, args...)
 	out, err := g.Output(ctx, nil, args...)
 
-	if exitError, ok := err.(*exec.ExitError); ok {
-		if waitStatus, ok := exitError.Sys().(syscall.WaitStatus); ok {
-			if waitStatus.ExitStatus() == 1 {
-				return "", &ErrGitKeyNotFound{Key: args[len(args)-1]}
+	if err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok {
+			if waitStatus, ok := exitError.Sys().(syscall.WaitStatus); ok {
+				if waitStatus.ExitStatus() == 1 {
+					return "", &ErrGitKeyNotFound{Key: args[len(args)-1]}
+				}
 			}
 		}
 		return "", err
@@ -170,10 +172,12 @@ func (g *Git) ConfigSet(ctx context.Context, args ...string) (string, error) {
 	args = append([]string{"config", "--null"}, args...)
 	out, err := g.Output(ctx, nil, args...)
 
-	if exitError, ok := err.(*exec.ExitError); ok {
-		if waitStatus, ok := exitError.Sys().(syscall.WaitStatus); ok {
-			if waitStatus.ExitStatus() == 1 {
-				return "", &ErrGitKeyNotFound{Key: args[len(args)-1]}
+	if err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok {
+			if waitStatus, ok := exitError.Sys().(syscall.WaitStatus); ok {
+				if waitStatus.ExitStatus() == 1 {
+					return "", &ErrGitKeyNotFound{Key: args[len(args)-1]}
+				}
 			}
 		}
 		return "", err
