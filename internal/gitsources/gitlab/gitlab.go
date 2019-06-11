@@ -21,7 +21,9 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
@@ -33,6 +35,11 @@ import (
 
 var (
 	GitlabOauth2Scopes = []string{"api"}
+
+	branchRefPrefix     = "refs/heads/"
+	tagRefPrefix        = "refs/tags/"
+	pullRequestRefRegex = regexp.MustCompile("refs/merge-requests/(.*)/head")
+	pullRequestRefFmt   = "refs/merge-requests/%s/head"
 )
 
 type Opts struct {
@@ -283,4 +290,101 @@ func fromGitlabRepo(rr *gitlab.Project) *gitsource.RepoInfo {
 		SSHCloneURL:  rr.SSHURLToRepo,
 		HTTPCloneURL: rr.HTTPURLToRepo,
 	}
+}
+
+// NOTE(sgotti) gitlab doesn't provide a get ref api
+func (c *Client) GetRef(repopath, ref string) (*gitsource.Ref, error) {
+	switch {
+	case strings.HasPrefix(ref, "refs/heads/"):
+
+		branch := strings.TrimPrefix(ref, "refs/heads/")
+		remoteBranch, _, err := c.client.Branches.GetBranch(repopath, branch)
+		if err != nil {
+			return nil, err
+		}
+
+		if err != nil {
+			return nil, err
+		}
+
+		return &gitsource.Ref{
+			Ref:       ref,
+			CommitSHA: remoteBranch.Commit.ID,
+		}, nil
+
+	case strings.HasPrefix(ref, "refs/tags/"):
+		tag := strings.TrimPrefix(ref, "refs/heads/")
+		remoteTag, _, err := c.client.Tags.GetTag(repopath, tag)
+		if err != nil {
+			return nil, err
+		}
+
+		if err != nil {
+			return nil, err
+		}
+
+		return &gitsource.Ref{
+			Ref:       ref,
+			CommitSHA: remoteTag.Commit.ID,
+		}, nil
+	default:
+		return nil, fmt.Errorf("unsupported ref: %s", ref)
+	}
+}
+
+func (c *Client) RefType(ref string) (gitsource.RefType, string, error) {
+	switch {
+	case strings.HasPrefix(ref, branchRefPrefix):
+		return gitsource.RefTypeBranch, strings.TrimPrefix(ref, branchRefPrefix), nil
+
+	case strings.HasPrefix(ref, tagRefPrefix):
+		return gitsource.RefTypeTag, strings.TrimPrefix(ref, tagRefPrefix), nil
+
+	case pullRequestRefRegex.MatchString(ref):
+		m := pullRequestRefRegex.FindStringSubmatch(ref)
+		return gitsource.RefTypePullRequest, m[0], nil
+
+	default:
+		return -1, "", fmt.Errorf("unsupported ref: %s", ref)
+	}
+}
+
+func (c *Client) GetCommit(repopath, commitSHA string) (*gitsource.Commit, error) {
+	commit, _, err := c.client.Commits.GetCommit(repopath, commitSHA, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return &gitsource.Commit{
+		SHA:     commit.ID,
+		Message: commit.Message,
+	}, nil
+}
+
+func (c *Client) BranchRef(branch string) string {
+	return branchRefPrefix + branch
+}
+
+func (c *Client) TagRef(tag string) string {
+	return tagRefPrefix + tag
+}
+
+func (c *Client) PullRequestRef(prID string) string {
+	return fmt.Sprintf(pullRequestRefFmt, prID)
+}
+
+func (c *Client) CommitLink(repoInfo *gitsource.RepoInfo, commitSHA string) string {
+	return fmt.Sprintf("%s/commit/%s", repoInfo.HTMLURL, commitSHA)
+}
+
+func (c *Client) BranchLink(repoInfo *gitsource.RepoInfo, branch string) string {
+	return fmt.Sprintf("%s/tree/%s", repoInfo.HTMLURL, branch)
+}
+
+func (c *Client) TagLink(repoInfo *gitsource.RepoInfo, tag string) string {
+	return fmt.Sprintf("%s/tree/%s", repoInfo.HTMLURL, tag)
+}
+
+func (c *Client) PullRequestLink(repoInfo *gitsource.RepoInfo, prID string) string {
+	return fmt.Sprintf("%s/merge_requests/%s", repoInfo.HTMLURL, prID)
 }

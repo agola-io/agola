@@ -168,3 +168,43 @@ func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource
 func (c *Client) ListUserRepos() ([]*gitsource.RepoInfo, error) {
 	return nil, nil
 }
+
+func (c *Client) GetRef(repopath, ref string) (*gitsource.Ref, error) {
+	return nil, nil
+}
+
+func (c *Client) RefType(ref string) (gitsource.RefType, string, error) {
+	return -1, "", nil
+}
+
+func (c *Client) GetCommit(repopath, commitSHA string) (*gitsource.Commit, error) {
+	return nil, nil
+}
+
+func (c *Client) BranchRef(branch string) string {
+	return ""
+}
+
+func (c *Client) TagRef(tag string) string {
+	return ""
+}
+
+func (c *Client) PullRequestRef(prID string) string {
+	return ""
+}
+
+func (c *Client) CommitLink(repoInfo *gitsource.RepoInfo, commitSHA string) string {
+	return ""
+}
+
+func (c *Client) BranchLink(repoInfo *gitsource.RepoInfo, branch string) string {
+	return ""
+}
+
+func (c *Client) TagLink(repoInfo *gitsource.RepoInfo, tag string) string {
+	return ""
+}
+
+func (c *Client) PullRequestLink(repoInfo *gitsource.RepoInfo, prID string) string {
+	return ""
+}

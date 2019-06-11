@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/http"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -45,6 +46,11 @@ const (
 var (
 	// gitea corrently doesn't have any auth scope
 	GiteaOauth2Scopes = []string{""}
+
+	branchRefPrefix     = "refs/heads/"
+	tagRefPrefix        = "refs/tags/"
+	pullRequestRefRegex = regexp.MustCompile("refs/pull/(.*)/head")
+	pullRequestRefFmt   = "refs/pull/%s/head"
 )
 
 type Opts struct {
@@ -396,4 +402,94 @@ func fromGiteaRepo(rr *gitea.Repository) *gitsource.RepoInfo {
 		SSHCloneURL:  rr.SSHURL,
 		HTTPCloneURL: rr.CloneURL,
 	}
+}
+
+func (c *Client) GetRef(repopath, ref string) (*gitsource.Ref, error) {
+	owner, reponame, err := parseRepoPath(repopath)
+	if err != nil {
+		return nil, err
+	}
+
+	remoteRef, err := c.client.GetRepoRef(owner, reponame, ref)
+	if err != nil {
+		return nil, err
+	}
+
+	return fromGiteaRef(remoteRef)
+}
+
+func fromGiteaRef(remoteRef *gitea.Reference) (*gitsource.Ref, error) {
+	t := remoteRef.Object.Type
+	switch t {
+	case "commit":
+	default:
+		return nil, fmt.Errorf("unsupported object type: %s", t)
+	}
+
+	return &gitsource.Ref{
+		Ref:       remoteRef.Ref,
+		CommitSHA: remoteRef.Object.SHA,
+	}, nil
+}
+
+func (c *Client) RefType(ref string) (gitsource.RefType, string, error) {
+	switch {
+	case strings.HasPrefix(ref, branchRefPrefix):
+		return gitsource.RefTypeBranch, strings.TrimPrefix(ref, branchRefPrefix), nil
+
+	case strings.HasPrefix(ref, tagRefPrefix):
+		return gitsource.RefTypeTag, strings.TrimPrefix(ref, tagRefPrefix), nil
+
+	case pullRequestRefRegex.MatchString(ref):
+		m := pullRequestRefRegex.FindStringSubmatch(ref)
+		return gitsource.RefTypePullRequest, m[0], nil
+
+	default:
+		return -1, "", fmt.Errorf("unsupported ref: %s", ref)
+	}
+}
+
+func (c *Client) GetCommit(repopath, commitSHA string) (*gitsource.Commit, error) {
+	owner, reponame, err := parseRepoPath(repopath)
+	if err != nil {
+		return nil, err
+	}
+
+	commit, err := c.client.GetSingleCommit(owner, reponame, commitSHA)
+	if err != nil {
+		return nil, err
+	}
+
+	return &gitsource.Commit{
+		SHA:     commit.SHA,
+		Message: commit.RepoCommit.Message,
+	}, nil
+}
+
+func (c *Client) BranchRef(branch string) string {
+	return branchRefPrefix + branch
+}
+
+func (c *Client) TagRef(tag string) string {
+	return tagRefPrefix + tag
+}
+
+func (c *Client) PullRequestRef(prID string) string {
+	return fmt.Sprintf(pullRequestRefFmt, prID)
+}
+
+func (c *Client) CommitLink(repoInfo *gitsource.RepoInfo, commitSHA string) string {
+	return fmt.Sprintf("%s/commit/%s", repoInfo.HTMLURL, commitSHA)
+}
+
+func (c *Client) BranchLink(repoInfo *gitsource.RepoInfo, branch string) string {
+	return fmt.Sprintf("%s/src/branch/%s", repoInfo.HTMLURL, branch)
+}
+
+func (c *Client) TagLink(repoInfo *gitsource.RepoInfo, tag string) string {
+	return fmt.Sprintf("%s/src/tag/%s", repoInfo.HTMLURL, tag)
+}
+
+func (c *Client) PullRequestLink(repoInfo *gitsource.RepoInfo, prID string) string {
+	return fmt.Sprintf("%s/pulls/%s", repoInfo.HTMLURL, prID)
 }

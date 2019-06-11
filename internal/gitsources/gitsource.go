@@ -45,6 +45,19 @@ type GitSource interface {
 	CreateCommitStatus(repopath, commitSHA string, status CommitStatus, targetURL, description, context string) error
 	// ListUserRepos report repos where the user has the permission to create deploy keys and webhooks
 	ListUserRepos() ([]*RepoInfo, error)
+	GetRef(repopath, ref string) (*Ref, error)
+	// RefType returns the ref type and the related name (branch, tag, pr id)
+	RefType(ref string) (RefType, string, error)
+	GetCommit(repopath, commitSHA string) (*Commit, error)
+
+	BranchRef(branch string) string
+	TagRef(tag string) string
+	PullRequestRef(prID string) string
+
+	CommitLink(repoInfo *RepoInfo, commitSHA string) string
+	BranchLink(repoInfo *RepoInfo, branch string) string
+	TagLink(repoInfo *RepoInfo, tag string) string
+	PullRequestLink(repoInfo *RepoInfo, prID string) string
 }
 
 type UserSource interface {
@@ -79,4 +92,22 @@ type UserInfo struct {
 	ID        string
 	LoginName string
 	Email     string
+}
+
+type RefType int
+
+const (
+	RefTypeBranch RefType = iota
+	RefTypeTag
+	RefTypePullRequest
+)
+
+type Ref struct {
+	Ref       string
+	CommitSHA string
+}
+
+type Commit struct {
+	SHA     string
+	Message string
 }
