@@ -18,11 +18,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var cmdLocalRun = &cobra.Command{
-	Use:   "localrun",
-	Short: "localrun",
+var cmdDirectRun = &cobra.Command{
+	Use:   "directrun",
+	Short: "directrun",
 }
 
 func init() {
-	cmdAgola.AddCommand(cmdLocalRun)
+	cmdAgola.AddCommand(cmdDirectRun)
 }

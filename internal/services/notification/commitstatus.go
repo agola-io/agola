@@ -62,7 +62,7 @@ func (n *NotificationService) updateCommitStatus(ctx context.Context, ev *rstype
 		return err
 	}
 
-	// ignore user local runs
+	// ignore user direct runs
 	if groupType == common.GroupTypeUser {
 		return nil
 	}
