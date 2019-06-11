@@ -21,7 +21,7 @@ import (
 
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
 	"github.com/sorintlab/agola/internal/services/common"
-	"github.com/sorintlab/agola/internal/services/gateway"
+	"github.com/sorintlab/agola/internal/services/gateway/action"
 	rstypes "github.com/sorintlab/agola/internal/services/runservice/types"
 
 	errors "golang.org/x/xerrors"
@@ -98,7 +98,7 @@ func (n *NotificationService) updateCommitStatus(ctx context.Context, ev *rstype
 	description := statusDescription(commitStatus)
 	context := fmt.Sprintf("%s/%s/%s", n.gc.ID, project.Name, run.RunConfig.Name)
 
-	if err := gitSource.CreateCommitStatus(project.RepositoryPath, run.Run.Annotations[gateway.AnnotationCommitSHA], commitStatus, targetURL, description, context); err != nil {
+	if err := gitSource.CreateCommitStatus(project.RepositoryPath, run.Run.Annotations[action.AnnotationCommitSHA], commitStatus, targetURL, description, context); err != nil {
 		return err
 	}
 
