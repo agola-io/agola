@@ -36,7 +36,7 @@ TOOLBOX_ARCHS=amd64 arm64
 all: build
 
 .PHONY: build
-build: agola agola-toolbox agola-git-hook
+build: agola agola-toolbox
 
 .PHONY: test
 test: gocovmerge
@@ -56,10 +56,6 @@ agola-toolbox:
 .PHONY: go-bindata
 go-bindata:
 	GOBIN=$(PROJDIR)/tools/bin go install github.com/go-bindata/go-bindata/go-bindata
-
-.PHONY: agola-git-hook
-agola-git-hook:
-	CGO_ENABLED=0 GO111MODULE=on go build $(if $(AGOLA_TAGS),-tags "$(AGOLA_TAGS)") -ldflags $(LD_FLAGS) -o $(PROJDIR)/bin/agola-git-hook $(REPO_PATH)/cmd/agola-git-hook
 
 .PHONY: gocovmerge
 gocovmerge:

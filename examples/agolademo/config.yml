@@ -61,7 +61,6 @@ executor:
 
 gitserver:
   dataDir: /tmp/agola/gitserver
-  githookPath: ./bin/agola-git-hook
   gatewayURL: "http://localhost:8000"
   web:
     listenAddress: ":4003"

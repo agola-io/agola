@@ -128,7 +128,6 @@ data:
 
     gitserver:
       dataDir: /mnt/agola/local/gitserver
-      githookPath: ./bin/agola-git-hook
       gatewayURL: "http://agola-internal:8000"
       web:
         listenAddress: ":4003"
