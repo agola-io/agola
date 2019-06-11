@@ -260,3 +260,46 @@ func createProjectResponse(r *csapi.Project) *ProjectResponse {
 
 	return res
 }
+
+type ProjectCreateRunRequest struct {
+	Branch    string `json:"branch,omitempty"`
+	Tag       string `json:"tag,omitempty"`
+	Ref       string `json:"ref,omitempty"`
+	CommitSHA string `json:"commit_sha,omitempty"`
+}
+
+type ProjectCreateRunHandler struct {
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
+}
+
+func NewProjectCreateRunHandler(logger *zap.Logger, ah *action.ActionHandler) *ProjectCreateRunHandler {
+	return &ProjectCreateRunHandler{log: logger.Sugar(), ah: ah}
+}
+
+func (h *ProjectCreateRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	projectRef, err := url.PathUnescape(vars["projectref"])
+	if err != nil {
+		httpError(w, util.NewErrBadRequest(err))
+		return
+	}
+
+	var req ProjectCreateRunRequest
+	d := json.NewDecoder(r.Body)
+	if err := d.Decode(&req); err != nil {
+		httpError(w, util.NewErrBadRequest(err))
+		return
+	}
+
+	err = h.ah.ProjectCreateRun(ctx, projectRef, req.Branch, req.Tag, req.Ref, req.CommitSHA)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	if err := httpResponse(w, http.StatusCreated, nil); err != nil {
+		h.log.Errorf("err: %+v", err)
+	}
+}

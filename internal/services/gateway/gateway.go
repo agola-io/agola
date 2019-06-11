@@ -162,6 +162,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	deleteProjectHandler := api.NewDeleteProjectHandler(logger, g.ah)
 	projectReconfigHandler := api.NewProjectReconfigHandler(logger, g.ah)
 	projectUpdateRepoLinkedAccountHandler := api.NewProjectUpdateRepoLinkedAccountHandler(logger, g.ah)
+	projectCreateRunHandler := api.NewProjectCreateRunHandler(logger, g.ah)
 
 	secretHandler := api.NewSecretHandler(logger, g.ah)
 	createSecretHandler := api.NewCreateSecretHandler(logger, g.ah)
@@ -242,6 +243,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/projects/{projectref}", authForcedHandler(deleteProjectHandler)).Methods("DELETE")
 	apirouter.Handle("/projects/{projectref}/reconfig", authForcedHandler(projectReconfigHandler)).Methods("PUT")
 	apirouter.Handle("/projects/{projectref}/updaterepolinkedaccount", authForcedHandler(projectUpdateRepoLinkedAccountHandler)).Methods("PUT")
+	apirouter.Handle("/projects/{projectref}/createrun", authForcedHandler(projectCreateRunHandler)).Methods("PUT")
 
 	apirouter.Handle("/projectgroups/{projectgroupref}/secrets", authForcedHandler(secretHandler)).Methods("GET")
 	apirouter.Handle("/projects/{projectref}/secrets", authForcedHandler(secretHandler)).Methods("GET")

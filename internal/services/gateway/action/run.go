@@ -430,7 +430,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 
 	data, filename, err := h.fetchConfigFiles(req.GitSource, req.RepoPath, req.CommitSHA)
 	if err != nil {
-		return errors.Errorf("failed to fetch config file: %w", err)
+		return util.NewErrInternal(errors.Errorf("failed to fetch config file: %w", err))
 	}
 	h.log.Debug("data: %s", data)
 

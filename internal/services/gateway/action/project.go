@@ -21,6 +21,7 @@ import (
 	"net/url"
 	"path"
 
+	gitsource "github.com/sorintlab/agola/internal/gitsources"
 	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
 	"github.com/sorintlab/agola/internal/services/types"
 	"github.com/sorintlab/agola/internal/util"
@@ -120,12 +121,12 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 		return nil, errors.Errorf("user doesn't have a linked account for remote source %q", rs.Name)
 	}
 
-	gitsource, err := h.GetGitSource(ctx, rs, user.Name, la)
+	gitSource, err := h.GetGitSource(ctx, rs, user.Name, la)
 	if err != nil {
 		return nil, errors.Errorf("failed to create gitsource client: %w", err)
 	}
 
-	repo, err := gitsource.GetRepoInfo(req.RepoPath)
+	repo, err := gitSource.GetRepoInfo(req.RepoPath)
 	if err != nil {
 		return nil, errors.Errorf("failed to get repository info from gitsource: %w", err)
 	}
@@ -349,4 +350,166 @@ func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) er
 		return ErrFromRemote(resp, err)
 	}
 	return nil
+}
+
+func (h *ActionHandler) ProjectCreateRun(ctx context.Context, projectRef, branch, tag, refName, commitSHA string) error {
+	curUserID := h.CurrentUserID(ctx)
+
+	user, resp, err := h.configstoreClient.GetUser(ctx, curUserID)
+	if err != nil {
+		return errors.Errorf("failed to get user %q: %w", curUserID, ErrFromRemote(resp, err))
+	}
+
+	p, resp, err := h.configstoreClient.GetProject(ctx, projectRef)
+	if err != nil {
+		return errors.Errorf("failed to get project %q: %w", projectRef, ErrFromRemote(resp, err))
+	}
+
+	isProjectOwner, err := h.IsProjectOwner(ctx, p.OwnerType, p.OwnerID)
+	if err != nil {
+		return errors.Errorf("failed to determine ownership: %w", err)
+	}
+	if !isProjectOwner {
+		return util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
+	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, p.RemoteSourceID)
+	if err != nil {
+		return errors.Errorf("failed to get remote source %q: %w", p.RemoteSourceID, ErrFromRemote(resp, err))
+	}
+	h.log.Infof("rs: %s", util.Dump(rs))
+	var la *types.LinkedAccount
+	for _, v := range user.LinkedAccounts {
+		if v.RemoteSourceID == rs.ID {
+			la = v
+			break
+		}
+	}
+	h.log.Infof("la: %s", util.Dump(la))
+	if la == nil {
+		return util.NewErrBadRequest(errors.Errorf("user doesn't have a linked account for remote source %q", rs.Name))
+	}
+
+	gitSource, err := h.GetGitSource(ctx, rs, user.Name, la)
+	if err != nil {
+		return errors.Errorf("failed to create gitsource client: %w", err)
+	}
+
+	// check user has access to the repository
+	repoInfo, err := gitSource.GetRepoInfo(p.RepositoryPath)
+	if err != nil {
+		return errors.Errorf("failed to get repository info from gitsource: %w", err)
+	}
+
+	set := 0
+	if branch != "" {
+		set++
+	}
+	if tag != "" {
+		set++
+	}
+	if refName != "" {
+		set++
+	}
+	if set == 0 {
+		return util.NewErrBadRequest(errors.Errorf("one of branch, tag or ref is required"))
+	}
+	if set > 1 {
+		return util.NewErrBadRequest(errors.Errorf("only one of branch, tag or ref can be provided"))
+	}
+
+	var refType types.RunRefType
+	var message string
+	var branchLink, tagLink string
+
+	var refCommitSHA string
+	if refName == "" {
+		if branch != "" {
+			refName = gitSource.BranchRef(branch)
+		}
+		if tag != "" {
+			refName = gitSource.TagRef(tag)
+		}
+	}
+
+	gitRefType, name, err := gitSource.RefType(refName)
+	if err != nil {
+		return util.NewErrBadRequest(errors.Errorf("failed to get refType for ref %q: %w", refName, err))
+	}
+	ref, err := gitSource.GetRef(p.RepositoryPath, refName)
+	if err != nil {
+		return errors.Errorf("failed to get ref information from git source for ref %q: %w", refName, err)
+	}
+	refCommitSHA = ref.CommitSHA
+	switch gitRefType {
+	case gitsource.RefTypeBranch:
+		branch = name
+	case gitsource.RefTypeTag:
+		tag = name
+		// TODO(sgotti) implement manual run creation on a pull request if really needed
+	default:
+		return errors.Errorf("unsupported ref %q for manual run creation", refName)
+	}
+
+	// TODO(sgotti) check that the provided ref contains the provided commitSHA
+
+	// if no commitSHA has been provided use the ref commit sha
+	if commitSHA == "" && refCommitSHA != "" {
+		commitSHA = refCommitSHA
+	}
+
+	commit, err := gitSource.GetCommit(p.RepositoryPath, commitSHA)
+	if err != nil {
+		return errors.Errorf("failed to get commit information from git source for commit sha %q: %w", commitSHA, err)
+	}
+
+	// use the commit full sha since the user could have provided a short commit sha
+	commitSHA = commit.SHA
+
+	if branch != "" {
+		refType = types.RunRefTypeBranch
+		message = commit.Message
+		branchLink = gitSource.BranchLink(repoInfo, branch)
+
+	}
+
+	if tag != "" {
+		refType = types.RunRefTypeBranch
+		message = fmt.Sprintf("Tag %s", tag)
+		tagLink = gitSource.TagLink(repoInfo, tag)
+
+	}
+
+	// use remotesource skipSSHHostKeyCheck config and override with project config if set to true there
+	skipSSHHostKeyCheck := rs.SkipSSHHostKeyCheck
+	if p.SkipSSHHostKeyCheck {
+		skipSSHHostKeyCheck = p.SkipSSHHostKeyCheck
+	}
+
+	req := &CreateRunRequest{
+		RunType:            types.RunTypeProject,
+		RefType:            refType,
+		RunCreationTrigger: types.RunCreationTriggerTypeManual,
+
+		Project:             p.Project,
+		RepoPath:            p.RepositoryPath,
+		GitSource:           gitSource,
+		CommitSHA:           commitSHA,
+		Message:             message,
+		Branch:              branch,
+		Tag:                 tag,
+		PullRequestID:       "",
+		Ref:                 refName,
+		SSHPrivKey:          p.SSHPrivateKey,
+		SSHHostKey:          rs.SSHHostKey,
+		SkipSSHHostKeyCheck: skipSSHHostKeyCheck,
+		CloneURL:            repoInfo.SSHCloneURL,
+
+		CommitLink:      gitSource.CommitLink(repoInfo, commitSHA),
+		BranchLink:      branchLink,
+		TagLink:         tagLink,
+		PullRequestLink: "",
+	}
+
+	return h.CreateRuns(ctx, req)
 }
