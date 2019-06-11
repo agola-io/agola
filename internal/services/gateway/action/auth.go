@@ -191,7 +191,7 @@ func (h *ActionHandler) CanGetRun(ctx context.Context, runGroup string) (bool, e
 		ownerID = p.OwnerID
 		visibility = p.GlobalVisibility
 	case common.GroupTypeUser:
-		// user local runs
+		// user direct runs
 		ownerType = types.ConfigTypeUser
 		ownerID = groupID
 		visibility = types.VisibilityPrivate
@@ -227,7 +227,7 @@ func (h *ActionHandler) CanDoRunActions(ctx context.Context, runGroup string) (b
 		ownerType = p.OwnerType
 		ownerID = p.OwnerID
 	case common.GroupTypeUser:
-		// user local runs
+		// user direct runs
 		ownerType = types.ConfigTypeUser
 		ownerID = groupID
 	}
