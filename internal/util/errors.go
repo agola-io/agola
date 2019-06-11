@@ -131,3 +131,21 @@ func (*ErrUnauthorized) Is(err error) bool {
 	_, ok := err.(*ErrUnauthorized)
 	return ok
 }
+
+type ErrInternal struct {
+	Err error
+}
+
+// ErrInternal represent an internal error that should be returned to the user
+func (e *ErrInternal) Error() string {
+	return e.Err.Error()
+}
+
+func NewErrInternal(err error) *ErrInternal {
+	return &ErrInternal{Err: err}
+}
+
+func (*ErrInternal) Is(err error) bool {
+	_, ok := err.(*ErrInternal)
+	return ok
+}

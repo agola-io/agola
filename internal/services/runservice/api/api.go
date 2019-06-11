@@ -66,6 +66,10 @@ func ErrorResponseFromError(err error) *ErrorResponse {
 		var cerr *util.ErrUnauthorized
 		errors.As(err, &cerr)
 		aerr = cerr
+	case errors.Is(err, &util.ErrInternal{}):
+		var cerr *util.ErrInternal
+		errors.As(err, &cerr)
+		aerr = cerr
 	}
 
 	if aerr != nil {
@@ -99,6 +103,9 @@ func httpError(w http.ResponseWriter, err error) bool {
 		w.Write(resj)
 	case errors.Is(err, &util.ErrUnauthorized{}):
 		w.WriteHeader(http.StatusUnauthorized)
+		w.Write(resj)
+	case errors.Is(err, &util.ErrInternal{}):
+		w.WriteHeader(http.StatusInternalServerError)
 		w.Write(resj)
 	default:
 		w.WriteHeader(http.StatusInternalServerError)
