@@ -28,8 +28,8 @@ import (
 )
 
 const (
-	gitIndexFile  = "index"
-	gitRefsPrefix = "refs/gitsave"
+	gitIndexFile      = "index"
+	defaultRefsPrefix = "refs/gitsave"
 )
 
 func copyFile(src, dest string) error {
@@ -146,15 +146,30 @@ func GitPush(configPath, remote, branch string) error {
 type GitSaveConfig struct {
 	AddUntracked bool
 	AddIgnored   bool
+	RefsPrefix   string
 }
 
 type GitSave struct {
-	log  *zap.SugaredLogger
-	conf *GitSaveConfig
+	log        *zap.SugaredLogger
+	conf       *GitSaveConfig
+	refsPrefix string
 }
 
 func NewGitSave(logger *zap.Logger, conf *GitSaveConfig) *GitSave {
-	return &GitSave{log: logger.Sugar(), conf: conf}
+	refsPrefix := conf.RefsPrefix
+	if refsPrefix == "" {
+		refsPrefix = defaultRefsPrefix
+	}
+	return &GitSave{
+		log:        logger.Sugar(),
+		conf:       conf,
+		refsPrefix: refsPrefix,
+	}
+
+}
+
+func (s *GitSave) RefsPrefix() string {
+	return s.refsPrefix
 }
 
 // Save adds files to the provided index, creates a tree and a commit pointing to
@@ -231,7 +246,7 @@ func (s *GitSave) Save(message, branchName string) error {
 	s.log.Infof("commit: %s", commitSHA)
 
 	s.log.Infof("updating ref")
-	if err = gitUpdateRef("git-save", filepath.Join(gitRefsPrefix, branchName), commitSHA); err != nil {
+	if err = gitUpdateRef("git-save", filepath.Join(s.refsPrefix, branchName), commitSHA); err != nil {
 		return err
 	}
 
