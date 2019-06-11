@@ -85,7 +85,7 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 
 	branch := "gitsavebranch-" + uuid.NewV4().String()
 
-	if err := gs.Save("agola direct run", branch); err != nil {
+	if _, err := gs.Save("agola direct run", branch); err != nil {
 		log.Fatalf("err: %v", err)
 	}
 

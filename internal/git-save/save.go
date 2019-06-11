@@ -175,10 +175,10 @@ func (s *GitSave) RefsPrefix() string {
 // Save adds files to the provided index, creates a tree and a commit pointing to
 // that tree, finally it creates a branch poiting to that commit
 // Save will use the current worktree index if available to speed the index generation
-func (s *GitSave) Save(message, branchName string) error {
+func (s *GitSave) Save(message, branchName string) (string, error) {
 	gitdir, err := GitDir()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	tmpIndexPath := filepath.Join(gitdir, "gitsave-index-"+uuid.NewV4().String())
@@ -188,25 +188,25 @@ func (s *GitSave) Save(message, branchName string) error {
 
 	curBranch, err := currentGitBranch()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	indexExists, err := fileExists(indexPath)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if indexExists {
 		// copy current git index to a temporary index
 		if err := copyFile(indexPath, tmpIndexPath); err != nil {
-			return err
+			return "", err
 		}
 		s.log.Infof("created temporary index: %s", tmpIndexPath)
 		// read the current branch tree information into the index
 		git := &util.Git{Env: []string{"GIT_INDEX_FILE=" + tmpIndexPath}}
 		_, err = git.Output(context.Background(), nil, "read-tree", curBranch)
 		if err != nil {
-			return err
+			return "", err
 		}
 	} else {
 		s.log.Infof("index %s does not exist", indexPath)
@@ -214,41 +214,41 @@ func (s *GitSave) Save(message, branchName string) error {
 
 	s.log.Infof("updating files already in the index")
 	if err := gitUpdateFiles(tmpIndexPath); err != nil {
-		return err
+		return "", err
 	}
 
 	if s.conf.AddUntracked {
 		s.log.Infof("adding untracked files")
 		if err := gitAddUntrackedFiles(tmpIndexPath); err != nil {
-			return err
+			return "", err
 		}
 	}
 
 	if s.conf.AddIgnored {
 		s.log.Infof("adding ignored files")
 		if err := gitAddIgnoredFiles(tmpIndexPath); err != nil {
-			return err
+			return "", err
 		}
 	}
 
 	s.log.Infof("writing tree file")
 	treeSHA, err := gitWriteTree(tmpIndexPath)
 	if err != nil {
-		return err
+		return "", err
 	}
 	s.log.Infof("tree: %s", treeSHA)
 
 	s.log.Infof("committing tree")
 	commitSHA, err := gitCommitTree(message, treeSHA)
 	if err != nil {
-		return err
+		return "", err
 	}
 	s.log.Infof("commit: %s", commitSHA)
 
 	s.log.Infof("updating ref")
 	if err = gitUpdateRef("git-save", filepath.Join(s.refsPrefix, branchName), commitSHA); err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return commitSHA, nil
 }
