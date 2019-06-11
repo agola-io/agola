@@ -36,4 +36,5 @@ type RunCreationTriggerType string
 
 const (
 	RunCreationTriggerTypeWebhook RunCreationTriggerType = "webhook"
+	RunCreationTriggerTypeManual  RunCreationTriggerType = "manual"
 )
