@@ -392,6 +392,7 @@ func fromGiteaRepo(rr *gitea.Repository) *gitsource.RepoInfo {
 	return &gitsource.RepoInfo{
 		ID:           strconv.FormatInt(rr.ID, 10),
 		Path:         path.Join(rr.Owner.UserName, rr.Name),
+		HTMLURL:      rr.HTMLURL,
 		SSHCloneURL:  rr.SSHURL,
 		HTTPCloneURL: rr.CloneURL,
 	}

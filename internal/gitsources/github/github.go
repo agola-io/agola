@@ -387,6 +387,7 @@ func fromGithubRepo(rr *github.Repository) *gitsource.RepoInfo {
 	return &gitsource.RepoInfo{
 		ID:           strconv.FormatInt(*rr.ID, 10),
 		Path:         path.Join(*rr.Owner.Login, *rr.Name),
+		HTMLURL:      *rr.HTMLURL,
 		SSHCloneURL:  *rr.SSHURL,
 		HTTPCloneURL: *rr.CloneURL,
 	}

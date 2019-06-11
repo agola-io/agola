@@ -50,7 +50,7 @@ type Client struct {
 	oauth2Secret   string
 }
 
-// fromCommitStatus converts a gitsource commit status to a gitea commit status
+// fromCommitStatus converts a gitsource commit status to a gitlab commit status
 func fromCommitStatus(status gitsource.CommitStatus) gitlab.BuildStateValue {
 	switch status {
 	case gitsource.CommitStatusPending:
@@ -279,6 +279,7 @@ func fromGitlabRepo(rr *gitlab.Project) *gitsource.RepoInfo {
 	return &gitsource.RepoInfo{
 		ID:           strconv.Itoa(rr.ID),
 		Path:         rr.PathWithNamespace,
+		HTMLURL:      rr.WebURL,
 		SSHCloneURL:  rr.SSHURLToRepo,
 		HTTPCloneURL: rr.HTTPURLToRepo,
 	}
