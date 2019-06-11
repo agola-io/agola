@@ -228,6 +228,15 @@ func (c *Client) DeleteProject(ctx context.Context, projectRef string) (*http.Re
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/projects/%s", url.PathEscape(projectRef)), nil, jsonContent, nil)
 }
 
+func (c *Client) ProjectCreateRun(ctx context.Context, projectRef string, req *ProjectCreateRunRequest) (*http.Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.getResponse(ctx, "POST", fmt.Sprintf("/projects/%s/createrun", url.PathEscape(projectRef)), nil, jsonContent, bytes.NewReader(reqj))
+}
+
 func (c *Client) ReconfigProject(ctx context.Context, projectRef string) (*http.Response, error) {
 	return c.getResponse(ctx, "PUT", fmt.Sprintf("/projects/%s/reconfig", url.PathEscape(projectRef)), nil, jsonContent, nil)
 }
