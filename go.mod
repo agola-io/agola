@@ -1,7 +1,8 @@
 module github.com/sorintlab/agola
 
 require (
-	code.gitea.io/sdk v0.0.0-20190219191342-62c4fab696b4
+	code.gitea.io/gitea v1.9.0-dev.0.20190511102134-34eee25bd42d
+	code.gitea.io/sdk/gitea v0.0.0-20190602153954-7e711e06b588
 	github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 // indirect
 	github.com/Masterminds/squirrel v0.0.0-20181204161840-e5bf00f96d4a
 	github.com/Microsoft/go-winio v0.4.11 // indirect
@@ -34,11 +35,9 @@ require (
 	github.com/hashicorp/golang-lru v0.5.1 // indirect
 	github.com/imdario/mergo v0.3.7 // indirect
 	github.com/json-iterator/go v1.1.6 // indirect
-	github.com/jtolds/gls v4.2.1+incompatible // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
 	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
-	github.com/lib/pq v1.0.0 // indirect
 	github.com/mattn/go-sqlite3 v1.10.0
 	github.com/minio/minio-go v6.0.14+incompatible
 	github.com/mitchellh/copystructure v1.0.0
@@ -50,10 +49,8 @@ require (
 	github.com/opencontainers/runc v0.1.1 // indirect
 	github.com/sanity-io/litter v1.1.0
 	github.com/satori/go.uuid v1.2.0
-	github.com/sergi/go-diff v1.0.0 // indirect
 	github.com/sgotti/gexpect v0.0.0-20161123102107-0afc6c19f50a
 	github.com/smartystreets/assertions v0.0.0-20190116191733-b6c0e53d7304 // indirect
-	github.com/smartystreets/goconvey v0.0.0-20181108003508-044398e4856c // indirect
 	github.com/spf13/cobra v0.0.3
 	github.com/xanzy/go-gitlab v0.14.1
 	go.etcd.io/etcd v0.0.0-20181128220305-dedae6eb7c25

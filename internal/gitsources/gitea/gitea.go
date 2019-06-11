@@ -29,6 +29,7 @@ import (
 
 	gitsource "github.com/sorintlab/agola/internal/gitsources"
 
+	gtypes "code.gitea.io/gitea/modules/structs"
 	"code.gitea.io/sdk/gitea"
 	"golang.org/x/oauth2"
 	errors "golang.org/x/xerrors"
@@ -63,16 +64,16 @@ type Client struct {
 }
 
 // fromCommitStatus converts a gitsource commit status to a gitea commit status
-func fromCommitStatus(status gitsource.CommitStatus) gitea.StatusState {
+func fromCommitStatus(status gitsource.CommitStatus) gtypes.StatusState {
 	switch status {
 	case gitsource.CommitStatusPending:
-		return gitea.StatusPending
+		return gtypes.StatusPending
 	case gitsource.CommitStatusSuccess:
-		return gitea.StatusSuccess
+		return gtypes.StatusSuccess
 	case gitsource.CommitStatusError:
-		return gitea.StatusError
+		return gtypes.StatusError
 	case gitsource.CommitStatusFailed:
-		return gitea.StatusFailure
+		return gtypes.StatusFailure
 	default:
 		panic(fmt.Errorf("unknown commit status %q", status))
 	}
@@ -180,7 +181,7 @@ func (c *Client) LoginPassword(username, password, tokenName string) (string, er
 	}
 	for _, token := range tokens {
 		if token.Name == tokenName {
-			accessToken = token.Sha1
+			accessToken = token.Token
 			break
 		}
 	}
@@ -190,12 +191,12 @@ func (c *Client) LoginPassword(username, password, tokenName string) (string, er
 		token, terr := c.client.CreateAccessToken(
 			username,
 			password,
-			gitea.CreateAccessTokenOption{Name: tokenName},
+			gtypes.CreateAccessTokenOption{Name: tokenName},
 		)
 		if terr != nil {
 			return "", terr
 		}
-		accessToken = token.Sha1
+		accessToken = token.Token
 	}
 
 	return accessToken, nil
@@ -239,7 +240,7 @@ func (c *Client) CreateDeployKey(repopath, title, pubKey string, readonly bool) 
 	if err != nil {
 		return err
 	}
-	if _, err = c.client.CreateDeployKey(owner, reponame, gitea.CreateKeyOption{
+	if _, err = c.client.CreateDeployKey(owner, reponame, gtypes.CreateKeyOption{
 		Title:    title,
 		Key:      pubKey,
 		ReadOnly: readonly,
@@ -275,7 +276,7 @@ func (c *Client) UpdateDeployKey(repopath, title, pubKey string, readonly bool) 
 		}
 	}
 
-	if _, err := c.client.CreateDeployKey(owner, reponame, gitea.CreateKeyOption{
+	if _, err := c.client.CreateDeployKey(owner, reponame, gtypes.CreateKeyOption{
 		Title:    title,
 		Key:      pubKey,
 		ReadOnly: readonly,
@@ -313,7 +314,7 @@ func (c *Client) CreateRepoWebhook(repopath, url, secret string) error {
 		return err
 	}
 
-	opts := gitea.CreateHookOption{
+	opts := gtypes.CreateHookOption{
 		Type: "gitea",
 		Config: map[string]string{
 			"url":          url,
@@ -359,7 +360,7 @@ func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource
 	if err != nil {
 		return err
 	}
-	_, err = c.client.CreateStatus(owner, reponame, commitSHA, gitea.CreateStatusOption{
+	_, err = c.client.CreateStatus(owner, reponame, commitSHA, gtypes.CreateStatusOption{
 		State:       fromCommitStatus(status),
 		TargetURL:   targetURL,
 		Description: description,
