@@ -24,6 +24,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/sorintlab/agola/internal/etcd"
 	"github.com/sorintlab/agola/internal/objectstorage"
@@ -59,6 +60,9 @@ func (h *ExecutorStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
+
+	// set last status update time
+	executor.LastStatusUpdateTime = time.Now()
 
 	if _, err := store.PutExecutor(ctx, h.e, executor); err != nil {
 		http.Error(w, "", http.StatusInternalServerError)
