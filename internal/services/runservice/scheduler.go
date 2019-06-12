@@ -43,6 +43,8 @@ import (
 
 const (
 	cacheCleanerInterval = 1 * 24 * time.Hour
+
+	defaultExecutorNotAliveInterval = 60 * time.Second
 )
 
 var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
@@ -273,7 +275,15 @@ func (s *Runservice) chooseExecutor(ctx context.Context, rct *types.RunConfigTas
 	if err != nil {
 		return nil, err
 	}
+	return chooseExecutor(executors, rct), nil
+}
+
+func chooseExecutor(executors []*types.Executor, rct *types.RunConfigTask) *types.Executor {
 	for _, e := range executors {
+		if e.LastStatusUpdateTime.Add(defaultExecutorNotAliveInterval).Before(time.Now()) {
+			continue
+		}
+
 		// if arch is not defined use any executor arch
 		if rct.Runtime.Arch != "" {
 			hasArch := false
@@ -286,15 +296,17 @@ func (s *Runservice) chooseExecutor(ctx context.Context, rct *types.RunConfigTas
 				continue
 			}
 		}
+
 		if e.ActiveTasksLimit != 0 {
 			if e.ActiveTasks >= e.ActiveTasksLimit {
 				continue
 			}
 		}
 
-		return e, nil
+		return e
 	}
-	return nil, nil
+
+	return nil
 }
 
 type parentsByLevelName []*types.RunConfigTask

@@ -18,8 +18,10 @@ import (
 	"context"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/sorintlab/agola/internal/common"
 	"github.com/sorintlab/agola/internal/services/runservice/types"
 )
 
@@ -535,6 +537,109 @@ func TestGetTasksToRun(t *testing.T) {
 
 			if diff := cmp.Diff(tt.out, outTasks); diff != "" {
 				t.Error(diff)
+			}
+		})
+	}
+}
+
+func TestChooseExecutor(t *testing.T) {
+	executorOK := &types.Executor{
+		ID:                   "executorOK",
+		Archs:                []common.Arch{common.ArchAMD64},
+		ActiveTasksLimit:     2,
+		ActiveTasks:          0,
+		LastStatusUpdateTime: time.Now(),
+	}
+
+	executorNoFreeTaskSlots := func() *types.Executor {
+		e := executorOK.DeepCopy()
+		e.ID = "executorNoFreeTasksSlots"
+		e.ActiveTasks = 2
+		return e
+	}()
+
+	executorNotAlive := func() *types.Executor {
+		e := executorOK.DeepCopy()
+		e.ID = "executorNotAlive"
+		e.LastStatusUpdateTime = time.Now().Add(-120 * time.Second)
+		return e
+	}()
+
+	executorOKMultipleArchs := func() *types.Executor {
+		e := executorOK.DeepCopy()
+		e.ID = "executorOKMultipleArchs"
+		e.Archs = []common.Arch{common.ArchAMD64, common.ArchARM64}
+		return e
+	}()
+
+	// Only primary and the required variables for this test are set
+	rct := &types.RunConfigTask{
+		ID:   "task01",
+		Name: "task01",
+		Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
+			Arch: common.ArchAMD64,
+		},
+	}
+
+	tests := []struct {
+		name      string
+		executors []*types.Executor
+		rct       *types.RunConfigTask
+		out       *types.Executor
+		err       error
+	}{
+		{
+			name:      "test single executor ok",
+			executors: []*types.Executor{executorOK},
+			// Only primary and the required variables for this test are set
+			rct: rct,
+			out: executorOK,
+		},
+		{
+			name:      "test single executor without free task slots",
+			executors: []*types.Executor{executorNoFreeTaskSlots},
+			// Only primary and the required variables for this test are set
+			rct: rct,
+			out: nil,
+		},
+		{
+			name:      "test single executor not alive",
+			executors: []*types.Executor{executorNotAlive},
+			rct:       rct,
+			out:       nil,
+		},
+		{
+			name: "test single executor with different arch",
+			executors: func() []*types.Executor {
+				e := executorOK.DeepCopy()
+				e.Archs = []common.Arch{common.ArchARM64}
+				return []*types.Executor{e}
+			}(),
+			rct: rct,
+			out: nil,
+		},
+		{
+			name:      "test single executor with multiple archs and one matches the task required arch",
+			executors: []*types.Executor{executorOKMultipleArchs},
+			rct:       rct,
+			out:       executorOKMultipleArchs,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := chooseExecutor(tt.executors, tt.rct)
+			if e == nil && tt.out == nil {
+				return
+			}
+			if e == nil && tt.out != nil {
+				t.Fatalf("expected executor with id: %s, go no executor selected", tt.out.ID)
+			}
+			if e != nil && tt.out == nil {
+				t.Fatalf("expected no executor selected, got executor with id: %s", e.ID)
+			}
+			if e != tt.out {
+				t.Fatalf("wrong executor ID, expected %s, got: %s", tt.out.ID, e.ID)
 			}
 		})
 	}

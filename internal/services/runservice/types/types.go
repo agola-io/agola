@@ -333,6 +333,14 @@ type RunConfigTask struct {
 	DockerRegistriesAuth map[string]DockerRegistryAuth   `json:"docker_registries_auth"`
 }
 
+func (rct *RunConfigTask) DeepCopy() *RunConfigTask {
+	nrct, err := copystructure.Copy(rct)
+	if err != nil {
+		panic(err)
+	}
+	return nrct.(*RunConfigTask)
+}
+
 type RunConfigTaskDependCondition string
 
 const (
@@ -611,8 +619,18 @@ type Executor struct {
 	// SiblingExecutors are all the executors in the ExecutorGroup
 	SiblingsExecutors []string `json:"siblings_executors,omitempty"`
 
+	LastStatusUpdateTime time.Time `json:"last_status_update_time,omitempty"`
+
 	// internal values not saved
 	Revision int64 `json:"-"`
+}
+
+func (e *Executor) DeepCopy() *Executor {
+	ne, err := copystructure.Copy(e)
+	if err != nil {
+		panic(err)
+	}
+	return ne.(*Executor)
 }
 
 type RunEvent struct {
