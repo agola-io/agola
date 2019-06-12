@@ -1163,7 +1163,7 @@ func (e *Executor) tasksDataCleaner(ctx context.Context) error {
 			}
 		}
 		if resp.StatusCode == http.StatusNotFound {
-			taskDir := filepath.Join(e.tasksDir(), entry.Name())
+			taskDir := e.taskPath(etID)
 			log.Infof("removing task dir %q", taskDir)
 			// remove task dir
 			if err := os.RemoveAll(taskDir); err != nil {
