@@ -160,6 +160,7 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 
 	searchLabels := map[string]string{}
 	searchLabels[agolaLabelKey] = agolaLabelValue
+	searchLabels[executorIDKey] = d.executorID
 	searchLabels[podIDKey] = podConfig.ID
 	searchLabels[taskIDKey] = podConfig.TaskID
 	args := filters.NewArgs()
@@ -256,6 +257,7 @@ func (d *DockerDriver) createContainer(ctx context.Context, index int, podConfig
 
 	labels := map[string]string{}
 	labels[agolaLabelKey] = agolaLabelValue
+	labels[executorIDKey] = d.executorID
 	labels[podIDKey] = podConfig.ID
 	labels[taskIDKey] = podConfig.TaskID
 
@@ -313,6 +315,11 @@ func (d *DockerDriver) GetPods(ctx context.Context, all bool) ([]Pod, error) {
 
 	podsMap := map[string]*DockerPod{}
 	for _, container := range containers {
+		executorID, ok := container.Labels[executorIDKey]
+		if !ok || executorID != d.executorID {
+			// skip container
+			continue
+		}
 		podID, ok := container.Labels[podIDKey]
 		if !ok {
 			// skip container
@@ -330,6 +337,11 @@ func (d *DockerDriver) GetPods(ctx context.Context, all bool) ([]Pod, error) {
 	}
 
 	for _, container := range containers {
+		executorID, ok := container.Labels[executorIDKey]
+		if !ok || executorID != d.executorID {
+			// skip container
+			continue
+		}
 		podID, ok := container.Labels[podIDKey]
 		if !ok {
 			// skip container
