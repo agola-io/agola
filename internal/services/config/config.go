@@ -110,6 +110,8 @@ type Executor struct {
 	Labels map[string]string `yaml:"labels"`
 	// ActiveTasksLimit is the max number of concurrent active tasks
 	ActiveTasksLimit int `yaml:"active_tasks_limit"`
+
+	AllowPrivilegedContainers bool `yaml:"allowPrivilegedContainers"`
 }
 
 type Configstore struct {

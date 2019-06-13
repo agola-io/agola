@@ -605,6 +605,8 @@ type Executor struct {
 
 	Labels map[string]string `json:"labels,omitempty"`
 
+	AllowPrivilegedContainers bool `json:"allow_privileged_containers,omitempty"`
+
 	ActiveTasksLimit int `json:"active_tasks_limit,omitempty"`
 	ActiveTasks      int `json:"active_tasks,omitempty"`
 

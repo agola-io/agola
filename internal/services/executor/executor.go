@@ -693,15 +693,16 @@ func (e *Executor) sendExecutorStatus(ctx context.Context) error {
 	}
 
 	executor := &types.Executor{
-		ID:                e.id,
-		Archs:             archs,
-		ListenURL:         e.listenURL,
-		Labels:            labels,
-		ActiveTasksLimit:  e.c.ActiveTasksLimit,
-		ActiveTasks:       activeTasks,
-		Dynamic:           e.dynamic,
-		ExecutorGroup:     executorGroup,
-		SiblingsExecutors: siblingsExecutors,
+		ID:                        e.id,
+		Archs:                     archs,
+		AllowPrivilegedContainers: e.c.AllowPrivilegedContainers,
+		ListenURL:                 e.listenURL,
+		Labels:                    labels,
+		ActiveTasksLimit:          e.c.ActiveTasksLimit,
+		ActiveTasks:               activeTasks,
+		Dynamic:                   e.dynamic,
+		ExecutorGroup:             executorGroup,
+		SiblingsExecutors:         siblingsExecutors,
 	}
 
 	log.Debugf("send executor status: %s", util.Dump(executor))
@@ -834,6 +835,29 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 		return err
 	}
 
+	setupLogPath := e.setupLogPath(et.ID)
+	if err := os.MkdirAll(filepath.Dir(setupLogPath), 0770); err != nil {
+		return err
+	}
+	outf, err := os.Create(setupLogPath)
+	if err != nil {
+		return err
+	}
+	defer outf.Close()
+
+	// error out if privileged containers are required but not allowed
+	requiresPrivilegedContainers := false
+	for _, c := range et.Containers {
+		if c.Privileged == true {
+			requiresPrivilegedContainers = true
+			break
+		}
+	}
+	if requiresPrivilegedContainers == true && e.c.AllowPrivilegedContainers == false {
+		outf.WriteString("Executor doesn't allow executing privileged containers.\n")
+		return errors.Errorf("executor doesn't allow executing privileged containers")
+	}
+
 	log.Debugf("starting pod")
 
 	dockerConfig, err := registry.GenDockerConfig(et.DockerRegistriesAuth, []string{et.Containers[0].Image})
@@ -868,16 +892,6 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 			Privileged: c.Privileged,
 		}
 	}
-
-	setupLogPath := e.setupLogPath(et.ID)
-	if err := os.MkdirAll(filepath.Dir(setupLogPath), 0770); err != nil {
-		return err
-	}
-	outf, err := os.Create(setupLogPath)
-	if err != nil {
-		return err
-	}
-	defer outf.Close()
 
 	outf.WriteString("Starting pod.\n")
 	pod, err := e.driver.NewPod(ctx, podConfig, outf)
