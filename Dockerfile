@@ -42,7 +42,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # copy to agola binaries
-COPY --from=server_builder /agola/bin/agola /agola/bin/agola-toolbox-* /agola/bin/agola-git-hook /bin/
+COPY --from=server_builder /agola/bin/agola /agola/bin/agola-toolbox-* /bin/
 
 ENTRYPOINT ["/bin/agola"]
 
