@@ -802,7 +802,7 @@ func (e *Executor) executeTask(ctx context.Context, et *types.ExecutorTask) {
 
 	rt.Unlock()
 
-	_, err := e.executeTaskInternal(ctx, et, rt.pod)
+	_, err := e.executeTaskSteps(ctx, rt, rt.pod)
 
 	rt.Lock()
 	if err != nil {
@@ -894,21 +894,12 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 	return nil
 }
 
-func (e *Executor) executeTaskInternal(ctx context.Context, et *types.ExecutorTask, pod driver.Pod) (int, error) {
-	log.Debugf("task: %s", et.TaskName)
-
-	for i, step := range et.Steps {
-		//log.Debugf("step: %v", util.Dump(step))
-
-		rt, ok := e.runningTasks.get(et.ID)
-		if !ok {
-			panic(errors.Errorf("not running task for task id %s, this should never happen", et.ID))
-		}
-
+func (e *Executor) executeTaskSteps(ctx context.Context, rt *runningTask, pod driver.Pod) (int, error) {
+	for i, step := range rt.et.Steps {
 		rt.Lock()
 		rt.et.Status.Steps[i].Phase = types.ExecutorTaskPhaseRunning
 		rt.et.Status.Steps[i].StartTime = util.TimePtr(time.Now())
-		if err := e.sendExecutorTaskStatus(ctx, et); err != nil {
+		if err := e.sendExecutorTaskStatus(ctx, rt.et); err != nil {
 			log.Errorf("err: %+v", err)
 		}
 		rt.Unlock()
@@ -921,29 +912,29 @@ func (e *Executor) executeTaskInternal(ctx context.Context, et *types.ExecutorTa
 		case *types.RunStep:
 			log.Debugf("run step: %s", util.Dump(s))
 			stepName = s.Name
-			exitCode, err = e.doRunStep(ctx, s, et, pod, e.stepLogPath(et.ID, i))
+			exitCode, err = e.doRunStep(ctx, s, rt.et, pod, e.stepLogPath(rt.et.ID, i))
 
 		case *types.SaveToWorkspaceStep:
 			log.Debugf("save to workspace step: %s", util.Dump(s))
 			stepName = s.Name
-			archivePath := e.archivePath(et.ID, i)
-			exitCode, err = e.doSaveToWorkspaceStep(ctx, s, et, pod, e.stepLogPath(et.ID, i), archivePath)
+			archivePath := e.archivePath(rt.et.ID, i)
+			exitCode, err = e.doSaveToWorkspaceStep(ctx, s, rt.et, pod, e.stepLogPath(rt.et.ID, i), archivePath)
 
 		case *types.RestoreWorkspaceStep:
 			log.Debugf("restore workspace step: %s", util.Dump(s))
 			stepName = s.Name
-			exitCode, err = e.doRestoreWorkspaceStep(ctx, s, et, pod, e.stepLogPath(et.ID, i))
+			exitCode, err = e.doRestoreWorkspaceStep(ctx, s, rt.et, pod, e.stepLogPath(rt.et.ID, i))
 
 		case *types.SaveCacheStep:
 			log.Debugf("save cache step: %s", util.Dump(s))
 			stepName = s.Name
-			archivePath := e.archivePath(et.ID, i)
-			exitCode, err = e.doSaveCacheStep(ctx, s, et, pod, e.stepLogPath(et.ID, i), archivePath)
+			archivePath := e.archivePath(rt.et.ID, i)
+			exitCode, err = e.doSaveCacheStep(ctx, s, rt.et, pod, e.stepLogPath(rt.et.ID, i), archivePath)
 
 		case *types.RestoreCacheStep:
 			log.Debugf("restore cache step: %s", util.Dump(s))
 			stepName = s.Name
-			exitCode, err = e.doRestoreCacheStep(ctx, s, et, pod, e.stepLogPath(et.ID, i))
+			exitCode, err = e.doRestoreCacheStep(ctx, s, rt.et, pod, e.stepLogPath(rt.et.ID, i))
 
 		default:
 			return i, errors.Errorf("unknown step type: %s", util.Dump(s))
@@ -962,14 +953,14 @@ func (e *Executor) executeTaskInternal(ctx context.Context, et *types.ExecutorTa
 			} else {
 				rt.et.Status.Steps[i].Phase = types.ExecutorTaskPhaseFailed
 			}
-			serr = errors.Errorf("failed to execute step: %w", err)
+			serr = errors.Errorf("failed to execute step %s: %w", util.Dump(step), err)
 		} else if exitCode != 0 {
 			rt.et.Status.Steps[i].Phase = types.ExecutorTaskPhaseFailed
 			rt.et.Status.Steps[i].ExitCode = exitCode
 			serr = errors.Errorf("step %q failed with exitcode %d", stepName, exitCode)
 		}
 
-		if err := e.sendExecutorTaskStatus(ctx, et); err != nil {
+		if err := e.sendExecutorTaskStatus(ctx, rt.et); err != nil {
 			log.Errorf("err: %+v", err)
 		}
 		rt.Unlock()
