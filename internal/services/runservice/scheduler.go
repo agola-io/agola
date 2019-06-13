@@ -279,8 +279,21 @@ func (s *Runservice) chooseExecutor(ctx context.Context, rct *types.RunConfigTas
 }
 
 func chooseExecutor(executors []*types.Executor, rct *types.RunConfigTask) *types.Executor {
+	requiresPrivilegedContainers := false
+	for _, c := range rct.Runtime.Containers {
+		if c.Privileged == true {
+			requiresPrivilegedContainers = true
+			break
+		}
+	}
+
 	for _, e := range executors {
 		if e.LastStatusUpdateTime.Add(defaultExecutorNotAliveInterval).Before(time.Now()) {
+			continue
+		}
+
+		// skip executor provileged containers are required but not allowed
+		if requiresPrivilegedContainers == true && e.AllowPrivilegedContainers == false {
 			continue
 		}
 

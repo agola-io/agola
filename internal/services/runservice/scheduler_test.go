@@ -572,12 +572,32 @@ func TestChooseExecutor(t *testing.T) {
 		return e
 	}()
 
+	executorOKAllowsPriviledContainers := func() *types.Executor {
+		e := executorOK.DeepCopy()
+		e.ID = "executorOKAllowsPrivilegedContainers"
+		e.AllowPrivilegedContainers = true
+		return e
+	}()
+
 	// Only primary and the required variables for this test are set
 	rct := &types.RunConfigTask{
 		ID:   "task01",
 		Name: "task01",
 		Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 			Arch: common.ArchAMD64,
+		},
+	}
+
+	rctWithPrivilegedContainers := &types.RunConfigTask{
+		ID:   "task01",
+		Name: "task01",
+		Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
+			Arch: common.ArchAMD64,
+			Containers: []*types.Container{
+				{
+					Privileged: true,
+				},
+			},
 		},
 	}
 
@@ -623,6 +643,18 @@ func TestChooseExecutor(t *testing.T) {
 			executors: []*types.Executor{executorOKMultipleArchs},
 			rct:       rct,
 			out:       executorOKMultipleArchs,
+		},
+		{
+			name:      "test single executor without allowed privileged container but privileged containers are required",
+			executors: []*types.Executor{executorOK},
+			rct:       rctWithPrivilegedContainers,
+			out:       nil,
+		},
+		{
+			name:      "test single executor with allowed privileged container and privileged containers are required",
+			executors: []*types.Executor{executorOKAllowsPriviledContainers},
+			rct:       rctWithPrivilegedContainers,
+			out:       executorOKAllowsPriviledContainers,
 		},
 	}
 
