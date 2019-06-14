@@ -163,7 +163,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 		h.log.Errorf("failed to setup git source repo, trying to cleanup: %+v", ErrFromRemote(resp, err))
 		// try to cleanup gitsource configs and remove project
 		// we'll log but ignore errors
-		h.log.Infof("deleting project")
+		h.log.Infof("deleting project with ID: %q", rp.ID)
 		resp, err := h.configstoreClient.DeleteProject(ctx, rp.ID)
 		if err != nil {
 			h.log.Errorf("failed to delete project: %+v", ErrFromRemote(resp, err))
@@ -360,19 +360,9 @@ func (h *ActionHandler) ReconfigProject(ctx context.Context, projectRef string) 
 		return util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
-	user, resp, err := h.configstoreClient.GetUserByLinkedAccount(ctx, p.LinkedAccountID)
+	user, rs, la, err := h.getRemoteRepoAccessData(ctx, p.LinkedAccountID)
 	if err != nil {
-		return errors.Errorf("failed to get user with linked account id %q: %w", p.LinkedAccountID, ErrFromRemote(resp, err))
-	}
-
-	la := user.LinkedAccounts[p.LinkedAccountID]
-	if la == nil {
-		return errors.Errorf("linked account %q in user %q doesn't exist", p.LinkedAccountID, user.Name)
-	}
-
-	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, la.RemoteSourceID)
-	if err != nil {
-		return errors.Errorf("failed to get remote source %q: %w", la.RemoteSourceID, ErrFromRemote(resp, err))
+		return errors.Errorf("failed to get remote repo access data: %w", err)
 	}
 
 	// TODO(sgotti) update project repo path if the remote let us query by repository id
@@ -394,10 +384,30 @@ func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) er
 		return util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
+	// get data needed for repo cleanup
+	// we'll log but ignore errors
+	canDoRepCleanup := true
+	user, rs, la, err := h.getRemoteRepoAccessData(ctx, p.LinkedAccountID)
+	if err != nil {
+		canDoRepCleanup = false
+		h.log.Errorf("failed to get remote repo access data: %+v", err)
+	}
+
+	h.log.Infof("deleting project with ID: %q", p.ID)
 	resp, err = h.configstoreClient.DeleteProject(ctx, projectRef)
 	if err != nil {
 		return ErrFromRemote(resp, err)
 	}
+
+	// try to cleanup gitsource configs
+	// we'll log but ignore errors
+	if canDoRepCleanup {
+		h.log.Infof("cleanup git source repo")
+		if err := h.cleanupGitSourceRepo(ctx, rs, user, la, p); err != nil {
+			h.log.Errorf("failed to cleanup git source repo: %+v", ErrFromRemote(resp, err))
+		}
+	}
+
 	return nil
 }
 
@@ -559,4 +569,23 @@ func (h *ActionHandler) ProjectCreateRun(ctx context.Context, projectRef, branch
 	}
 
 	return h.CreateRuns(ctx, req)
+}
+
+func (h *ActionHandler) getRemoteRepoAccessData(ctx context.Context, linkedAccountID string) (*types.User, *types.RemoteSource, *types.LinkedAccount, error) {
+	user, resp, err := h.configstoreClient.GetUserByLinkedAccount(ctx, linkedAccountID)
+	if err != nil {
+		return nil, nil, nil, errors.Errorf("failed to get user with linked account id %q: %w", linkedAccountID, ErrFromRemote(resp, err))
+	}
+
+	la := user.LinkedAccounts[linkedAccountID]
+	if la == nil {
+		return nil, nil, nil, errors.Errorf("linked account %q in user %q doesn't exist", linkedAccountID, user.Name)
+	}
+
+	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, la.RemoteSourceID)
+	if err != nil {
+		return nil, nil, nil, errors.Errorf("failed to get remote source %q: %w", la.RemoteSourceID, ErrFromRemote(resp, err))
+	}
+
+	return user, rs, la, nil
 }
