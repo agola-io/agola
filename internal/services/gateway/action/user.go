@@ -168,7 +168,6 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 	if err != nil {
 		return nil, errors.Errorf("failed to get remote source %q: %w", req.RemoteSourceName, ErrFromRemote(resp, err))
 	}
-	h.log.Infof("rs: %s", util.Dump(rs))
 	var la *types.LinkedAccount
 	for _, v := range user.LinkedAccounts {
 		if v.RemoteSourceID == rs.ID {
@@ -176,7 +175,6 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 			break
 		}
 	}
-	h.log.Infof("la: %s", util.Dump(la))
 	if la != nil {
 		return nil, util.NewErrBadRequest(errors.Errorf("user %q already have a linked account for remote source %q", userRef, rs.Name))
 	}
@@ -230,7 +228,6 @@ func (h *ActionHandler) UpdateUserLA(ctx context.Context, userRef string, la *ty
 			break
 		}
 	}
-	h.log.Infof("la: %s", util.Dump(la))
 	if !laFound {
 		return util.NewErrBadRequest(errors.Errorf("user %q doesn't have a linked account with id %q", userRef, la.ID))
 	}
@@ -314,7 +311,6 @@ func (h *ActionHandler) RegisterUser(ctx context.Context, req *RegisterUserReque
 	if err != nil {
 		return nil, errors.Errorf("failed to get remote source %q: %w", req.RemoteSourceName, ErrFromRemote(resp, err))
 	}
-	h.log.Infof("rs: %s", util.Dump(rs))
 
 	accessToken, err := common.GetAccessToken(rs, req.UserAccessToken, req.Oauth2AccessToken)
 	if err != nil {
@@ -374,7 +370,6 @@ func (h *ActionHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (*
 	if err != nil {
 		return nil, errors.Errorf("failed to get remote source %q: %w", req.RemoteSourceName, ErrFromRemote(resp, err))
 	}
-	h.log.Infof("rs: %s", util.Dump(rs))
 
 	accessToken, err := common.GetAccessToken(rs, req.UserAccessToken, req.Oauth2AccessToken)
 	if err != nil {
@@ -405,7 +400,6 @@ func (h *ActionHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (*
 			break
 		}
 	}
-	h.log.Infof("la: %s", util.Dump(la))
 	if la == nil {
 		return nil, errors.Errorf("linked account for user %q for remote source %q doesn't exist", user.Name, rs.Name)
 	}
@@ -465,7 +459,6 @@ func (h *ActionHandler) Authorize(ctx context.Context, req *AuthorizeRequest) (*
 	if err != nil {
 		return nil, errors.Errorf("failed to get remote source %q: %w", req.RemoteSourceName, ErrFromRemote(resp, err))
 	}
-	h.log.Infof("rs: %s", util.Dump(rs))
 
 	accessToken, err := common.GetAccessToken(rs, req.UserAccessToken, req.Oauth2AccessToken)
 	if err != nil {
@@ -500,7 +493,6 @@ func (h *ActionHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSource
 	if err != nil {
 		return nil, errors.Errorf("failed to get remote source %q: %w", remoteSourceName, ErrFromRemote(resp, err))
 	}
-	h.log.Infof("rs: %s", util.Dump(rs))
 
 	switch requestType {
 	case RemoteSourceRequestTypeCreateUserLA:
@@ -526,7 +518,6 @@ func (h *ActionHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSource
 				break
 			}
 		}
-		h.log.Infof("la: %s", util.Dump(la))
 		if la != nil {
 			return nil, util.NewErrBadRequest(errors.Errorf("user %q already have a linked account for remote source %q", req.UserRef, rs.Name))
 		}
@@ -555,7 +546,6 @@ func (h *ActionHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSource
 		if err != nil {
 			return nil, err
 		}
-		h.log.Infof("oauth2 redirect: %s", redirect)
 
 		return &RemoteSourceAuthResponse{
 			Oauth2Redirect: redirect,
@@ -574,7 +564,6 @@ func (h *ActionHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSource
 			}
 			return nil, errors.Errorf("failed to login to remote source %q with login name %q: %w", rs.Name, loginName, err)
 		}
-		h.log.Infof("access token: %s", accessToken)
 		requestj, err := json.Marshal(req)
 		if err != nil {
 			return nil, err
@@ -741,7 +730,6 @@ func (h *ActionHandler) HandleOauth2Callback(ctx context.Context, code, state st
 	if err != nil {
 		return nil, errors.Errorf("failed to get remote source %q: %w", remoteSourceName, ErrFromRemote(resp, err))
 	}
-	h.log.Infof("rs: %s", util.Dump(rs))
 
 	oauth2Source, err := common.GetOauth2Source(rs, "")
 	if err != nil {

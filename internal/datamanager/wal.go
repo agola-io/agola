@@ -517,7 +517,6 @@ func (d *DataManager) WriteWalAdditionalOps(ctx context.Context, actions []*Acti
 	getWalsData := etcdclientv3.OpGet(etcdWalsDataKey)
 	getWal := etcdclientv3.OpGet(walKey)
 
-	//w.log.Infof("cgt: %s", util.Dump(cgt))
 	if cgt != nil {
 		for cgName, cgRev := range cgt.ChangeGroupsRevisions {
 			cgKey := path.Join(etcdChangeGroupsDir, cgName)

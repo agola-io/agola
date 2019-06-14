@@ -159,7 +159,6 @@ func (h *GitSmartHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	repoPath, reqType, err := MatchPath(r.URL.Path)
-	h.log.Infof("repoPath: %s", repoPath)
 	repoAbsPath, exists, err := h.repoAbsPathFunc(h.reposDir, repoPath)
 	if err != nil {
 		if err == ErrWrongRepoPath {
@@ -169,8 +168,6 @@ func (h *GitSmartHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	h.log.Infof("repoAbsPath: %s", repoAbsPath)
-	h.log.Infof("repo exists: %t", exists)
 
 	git := &util.Git{GitDir: repoAbsPath}
 
@@ -186,7 +183,7 @@ func (h *GitSmartHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case RequestTypeInfoRefs:
 		if h.createRepo && !exists {
 			if output, err := git.Output(ctx, nil, "init", "--bare", repoAbsPath); err != nil {
-				h.log.Infof("git error %v, output: %s", err, output)
+				h.log.Errorf("git error %v, output: %s", err, output)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -218,7 +215,7 @@ func (h *GitSmartHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err := gitService(ctx, w, body, repoAbsPath, "upload-pack"); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			// we cannot return any http error since the http header has already been written
-			h.log.Infof("git command error: %v", err)
+			h.log.Errorf("git command error: %v", err)
 		}
 	case RequestTypeReceivePack:
 		w.Header().Set("Content-Type", "application/x-git-receive-pack-result")
@@ -226,7 +223,7 @@ func (h *GitSmartHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err := gitService(ctx, w, body, repoAbsPath, "receive-pack"); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			// we cannot return any http error since the http header has already been written
-			h.log.Infof("git command error: %v", err)
+			h.log.Errorf("git command error: %v", err)
 		}
 	}
 }
@@ -254,8 +251,6 @@ func (h *FetchFileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.log.Infof("fetchData: %v", fetchData)
-
 	repoAbsPath, _, err := h.repoAbsPathFunc(h.reposDir, fetchData.RepoPath)
 	if err != nil {
 		if err == ErrWrongRepoPath {
@@ -269,6 +264,6 @@ func (h *FetchFileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := gitFetchFile(ctx, w, r.Body, repoAbsPath, fetchData.Ref, fetchData.Path); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		// we cannot return any http error since the http header has already been written
-		h.log.Infof("git command error: %v", err)
+		h.log.Errorf("git command error: %v", err)
 	}
 }

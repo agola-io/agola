@@ -226,7 +226,6 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// handle special queries, like get user by token
 	queryType := query.Get("query_type")
-	h.log.Infof("query_type: %s", queryType)
 
 	var users []*types.User
 	switch queryType {
@@ -238,7 +237,6 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			user, err = h.readDB.GetUserByTokenValue(tx, token)
 			return err
 		})
-		h.log.Infof("user: %s", util.Dump(user))
 		if err != nil {
 			h.log.Errorf("err: %+v", err)
 			httpError(w, err)
@@ -257,7 +255,6 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			user, err = h.readDB.GetUserByLinkedAccount(tx, linkedAccountID)
 			return err
 		})
-		h.log.Infof("user: %s", util.Dump(user))
 		if err != nil {
 			h.log.Errorf("err: %+v", err)
 			httpError(w, err)
@@ -277,7 +274,6 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			user, err = h.readDB.GetUserByLinkedAccountRemoteUserIDandSource(tx, remoteUserID, remoteSourceID)
 			return err
 		})
-		h.log.Infof("user: %s", util.Dump(user))
 		if err != nil {
 			h.log.Errorf("err: %+v", err)
 			httpError(w, err)

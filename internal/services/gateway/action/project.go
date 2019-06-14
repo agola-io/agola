@@ -108,7 +108,6 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 	if err != nil {
 		return nil, errors.Errorf("failed to get remote source %q: %w", req.RemoteSourceName, ErrFromRemote(resp, err))
 	}
-	h.log.Infof("rs: %s", util.Dump(rs))
 	var la *types.LinkedAccount
 	for _, v := range user.LinkedAccounts {
 		if v.RemoteSourceID == rs.ID {
@@ -116,7 +115,6 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 			break
 		}
 	}
-	h.log.Infof("la: %s", util.Dump(la))
 	if la == nil {
 		return nil, errors.Errorf("user doesn't have a linked account for remote source %q", rs.Name)
 	}
@@ -220,7 +218,6 @@ func (h *ActionHandler) ProjectUpdateRepoLinkedAccount(ctx context.Context, proj
 	if err != nil {
 		return nil, errors.Errorf("failed to get remote source %q: %w", p.RemoteSourceID, ErrFromRemote(resp, err))
 	}
-	h.log.Infof("rs: %s", util.Dump(rs))
 	var la *types.LinkedAccount
 	for _, v := range user.LinkedAccounts {
 		if v.RemoteSourceID == rs.ID {
@@ -228,7 +225,6 @@ func (h *ActionHandler) ProjectUpdateRepoLinkedAccount(ctx context.Context, proj
 			break
 		}
 	}
-	h.log.Infof("la: %s", util.Dump(la))
 	if la == nil {
 		return nil, util.NewErrBadRequest(errors.Errorf("user doesn't have a linked account for remote source %q", rs.Name))
 	}
@@ -316,7 +312,6 @@ func (h *ActionHandler) ReconfigProject(ctx context.Context, projectRef string) 
 	}
 
 	la := user.LinkedAccounts[p.LinkedAccountID]
-	h.log.Infof("la: %s", util.Dump(la))
 	if la == nil {
 		return errors.Errorf("linked account %q in user %q doesn't exist", p.LinkedAccountID, user.Name)
 	}
@@ -377,7 +372,6 @@ func (h *ActionHandler) ProjectCreateRun(ctx context.Context, projectRef, branch
 	if err != nil {
 		return errors.Errorf("failed to get remote source %q: %w", p.RemoteSourceID, ErrFromRemote(resp, err))
 	}
-	h.log.Infof("rs: %s", util.Dump(rs))
 	var la *types.LinkedAccount
 	for _, v := range user.LinkedAccounts {
 		if v.RemoteSourceID == rs.ID {
@@ -385,7 +379,6 @@ func (h *ActionHandler) ProjectCreateRun(ctx context.Context, projectRef, branch
 			break
 		}
 	}
-	h.log.Infof("la: %s", util.Dump(la))
 	if la == nil {
 		return util.NewErrBadRequest(errors.Errorf("user doesn't have a linked account for remote source %q", rs.Name))
 	}

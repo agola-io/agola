@@ -306,7 +306,7 @@ func (r *ReadDB) SyncRDB(ctx context.Context) error {
 		}
 	}
 
-	r.log.Infof("startWalSeq: %s", curWalSeq)
+	r.log.Debugf("startWalSeq: %s", curWalSeq)
 
 	// Sync from wals
 	// sync from objectstorage until the current known lastCommittedStorageWal in
@@ -326,8 +326,8 @@ func (r *ReadDB) SyncRDB(ctx context.Context) error {
 	if err != nil {
 		return errors.Errorf("failed to get first available wal data: %w", err)
 	}
-	r.log.Infof("firstAvailableWalData: %s", util.Dump(firstAvailableWalData))
-	r.log.Infof("revision: %d", revision)
+	r.log.Debugf("firstAvailableWalData: %s", util.Dump(firstAvailableWalData))
+	r.log.Debugf("revision: %d", revision)
 	if firstAvailableWalData == nil {
 		if curWalSeq != "" {
 			// this happens if etcd has been reset
@@ -448,7 +448,7 @@ func (r *ReadDB) HandleEvents(ctx context.Context) error {
 
 	wctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	r.log.Infof("revision: %d", revision)
+	r.log.Debugf("revision: %d", revision)
 	wch := r.dm.Watch(wctx, revision+1)
 	for we := range wch {
 		r.log.Debugf("we: %s", util.Dump(we))
@@ -487,7 +487,7 @@ func (r *ReadDB) HandleEvents(ctx context.Context) error {
 				if err != nil {
 					return err
 				}
-				r.log.Infof("we.WalData.WalSequence: %q", we.WalData.WalSequence)
+				r.log.Debugf("we.WalData.WalSequence: %q", we.WalData.WalSequence)
 				weWalEpoch := weWalSequence.Epoch
 				if curWalEpoch != weWalEpoch {
 					r.Initialized = false
@@ -665,13 +665,11 @@ func (r *ReadDB) Do(f func(tx *db.Tx) error) error {
 }
 
 func (r *ReadDB) insertRevision(tx *db.Tx, revision int64) error {
-	//r.log.Infof("insert revision: %d", revision)
 	// poor man insert or update that works because transaction isolation level is serializable
 	if _, err := tx.Exec("delete from revision"); err != nil {
 		return errors.Errorf("failed to delete revision: %w", err)
 	}
 	// TODO(sgotti) go database/sql and mattn/sqlite3 don't support uint64 types...
-	//q, args, err = revisionInsert.Values(int64(wresp.Header.ClusterId), run.Revision).ToSql()
 	q, args, err := revisionInsert.Values(revision).ToSql()
 	if err != nil {
 		return errors.Errorf("failed to build query: %w", err)
@@ -710,7 +708,7 @@ func (r *ReadDB) getRevision(tx *db.Tx) (int64, error) {
 }
 
 func (r *ReadDB) insertCommittedWalSequence(tx *db.Tx, seq string) error {
-	r.log.Infof("insert seq: %s", seq)
+	r.log.Debugf("insert seq: %s", seq)
 	// poor man insert or update that works because transaction isolation level is serializable
 	if _, err := tx.Exec("delete from committedwalsequence"); err != nil {
 		return errors.Errorf("failed to delete committedwalsequence: %w", err)
@@ -742,7 +740,7 @@ func (r *ReadDB) GetCommittedWalSequence(tx *db.Tx) (string, error) {
 }
 
 func (r *ReadDB) insertChangeGroupRevision(tx *db.Tx, changegroup string, revision int64) error {
-	r.log.Infof("insertChangeGroupRevision: %s %d", changegroup, revision)
+	r.log.Debugf("insertChangeGroupRevision: %s %d", changegroup, revision)
 
 	// poor man insert or update that works because transaction isolation level is serializable
 	if _, err := tx.Exec("delete from changegrouprevision where id = $1", changegroup); err != nil {

@@ -54,7 +54,6 @@ func (s *Scheduler) schedule(ctx context.Context) error {
 		if err != nil {
 			return errors.Errorf("failed to get queued runs: %w", err)
 		}
-		//log.Infof("queuedRuns: %s", util.Dump(queuedRunsResponse.Runs))
 
 		for _, run := range queuedRunsResponse.Runs {
 			groups[run.Group] = struct{}{}
@@ -79,7 +78,6 @@ func (s *Scheduler) schedule(ctx context.Context) error {
 func (s *Scheduler) scheduleRun(ctx context.Context, groupID string) error {
 	// get first queued run
 	queuedRunsResponse, _, err := s.runserviceClient.GetGroupFirstQueuedRuns(ctx, groupID, nil)
-	//log.Infof("first queuedRuns: %s", util.Dump(queuedRunsResponse.Runs))
 	if err != nil {
 		return errors.Errorf("failed to get the first project queued run: %w", err)
 	}
@@ -87,7 +85,6 @@ func (s *Scheduler) scheduleRun(ctx context.Context, groupID string) error {
 		return nil
 	}
 
-	//log.Infof("queued runs: %s", queuedRunsResponse.Runs)
 	run := queuedRunsResponse.Runs[0]
 
 	changegroup := util.EncodeSha256Hex(fmt.Sprintf("changegroup-%s", groupID))
@@ -95,10 +92,9 @@ func (s *Scheduler) scheduleRun(ctx context.Context, groupID string) error {
 	if err != nil {
 		return errors.Errorf("failed to get running runs: %w", err)
 	}
-	//log.Infof("running Runs: %s", util.Dump(runningRunsResponse.Runs))
 	if len(runningRunsResponse.Runs) == 0 {
 		log.Infof("starting run %s", run.ID)
-		log.Infof("changegroups: %s", runningRunsResponse.ChangeGroupsUpdateToken)
+		log.Debugf("changegroups: %s", runningRunsResponse.ChangeGroupsUpdateToken)
 		if _, err := s.runserviceClient.StartRun(ctx, run.ID, runningRunsResponse.ChangeGroupsUpdateToken); err != nil {
 			log.Errorf("failed to start run %s: %v", run.ID, err)
 		}

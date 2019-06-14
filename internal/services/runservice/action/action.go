@@ -244,8 +244,8 @@ func (h *ActionHandler) recreateRun(ctx context.Context, req *RunCreateRequest) 
 		return nil, util.NewErrBadRequest(errors.Errorf("run %q doesn't exist: %w", req.RunID, err))
 	}
 
-	h.log.Infof("rc: %s", util.Dump(rc))
-	h.log.Infof("run: %s", util.Dump(run))
+	h.log.Debugf("rc: %s", util.Dump(rc))
+	h.log.Debugf("run: %s", util.Dump(run))
 
 	if req.FromStart {
 		if canRestart, reason := run.CanRestartFromScratch(); !canRestart {
@@ -259,8 +259,8 @@ func (h *ActionHandler) recreateRun(ctx context.Context, req *RunCreateRequest) 
 
 	rb := recreateRun(util.DefaultUUIDGenerator{}, run, rc, id, req)
 
-	h.log.Infof("created rc from existing rc: %s", util.Dump(rb.Rc))
-	h.log.Infof("created run from existing run: %s", util.Dump(rb.Run))
+	h.log.Debugf("created rc from existing rc: %s", util.Dump(rb.Rc))
+	h.log.Debugf("created run from existing run: %s", util.Dump(rb.Run))
 
 	return rb, nil
 }
@@ -383,7 +383,7 @@ func (h *ActionHandler) saveRun(ctx context.Context, rb *types.RunBundle, runcgt
 	rc := rb.Rc
 
 	c, cgt, err := h.getRunCounter(run.Group)
-	h.log.Infof("c: %d, cgt: %s", c, util.Dump(cgt))
+	h.log.Debugf("c: %d, cgt: %s", c, util.Dump(cgt))
 	if err != nil {
 		return err
 	}

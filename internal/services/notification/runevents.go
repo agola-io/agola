@@ -99,7 +99,6 @@ func (n *NotificationService) runEventsHandler(ctx context.Context) error {
 			buf.Write(line[6:])
 		case bytes.Equal(line, []byte("\n")):
 			data := buf.Bytes()
-			log.Infof("data: %s", data)
 			buf.Reset()
 
 			var ev *rstypes.RunEvent

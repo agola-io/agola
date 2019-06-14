@@ -50,7 +50,6 @@ func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if userIDVal != nil {
 		userID = userIDVal.(string)
 	}
-	h.log.Infof("userID: %q", userID)
 
 	var req CreateOrgRequest
 	d := json.NewDecoder(r.Body)

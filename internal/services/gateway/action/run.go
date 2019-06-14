@@ -516,30 +516,25 @@ func (h *ActionHandler) genRunVariables(ctx context.Context, req *CreateRunReque
 	if err != nil {
 		return nil, errors.Errorf("failed to get project variables: %w", err)
 	}
-	h.log.Infof("pvars: %v", util.Dump(pvars))
 
 	// remove overriden variables
 	pvars = common.FilterOverriddenVariables(pvars)
-	h.log.Infof("pvars: %v", util.Dump(pvars))
 
 	// get project secrets
 	secrets, _, err := h.configstoreClient.GetProjectSecrets(ctx, req.Project.ID, true)
 	if err != nil {
 		return nil, errors.Errorf("failed to get project secrets: %w", err)
 	}
-	h.log.Infof("secrets: %v", util.Dump(secrets))
 	for _, pvar := range pvars {
 		// find the value match
 		var varval types.VariableValue
 		for _, varval = range pvar.Values {
-			h.log.Infof("varval: %v", util.Dump(varval))
 			match := types.MatchWhen(varval.When, req.Branch, req.Tag, req.Ref)
 			if !match {
 				continue
 			}
 			// get the secret value referenced by the variable, it must be a secret at the same level or a lower level
 			secret := common.GetVarValueMatchingSecret(varval, pvar.ParentPath, secrets)
-			h.log.Infof("secret: %v", util.Dump(secret))
 			if secret != nil {
 				varValue, ok := secret.Data[varval.SecretVar]
 				if ok {
@@ -549,7 +544,6 @@ func (h *ActionHandler) genRunVariables(ctx context.Context, req *CreateRunReque
 			break
 		}
 	}
-	h.log.Infof("variables: %v", util.Dump(variables))
 
 	return variables, nil
 }

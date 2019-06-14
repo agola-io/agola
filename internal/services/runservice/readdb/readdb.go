@@ -200,14 +200,12 @@ func (r *ReadDB) SyncRDB(ctx context.Context) error {
 			}
 			resp := listResp.Resp
 			continuation = listResp.Continuation
-			r.log.Infof("continuation: %s", util.Dump(continuation))
 
 			if revision == 0 {
 				revision = resp.Header.Revision
 			}
 
 			for _, kv := range resp.Kvs {
-				r.log.Infof("key: %s", kv.Key)
 				var run *types.Run
 				if err := json.Unmarshal(kv.Value, &run); err != nil {
 					return err
@@ -570,7 +568,7 @@ func (r *ReadDB) SyncObjectStorage(ctx context.Context) error {
 		}
 	}
 
-	r.log.Infof("startWalSeq: %s", curWalSeq)
+	r.log.Debugf("startWalSeq: %s", curWalSeq)
 
 	// Sync from wals
 	// sync from objectstorage until the current known lastCommittedStorageWal in etcd
@@ -590,8 +588,8 @@ func (r *ReadDB) SyncObjectStorage(ctx context.Context) error {
 	if err != nil {
 		return errors.Errorf("failed to get first available wal data: %w", err)
 	}
-	r.log.Infof("firstAvailableWalData: %s", util.Dump(firstAvailableWalData))
-	r.log.Infof("revision: %d", revision)
+	r.log.Debugf("firstAvailableWalData: %s", util.Dump(firstAvailableWalData))
+	r.log.Debugf("revision: %d", revision)
 	if firstAvailableWalData == nil {
 		if curWalSeq != "" {
 			// this happens if etcd has been reset
@@ -784,7 +782,7 @@ func (r *ReadDB) handleEventsOST(ctx context.Context) error {
 
 	wctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	r.log.Infof("revision: %d", revision)
+	r.log.Debugf("revision: %d", revision)
 	wch := r.dm.Watch(wctx, revision+1)
 	for we := range wch {
 		r.log.Debugf("we: %s", util.Dump(we))
@@ -824,7 +822,7 @@ func (r *ReadDB) handleEventsOST(ctx context.Context) error {
 				if err != nil {
 					return err
 				}
-				r.log.Infof("we.WalData.WalSequence: %q", we.WalData.WalSequence)
+				r.log.Debugf("we.WalData.WalSequence: %q", we.WalData.WalSequence)
 				weWalEpoch := weWalSequence.Epoch
 				if curWalEpoch != weWalEpoch {
 					r.Initialized = false
@@ -879,7 +877,7 @@ func (r *ReadDB) applyWal(tx *db.Tx, walDataFileID string) error {
 }
 
 func (r *ReadDB) applyAction(tx *db.Tx, action *datamanager.Action) error {
-	r.log.Infof("action: dataType: %s, ID: %s", action.DataType, action.ID)
+	r.log.Debugf("action: dataType: %s, ID: %s", action.DataType, action.ID)
 	switch action.ActionType {
 	case datamanager.ActionTypePut:
 		switch action.DataType {
@@ -896,7 +894,7 @@ func (r *ReadDB) applyAction(tx *db.Tx, action *datamanager.Action) error {
 			if err := json.Unmarshal(action.Data, &runCounter); err != nil {
 				return err
 			}
-			r.log.Infof("inserting run counter %q, c: %d", action.ID, runCounter)
+			r.log.Debugf("inserting run counter %q, c: %d", action.ID, runCounter)
 			if err := r.insertRunCounterOST(tx, action.ID, runCounter); err != nil {
 				return err
 			}
@@ -1443,7 +1441,7 @@ func scanChangeGroupsRevision(rows *sql.Rows) (types.ChangeGroupsRevisions, erro
 }
 
 func (r *ReadDB) insertCommittedWalSequenceOST(tx *db.Tx, seq string) error {
-	r.log.Infof("insert seq: %s", seq)
+	r.log.Debugf("insert seq: %s", seq)
 	// poor man insert or update that works because transaction isolation level is serializable
 	if _, err := tx.Exec("delete from committedwalsequence_ost"); err != nil {
 		return errors.Errorf("failed to delete committedwalsequence: %w", err)
@@ -1475,7 +1473,7 @@ func (r *ReadDB) GetCommittedWalSequenceOST(tx *db.Tx) (string, error) {
 }
 
 func (r *ReadDB) insertChangeGroupRevisionOST(tx *db.Tx, changegroup string, revision int64) error {
-	r.log.Infof("insertChangeGroupRevision: %s %d", changegroup, revision)
+	r.log.Debugf("insertChangeGroupRevision: %s %d", changegroup, revision)
 
 	// poor man insert or update that works because transaction isolation level is serializable
 	if _, err := tx.Exec("delete from changegrouprevision_ost where id = $1", changegroup); err != nil {

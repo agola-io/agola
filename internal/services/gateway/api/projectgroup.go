@@ -60,7 +60,6 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		return
 	}
 	userID := userIDVal.(string)
-	h.log.Infof("userID: %q", userID)
 
 	creq := &action.CreateProjectGroupRequest{
 		Name:          req.Name,

@@ -46,7 +46,7 @@ func (r *ReadDB) insertUser(tx *db.Tx, data []byte) error {
 	if err := json.Unmarshal(data, &user); err != nil {
 		return errors.Errorf("failed to unmarshal user: %w", err)
 	}
-	r.log.Infof("inserting user: %s", util.Dump(user))
+	r.log.Debugf("inserting user: %s", util.Dump(user))
 	// poor man insert or update...
 	if err := r.deleteUser(tx, user.ID); err != nil {
 		return err
@@ -74,7 +74,7 @@ func (r *ReadDB) insertUser(tx *db.Tx, data []byte) error {
 	}
 	// insert user_token
 	for _, tokenValue := range user.Tokens {
-		r.log.Infof("inserting user token: %s", tokenValue)
+		r.log.Debugf("inserting user token: %s", tokenValue)
 		if err := r.deleteUserToken(tx, tokenValue); err != nil {
 			return err
 		}

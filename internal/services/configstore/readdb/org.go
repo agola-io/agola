@@ -40,7 +40,7 @@ func (r *ReadDB) insertOrg(tx *db.Tx, data []byte) error {
 	if err := json.Unmarshal(data, &org); err != nil {
 		return errors.Errorf("failed to unmarshal org: %w", err)
 	}
-	r.log.Infof("inserting org: %s", util.Dump(org))
+	r.log.Debugf("inserting org: %s", util.Dump(org))
 	// poor man insert or update...
 	if err := r.deleteOrg(tx, org.ID); err != nil {
 		return err
@@ -209,7 +209,7 @@ func (r *ReadDB) insertOrgMember(tx *db.Tx, data []byte) error {
 	if err := json.Unmarshal(data, &orgmember); err != nil {
 		return errors.Errorf("failed to unmarshal orgmember: %w", err)
 	}
-	r.log.Infof("inserting orgmember: %s", util.Dump(orgmember))
+	r.log.Debugf("inserting orgmember: %s", util.Dump(orgmember))
 	// poor man insert or update...
 	if err := r.deleteOrgMember(tx, orgmember.ID); err != nil {
 		return err

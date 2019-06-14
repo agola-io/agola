@@ -79,7 +79,6 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) error {
 		return util.NewErrInternal(errors.Errorf("failed to get user by linked account %q: %w", project.LinkedAccountID, err))
 	}
 	la := user.LinkedAccounts[project.LinkedAccountID]
-	h.log.Infof("la: %s", util.Dump(la))
 	if la == nil {
 		return util.NewErrInternal(errors.Errorf("linked account %q in user %q doesn't exist", project.LinkedAccountID, user.Name))
 	}
@@ -113,8 +112,6 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) error {
 	}
 
 	cloneURL := webhookData.SSHURL
-
-	h.log.Infof("webhookData: %s", util.Dump(webhookData))
 
 	req := &action.CreateRunRequest{
 		RunType:            types.RunTypeProject,

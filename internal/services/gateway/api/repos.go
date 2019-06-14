@@ -38,8 +38,6 @@ func (h *ReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	path := vars["rest"]
 
-	h.log.Infof("path: %s", path)
-
 	u, err := url.Parse(h.gitServerURL)
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
@@ -48,9 +46,6 @@ func (h *ReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	u.Path = path
 	u.RawQuery = r.URL.RawQuery
-
-	h.log.Infof("u: %s", u.String())
-	// TODO(sgotti) Check authorized call from client
 
 	defer r.Body.Close()
 	// proxy all the request body to the destination server
