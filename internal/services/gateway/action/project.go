@@ -156,9 +156,26 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 	if err != nil {
 		return nil, errors.Errorf("failed to create project: %w", ErrFromRemote(resp, err))
 	}
-	h.log.Infof("project %s created, ID: %s", p.Name, p.ID)
+	h.log.Infof("project %s created, ID: %s", rp.Name, rp.ID)
 
-	return rp, h.SetupProject(ctx, rs, user, la, rp)
+	if serr := h.setupGitSourceRepo(ctx, rs, user, la, rp); serr != nil {
+		var err error
+		h.log.Errorf("failed to setup git source repo, trying to cleanup: %+v", ErrFromRemote(resp, err))
+		// try to cleanup gitsource configs and remove project
+		// we'll log but ignore errors
+		h.log.Infof("deleting project")
+		resp, err := h.configstoreClient.DeleteProject(ctx, rp.ID)
+		if err != nil {
+			h.log.Errorf("failed to delete project: %+v", ErrFromRemote(resp, err))
+		}
+		h.log.Infof("cleanup git source repo")
+		if err := h.cleanupGitSourceRepo(ctx, rs, user, la, rp); err != nil {
+			h.log.Errorf("failed to cleanup git source repo: %+v", ErrFromRemote(resp, err))
+		}
+		return nil, errors.Errorf("failed to setup git source repo: %w", serr)
+	}
+
+	return rp, nil
 }
 
 type UpdateProjectRequest struct {
@@ -252,7 +269,7 @@ func (h *ActionHandler) ProjectUpdateRepoLinkedAccount(ctx context.Context, proj
 	return rp, nil
 }
 
-func (h *ActionHandler) SetupProject(ctx context.Context, rs *types.RemoteSource, user *types.User, la *types.LinkedAccount, project *csapi.Project) error {
+func (h *ActionHandler) setupGitSourceRepo(ctx context.Context, rs *types.RemoteSource, user *types.User, la *types.LinkedAccount, project *csapi.Project) error {
 	gitsource, err := h.GetGitSource(ctx, rs, user.Name, la)
 	if err != nil {
 		return errors.Errorf("failed to create gitsource client: %w", err)
@@ -263,33 +280,70 @@ func (h *ActionHandler) SetupProject(ctx context.Context, rs *types.RemoteSource
 		return errors.Errorf("failed to extract public key: %w", err)
 	}
 
-	webhookURL, err := url.Parse(fmt.Sprintf("%s/webhooks", h.apiExposedURL))
+	webhookURL, err := h.genWebhookURL(project)
 	if err != nil {
 		return errors.Errorf("failed to generate webhook url: %w", err)
+	}
+
+	// generate deploy keys and webhooks containing the agola project id so we
+	// can have multiple projects referencing the same remote repository and this
+	// will trigger multiple different runs
+	deployKeyName := fmt.Sprintf("agola deploy key - %s", project.ID)
+	h.log.Infof("creating/updating deploy key: %s", deployKeyName)
+	if err := gitsource.UpdateDeployKey(project.RepositoryPath, deployKeyName, string(pubKey), true); err != nil {
+		return errors.Errorf("failed to create deploy key: %w", err)
+	}
+	h.log.Infof("deleting existing webhooks")
+	if err := gitsource.DeleteRepoWebhook(project.RepositoryPath, webhookURL); err != nil {
+		return errors.Errorf("failed to delete repository webhook: %w", err)
+	}
+	h.log.Infof("creating webhook to url: %s", webhookURL)
+	if err := gitsource.CreateRepoWebhook(project.RepositoryPath, webhookURL, project.WebhookSecret); err != nil {
+		return errors.Errorf("failed to create repository webhook: %w", err)
+	}
+
+	return nil
+}
+
+func (h *ActionHandler) cleanupGitSourceRepo(ctx context.Context, rs *types.RemoteSource, user *types.User, la *types.LinkedAccount, project *csapi.Project) error {
+	gitsource, err := h.GetGitSource(ctx, rs, user.Name, la)
+	if err != nil {
+		return errors.Errorf("failed to create gitsource client: %w", err)
+	}
+
+	webhookURL, err := h.genWebhookURL(project)
+	if err != nil {
+		return errors.Errorf("failed to generate webhook url: %w", err)
+	}
+
+	// generate deploy keys and webhooks containing the agola project id so we
+	// can have multiple projects referencing the same remote repository and this
+	// will trigger multiple different runs
+	deployKeyName := fmt.Sprintf("agola deploy key - %s", project.ID)
+	h.log.Infof("deleting deploy key: %s", deployKeyName)
+	if err := gitsource.DeleteDeployKey(project.RepositoryPath, deployKeyName); err != nil {
+		return errors.Errorf("failed to create deploy key: %w", err)
+	}
+	h.log.Infof("deleting existing webhooks")
+	if err := gitsource.DeleteRepoWebhook(project.RepositoryPath, webhookURL); err != nil {
+		return errors.Errorf("failed to delete repository webhook: %w", err)
+	}
+
+	return nil
+}
+
+func (h *ActionHandler) genWebhookURL(project *csapi.Project) (string, error) {
+	baseWebhookURL := fmt.Sprintf("%s/webhooks", h.apiExposedURL)
+	webhookURL, err := url.Parse(baseWebhookURL)
+	if err != nil {
+		return "", errors.Errorf("failed to parse base webhook url %q: %w", baseWebhookURL, err)
 	}
 	q := url.Values{}
 	q.Add("projectid", project.ID)
 	q.Add("agolaid", h.agolaID)
 	webhookURL.RawQuery = q.Encode()
 
-	// generate deploy keys and webhooks containing the agola project id so we
-	// can have multiple projects referencing the same remote repository and this
-	// will trigger multiple different runs
-	deployKeyName := fmt.Sprintf("agola deploy key - %s", project.ID)
-	h.log.Infof("creating/updating deploy key: %s", string(pubKey))
-	if err := gitsource.UpdateDeployKey(project.RepositoryPath, deployKeyName, string(pubKey), true); err != nil {
-		return errors.Errorf("failed to create deploy key: %w", err)
-	}
-	h.log.Infof("deleting existing webhooks")
-	if err := gitsource.DeleteRepoWebhook(project.RepositoryPath, webhookURL.String()); err != nil {
-		return errors.Errorf("failed to delete repository webhook: %w", err)
-	}
-	h.log.Infof("creating webhook to url: %s", webhookURL)
-	if err := gitsource.CreateRepoWebhook(project.RepositoryPath, webhookURL.String(), project.WebhookSecret); err != nil {
-		return errors.Errorf("failed to create repository webhook: %w", err)
-	}
-
-	return nil
+	return webhookURL.String(), nil
 }
 
 func (h *ActionHandler) ReconfigProject(ctx context.Context, projectRef string) error {
@@ -323,7 +377,7 @@ func (h *ActionHandler) ReconfigProject(ctx context.Context, projectRef string) 
 
 	// TODO(sgotti) update project repo path if the remote let us query by repository id
 
-	return h.SetupProject(ctx, rs, user, la, p)
+	return h.setupGitSourceRepo(ctx, rs, user, la, p)
 }
 
 func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) error {
