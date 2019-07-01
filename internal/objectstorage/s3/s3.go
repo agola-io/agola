@@ -21,7 +21,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/sorintlab/agola/internal/objectstorage/types"
+	"agola.io/agola/internal/objectstorage/types"
 
 	minio "github.com/minio/minio-go"
 	errors "golang.org/x/xerrors"

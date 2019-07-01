@@ -21,9 +21,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/sorintlab/agola/internal/services/gateway/action"
-	rstypes "github.com/sorintlab/agola/internal/services/runservice/types"
-	"github.com/sorintlab/agola/internal/util"
+	"agola.io/agola/internal/services/gateway/action"
+	rstypes "agola.io/agola/internal/services/runservice/types"
+	"agola.io/agola/internal/util"
 	"go.uber.org/zap"
 	errors "golang.org/x/xerrors"
 

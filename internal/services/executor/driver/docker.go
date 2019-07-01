@@ -28,8 +28,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sorintlab/agola/internal/common"
-	"github.com/sorintlab/agola/internal/services/executor/registry"
+	"agola.io/agola/internal/common"
+	"agola.io/agola/internal/services/executor/registry"
 	errors "golang.org/x/xerrors"
 
 	"github.com/docker/docker/api/types"

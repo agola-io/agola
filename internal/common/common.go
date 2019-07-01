@@ -21,11 +21,11 @@ import (
 	"os"
 	"path"
 
-	"github.com/sorintlab/agola/internal/etcd"
-	"github.com/sorintlab/agola/internal/objectstorage"
-	"github.com/sorintlab/agola/internal/objectstorage/posix"
-	"github.com/sorintlab/agola/internal/objectstorage/s3"
-	"github.com/sorintlab/agola/internal/services/config"
+	"agola.io/agola/internal/etcd"
+	"agola.io/agola/internal/objectstorage"
+	"agola.io/agola/internal/objectstorage/posix"
+	"agola.io/agola/internal/objectstorage/s3"
+	"agola.io/agola/internal/services/config"
 	"go.uber.org/zap"
 	errors "golang.org/x/xerrors"
 )

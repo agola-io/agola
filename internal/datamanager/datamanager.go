@@ -20,8 +20,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sorintlab/agola/internal/etcd"
-	"github.com/sorintlab/agola/internal/objectstorage"
+	"agola.io/agola/internal/etcd"
+	"agola.io/agola/internal/objectstorage"
 
 	"go.uber.org/zap"
 	errors "golang.org/x/xerrors"

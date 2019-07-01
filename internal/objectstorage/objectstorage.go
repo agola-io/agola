@@ -17,7 +17,7 @@ package objectstorage
 import (
 	"io"
 
-	"github.com/sorintlab/agola/internal/objectstorage/types"
+	"agola.io/agola/internal/objectstorage/types"
 )
 
 type Storage interface {

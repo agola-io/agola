@@ -15,7 +15,7 @@
 package main
 
 import (
-	"github.com/sorintlab/agola/cmd/agola/cmd"
+	"agola.io/agola/cmd/agola/cmd"
 )
 
 func main() {

@@ -23,8 +23,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/sorintlab/agola/internal/objectstorage/common"
-	"github.com/sorintlab/agola/internal/objectstorage/types"
+	"agola.io/agola/internal/objectstorage/common"
+	"agola.io/agola/internal/objectstorage/types"
 
 	errors "golang.org/x/xerrors"
 )

@@ -19,8 +19,8 @@ import (
 	"net/url"
 	"path"
 
-	"github.com/sorintlab/agola/internal/services/common"
-	rstypes "github.com/sorintlab/agola/internal/services/runservice/types"
+	"agola.io/agola/internal/services/common"
+	rstypes "agola.io/agola/internal/services/runservice/types"
 )
 
 // GetBadge return a badge for a project branch

@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"time"
 
+	"agola.io/agola/internal/common"
+	"agola.io/agola/internal/util"
 	"github.com/mitchellh/copystructure"
-	"github.com/sorintlab/agola/internal/common"
-	"github.com/sorintlab/agola/internal/util"
 )
 
 const (

@@ -24,7 +24,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/sorintlab/agola/internal/util"
+	"agola.io/agola/internal/util"
 
 	"go.uber.org/zap"
 	errors "golang.org/x/xerrors"

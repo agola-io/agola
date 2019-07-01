@@ -27,9 +27,9 @@ import (
 	"time"
 	"unicode"
 
+	slog "agola.io/agola/internal/log"
 	"github.com/docker/docker/api/types"
 	uuid "github.com/satori/go.uuid"
-	slog "github.com/sorintlab/agola/internal/log"
 
 	"github.com/google/go-cmp/cmp"
 	"go.uber.org/zap"

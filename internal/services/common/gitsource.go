@@ -15,11 +15,11 @@
 package common
 
 import (
-	gitsource "github.com/sorintlab/agola/internal/gitsources"
-	"github.com/sorintlab/agola/internal/gitsources/gitea"
-	"github.com/sorintlab/agola/internal/gitsources/github"
-	"github.com/sorintlab/agola/internal/gitsources/gitlab"
-	"github.com/sorintlab/agola/internal/services/types"
+	gitsource "agola.io/agola/internal/gitsources"
+	"agola.io/agola/internal/gitsources/gitea"
+	"agola.io/agola/internal/gitsources/github"
+	"agola.io/agola/internal/gitsources/gitlab"
+	"agola.io/agola/internal/services/types"
 
 	errors "golang.org/x/xerrors"
 )

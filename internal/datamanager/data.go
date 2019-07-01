@@ -23,8 +23,8 @@ import (
 	"sort"
 	"strings"
 
-	ostypes "github.com/sorintlab/agola/internal/objectstorage/types"
-	"github.com/sorintlab/agola/internal/sequence"
+	ostypes "agola.io/agola/internal/objectstorage/types"
+	"agola.io/agola/internal/sequence"
 
 	uuid "github.com/satori/go.uuid"
 	errors "golang.org/x/xerrors"

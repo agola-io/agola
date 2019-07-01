@@ -18,9 +18,9 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/sorintlab/agola/internal/db"
-	"github.com/sorintlab/agola/internal/services/types"
-	"github.com/sorintlab/agola/internal/util"
+	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/services/types"
+	"agola.io/agola/internal/util"
 
 	sq "github.com/Masterminds/squirrel"
 	errors "golang.org/x/xerrors"

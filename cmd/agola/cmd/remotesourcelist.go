@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/sorintlab/agola/internal/services/gateway/api"
+	"agola.io/agola/internal/services/gateway/api"
 	"github.com/spf13/cobra"
 )
 

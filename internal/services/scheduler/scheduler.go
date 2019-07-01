@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"time"
 
-	slog "github.com/sorintlab/agola/internal/log"
-	"github.com/sorintlab/agola/internal/services/common"
-	"github.com/sorintlab/agola/internal/services/config"
-	rsapi "github.com/sorintlab/agola/internal/services/runservice/api"
-	"github.com/sorintlab/agola/internal/util"
+	slog "agola.io/agola/internal/log"
+	"agola.io/agola/internal/services/common"
+	"agola.io/agola/internal/services/config"
+	rsapi "agola.io/agola/internal/services/runservice/api"
+	"agola.io/agola/internal/util"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"

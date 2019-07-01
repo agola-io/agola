@@ -19,10 +19,10 @@ import (
 	"fmt"
 	"net/url"
 
-	gitsource "github.com/sorintlab/agola/internal/gitsources"
-	"github.com/sorintlab/agola/internal/services/common"
-	"github.com/sorintlab/agola/internal/services/gateway/action"
-	rstypes "github.com/sorintlab/agola/internal/services/runservice/types"
+	gitsource "agola.io/agola/internal/gitsources"
+	"agola.io/agola/internal/services/common"
+	"agola.io/agola/internal/services/gateway/action"
+	rstypes "agola.io/agola/internal/services/runservice/types"
 
 	errors "golang.org/x/xerrors"
 )

@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sorintlab/agola/internal/etcd"
+	"agola.io/agola/internal/etcd"
 
 	etcdclientv3rpc "go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
 	"go.etcd.io/etcd/mvcc/mvccpb"

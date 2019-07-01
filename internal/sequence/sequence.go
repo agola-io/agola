@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sorintlab/agola/internal/etcd"
+	"agola.io/agola/internal/etcd"
 	errors "golang.org/x/xerrors"
 )
 

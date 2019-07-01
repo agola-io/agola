@@ -17,8 +17,8 @@ package action
 import (
 	"context"
 
-	"github.com/sorintlab/agola/internal/services/common"
-	"github.com/sorintlab/agola/internal/services/types"
+	"agola.io/agola/internal/services/common"
+	"agola.io/agola/internal/services/types"
 
 	errors "golang.org/x/xerrors"
 )

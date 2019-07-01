@@ -21,8 +21,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/sorintlab/agola/internal/common"
-	"github.com/sorintlab/agola/internal/services/executor/registry"
+	"agola.io/agola/internal/common"
+	"agola.io/agola/internal/services/executor/registry"
 )
 
 const (

@@ -26,8 +26,8 @@ import (
 	"strings"
 	"time"
 
-	gitsource "github.com/sorintlab/agola/internal/gitsources"
-	"github.com/sorintlab/agola/internal/services/types"
+	gitsource "agola.io/agola/internal/gitsources"
+	"agola.io/agola/internal/services/types"
 	errors "golang.org/x/xerrors"
 )
 

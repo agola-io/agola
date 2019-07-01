@@ -17,8 +17,8 @@ package cmd
 import (
 	"net/url"
 
-	"github.com/sorintlab/agola/cmd"
-	slog "github.com/sorintlab/agola/internal/log"
+	"agola.io/agola/cmd"
+	slog "agola.io/agola/internal/log"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"

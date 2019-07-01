@@ -17,7 +17,7 @@ package cmd
 import (
 	"context"
 
-	"github.com/sorintlab/agola/internal/services/gateway/api"
+	"agola.io/agola/internal/services/gateway/api"
 
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"

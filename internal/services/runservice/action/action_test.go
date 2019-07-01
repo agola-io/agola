@@ -17,9 +17,9 @@ package action
 import (
 	"testing"
 
+	"agola.io/agola/internal/services/runservice/types"
+	"agola.io/agola/internal/util"
 	"github.com/google/go-cmp/cmp"
-	"github.com/sorintlab/agola/internal/services/runservice/types"
-	"github.com/sorintlab/agola/internal/util"
 )
 
 func TestRecreateRun(t *testing.T) {

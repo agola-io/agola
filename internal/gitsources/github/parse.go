@@ -21,9 +21,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/go-github/v25/github"
-	"github.com/sorintlab/agola/internal/services/types"
+	"agola.io/agola/internal/services/types"
 
+	"github.com/google/go-github/v25/github"
 	errors "golang.org/x/xerrors"
 )
 

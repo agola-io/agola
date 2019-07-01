@@ -23,10 +23,10 @@ import (
 	"regexp"
 	"strings"
 
-	handlers "github.com/sorintlab/agola/internal/git-handler"
-	slog "github.com/sorintlab/agola/internal/log"
-	"github.com/sorintlab/agola/internal/services/config"
-	"github.com/sorintlab/agola/internal/util"
+	handlers "agola.io/agola/internal/git-handler"
+	slog "agola.io/agola/internal/log"
+	"agola.io/agola/internal/services/config"
+	"agola.io/agola/internal/util"
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"

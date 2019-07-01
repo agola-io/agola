@@ -26,11 +26,11 @@ import (
 	"testing"
 	"time"
 
-	slog "github.com/sorintlab/agola/internal/log"
-	"github.com/sorintlab/agola/internal/objectstorage"
-	"github.com/sorintlab/agola/internal/objectstorage/posix"
-	ostypes "github.com/sorintlab/agola/internal/objectstorage/types"
-	"github.com/sorintlab/agola/internal/testutil"
+	slog "agola.io/agola/internal/log"
+	"agola.io/agola/internal/objectstorage"
+	"agola.io/agola/internal/objectstorage/posix"
+	ostypes "agola.io/agola/internal/objectstorage/types"
+	"agola.io/agola/internal/testutil"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"

@@ -18,8 +18,8 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/sorintlab/agola/internal/services/gateway/api"
-	"github.com/sorintlab/agola/internal/services/types"
+	"agola.io/agola/internal/services/gateway/api"
+	"agola.io/agola/internal/services/types"
 
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"

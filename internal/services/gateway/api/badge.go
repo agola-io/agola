@@ -18,9 +18,9 @@ import (
 	"net/http"
 	"net/url"
 
+	"agola.io/agola/internal/services/gateway/action"
+	"agola.io/agola/internal/util"
 	"github.com/gorilla/mux"
-	"github.com/sorintlab/agola/internal/services/gateway/action"
-	"github.com/sorintlab/agola/internal/util"
 	"go.uber.org/zap"
 )
 

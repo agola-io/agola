@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	gitsource "github.com/sorintlab/agola/internal/gitsources"
+	gitsource "agola.io/agola/internal/gitsources"
 
 	gitlab "github.com/xanzy/go-gitlab"
 	"golang.org/x/oauth2"

@@ -15,8 +15,8 @@
 package action
 
 import (
-	"github.com/sorintlab/agola/internal/datamanager"
-	"github.com/sorintlab/agola/internal/services/configstore/readdb"
+	"agola.io/agola/internal/datamanager"
+	"agola.io/agola/internal/services/configstore/readdb"
 
 	"go.uber.org/zap"
 )

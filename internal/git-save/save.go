@@ -20,8 +20,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"agola.io/agola/internal/util"
 	uuid "github.com/satori/go.uuid"
-	"github.com/sorintlab/agola/internal/util"
 
 	"go.uber.org/zap"
 	errors "golang.org/x/xerrors"

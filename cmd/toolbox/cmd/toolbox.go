@@ -15,7 +15,7 @@
 package cmd
 
 import (
-	"github.com/sorintlab/agola/cmd"
+	"agola.io/agola/cmd"
 
 	"github.com/spf13/cobra"
 )

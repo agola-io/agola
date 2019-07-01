@@ -26,9 +26,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sorintlab/agola/internal/etcd"
-	ostypes "github.com/sorintlab/agola/internal/objectstorage/types"
-	"github.com/sorintlab/agola/internal/sequence"
+	"agola.io/agola/internal/etcd"
+	ostypes "agola.io/agola/internal/objectstorage/types"
+	"agola.io/agola/internal/sequence"
 
 	uuid "github.com/satori/go.uuid"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"

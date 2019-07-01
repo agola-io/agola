@@ -19,9 +19,9 @@ import (
 	"net/http"
 	"net/url"
 
+	"agola.io/agola/internal/services/types"
+	"agola.io/agola/internal/util"
 	"github.com/gorilla/mux"
-	"github.com/sorintlab/agola/internal/services/types"
-	"github.com/sorintlab/agola/internal/util"
 	errors "golang.org/x/xerrors"
 )
 

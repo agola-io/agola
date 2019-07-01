@@ -17,9 +17,9 @@ package common
 import (
 	"testing"
 
+	csapi "agola.io/agola/internal/services/configstore/api"
+	"agola.io/agola/internal/services/types"
 	"github.com/google/go-cmp/cmp"
-	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
-	"github.com/sorintlab/agola/internal/services/types"
 )
 
 func TestFilterOverriddenVariables(t *testing.T) {

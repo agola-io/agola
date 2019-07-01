@@ -18,11 +18,11 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/sorintlab/agola/internal/db"
-	"github.com/sorintlab/agola/internal/services/configstore/action"
-	"github.com/sorintlab/agola/internal/services/configstore/readdb"
-	"github.com/sorintlab/agola/internal/services/types"
-	"github.com/sorintlab/agola/internal/util"
+	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/services/configstore/action"
+	"agola.io/agola/internal/services/configstore/readdb"
+	"agola.io/agola/internal/services/types"
+	"agola.io/agola/internal/util"
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"

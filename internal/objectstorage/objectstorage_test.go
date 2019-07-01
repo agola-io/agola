@@ -24,9 +24,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sorintlab/agola/internal/objectstorage/posix"
-	"github.com/sorintlab/agola/internal/objectstorage/posixflat"
-	"github.com/sorintlab/agola/internal/objectstorage/s3"
+	"agola.io/agola/internal/objectstorage/posix"
+	"agola.io/agola/internal/objectstorage/posixflat"
+	"agola.io/agola/internal/objectstorage/s3"
 )
 
 func TestList(t *testing.T) {

@@ -26,7 +26,7 @@ import (
 	"strconv"
 	"strings"
 
-	rstypes "github.com/sorintlab/agola/internal/services/runservice/types"
+	rstypes "agola.io/agola/internal/services/runservice/types"
 	errors "golang.org/x/xerrors"
 )
 

@@ -20,9 +20,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/sorintlab/agola/internal/common"
-	"github.com/sorintlab/agola/internal/services/types"
-	"github.com/sorintlab/agola/internal/util"
+	"agola.io/agola/internal/common"
+	"agola.io/agola/internal/services/types"
+	"agola.io/agola/internal/util"
 
 	"github.com/ghodss/yaml"
 	"github.com/google/go-jsonnet"

@@ -18,7 +18,7 @@ import (
 	"io/ioutil"
 	"time"
 
-	"github.com/sorintlab/agola/internal/util"
+	"agola.io/agola/internal/util"
 	errors "golang.org/x/xerrors"
 	yaml "gopkg.in/yaml.v2"
 )

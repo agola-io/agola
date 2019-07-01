@@ -19,9 +19,9 @@ import (
 	"fmt"
 	"path"
 
-	gitsave "github.com/sorintlab/agola/internal/git-save"
-	"github.com/sorintlab/agola/internal/services/gateway/api"
-	"github.com/sorintlab/agola/internal/util"
+	gitsave "agola.io/agola/internal/git-save"
+	"agola.io/agola/internal/services/gateway/api"
+	"agola.io/agola/internal/util"
 
 	uuid "github.com/satori/go.uuid"
 	"github.com/spf13/cobra"

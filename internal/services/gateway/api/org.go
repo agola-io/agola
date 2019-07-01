@@ -19,9 +19,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/sorintlab/agola/internal/services/gateway/action"
-	"github.com/sorintlab/agola/internal/services/types"
-	"github.com/sorintlab/agola/internal/util"
+	"agola.io/agola/internal/services/gateway/action"
+	"agola.io/agola/internal/services/types"
+	"agola.io/agola/internal/util"
 	"go.uber.org/zap"
 	errors "golang.org/x/xerrors"
 

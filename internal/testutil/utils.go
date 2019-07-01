@@ -28,7 +28,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sorintlab/agola/internal/etcd"
+	"agola.io/agola/internal/etcd"
 	"go.etcd.io/etcd/embed"
 	"go.uber.org/zap"
 

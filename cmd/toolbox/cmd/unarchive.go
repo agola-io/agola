@@ -20,8 +20,8 @@ import (
 	"log"
 	"os"
 
+	"agola.io/agola/internal/toolbox/unarchive"
 	"github.com/mitchellh/go-homedir"
-	"github.com/sorintlab/agola/internal/toolbox/unarchive"
 
 	"github.com/spf13/cobra"
 )

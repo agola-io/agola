@@ -20,9 +20,9 @@ import (
 	"testing"
 	"time"
 
+	"agola.io/agola/internal/common"
+	"agola.io/agola/internal/services/runservice/types"
 	"github.com/google/go-cmp/cmp"
-	"github.com/sorintlab/agola/internal/common"
-	"github.com/sorintlab/agola/internal/services/runservice/types"
 )
 
 func TestAdvanceRunTasks(t *testing.T) {

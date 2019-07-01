@@ -21,10 +21,10 @@ import (
 	"sort"
 	"strconv"
 
-	gitsource "github.com/sorintlab/agola/internal/gitsources"
-	"github.com/sorintlab/agola/internal/services/gateway/action"
-	"github.com/sorintlab/agola/internal/services/types"
-	"github.com/sorintlab/agola/internal/util"
+	gitsource "agola.io/agola/internal/gitsources"
+	"agola.io/agola/internal/services/gateway/action"
+	"agola.io/agola/internal/services/types"
+	"agola.io/agola/internal/util"
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"

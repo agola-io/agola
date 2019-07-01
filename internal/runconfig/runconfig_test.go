@@ -19,10 +19,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/sorintlab/agola/internal/config"
-	rstypes "github.com/sorintlab/agola/internal/services/runservice/types"
-	"github.com/sorintlab/agola/internal/services/types"
-	"github.com/sorintlab/agola/internal/util"
+	"agola.io/agola/internal/config"
+	rstypes "agola.io/agola/internal/services/runservice/types"
+	"agola.io/agola/internal/services/types"
+	"agola.io/agola/internal/util"
 
 	"github.com/google/go-cmp/cmp"
 	errors "golang.org/x/xerrors"

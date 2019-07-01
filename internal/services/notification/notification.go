@@ -17,12 +17,12 @@ package notification
 import (
 	"context"
 
-	"github.com/sorintlab/agola/internal/common"
-	"github.com/sorintlab/agola/internal/etcd"
-	slog "github.com/sorintlab/agola/internal/log"
-	"github.com/sorintlab/agola/internal/services/config"
-	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
-	rsapi "github.com/sorintlab/agola/internal/services/runservice/api"
+	"agola.io/agola/internal/common"
+	"agola.io/agola/internal/etcd"
+	slog "agola.io/agola/internal/log"
+	"agola.io/agola/internal/services/config"
+	csapi "agola.io/agola/internal/services/configstore/api"
+	rsapi "agola.io/agola/internal/services/runservice/api"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"

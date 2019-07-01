@@ -17,12 +17,12 @@ package api
 import (
 	"net/http"
 
-	"github.com/sorintlab/agola/internal/services/common"
-	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
-	"github.com/sorintlab/agola/internal/services/gateway/action"
-	rsapi "github.com/sorintlab/agola/internal/services/runservice/api"
-	"github.com/sorintlab/agola/internal/services/types"
-	"github.com/sorintlab/agola/internal/util"
+	"agola.io/agola/internal/services/common"
+	csapi "agola.io/agola/internal/services/configstore/api"
+	"agola.io/agola/internal/services/gateway/action"
+	rsapi "agola.io/agola/internal/services/runservice/api"
+	"agola.io/agola/internal/services/types"
+	"agola.io/agola/internal/util"
 
 	"go.uber.org/zap"
 	errors "golang.org/x/xerrors"

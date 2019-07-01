@@ -1,4 +1,4 @@
-module github.com/sorintlab/agola
+module agola.io/agola
 
 require (
 	code.gitea.io/gitea v1.9.0-dev.0.20190511102134-34eee25bd42d

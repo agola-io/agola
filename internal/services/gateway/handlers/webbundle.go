@@ -20,7 +20,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/sorintlab/agola/webbundle"
+	"agola.io/agola/webbundle"
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 )

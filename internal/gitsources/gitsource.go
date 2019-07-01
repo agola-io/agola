@@ -18,7 +18,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/sorintlab/agola/internal/services/types"
+	"agola.io/agola/internal/services/types"
 	"golang.org/x/oauth2"
 )
 

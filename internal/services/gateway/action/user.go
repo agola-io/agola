@@ -21,12 +21,12 @@ import (
 	"strings"
 	"time"
 
-	gitsource "github.com/sorintlab/agola/internal/gitsources"
-	"github.com/sorintlab/agola/internal/gitsources/agolagit"
-	"github.com/sorintlab/agola/internal/services/common"
-	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
-	"github.com/sorintlab/agola/internal/services/types"
-	"github.com/sorintlab/agola/internal/util"
+	gitsource "agola.io/agola/internal/gitsources"
+	"agola.io/agola/internal/gitsources/agolagit"
+	"agola.io/agola/internal/services/common"
+	csapi "agola.io/agola/internal/services/configstore/api"
+	"agola.io/agola/internal/services/types"
+	"agola.io/agola/internal/util"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	errors "golang.org/x/xerrors"

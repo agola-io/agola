@@ -18,9 +18,9 @@ import (
 	"context"
 	"path"
 
-	csapi "github.com/sorintlab/agola/internal/services/configstore/api"
-	"github.com/sorintlab/agola/internal/services/types"
-	"github.com/sorintlab/agola/internal/util"
+	csapi "agola.io/agola/internal/services/configstore/api"
+	"agola.io/agola/internal/services/types"
+	"agola.io/agola/internal/util"
 
 	errors "golang.org/x/xerrors"
 )

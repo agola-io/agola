@@ -24,12 +24,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sorintlab/agola/internal/util"
+	"agola.io/agola/internal/common"
+	"agola.io/agola/internal/util"
 
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/archive"
 	uuid "github.com/satori/go.uuid"
-	"github.com/sorintlab/agola/internal/common"
 	"go.uber.org/zap"
 	errors "golang.org/x/xerrors"
 	corev1 "k8s.io/api/core/v1"

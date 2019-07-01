@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sorintlab/agola/internal/util"
+	"agola.io/agola/internal/util"
 
 	"go.etcd.io/etcd/clientv3"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"

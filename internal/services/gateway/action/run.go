@@ -20,14 +20,14 @@ import (
 	"net/http"
 	"path"
 
-	"github.com/sorintlab/agola/internal/config"
-	gitsource "github.com/sorintlab/agola/internal/gitsources"
-	"github.com/sorintlab/agola/internal/runconfig"
-	"github.com/sorintlab/agola/internal/services/common"
-	rsapi "github.com/sorintlab/agola/internal/services/runservice/api"
-	rstypes "github.com/sorintlab/agola/internal/services/runservice/types"
-	"github.com/sorintlab/agola/internal/services/types"
-	"github.com/sorintlab/agola/internal/util"
+	"agola.io/agola/internal/config"
+	gitsource "agola.io/agola/internal/gitsources"
+	"agola.io/agola/internal/runconfig"
+	"agola.io/agola/internal/services/common"
+	rsapi "agola.io/agola/internal/services/runservice/api"
+	rstypes "agola.io/agola/internal/services/runservice/types"
+	"agola.io/agola/internal/services/types"
+	"agola.io/agola/internal/util"
 
 	errors "golang.org/x/xerrors"
 )

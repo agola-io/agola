@@ -17,8 +17,8 @@ package api
 import (
 	"net/http"
 
-	"github.com/sorintlab/agola/internal/services/gateway/action"
-	"github.com/sorintlab/agola/internal/util"
+	"agola.io/agola/internal/services/gateway/action"
+	"agola.io/agola/internal/util"
 
 	"go.uber.org/zap"
 )
