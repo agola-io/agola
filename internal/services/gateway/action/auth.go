@@ -194,12 +194,12 @@ func (h *ActionHandler) CanGetRun(ctx context.Context, runGroup string) (bool, e
 		visibility = types.VisibilityPrivate
 	}
 
+	if visibility == types.VisibilityPublic {
+		return true, nil
+	}
 	isProjectMember, err := h.IsProjectMember(ctx, ownerType, ownerID)
 	if err != nil {
 		return false, errors.Errorf("failed to determine ownership: %w", err)
-	}
-	if visibility == types.VisibilityPublic {
-		return true, nil
 	}
 	if !isProjectMember {
 		return false, nil

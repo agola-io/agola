@@ -286,9 +286,9 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/orgs/{orgref}/members/{userref}", authForcedHandler(addOrgMemberHandler)).Methods("PUT")
 	apirouter.Handle("/orgs/{orgref}/members/{userref}", authForcedHandler(removeOrgMemberHandler)).Methods("DELETE")
 
-	apirouter.Handle("/runs/{runid}", authForcedHandler(runHandler)).Methods("GET")
+	apirouter.Handle("/runs/{runid}", authOptionalHandler(runHandler)).Methods("GET")
 	apirouter.Handle("/runs/{runid}/actions", authForcedHandler(runActionsHandler)).Methods("PUT")
-	apirouter.Handle("/runs/{runid}/tasks/{taskid}", authForcedHandler(runtaskHandler)).Methods("GET")
+	apirouter.Handle("/runs/{runid}/tasks/{taskid}", authOptionalHandler(runtaskHandler)).Methods("GET")
 	apirouter.Handle("/runs/{runid}/tasks/{taskid}/actions", authForcedHandler(runTaskActionsHandler)).Methods("PUT")
 	apirouter.Handle("/runs", authForcedHandler(runsHandler)).Methods("GET")
 
