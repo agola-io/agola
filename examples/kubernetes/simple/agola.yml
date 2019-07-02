@@ -160,7 +160,7 @@ spec:
           - "--config"
           - /mnt/agola/config/config.yml
           - "--components"
-          - all
+          - all-base,executor
         env:
         ports:
           - containerPort: 8000

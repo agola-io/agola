@@ -41,7 +41,7 @@ var (
 )
 
 var componentsNames = []string{
-	"all",
+	"all-base",
 	"gateway",
 	"scheduler",
 	"notification",
@@ -75,7 +75,7 @@ func init() {
 	flags := cmdServe.PersistentFlags()
 
 	flags.StringVar(&serveOpts.config, "config", "./config.yml", "config file path")
-	flags.StringSliceVar(&serveOpts.components, "components", []string{}, `list of components to start (specify "all" to start all components)`)
+	flags.StringSliceVar(&serveOpts.components, "components", []string{}, `list of components to start. Specify "all-base" to start all base components (excluding the executor).`)
 	flags.BoolVar(&serveOpts.embeddedEtcd, "embedded-etcd", false, "start and use an embedded etcd, only for testing purpose")
 	flags.StringVar(&serveOpts.embeddedEtcdDataDir, "embedded-etcd-data-dir", "/tmp/agola/etcd", "embedded etcd data dir, only for testing purpose")
 
@@ -112,7 +112,7 @@ func embeddedEtcd(ctx context.Context) error {
 }
 
 func isComponentEnabled(name string) bool {
-	if util.StringInSlice(serveOpts.components, "all") {
+	if util.StringInSlice(serveOpts.components, "all-base") && name != "executor" {
 		return true
 	}
 	return util.StringInSlice(serveOpts.components, name)
