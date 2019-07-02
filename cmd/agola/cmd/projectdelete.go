@@ -44,7 +44,9 @@ func init() {
 
 	flags.StringVar(&projectDeleteOpts.projectRef, "project", "", "project id or full path")
 
-	cmdProjectDelete.MarkFlagRequired("project")
+	if err := cmdProjectDelete.MarkFlagRequired("project"); err != nil {
+		log.Fatal(err)
+	}
 
 	cmdProject.AddCommand(cmdProjectDelete)
 }

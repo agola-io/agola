@@ -39,11 +39,13 @@ type projectListOptions struct {
 var projectListOpts projectListOptions
 
 func init() {
-	flags := cmdProjectList.PersistentFlags()
+	flags := cmdProjectList.Flags()
 
 	flags.StringVar(&projectListOpts.parentPath, "parent", "", `project group path (i.e "org/org01" for root project group in org01, "/user/user01/group01/subgroub01") or project group id`)
 
-	cmdProjectList.MarkFlagRequired("parent")
+	if err := cmdProjectList.MarkFlagRequired("parent"); err != nil {
+		log.Fatal(err)
+	}
 
 	cmdProject.AddCommand(cmdProjectList)
 }

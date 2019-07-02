@@ -50,8 +50,12 @@ func init() {
 	flags.StringVar(&userLACreateOpts.remoteSourceLoginName, "remote-name", "", "remote source login name")
 	flags.StringVar(&userLACreateOpts.remoteSourceLoginPassword, "remote-password", "", "remote source password")
 
-	cmdUserLACreate.MarkFlagRequired("username")
-	cmdUserLACreate.MarkFlagRequired("remote-source")
+	if err := cmdUserLACreate.MarkFlagRequired("username"); err != nil {
+		log.Fatal(err)
+	}
+	if err := cmdUserLACreate.MarkFlagRequired("remote-source"); err != nil {
+		log.Fatal(err)
+	}
 
 	cmdUserLA.AddCommand(cmdUserLACreate)
 }

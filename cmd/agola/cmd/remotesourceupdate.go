@@ -59,7 +59,9 @@ func init() {
 	flags.StringVar(&remoteSourceUpdateOpts.sshHostKey, "ssh-host-key", "", "remotesource ssh public host key")
 	flags.BoolVarP(&remoteSourceUpdateOpts.skipSSHHostKeyCheck, "skip-ssh-host-key-check", "s", false, "skip ssh host key check")
 
-	cmdRemoteSourceUpdate.MarkFlagRequired("ref")
+	if err := cmdRemoteSourceUpdate.MarkFlagRequired("ref"); err != nil {
+		log.Fatal(err)
+	}
 
 	cmdRemoteSource.AddCommand(cmdRemoteSourceUpdate)
 }

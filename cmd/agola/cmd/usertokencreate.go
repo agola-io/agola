@@ -47,8 +47,12 @@ func init() {
 	flags.StringVarP(&userTokenCreateOpts.username, "username", "n", "", "user name")
 	flags.StringVarP(&userTokenCreateOpts.tokenName, "tokenname", "t", "", "token name")
 
-	cmdUserTokenCreate.MarkFlagRequired("username")
-	cmdUserTokenCreate.MarkFlagRequired("tokenname")
+	if err := cmdUserTokenCreate.MarkFlagRequired("username"); err != nil {
+		log.Fatal(err)
+	}
+	if err := cmdUserTokenCreate.MarkFlagRequired("tokenname"); err != nil {
+		log.Fatal(err)
+	}
 
 	cmdUserToken.AddCommand(cmdUserTokenCreate)
 }

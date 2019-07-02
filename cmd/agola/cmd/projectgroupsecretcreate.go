@@ -35,9 +35,15 @@ func init() {
 	flags.StringVarP(&secretCreateOpts.name, "name", "n", "", "secret name")
 	flags.StringVar(&secretCreateOpts.data, "data", "", "json map of secret data")
 
-	cmdProjectGroupSecretCreate.MarkFlagRequired("project")
-	cmdProjectGroupSecretCreate.MarkFlagRequired("name")
-	cmdProjectGroupSecretCreate.MarkFlagRequired("data")
+	if err := cmdProjectGroupSecretCreate.MarkFlagRequired("projectgroup"); err != nil {
+		log.Fatal(err)
+	}
+	if err := cmdProjectGroupSecretCreate.MarkFlagRequired("name"); err != nil {
+		log.Fatal(err)
+	}
+	if err := cmdProjectGroupSecretCreate.MarkFlagRequired("data"); err != nil {
+		log.Fatal(err)
+	}
 
 	cmdProjectGroupSecret.AddCommand(cmdProjectGroupSecretCreate)
 }

@@ -46,8 +46,12 @@ func init() {
 	flags.StringVarP(&userLADeleteOpts.userName, "username", "n", "", "user name")
 	flags.StringVar(&userLADeleteOpts.laID, "laid", "", "linked account id")
 
-	cmdUserLADelete.MarkFlagRequired("username")
-	cmdUserLADelete.MarkFlagRequired("laid")
+	if err := cmdUserLADelete.MarkFlagRequired("username"); err != nil {
+		log.Fatal(err)
+	}
+	if err := cmdUserLADelete.MarkFlagRequired("laid"); err != nil {
+		log.Fatal(err)
+	}
 
 	cmdUserLA.AddCommand(cmdUserLADelete)
 }

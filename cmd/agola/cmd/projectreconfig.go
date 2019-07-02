@@ -44,7 +44,9 @@ func init() {
 
 	flags.StringVarP(&projectReconfigOpts.name, "name", "n", "", "project name")
 
-	cmdProjectReconfig.MarkFlagRequired("name")
+	if err := cmdProjectReconfig.MarkFlagRequired("name"); err != nil {
+		log.Fatal(err)
+	}
 
 	cmdProject.AddCommand(cmdProjectReconfig)
 }

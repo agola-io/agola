@@ -44,7 +44,9 @@ func init() {
 
 	flags.StringVarP(&userDeleteOpts.username, "username", "n", "", "user name")
 
-	cmdUserDelete.MarkFlagRequired("username")
+	if err := cmdUserDelete.MarkFlagRequired("username"); err != nil {
+		log.Fatal(err)
+	}
 
 	cmdUser.AddCommand(cmdUserDelete)
 }

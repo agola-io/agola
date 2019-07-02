@@ -72,14 +72,19 @@ type serveOptions struct {
 var serveOpts serveOptions
 
 func init() {
-	flags := cmdServe.PersistentFlags()
+	flags := cmdServe.Flags()
 
 	flags.StringVar(&serveOpts.config, "config", "./config.yml", "config file path")
 	flags.StringSliceVar(&serveOpts.components, "components", []string{}, `list of components to start. Specify "all-base" to start all base components (excluding the executor).`)
 	flags.BoolVar(&serveOpts.embeddedEtcd, "embedded-etcd", false, "start and use an embedded etcd, only for testing purpose")
 	flags.StringVar(&serveOpts.embeddedEtcdDataDir, "embedded-etcd-data-dir", "/tmp/agola/etcd", "embedded etcd data dir, only for testing purpose")
 
-	cmdServe.MarkFlagRequired("config")
+	if err := cmdServe.MarkFlagRequired("config"); err != nil {
+		log.Fatal(err)
+	}
+	if err := cmdServe.MarkFlagRequired("components"); err != nil {
+		log.Fatal(err)
+	}
 
 	cmdAgola.AddCommand(cmdServe)
 }

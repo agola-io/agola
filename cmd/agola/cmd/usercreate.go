@@ -44,7 +44,9 @@ func init() {
 
 	flags.StringVarP(&userCreateOpts.username, "username", "n", "", "user name")
 
-	cmdUserCreate.MarkFlagRequired("username")
+	if err := cmdUserCreate.MarkFlagRequired("username"); err != nil {
+		log.Fatal(err)
+	}
 
 	cmdUser.AddCommand(cmdUserCreate)
 }

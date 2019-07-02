@@ -46,8 +46,12 @@ func init() {
 	flags.StringVar(&variableDeleteOpts.parentRef, "project", "", "project id or full path")
 	flags.StringVarP(&variableDeleteOpts.name, "name", "n", "", "variable name")
 
-	cmdProjectVariableDelete.MarkFlagRequired("projectgroup")
-	cmdProjectVariableDelete.MarkFlagRequired("name")
+	if err := cmdProjectVariableDelete.MarkFlagRequired("project"); err != nil {
+		log.Fatal(err)
+	}
+	if err := cmdProjectVariableDelete.MarkFlagRequired("name"); err != nil {
+		log.Fatal(err)
+	}
 
 	cmdProjectVariable.AddCommand(cmdProjectVariableDelete)
 }

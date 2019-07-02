@@ -35,9 +35,15 @@ func init() {
 	flags.StringVarP(&variableCreateOpts.name, "name", "n", "", "variable name")
 	flags.StringVar(&variableCreateOpts.values, "values", "", "json list of values and conditions")
 
-	cmdProjectGroupVariableCreate.MarkFlagRequired("project")
-	cmdProjectGroupVariableCreate.MarkFlagRequired("name")
-	cmdProjectGroupVariableCreate.MarkFlagRequired("values")
+	if err := cmdProjectGroupVariableCreate.MarkFlagRequired("projectgroup"); err != nil {
+		log.Fatal(err)
+	}
+	if err := cmdProjectGroupVariableCreate.MarkFlagRequired("name"); err != nil {
+		log.Fatal(err)
+	}
+	if err := cmdProjectGroupVariableCreate.MarkFlagRequired("values"); err != nil {
+		log.Fatal(err)
+	}
 
 	cmdProjectGroupVariable.AddCommand(cmdProjectGroupVariableCreate)
 }

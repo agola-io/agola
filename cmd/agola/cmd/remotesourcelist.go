@@ -40,7 +40,7 @@ type remoteSourceListOptions struct {
 var remoteSourceListOpts remoteSourceListOptions
 
 func init() {
-	flags := cmdRemoteSourceList.PersistentFlags()
+	flags := cmdRemoteSourceList.Flags()
 
 	flags.IntVar(&remoteSourceListOpts.limit, "limit", 10, "max number of runs to show")
 	flags.StringVar(&remoteSourceListOpts.start, "start", "", "starting user name (excluded) to fetch")

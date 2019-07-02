@@ -62,10 +62,18 @@ func init() {
 	flags.StringVar(&remoteSourceCreateOpts.sshHostKey, "ssh-host-key", "", "remotesource ssh public host key")
 	flags.BoolVarP(&remoteSourceCreateOpts.skipSSHHostKeyCheck, "skip-ssh-host-key-check", "s", false, "skip ssh host key check")
 
-	cmdRemoteSourceCreate.MarkFlagRequired("name")
-	cmdRemoteSourceCreate.MarkFlagRequired("type")
-	cmdRemoteSourceCreate.MarkFlagRequired("auth-type")
-	cmdRemoteSourceCreate.MarkFlagRequired("api-url")
+	if err := cmdRemoteSourceCreate.MarkFlagRequired("name"); err != nil {
+		log.Fatal(err)
+	}
+	if err := cmdRemoteSourceCreate.MarkFlagRequired("type"); err != nil {
+		log.Fatal(err)
+	}
+	if err := cmdRemoteSourceCreate.MarkFlagRequired("auth-type"); err != nil {
+		log.Fatal(err)
+	}
+	if err := cmdRemoteSourceCreate.MarkFlagRequired("api-url"); err != nil {
+		log.Fatal(err)
+	}
 
 	cmdRemoteSource.AddCommand(cmdRemoteSourceCreate)
 }

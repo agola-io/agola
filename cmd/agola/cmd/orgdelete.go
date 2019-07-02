@@ -44,7 +44,9 @@ func init() {
 
 	flags.StringVarP(&orgDeleteOpts.name, "name", "n", "", "organization name")
 
-	cmdOrgDelete.MarkFlagRequired("name")
+	if err := cmdOrgDelete.MarkFlagRequired("name"); err != nil {
+		log.Fatal(err)
+	}
 
 	cmdOrg.AddCommand(cmdOrgDelete)
 }

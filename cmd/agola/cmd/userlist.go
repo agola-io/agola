@@ -40,7 +40,7 @@ type userListOptions struct {
 var userListOpts userListOptions
 
 func init() {
-	flags := cmdUserList.PersistentFlags()
+	flags := cmdUserList.Flags()
 
 	flags.IntVar(&userListOpts.limit, "limit", 10, "max number of runs to show")
 	flags.StringVar(&userListOpts.start, "start", "", "starting user name (excluded) to fetch")

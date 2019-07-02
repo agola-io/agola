@@ -49,8 +49,12 @@ func init() {
 	flags.StringVar(&orgMemberAddOpts.username, "username", "", "user name")
 	flags.StringVarP(&orgMemberAddOpts.role, "role", "r", "member", "member role (owner or member)")
 
-	cmdOrgMemberAdd.MarkFlagRequired("orgname")
-	cmdOrgMemberAdd.MarkFlagRequired("username")
+	if err := cmdOrgMemberAdd.MarkFlagRequired("orgname"); err != nil {
+		log.Fatal(err)
+	}
+	if err := cmdOrgMemberAdd.MarkFlagRequired("username"); err != nil {
+		log.Fatal(err)
+	}
 
 	cmdOrgMember.AddCommand(cmdOrgMemberAdd)
 }

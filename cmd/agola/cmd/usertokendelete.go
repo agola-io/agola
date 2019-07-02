@@ -46,8 +46,12 @@ func init() {
 	flags.StringVarP(&userTokenDeleteOpts.userName, "username", "n", "", "user name")
 	flags.StringVarP(&userTokenDeleteOpts.tokenName, "tokenname", "t", "", "token name")
 
-	cmdUserTokenDelete.MarkFlagRequired("username")
-	cmdUserTokenDelete.MarkFlagRequired("tokenname")
+	if err := cmdUserTokenDelete.MarkFlagRequired("username"); err != nil {
+		log.Fatal(err)
+	}
+	if err := cmdUserTokenDelete.MarkFlagRequired("tokenname"); err != nil {
+		log.Fatal(err)
+	}
 
 	cmdUserToken.AddCommand(cmdUserTokenDelete)
 }

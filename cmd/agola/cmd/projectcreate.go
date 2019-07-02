@@ -55,10 +55,18 @@ func init() {
 	flags.StringVar(&projectCreateOpts.parentPath, "parent", "", `parent project group path (i.e "org/org01" for root project group in org01, "user/user01/group01/subgroub01") or project group id where the project should be created`)
 	flags.StringVar(&projectCreateOpts.visibility, "visibility", "public", `project visibility (public or private)`)
 
-	cmdProjectCreate.MarkFlagRequired("name")
-	cmdProjectCreate.MarkFlagRequired("parent")
-	cmdProjectCreate.MarkFlagRequired("repo-url")
-	cmdProjectCreate.MarkFlagRequired("remote-source")
+	if err := cmdProjectCreate.MarkFlagRequired("name"); err != nil {
+		log.Fatal(err)
+	}
+	if err := cmdProjectCreate.MarkFlagRequired("parent"); err != nil {
+		log.Fatal(err)
+	}
+	if err := cmdProjectCreate.MarkFlagRequired("repo-path"); err != nil {
+		log.Fatal(err)
+	}
+	if err := cmdProjectCreate.MarkFlagRequired("remote-source"); err != nil {
+		log.Fatal(err)
+	}
 
 	cmdProject.AddCommand(cmdProjectCreate)
 }

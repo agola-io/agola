@@ -46,8 +46,12 @@ func init() {
 	flags.StringVar(&secretDeleteOpts.parentRef, "project", "", "project id or full path")
 	flags.StringVarP(&secretDeleteOpts.name, "name", "n", "", "secret name")
 
-	cmdProjectSecretDelete.MarkFlagRequired("projectgroup")
-	cmdProjectSecretDelete.MarkFlagRequired("name")
+	if err := cmdProjectSecretDelete.MarkFlagRequired("project"); err != nil {
+		log.Fatal(err)
+	}
+	if err := cmdProjectSecretDelete.MarkFlagRequired("name"); err != nil {
+		log.Fatal(err)
+	}
 
 	cmdProjectSecret.AddCommand(cmdProjectSecretDelete)
 }

@@ -46,8 +46,12 @@ func init() {
 	flags.StringVarP(&orgMemberRemoveOpts.orgname, "orgname", "n", "", "organization name")
 	flags.StringVar(&orgMemberRemoveOpts.username, "username", "", "user name")
 
-	cmdOrgMemberRemove.MarkFlagRequired("orgname")
-	cmdOrgMemberRemove.MarkFlagRequired("username")
+	if err := cmdOrgMemberRemove.MarkFlagRequired("orgname"); err != nil {
+		log.Fatal(err)
+	}
+	if err := cmdOrgMemberRemove.MarkFlagRequired("username"); err != nil {
+		log.Fatal(err)
+	}
 
 	cmdOrgMember.AddCommand(cmdOrgMemberRemove)
 }

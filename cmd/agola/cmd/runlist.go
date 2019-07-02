@@ -43,7 +43,7 @@ type runListOptions struct {
 var runListOpts runListOptions
 
 func init() {
-	flags := cmdRunList.PersistentFlags()
+	flags := cmdRunList.Flags()
 
 	flags.StringSliceVarP(&runListOpts.statusFilter, "status", "s", nil, "filter runs matching the provided status. This option can be repeated multiple times")
 	flags.StringArrayVarP(&runListOpts.labelFilter, "label", "l", nil, "filter runs matching the provided label. This option can be repeated multiple times, in this case only runs matching all the labels will be returned")

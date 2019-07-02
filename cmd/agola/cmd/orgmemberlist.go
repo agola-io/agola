@@ -48,7 +48,9 @@ func init() {
 
 	flags.StringVarP(&orgMemberListOpts.orgname, "orgname", "n", "", "organization name")
 
-	cmdOrgMemberList.MarkFlagRequired("orgname")
+	if err := cmdOrgMemberList.MarkFlagRequired("orgname"); err != nil {
+		log.Fatal(err)
+	}
 
 	cmdOrgMember.AddCommand(cmdOrgMemberList)
 }

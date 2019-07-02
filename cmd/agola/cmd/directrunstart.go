@@ -49,7 +49,7 @@ type directRunStartOptions struct {
 var directRunStartOpts directRunStartOptions
 
 func init() {
-	flags := cmdDirectRunStart.PersistentFlags()
+	flags := cmdDirectRunStart.Flags()
 
 	flags.StringSliceVarP(&directRunStartOpts.statusFilter, "status", "s", nil, "filter runs matching the provided status. This option can be repeated multiple times")
 	flags.StringArrayVarP(&directRunStartOpts.labelFilter, "label", "l", nil, "filter runs matching the provided label. This option can be repeated multiple times, in this case only runs matching all the labels will be returned")

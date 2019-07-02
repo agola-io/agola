@@ -49,8 +49,12 @@ func init() {
 	flags.StringVar(&projectGroupCreateOpts.parentPath, "parent", "", `parent project group path (i.e "org/org01" for root project group in org01, "user/user01/group01/subgroub01") or project group id where the project group should be created`)
 	flags.StringVar(&projectGroupCreateOpts.visibility, "visibility", "public", `project group visibility (public or private)`)
 
-	cmdProjectGroupCreate.MarkFlagRequired("name")
-	cmdProjectGroupCreate.MarkFlagRequired("parent")
+	if err := cmdProjectGroupCreate.MarkFlagRequired("name"); err != nil {
+		log.Fatal(err)
+	}
+	if err := cmdProjectGroupCreate.MarkFlagRequired("parent"); err != nil {
+		log.Fatal(err)
+	}
 
 	cmdProjectGroup.AddCommand(cmdProjectGroupCreate)
 }

@@ -47,7 +47,9 @@ func init() {
 	flags.StringVarP(&orgCreateOpts.name, "name", "n", "", "organization name")
 	flags.StringVar(&orgCreateOpts.visibility, "visibility", "public", `organization visibility (public or private)`)
 
-	cmdOrgCreate.MarkFlagRequired("name")
+	if err := cmdOrgCreate.MarkFlagRequired("name"); err != nil {
+		log.Fatal(err)
+	}
 
 	cmdOrg.AddCommand(cmdOrgCreate)
 }
