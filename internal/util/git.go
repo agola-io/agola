@@ -50,7 +50,6 @@ func ParseGitURL(u string) (*url.URL, error) {
 }
 
 type Git struct {
-	cmd    *exec.Cmd
 	GitDir string
 	Env    []string
 }

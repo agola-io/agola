@@ -171,7 +171,6 @@ func unescape(s string) (string, bool, error) {
 	if nc > splitLength && nc%splitLength == 2 && s[len(s)-2:] == ".f" {
 		hasFileMarker = true
 		s = s[:len(s)-2]
-		nc -= 2
 	}
 
 	if n == 0 && ns == 0 {

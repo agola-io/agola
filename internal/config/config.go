@@ -280,9 +280,9 @@ func (s *Steps) UnmarshalJSON(b []byte) error {
 
 				case "run":
 					var s RunStep
-					switch stepSpec.(type) {
+					switch stepSpec := stepSpec.(type) {
 					case string:
-						s.Command = stepSpec.(string)
+						s.Command = stepSpec
 					default:
 						if err := json.Unmarshal(stepSpecRaw, &s); err != nil {
 							return err

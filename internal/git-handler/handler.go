@@ -159,6 +159,11 @@ func (h *GitSmartHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	repoPath, reqType, err := MatchPath(r.URL.Path)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	repoAbsPath, exists, err := h.repoAbsPathFunc(h.reposDir, repoPath)
 	if err != nil {
 		if err == ErrWrongRepoPath {
@@ -207,7 +212,7 @@ func (h *GitSmartHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		w.Header().Set("Content-Type", "application/x-git-"+serviceName+"-advertisement")
-		w.Write(res)
+		_, _ = w.Write(res)
 
 	case RequestTypeUploadPack:
 		w.Header().Set("Content-Type", "application/x-git-upload-pack-result")

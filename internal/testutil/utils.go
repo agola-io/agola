@@ -104,8 +104,8 @@ func (p *Process) Kill() {
 	if p.Cmd == nil {
 		panic(fmt.Errorf("p: %s, cmd is empty", p.uid))
 	}
-	p.Cmd.Cmd.Process.Signal(os.Kill)
-	p.Cmd.Wait()
+	_ = p.Cmd.Cmd.Process.Signal(os.Kill)
+	_ = p.Cmd.Wait()
 	p.Cmd = nil
 }
 
@@ -115,8 +115,8 @@ func (p *Process) Stop() {
 		panic(fmt.Errorf("p: %s, cmd is empty", p.uid))
 	}
 	p.Cmd.Continue()
-	p.Cmd.Cmd.Process.Signal(os.Interrupt)
-	p.Cmd.Wait()
+	_ = p.Cmd.Cmd.Process.Signal(os.Interrupt)
+	_ = p.Cmd.Wait()
 	p.Cmd = nil
 }
 

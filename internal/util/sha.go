@@ -24,7 +24,7 @@ import (
 func EncodeSha1Hex(str string) string {
 	h := sha1.New()
 	// TODO(sgotti) must handle write errors
-	h.Write([]byte(str))
+	_, _ = h.Write([]byte(str))
 	return hex.EncodeToString(h.Sum(nil))
 }
 
@@ -32,6 +32,6 @@ func EncodeSha1Hex(str string) string {
 func EncodeSha256Hex(str string) string {
 	h := sha256.New()
 	// TODO(sgotti) must handle write errors
-	h.Write([]byte(str))
+	_, _ = h.Write([]byte(str))
 	return hex.EncodeToString(h.Sum(nil))
 }

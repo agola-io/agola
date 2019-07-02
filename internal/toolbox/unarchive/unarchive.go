@@ -184,7 +184,3 @@ func writeNewHardLink(fpath string, target string) error {
 	}
 	return nil
 }
-
-func isSymlink(fi os.FileInfo) bool {
-	return fi.Mode()&os.ModeSymlink != 0
-}
