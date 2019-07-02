@@ -156,19 +156,14 @@ func (s *Runservice) Run(ctx context.Context) error {
 		time.Sleep(1 * time.Second)
 	}
 
-	go s.readDB.Run(ctx)
+	go func() { errCh <- s.readDB.Run(ctx) }()
 
 	ch := make(chan *types.ExecutorTask)
-
-	// noop coors handler
-	corsHandler := func(h http.Handler) http.Handler {
-		return h
-	}
 
 	corsAllowedMethodsOptions := ghandlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "DELETE"})
 	corsAllowedHeadersOptions := ghandlers.AllowedHeaders([]string{"Accept", "Accept-Encoding", "Authorization", "Content-Length", "Content-Type", "X-CSRF-Token", "Authorization"})
 	corsAllowedOriginsOptions := ghandlers.AllowedOrigins([]string{"*"})
-	corsHandler = ghandlers.CORS(corsAllowedMethodsOptions, corsAllowedHeadersOptions, corsAllowedOriginsOptions)
+	corsHandler := ghandlers.CORS(corsAllowedMethodsOptions, corsAllowedHeadersOptions, corsAllowedOriginsOptions)
 
 	// executor dedicated api, only calls from executor should happen on these handlers
 	executorStatusHandler := api.NewExecutorStatusHandler(logger, s.e, s.ah)

@@ -178,7 +178,6 @@ func TestRecreateRun(t *testing.T) {
 		req   *RunCreateRequest
 		outrc *types.RunConfig
 		outr  *types.Run
-		err   error
 	}{
 		{
 			name:  "test recreate run from start with all not start tasks",

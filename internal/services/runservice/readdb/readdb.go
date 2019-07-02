@@ -59,22 +59,22 @@ var (
 	revisionSelect = sb.Select("revision").From("revision")
 	revisionInsert = sb.Insert("revision").Columns("revision")
 
-	runSelect = sb.Select("id", "grouppath", "phase").From("run")
+	//runSelect = sb.Select("id", "grouppath", "phase").From("run")
 	runInsert = sb.Insert("run").Columns("id", "grouppath", "phase")
 
 	rundataInsert = sb.Insert("rundata").Columns("id", "data")
 
-	runeventSelect = sb.Select("data").From("runevent")
+	//runeventSelect = sb.Select("data").From("runevent")
 	runeventInsert = sb.Insert("runevent").Columns("sequence", "data")
 
 	changegrouprevisionSelect = sb.Select("id, revision").From("changegrouprevision")
 	changegrouprevisionInsert = sb.Insert("changegrouprevision").Columns("id", "revision")
 
 	// readdb tables based on objectstorage data
-	revisionOSTSelect = sb.Select("revision").From("revision_ost")
+	//revisionOSTSelect = sb.Select("revision").From("revision_ost")
 	revisionOSTInsert = sb.Insert("revision_ost").Columns("revision")
 
-	runOSTSelect = sb.Select("id", "grouppath", "phase").From("run_ost")
+	//runOSTSelect = sb.Select("id", "grouppath", "phase").From("run_ost")
 	runOSTInsert = sb.Insert("run_ost").Columns("id", "grouppath", "phase")
 
 	rundataOSTInsert = sb.Insert("rundata_ost").Columns("id", "data")
@@ -367,7 +367,7 @@ func (r *ReadDB) handleEvents(ctx context.Context) error {
 		}
 		// check that the run sequence epoch isn't different than the current one (this means etcd
 		// has been reset, or worst, restored from a backup or manually deleted)
-		if runSequence == nil || runSequence.Epoch != lastRunSequence.Epoch {
+		if runSequence.Epoch != lastRunSequence.Epoch {
 			r.SetInitialized(false)
 			return errors.Errorf("last run epoch %d is different than current epoch in etcd %d, reinitializing.", lastRunSequence.Epoch, runSequence.Epoch)
 		}
@@ -1525,7 +1525,7 @@ func fetchChangeGroupsRevisionOST(tx *db.Tx, q string, args ...interface{}) (map
 		return nil, err
 	}
 	defer rows.Close()
-	return scanChangeGroupsRevision(rows)
+	return scanChangeGroupsRevisionOST(rows)
 }
 
 func scanChangeGroupsRevisionOST(rows *sql.Rows) (map[string]int64, error) {

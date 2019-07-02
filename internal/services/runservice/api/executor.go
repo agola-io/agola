@@ -333,7 +333,7 @@ func matchCache(ost *objectstorage.ObjStorage, key string, prefix bool) (string,
 				return "", object.Err
 			}
 
-			if (lastObject == nil) || (lastObject != nil && lastObject.LastModified.Before(object.LastModified)) {
+			if (lastObject == nil) || (lastObject.LastModified.Before(object.LastModified)) {
 				lastObject = &object
 			}
 

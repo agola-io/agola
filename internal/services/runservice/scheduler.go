@@ -76,15 +76,6 @@ func (s *Runservice) runActiveExecutorTasks(ctx context.Context, runID string) (
 	return activeTasks, nil
 }
 
-func (s *Runservice) runHasActiveExecutorTasks(ctx context.Context, runID string) (bool, error) {
-	activeTasks, err := s.runActiveExecutorTasks(ctx, runID)
-	if err != nil {
-		return false, err
-	}
-
-	return len(activeTasks) > 0, nil
-}
-
 func advanceRunTasks(ctx context.Context, curRun *types.Run, rc *types.RunConfig, activeExecutorTasks []*types.ExecutorTask) (*types.Run, error) {
 	log.Debugf("run: %s", util.Dump(curRun))
 	log.Debugf("rc: %s", util.Dump(rc))
@@ -281,7 +272,7 @@ func (s *Runservice) chooseExecutor(ctx context.Context, rct *types.RunConfigTas
 func chooseExecutor(executors []*types.Executor, rct *types.RunConfigTask) *types.Executor {
 	requiresPrivilegedContainers := false
 	for _, c := range rct.Runtime.Containers {
-		if c.Privileged == true {
+		if c.Privileged {
 			requiresPrivilegedContainers = true
 			break
 		}
@@ -293,7 +284,7 @@ func chooseExecutor(executors []*types.Executor, rct *types.RunConfigTask) *type
 		}
 
 		// skip executor provileged containers are required but not allowed
-		if requiresPrivilegedContainers == true && e.AllowPrivilegedContainers == false {
+		if requiresPrivilegedContainers && !e.AllowPrivilegedContainers {
 			continue
 		}
 
@@ -864,7 +855,7 @@ func (s *Runservice) runTasksUpdater(ctx context.Context) error {
 	if err := m.Lock(ctx); err != nil {
 		return err
 	}
-	defer m.Unlock(ctx)
+	defer func() { _ = m.Unlock(ctx) }()
 
 	resp, err := s.e.List(ctx, common.EtcdTasksDir, "", 0)
 	if err != nil {
@@ -1378,7 +1369,7 @@ func (s *Runservice) cacheCleaner(ctx context.Context, cacheExpireInterval time.
 	if err := m.Lock(ctx); err != nil {
 		return err
 	}
-	defer m.Unlock(ctx)
+	defer func() { _ = m.Unlock(ctx) }()
 
 	doneCh := make(chan struct{})
 	defer close(doneCh)

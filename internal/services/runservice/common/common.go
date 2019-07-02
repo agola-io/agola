@@ -70,10 +70,6 @@ var (
 	StorageCountersDir    = path.Join(StorageDataDir, "counters")
 )
 
-const (
-	etcdWalsMinRevisionRange = 100
-)
-
 type DataType string
 
 const (

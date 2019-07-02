@@ -129,7 +129,6 @@ func TestAdvanceRunTasks(t *testing.T) {
 		r                   *types.Run
 		activeExecutorTasks []*types.ExecutorTask
 		out                 *types.Run
-		err                 error
 	}{
 		{
 			name: "test top level task not started",
@@ -472,7 +471,6 @@ func TestGetTasksToRun(t *testing.T) {
 		rc   *types.RunConfig
 		r    *types.Run
 		out  []string
-		err  error
 	}{
 		{
 			name: "test run top level tasks",
@@ -532,8 +530,8 @@ func TestGetTasksToRun(t *testing.T) {
 			for _, t := range tasks {
 				outTasks = append(outTasks, t.ID)
 			}
-			sort.Sort(sort.StringSlice(tt.out))
-			sort.Sort(sort.StringSlice(outTasks))
+			sort.Strings(tt.out)
+			sort.Strings(outTasks)
 
 			if diff := cmp.Diff(tt.out, outTasks); diff != "" {
 				t.Error(diff)
@@ -606,7 +604,6 @@ func TestChooseExecutor(t *testing.T) {
 		executors []*types.Executor
 		rct       *types.RunConfigTask
 		out       *types.Executor
-		err       error
 	}{
 		{
 			name:      "test single executor ok",
