@@ -66,9 +66,8 @@ func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 }
 
 type CreateRemoteSourceHandler struct {
-	log    *zap.SugaredLogger
-	ah     *action.ActionHandler
-	readDB *readdb.ReadDB
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
 func NewCreateRemoteSourceHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateRemoteSourceHandler {
@@ -97,9 +96,8 @@ func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 }
 
 type UpdateRemoteSourceHandler struct {
-	log    *zap.SugaredLogger
-	ah     *action.ActionHandler
-	readDB *readdb.ReadDB
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
 func NewUpdateRemoteSourceHandler(logger *zap.Logger, ah *action.ActionHandler) *UpdateRemoteSourceHandler {

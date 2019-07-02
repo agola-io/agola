@@ -90,9 +90,8 @@ func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type CreateVariableHandler struct {
-	log    *zap.SugaredLogger
-	ah     *action.ActionHandler
-	readDB *readdb.ReadDB
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
 func NewCreateVariableHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateVariableHandler {

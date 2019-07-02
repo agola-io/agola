@@ -21,10 +21,6 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-const (
-	etcdWalsMinRevisionRange = 100
-)
-
 type RefType int
 
 const (

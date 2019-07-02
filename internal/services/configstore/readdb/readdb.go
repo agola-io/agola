@@ -21,7 +21,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"agola.io/agola/internal/datamanager"
@@ -61,7 +60,6 @@ type ReadDB struct {
 	dm      *datamanager.DataManager
 
 	Initialized bool
-	initMutex   sync.Mutex
 }
 
 func NewReadDB(ctx context.Context, logger *zap.Logger, dataDir string, e *etcd.Store, ost *objectstorage.ObjStorage, dm *datamanager.DataManager) (*ReadDB, error) {
@@ -407,9 +405,6 @@ func (r *ReadDB) Run(ctx context.Context) error {
 	}
 
 	for {
-		if !r.Initialized {
-			r.Initialize(ctx)
-		}
 		if err := r.HandleEvents(ctx); err != nil {
 			r.log.Errorf("handleevents err: %+v", err)
 		}

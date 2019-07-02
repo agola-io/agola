@@ -31,13 +31,13 @@ var (
 	userSelect = sb.Select("user.id", "user.data").From("user")
 	userInsert = sb.Insert("user").Columns("id", "name", "data")
 
-	linkedaccountSelect        = sb.Select("id", "data").From("linkedaccount")
-	linkedaccountInsert        = sb.Insert("linkedaccount").Columns("id", "name", "data")
-	linkedaccountuserInsert    = sb.Insert("linkedaccount_user").Columns("id", "remotesourceid", "userid", "remoteuserid")
-	linkedaccountuserSelect    = sb.Select("id", "userid").From("linkedaccount_user")
-	linkedaccountprojectInsert = sb.Insert("linkedaccount_project").Columns("id", "userid")
+	//linkedaccountSelect     = sb.Select("id", "data").From("linkedaccount")
+	//linkedaccountInsert     = sb.Insert("linkedaccount").Columns("id", "name", "data")
+	linkedaccountuserInsert = sb.Insert("linkedaccount_user").Columns("id", "remotesourceid", "userid", "remoteuserid")
+	//linkedaccountuserSelect    = sb.Select("id", "userid").From("linkedaccount_user")
+	//linkedaccountprojectInsert = sb.Insert("linkedaccount_project").Columns("id", "userid")
 
-	usertokenSelect = sb.Select("tokenvalue", "userid").From("user_token")
+	//usertokenSelect = sb.Select("tokenvalue", "userid").From("user_token")
 	usertokenInsert = sb.Insert("user_token").Columns("tokenvalue", "userid")
 )
 
@@ -127,14 +127,6 @@ func (r *ReadDB) deleteUserLinkedAccount(tx *db.Tx, id string) error {
 	}
 	if _, err := tx.Exec("delete from linkedaccount_project where id = $1", id); err != nil {
 		return errors.Errorf("failed to delete linked account: %w", err)
-	}
-	return nil
-}
-
-func (r *ReadDB) deleteAllUserTokens(tx *db.Tx, userID string) error {
-	// poor man insert or update...
-	if _, err := tx.Exec("delete from user_token where userid = $1", userID); err != nil {
-		return errors.Errorf("failed to delete user_token: %w", err)
 	}
 	return nil
 }
@@ -355,45 +347,4 @@ func scanUsers(rows *sql.Rows) ([]*types.User, []string, error) {
 		return nil, nil, err
 	}
 	return users, ids, nil
-}
-
-type LinkedAccountUser struct {
-	ID     string
-	UserID string
-}
-
-func fetchLinkedAccounts(tx *db.Tx, q string, args ...interface{}) ([]*LinkedAccountUser, error) {
-	rows, err := tx.Query(q, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	linkedAccounts, err := scanLinkedAccounts(rows)
-
-	return linkedAccounts, err
-}
-
-func scanLinkedAccount(rows *sql.Rows, additionalFields ...interface{}) (*LinkedAccountUser, error) {
-	var id, userid string
-	if err := rows.Scan(&id, &userid); err != nil {
-		return nil, errors.Errorf("failed to scan rows: %w", err)
-	}
-
-	return &LinkedAccountUser{ID: id, UserID: userid}, nil
-}
-
-func scanLinkedAccounts(rows *sql.Rows) ([]*LinkedAccountUser, error) {
-	linkedAccounts := []*LinkedAccountUser{}
-	for rows.Next() {
-		linkedAccount, err := scanLinkedAccount(rows)
-		if err != nil {
-			rows.Close()
-			return nil, err
-		}
-		linkedAccounts = append(linkedAccounts, linkedAccount)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return linkedAccounts, nil
 }

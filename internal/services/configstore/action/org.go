@@ -179,7 +179,6 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) 
 
 func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 	var org *types.Organization
-	var projects []*types.Project
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
 	// must do all the checks in a single transaction to avoid concurrent changes
@@ -214,14 +213,6 @@ func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 			DataType:   string(types.ConfigTypeOrg),
 			ID:         org.ID,
 		},
-	}
-	// delete all org projects
-	for _, project := range projects {
-		actions = append(actions, &datamanager.Action{
-			ActionType: datamanager.ActionTypeDelete,
-			DataType:   string(types.ConfigTypeProject),
-			ID:         project.ID,
-		})
 	}
 
 	_, err = h.dm.WriteWal(ctx, actions, cgt)

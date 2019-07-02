@@ -43,13 +43,12 @@ var logger = slog.New(level)
 var log = logger.Sugar()
 
 type Configstore struct {
-	c             *config.Configstore
-	e             *etcd.Store
-	dm            *datamanager.DataManager
-	readDB        *readdb.ReadDB
-	ost           *objectstorage.ObjStorage
-	ah            *action.ActionHandler
-	listenAddress string
+	c      *config.Configstore
+	e      *etcd.Store
+	dm     *datamanager.DataManager
+	readDB *readdb.ReadDB
+	ost    *objectstorage.ObjStorage
+	ah     *action.ActionHandler
 }
 
 func NewConfigstore(ctx context.Context, c *config.Configstore) (*Configstore, error) {
@@ -115,15 +114,10 @@ func (s *Configstore) Run(ctx context.Context) error {
 
 	go func() { errCh <- s.readDB.Run(ctx) }()
 
-	// noop coors handler
-	corsHandler := func(h http.Handler) http.Handler {
-		return h
-	}
-
 	corsAllowedMethodsOptions := ghandlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "DELETE"})
 	corsAllowedHeadersOptions := ghandlers.AllowedHeaders([]string{"Accept", "Accept-Encoding", "Authorization", "Content-Length", "Content-Type", "X-CSRF-Token", "Authorization"})
 	corsAllowedOriginsOptions := ghandlers.AllowedOrigins([]string{"*"})
-	corsHandler = ghandlers.CORS(corsAllowedMethodsOptions, corsAllowedHeadersOptions, corsAllowedOriginsOptions)
+	corsHandler := ghandlers.CORS(corsAllowedMethodsOptions, corsAllowedHeadersOptions, corsAllowedOriginsOptions)
 
 	projectGroupHandler := api.NewProjectGroupHandler(logger, s.readDB)
 	projectGroupSubgroupsHandler := api.NewProjectGroupSubgroupsHandler(logger, s.ah, s.readDB)

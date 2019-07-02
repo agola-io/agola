@@ -51,12 +51,15 @@ func setupEtcd(t *testing.T, dir string) *testutil.TestEmbeddedEtcd {
 
 func shutdownEtcd(tetcd *testutil.TestEmbeddedEtcd) {
 	if tetcd.Etcd != nil {
-		tetcd.Kill()
+		_ = tetcd.Kill()
 	}
 }
 
 func setupConfigstore(t *testing.T, ctx context.Context, dir string) (*Configstore, *testutil.TestEmbeddedEtcd) {
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 	tetcd := setupEtcd(t, etcdDir)
 
 	listenAddress, port, err := testutil.GetFreePort(true, false)
@@ -65,7 +68,13 @@ func setupConfigstore(t *testing.T, ctx context.Context, dir string) (*Configsto
 	}
 
 	ostDir, err := ioutil.TempDir(dir, "ost")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 	csDir, err := ioutil.TempDir(dir, "cs")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 
 	baseConfig := config.Configstore{
 		Etcd: config.Etcd{
@@ -117,6 +126,9 @@ func TestResync(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 	tetcd := setupEtcd(t, etcdDir)
 	defer shutdownEtcd(tetcd)
 
@@ -136,9 +148,21 @@ func TestResync(t *testing.T) {
 	ctx := context.Background()
 
 	ostDir, err := ioutil.TempDir(dir, "ost")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 	csDir1, err := ioutil.TempDir(dir, "cs1")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 	csDir2, err := ioutil.TempDir(dir, "cs2")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 	csDir3, err := ioutil.TempDir(dir, "cs3")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 
 	baseConfig := config.Configstore{
 		Etcd: config.Etcd{
@@ -171,17 +195,9 @@ func TestResync(t *testing.T) {
 	ctx2, cancel2 := context.WithCancel(context.Background())
 
 	t.Logf("starting cs1")
-	go func() {
-		if err := cs1.Run(ctx1); err != nil {
-			t.Fatalf("err: %v", err)
-		}
-	}()
+	go func() { _ = cs1.Run(ctx1) }()
 	t.Logf("starting cs2")
-	go func() {
-		if err := cs2.Run(ctx2); err != nil {
-			t.Fatalf("err: %v", err)
-		}
-	}()
+	go func() { _ = cs2.Run(ctx2) }()
 
 	time.Sleep(1 * time.Second)
 
@@ -221,7 +237,7 @@ func TestResync(t *testing.T) {
 	}
 	log.Infof("starting cs2")
 	ctx2 = context.Background()
-	go cs2.Run(ctx2)
+	go func() { _ = cs2.Run(ctx2) }()
 
 	time.Sleep(5 * time.Second)
 
@@ -254,7 +270,7 @@ func TestResync(t *testing.T) {
 		t.Fatalf("err: %v", err)
 	}
 	ctx3 := context.Background()
-	go cs3.Run(ctx3)
+	go func() { _ = cs3.Run(ctx3) }()
 
 	time.Sleep(5 * time.Second)
 
@@ -305,9 +321,7 @@ func TestUser(t *testing.T) {
 
 	t.Logf("starting cs")
 	go func() {
-		if err := cs.Run(ctx); err != nil {
-			t.Fatalf("err: %v", err)
-		}
+		_ = cs.Run(ctx)
 	}()
 
 	// TODO(sgotti) change the sleep with a real check that all is ready
@@ -342,7 +356,7 @@ func TestUser(t *testing.T) {
 		wg := sync.WaitGroup{}
 		for i := 0; i < 10; i++ {
 			wg.Add(1)
-			go cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user02"})
+			go func() { _, _ = cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user02"}) }()
 			wg.Done()
 		}
 		wg.Wait()
@@ -374,9 +388,7 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 
 	t.Logf("starting cs")
 	go func() {
-		if err := cs.Run(ctx); err != nil {
-			t.Fatalf("err: %v", err)
-		}
+		_ = cs.Run(ctx)
 	}()
 
 	// TODO(sgotti) change the sleep with a real check that all is ready
@@ -489,7 +501,9 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 		wg := sync.WaitGroup{}
 		for i := 0; i < 10; i++ {
 			wg.Add(1)
-			go cs.ah.CreateProject(ctx, &types.Project{Name: "project02", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+			go func() {
+				_, _ = cs.ah.CreateProject(ctx, &types.Project{Name: "project02", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+			}()
 			wg.Done()
 		}
 		wg.Wait()
@@ -521,9 +535,7 @@ func TestProjectGroupDelete(t *testing.T) {
 
 	t.Logf("starting cs")
 	go func() {
-		if err := cs.Run(ctx); err != nil {
-			t.Fatalf("err: %v", err)
-		}
+		_ = cs.Run(ctx)
 	}()
 
 	// TODO(sgotti) change the sleep with a real check that all is ready
@@ -661,11 +673,7 @@ func TestOrgMembers(t *testing.T) {
 	defer shutdownEtcd(tetcd)
 
 	t.Logf("starting cs")
-	go func() {
-		if err := cs.Run(ctx); err != nil {
-			t.Fatalf("err: %v", err)
-		}
-	}()
+	go func() { _ = cs.Run(ctx) }()
 
 	// TODO(sgotti) change the sleep with a real check that all is ready
 	time.Sleep(2 * time.Second)

@@ -117,9 +117,8 @@ func (h *SecretsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type CreateSecretHandler struct {
-	log    *zap.SugaredLogger
-	ah     *action.ActionHandler
-	readDB *readdb.ReadDB
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
 func NewCreateSecretHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateSecretHandler {

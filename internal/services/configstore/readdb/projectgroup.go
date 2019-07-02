@@ -49,7 +49,7 @@ func (r *ReadDB) insertProjectGroup(tx *db.Tx, data []byte) error {
 		return errors.Errorf("failed to build query: %w", err)
 	}
 	if _, err = tx.Exec(q, args...); err != nil {
-		errors.Errorf("failed to insert group: %w", err)
+		return errors.Errorf("failed to insert group: %w", err)
 	}
 
 	return nil
