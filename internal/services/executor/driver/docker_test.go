@@ -38,7 +38,6 @@ import (
 
 var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
 var logger = slog.New(level)
-var log = logger.Sugar()
 
 func parseEnv(envvar string) (string, string, error) {
 	// trim white spaces at the start
@@ -112,7 +111,7 @@ func TestDockerPod(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
-		defer pod.Remove(ctx)
+		defer func() { _ = pod.Remove(ctx) }()
 	})
 
 	t.Run("execute a command inside a pod", func(t *testing.T) {
@@ -130,7 +129,7 @@ func TestDockerPod(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
-		defer pod.Remove(ctx)
+		defer func() { _ = pod.Remove(ctx) }()
 
 		ce, err := pod.Exec(ctx, &ExecConfig{
 			Cmd: []string{"ls"},
@@ -169,7 +168,7 @@ func TestDockerPod(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
-		defer pod.Remove(ctx)
+		defer func() { _ = pod.Remove(ctx) }()
 
 		var buf bytes.Buffer
 		ce, err := pod.Exec(ctx, &ExecConfig{
@@ -223,7 +222,7 @@ func TestDockerPod(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
-		defer pod.Remove(ctx)
+		defer func() { _ = pod.Remove(ctx) }()
 	})
 
 	t.Run("test communication between two containers", func(t *testing.T) {
@@ -244,7 +243,7 @@ func TestDockerPod(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
-		defer pod.Remove(ctx)
+		defer func() { _ = pod.Remove(ctx) }()
 
 		// wait for nginx up
 		time.Sleep(1 * time.Second)
@@ -280,7 +279,7 @@ func TestDockerPod(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
-		defer pod.Remove(ctx)
+		defer func() { _ = pod.Remove(ctx) }()
 
 		pods, err := d.GetPods(ctx, true)
 		if err != nil {
@@ -326,7 +325,7 @@ func TestDockerPod(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
-		defer pod.Remove(ctx)
+		defer func() { _ = pod.Remove(ctx) }()
 
 		pods, err := d.GetPods(ctx, true)
 		if err != nil {
@@ -372,7 +371,7 @@ func TestDockerPod(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
-		defer pod.Remove(ctx)
+		defer func() { _ = pod.Remove(ctx) }()
 
 		// delete the first container
 		dp := pod.(*DockerPod)

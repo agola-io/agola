@@ -45,7 +45,7 @@ func (d *K8sDriver) updateLease(ctx context.Context) error {
 
 	if d.useLeaseAPI {
 		duration := int32(duration)
-		now := metav1.MicroTime{now}
+		now := metav1.MicroTime{Time: now}
 
 		leaseClient := d.client.CoordinationV1().Leases(d.namespace)
 		found := false
@@ -76,7 +76,7 @@ func (d *K8sDriver) updateLease(ctx context.Context) error {
 				RenewTime:            &now,
 			},
 		}
-		lease, err = leaseClient.Create(lease)
+		_, err = leaseClient.Create(lease)
 		return err
 	} else {
 		cmClient := d.client.CoreV1().ConfigMaps(d.namespace)
@@ -128,10 +128,9 @@ func (d *K8sDriver) updateLease(ctx context.Context) error {
 			},
 		}
 		cm.Annotations[cmLeaseKey] = string(ldj)
-		cm, err = cmClient.Create(cm)
+		_, err = cmClient.Create(cm)
 		return err
 	}
-	return nil
 }
 
 func (d *K8sDriver) getLeases(ctx context.Context) ([]string, error) {

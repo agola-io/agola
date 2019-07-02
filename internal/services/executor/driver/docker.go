@@ -51,7 +51,7 @@ type DockerDriver struct {
 }
 
 func NewDockerDriver(logger *zap.Logger, executorID, initVolumeHostDir, toolboxPath string) (*DockerDriver, error) {
-	cli, err := client.NewEnvClient()
+	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,9 @@ func (d *DockerDriver) CopyToolbox(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	io.Copy(os.Stdout, reader)
+	if _, err := io.Copy(os.Stdout, reader); err != nil {
+		return err
+	}
 
 	resp, err := d.client.ContainerCreate(ctx, &container.Config{
 		Entrypoint: []string{"cat"},
@@ -125,7 +127,7 @@ func (d *DockerDriver) CopyToolbox(ctx context.Context) error {
 	}
 
 	// ignore remove error
-	d.client.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{Force: true})
+	_ = d.client.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{Force: true})
 
 	return nil
 }
@@ -387,17 +389,6 @@ func (d *DockerDriver) GetPods(ctx context.Context, all bool) ([]Pod, error) {
 		pods = append(pods, pod)
 	}
 	return pods, nil
-}
-
-func podLabelsFromContainer(containerLabels map[string]string) map[string]string {
-	labels := map[string]string{}
-	// keep only labels starting with our prefix
-	for k, v := range containerLabels {
-		if strings.HasPrefix(k, labelPrefix) {
-			labels[k] = v
-		}
-	}
-	return labels
 }
 
 type DockerPod struct {

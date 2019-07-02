@@ -27,7 +27,6 @@ import (
 	"agola.io/agola/internal/common"
 	"agola.io/agola/internal/util"
 
-	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/archive"
 	uuid "github.com/satori/go.uuid"
 	"go.uber.org/zap"
@@ -58,7 +57,6 @@ const (
 
 	executorsGroupIDKey          = labelPrefix + "executorsgroupid"
 	executorsGroupIDConfigMapKey = "executorsgroupid"
-	useLeaseAPIKey               = labelPrefix + "useleaseapi"
 	cmLeaseKey                   = labelPrefix + "lease"
 
 	renewExecutorLeaseInterval = 10 * time.Second
@@ -279,8 +277,7 @@ func (d *K8sDriver) getOrCreateExecutorsGroupID(ctx context.Context) (string, er
 		},
 		Data: map[string]string{executorsGroupIDConfigMapKey: executorsGroupID},
 	}
-	cm, err = cmClient.Create(cm)
-	if err != nil {
+	if _, err = cmClient.Create(cm); err != nil {
 		return "", err
 	}
 
@@ -322,7 +319,7 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 		Type: corev1.SecretTypeDockerConfigJson,
 	}
 
-	secret, err = secretClient.Create(secret)
+	_, err = secretClient.Create(secret)
 	if err != nil {
 		return nil, err
 	}
@@ -647,9 +644,7 @@ func (p *K8sPod) Remove(ctx context.Context) error {
 }
 
 type K8sContainerExec struct {
-	execID string
-	client *client.Client
-	endCh  chan error
+	endCh chan error
 
 	stdin io.WriteCloser
 }

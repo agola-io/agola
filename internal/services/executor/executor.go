@@ -84,8 +84,7 @@ func (e *Executor) createFile(ctx context.Context, pod driver.Pod, command, user
 
 	stdin := ce.Stdin()
 	go func() {
-		io.WriteString(stdin, command)
-		io.WriteString(stdin, "\n")
+		_, _ = io.WriteString(stdin, command+"\n")
 		stdin.Close()
 	}()
 
@@ -157,7 +156,7 @@ func (e *Executor) doRunStep(ctx context.Context, s *types.RunStep, t *types.Exe
 
 	workingDir, err = e.expandDir(ctx, t, pod, outf, workingDir)
 	if err != nil {
-		outf.WriteString(fmt.Sprintf("failed to expand working dir %q. Error: %s\n", workingDir, err))
+		_, _ = outf.WriteString(fmt.Sprintf("failed to expand working dir %q. Error: %s\n", workingDir, err))
 		return -1, err
 	}
 
@@ -208,7 +207,7 @@ func (e *Executor) doSaveToWorkspaceStep(ctx context.Context, s *types.SaveToWor
 
 	workingDir, err := e.expandDir(ctx, t, pod, logf, t.WorkingDir)
 	if err != nil {
-		logf.WriteString(fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.WorkingDir, err))
+		_, _ = logf.WriteString(fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.WorkingDir, err))
 		return -1, err
 	}
 
@@ -254,7 +253,7 @@ func (e *Executor) doSaveToWorkspaceStep(ctx context.Context, s *types.SaveToWor
 	enc := json.NewEncoder(stdin)
 
 	go func() {
-		enc.Encode(a)
+		_ = enc.Encode(a)
 		stdin.Close()
 	}()
 
@@ -333,7 +332,7 @@ func (e *Executor) template(ctx context.Context, t *types.ExecutorTask, pod driv
 
 	workingDir, err := e.expandDir(ctx, t, pod, logf, t.WorkingDir)
 	if err != nil {
-		io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.WorkingDir, err))
+		_, _ = io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.WorkingDir, err))
 		return "", err
 	}
 
@@ -353,7 +352,7 @@ func (e *Executor) template(ctx context.Context, t *types.ExecutorTask, pod driv
 
 	stdin := ce.Stdin()
 	go func() {
-		io.WriteString(stdin, key)
+		_, _ = io.WriteString(stdin, key)
 		stdin.Close()
 	}()
 
@@ -380,7 +379,7 @@ func (e *Executor) unarchive(ctx context.Context, t *types.ExecutorTask, source 
 
 	workingDir, err := e.expandDir(ctx, t, pod, logf, t.WorkingDir)
 	if err != nil {
-		io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.WorkingDir, err))
+		_, _ = io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.WorkingDir, err))
 		return err
 	}
 
@@ -400,7 +399,7 @@ func (e *Executor) unarchive(ctx context.Context, t *types.ExecutorTask, source 
 
 	stdin := ce.Stdin()
 	go func() {
-		io.Copy(stdin, source)
+		_, _ = io.Copy(stdin, source)
 		stdin.Close()
 	}()
 
@@ -498,7 +497,7 @@ func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, 
 
 	workingDir, err := e.expandDir(ctx, t, pod, logf, t.WorkingDir)
 	if err != nil {
-		io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.WorkingDir, err))
+		_, _ = io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.WorkingDir, err))
 		return -1, err
 	}
 
@@ -544,7 +543,7 @@ func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, 
 	enc := json.NewEncoder(stdin)
 
 	go func() {
-		enc.Encode(a)
+		_ = enc.Encode(a)
 		stdin.Close()
 	}()
 
@@ -848,13 +847,13 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 	// error out if privileged containers are required but not allowed
 	requiresPrivilegedContainers := false
 	for _, c := range et.Containers {
-		if c.Privileged == true {
+		if c.Privileged {
 			requiresPrivilegedContainers = true
 			break
 		}
 	}
-	if requiresPrivilegedContainers == true && e.c.AllowPrivilegedContainers == false {
-		outf.WriteString("Executor doesn't allow executing privileged containers.\n")
+	if requiresPrivilegedContainers && !e.c.AllowPrivilegedContainers {
+		_, _ = outf.WriteString("Executor doesn't allow executing privileged containers.\n")
 		return errors.Errorf("executor doesn't allow executing privileged containers")
 	}
 
@@ -893,18 +892,18 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 		}
 	}
 
-	outf.WriteString("Starting pod.\n")
+	_, _ = outf.WriteString("Starting pod.\n")
 	pod, err := e.driver.NewPod(ctx, podConfig, outf)
 	if err != nil {
-		outf.WriteString(fmt.Sprintf("Pod failed to start. Error: %s\n", err))
+		_, _ = outf.WriteString(fmt.Sprintf("Pod failed to start. Error: %s\n", err))
 		return err
 	}
-	outf.WriteString("Pod started.\n")
+	_, _ = outf.WriteString("Pod started.\n")
 
 	if et.WorkingDir != "" {
-		outf.WriteString(fmt.Sprintf("Creating working dir %q.\n", et.WorkingDir))
+		_, _ = outf.WriteString(fmt.Sprintf("Creating working dir %q.\n", et.WorkingDir))
 		if err := e.mkdir(ctx, et, pod, outf, et.WorkingDir); err != nil {
-			outf.WriteString(fmt.Sprintf("Failed to create working dir %q. Error: %s\n", et.WorkingDir, err))
+			_, _ = outf.WriteString(fmt.Sprintf("Failed to create working dir %q. Error: %s\n", et.WorkingDir, err))
 			return err
 		}
 	}
@@ -1028,7 +1027,7 @@ func (e *Executor) podsCleaner(ctx context.Context) error {
 		if pod.ExecutorID() == e.id {
 			if _, ok := e.runningTasks.get(taskID); !ok {
 				log.Infof("removing pod %s for not running task: %s", pod.ID(), taskID)
-				pod.Remove(ctx)
+				_ = pod.Remove(ctx)
 			}
 		}
 
@@ -1042,7 +1041,7 @@ func (e *Executor) podsCleaner(ctx context.Context) error {
 		}
 		if !owned {
 			log.Infof("removing pod %s since it's not owned by any active executor", pod.ID())
-			pod.Remove(ctx)
+			_ = pod.Remove(ctx)
 		}
 	}
 
@@ -1174,7 +1173,9 @@ func (e *Executor) taskUpdater(ctx context.Context, et *types.ExecutorTask) {
 					s.EndTime = util.TimePtr(time.Now())
 				}
 			}
-			e.sendExecutorTaskStatus(ctx, et)
+			if err := e.sendExecutorTaskStatus(ctx, et); err != nil {
+				log.Errorf("err: %+v", err)
+			}
 		}
 	}
 }
@@ -1260,12 +1261,6 @@ func (r *runningTasks) addIfNotExists(rtID string, rt *runningTask) bool {
 	}
 	r.tasks[rtID] = rt
 	return true
-}
-
-func (r *runningTasks) add(rtID string, rt *runningTask) {
-	r.m.Lock()
-	defer r.m.Unlock()
-	r.tasks[rtID] = rt
 }
 
 func (r *runningTasks) delete(rtID string) {
