@@ -68,9 +68,8 @@ func NewNotificationService(gc *config.Config) (*NotificationService, error) {
 func (n *NotificationService) Run(ctx context.Context) error {
 	go n.runEventsHandlerLoop(ctx)
 
-	select {
-	case <-ctx.Done():
-		log.Infof("notification service exiting")
-		return nil
-	}
+	<-ctx.Done()
+	log.Infof("notification service exiting")
+
+	return nil
 }

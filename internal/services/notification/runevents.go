@@ -65,7 +65,7 @@ func (n *NotificationService) runEventsHandler(ctx context.Context) error {
 	if err := m.Lock(ctx); err != nil {
 		return err
 	}
-	defer m.Unlock(ctx)
+	defer func() { _ = m.Unlock(ctx) }()
 
 	resp, err := n.runserviceClient.GetRunEvents(ctx, "")
 	if err != nil {
