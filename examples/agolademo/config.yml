@@ -28,28 +28,28 @@ notification:
     endpoints: "http://localhost:2379"
 
 configstore:
-  dataDir: /tmp/agola/configstore
+  dataDir: /data/agola/configstore
   etcd:
     endpoints: "http://localhost:2379"
   objectStorage:
     type: posix
-    path: /tmp/agola/configstore/ost
+    path: /data/agola/configstore/ost
   web:
     listenAddress: ":4002"
 
 runservice:
   #debug: true
-  dataDir: /tmp/agola/runservice
+  dataDir: /data/agola/runservice
   etcd:
     endpoints: "http://localhost:2379"
   objectStorage:
     type: posix
-    path: /tmp/agola/runservice/ost
+    path: /data/agola/runservice/ost
   web:
     listenAddress: ":4000"
 
 executor:
-  dataDir: /tmp/agola/executor
+  dataDir: /data/agola/executor
   # The directory containing the toolbox compiled for the various supported architectures
   toolboxPath: ./bin
   runserviceURL: "http://localhost:4000"
@@ -60,7 +60,7 @@ executor:
     type: docker
 
 gitserver:
-  dataDir: /tmp/agola/gitserver
+  dataDir: /data/agola/gitserver
   gatewayURL: "http://localhost:8000"
   web:
     listenAddress: ":4003"
