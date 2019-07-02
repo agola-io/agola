@@ -51,7 +51,9 @@ func NewWebBundleHandlerFunc(gatewayURL string) func(w http.ResponseWriter, r *h
 		gatewayURL,
 		"/api/v1alpha",
 	}
-	configTpl.Execute(&buf, configTplData)
+	if err := configTpl.Execute(&buf, configTplData); err != nil {
+		panic(err)
+	}
 
 	config := buf.Bytes()
 

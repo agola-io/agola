@@ -150,7 +150,7 @@ func (h *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func stripPrefixFromTokenString(prefix string) func(tok string) (string, error) {
 	return func(tok string) (string, error) {
 		pl := len(prefix)
-		if len(tok) > pl && strings.ToUpper(tok[0:pl+1]) == strings.ToUpper(prefix+" ") {
+		if len(tok) > pl && strings.EqualFold(tok[0:pl+1], prefix+" ") {
 			return tok[pl+1:], nil
 		}
 		return "", nil
@@ -161,20 +161,20 @@ func stripPrefixFromTokenString(prefix string) func(tok string) (string, error) 
 // header
 // Uses PostExtractionFilter to strip "token " prefix from header
 var TokenExtractor = &jwtrequest.PostExtractionFilter{
-	jwtrequest.MultiExtractor{
+	Extractor: jwtrequest.MultiExtractor{
 		jwtrequest.HeaderExtractor{"Authorization"},
 		jwtrequest.ArgumentExtractor{"access_token"},
 	},
-	stripPrefixFromTokenString("token"),
+	Filter: stripPrefixFromTokenString("token"),
 }
 
 // BearerTokenExtractor extracts a bearer token in format "bearer THETOKEN" from
 // Authorization header
 // Uses PostExtractionFilter to strip "Bearer " prefix from header
 var BearerTokenExtractor = &jwtrequest.PostExtractionFilter{
-	jwtrequest.MultiExtractor{
+	Extractor: jwtrequest.MultiExtractor{
 		jwtrequest.HeaderExtractor{"Authorization"},
 		jwtrequest.ArgumentExtractor{"access_token"},
 	},
-	stripPrefixFromTokenString("bearer"),
+	Filter: stripPrefixFromTokenString("bearer"),
 }

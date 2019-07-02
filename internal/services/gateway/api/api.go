@@ -78,22 +78,22 @@ func httpError(w http.ResponseWriter, err error) bool {
 	switch {
 	case errors.Is(err, &util.ErrBadRequest{}):
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write(resj)
+		_, _ = w.Write(resj)
 	case errors.Is(err, &util.ErrNotFound{}):
 		w.WriteHeader(http.StatusNotFound)
-		w.Write(resj)
+		_, _ = w.Write(resj)
 	case errors.Is(err, &util.ErrForbidden{}):
 		w.WriteHeader(http.StatusForbidden)
-		w.Write(resj)
+		_, _ = w.Write(resj)
 	case errors.Is(err, &util.ErrUnauthorized{}):
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write(resj)
+		_, _ = w.Write(resj)
 	case errors.Is(err, &util.ErrInternal{}):
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write(resj)
+		_, _ = w.Write(resj)
 	default:
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write(resj)
+		_, _ = w.Write(resj)
 	}
 	return true
 }
@@ -133,7 +133,7 @@ func httpErrorFromRemote(w http.ResponseWriter, resp *http.Response, err error) 
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
-		w.Write(resj)
+		_, _ = w.Write(resj)
 		return true
 	}
 	return false

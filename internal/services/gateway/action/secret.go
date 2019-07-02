@@ -21,7 +21,6 @@ import (
 	csapi "agola.io/agola/internal/services/configstore/api"
 	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
-	"go.uber.org/zap"
 
 	errors "golang.org/x/xerrors"
 )
@@ -64,11 +63,6 @@ type CreateSecretRequest struct {
 	// external secret
 	SecretProviderID string
 	Path             string
-}
-
-type CreateSecretHandler struct {
-	log               *zap.SugaredLogger
-	configstoreClient *csapi.Client
 }
 
 func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretRequest) (*csapi.Secret, error) {

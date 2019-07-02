@@ -137,15 +137,10 @@ func NewGateway(gc *config.Config) (*Gateway, error) {
 }
 
 func (g *Gateway) Run(ctx context.Context) error {
-	// noop coors handler
-	corsHandler := func(h http.Handler) http.Handler {
-		return h
-	}
-
 	corsAllowedMethodsOptions := ghandlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "DELETE"})
 	corsAllowedHeadersOptions := ghandlers.AllowedHeaders([]string{"Accept", "Accept-Encoding", "Authorization", "Content-Length", "Content-Type", "X-CSRF-Token", "Authorization"})
 	corsAllowedOriginsOptions := ghandlers.AllowedOrigins([]string{"*"})
-	corsHandler = ghandlers.CORS(corsAllowedMethodsOptions, corsAllowedHeadersOptions, corsAllowedOriginsOptions)
+	corsHandler := ghandlers.CORS(corsAllowedMethodsOptions, corsAllowedHeadersOptions, corsAllowedOriginsOptions)
 
 	webhooksHandler := api.NewWebhooksHandler(logger, g.ah, g.configstoreClient, g.runserviceClient, g.c.APIExposedURL)
 
@@ -307,7 +302,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	router.Handle("/webhooks", webhooksHandler).Methods("POST")
 	router.PathPrefix("/").HandlerFunc(handlers.NewWebBundleHandlerFunc(g.c.APIExposedURL))
 
-	maxBytesHandler := handlers.NewMaxBytesHandler(router, 1024*1024)
+	maxBytesHandler := handlers.NewMaxBytesHandler(router, maxRequestSize)
 
 	mainrouter := mux.NewRouter()
 	mainrouter.PathPrefix("/repos/").Handler(corsHandler(reposRouter))

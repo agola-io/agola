@@ -176,7 +176,7 @@ func createUserResponse(u *types.User) *UserResponse {
 	for tokenName := range u.Tokens {
 		user.Tokens = append(user.Tokens, tokenName)
 	}
-	sort.Sort(sort.StringSlice(user.Tokens))
+	sort.Strings(user.Tokens)
 
 	for _, la := range u.LinkedAccounts {
 		user.LinkedAccounts = append(user.LinkedAccounts, &LinkedAccountResponse{
