@@ -36,9 +36,7 @@ var cmdOrgMemberList = &cobra.Command{
 }
 
 type orgMemberListOptions struct {
-	orgname  string
-	username string
-	role     string
+	orgname string
 }
 
 var orgMemberListOpts orgMemberListOptions

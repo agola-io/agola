@@ -102,15 +102,12 @@ func embeddedEtcd(ctx context.Context) error {
 	}
 
 	go func() {
-		select {
-		case <-e.Server.ReadyNotify():
-			log.Infof("embedded etcd server is ready")
-		}
-		select {
-		case <-ctx.Done():
-			log.Infof("stopping embedded etcd server")
-			e.Close()
-		}
+		<-e.Server.ReadyNotify()
+		log.Infof("embedded etcd server is ready")
+
+		<-ctx.Done()
+		log.Infof("stopping embedded etcd server")
+		e.Close()
 	}()
 
 	return nil
