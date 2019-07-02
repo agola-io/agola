@@ -28,9 +28,6 @@ import (
 )
 
 const (
-	hookPush        = "push"
-	hookPullRequest = "pull_request"
-
 	prStateOpen = "open"
 
 	prActionOpen = "opened"

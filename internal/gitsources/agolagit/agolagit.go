@@ -16,7 +16,6 @@ package agolagit
 
 import (
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -112,18 +111,6 @@ func (c *Client) getResponse(method, path string, query url.Values, header http.
 	}
 
 	return resp, nil
-}
-
-func (c *Client) getParsedResponse(method, path string, query url.Values, header http.Header, ibody io.Reader, obj interface{}) (*http.Response, error) {
-	resp, err := c.getResponse(method, path, query, header, ibody)
-	if err != nil {
-		return resp, err
-	}
-	defer resp.Body.Close()
-
-	d := json.NewDecoder(resp.Body)
-
-	return resp, d.Decode(obj)
 }
 
 func (c *Client) GetUserInfo() (*gitsource.UserInfo, error) {

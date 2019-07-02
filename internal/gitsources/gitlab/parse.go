@@ -35,11 +35,6 @@ const (
 	hookPush        = "Push Hook"
 	hookTagPush     = "Tag Push Hook"
 	hookPullRequest = "Merge Request Hook"
-
-	prStateOpen = "open"
-
-	prActionOpen = "opened"
-	prActionSync = "synchronized"
 )
 
 func (c *Client) ParseWebhook(r *http.Request, secret string) (*types.WebhookData, error) {

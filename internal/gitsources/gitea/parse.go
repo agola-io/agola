@@ -60,7 +60,9 @@ func (c *Client) ParseWebhook(r *http.Request, secret string) (*types.WebhookDat
 			return nil, errors.Errorf("wrong webhook signature")
 		}
 		h := hmac.New(sha256.New, []byte(secret))
-		h.Write(data)
+		if _, err := h.Write(data); err != nil {
+			return nil, errors.Errorf("failed to calculate webhook signature")
+		}
 		cs := h.Sum(nil)
 		if !hmac.Equal(cs, ds) {
 			return nil, errors.Errorf("wrong webhook signature")

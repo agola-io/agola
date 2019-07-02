@@ -90,7 +90,9 @@ func New(opts Opts) (*Client, error) {
 	}
 	httpClient := &http.Client{Transport: transport}
 	client := gitlab.NewOAuthClient(httpClient, opts.Token)
-	client.SetBaseURL(opts.APIURL)
+	if err := client.SetBaseURL(opts.APIURL); err != nil {
+		return nil, errors.Errorf("failed to set gitlab client base url: %w", err)
+	}
 
 	return &Client{
 		client:         client,
@@ -303,10 +305,6 @@ func (c *Client) GetRef(repopath, ref string) (*gitsource.Ref, error) {
 			return nil, err
 		}
 
-		if err != nil {
-			return nil, err
-		}
-
 		return &gitsource.Ref{
 			Ref:       ref,
 			CommitSHA: remoteBranch.Commit.ID,
@@ -315,10 +313,6 @@ func (c *Client) GetRef(repopath, ref string) (*gitsource.Ref, error) {
 	case strings.HasPrefix(ref, "refs/tags/"):
 		tag := strings.TrimPrefix(ref, "refs/heads/")
 		remoteTag, _, err := c.client.Tags.GetTag(repopath, tag)
-		if err != nil {
-			return nil, err
-		}
-
 		if err != nil {
 			return nil, err
 		}
