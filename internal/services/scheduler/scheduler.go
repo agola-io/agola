@@ -190,6 +190,7 @@ func NewScheduler(c *config.Scheduler) (*Scheduler, error) {
 	}
 
 	return &Scheduler{
+		c:                c,
 		runserviceClient: rsapi.NewClient(c.RunserviceURL),
 	}, nil
 }
@@ -198,9 +199,8 @@ func (s *Scheduler) Run(ctx context.Context) error {
 	go s.scheduleLoop(ctx)
 	go s.approveLoop(ctx)
 
-	select {
-	case <-ctx.Done():
-		log.Infof("scheduler exiting")
-		return nil
-	}
+	<-ctx.Done()
+	log.Infof("scheduler exiting")
+
+	return nil
 }
