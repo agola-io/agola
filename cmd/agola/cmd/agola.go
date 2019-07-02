@@ -16,6 +16,7 @@ package cmd
 
 import (
 	"net/url"
+	"os"
 
 	"agola.io/agola/cmd"
 	slog "agola.io/agola/internal/log"
@@ -75,5 +76,7 @@ func init() {
 }
 
 func Execute() {
-	cmdAgola.Execute()
+	if err := cmdAgola.Execute(); err != nil {
+		os.Exit(1)
+	}
 }
