@@ -72,26 +72,9 @@ func (c *WalChanges) putRevision(revision int64) {
 	c.revision = revision
 }
 
-func (c *WalChanges) curWalSeq() string {
-	return c.walSeq
-}
-
 func (c *WalChanges) getPut(dataType, id string) (string, bool) {
 	walseq, ok := c.puts[dataType][id]
 	return walseq, ok
-}
-
-func (c *WalChanges) getDeletesMap() map[string]struct{} {
-	dmap := map[string]struct{}{}
-	for p := range c.deletes {
-		dmap[p] = struct{}{}
-	}
-	return dmap
-}
-
-func (c *WalChanges) getDelete(p string) bool {
-	_, ok := c.deletes[p]
-	return ok
 }
 
 func (c *WalChanges) addPut(dataType, id, walseq string, revision int64) {
@@ -188,7 +171,7 @@ func (d *DataManager) applyWalChangesAction(ctx context.Context, action *Action,
 	d.changes.actions[walSequence] = append(d.changes.actions[walSequence], action)
 }
 
-func (d *DataManager) watcherLoop(ctx context.Context) error {
+func (d *DataManager) watcherLoop(ctx context.Context) {
 	for {
 		initialized := d.changes.initialized
 		if !initialized {
@@ -204,7 +187,7 @@ func (d *DataManager) watcherLoop(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			d.log.Infof("watcher exiting")
-			return nil
+			return
 		default:
 		}
 

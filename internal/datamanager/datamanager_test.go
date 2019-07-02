@@ -38,7 +38,6 @@ import (
 
 var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
 var logger = slog.New(level)
-var log = logger.Sugar()
 
 func setupEtcd(t *testing.T, dir string) *testutil.TestEmbeddedEtcd {
 	tetcd, err := testutil.NewTestEmbeddedEtcd(t, logger, dir)
@@ -56,15 +55,8 @@ func setupEtcd(t *testing.T, dir string) *testutil.TestEmbeddedEtcd {
 
 func shutdownEtcd(tetcd *testutil.TestEmbeddedEtcd) {
 	if tetcd.Etcd != nil {
-		tetcd.Kill()
+		_ = tetcd.Kill()
 	}
-}
-
-type noopCheckpointer struct {
-}
-
-func (c *noopCheckpointer) Checkpoint(ctx context.Context, action *Action) error {
-	return nil
 }
 
 func TestEtcdReset(t *testing.T) {
@@ -75,12 +67,18 @@ func TestEtcdReset(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 	tetcd := setupEtcd(t, etcdDir)
 	defer shutdownEtcd(tetcd)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	ostDir, err := ioutil.TempDir(dir, "ost")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 
 	ost, err := posix.New(ostDir)
 	if err != nil {
@@ -95,10 +93,13 @@ func TestEtcdReset(t *testing.T) {
 		DataTypes:       []string{"datatype01"},
 	}
 	dm, err := NewDataManager(ctx, logger, dmConfig)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 	dmReadyCh := make(chan struct{})
 
 	t.Logf("starting datamanager")
-	go dm.Run(ctx, dmReadyCh)
+	go func() { _ = dm.Run(ctx, dmReadyCh) }()
 	<-dmReadyCh
 
 	actions := []*Action{
@@ -109,10 +110,8 @@ func TestEtcdReset(t *testing.T) {
 		},
 	}
 
-	expectedObjects := []string{}
 	for i := 0; i < 20; i++ {
 		objectID := fmt.Sprintf("object%02d", i)
-		expectedObjects = append(expectedObjects, objectID)
 		actions[0].ID = objectID
 		if _, err := dm.WriteWal(ctx, actions, nil); err != nil {
 			t.Fatalf("unexpected err: %v", err)
@@ -128,7 +127,9 @@ func TestEtcdReset(t *testing.T) {
 	t.Logf("stopping etcd")
 	// Reset etcd
 	shutdownEtcd(tetcd)
-	tetcd.WaitDown(10 * time.Second)
+	if err := tetcd.WaitDown(10 * time.Second); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 	t.Logf("resetting etcd")
 	os.RemoveAll(etcdDir)
 	t.Logf("starting etcd")
@@ -149,10 +150,13 @@ func TestEtcdReset(t *testing.T) {
 		DataTypes:       []string{"datatype01"},
 	}
 	dm, err = NewDataManager(ctx, logger, dmConfig)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 	dmReadyCh = make(chan struct{})
 
 	t.Logf("starting datamanager")
-	go dm.Run(ctx, dmReadyCh)
+	go func() { _ = dm.Run(ctx, dmReadyCh) }()
 	<-dmReadyCh
 
 	time.Sleep(5 * time.Second)
@@ -174,12 +178,18 @@ func TestConcurrentUpdate(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 	tetcd := setupEtcd(t, etcdDir)
 	defer shutdownEtcd(tetcd)
 
 	ctx := context.Background()
 
 	ostDir, err := ioutil.TempDir(dir, "ost")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 
 	ost, err := posix.New(ostDir)
 	if err != nil {
@@ -193,6 +203,9 @@ func TestConcurrentUpdate(t *testing.T) {
 		DataTypes:       []string{"datatype01"},
 	}
 	dm, err := NewDataManager(ctx, logger, dmConfig)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 
 	actions := []*Action{
 		{
@@ -204,7 +217,7 @@ func TestConcurrentUpdate(t *testing.T) {
 	}
 
 	dmReadyCh := make(chan struct{})
-	go dm.Run(ctx, dmReadyCh)
+	go func() { _ = dm.Run(ctx, dmReadyCh) }()
 	<-dmReadyCh
 
 	time.Sleep(5 * time.Second)
@@ -236,7 +249,7 @@ func TestConcurrentUpdate(t *testing.T) {
 
 	oldcgt = cgt
 	// this must work successfully
-	cgt, err = dm.WriteWal(ctx, actions, cgt)
+	_, err = dm.WriteWal(ctx, actions, cgt)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -256,12 +269,18 @@ func TestWalCleaner(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 	tetcd := setupEtcd(t, etcdDir)
 	defer shutdownEtcd(tetcd)
 
 	ctx := context.Background()
 
 	ostDir, err := ioutil.TempDir(dir, "ost")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 
 	ost, err := posix.New(ostDir)
 	if err != nil {
@@ -277,6 +296,9 @@ func TestWalCleaner(t *testing.T) {
 		MinCheckpointWalsNum: 1,
 	}
 	dm, err := NewDataManager(ctx, logger, dmConfig)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 
 	actions := []*Action{
 		{
@@ -288,7 +310,7 @@ func TestWalCleaner(t *testing.T) {
 	}
 
 	dmReadyCh := make(chan struct{})
-	go dm.Run(ctx, dmReadyCh)
+	go func() { _ = dm.Run(ctx, dmReadyCh) }()
 	<-dmReadyCh
 
 	for i := 0; i < 20; i++ {
@@ -321,12 +343,18 @@ func TestReadObject(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 	tetcd := setupEtcd(t, etcdDir)
 	defer shutdownEtcd(tetcd)
 
 	ctx := context.Background()
 
 	ostDir, err := ioutil.TempDir(dir, "ost")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 	ost, err := posix.New(ostDir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -340,9 +368,12 @@ func TestReadObject(t *testing.T) {
 		DataTypes:       []string{"datatype01"},
 	}
 	dm, err := NewDataManager(ctx, logger, dmConfig)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 
 	dmReadyCh := make(chan struct{})
-	go dm.Run(ctx, dmReadyCh)
+	go func() { _ = dm.Run(ctx, dmReadyCh) }()
 	<-dmReadyCh
 
 	time.Sleep(5 * time.Second)
@@ -479,12 +510,18 @@ func TestCheckpoint(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 	tetcd := setupEtcd(t, etcdDir)
 	defer shutdownEtcd(tetcd)
 
 	ctx := context.Background()
 
 	ostDir, err := ioutil.TempDir(dir, "ost")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 	ost, err := posix.New(ostDir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -502,8 +539,11 @@ func TestCheckpoint(t *testing.T) {
 		MaxDataFileSize: 10 * 1024,
 	}
 	dm, err := NewDataManager(ctx, logger, dmConfig)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 	dmReadyCh := make(chan struct{})
-	go dm.Run(ctx, dmReadyCh)
+	go func() { _ = dm.Run(ctx, dmReadyCh) }()
 	<-dmReadyCh
 
 	time.Sleep(5 * time.Second)
@@ -667,7 +707,7 @@ func TestCheckpoint(t *testing.T) {
 	}
 	actionGroups = append(actionGroups, actions)
 
-	currentEntries, err = testCheckpoint(t, ctx, dm, actionGroups, currentEntries)
+	_, err = testCheckpoint(t, ctx, dm, actionGroups, currentEntries)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}

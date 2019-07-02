@@ -166,9 +166,8 @@ func (d *DataManager) Run(ctx context.Context, readyCh chan struct{}) error {
 	go d.compactChangeGroupsLoop(ctx)
 	go d.etcdPingerLoop(ctx)
 
-	select {
-	case <-ctx.Done():
-		d.log.Infof("walmanager exiting")
-		return nil
-	}
+	<-ctx.Done()
+	d.log.Infof("walmanager exiting")
+
+	return nil
 }

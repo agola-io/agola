@@ -143,24 +143,6 @@ func (d *DataManager) ReadObject(dataType, id string, cgNames []string) (io.Read
 	return ioutil.NopCloser(f), cgt, err
 }
 
-func (d *DataManager) changesList(paths []string, prefix, startWith string, recursive bool) []string {
-	fpaths := []string{}
-	for _, p := range paths {
-		if !recursive && len(p) > len(prefix) {
-			rel := strings.TrimPrefix(p, prefix)
-			skip := strings.Contains(rel, d.ost.Delimiter())
-			if skip {
-				continue
-			}
-		}
-		if strings.HasPrefix(p, prefix) && p > startWith {
-			fpaths = append(fpaths, p)
-		}
-	}
-
-	return fpaths
-}
-
 func (d *DataManager) HasOSTWal(walseq string) (bool, error) {
 	_, err := d.ost.Stat(d.storageWalStatusFile(walseq) + ".committed")
 	if err == ostypes.ErrNotExist {
@@ -601,7 +583,7 @@ func (d *DataManager) sync(ctx context.Context) error {
 	if err := m.Lock(ctx); err != nil {
 		return err
 	}
-	defer m.Unlock(ctx)
+	defer func() { _ = m.Unlock(ctx) }()
 
 	resp, err := d.e.List(ctx, etcdWalsDir+"/", "", 0)
 	if err != nil {
@@ -695,7 +677,7 @@ func (d *DataManager) checkpoint(ctx context.Context) error {
 	if err := m.Lock(ctx); err != nil {
 		return err
 	}
-	defer m.Unlock(ctx)
+	defer func() { _ = m.Unlock(ctx) }()
 
 	resp, err := d.e.List(ctx, etcdWalsDir+"/", "", 0)
 	if err != nil {
@@ -774,7 +756,7 @@ func (d *DataManager) walCleaner(ctx context.Context) error {
 	if err := m.Lock(ctx); err != nil {
 		return err
 	}
-	defer m.Unlock(ctx)
+	defer func() { _ = m.Unlock(ctx) }()
 
 	resp, err := d.e.List(ctx, etcdWalsDir+"/", "", 0)
 	if err != nil {
