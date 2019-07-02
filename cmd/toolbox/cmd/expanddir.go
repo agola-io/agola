@@ -43,5 +43,5 @@ func expanddirRun(cmd *cobra.Command, args []string) {
 		log.Fatalf("failed to expand dir %q: %v", expDir, err)
 	}
 
-	io.WriteString(os.Stdout, expDir)
+	_, _ = io.WriteString(os.Stdout, expDir)
 }

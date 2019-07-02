@@ -15,6 +15,9 @@
 package cmd
 
 import (
+	"log"
+	"os"
+
 	"agola.io/agola/cmd"
 
 	"github.com/spf13/cobra"
@@ -25,9 +28,15 @@ var CmdToolbox = &cobra.Command{
 	Short:   "toolbox",
 	Version: cmd.Version,
 	// just defined to make --version work
-	Run: func(c *cobra.Command, args []string) { c.Help() },
+	Run: func(c *cobra.Command, args []string) {
+		if err := c.Help(); err != nil {
+			log.Fatal(err)
+		}
+	},
 }
 
 func Execute() {
-	CmdToolbox.Execute()
+	if err := CmdToolbox.Execute(); err != nil {
+		os.Exit(1)
+	}
 }
