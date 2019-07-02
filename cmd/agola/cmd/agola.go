@@ -47,7 +47,11 @@ var cmdAgola = &cobra.Command{
 			level.SetLevel(zapcore.DebugLevel)
 		}
 	},
-	Run: func(c *cobra.Command, args []string) { c.Help() },
+	Run: func(c *cobra.Command, args []string) {
+		if err := c.Help(); err != nil {
+			log.Fatal(err)
+		}
+	},
 }
 
 type agolaOptions struct {
