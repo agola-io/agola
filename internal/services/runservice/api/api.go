@@ -515,6 +515,7 @@ type RunCreateRequest struct {
 	Group             string                          `json:"group"`
 	SetupErrors       []string                        `json:"setup_errors"`
 	StaticEnvironment map[string]string               `json:"static_environment"`
+	CacheGroup        string                          `json:"cache_group"`
 
 	// existing run fields
 	RunID      string   `json:"run_id"`
@@ -556,6 +557,7 @@ func (h *RunCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Group:             req.Group,
 		SetupErrors:       req.SetupErrors,
 		StaticEnvironment: req.StaticEnvironment,
+		CacheGroup:        req.CacheGroup,
 
 		RunID:      req.RunID,
 		FromStart:  req.FromStart,

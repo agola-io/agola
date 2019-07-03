@@ -335,6 +335,11 @@ func (s *Runservice) genExecutorTask(ctx context.Context, r *types.Run, rt *type
 	// run config Environment variables ovverride every other environment variable
 	mergeEnv(environment, rc.Environment)
 
+	cachePrefix := store.OSTRootGroup(r.Group)
+	if rc.CacheGroup != "" {
+		cachePrefix = rc.CacheGroup
+	}
+
 	et := &types.ExecutorTask{
 		// The executorTask ID must be the same as the runTask ID so we can detect if
 		// there's already an executorTask scheduled for that run task and we can get
@@ -349,7 +354,7 @@ func (s *Runservice) genExecutorTask(ctx context.Context, r *types.Run, rt *type
 		Shell:       rct.Shell,
 		User:        rct.User,
 		Steps:       rct.Steps,
-		CachePrefix: store.OSTRootGroup(r.Group),
+		CachePrefix: cachePrefix,
 		Status: types.ExecutorTaskStatus{
 			Phase:      types.ExecutorTaskPhaseNotStarted,
 			Steps:      make([]*types.ExecutorTaskStepStatus, len(rct.Steps)),

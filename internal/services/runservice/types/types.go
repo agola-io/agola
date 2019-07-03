@@ -306,6 +306,9 @@ type RunConfig struct {
 	Environment map[string]string `json:"environment,omitempty"`
 
 	Tasks map[string]*RunConfigTask `json:"tasks,omitempty"`
+
+	// CacheGroup is the cache group where the run caches belongs
+	CacheGroup string `json:"cache_group,omitempty"`
 }
 
 func (rc *RunConfig) DeepCopy() *RunConfig {

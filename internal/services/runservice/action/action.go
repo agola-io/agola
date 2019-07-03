@@ -135,6 +135,7 @@ type RunCreateRequest struct {
 	Group             string
 	SetupErrors       []string
 	StaticEnvironment map[string]string
+	CacheGroup        string
 
 	// existing run fields
 	RunID      string
@@ -210,6 +211,7 @@ func (h *ActionHandler) newRun(ctx context.Context, req *RunCreateRequest) (*typ
 		StaticEnvironment: req.StaticEnvironment,
 		Environment:       req.Environment,
 		Annotations:       req.Annotations,
+		CacheGroup:        req.CacheGroup,
 	}
 
 	run := genRun(rc)
