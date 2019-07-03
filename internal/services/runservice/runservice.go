@@ -97,8 +97,9 @@ func NewRunservice(ctx context.Context, c *config.Runservice) (*Runservice, erro
 	}
 
 	dmConf := &datamanager.DataManagerConfig{
-		E:   e,
-		OST: ost,
+		BasePath: "rundata",
+		E:        e,
+		OST:      ost,
 		DataTypes: []string{
 			string(common.DataTypeRun),
 			string(common.DataTypeRunConfig),
