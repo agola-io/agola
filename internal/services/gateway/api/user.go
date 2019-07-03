@@ -605,6 +605,7 @@ func (h *LoginUserHandler) loginUser(ctx context.Context, req *LoginUserRequest)
 }
 
 type UserCreateRunRequest struct {
+	RepoUUID  string `json:"repo_uuid,omitempty"`
 	RepoPath  string `json:"repo_path,omitempty"`
 	Branch    string `json:"branch,omitempty"`
 	CommitSHA string `json:"commit_sha,omitempty"`
@@ -630,7 +631,14 @@ func (h *UserCreateRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	err := h.ah.UserCreateRun(ctx, req.RepoPath, req.Branch, req.CommitSHA, req.Message)
+	creq := &action.UserCreateRunRequest{
+		RepoUUID:  req.RepoUUID,
+		RepoPath:  req.RepoPath,
+		Branch:    req.Branch,
+		CommitSHA: req.CommitSHA,
+		Message:   req.Message,
+	}
+	err := h.ah.UserCreateRun(ctx, creq)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return

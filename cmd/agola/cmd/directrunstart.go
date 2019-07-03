@@ -103,6 +103,7 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 
 	log.Infof("starting direct run")
 	req := &api.UserCreateRunRequest{
+		RepoUUID:  repoUUID,
 		RepoPath:  repoPath,
 		Branch:    branch,
 		CommitSHA: commitSHA,

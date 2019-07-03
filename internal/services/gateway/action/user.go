@@ -806,7 +806,15 @@ func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName 
 	return nil
 }
 
-func (h *ActionHandler) UserCreateRun(ctx context.Context, repoPath, branch, commitSHA, message string) error {
+type UserCreateRunRequest struct {
+	RepoUUID  string
+	RepoPath  string
+	Branch    string
+	CommitSHA string
+	Message   string
+}
+
+func (h *ActionHandler) UserCreateRun(ctx context.Context, req *UserCreateRunRequest) error {
 	curUserID := h.CurrentUserID(ctx)
 
 	user, resp, err := h.configstoreClient.GetUser(ctx, curUserID)
@@ -815,39 +823,44 @@ func (h *ActionHandler) UserCreateRun(ctx context.Context, repoPath, branch, com
 	}
 
 	// Verify that the repo is owned by the user
-	repoParts := strings.Split(repoPath, "/")
+	repoParts := strings.Split(req.RepoPath, "/")
+	if req.RepoUUID == "" {
+		return util.NewErrBadRequest(errors.Errorf("empty repo uuid"))
+	}
 	if len(repoParts) != 2 {
-		return util.NewErrBadRequest(errors.Errorf("wrong repo path: %q", repoPath))
+		return util.NewErrBadRequest(errors.Errorf("wrong repo path: %q", req.RepoPath))
 	}
 	if repoParts[0] != user.ID {
-		return util.NewErrUnauthorized(errors.Errorf("repo %q not owned", repoPath))
+		return util.NewErrUnauthorized(errors.Errorf("repo %q not owned", req.RepoPath))
 	}
 
 	gitSource := agolagit.New(h.apiExposedURL + "/repos")
-	cloneURL := fmt.Sprintf("%s/%s.git", h.apiExposedURL+"/repos", repoPath)
+	cloneURL := fmt.Sprintf("%s/%s.git", h.apiExposedURL+"/repos", req.RepoPath)
 
-	req := &CreateRunRequest{
+	creq := &CreateRunRequest{
 		RunType:            types.RunTypeUser,
 		RefType:            types.RunRefTypeBranch,
 		RunCreationTrigger: types.RunCreationTriggerTypeManual,
 
 		Project:       nil,
 		User:          user,
-		RepoPath:      repoPath,
+		RepoPath:      req.RepoPath,
 		GitSource:     gitSource,
-		CommitSHA:     commitSHA,
-		Message:       message,
-		Branch:        branch,
+		CommitSHA:     req.CommitSHA,
+		Message:       req.Message,
+		Branch:        req.Branch,
 		Tag:           "",
 		PullRequestID: "",
-		Ref:           gitSource.BranchRef(branch),
+		Ref:           gitSource.BranchRef(req.Branch),
 		CloneURL:      cloneURL,
 
 		CommitLink:      "",
 		BranchLink:      "",
 		TagLink:         "",
 		PullRequestLink: "",
+
+		UserRunRepoUUID: req.RepoUUID,
 	}
 
-	return h.CreateRuns(ctx, req)
+	return h.CreateRuns(ctx, creq)
 }

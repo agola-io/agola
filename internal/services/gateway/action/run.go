@@ -318,6 +318,8 @@ type CreateRunRequest struct {
 	// CompareLink is provided only when triggered by a webhook and contains the
 	// commit compare link
 	CompareLink string
+
+	UserRunRepoUUID string
 }
 
 func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) error {
@@ -428,6 +430,12 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 		annotations[AnnotationPullRequestLink] = req.PullRequestLink
 	}
 
+	// Since user belong to the same group (the user uuid) we needed another way to differentiate the cache. We'll use the user uuid + the user run repo uuid
+	var cacheGroup string
+	if req.RunType == types.RunTypeUser {
+		cacheGroup = req.User.ID + "-" + req.UserRunRepoUUID
+	}
+
 	data, filename, err := h.fetchConfigFiles(req.GitSource, req.RepoPath, req.CommitSHA)
 	if err != nil {
 		return util.NewErrInternal(errors.Errorf("failed to fetch config file: %w", err))
@@ -477,6 +485,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 			Name:              run.Name,
 			StaticEnvironment: env,
 			Annotations:       annotations,
+			CacheGroup:        cacheGroup,
 		}
 
 		if _, _, err := h.runserviceClient.CreateRun(ctx, createRunReq); err != nil {
