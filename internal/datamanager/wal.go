@@ -38,18 +38,6 @@ import (
 	errors "golang.org/x/xerrors"
 )
 
-func (d *DataManager) storageWalStatusFile(walSeq string) string {
-	return path.Join(d.basePath, storageWalsStatusDir, walSeq)
-}
-
-func (d *DataManager) storageWalDataFile(walFileID string) string {
-	return path.Join(d.basePath, storageWalsDataDir, walFileID)
-}
-
-func etcdWalKey(walSeq string) string {
-	return path.Join(etcdWalsDir, walSeq)
-}
-
 type ActionType string
 
 const (

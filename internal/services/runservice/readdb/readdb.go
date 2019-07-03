@@ -659,7 +659,7 @@ func (r *ReadDB) SyncFromDump() (string, error) {
 	}
 	for dataType, files := range dumpIndex.Files {
 		for _, file := range files {
-			dumpf, err := r.ost.ReadObject(datamanager.DataFilePath(dataType, file.ID))
+			dumpf, err := r.ost.ReadObject(r.dm.DataFilePath(dataType, file.ID))
 			if err != nil {
 				return "", err
 			}

@@ -16,6 +16,7 @@ package datamanager
 
 import (
 	"context"
+	"fmt"
 	"path"
 	"strings"
 	"time"
@@ -30,12 +31,6 @@ import (
 // TODO(sgotti) handle etcd unwanted changes:
 // * Etcd cluster rebuild: we cannot rely on etcd header ClusterID since it could be the same as it's generated using the listen urls. We should add our own clusterid key and use it.
 // * Etcd cluster restored to a previous revision: really bad cause should detect that the revision is smaller than the current one
-
-// Storage paths
-// wals/{walSeq}
-//
-// Etcd paths
-// wals/{walSeq}
 
 const (
 	DefaultCheckpointInterval   = 10 * time.Second
@@ -145,6 +140,34 @@ func NewDataManager(ctx context.Context, logger *zap.Logger, conf *DataManagerCo
 	}
 
 	return d, nil
+}
+
+func (d *DataManager) storageWalStatusFile(walSeq string) string {
+	return path.Join(d.basePath, storageWalsStatusDir, walSeq)
+}
+
+func (d *DataManager) storageWalDataFile(walFileID string) string {
+	return path.Join(d.basePath, storageWalsDataDir, walFileID)
+}
+
+func (d *DataManager) storageDataDir() string {
+	return path.Join(d.basePath, storageDataDir)
+}
+
+func (d *DataManager) dataStatusPath(sequence string) string {
+	return fmt.Sprintf("%s/%s.status", d.storageDataDir(), sequence)
+}
+
+func (d *DataManager) DataFileIndexPath(dataType, id string) string {
+	return fmt.Sprintf("%s/%s/%s.index", d.storageDataDir(), dataType, id)
+}
+
+func (d *DataManager) DataFilePath(dataType, id string) string {
+	return fmt.Sprintf("%s/%s/%s.data", d.storageDataDir(), dataType, id)
+}
+
+func etcdWalKey(walSeq string) string {
+	return path.Join(etcdWalsDir, walSeq)
 }
 
 func (d *DataManager) Run(ctx context.Context, readyCh chan struct{}) error {

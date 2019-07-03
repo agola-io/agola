@@ -461,7 +461,7 @@ func TestReadObject(t *testing.T) {
 	}
 }
 
-func testCheckpoint(t *testing.T, ctx context.Context, dm *DataManager, actionGroups [][]*Action, currentEntries map[string]*DataEntry) (map[string]*DataEntry, error) {
+func doAndCheckCheckpoint(t *testing.T, ctx context.Context, dm *DataManager, actionGroups [][]*Action, currentEntries map[string]*DataEntry) (map[string]*DataEntry, error) {
 	expectedEntries := map[string]*DataEntry{}
 	for _, e := range currentEntries {
 		expectedEntries[e.ID] = e
@@ -503,6 +503,28 @@ func testCheckpoint(t *testing.T, ctx context.Context, dm *DataManager, actionGr
 
 // TODO(sgotti) some fuzzy testing will be really good
 func TestCheckpoint(t *testing.T) {
+	tests := []struct {
+		name     string
+		basePath string
+	}{
+		{
+			name:     "test with empty basepath",
+			basePath: "",
+		},
+		{
+			name:     "test with relative basepath",
+			basePath: "base/path",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testCheckpoint(t, tt.basePath)
+		})
+	}
+}
+
+func testCheckpoint(t *testing.T, basePath string) {
 	dir, err := ioutil.TempDir("", "agola")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -528,8 +550,9 @@ func TestCheckpoint(t *testing.T) {
 	}
 
 	dmConfig := &DataManagerConfig{
-		E:   tetcd.TestEtcd.Store,
-		OST: objectstorage.NewObjStorage(ost, "/"),
+		BasePath: basePath,
+		E:        tetcd.TestEtcd.Store,
+		OST:      objectstorage.NewObjStorage(ost, "/"),
 		// remove almost all wals to see that they are removed also from changes
 		EtcdWalsKeepNum: 1,
 		DataTypes:       []string{"datatype01"},
@@ -562,7 +585,7 @@ func TestCheckpoint(t *testing.T) {
 		actions = append(actions, action)
 	}
 
-	currentEntries, err := testCheckpoint(t, ctx, dm, [][]*Action{actions}, nil)
+	currentEntries, err := doAndCheckCheckpoint(t, ctx, dm, [][]*Action{actions}, nil)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -577,7 +600,7 @@ func TestCheckpoint(t *testing.T) {
 		})
 	}
 
-	currentEntries, err = testCheckpoint(t, ctx, dm, [][]*Action{actions}, currentEntries)
+	currentEntries, err = doAndCheckCheckpoint(t, ctx, dm, [][]*Action{actions}, currentEntries)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -594,7 +617,7 @@ func TestCheckpoint(t *testing.T) {
 		actions = append(actions, action)
 	}
 
-	currentEntries, err = testCheckpoint(t, ctx, dm, [][]*Action{actions}, currentEntries)
+	currentEntries, err = doAndCheckCheckpoint(t, ctx, dm, [][]*Action{actions}, currentEntries)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -610,7 +633,7 @@ func TestCheckpoint(t *testing.T) {
 		actions = append(actions, action)
 	}
 
-	currentEntries, err = testCheckpoint(t, ctx, dm, [][]*Action{actions}, currentEntries)
+	currentEntries, err = doAndCheckCheckpoint(t, ctx, dm, [][]*Action{actions}, currentEntries)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -626,7 +649,7 @@ func TestCheckpoint(t *testing.T) {
 		actions = append(actions, action)
 	}
 
-	currentEntries, err = testCheckpoint(t, ctx, dm, [][]*Action{actions}, currentEntries)
+	currentEntries, err = doAndCheckCheckpoint(t, ctx, dm, [][]*Action{actions}, currentEntries)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -643,7 +666,7 @@ func TestCheckpoint(t *testing.T) {
 		actions = append(actions, action)
 	}
 
-	currentEntries, err = testCheckpoint(t, ctx, dm, [][]*Action{actions}, currentEntries)
+	currentEntries, err = doAndCheckCheckpoint(t, ctx, dm, [][]*Action{actions}, currentEntries)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -660,7 +683,7 @@ func TestCheckpoint(t *testing.T) {
 		actions = append(actions, action)
 	}
 
-	currentEntries, err = testCheckpoint(t, ctx, dm, [][]*Action{actions}, currentEntries)
+	currentEntries, err = doAndCheckCheckpoint(t, ctx, dm, [][]*Action{actions}, currentEntries)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -707,7 +730,7 @@ func TestCheckpoint(t *testing.T) {
 	}
 	actionGroups = append(actionGroups, actions)
 
-	_, err = testCheckpoint(t, ctx, dm, actionGroups, currentEntries)
+	_, err = doAndCheckCheckpoint(t, ctx, dm, actionGroups, currentEntries)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -724,7 +747,7 @@ func checkDataFiles(ctx context.Context, t *testing.T, dm *DataManager, expected
 	var prevLastEntryID string
 
 	for i, file := range curDataStatus.Files["datatype01"] {
-		dataFileIndexf, err := dm.ost.ReadObject(DataFileIndexPath("datatype01", file.ID))
+		dataFileIndexf, err := dm.ost.ReadObject(dm.DataFileIndexPath("datatype01", file.ID))
 		if err != nil {
 			return err
 		}
@@ -739,7 +762,7 @@ func checkDataFiles(ctx context.Context, t *testing.T, dm *DataManager, expected
 		dataFileIndexf.Close()
 		dataEntriesMap := map[string]*DataEntry{}
 		dataEntries := []*DataEntry{}
-		dataf, err := dm.ost.ReadObject(DataFilePath("datatype01", file.ID))
+		dataf, err := dm.ost.ReadObject(dm.DataFilePath("datatype01", file.ID))
 		if err != nil {
 			return err
 		}

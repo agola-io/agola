@@ -57,18 +57,6 @@ type DataEntry struct {
 	Data     []byte `json:"data,omitempty"`
 }
 
-func dataStatusPath(sequence string) string {
-	return fmt.Sprintf("%s/%s.status", storageDataDir, sequence)
-}
-
-func DataFileIndexPath(dataType, id string) string {
-	return fmt.Sprintf("%s/%s/%s.index", storageDataDir, dataType, id)
-}
-
-func DataFilePath(dataType, id string) string {
-	return fmt.Sprintf("%s/%s/%s.data", storageDataDir, dataType, id)
-}
-
 // TODO(sgotti) this implementation could be heavily optimized to store less data in memory
 
 // TODO(sgotti)
@@ -191,7 +179,7 @@ func (d *DataManager) writeDataSnapshot(ctx context.Context, wals []*WalData) er
 	if err != nil {
 		return err
 	}
-	if err := d.ost.WriteObject(dataStatusPath(dataSequence.String()), bytes.NewReader(dataStatusj), int64(len(dataStatusj)), true); err != nil {
+	if err := d.ost.WriteObject(d.dataStatusPath(dataSequence.String()), bytes.NewReader(dataStatusj), int64(len(dataStatusj)), true); err != nil {
 		return err
 	}
 
@@ -203,7 +191,7 @@ func (d *DataManager) writeDataFile(ctx context.Context, buf *bytes.Buffer, size
 		return fmt.Errorf("empty data entries")
 	}
 
-	if err := d.ost.WriteObject(DataFilePath(dataType, dataFileID), buf, size, true); err != nil {
+	if err := d.ost.WriteObject(d.DataFilePath(dataType, dataFileID), buf, size, true); err != nil {
 		return err
 	}
 
@@ -211,7 +199,7 @@ func (d *DataManager) writeDataFile(ctx context.Context, buf *bytes.Buffer, size
 	if err != nil {
 		return err
 	}
-	if err := d.ost.WriteObject(DataFileIndexPath(dataType, dataFileID), bytes.NewReader(dataFileIndexj), int64(len(dataFileIndexj)), true); err != nil {
+	if err := d.ost.WriteObject(d.DataFileIndexPath(dataType, dataFileID), bytes.NewReader(dataFileIndexj), int64(len(dataFileIndexj)), true); err != nil {
 		return err
 	}
 
@@ -326,7 +314,7 @@ func (d *DataManager) writeDataType(ctx context.Context, wi walIndex, dataType s
 
 		if actionGroup.DataStatusFile != nil {
 			// TODO(sgotti) instead of reading all entries in memory decode it's contents one by one when needed
-			oldDataf, err := d.ost.ReadObject(DataFilePath(dataType, actionGroup.DataStatusFile.ID))
+			oldDataf, err := d.ost.ReadObject(d.DataFilePath(dataType, actionGroup.DataStatusFile.ID))
 			if err != nil && err != ostypes.ErrNotExist {
 				return nil, err
 			}
@@ -497,7 +485,7 @@ func (d *DataManager) Read(dataType, id string) (io.Reader, error) {
 		}
 	}
 
-	dataFileIndexf, err := d.ost.ReadObject(DataFileIndexPath(dataType, matchingDataFileID))
+	dataFileIndexf, err := d.ost.ReadObject(d.DataFileIndexPath(dataType, matchingDataFileID))
 	if err != nil {
 		return nil, err
 	}
@@ -515,7 +503,7 @@ func (d *DataManager) Read(dataType, id string) (io.Reader, error) {
 		return nil, ostypes.ErrNotExist
 	}
 
-	dataf, err := d.ost.ReadObject(DataFilePath(dataType, matchingDataFileID))
+	dataf, err := d.ost.ReadObject(d.DataFilePath(dataType, matchingDataFileID))
 	if err != nil {
 		return nil, err
 	}
@@ -539,7 +527,7 @@ func (d *DataManager) GetLastDataStatusPath() (string, error) {
 	defer close(doneCh)
 
 	var dataStatusPath string
-	for object := range d.ost.List(storageDataDir+"/", "", false, doneCh) {
+	for object := range d.ost.List(d.storageDataDir()+"/", "", false, doneCh) {
 		if object.Err != nil {
 			return "", object.Err
 		}
