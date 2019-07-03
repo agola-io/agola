@@ -72,8 +72,9 @@ func NewConfigstore(ctx context.Context, c *config.Configstore) (*Configstore, e
 	}
 
 	dmConf := &datamanager.DataManagerConfig{
-		E:   e,
-		OST: ost,
+		BasePath: "configdata",
+		E:        e,
+		OST:      ost,
 		DataTypes: []string{
 			string(types.ConfigTypeUser),
 			string(types.ConfigTypeOrg),
