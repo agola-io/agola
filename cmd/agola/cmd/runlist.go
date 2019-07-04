@@ -17,8 +17,10 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"path"
 
 	"agola.io/agola/internal/services/gateway/api"
+	errors "golang.org/x/xerrors"
 
 	"github.com/spf13/cobra"
 )
@@ -34,10 +36,10 @@ var cmdRunList = &cobra.Command{
 }
 
 type runListOptions struct {
-	statusFilter []string
-	labelFilter  []string
-	limit        int
-	start        string
+	projectRef  string
+	phaseFilter []string
+	limit       int
+	start       string
 }
 
 var runListOpts runListOptions
@@ -45,10 +47,14 @@ var runListOpts runListOptions
 func init() {
 	flags := cmdRunList.Flags()
 
-	flags.StringSliceVarP(&runListOpts.statusFilter, "status", "s", nil, "filter runs matching the provided status. This option can be repeated multiple times")
-	flags.StringArrayVarP(&runListOpts.labelFilter, "label", "l", nil, "filter runs matching the provided label. This option can be repeated multiple times, in this case only runs matching all the labels will be returned")
+	flags.StringVar(&runListOpts.projectRef, "project", "", "project id or full path")
+	flags.StringSliceVarP(&runListOpts.phaseFilter, "phase", "s", nil, "filter runs matching the provided phase. This option can be repeated multiple times")
 	flags.IntVar(&runListOpts.limit, "limit", 10, "max number of runs to show")
 	flags.StringVar(&runListOpts.start, "start", "", "starting run id (excluded) to fetch")
+
+	if err := cmdRunList.MarkFlagRequired("project"); err != nil {
+		log.Fatal(err)
+	}
 
 	cmdRun.AddCommand(cmdRunList)
 }
@@ -65,7 +71,12 @@ func printRuns(runs []*api.RunResponse) {
 func runList(cmd *cobra.Command, args []string) error {
 	gwclient := api.NewClient(gatewayURL, token)
 
-	runsResp, _, err := gwclient.GetRuns(context.TODO(), runListOpts.statusFilter, runListOpts.labelFilter, []string{}, runListOpts.start, runListOpts.limit, false)
+	project, _, err := gwclient.GetProject(context.TODO(), runListOpts.projectRef)
+	if err != nil {
+		return errors.Errorf("failed to get project %s: %v", runListOpts.projectRef, err)
+	}
+	groups := []string{path.Join("/project", project.ID)}
+	runsResp, _, err := gwclient.GetRuns(context.TODO(), runListOpts.phaseFilter, groups, nil, runListOpts.start, runListOpts.limit, false)
 	if err != nil {
 		return err
 	}
