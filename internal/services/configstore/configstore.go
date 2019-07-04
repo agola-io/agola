@@ -255,12 +255,17 @@ func (s *Configstore) Run(ctx context.Context) error {
 	case <-ctx.Done():
 		log.Infof("configstore exiting")
 		httpServer.Close()
-		return nil
 	case err := <-lerrCh:
-		log.Errorf("http server listen error: %+v", err)
-		return err
+		if err != nil {
+			log.Errorf("http server listen error: %+v", err)
+			return err
+		}
 	case err := <-errCh:
-		log.Errorf("error: %+v", err)
-		return err
+		if err != nil {
+			log.Errorf("error: %+v", err)
+			return err
+		}
 	}
+
+	return nil
 }

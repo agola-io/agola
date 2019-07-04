@@ -1429,9 +1429,12 @@ func (e *Executor) Run(ctx context.Context) error {
 	case <-ctx.Done():
 		log.Infof("runservice executor exiting")
 		httpServer.Close()
-		return nil
 	case err := <-lerrCh:
-		log.Errorf("http server listen error: %v", err)
-		return err
+		if err != nil {
+			log.Errorf("http server listen error: %v", err)
+			return err
+		}
 	}
+
+	return nil
 }
