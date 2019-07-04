@@ -129,8 +129,6 @@ type Gitserver struct {
 
 	DataDir string `yaml:"dataDir"`
 
-	GatewayURL string `yaml:"gatewayURL"`
-
 	Web           Web           `yaml:"web"`
 	Etcd          Etcd          `yaml:"etcd"`
 	ObjectStorage ObjectStorage `yaml:"objectStorage"`
@@ -343,9 +341,6 @@ func Validate(c *Config) error {
 	// Git server
 	if c.Gitserver.DataDir == "" {
 		return errors.Errorf("git server dataDir is empty")
-	}
-	if c.Gitserver.GatewayURL == "" {
-		return errors.Errorf("git server gatewayURL is empty")
 	}
 
 	return nil
