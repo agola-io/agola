@@ -16,18 +16,41 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
+	"io/ioutil"
+	"os"
 
+	"agola.io/agola/internal/config"
 	"agola.io/agola/internal/services/gateway/api"
 	"agola.io/agola/internal/services/types"
 
+	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
 )
 
 var cmdProjectVariableCreate = &cobra.Command{
-	Use:   "create",
-	Short: "create a project variable",
+	Use: "create",
+	Short: `create a project variable
+The variable values should be provided by a yaml document. Examples:
+
+- secret_name: secret01
+  secret_var: var01
+  when:
+    branch: master
+    tag:
+      - v1.x
+      - v2.x
+- secret_name: secret02
+  secret_var: data02
+  when:
+    ref:
+      include:
+        - '#/refs/pull/.*#'
+        - '#/refs/heads/devel.*#'
+      exclude: /refs/heads/develop
+
+The above yaml document defines a variable that can have two different values depending on the first matching condition.
+	`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := variableCreate(cmd, "project", args); err != nil {
 			log.Fatalf("err: %v", err)
@@ -38,7 +61,7 @@ var cmdProjectVariableCreate = &cobra.Command{
 type variableCreateOptions struct {
 	parentRef string
 	name      string
-	values    string
+	file      string
 }
 
 var variableCreateOpts variableCreateOptions
@@ -48,7 +71,7 @@ func init() {
 
 	flags.StringVar(&variableCreateOpts.parentRef, "project", "", "project id or full path")
 	flags.StringVarP(&variableCreateOpts.name, "name", "n", "", "variable name")
-	flags.StringVar(&variableCreateOpts.values, "values", "", "json list of values and conditions")
+	flags.StringVarP(&variableCreateOpts.file, "file", "f", "", `yaml file containing the variable definition (use "-" to read from stdin`)
 
 	if err := cmdProjectVariableCreate.MarkFlagRequired("project"); err != nil {
 		log.Fatal(err)
@@ -56,23 +79,53 @@ func init() {
 	if err := cmdProjectVariableCreate.MarkFlagRequired("name"); err != nil {
 		log.Fatal(err)
 	}
-	if err := cmdProjectVariableCreate.MarkFlagRequired("values"); err != nil {
+	if err := cmdProjectVariableCreate.MarkFlagRequired("file"); err != nil {
 		log.Fatal(err)
 	}
 
 	cmdProjectVariable.AddCommand(cmdProjectVariableCreate)
 }
 
+type VariableValue struct {
+	SecretName string `json:"secret_name,omitempty"`
+	SecretVar  string `json:"secret_var,omitempty"`
+
+	When *config.When `json:"when,omitempty"`
+}
+
 func variableCreate(cmd *cobra.Command, ownertype string, args []string) error {
 	gwclient := api.NewClient(gatewayURL, token)
 
-	var values []types.VariableValue
-	if err := json.Unmarshal([]byte(variableCreateOpts.values), &values); err != nil {
-		log.Fatalf("failed to unmarshall values: %v", err)
+	// "github.com/ghodss/yaml" doesn't provide a streaming decoder
+	var data []byte
+	var err error
+	if variableCreateOpts.file == "-" {
+		data, err = ioutil.ReadAll(os.Stdin)
+		if err != nil {
+			return err
+		}
+	} else {
+		data, err = ioutil.ReadFile(variableCreateOpts.file)
+		if err != nil {
+			return err
+		}
+	}
+
+	var values []VariableValue
+	if err := yaml.Unmarshal(data, &values); err != nil {
+		log.Fatalf("failed to unmarshal values: %v", err)
+	}
+	rvalues := []types.VariableValue{}
+	for _, value := range values {
+		rvalues = append(rvalues, types.VariableValue{
+			SecretName: value.SecretName,
+			SecretVar:  value.SecretVar,
+			When:       (*types.When)(value.When),
+		})
 	}
 	req := &api.CreateVariableRequest{
 		Name:   variableCreateOpts.name,
-		Values: values,
+		Values: rvalues,
 	}
 
 	switch ownertype {
