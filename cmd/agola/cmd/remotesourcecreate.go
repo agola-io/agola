@@ -55,7 +55,7 @@ func init() {
 	flags.StringVarP(&remoteSourceCreateOpts.name, "name", "n", "", "remotesource name")
 	flags.StringVar(&remoteSourceCreateOpts.rsType, "type", "", "remotesource type")
 	flags.StringVar(&remoteSourceCreateOpts.authType, "auth-type", "", "remote source auth type")
-	flags.StringVar(&remoteSourceCreateOpts.apiURL, "api-url", "", "remotesource api url")
+	flags.StringVar(&remoteSourceCreateOpts.apiURL, "api-url", "", `remotesource api url (when type is "github" defaults to "https://api.github.com")`)
 	flags.BoolVarP(&remoteSourceCreateOpts.skipVerify, "skip-verify", "", false, "skip remote source api tls certificate verification")
 	flags.StringVar(&remoteSourceCreateOpts.oauth2ClientID, "clientid", "", "remotesource oauth2 client id")
 	flags.StringVar(&remoteSourceCreateOpts.oauth2ClientSecret, "secret", "", "remotesource oauth2 secret")
@@ -71,9 +71,6 @@ func init() {
 	if err := cmdRemoteSourceCreate.MarkFlagRequired("auth-type"); err != nil {
 		log.Fatal(err)
 	}
-	if err := cmdRemoteSourceCreate.MarkFlagRequired("api-url"); err != nil {
-		log.Fatal(err)
-	}
 
 	cmdRemoteSource.AddCommand(cmdRemoteSourceCreate)
 }
@@ -85,6 +82,10 @@ func remoteSourceCreate(cmd *cobra.Command, args []string) error {
 	if remoteSourceCreateOpts.rsType == string(types.RemoteSourceTypeGithub) {
 		remoteSourceCreateOpts.apiURL = github.GitHubAPIURL
 		remoteSourceCreateOpts.sshHostKey = github.GitHubSSHHostKey
+	}
+
+	if remoteSourceCreateOpts.apiURL == "" {
+		return errors.Errorf(`required flag "api-url" not set`)
 	}
 
 	req := &api.CreateRemoteSourceRequest{
