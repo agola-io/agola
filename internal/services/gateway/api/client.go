@@ -338,10 +338,13 @@ func (c *Client) GetRun(ctx context.Context, runID string) (*RunResponse, *http.
 	return run, resp, err
 }
 
-func (c *Client) GetRuns(ctx context.Context, phaseFilter, groups, runGroups []string, start string, limit int, asc bool) ([]*RunsResponse, *http.Response, error) {
+func (c *Client) GetRuns(ctx context.Context, phaseFilter, resultFilter, groups, runGroups []string, start string, limit int, asc bool) ([]*RunsResponse, *http.Response, error) {
 	q := url.Values{}
 	for _, phase := range phaseFilter {
 		q.Add("phase", phase)
+	}
+	for _, result := range resultFilter {
+		q.Add("result", result)
 	}
 	for _, group := range groups {
 		q.Add("group", group)

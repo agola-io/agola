@@ -324,6 +324,7 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	phaseFilter := q["phase"]
+	resultFilter := q["result"]
 	changeGroups := q["changegroup"]
 	_, lastRun := q["lastrun"]
 
@@ -353,6 +354,7 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	areq := &action.GetRunsRequest{
 		PhaseFilter:  phaseFilter,
+		ResultFilter: resultFilter,
 		Group:        group,
 		LastRun:      lastRun,
 		ChangeGroups: changeGroups,

@@ -76,7 +76,7 @@ func runList(cmd *cobra.Command, args []string) error {
 		return errors.Errorf("failed to get project %s: %v", runListOpts.projectRef, err)
 	}
 	groups := []string{path.Join("/project", project.ID)}
-	runsResp, _, err := gwclient.GetRuns(context.TODO(), runListOpts.phaseFilter, groups, nil, runListOpts.start, runListOpts.limit, false)
+	runsResp, _, err := gwclient.GetRuns(context.TODO(), runListOpts.phaseFilter, nil, groups, nil, runListOpts.start, runListOpts.limit, false)
 	if err != nil {
 		return err
 	}
