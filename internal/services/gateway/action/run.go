@@ -82,6 +82,7 @@ func (h *ActionHandler) GetRun(ctx context.Context, runID string) (*rsapi.RunRes
 
 type GetRunsRequest struct {
 	PhaseFilter  []string
+	ResultFilter []string
 	Group        string
 	LastRun      bool
 	ChangeGroups []string
@@ -100,7 +101,7 @@ func (h *ActionHandler) GetRuns(ctx context.Context, req *GetRunsRequest) (*rsap
 	}
 
 	groups := []string{req.Group}
-	runsResp, resp, err := h.runserviceClient.GetRuns(ctx, req.PhaseFilter, groups, req.LastRun, req.ChangeGroups, req.StartRunID, req.Limit, req.Asc)
+	runsResp, resp, err := h.runserviceClient.GetRuns(ctx, req.PhaseFilter, req.ResultFilter, groups, req.LastRun, req.ChangeGroups, req.StartRunID, req.Limit, req.Asc)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
 	}

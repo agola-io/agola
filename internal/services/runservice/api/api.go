@@ -445,6 +445,7 @@ func NewRunsHandler(logger *zap.Logger, readDB *readdb.ReadDB) *RunsHandler {
 func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	phaseFilter := types.RunPhaseFromStringSlice(query["phase"])
+	resultFilter := types.RunResultFromStringSlice(query["result"])
 
 	changeGroups := query["changegroup"]
 	groups := query["group"]
@@ -479,7 +480,7 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	err := h.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		runs, err = h.readDB.GetRuns(tx, groups, lastRun, phaseFilter, start, limit, sortOrder)
+		runs, err = h.readDB.GetRuns(tx, groups, lastRun, phaseFilter, resultFilter, start, limit, sortOrder)
 		if err != nil {
 			h.log.Errorf("err: %+v", err)
 			return err

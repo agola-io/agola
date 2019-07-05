@@ -81,6 +81,14 @@ func RunPhaseFromStringSlice(slice []string) []RunPhase {
 	return rss
 }
 
+func RunResultFromStringSlice(slice []string) []RunResult {
+	rss := make([]RunResult, len(slice))
+	for i, s := range slice {
+		rss[i] = RunResult(s)
+	}
+	return rss
+}
+
 // Run is the run status of a RUN. Until the run is not finished it'll live in
 // etcd. So we should keep it smaller to avoid using too much space
 type Run struct {

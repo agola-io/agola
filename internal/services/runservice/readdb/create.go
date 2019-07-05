@@ -18,7 +18,7 @@ var Stmts = []string{
 	// last processed etcd event revision
 	"create table revision (revision bigint, PRIMARY KEY(revision))",
 
-	"create table run (id varchar, grouppath varchar, phase varchar, PRIMARY KEY (id, grouppath, phase))",
+	"create table run (id varchar, grouppath varchar, phase varchar, result varchar, PRIMARY KEY (id, grouppath, phase))",
 
 	"create table rundata (id varchar, data bytea, PRIMARY KEY (id))",
 
@@ -35,7 +35,7 @@ var Stmts = []string{
 
 	"create table changegrouprevision_ost (id varchar, revision varchar, PRIMARY KEY (id, revision))",
 
-	"create table run_ost (id varchar, grouppath varchar, phase varchar, PRIMARY KEY (id, grouppath, phase))",
+	"create table run_ost (id varchar, grouppath varchar, phase varchar, result varchar, PRIMARY KEY (id, grouppath, phase))",
 
 	"create table rundata_ost (id varchar, data bytea, PRIMARY KEY (id))",
 
