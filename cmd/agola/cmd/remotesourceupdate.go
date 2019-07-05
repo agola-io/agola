@@ -43,6 +43,8 @@ type remoteSourceUpdateOptions struct {
 	oauth2ClientSecret  string
 	sshHostKey          string
 	skipSSHHostKeyCheck bool
+	registrationEnabled bool
+	loginEnabled        bool
 }
 
 var remoteSourceUpdateOpts remoteSourceUpdateOptions
@@ -58,6 +60,8 @@ func init() {
 	flags.StringVar(&remoteSourceUpdateOpts.oauth2ClientSecret, "secret", "", "remotesource oauth2 secret")
 	flags.StringVar(&remoteSourceUpdateOpts.sshHostKey, "ssh-host-key", "", "remotesource ssh public host key")
 	flags.BoolVarP(&remoteSourceUpdateOpts.skipSSHHostKeyCheck, "skip-ssh-host-key-check", "s", false, "skip ssh host key check")
+	flags.BoolVar(&remoteSourceUpdateOpts.registrationEnabled, "registration-enabled", false, "enabled/disable user registration with this remote source")
+	flags.BoolVar(&remoteSourceUpdateOpts.loginEnabled, "login-enabled", false, "enabled/disable user login with this remote source")
 
 	if err := cmdRemoteSourceUpdate.MarkFlagRequired("ref"); err != nil {
 		log.Fatal(err)
@@ -92,6 +96,12 @@ func remoteSourceUpdate(cmd *cobra.Command, args []string) error {
 	}
 	if flags.Changed("skip-ssh-host-key-check") {
 		req.SkipSSHHostKeyCheck = &remoteSourceUpdateOpts.skipSSHHostKeyCheck
+	}
+	if flags.Changed("registration-enabled") {
+		req.RegistrationEnabled = &remoteSourceUpdateOpts.registrationEnabled
+	}
+	if flags.Changed("login-enabled") {
+		req.LoginEnabled = &remoteSourceUpdateOpts.loginEnabled
 	}
 
 	log.Infof("updating remotesource")

@@ -38,6 +38,8 @@ type CreateRemoteSourceRequest struct {
 	Oauth2ClientSecret  string `json:"oauth_2_client_secret"`
 	SSHHostKey          string `json:"ssh_host_key"`
 	SkipSSHHostKeyCheck bool   `json:"skip_ssh_host_key_check"`
+	RegistrationEnabled *bool  `json:"registration_enabled"`
+	LoginEnabled        *bool  `json:"login_enabled"`
 }
 
 type CreateRemoteSourceHandler struct {
@@ -69,6 +71,8 @@ func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		Oauth2ClientSecret:  req.Oauth2ClientSecret,
 		SSHHostKey:          req.SSHHostKey,
 		SkipSSHHostKeyCheck: req.SkipSSHHostKeyCheck,
+		RegistrationEnabled: req.RegistrationEnabled,
+		LoginEnabled:        req.LoginEnabled,
 	}
 	rs, err := h.ah.CreateRemoteSource(ctx, creq)
 	if httpError(w, err) {
@@ -90,6 +94,8 @@ type UpdateRemoteSourceRequest struct {
 	Oauth2ClientSecret  *string `json:"oauth_2_client_secret"`
 	SSHHostKey          *string `json:"ssh_host_key"`
 	SkipSSHHostKeyCheck *bool   `json:"skip_ssh_host_key_check"`
+	RegistrationEnabled *bool   `json:"registration_enabled"`
+	LoginEnabled        *bool   `json:"login_enabled"`
 }
 
 type UpdateRemoteSourceHandler struct {
@@ -123,6 +129,8 @@ func (h *UpdateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		Oauth2ClientSecret:  req.Oauth2ClientSecret,
 		SSHHostKey:          req.SSHHostKey,
 		SkipSSHHostKeyCheck: req.SkipSSHHostKeyCheck,
+		RegistrationEnabled: req.RegistrationEnabled,
+		LoginEnabled:        req.LoginEnabled,
 	}
 	rs, err := h.ah.UpdateRemoteSource(ctx, creq)
 	if httpError(w, err) {
@@ -137,16 +145,20 @@ func (h *UpdateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 }
 
 type RemoteSourceResponse struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	AuthType string `json:"auth_type"`
+	ID                  string `json:"id"`
+	Name                string `json:"name"`
+	AuthType            string `json:"auth_type"`
+	RegistrationEnabled bool   `json:"registration_enabled"`
+	LoginEnabled        bool   `json:"login_enabled"`
 }
 
 func createRemoteSourceResponse(r *types.RemoteSource) *RemoteSourceResponse {
 	rs := &RemoteSourceResponse{
-		ID:       r.ID,
-		Name:     r.Name,
-		AuthType: string(r.AuthType),
+		ID:                  r.ID,
+		Name:                r.Name,
+		AuthType:            string(r.AuthType),
+		RegistrationEnabled: *r.RegistrationEnabled,
+		LoginEnabled:        *r.LoginEnabled,
 	}
 	return rs
 }

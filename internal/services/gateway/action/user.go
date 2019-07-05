@@ -311,6 +311,9 @@ func (h *ActionHandler) RegisterUser(ctx context.Context, req *RegisterUserReque
 	if err != nil {
 		return nil, errors.Errorf("failed to get remote source %q: %w", req.RemoteSourceName, ErrFromRemote(resp, err))
 	}
+	if !*rs.RegistrationEnabled {
+		return nil, util.NewErrBadRequest(errors.Errorf("remote source user registration is disabled"))
+	}
 
 	accessToken, err := common.GetAccessToken(rs, req.UserAccessToken, req.Oauth2AccessToken)
 	if err != nil {
@@ -369,6 +372,9 @@ func (h *ActionHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (*
 	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, req.RemoteSourceName)
 	if err != nil {
 		return nil, errors.Errorf("failed to get remote source %q: %w", req.RemoteSourceName, ErrFromRemote(resp, err))
+	}
+	if !*rs.LoginEnabled {
+		return nil, util.NewErrBadRequest(errors.Errorf("remote source user login is disabled"))
 	}
 
 	accessToken, err := common.GetAccessToken(rs, req.UserAccessToken, req.Oauth2AccessToken)

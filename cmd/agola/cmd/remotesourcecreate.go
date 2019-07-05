@@ -20,6 +20,7 @@ import (
 	"agola.io/agola/internal/gitsources/github"
 	"agola.io/agola/internal/services/gateway/api"
 	"agola.io/agola/internal/services/types"
+	"agola.io/agola/internal/util"
 
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
@@ -45,6 +46,8 @@ type remoteSourceCreateOptions struct {
 	oauth2ClientSecret  string
 	sshHostKey          string
 	skipSSHHostKeyCheck bool
+	registrationEnabled bool
+	loginEnabled        bool
 }
 
 var remoteSourceCreateOpts remoteSourceCreateOptions
@@ -61,6 +64,8 @@ func init() {
 	flags.StringVar(&remoteSourceCreateOpts.oauth2ClientSecret, "secret", "", "remotesource oauth2 secret")
 	flags.StringVar(&remoteSourceCreateOpts.sshHostKey, "ssh-host-key", "", "remotesource ssh public host key")
 	flags.BoolVarP(&remoteSourceCreateOpts.skipSSHHostKeyCheck, "skip-ssh-host-key-check", "s", false, "skip ssh host key check")
+	flags.BoolVar(&remoteSourceCreateOpts.registrationEnabled, "registration-enabled", true, "enabled/disable user registration with this remote source")
+	flags.BoolVar(&remoteSourceCreateOpts.loginEnabled, "login-enabled", true, "enabled/disable user login with this remote source")
 
 	if err := cmdRemoteSourceCreate.MarkFlagRequired("name"); err != nil {
 		log.Fatal(err)
@@ -98,6 +103,8 @@ func remoteSourceCreate(cmd *cobra.Command, args []string) error {
 		Oauth2ClientSecret:  remoteSourceCreateOpts.oauth2ClientSecret,
 		SSHHostKey:          remoteSourceCreateOpts.sshHostKey,
 		SkipSSHHostKeyCheck: remoteSourceCreateOpts.skipSSHHostKeyCheck,
+		RegistrationEnabled: util.BoolP(remoteSourceCreateOpts.registrationEnabled),
+		LoginEnabled:        util.BoolP(remoteSourceCreateOpts.loginEnabled),
 	}
 
 	log.Infof("creating remotesource")

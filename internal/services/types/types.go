@@ -15,9 +15,12 @@
 package types
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"time"
+
+	"agola.io/agola/internal/util"
 )
 
 // Configstore types
@@ -175,6 +178,28 @@ type RemoteSource struct {
 	SSHHostKey string `json:"ssh_host_key,omitempty"` // Public ssh host key of the remote source
 
 	SkipSSHHostKeyCheck bool `json:"skip_ssh_host_key_check,omitempty"`
+
+	RegistrationEnabled *bool `json:"registration_enabled,omitempty"`
+	LoginEnabled        *bool `json:"login_enabled,omitempty"`
+}
+
+func (rs *RemoteSource) UnmarshalJSON(b []byte) error {
+	type remoteSource RemoteSource
+
+	trs := (*remoteSource)(rs)
+
+	if err := json.Unmarshal(b, &trs); err != nil {
+		return err
+	}
+
+	if trs.RegistrationEnabled == nil {
+		trs.RegistrationEnabled = util.BoolP(true)
+	}
+	if trs.LoginEnabled == nil {
+		trs.LoginEnabled = util.BoolP(true)
+	}
+
+	return nil
 }
 
 func SourceSupportedAuthTypes(rsType RemoteSourceType) []RemoteSourceAuthType {

@@ -55,6 +55,8 @@ type CreateRemoteSourceRequest struct {
 	Oauth2ClientSecret  string
 	SSHHostKey          string
 	SkipSSHHostKeyCheck bool
+	RegistrationEnabled *bool
+	LoginEnabled        *bool
 }
 
 func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemoteSourceRequest) (*types.RemoteSource, error) {
@@ -103,6 +105,8 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemot
 		Oauth2ClientSecret:  req.Oauth2ClientSecret,
 		SSHHostKey:          req.SSHHostKey,
 		SkipSSHHostKeyCheck: req.SkipSSHHostKeyCheck,
+		RegistrationEnabled: req.RegistrationEnabled,
+		LoginEnabled:        req.LoginEnabled,
 	}
 
 	h.log.Infof("creating remotesource")
@@ -125,6 +129,8 @@ type UpdateRemoteSourceRequest struct {
 	Oauth2ClientSecret  *string
 	SSHHostKey          *string
 	SkipSSHHostKeyCheck *bool
+	RegistrationEnabled *bool
+	LoginEnabled        *bool
 }
 
 func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, req *UpdateRemoteSourceRequest) (*types.RemoteSource, error) {
@@ -157,6 +163,12 @@ func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, req *UpdateRemot
 	}
 	if req.SkipSSHHostKeyCheck != nil {
 		rs.SkipSSHHostKeyCheck = *req.SkipSSHHostKeyCheck
+	}
+	if req.RegistrationEnabled != nil {
+		rs.RegistrationEnabled = req.RegistrationEnabled
+	}
+	if req.LoginEnabled != nil {
+		rs.LoginEnabled = req.LoginEnabled
 	}
 
 	h.log.Infof("updating remotesource")
