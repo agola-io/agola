@@ -267,6 +267,17 @@ func (c *Client) CreateProjectGroupVariable(ctx context.Context, projectGroupRef
 	return resVariable, resp, err
 }
 
+func (c *Client) UpdateProjectGroupVariable(ctx context.Context, projectGroupRef, variableName string, variable *types.Variable) (*Variable, *http.Response, error) {
+	pj, err := json.Marshal(variable)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	resVariable := new(Variable)
+	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/projectgroups/%s/variables/%s", url.PathEscape(projectGroupRef), variableName), nil, jsonContent, bytes.NewReader(pj), resVariable)
+	return resVariable, resp, err
+}
+
 func (c *Client) CreateProjectVariable(ctx context.Context, projectRef string, variable *types.Variable) (*Variable, *http.Response, error) {
 	pj, err := json.Marshal(variable)
 	if err != nil {
@@ -275,6 +286,17 @@ func (c *Client) CreateProjectVariable(ctx context.Context, projectRef string, v
 
 	resVariable := new(Variable)
 	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/projects/%s/variables", url.PathEscape(projectRef)), nil, jsonContent, bytes.NewReader(pj), resVariable)
+	return resVariable, resp, err
+}
+
+func (c *Client) UpdateProjectVariable(ctx context.Context, projectRef, variableName string, variable *types.Variable) (*Variable, *http.Response, error) {
+	pj, err := json.Marshal(variable)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	resVariable := new(Variable)
+	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/projects/%s/variables/%s", url.PathEscape(projectRef), variableName), nil, jsonContent, bytes.NewReader(pj), resVariable)
 	return resVariable, resp, err
 }
 

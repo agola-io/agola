@@ -48,24 +48,32 @@ func (h *ActionHandler) GetVariables(ctx context.Context, parentType types.Confi
 	return variables, nil
 }
 
-func (h *ActionHandler) CreateVariable(ctx context.Context, variable *types.Variable) (*types.Variable, error) {
+func (h *ActionHandler) ValidateVariable(ctx context.Context, variable *types.Variable) error {
 	if variable.Name == "" {
-		return nil, util.NewErrBadRequest(errors.Errorf("variable name required"))
+		return util.NewErrBadRequest(errors.Errorf("variable name required"))
 	}
 	if !util.ValidateName(variable.Name) {
-		return nil, util.NewErrBadRequest(errors.Errorf("invalid variable name %q", variable.Name))
+		return util.NewErrBadRequest(errors.Errorf("invalid variable name %q", variable.Name))
 	}
 	if len(variable.Values) == 0 {
-		return nil, util.NewErrBadRequest(errors.Errorf("variable values required"))
+		return util.NewErrBadRequest(errors.Errorf("variable values required"))
 	}
 	if variable.Parent.Type == "" {
-		return nil, util.NewErrBadRequest(errors.Errorf("variable parent type required"))
+		return util.NewErrBadRequest(errors.Errorf("variable parent type required"))
 	}
 	if variable.Parent.ID == "" {
-		return nil, util.NewErrBadRequest(errors.Errorf("variable parent id required"))
+		return util.NewErrBadRequest(errors.Errorf("variable parent id required"))
 	}
 	if variable.Parent.Type != types.ConfigTypeProject && variable.Parent.Type != types.ConfigTypeProjectGroup {
-		return nil, util.NewErrBadRequest(errors.Errorf("invalid variable parent type %q", variable.Parent.Type))
+		return util.NewErrBadRequest(errors.Errorf("invalid variable parent type %q", variable.Parent.Type))
+	}
+
+	return nil
+}
+
+func (h *ActionHandler) CreateVariable(ctx context.Context, variable *types.Variable) (*types.Variable, error) {
+	if err := h.ValidateVariable(ctx, variable); err != nil {
+		return nil, err
 	}
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
@@ -118,6 +126,86 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, variable *types.Vari
 
 	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return variable, err
+}
+
+type UpdateVariableRequest struct {
+	VariableName string
+
+	Variable *types.Variable
+}
+
+func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableRequest) (*types.Variable, error) {
+	if err := h.ValidateVariable(ctx, req.Variable); err != nil {
+		return nil, err
+	}
+
+	var curVariable *types.Variable
+	var cgt *datamanager.ChangeGroupsUpdateToken
+	// changegroup is the variable name
+
+	// must do all the checks in a single transaction to avoid concurrent changes
+	err := h.readDB.Do(func(tx *db.Tx) error {
+		var err error
+
+		parentID, err := h.readDB.ResolveConfigID(tx, req.Variable.Parent.Type, req.Variable.Parent.ID)
+		if err != nil {
+			return err
+		}
+		req.Variable.Parent.ID = parentID
+
+		// check variable exists
+		curVariable, err = h.readDB.GetVariableByName(tx, req.Variable.Parent.ID, req.VariableName)
+		if err != nil {
+			return err
+		}
+		if curVariable == nil {
+			return util.NewErrBadRequest(errors.Errorf("variable with name %q for %s with id %q doesn't exists", req.VariableName, req.Variable.Parent.Type, req.Variable.Parent.ID))
+		}
+
+		if curVariable.Name != req.Variable.Name {
+			// check duplicate variable name
+			u, err := h.readDB.GetVariableByName(tx, req.Variable.Parent.ID, req.Variable.Name)
+			if err != nil {
+				return err
+			}
+			if u != nil {
+				return util.NewErrBadRequest(errors.Errorf("variable with name %q for %s with id %q already exists", req.Variable.Name, req.Variable.Parent.Type, req.Variable.Parent.ID))
+			}
+		}
+
+		// set/override ID that must be kept from the current variable
+		req.Variable.ID = curVariable.ID
+
+		cgNames := []string{
+			util.EncodeSha256Hex("variablename-" + req.Variable.ID),
+			util.EncodeSha256Hex("variablename-" + req.Variable.Name),
+		}
+		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	variablej, err := json.Marshal(req.Variable)
+	if err != nil {
+		return nil, errors.Errorf("failed to marshal variable: %w", err)
+	}
+	actions := []*datamanager.Action{
+		{
+			ActionType: datamanager.ActionTypePut,
+			DataType:   string(types.ConfigTypeVariable),
+			ID:         req.Variable.ID,
+			Data:       variablej,
+		},
+	}
+
+	_, err = h.dm.WriteWal(ctx, actions, cgt)
+	return req.Variable, err
 }
 
 func (h *ActionHandler) DeleteVariable(ctx context.Context, parentType types.ConfigType, parentRef, variableName string) error {

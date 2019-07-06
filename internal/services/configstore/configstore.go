@@ -138,6 +138,7 @@ func (s *Configstore) Run(ctx context.Context) error {
 
 	variablesHandler := api.NewVariablesHandler(logger, s.ah, s.readDB)
 	createVariableHandler := api.NewCreateVariableHandler(logger, s.ah)
+	updateVariableHandler := api.NewUpdateVariableHandler(logger, s.ah)
 	deleteVariableHandler := api.NewDeleteVariableHandler(logger, s.ah)
 
 	userHandler := api.NewUserHandler(logger, s.readDB)
@@ -196,6 +197,8 @@ func (s *Configstore) Run(ctx context.Context) error {
 	apirouter.Handle("/projects/{projectref}/variables", variablesHandler).Methods("GET")
 	apirouter.Handle("/projectgroups/{projectgroupref}/variables", createVariableHandler).Methods("POST")
 	apirouter.Handle("/projects/{projectref}/variables", createVariableHandler).Methods("POST")
+	apirouter.Handle("/projectgroups/{projectgroupref}/variables/{variablename}", updateVariableHandler).Methods("PUT")
+	apirouter.Handle("/projects/{projectref}/variables/{variablename}", updateVariableHandler).Methods("PUT")
 	apirouter.Handle("/projectgroups/{projectgroupref}/variables/{variablename}", deleteVariableHandler).Methods("DELETE")
 	apirouter.Handle("/projects/{projectref}/variables/{variablename}", deleteVariableHandler).Methods("DELETE")
 

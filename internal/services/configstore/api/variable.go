@@ -127,6 +127,51 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	}
 }
 
+type UpdateVariableHandler struct {
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
+}
+
+func NewUpdateVariableHandler(logger *zap.Logger, ah *action.ActionHandler) *UpdateVariableHandler {
+	return &UpdateVariableHandler{log: logger.Sugar(), ah: ah}
+}
+
+func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	variableName := vars["variablename"]
+
+	parentType, parentRef, err := GetConfigTypeRef(r)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	var variable *types.Variable
+	d := json.NewDecoder(r.Body)
+	if err := d.Decode(&variable); err != nil {
+		httpError(w, util.NewErrBadRequest(err))
+		return
+	}
+
+	variable.Parent.Type = parentType
+	variable.Parent.ID = parentRef
+
+	areq := &action.UpdateVariableRequest{
+		VariableName: variableName,
+		Variable:     variable,
+	}
+	variable, err = h.ah.UpdateVariable(ctx, areq)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	if err := httpResponse(w, http.StatusOK, variable); err != nil {
+		h.log.Errorf("err: %+v", err)
+	}
+}
+
 type DeleteVariableHandler struct {
 	log *zap.SugaredLogger
 	ah  *action.ActionHandler
