@@ -829,6 +829,73 @@ func TestRemoteSource(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "test update remote source keeping same name",
+			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
+				rs01 := &types.RemoteSource{
+					Name:               "rs01",
+					APIURL:             "https://api.example.com",
+					Type:               types.RemoteSourceTypeGitea,
+					AuthType:           types.RemoteSourceAuthTypeOauth2,
+					Oauth2ClientID:     "clientid",
+					Oauth2ClientSecret: "clientsecret",
+				}
+				rs01, err := cs.ah.CreateRemoteSource(ctx, rs01)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				rs01.APIURL = "https://api01.example.com"
+				req := &action.UpdateRemoteSourceRequest{
+					RemoteSourceRef: "rs01",
+					RemoteSource:    rs01,
+				}
+				_, err = cs.ah.UpdateRemoteSource(ctx, req)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+			},
+		},
+		{
+			name: "test rename remote source to an already existing name",
+			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
+				rs01 := &types.RemoteSource{
+					Name:               "rs01",
+					APIURL:             "https://api.example.com",
+					Type:               types.RemoteSourceTypeGitea,
+					AuthType:           types.RemoteSourceAuthTypeOauth2,
+					Oauth2ClientID:     "clientid",
+					Oauth2ClientSecret: "clientsecret",
+				}
+				rs01, err := cs.ah.CreateRemoteSource(ctx, rs01)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				rs02 := &types.RemoteSource{
+					Name:               "rs02",
+					APIURL:             "https://api.example.com",
+					Type:               types.RemoteSourceTypeGitea,
+					AuthType:           types.RemoteSourceAuthTypeOauth2,
+					Oauth2ClientID:     "clientid",
+					Oauth2ClientSecret: "clientsecret",
+				}
+				if _, err = cs.ah.CreateRemoteSource(ctx, rs02); err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				expectedError := util.NewErrBadRequest(fmt.Errorf(`remotesource "rs02" already exists`))
+				rs01.Name = "rs02"
+				req := &action.UpdateRemoteSourceRequest{
+					RemoteSourceRef: "rs01",
+					RemoteSource:    rs01,
+				}
+				_, err = cs.ah.UpdateRemoteSource(ctx, req)
+				if err.Error() != expectedError.Error() {
+					t.Fatalf("expected err: %v, got err: %v", expectedError.Error(), err.Error())
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {

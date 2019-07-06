@@ -125,19 +125,35 @@ func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, req *UpdateRemot
 		return nil, err
 	}
 
+	var curRemoteSource *types.RemoteSource
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the checks in a single transaction to avoid concurrent changes
 	err := h.readDB.Do(func(tx *db.Tx) error {
 		var err error
-		// check duplicate remoteSource name
-		curRemoteSource, err := h.readDB.GetRemoteSourceByName(tx, req.RemoteSourceRef)
+
+		// check remotesource exists
+		curRemoteSource, err = h.readDB.GetRemoteSourceByName(tx, req.RemoteSourceRef)
 		if err != nil {
 			return err
 		}
 		if curRemoteSource == nil {
 			return util.NewErrBadRequest(errors.Errorf("remotesource with ref %q doesn't exist", req.RemoteSourceRef))
 		}
+
+		if curRemoteSource.Name != req.RemoteSource.Name {
+			// check duplicate remoteSource name
+			u, err := h.readDB.GetRemoteSourceByName(tx, req.RemoteSource.Name)
+			if err != nil {
+				return err
+			}
+			if u != nil {
+				return util.NewErrBadRequest(errors.Errorf("remotesource %q already exists", u.Name))
+			}
+		}
+
+		// set/override ID that must be kept from the current remote source
+		req.RemoteSource.ID = curRemoteSource.ID
 
 		// changegroup is the remotesource id and also name since we could change the
 		// name so concurrently updating on the new name
