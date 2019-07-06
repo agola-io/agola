@@ -32,6 +32,7 @@ import (
 	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/testutil"
 	"agola.io/agola/internal/util"
+
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -748,4 +749,106 @@ func TestOrgMembers(t *testing.T) {
 	// TODO(sgotti) change the sleep with a real check that user is in readdb
 	time.Sleep(2 * time.Second)
 
+}
+
+func TestRemoteSource(t *testing.T) {
+	dir, err := ioutil.TempDir("", "agola")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	tests := []struct {
+		name string
+		f    func(ctx context.Context, t *testing.T, cs *Configstore)
+	}{
+		{
+			name: "test create remote source",
+			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
+				rs := &types.RemoteSource{
+					Name:               "rs01",
+					APIURL:             "https://api.example.com",
+					Type:               types.RemoteSourceTypeGitea,
+					AuthType:           types.RemoteSourceAuthTypeOauth2,
+					Oauth2ClientID:     "clientid",
+					Oauth2ClientSecret: "clientsecret",
+				}
+				_, err := cs.ah.CreateRemoteSource(ctx, rs)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+			},
+		},
+		{
+			name: "test create duplicate remote source",
+			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
+				rs := &types.RemoteSource{
+					Name:               "rs01",
+					APIURL:             "https://api.example.com",
+					Type:               types.RemoteSourceTypeGitea,
+					AuthType:           types.RemoteSourceAuthTypeOauth2,
+					Oauth2ClientID:     "clientid",
+					Oauth2ClientSecret: "clientsecret",
+				}
+				rs, err := cs.ah.CreateRemoteSource(ctx, rs)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				expectedError := util.NewErrBadRequest(fmt.Errorf(`remotesource "rs01" already exists`))
+				_, err = cs.ah.CreateRemoteSource(ctx, rs)
+				if err.Error() != expectedError.Error() {
+					t.Fatalf("expected err: %v, got err: %v", expectedError.Error(), err.Error())
+				}
+			},
+		},
+		{
+			name: "test rename remote source",
+			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
+				rs := &types.RemoteSource{
+					Name:               "rs01",
+					APIURL:             "https://api.example.com",
+					Type:               types.RemoteSourceTypeGitea,
+					AuthType:           types.RemoteSourceAuthTypeOauth2,
+					Oauth2ClientID:     "clientid",
+					Oauth2ClientSecret: "clientsecret",
+				}
+				rs, err := cs.ah.CreateRemoteSource(ctx, rs)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				rs.Name = "rs02"
+				req := &action.UpdateRemoteSourceRequest{
+					RemoteSourceRef: "rs01",
+					RemoteSource:    rs,
+				}
+				_, err = cs.ah.UpdateRemoteSource(ctx, req)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir, err := ioutil.TempDir(dir, "agola")
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			ctx := context.Background()
+
+			cs, tetcd := setupConfigstore(t, ctx, dir)
+			defer shutdownEtcd(tetcd)
+
+			t.Logf("starting cs")
+			go func() { _ = cs.Run(ctx) }()
+
+			// TODO(sgotti) change the sleep with a real check that all is ready
+			time.Sleep(2 * time.Second)
+
+			tt.f(ctx, t, cs)
+		})
+	}
 }
