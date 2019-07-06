@@ -141,6 +141,79 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateVariableR
 	return rv, cssecrets, nil
 }
 
+type UpdateVariableRequest struct {
+	VariableName string
+
+	Name string
+
+	ParentType types.ConfigType
+	ParentRef  string
+
+	Values []types.VariableValue
+}
+
+func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableRequest) (*csapi.Variable, []*csapi.Secret, error) {
+	isVariableOwner, err := h.IsVariableOwner(ctx, req.ParentType, req.ParentRef)
+	if err != nil {
+		return nil, nil, errors.Errorf("failed to determine ownership: %w", err)
+	}
+	if !isVariableOwner {
+		return nil, nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
+	if !util.ValidateName(req.Name) {
+		return nil, nil, util.NewErrBadRequest(errors.Errorf("invalid variable name %q", req.Name))
+	}
+
+	if len(req.Values) == 0 {
+		return nil, nil, util.NewErrBadRequest(errors.Errorf("empty variable values"))
+	}
+
+	v := &types.Variable{
+		Name: req.Name,
+		Parent: types.Parent{
+			Type: req.ParentType,
+			ID:   req.ParentRef,
+		},
+		Values: req.Values,
+	}
+
+	var cssecrets []*csapi.Secret
+	var rv *csapi.Variable
+
+	switch req.ParentType {
+	case types.ConfigTypeProjectGroup:
+		var err error
+		var resp *http.Response
+		cssecrets, resp, err = h.configstoreClient.GetProjectGroupSecrets(ctx, req.ParentRef, true)
+		if err != nil {
+			return nil, nil, errors.Errorf("failed to get project group %q secrets: %w", req.ParentRef, ErrFromRemote(resp, err))
+		}
+
+		h.log.Infof("creating project group variable")
+		rv, resp, err = h.configstoreClient.UpdateProjectGroupVariable(ctx, req.ParentRef, req.VariableName, v)
+		if err != nil {
+			return nil, nil, errors.Errorf("failed to create variable: %w", ErrFromRemote(resp, err))
+		}
+	case types.ConfigTypeProject:
+		var err error
+		var resp *http.Response
+		cssecrets, resp, err = h.configstoreClient.GetProjectSecrets(ctx, req.ParentRef, true)
+		if err != nil {
+			return nil, nil, errors.Errorf("failed to get project %q secrets: %w", req.ParentRef, ErrFromRemote(resp, err))
+		}
+
+		h.log.Infof("creating project variable")
+		rv, resp, err = h.configstoreClient.UpdateProjectVariable(ctx, req.ParentRef, req.VariableName, v)
+		if err != nil {
+			return nil, nil, errors.Errorf("failed to create variable: %w", ErrFromRemote(resp, err))
+		}
+	}
+	h.log.Infof("variable %s created, ID: %s", rv.Name, rv.ID)
+
+	return rv, cssecrets, nil
+}
+
 func (h *ActionHandler) DeleteVariable(ctx context.Context, parentType types.ConfigType, parentRef, name string) error {
 	isVariableOwner, err := h.IsVariableOwner(ctx, parentType, parentRef)
 	if err != nil {

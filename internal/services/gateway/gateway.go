@@ -165,6 +165,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	variableHandler := api.NewVariableHandler(logger, g.ah)
 	createVariableHandler := api.NewCreateVariableHandler(logger, g.ah)
+	updateVariableHandler := api.NewUpdateVariableHandler(logger, g.ah)
 	deleteVariableHandler := api.NewDeleteVariableHandler(logger, g.ah)
 
 	currentUserHandler := api.NewCurrentUserHandler(logger, g.ah)
@@ -252,6 +253,8 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/projects/{projectref}/variables", authForcedHandler(variableHandler)).Methods("GET")
 	apirouter.Handle("/projectgroups/{projectgroupref}/variables", authForcedHandler(createVariableHandler)).Methods("POST")
 	apirouter.Handle("/projects/{projectref}/variables", authForcedHandler(createVariableHandler)).Methods("POST")
+	apirouter.Handle("/projectgroups/{projectgroupref}/variables/{variablename}", authForcedHandler(updateVariableHandler)).Methods("PUT")
+	apirouter.Handle("/projects/{projectref}/variables/{variablename}", authForcedHandler(updateVariableHandler)).Methods("PUT")
 	apirouter.Handle("/projectgroups/{projectgroupref}/variables/{variablename}", authForcedHandler(deleteVariableHandler)).Methods("DELETE")
 	apirouter.Handle("/projects/{projectref}/variables/{variablename}", authForcedHandler(deleteVariableHandler)).Methods("DELETE")
 

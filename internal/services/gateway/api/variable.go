@@ -157,6 +157,58 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	}
 }
 
+type UpdateVariableRequest struct {
+	Name string `json:"name,omitempty"`
+
+	Values []types.VariableValue `json:"values,omitempty"`
+}
+
+type UpdateVariableHandler struct {
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
+}
+
+func NewUpdateVariableHandler(logger *zap.Logger, ah *action.ActionHandler) *UpdateVariableHandler {
+	return &UpdateVariableHandler{log: logger.Sugar(), ah: ah}
+}
+
+func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	variableName := vars["variablename"]
+
+	parentType, parentRef, err := GetConfigTypeRef(r)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	var req UpdateVariableRequest
+	d := json.NewDecoder(r.Body)
+	if err := d.Decode(&req); err != nil {
+		httpError(w, util.NewErrBadRequest(err))
+		return
+	}
+	areq := &action.UpdateVariableRequest{
+		VariableName: variableName,
+
+		Name:       req.Name,
+		ParentType: parentType,
+		ParentRef:  parentRef,
+		Values:     req.Values,
+	}
+	csvar, cssecrets, err := h.ah.UpdateVariable(ctx, areq)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	res := createVariableResponse(csvar, cssecrets)
+	if err := httpResponse(w, http.StatusOK, res); err != nil {
+		h.log.Errorf("err: %+v", err)
+	}
+}
+
 type DeleteVariableHandler struct {
 	log *zap.SugaredLogger
 	ah  *action.ActionHandler
