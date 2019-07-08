@@ -16,18 +16,27 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
+	"io/ioutil"
+	"os"
 
 	"agola.io/agola/internal/services/gateway/api"
 	"agola.io/agola/internal/services/types"
 
+	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
 )
 
 var cmdProjectSecretCreate = &cobra.Command{
 	Use:   "create",
-	Short: "create a project secret",
+	Short: "create a project local secret",
+	Long: `create a project local secret
+
+The secret data should be provided by a yaml document. Examples:
+
+data01: secretvalue01
+data02: secretvalue02
+`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := secretCreate(cmd, "project", args); err != nil {
 			log.Fatalf("err: %v", err)
@@ -38,7 +47,7 @@ var cmdProjectSecretCreate = &cobra.Command{
 type secretCreateOptions struct {
 	parentRef string
 	name      string
-	data      string
+	file      string
 }
 
 var secretCreateOpts secretCreateOptions
@@ -48,7 +57,7 @@ func init() {
 
 	flags.StringVar(&secretCreateOpts.parentRef, "project", "", "project id or full path")
 	flags.StringVarP(&secretCreateOpts.name, "name", "n", "", "secret name")
-	flags.StringVar(&secretCreateOpts.data, "data", "", "json map of secret data")
+	flags.StringVarP(&secretCreateOpts.file, "file", "f", "", `yaml file containing the secret data (use "-" to read from stdin`)
 
 	if err := cmdProjectSecretCreate.MarkFlagRequired("project"); err != nil {
 		log.Fatal(err)
@@ -56,7 +65,7 @@ func init() {
 	if err := cmdProjectSecretCreate.MarkFlagRequired("name"); err != nil {
 		log.Fatal(err)
 	}
-	if err := cmdProjectSecretCreate.MarkFlagRequired("data"); err != nil {
+	if err := cmdProjectSecretCreate.MarkFlagRequired("file"); err != nil {
 		log.Fatal(err)
 	}
 
@@ -66,14 +75,29 @@ func init() {
 func secretCreate(cmd *cobra.Command, ownertype string, args []string) error {
 	gwclient := api.NewClient(gatewayURL, token)
 
-	var data map[string]string
-	if err := json.Unmarshal([]byte(secretCreateOpts.data), &data); err != nil {
-		log.Fatalf("failed to unmarshall values: %v", err)
+	// "github.com/ghodss/yaml" doesn't provide a streaming decoder
+	var data []byte
+	var err error
+	if secretCreateOpts.file == "-" {
+		data, err = ioutil.ReadAll(os.Stdin)
+		if err != nil {
+			return err
+		}
+	} else {
+		data, err = ioutil.ReadFile(secretCreateOpts.file)
+		if err != nil {
+			return err
+		}
+	}
+
+	var secretData map[string]string
+	if err := yaml.Unmarshal(data, &secretData); err != nil {
+		log.Fatalf("failed to unmarshal secret: %v", err)
 	}
 	req := &api.CreateSecretRequest{
 		Name: secretCreateOpts.name,
 		Type: types.SecretTypeInternal,
-		Data: data,
+		Data: secretData,
 	}
 
 	switch ownertype {

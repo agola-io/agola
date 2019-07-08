@@ -29,8 +29,10 @@ import (
 )
 
 var cmdProjectVariableCreate = &cobra.Command{
-	Use: "create",
-	Short: `create a project variable
+	Use:   "create",
+	Short: "create a project group variable",
+	Long: `create a project group variable
+
 The variable values should be provided by a yaml document. Examples:
 
 - secret_name: secret01
