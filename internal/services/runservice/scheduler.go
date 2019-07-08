@@ -1177,6 +1177,15 @@ func (s *Runservice) fetcher(ctx context.Context) error {
 
 				s.fetchTaskLogs(ctx, r.ID, rt)
 				s.fetchTaskArchives(ctx, r.ID, rt)
+
+				// if the fetching is finished we can remove the executor tasks. We cannot
+				// remove it before since it contains the reference to the executor where we
+				// should fetch the data
+				if rt.LogsFetchFinished() && rt.ArchivesFetchFinished() {
+					if err := store.DeleteExecutorTask(ctx, s.e, rt.ID); err != nil {
+						return err
+					}
+				}
 			}
 		}
 	}
@@ -1298,17 +1307,6 @@ func (s *Runservice) finishedRunArchiver(ctx context.Context, r *types.Run) erro
 		return nil
 	}
 	log.Infof("run %q archiving completed", r.ID)
-
-	// if the fetching is finished we can remove the executor tasks. We cannot
-	// remove it before since it contains the reference to the executor where we
-	// should fetch the data
-
-	for _, rt := range r.Tasks {
-		log.Infof("deleting executor task %s", rt.ID)
-		if err := store.DeleteExecutorTask(ctx, s.e, rt.ID); err != nil {
-			return err
-		}
-	}
 
 	r.Archived = true
 	if _, err := store.AtomicPutRun(ctx, s.e, r, nil, nil); err != nil {
