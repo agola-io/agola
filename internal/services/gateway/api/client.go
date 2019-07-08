@@ -172,6 +172,17 @@ func (c *Client) CreateProjectGroupSecret(ctx context.Context, projectGroupRef s
 	return secret, resp, err
 }
 
+func (c *Client) UpdateProjectGroupSecret(ctx context.Context, projectGroupRef, secretName string, req *UpdateSecretRequest) (*SecretResponse, *http.Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	secret := new(SecretResponse)
+	resp, err := c.getParsedResponse(ctx, "PUT", path.Join("/projectgroups", url.PathEscape(projectGroupRef), "secrets", secretName), nil, jsonContent, bytes.NewReader(reqj), secret)
+	return secret, resp, err
+}
+
 func (c *Client) DeleteProjectGroupSecret(ctx context.Context, projectGroupRef, secretName string) (*http.Response, error) {
 	return c.getResponse(ctx, "DELETE", path.Join("/projectgroups", url.PathEscape(projectGroupRef), "secrets", secretName), nil, jsonContent, nil)
 }
@@ -184,6 +195,17 @@ func (c *Client) CreateProjectSecret(ctx context.Context, projectRef string, req
 
 	secret := new(SecretResponse)
 	resp, err := c.getParsedResponse(ctx, "POST", path.Join("/projects", url.PathEscape(projectRef), "secrets"), nil, jsonContent, bytes.NewReader(reqj), secret)
+	return secret, resp, err
+}
+
+func (c *Client) UpdateProjectSecret(ctx context.Context, projectRef, secretName string, req *UpdateSecretRequest) (*SecretResponse, *http.Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	secret := new(SecretResponse)
+	resp, err := c.getParsedResponse(ctx, "PUT", path.Join("/projects", url.PathEscape(projectRef), "secrets", secretName), nil, jsonContent, bytes.NewReader(reqj), secret)
 	return secret, resp, err
 }
 

@@ -134,6 +134,68 @@ func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 
 	res := createSecretResponse(cssecret)
+	if err := httpResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Errorf("err: %+v", err)
+	}
+}
+
+type UpdateSecretRequest struct {
+	Name string `json:"name,omitempty"`
+
+	Type types.SecretType `json:"type,omitempty"`
+
+	// internal secret
+	Data map[string]string `json:"data,omitempty"`
+
+	// external secret
+	SecretProviderID string `json:"secret_provider_id,omitempty"`
+	Path             string `json:"path,omitempty"`
+}
+
+type UpdateSecretHandler struct {
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
+}
+
+func NewUpdateSecretHandler(logger *zap.Logger, ah *action.ActionHandler) *UpdateSecretHandler {
+	return &UpdateSecretHandler{log: logger.Sugar(), ah: ah}
+}
+
+func (h *UpdateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	secretName := vars["secretname"]
+
+	parentType, parentRef, err := GetConfigTypeRef(r)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	var req UpdateSecretRequest
+	d := json.NewDecoder(r.Body)
+	if err := d.Decode(&req); err != nil {
+		httpError(w, util.NewErrBadRequest(err))
+		return
+	}
+	areq := &action.UpdateSecretRequest{
+		SecretName: secretName,
+
+		Name:             req.Name,
+		ParentType:       parentType,
+		ParentRef:        parentRef,
+		Type:             req.Type,
+		Data:             req.Data,
+		SecretProviderID: req.SecretProviderID,
+		Path:             req.Path,
+	}
+	cssecret, err := h.ah.UpdateSecret(ctx, areq)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	res := createSecretResponse(cssecret)
 	if err := httpResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
