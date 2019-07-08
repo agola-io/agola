@@ -226,9 +226,21 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, req *UpdateProje
 			req.ProjectGroup.Name = ""
 		}
 
-		pgp, err := h.readDB.GetProjectGroupPath(tx, pg)
+		pgPath, err := h.readDB.GetProjectGroupPath(tx, pg)
 		if err != nil {
 			return err
+		}
+		pgp := path.Join(path.Dir(pgPath), req.ProjectGroup.Name)
+
+		if pg.Name != req.ProjectGroup.Name {
+			// check duplicate project group name
+			ap, err := h.readDB.GetProjectGroupByName(tx, req.ProjectGroup.Parent.ID, req.ProjectGroup.Name)
+			if err != nil {
+				return err
+			}
+			if ap != nil {
+				return util.NewErrBadRequest(errors.Errorf("project group with name %q, path %q already exists", req.ProjectGroup.Name, pgp))
+			}
 		}
 
 		// changegroup is the project group path. Use "projectpath" prefix as it must

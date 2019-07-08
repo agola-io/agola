@@ -197,18 +197,21 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, req *UpdateProjectReq
 			return util.NewErrBadRequest(errors.Errorf("changing project parent isn't supported"))
 		}
 
-		pp, err := h.readDB.GetProjectPath(tx, p)
+		groupPath, err := h.readDB.GetProjectGroupPath(tx, group)
 		if err != nil {
 			return err
 		}
+		pp := path.Join(groupPath, req.Project.Name)
 
-		// check duplicate project name
-		ap, err := h.readDB.GetProjectByName(tx, req.Project.Parent.ID, req.Project.Name)
-		if err != nil {
-			return err
-		}
-		if ap != nil {
-			return util.NewErrBadRequest(errors.Errorf("project with name %q, path %q already exists", p.Name, pp))
+		if p.Name != req.Project.Name {
+			// check duplicate project name
+			ap, err := h.readDB.GetProjectByName(tx, req.Project.Parent.ID, req.Project.Name)
+			if err != nil {
+				return err
+			}
+			if ap != nil {
+				return util.NewErrBadRequest(errors.Errorf("project with name %q, path %q already exists", req.Project.Name, pp))
+			}
 		}
 
 		// changegroup is the project path. Use "projectpath" prefix as it must
