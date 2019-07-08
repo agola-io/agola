@@ -226,6 +226,28 @@ func (c *Client) CreateProjectSecret(ctx context.Context, projectRef string, sec
 	return resSecret, resp, err
 }
 
+func (c *Client) UpdateProjectGroupSecret(ctx context.Context, projectGroupRef, secretName string, secret *types.Secret) (*Secret, *http.Response, error) {
+	pj, err := json.Marshal(secret)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	resSecret := new(Secret)
+	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/projectgroups/%s/secrets/%s", url.PathEscape(projectGroupRef), secretName), nil, jsonContent, bytes.NewReader(pj), resSecret)
+	return resSecret, resp, err
+}
+
+func (c *Client) UpdateProjectSecret(ctx context.Context, projectRef, secretName string, secret *types.Secret) (*Secret, *http.Response, error) {
+	pj, err := json.Marshal(secret)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	resSecret := new(Secret)
+	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/projects/%s/secrets/%s", url.PathEscape(projectRef), secretName), nil, jsonContent, bytes.NewReader(pj), resSecret)
+	return resSecret, resp, err
+}
+
 func (c *Client) DeleteProjectGroupSecret(ctx context.Context, projectGroupRef, secretName string) (*http.Response, error) {
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/projectgroups/%s/secrets/%s", url.PathEscape(projectGroupRef), secretName), nil, jsonContent, nil)
 }

@@ -154,6 +154,51 @@ func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+type UpdateSecretHandler struct {
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
+}
+
+func NewUpdateSecretHandler(logger *zap.Logger, ah *action.ActionHandler) *UpdateSecretHandler {
+	return &UpdateSecretHandler{log: logger.Sugar(), ah: ah}
+}
+
+func (h *UpdateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	secretName := vars["secretname"]
+
+	parentType, parentRef, err := GetConfigTypeRef(r)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	var secret *types.Secret
+	d := json.NewDecoder(r.Body)
+	if err := d.Decode(&secret); err != nil {
+		httpError(w, util.NewErrBadRequest(err))
+		return
+	}
+
+	secret.Parent.Type = parentType
+	secret.Parent.ID = parentRef
+
+	areq := &action.UpdateSecretRequest{
+		SecretName: secretName,
+		Secret:     secret,
+	}
+	secret, err = h.ah.UpdateSecret(ctx, areq)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	if err := httpResponse(w, http.StatusOK, secret); err != nil {
+		h.log.Errorf("err: %+v", err)
+	}
+}
+
 type DeleteSecretHandler struct {
 	log *zap.SugaredLogger
 	ah  *action.ActionHandler

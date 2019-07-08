@@ -134,6 +134,7 @@ func (s *Configstore) Run(ctx context.Context) error {
 
 	secretsHandler := api.NewSecretsHandler(logger, s.ah, s.readDB)
 	createSecretHandler := api.NewCreateSecretHandler(logger, s.ah)
+	updateSecretHandler := api.NewUpdateSecretHandler(logger, s.ah)
 	deleteSecretHandler := api.NewDeleteSecretHandler(logger, s.ah)
 
 	variablesHandler := api.NewVariablesHandler(logger, s.ah, s.readDB)
@@ -190,6 +191,8 @@ func (s *Configstore) Run(ctx context.Context) error {
 	apirouter.Handle("/projects/{projectref}/secrets", secretsHandler).Methods("GET")
 	apirouter.Handle("/projectgroups/{projectgroupref}/secrets", createSecretHandler).Methods("POST")
 	apirouter.Handle("/projects/{projectref}/secrets", createSecretHandler).Methods("POST")
+	apirouter.Handle("/projectgroups/{projectgroupref}/secrets/{secretname}", updateSecretHandler).Methods("PUT")
+	apirouter.Handle("/projects/{projectref}/secrets/{secretname}", updateSecretHandler).Methods("PUT")
 	apirouter.Handle("/projectgroups/{projectgroupref}/secrets/{secretname}", deleteSecretHandler).Methods("DELETE")
 	apirouter.Handle("/projects/{projectref}/secrets/{secretname}", deleteSecretHandler).Methods("DELETE")
 
