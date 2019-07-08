@@ -396,6 +396,10 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if run == nil {
+		httpError(w, util.NewErrNotFound(errors.Errorf("run %q doesn't exist", runID)))
+		return
+	}
 
 	cgts, err := types.MarshalChangeGroupsUpdateToken(cgt)
 	if err != nil {
