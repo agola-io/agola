@@ -87,6 +87,13 @@ func webhookDataFromPush(hook *github.PushEvent) (*types.WebhookData, error) {
 		whd.Tag = strings.TrimPrefix(*hook.Ref, "refs/tags/")
 		whd.TagLink = fmt.Sprintf("%s/tree/%s", *hook.Repo.HTMLURL, whd.Tag)
 		whd.Message = fmt.Sprintf("Tag %s", whd.Tag)
+
+		// if it's a signed tag hook.After points to the signed tag sha and not the
+		// commit sha. In this case use hook.HeadCommit.ID
+		if hook.HeadCommit.ID != nil {
+			whd.CommitSHA = *hook.HeadCommit.ID
+		}
+
 	default:
 		// ignore received webhook since it doesn't have a ref we're interested in
 		return nil, fmt.Errorf("unsupported webhook ref %q", *hook.Ref)
