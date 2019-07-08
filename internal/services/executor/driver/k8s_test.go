@@ -19,6 +19,7 @@ import (
 	"context"
 	"io/ioutil"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 
@@ -252,4 +253,52 @@ func TestK8sPod(t *testing.T) {
 		}
 	})
 
+}
+
+func TestParseGitVersion(t *testing.T) {
+	tests := []struct {
+		gitVersion string
+		out        *serverVersion
+		err        bool
+	}{
+		{
+			gitVersion: "v1.8.0",
+			out:        &serverVersion{Major: 1, Minor: 8},
+		},
+		{
+			gitVersion: "v1.12.0",
+			out:        &serverVersion{Major: 1, Minor: 12},
+		},
+		{
+			gitVersion: "v1.12.20",
+			out:        &serverVersion{Major: 1, Minor: 12},
+		},
+		{
+			gitVersion: "v1.12.8-test.10",
+			out:        &serverVersion{Major: 1, Minor: 12},
+		},
+		{
+			gitVersion: "v1.a",
+			err:        true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run("", func(t *testing.T) {
+			sv, err := parseGitVersion(tt.gitVersion)
+			if tt.err {
+				if err == nil {
+					t.Errorf("expected error, got nil error")
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("unexpected err: %v", err)
+				return
+			}
+			if !reflect.DeepEqual(sv, tt.out) {
+				t.Errorf("expected %v, got %v", tt.out, sv)
+			}
+		})
+	}
 }

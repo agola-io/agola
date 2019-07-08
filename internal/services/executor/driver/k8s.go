@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -62,6 +64,8 @@ const (
 	renewExecutorLeaseInterval = 10 * time.Second
 	staleExecutorLeaseInterval = 1 * time.Minute
 	informerResyncInterval     = 10 * time.Second
+
+	k8sLabelArchBeta = "beta.kubernetes.io/arch"
 )
 
 type K8sDriver struct {
@@ -77,6 +81,7 @@ type K8sDriver struct {
 	podLister        listerscorev1.PodLister
 	cmLister         listerscorev1.ConfigMapLister
 	leaseLister      coordinationlistersv1.LeaseLister
+	k8sLabelArch     string
 }
 
 type K8sPod struct {
@@ -106,12 +111,29 @@ func NewK8sDriver(logger *zap.Logger, executorID, toolboxPath string) (*K8sDrive
 	}
 
 	d := &K8sDriver{
-		log:         logger.Sugar(),
-		restconfig:  kubecfg,
-		client:      kubecli,
-		toolboxPath: toolboxPath,
-		namespace:   namespace,
-		executorID:  executorID,
+		log:          logger.Sugar(),
+		restconfig:   kubecfg,
+		client:       kubecli,
+		toolboxPath:  toolboxPath,
+		namespace:    namespace,
+		executorID:   executorID,
+		k8sLabelArch: corev1.LabelArchStable,
+	}
+
+	serverVersion, err := d.client.Discovery().ServerVersion()
+	if err != nil {
+		return nil, err
+	}
+	sv, err := parseGitVersion(serverVersion.GitVersion)
+	// if server version parsing fails just warn but ignore it
+	if err != nil {
+		d.log.Warnf("failed to parse k8s server version: %v", err)
+	}
+	if sv != nil {
+		// for k8s version < v1.14.x use old arch label
+		if sv.Major == 1 && sv.Minor < 14 {
+			d.k8sLabelArch = k8sLabelArchBeta
+		}
 	}
 
 	lists, err := d.client.Discovery().ServerPreferredResources()
@@ -399,7 +421,7 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 
 	if podConfig.Arch != "" {
 		pod.Spec.NodeSelector = map[string]string{
-			corev1.LabelArchStable: string(podConfig.Arch),
+			d.k8sLabelArch: string(podConfig.Arch),
 		}
 	}
 
@@ -735,4 +757,30 @@ func genEnvVars(env map[string]string) []corev1.EnvVar {
 		envVars = append(envVars, corev1.EnvVar{Name: n, Value: v})
 	}
 	return envVars
+}
+
+type serverVersion struct {
+	Major int
+	Minor int
+}
+
+// k8s version is in this format: v0.0.0(-master+$Format:%h$)
+var gitVersionRegex = regexp.MustCompile("v([0-9]+).([0-9]+).[0-9]+.*")
+
+func parseGitVersion(gitVersion string) (*serverVersion, error) {
+	parsedVersion := gitVersionRegex.FindStringSubmatch(gitVersion)
+	if len(parsedVersion) != 3 {
+		return nil, fmt.Errorf("cannot parse git version %s", gitVersion)
+	}
+	sv := &serverVersion{}
+	var err error
+	sv.Major, err = strconv.Atoi(parsedVersion[1])
+	if err != nil {
+		return nil, err
+	}
+	sv.Minor, err = strconv.Atoi(parsedVersion[2])
+	if err != nil {
+		return nil, err
+	}
+	return sv, nil
 }
