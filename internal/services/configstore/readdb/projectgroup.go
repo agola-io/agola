@@ -31,7 +31,7 @@ import (
 
 var (
 	projectgroupSelect = sb.Select("id", "data").From("projectgroup")
-	projectgroupInsert = sb.Insert("projectgroup").Columns("id", "name", "parentid", "data")
+	projectgroupInsert = sb.Insert("projectgroup").Columns("id", "name", "parentid", "parenttype", "data")
 )
 
 func (r *ReadDB) insertProjectGroup(tx *db.Tx, data []byte) error {
@@ -44,7 +44,7 @@ func (r *ReadDB) insertProjectGroup(tx *db.Tx, data []byte) error {
 	if err := r.deleteProjectGroup(tx, group.ID); err != nil {
 		return err
 	}
-	q, args, err := projectgroupInsert.Values(group.ID, group.Name, group.Parent.ID, data).ToSql()
+	q, args, err := projectgroupInsert.Values(group.ID, group.Name, group.Parent.ID, group.Parent.Type, data).ToSql()
 	if err != nil {
 		return errors.Errorf("failed to build query: %w", err)
 	}

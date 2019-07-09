@@ -210,7 +210,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, req *UpdateProjectReq
 				return err
 			}
 			if ap != nil {
-				return util.NewErrBadRequest(errors.Errorf("project with name %q, path %q already exists", req.Project.Name, pp))
+				return util.NewErrBadRequest(errors.Errorf("project with name %q, path %q already exists", req.Project.Name,pp))
 			}
 		}
 

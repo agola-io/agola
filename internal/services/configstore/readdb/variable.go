@@ -28,7 +28,7 @@ import (
 
 var (
 	variableSelect = sb.Select("id", "data").From("variable")
-	variableInsert = sb.Insert("variable").Columns("id", "name", "parentid", "data")
+	variableInsert = sb.Insert("variable").Columns("id", "name", "parentid", "parenttype", "data")
 )
 
 func (r *ReadDB) insertVariable(tx *db.Tx, data []byte) error {
@@ -40,7 +40,7 @@ func (r *ReadDB) insertVariable(tx *db.Tx, data []byte) error {
 	if err := r.deleteVariable(tx, variable.ID); err != nil {
 		return err
 	}
-	q, args, err := variableInsert.Values(variable.ID, variable.Name, variable.Parent.ID, data).ToSql()
+	q, args, err := variableInsert.Values(variable.ID, variable.Name, variable.Parent.ID, variable.Parent.Type, data).ToSql()
 	if err != nil {
 		return errors.Errorf("failed to build query: %w", err)
 	}

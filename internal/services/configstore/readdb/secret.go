@@ -28,7 +28,7 @@ import (
 
 var (
 	secretSelect = sb.Select("id", "data").From("secret")
-	secretInsert = sb.Insert("secret").Columns("id", "name", "parentid", "data")
+	secretInsert = sb.Insert("secret").Columns("id", "name", "parentid", "parenttype", "data")
 )
 
 func (r *ReadDB) insertSecret(tx *db.Tx, data []byte) error {
@@ -40,7 +40,7 @@ func (r *ReadDB) insertSecret(tx *db.Tx, data []byte) error {
 	if err := r.deleteSecret(tx, secret.ID); err != nil {
 		return err
 	}
-	q, args, err := secretInsert.Values(secret.ID, secret.Name, secret.Parent.ID, data).ToSql()
+	q, args, err := secretInsert.Values(secret.ID, secret.Name, secret.Parent.ID, secret.Parent.Type, data).ToSql()
 	if err != nil {
 		return errors.Errorf("failed to build query: %w", err)
 	}

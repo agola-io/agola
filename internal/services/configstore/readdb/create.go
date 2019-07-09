@@ -25,10 +25,10 @@ var Stmts = []string{
 	// changegrouprevision stores the current revision of the changegroup for optimistic locking
 	"create table changegrouprevision (id varchar, revision varchar, PRIMARY KEY (id, revision))",
 
-	"create table projectgroup (id uuid, name varchar, parentid varchar, data bytea, PRIMARY KEY (id))",
+	"create table projectgroup (id uuid, name varchar, parentid varchar, parenttype varchar, data bytea, PRIMARY KEY (id))",
 	"create index projectgroup_name on projectgroup(name)",
 
-	"create table project (id uuid, name varchar, parentid varchar, data bytea, PRIMARY KEY (id))",
+	"create table project (id uuid, name varchar, parentid varchar, parenttype varchar, data bytea, PRIMARY KEY (id))",
 	"create index project_name on project(name)",
 
 	"create table user (id uuid, name varchar, data bytea, PRIMARY KEY (id))",
@@ -48,9 +48,9 @@ var Stmts = []string{
 
 	"create table linkedaccount_project (id uuid, projectid uuid, PRIMARY KEY (id), FOREIGN KEY(projectid) REFERENCES user(id))",
 
-	"create table secret (id uuid, name varchar, parentid varchar, data bytea, PRIMARY KEY (id))",
+	"create table secret (id uuid, name varchar, parentid varchar, parenttype varchar, data bytea, PRIMARY KEY (id))",
 	"create index secret_name on secret(name)",
 
-	"create table variable (id uuid, name varchar, parentid varchar, data bytea, PRIMARY KEY (id))",
+	"create table variable (id uuid, name varchar, parentid varchar, parenttype varchar, data bytea, PRIMARY KEY (id))",
 	"create index variable_name on variable(name)",
 }

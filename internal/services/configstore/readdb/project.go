@@ -31,7 +31,7 @@ import (
 
 var (
 	projectSelect = sb.Select("id", "data").From("project")
-	projectInsert = sb.Insert("project").Columns("id", "name", "parentid", "data")
+	projectInsert = sb.Insert("project").Columns("id", "name", "parentid", "parenttype", "data")
 )
 
 func (r *ReadDB) insertProject(tx *db.Tx, data []byte) error {
@@ -43,7 +43,7 @@ func (r *ReadDB) insertProject(tx *db.Tx, data []byte) error {
 	if err := r.deleteProject(tx, project.ID); err != nil {
 		return err
 	}
-	q, args, err := projectInsert.Values(project.ID, project.Name, project.Parent.ID, data).ToSql()
+	q, args, err := projectInsert.Values(project.ID, project.Name, project.Parent.ID, project.Parent.Type, data).ToSql()
 	if err != nil {
 		return errors.Errorf("failed to build query: %w", err)
 	}
