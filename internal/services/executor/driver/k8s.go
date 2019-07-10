@@ -165,6 +165,26 @@ func NewK8sDriver(logger *zap.Logger, executorID, toolboxPath string) (*K8sDrive
 	d.executorsGroupID = executorsGroupID
 
 	ctx := context.TODO()
+	factory := informers.NewSharedInformerFactoryWithOptions(d.client, informerResyncInterval, informers.WithNamespace(d.namespace))
+
+	nodeInformer := factory.Core().V1().Nodes()
+	d.nodeLister = nodeInformer.Lister()
+	go nodeInformer.Informer().Run(ctx.Done())
+
+	podInformer := factory.Core().V1().Pods()
+	d.podLister = podInformer.Lister()
+	go podInformer.Informer().Run(ctx.Done())
+
+	if d.useLeaseAPI {
+		leaseInformer := factory.Coordination().V1().Leases()
+		d.leaseLister = leaseInformer.Lister()
+		go leaseInformer.Informer().Run(ctx.Done())
+	} else {
+		cmInformer := factory.Core().V1().ConfigMaps()
+		d.cmLister = cmInformer.Lister()
+		go cmInformer.Informer().Run(ctx.Done())
+	}
+
 	go func() {
 		for {
 			if err := d.updateLease(ctx); err != nil {
@@ -196,26 +216,6 @@ func NewK8sDriver(logger *zap.Logger, executorID, toolboxPath string) (*K8sDrive
 			time.Sleep(renewExecutorLeaseInterval)
 		}
 	}()
-
-	factory := informers.NewSharedInformerFactoryWithOptions(d.client, informerResyncInterval, informers.WithNamespace(d.namespace))
-
-	nodeInformer := factory.Core().V1().Nodes()
-	d.nodeLister = nodeInformer.Lister()
-	go nodeInformer.Informer().Run(ctx.Done())
-
-	podInformer := factory.Core().V1().Pods()
-	d.podLister = podInformer.Lister()
-	go podInformer.Informer().Run(ctx.Done())
-
-	if d.useLeaseAPI {
-		leaseInformer := factory.Coordination().V1().Leases()
-		d.leaseLister = leaseInformer.Lister()
-		go leaseInformer.Informer().Run(ctx.Done())
-	} else {
-		cmInformer := factory.Core().V1().ConfigMaps()
-		d.cmLister = cmInformer.Lister()
-		go cmInformer.Informer().Run(ctx.Done())
-	}
 
 	return d, nil
 }
