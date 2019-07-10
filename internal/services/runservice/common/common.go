@@ -50,8 +50,9 @@ var (
 
 	EtcdPingKey = path.Join(EtcdSchedulerBaseDir, "ping")
 
-	EtcdCacheCleanerLockKey = path.Join(EtcdSchedulerBaseDir, "locks", "cachecleaner")
-	EtcdTaskUpdaterLockKey  = path.Join(EtcdSchedulerBaseDir, "locks", "taskupdater")
+	EtcdCompactChangeGroupsLockKey = path.Join(EtcdSchedulerBaseDir, "compactchangegroupslock")
+	EtcdCacheCleanerLockKey        = path.Join(EtcdSchedulerBaseDir, "locks", "cachecleaner")
+	EtcdTaskUpdaterLockKey         = path.Join(EtcdSchedulerBaseDir, "locks", "taskupdater")
 )
 
 func EtcdRunKey(runID string) string       { return path.Join(EtcdRunsDir, runID) }

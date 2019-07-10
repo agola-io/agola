@@ -436,6 +436,22 @@ func (s *Runservice) compactChangeGroupsLoop(ctx context.Context) {
 }
 
 func (s *Runservice) compactChangeGroups(ctx context.Context) error {
+	session, err := concurrency.NewSession(s.e.Client(), concurrency.WithTTL(5), concurrency.WithContext(ctx))
+	if err != nil {
+		return err
+	}
+	defer session.Close()
+
+	m := concurrency.NewMutex(session, common.EtcdCompactChangeGroupsLockKey)
+
+	// TODO(sgotti) find a way to use a trylock so we'll just return if already
+	// locked. Currently multiple task updaters will enqueue and start when another
+	// finishes (unuseful and consume resources)
+	if err := m.Lock(ctx); err != nil {
+		return err
+	}
+	defer func() { _ = m.Unlock(ctx) }()
+
 	resp, err := s.e.Client().Get(ctx, common.EtcdChangeGroupMinRevisionKey)
 	if err != nil {
 		return err
