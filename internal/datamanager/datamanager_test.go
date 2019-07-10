@@ -134,7 +134,6 @@ func TestEtcdReset(t *testing.T) {
 	os.RemoveAll(etcdDir)
 	t.Logf("starting etcd")
 	tetcd = setupEtcd(t, etcdDir)
-	defer shutdownEtcd(tetcd)
 	if err := tetcd.Start(); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}

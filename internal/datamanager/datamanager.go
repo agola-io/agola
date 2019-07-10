@@ -60,9 +60,11 @@ var (
 
 	etcdCheckpointSeqKey = path.Join(etcdWalBaseDir, "checkpointseq")
 
-	etcdSyncLockKey       = path.Join(etcdWalBaseDir, "synclock")
-	etcdCheckpointLockKey = path.Join(etcdWalBaseDir, "checkpointlock")
-	etcdWalCleanerLockKey = path.Join(etcdWalBaseDir, "walcleanerlock")
+	etcdInitEtcdLockKey                = path.Join(etcdWalBaseDir, "initetcd")
+	etcdSyncLockKey                = path.Join(etcdWalBaseDir, "synclock")
+	etcdCompactChangeGroupsLockKey = path.Join(etcdWalBaseDir, "compactchangegroupslock")
+	etcdCheckpointLockKey          = path.Join(etcdWalBaseDir, "checkpointlock")
+	etcdWalCleanerLockKey          = path.Join(etcdWalBaseDir, "walcleanerlock")
 
 	etcdChangeGroupsDir           = path.Join(etcdWalBaseDir, "changegroups")
 	etcdChangeGroupMinRevisionKey = path.Join(etcdWalBaseDir, "changegroupsminrev")
