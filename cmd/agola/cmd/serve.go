@@ -79,9 +79,6 @@ func init() {
 	flags.BoolVar(&serveOpts.embeddedEtcd, "embedded-etcd", false, "start and use an embedded etcd, only for testing purpose")
 	flags.StringVar(&serveOpts.embeddedEtcdDataDir, "embedded-etcd-data-dir", "/tmp/agola/etcd", "embedded etcd data dir, only for testing purpose")
 
-	if err := cmdServe.MarkFlagRequired("config"); err != nil {
-		log.Fatal(err)
-	}
 	if err := cmdServe.MarkFlagRequired("components"); err != nil {
 		log.Fatal(err)
 	}
