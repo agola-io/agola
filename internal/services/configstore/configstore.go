@@ -32,7 +32,6 @@ import (
 	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 
-	ghandlers "github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -114,11 +113,6 @@ func (s *Configstore) Run(ctx context.Context) error {
 	<-dmReadyCh
 
 	go func() { errCh <- s.readDB.Run(ctx) }()
-
-	corsAllowedMethodsOptions := ghandlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "DELETE"})
-	corsAllowedHeadersOptions := ghandlers.AllowedHeaders([]string{"Accept", "Accept-Encoding", "Authorization", "Content-Length", "Content-Type", "X-CSRF-Token", "Authorization"})
-	corsAllowedOriginsOptions := ghandlers.AllowedOrigins([]string{"*"})
-	corsHandler := ghandlers.CORS(corsAllowedMethodsOptions, corsAllowedHeadersOptions, corsAllowedOriginsOptions)
 
 	projectGroupHandler := api.NewProjectGroupHandler(logger, s.readDB)
 	projectGroupSubgroupsHandler := api.NewProjectGroupSubgroupsHandler(logger, s.ah, s.readDB)
@@ -234,7 +228,7 @@ func (s *Configstore) Run(ctx context.Context) error {
 	apirouter.Handle("/remotesources/{remotesourceref}", deleteRemoteSourceHandler).Methods("DELETE")
 
 	mainrouter := mux.NewRouter()
-	mainrouter.PathPrefix("/").Handler(corsHandler(router))
+	mainrouter.PathPrefix("/").Handler(router)
 
 	var tlsConfig *tls.Config
 	if s.c.Web.TLS {

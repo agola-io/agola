@@ -137,10 +137,17 @@ func NewGateway(gc *config.Config) (*Gateway, error) {
 }
 
 func (g *Gateway) Run(ctx context.Context) error {
+	// noop coors handler
+	corsHandler := func(h http.Handler) http.Handler {
+		return h
+	}
+
+if len(g.c.Web.AllowedOrigins) > 0 {
 	corsAllowedMethodsOptions := ghandlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "DELETE"})
 	corsAllowedHeadersOptions := ghandlers.AllowedHeaders([]string{"Accept", "Accept-Encoding", "Authorization", "Content-Length", "Content-Type", "X-CSRF-Token", "Authorization"})
-	corsAllowedOriginsOptions := ghandlers.AllowedOrigins([]string{"*"})
-	corsHandler := ghandlers.CORS(corsAllowedMethodsOptions, corsAllowedHeadersOptions, corsAllowedOriginsOptions)
+	corsAllowedOriginsOptions := ghandlers.AllowedOrigins(g.c.Web.AllowedOrigins)
+	corsHandler = ghandlers.CORS(corsAllowedMethodsOptions, corsAllowedHeadersOptions, corsAllowedOriginsOptions)
+}
 
 	webhooksHandler := api.NewWebhooksHandler(logger, g.ah, g.configstoreClient, g.runserviceClient, g.c.APIExposedURL)
 

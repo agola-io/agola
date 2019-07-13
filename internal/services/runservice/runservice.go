@@ -33,7 +33,6 @@ import (
 	"agola.io/agola/internal/services/runservice/types"
 	"agola.io/agola/internal/util"
 
-	ghandlers "github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
 	"go.uber.org/zap/zapcore"
@@ -161,11 +160,6 @@ func (s *Runservice) Run(ctx context.Context) error {
 
 	ch := make(chan *types.ExecutorTask)
 
-	corsAllowedMethodsOptions := ghandlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "DELETE"})
-	corsAllowedHeadersOptions := ghandlers.AllowedHeaders([]string{"Accept", "Accept-Encoding", "Authorization", "Content-Length", "Content-Type", "X-CSRF-Token", "Authorization"})
-	corsAllowedOriginsOptions := ghandlers.AllowedOrigins([]string{"*"})
-	corsHandler := ghandlers.CORS(corsAllowedMethodsOptions, corsAllowedHeadersOptions, corsAllowedOriginsOptions)
-
 	// executor dedicated api, only calls from executor should happen on these handlers
 	executorStatusHandler := api.NewExecutorStatusHandler(logger, s.e, s.ah)
 	executorTaskStatusHandler := api.NewExecutorTaskStatusHandler(s.e, ch)
@@ -217,7 +211,7 @@ func (s *Runservice) Run(ctx context.Context) error {
 	apirouter.Handle("/changegroups", changeGroupsUpdateTokensHandler).Methods("GET")
 
 	mainrouter := mux.NewRouter()
-	mainrouter.PathPrefix("/").Handler(corsHandler(router))
+	mainrouter.PathPrefix("/").Handler(router)
 
 	// Return a bad request when it doesn't match any route
 	mainrouter.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusBadRequest) })
