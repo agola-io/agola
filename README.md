@@ -5,6 +5,8 @@
 
 CI/CD redefined
 
+![](https://agola.io/screenshots/screenshot_run_01.png)
+
 ## Try it
 
 See [the agolademo example](https://agola.io/tryit)
