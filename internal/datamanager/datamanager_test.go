@@ -15,6 +15,7 @@
 package datamanager
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -31,6 +32,7 @@ import (
 	"agola.io/agola/internal/objectstorage/posix"
 	ostypes "agola.io/agola/internal/objectstorage/types"
 	"agola.io/agola/internal/testutil"
+	"agola.io/agola/internal/util"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -738,92 +740,97 @@ func testCheckpoint(t *testing.T, basePath string) {
 func checkDataFiles(ctx context.Context, t *testing.T, dm *DataManager, expectedEntriesMap map[string]*DataEntry) error {
 	// read the data file
 	curDataStatus, err := dm.GetLastDataStatus()
+	t.Logf("curDataStatus: %s", util.Dump(curDataStatus))
 	if err != nil {
 		return err
 	}
 
 	allEntriesMap := map[string]*DataEntry{}
-	var prevLastEntryID string
 
-	for i, file := range curDataStatus.Files["datatype01"] {
-		dataFileIndexf, err := dm.ost.ReadObject(dm.DataFileIndexPath("datatype01", file.ID))
-		if err != nil {
-			return err
-		}
-		var dataFileIndex *DataFileIndex
-		dec := json.NewDecoder(dataFileIndexf)
-		err = dec.Decode(&dataFileIndex)
-		if err != nil {
-			dataFileIndexf.Close()
-			return err
-		}
-
-		dataFileIndexf.Close()
-		dataEntriesMap := map[string]*DataEntry{}
-		dataEntries := []*DataEntry{}
-		dataf, err := dm.ost.ReadObject(dm.DataFilePath("datatype01", file.ID))
-		if err != nil {
-			return err
-		}
-		dec = json.NewDecoder(dataf)
-		var prevEntryID string
-		for {
-			var de *DataEntry
-
-			err := dec.Decode(&de)
-			if err == io.EOF {
-				// all done
-				break
-			}
+	for dataType := range curDataStatus.Files {
+		var prevLastEntryID string
+		t.Logf("dataType: %q", dataType)
+		for i, file := range curDataStatus.Files[dataType] {
+			t.Logf("data file: %d %q", i, file)
+			dataFileIndexf, err := dm.ost.ReadObject(dm.DataFileIndexPath(dataType, file.ID))
 			if err != nil {
-				dataf.Close()
 				return err
 			}
-			// check that there are no duplicate entries
-			if _, ok := allEntriesMap[de.ID]; ok {
-				return fmt.Errorf("duplicate entry id: %s", de.ID)
+			var dataFileIndex *DataFileIndex
+			dec := json.NewDecoder(dataFileIndexf)
+			err = dec.Decode(&dataFileIndex)
+			if err != nil {
+				dataFileIndexf.Close()
+				return err
 			}
-			// check that the entries are in order
-			if de.ID < prevEntryID {
-				return fmt.Errorf("previous entry id: %s greater than entry id: %s", prevEntryID, de.ID)
+
+			dataFileIndexf.Close()
+			dataEntriesMap := map[string]*DataEntry{}
+			dataEntries := []*DataEntry{}
+			dataf, err := dm.ost.ReadObject(dm.DataFilePath(dataType, file.ID))
+			if err != nil {
+				return err
+			}
+			dec = json.NewDecoder(dataf)
+			var prevEntryID string
+			for {
+				var de *DataEntry
+
+				err := dec.Decode(&de)
+				if err == io.EOF {
+					// all done
+					break
+				}
+				if err != nil {
+					dataf.Close()
+					return err
+				}
+				// check that there are no duplicate entries
+				if _, ok := allEntriesMap[de.ID]; ok {
+					return fmt.Errorf("duplicate entry id: %s", de.ID)
+				}
+				// check that the entries are in order
+				if de.ID < prevEntryID {
+					return fmt.Errorf("previous entry id: %s greater than entry id: %s", prevEntryID, de.ID)
+				}
+
+				dataEntriesMap[de.ID] = de
+				dataEntries = append(dataEntries, de)
+				allEntriesMap[de.ID] = de
+			}
+			dataf.Close()
+
+			// check that the index matches the entries
+			if len(dataFileIndex.Index) != len(dataEntriesMap) {
+				return fmt.Errorf("index entries: %d different than data entries: %d", len(dataFileIndex.Index), len(dataEntriesMap))
+			}
+			indexIDs := make([]string, len(dataFileIndex.Index))
+			entriesIDs := make([]string, len(dataEntriesMap))
+			for id := range dataFileIndex.Index {
+				indexIDs = append(indexIDs, id)
+			}
+			for id := range dataEntriesMap {
+				entriesIDs = append(entriesIDs, id)
+			}
+			sort.Strings(indexIDs)
+			sort.Strings(entriesIDs)
+			if !reflect.DeepEqual(indexIDs, entriesIDs) {
+				return fmt.Errorf("index entries ids don't match data entries ids: index: %v, data: %v", indexIDs, entriesIDs)
 			}
 
-			dataEntriesMap[de.ID] = de
-			dataEntries = append(dataEntries, de)
-			allEntriesMap[de.ID] = de
-		}
-		dataf.Close()
+			if file.LastEntryID != dataEntries[len(dataEntries)-1].ID {
+				return fmt.Errorf("lastEntryID for datafile %d: %s is different than real last entry id: %s", i, file.LastEntryID, dataEntries[len(dataEntries)-1].ID)
+			}
 
-		// check that the index matches the entries
-		if len(dataFileIndex.Index) != len(dataEntriesMap) {
-			return fmt.Errorf("index entries: %d different than data entries: %d", len(dataFileIndex.Index), len(dataEntriesMap))
+			// check that all the files are in order
+			if file.LastEntryID == prevLastEntryID {
+				return fmt.Errorf("lastEntryID for datafile %d is equal than previous file lastEntryID: %s == %s", i, file.LastEntryID, prevLastEntryID)
+			}
+			if file.LastEntryID < prevLastEntryID {
+				return fmt.Errorf("lastEntryID for datafile %d is less than previous file lastEntryID: %s < %s", i, file.LastEntryID, prevLastEntryID)
+			}
+			prevLastEntryID = file.LastEntryID
 		}
-		indexIDs := make([]string, len(dataFileIndex.Index))
-		entriesIDs := make([]string, len(dataEntriesMap))
-		for id := range dataFileIndex.Index {
-			indexIDs = append(indexIDs, id)
-		}
-		for id := range dataEntriesMap {
-			entriesIDs = append(entriesIDs, id)
-		}
-		sort.Strings(indexIDs)
-		sort.Strings(entriesIDs)
-		if !reflect.DeepEqual(indexIDs, entriesIDs) {
-			return fmt.Errorf("index entries ids don't match data entries ids: index: %v, data: %v", indexIDs, entriesIDs)
-		}
-
-		if file.LastEntryID != dataEntries[len(dataEntries)-1].ID {
-			return fmt.Errorf("lastEntryID for datafile %d: %s is different than real last entry id: %s", i, file.LastEntryID, dataEntries[len(dataEntries)-1].ID)
-		}
-
-		// check that all the files are in order
-		if file.LastEntryID == prevLastEntryID {
-			return fmt.Errorf("lastEntryID for datafile %d is equal than previous file lastEntryID: %s == %s", i, file.LastEntryID, prevLastEntryID)
-		}
-		if file.LastEntryID < prevLastEntryID {
-			return fmt.Errorf("lastEntryID for datafile %d is less than previous file lastEntryID: %s < %s", i, file.LastEntryID, prevLastEntryID)
-		}
-		prevLastEntryID = file.LastEntryID
 	}
 
 	// check that the number of entries is right
@@ -835,4 +842,260 @@ func checkDataFiles(ctx context.Context, t *testing.T, dm *DataManager, expected
 	}
 
 	return nil
+}
+
+func TestExportImport(t *testing.T) {
+	dir, err := ioutil.TempDir("", "agola")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	etcdDir, err := ioutil.TempDir(dir, "etcd")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	tetcd := setupEtcd(t, etcdDir)
+	defer shutdownEtcd(tetcd)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	ostDir, err := ioutil.TempDir(dir, "ost")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	ost, err := posix.New(ostDir)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	dmConfig := &DataManagerConfig{
+		BasePath: "basepath",
+		E:        tetcd.TestEtcd.Store,
+		OST:      objectstorage.NewObjStorage(ost, "/"),
+		// remove almost all wals to see that they are removed also from changes
+		EtcdWalsKeepNum: 1,
+		DataTypes:       []string{"datatype01", "datatype02"},
+		// checkpoint also with only one wal
+		MinCheckpointWalsNum: 1,
+		// use a small maxDataFileSize
+		MaxDataFileSize: 10 * 1024,
+	}
+	dm, err := NewDataManager(ctx, logger, dmConfig)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	dmReadyCh := make(chan struct{})
+	go func() { _ = dm.Run(ctx, dmReadyCh) }()
+	<-dmReadyCh
+
+	time.Sleep(5 * time.Second)
+
+	contents := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+	expectedEntries := map[string]*DataEntry{}
+
+	// test insert from scratch (no current entries)
+	actionGroups := [][]*Action{}
+	actions := []*Action{}
+	for i := 200; i < 400; i++ {
+		action := &Action{
+			ActionType: ActionTypePut,
+			ID:         fmt.Sprintf("object%04d", i),
+			DataType:   "datatype01",
+			Data:       []byte(fmt.Sprintf(`{ "ID": "%d", "Contents": %s }`, i, contents)),
+		}
+		actions = append(actions, action)
+	}
+	actionGroups = append(actionGroups, actions)
+
+	actions = []*Action{}
+	for i := 600; i < 1000; i++ {
+		action := &Action{
+			ActionType: ActionTypePut,
+			ID:         fmt.Sprintf("object%04d", i),
+			DataType:   "datatype02",
+			Data:       []byte(fmt.Sprintf(`{ "ID": "%d", "Contents": %s }`, i, contents)),
+		}
+		actions = append(actions, action)
+	}
+	actionGroups = append(actionGroups, actions)
+
+	for _, actionGroup := range actionGroups {
+		for _, action := range actionGroup {
+			switch action.ActionType {
+			case ActionTypePut:
+				expectedEntries[action.ID] = &DataEntry{ID: action.ID, DataType: action.DataType, Data: action.Data}
+			case ActionTypeDelete:
+				delete(expectedEntries, action.ID)
+			}
+		}
+	}
+
+	for _, actionGroup := range actionGroups {
+		// populate with a wal
+		_, err := dm.WriteWal(ctx, actionGroup, nil)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+	}
+
+	// wait for the event to be read
+	time.Sleep(500 * time.Millisecond)
+
+	var export bytes.Buffer
+	if err := dm.Export(ctx, &export); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	t.Logf("stopping datamanager")
+	cancel()
+
+	time.Sleep(5 * time.Second)
+
+	t.Logf("stopping etcd")
+	// Reset etcd
+	shutdownEtcd(tetcd)
+	if err := tetcd.WaitDown(10 * time.Second); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	t.Logf("resetting etcd")
+	os.RemoveAll(etcdDir)
+	t.Logf("starting etcd")
+	tetcd = setupEtcd(t, etcdDir)
+	if err := tetcd.Start(); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	defer shutdownEtcd(tetcd)
+
+	ostDir, err = ioutil.TempDir(dir, "ost")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	ost, err = posix.New(ostDir)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	ctx, cancel = context.WithCancel(context.Background())
+
+	dmConfig = &DataManagerConfig{
+		BasePath: "basepath",
+		E:        tetcd.TestEtcd.Store,
+		OST:      objectstorage.NewObjStorage(ost, "/"),
+		// remove almost all wals to see that they are removed also from changes
+		EtcdWalsKeepNum: 1,
+		DataTypes:       []string{"datatype01", "datatype02"},
+		// checkpoint also with only one wal
+		MinCheckpointWalsNum: 1,
+		// use a small maxDataFileSize
+		MaxDataFileSize: 10 * 1024,
+		MaintenanceMode: true,
+	}
+	dm, err = NewDataManager(ctx, logger, dmConfig)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	dmReadyCh = make(chan struct{})
+	go func() { _ = dm.Run(ctx, dmReadyCh) }()
+	<-dmReadyCh
+
+	time.Sleep(5 * time.Second)
+	if err := dm.Import(ctx, &export); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	if err := checkDataFiles(ctx, t, dm, expectedEntries); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	t.Logf("stopping datamanager")
+	cancel()
+
+	time.Sleep(5 * time.Second)
+
+	ctx = context.Background()
+
+	// restart datamanager in normal mode
+	dmConfig = &DataManagerConfig{
+		BasePath: "basepath",
+		E:        tetcd.TestEtcd.Store,
+		OST:      objectstorage.NewObjStorage(ost, "/"),
+		// remove almost all wals to see that they are removed also from changes
+		EtcdWalsKeepNum: 1,
+		DataTypes:       []string{"datatype01", "datatype02"},
+		// checkpoint also with only one wal
+		MinCheckpointWalsNum: 1,
+		// use a small maxDataFileSize
+		MaxDataFileSize: 10 * 1024,
+	}
+	dm, err = NewDataManager(ctx, logger, dmConfig)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	dmReadyCh = make(chan struct{})
+	go func() { _ = dm.Run(ctx, dmReadyCh) }()
+	<-dmReadyCh
+
+	time.Sleep(5 * time.Second)
+
+	if err := checkDataFiles(ctx, t, dm, expectedEntries); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	actionGroups = [][]*Action{}
+	actions = []*Action{}
+	for i := 400; i < 600; i++ {
+		action := &Action{
+			ActionType: ActionTypePut,
+			ID:         fmt.Sprintf("object%04d", i),
+			DataType:   "datatype01",
+			Data:       []byte(fmt.Sprintf(`{ "ID": "%d", "Contents": %s }`, i, contents)),
+		}
+		actions = append(actions, action)
+	}
+	actionGroups = append(actionGroups, actions)
+
+	actions = []*Action{}
+	for i := 1000; i < 1400; i++ {
+		action := &Action{
+			ActionType: ActionTypePut,
+			ID:         fmt.Sprintf("object%04d", i),
+			DataType:   "datatype02",
+			Data:       []byte(fmt.Sprintf(`{ "ID": "%d", "Contents": %s }`, i, contents)),
+		}
+		actions = append(actions, action)
+	}
+	actionGroups = append(actionGroups, actions)
+
+	for _, actionGroup := range actionGroups {
+		for _, action := range actionGroup {
+			switch action.ActionType {
+			case ActionTypePut:
+				expectedEntries[action.ID] = &DataEntry{ID: action.ID, DataType: action.DataType, Data: action.Data}
+			case ActionTypeDelete:
+				delete(expectedEntries, action.ID)
+			}
+		}
+	}
+
+	for _, actionGroup := range actionGroups {
+		// populate with a wal
+		_, err := dm.WriteWal(ctx, actionGroup, nil)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+	}
+
+	// wait for the event to be read
+	time.Sleep(500 * time.Millisecond)
+
+	if err := dm.checkpoint(ctx, false); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	if err := checkDataFiles(ctx, t, dm, expectedEntries); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 }
