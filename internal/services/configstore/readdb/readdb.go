@@ -352,6 +352,7 @@ func (r *ReadDB) SyncRDB(ctx context.Context) error {
 		}
 	}
 
+	r.log.Infof("syncing from wals")
 	err = r.rdb.Do(func(tx *db.Tx) error {
 		if err := r.insertRevision(tx, revision); err != nil {
 			return err
@@ -360,19 +361,19 @@ func (r *ReadDB) SyncRDB(ctx context.Context) error {
 		// use the same revision as previous operation
 		for walElement := range r.dm.ListEtcdWals(ctx, revision) {
 			if walElement.Err != nil {
-				return err
+				return walElement.Err
 			}
 			if walElement.WalData.WalSequence <= curWalSeq {
 				continue
 			}
 
-			if err := r.insertCommittedWalSequence(tx, walElement.WalData.WalSequence); err != nil {
-				return err
-			}
-
 			// update readdb only when the wal has been committed to etcd
 			if walElement.WalData.WalStatus != datamanager.WalStatusCommitted {
 				return nil
+			}
+
+			if err := r.insertCommittedWalSequence(tx, walElement.WalData.WalSequence); err != nil {
+				return err
 			}
 
 			r.log.Debugf("applying wal to db")
