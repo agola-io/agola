@@ -962,7 +962,26 @@ func (d *DataManager) InitEtcd(ctx context.Context) error {
 	}
 	defer func() { _ = m.Unlock(ctx) }()
 
-	// Create changegroup min revision if it doesn't exists
+	mustInit := false
+
+	_, err = d.e.Get(ctx, etcdWalsDataKey, 0)
+	if err != nil {
+		if err != etcd.ErrKeyNotFound {
+			return err
+		}
+		mustInit = true
+	}
+
+	if mustInit {
+		d.log.Infof("no data found in etcd, initializing")
+
+		// delete all wals from etcd
+		if err := d.deleteEtcd(ctx); err != nil {
+			return err
+		}
+	}
+
+	// Always create changegroup min revision if it doesn't exists
 	cmp := []etcdclientv3.Cmp{}
 	then := []etcdclientv3.Op{}
 
@@ -973,15 +992,9 @@ func (d *DataManager) InitEtcd(ctx context.Context) error {
 		return etcd.FromEtcdError(err)
 	}
 
-	_, err = d.e.Get(ctx, etcdWalsDataKey, 0)
-	if err != nil && err != etcd.ErrKeyNotFound {
-		return err
-	}
-	if err == nil {
+	if !mustInit {
 		return nil
 	}
-
-	d.log.Infof("no data found in etcd, initializing")
 
 	// walsdata not found in etcd
 
@@ -1055,7 +1068,7 @@ func (d *DataManager) InitEtcd(ctx context.Context) error {
 		return etcd.FromEtcdError(err)
 	}
 	if !tresp.Succeeded {
-		return errors.Errorf("failed to sync etcd: waldata already written")
+		return errors.Errorf("failed to sync etcd: walsdata already written")
 	}
 
 	return nil
