@@ -16,21 +16,30 @@ package action
 
 import (
 	"agola.io/agola/internal/datamanager"
+	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/services/configstore/readdb"
 
 	"go.uber.org/zap"
 )
 
 type ActionHandler struct {
-	log    *zap.SugaredLogger
-	readDB *readdb.ReadDB
-	dm     *datamanager.DataManager
+	log             *zap.SugaredLogger
+	readDB          *readdb.ReadDB
+	dm              *datamanager.DataManager
+	e               *etcd.Store
+	maintenanceMode bool
 }
 
-func NewActionHandler(logger *zap.Logger, readDB *readdb.ReadDB, dm *datamanager.DataManager) *ActionHandler {
+func NewActionHandler(logger *zap.Logger, readDB *readdb.ReadDB, dm *datamanager.DataManager, e *etcd.Store) *ActionHandler {
 	return &ActionHandler{
-		log:    logger.Sugar(),
-		readDB: readDB,
-		dm:     dm,
+		log:             logger.Sugar(),
+		readDB:          readDB,
+		dm:              dm,
+		e:               e,
+		maintenanceMode: false,
 	}
+}
+
+func (h *ActionHandler) SetMaintenanceMode(maintenanceMode bool) {
+	h.maintenanceMode = maintenanceMode
 }

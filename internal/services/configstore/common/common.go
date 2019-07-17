@@ -21,6 +21,10 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
+const (
+	EtcdMaintenanceKey = "maintenance"
+)
+
 type RefType int
 
 const (
