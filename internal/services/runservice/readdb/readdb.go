@@ -702,6 +702,16 @@ func (r *ReadDB) SyncFromDump() (string, error) {
 		}
 	}
 
+	err = r.rdb.Do(func(tx *db.Tx) error {
+		if err := r.insertCommittedWalSequenceOST(tx, dumpIndex.WalSequence); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+
 	return dumpIndex.WalSequence, nil
 }
 
