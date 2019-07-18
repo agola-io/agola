@@ -193,7 +193,7 @@ func (d *DataManager) deleteEtcd(ctx context.Context) error {
 
 func (d *DataManager) Run(ctx context.Context, readyCh chan struct{}) error {
 	for {
-		err := d.InitEtcd(ctx)
+		err := d.InitEtcd(ctx, nil)
 		if err == nil {
 			break
 		}

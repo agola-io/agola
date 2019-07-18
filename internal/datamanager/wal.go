@@ -907,7 +907,7 @@ func (d *DataManager) etcdPinger(ctx context.Context) error {
 	return nil
 }
 
-func (d *DataManager) InitEtcd(ctx context.Context) error {
+func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) error {
 	writeWal := func(wal *WalFile) error {
 		walFile, err := d.ost.ReadObject(d.storageWalStatusFile(wal.WalSequence) + ".committed")
 		if err != nil {
@@ -1002,15 +1002,19 @@ func (d *DataManager) InitEtcd(ctx context.Context) error {
 
 	// walsdata not found in etcd
 
-	curDataStatus, err := d.GetLastDataStatus()
-	if err != nil && err != ostypes.ErrNotExist {
-		return err
-	}
-	// set the first wal to import in etcd if there's a snapshot. In this way we'll
-	// ignore older wals (or wals left after an import)
 	var firstWal string
-	if err == nil {
-		firstWal = curDataStatus.WalSequence
+	if dataStatus != nil {
+		firstWal = dataStatus.WalSequence
+	} else {
+		dataStatus, err = d.GetLastDataStatus()
+		if err != nil && err != ostypes.ErrNotExist {
+			return err
+		}
+		// set the first wal to import in etcd if there's a snapshot. In this way we'll
+		// ignore older wals (or wals left after an import)
+		if err == nil {
+			firstWal = dataStatus.WalSequence
+		}
 	}
 
 	// if there're some wals in the objectstorage this means etcd has been reset.
