@@ -460,13 +460,14 @@ func (d *DataManager) WriteWalAdditionalOps(ctx context.Context, actions []*Acti
 	}
 	d.log.Debugf("wrote wal file: %s", walDataFilePath)
 
-	walsData.LastCommittedWalSequence = walSequence.String()
-
 	walData := &WalData{
-		WalSequence:   walSequence.String(),
-		WalDataFileID: walDataFileID,
-		WalStatus:     WalStatusCommitted,
+		WalSequence:         walSequence.String(),
+		WalDataFileID:       walDataFileID,
+		WalStatus:           WalStatusCommitted,
+		PreviousWalSequence: walsData.LastCommittedWalSequence,
 	}
+
+	walsData.LastCommittedWalSequence = walSequence.String()
 
 	walsDataj, err := json.Marshal(walsData)
 	if err != nil {
@@ -922,9 +923,10 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 		walFile.Close()
 
 		walData := &WalData{
-			WalSequence:   wal.WalSequence,
-			WalDataFileID: header.WalDataFileID,
-			WalStatus:     WalStatusCommittedStorage,
+			WalSequence:         wal.WalSequence,
+			WalDataFileID:       header.WalDataFileID,
+			WalStatus:           WalStatusCommittedStorage,
+			PreviousWalSequence: header.PreviousWalSequence,
 		}
 		if wal.Checkpointed {
 			walData.WalStatus = WalStatusCheckpointed
@@ -1101,13 +1103,14 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 		return err
 	}
 
-	lastCommittedStorageWalSequence = walSequence.String()
-
 	walData := &WalData{
-		WalSequence:   walSequence.String(),
-		WalDataFileID: walDataFileID,
-		WalStatus:     WalStatusCommittedStorage,
+		WalSequence:         walSequence.String(),
+		WalDataFileID:       walDataFileID,
+		WalStatus:           WalStatusCommittedStorage,
+		PreviousWalSequence: lastCommittedStorageWalSequence,
 	}
+
+	lastCommittedStorageWalSequence = walSequence.String()
 
 	walsData := &WalsData{
 		LastCommittedWalSequence: lastCommittedStorageWalSequence,
