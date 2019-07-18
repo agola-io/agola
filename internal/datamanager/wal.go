@@ -642,7 +642,7 @@ func (d *DataManager) sync(ctx context.Context) error {
 func (d *DataManager) checkpointLoop(ctx context.Context) {
 	for {
 		d.log.Debugf("checkpointer")
-		if err := d.checkpoint(ctx); err != nil {
+		if err := d.checkpoint(ctx, false); err != nil {
 			d.log.Errorf("checkpoint error: %v", err)
 		}
 
@@ -656,7 +656,7 @@ func (d *DataManager) checkpointLoop(ctx context.Context) {
 	}
 }
 
-func (d *DataManager) checkpoint(ctx context.Context) error {
+func (d *DataManager) checkpoint(ctx context.Context, force bool) error {
 	session, err := concurrency.NewSession(d.e.Client(), concurrency.WithTTL(5), concurrency.WithContext(ctx))
 	if err != nil {
 		return err
@@ -694,7 +694,11 @@ func (d *DataManager) checkpoint(ctx context.Context) error {
 		}
 		walsData = append(walsData, walData)
 	}
-	if len(walsData) < d.minCheckpointWalsNum {
+
+	if !force && len(walsData) < d.minCheckpointWalsNum {
+		return nil
+	}
+	if len(walsData) == 0 {
 		return nil
 	}
 

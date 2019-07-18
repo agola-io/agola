@@ -318,7 +318,7 @@ func TestWalCleaner(t *testing.T) {
 		}
 	}
 
-	if err := dm.checkpoint(ctx); err != nil {
+	if err := dm.checkpoint(ctx, true); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	if err := dm.walCleaner(ctx); err != nil {
@@ -436,7 +436,7 @@ func TestReadObject(t *testing.T) {
 	}
 
 	// do a checkpoint and wal clean
-	if err := dm.checkpoint(ctx); err != nil {
+	if err := dm.checkpoint(ctx, true); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	if err := dm.walCleaner(ctx); err != nil {
@@ -489,7 +489,7 @@ func doAndCheckCheckpoint(t *testing.T, ctx context.Context, dm *DataManager, ac
 	time.Sleep(500 * time.Millisecond)
 
 	// do a checkpoint
-	if err := dm.checkpoint(ctx); err != nil {
+	if err := dm.checkpoint(ctx, true); err != nil {
 		return nil, err
 	}
 
