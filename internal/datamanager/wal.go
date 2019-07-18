@@ -1025,6 +1025,10 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 	lastCommittedStorageWalSequence := ""
 	wroteWals := 0
 	for wal := range d.ListOSTWals("") {
+		// if there're wals in ost but not a datastatus return an error
+		if dataStatus == nil {
+			return errors.Errorf("no datastatus in etcd but some wals are present, this shouldn't happen")
+		}
 		d.log.Debugf("wal: %s", wal)
 		if wal.Err != nil {
 			return wal.Err
