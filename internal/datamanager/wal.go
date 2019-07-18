@@ -1002,6 +1002,17 @@ func (d *DataManager) InitEtcd(ctx context.Context) error {
 
 	// walsdata not found in etcd
 
+	curDataStatus, err := d.GetLastDataStatus()
+	if err != nil && err != ostypes.ErrNotExist {
+		return err
+	}
+	// set the first wal to import in etcd if there's a snapshot. In this way we'll
+	// ignore older wals (or wals left after an import)
+	var firstWal string
+	if err == nil {
+		firstWal = curDataStatus.WalSequence
+	}
+
 	// if there're some wals in the objectstorage this means etcd has been reset.
 	// So take all the wals in committed or checkpointed state starting from the
 	// first not checkpointed wal and put them in etcd
@@ -1013,6 +1024,10 @@ func (d *DataManager) InitEtcd(ctx context.Context) error {
 		d.log.Debugf("wal: %s", wal)
 		if wal.Err != nil {
 			return wal.Err
+		}
+
+		if wal.WalSequence < firstWal {
+			continue
 		}
 
 		lastCommittedStorageWalElem.Value = wal
