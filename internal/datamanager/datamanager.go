@@ -57,10 +57,9 @@ var (
 	etcdWalsDataKey                   = path.Join(etcdWalBaseDir, "walsdata")
 	etcdWalSeqKey                     = path.Join(etcdWalBaseDir, "walseq")
 	etcdLastCommittedStorageWalSeqKey = path.Join(etcdWalBaseDir, "lastcommittedstoragewalseq")
+	etcdCheckpointSeqKey              = path.Join(etcdWalBaseDir, "checkpointseq")
 
-	etcdCheckpointSeqKey = path.Join(etcdWalBaseDir, "checkpointseq")
-
-	etcdInitEtcdLockKey                = path.Join(etcdWalBaseDir, "initetcd")
+	etcdInitEtcdLockKey            = path.Join(etcdWalBaseDir, "initetcd")
 	etcdSyncLockKey                = path.Join(etcdWalBaseDir, "synclock")
 	etcdCompactChangeGroupsLockKey = path.Join(etcdWalBaseDir, "compactchangegroupslock")
 	etcdCheckpointLockKey          = path.Join(etcdWalBaseDir, "checkpointlock")
@@ -172,9 +171,29 @@ func etcdWalKey(walSeq string) string {
 	return path.Join(etcdWalsDir, walSeq)
 }
 
+// deleteEtcd deletes all etcd data excluding keys used for locking
+func (d *DataManager) deleteEtcd(ctx context.Context) error {
+	prefixes := []string{
+		etcdWalsDir + "/",
+		etcdWalsDataKey,
+		etcdWalSeqKey,
+		etcdLastCommittedStorageWalSeqKey,
+		etcdCheckpointSeqKey,
+		etcdChangeGroupsDir + "/",
+		etcdChangeGroupMinRevisionKey,
+	}
+	for _, prefix := range prefixes {
+		if err := d.e.DeletePrefix(ctx, prefix); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (d *DataManager) Run(ctx context.Context, readyCh chan struct{}) error {
 	for {
-		err := d.InitEtcd(ctx)
+		err := d.InitEtcd(ctx, nil)
 		if err == nil {
 			break
 		}

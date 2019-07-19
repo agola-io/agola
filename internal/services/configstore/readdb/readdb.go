@@ -188,6 +188,16 @@ func (r *ReadDB) SyncFromDump() (string, error) {
 		}
 	}
 
+	err = r.rdb.Do(func(tx *db.Tx) error {
+		if err := r.insertCommittedWalSequence(tx, dumpIndex.WalSequence); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+
 	return dumpIndex.WalSequence, nil
 }
 
@@ -341,17 +351,13 @@ func (r *ReadDB) SyncRDB(ctx context.Context) error {
 	r.log.Debugf("firstAvailableWalData: %s", util.Dump(firstAvailableWalData))
 	r.log.Debugf("revision: %d", revision)
 	if firstAvailableWalData == nil {
-		if curWalSeq != "" {
-			// this happens if etcd has been reset
-			return errors.Errorf("our curwalseq is %q but there's no wal data on etcd", curWalSeq)
-		}
+		return errors.Errorf("no wal data in etcd")
 	}
-	if firstAvailableWalData != nil {
-		if curWalSeq < firstAvailableWalData.WalSequence {
-			return errors.Errorf("current applied wal seq %q is smaller than the first available wal on etcd %q", curWalSeq, firstAvailableWalData.WalSequence)
-		}
+	if curWalSeq < firstAvailableWalData.WalSequence {
+		return errors.Errorf("current applied wal seq %q is smaller than the first available wal in etcd %q", curWalSeq, firstAvailableWalData.WalSequence)
 	}
 
+	r.log.Infof("syncing from wals")
 	err = r.rdb.Do(func(tx *db.Tx) error {
 		if err := r.insertRevision(tx, revision); err != nil {
 			return err
@@ -360,19 +366,19 @@ func (r *ReadDB) SyncRDB(ctx context.Context) error {
 		// use the same revision as previous operation
 		for walElement := range r.dm.ListEtcdWals(ctx, revision) {
 			if walElement.Err != nil {
-				return err
+				return walElement.Err
 			}
 			if walElement.WalData.WalSequence <= curWalSeq {
 				continue
 			}
 
-			if err := r.insertCommittedWalSequence(tx, walElement.WalData.WalSequence); err != nil {
-				return err
-			}
-
 			// update readdb only when the wal has been committed to etcd
 			if walElement.WalData.WalStatus != datamanager.WalStatusCommitted {
 				return nil
+			}
+
+			if err := r.insertCommittedWalSequence(tx, walElement.WalData.WalSequence); err != nil {
+				return err
 			}
 
 			r.log.Debugf("applying wal to db")

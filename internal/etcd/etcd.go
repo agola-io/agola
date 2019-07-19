@@ -286,6 +286,22 @@ func (s *Store) Delete(ctx context.Context, key string) error {
 	return err
 }
 
+func (s *Store) DeletePrefix(ctx context.Context, prefix string) error {
+	etcdv3Options := []clientv3.OpOption{}
+
+	key := prefix
+	if len(key) == 0 {
+		key = "\x00"
+		etcdv3Options = append(etcdv3Options, clientv3.WithFromKey())
+	} else {
+		etcdv3Options = append(etcdv3Options, clientv3.WithPrefix())
+	}
+
+	_, err := s.c.Delete(ctx, key, etcdv3Options...)
+
+	return err
+}
+
 func (s *Store) AtomicDelete(ctx context.Context, key string, revision int64) (*etcdclientv3.TxnResponse, error) {
 	cmp := etcdclientv3.Compare(etcdclientv3.ModRevision(key), "=", revision)
 	req := etcdclientv3.OpDelete(key)

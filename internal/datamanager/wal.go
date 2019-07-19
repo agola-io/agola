@@ -460,13 +460,14 @@ func (d *DataManager) WriteWalAdditionalOps(ctx context.Context, actions []*Acti
 	}
 	d.log.Debugf("wrote wal file: %s", walDataFilePath)
 
-	walsData.LastCommittedWalSequence = walSequence.String()
-
 	walData := &WalData{
-		WalSequence:   walSequence.String(),
-		WalDataFileID: walDataFileID,
-		WalStatus:     WalStatusCommitted,
+		WalSequence:         walSequence.String(),
+		WalDataFileID:       walDataFileID,
+		WalStatus:           WalStatusCommitted,
+		PreviousWalSequence: walsData.LastCommittedWalSequence,
 	}
+
+	walsData.LastCommittedWalSequence = walSequence.String()
 
 	walsDataj, err := json.Marshal(walsData)
 	if err != nil {
@@ -590,7 +591,7 @@ func (d *DataManager) sync(ctx context.Context) error {
 		switch walData.WalStatus {
 		case WalStatusCommitted:
 			walFilePath := d.storageWalStatusFile(walData.WalSequence)
-			d.log.Debugf("syncing committed wal to storage")
+			d.log.Debugf("syncing committed wal %q to storage", walData.WalSequence)
 			header := &WalHeader{
 				WalDataFileID:       walData.WalDataFileID,
 				PreviousWalSequence: walData.PreviousWalSequence,
@@ -642,7 +643,7 @@ func (d *DataManager) sync(ctx context.Context) error {
 func (d *DataManager) checkpointLoop(ctx context.Context) {
 	for {
 		d.log.Debugf("checkpointer")
-		if err := d.checkpoint(ctx); err != nil {
+		if err := d.checkpoint(ctx, false); err != nil {
 			d.log.Errorf("checkpoint error: %v", err)
 		}
 
@@ -656,7 +657,7 @@ func (d *DataManager) checkpointLoop(ctx context.Context) {
 	}
 }
 
-func (d *DataManager) checkpoint(ctx context.Context) error {
+func (d *DataManager) checkpoint(ctx context.Context, force bool) error {
 	session, err := concurrency.NewSession(d.e.Client(), concurrency.WithTTL(5), concurrency.WithContext(ctx))
 	if err != nil {
 		return err
@@ -694,7 +695,11 @@ func (d *DataManager) checkpoint(ctx context.Context) error {
 		}
 		walsData = append(walsData, walData)
 	}
-	if len(walsData) < d.minCheckpointWalsNum {
+
+	if !force && len(walsData) < d.minCheckpointWalsNum {
+		return nil
+	}
+	if len(walsData) == 0 {
 		return nil
 	}
 
@@ -903,7 +908,7 @@ func (d *DataManager) etcdPinger(ctx context.Context) error {
 	return nil
 }
 
-func (d *DataManager) InitEtcd(ctx context.Context) error {
+func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) error {
 	writeWal := func(wal *WalFile) error {
 		walFile, err := d.ost.ReadObject(d.storageWalStatusFile(wal.WalSequence) + ".committed")
 		if err != nil {
@@ -918,9 +923,10 @@ func (d *DataManager) InitEtcd(ctx context.Context) error {
 		walFile.Close()
 
 		walData := &WalData{
-			WalSequence:   wal.WalSequence,
-			WalDataFileID: header.WalDataFileID,
-			WalStatus:     WalStatusCommitted,
+			WalSequence:         wal.WalSequence,
+			WalDataFileID:       header.WalDataFileID,
+			WalStatus:           WalStatusCommittedStorage,
+			PreviousWalSequence: header.PreviousWalSequence,
 		}
 		if wal.Checkpointed {
 			walData.WalStatus = WalStatusCheckpointed
@@ -962,7 +968,26 @@ func (d *DataManager) InitEtcd(ctx context.Context) error {
 	}
 	defer func() { _ = m.Unlock(ctx) }()
 
-	// Create changegroup min revision if it doesn't exists
+	mustInit := false
+
+	_, err = d.e.Get(ctx, etcdWalsDataKey, 0)
+	if err != nil {
+		if err != etcd.ErrKeyNotFound {
+			return err
+		}
+		mustInit = true
+	}
+
+	if mustInit {
+		d.log.Infof("no data found in etcd, initializing")
+
+		// delete all wals from etcd
+		if err := d.deleteEtcd(ctx); err != nil {
+			return err
+		}
+	}
+
+	// Always create changegroup min revision if it doesn't exists
 	cmp := []etcdclientv3.Cmp{}
 	then := []etcdclientv3.Op{}
 
@@ -973,17 +998,26 @@ func (d *DataManager) InitEtcd(ctx context.Context) error {
 		return etcd.FromEtcdError(err)
 	}
 
-	_, err = d.e.Get(ctx, etcdWalsDataKey, 0)
-	if err != nil && err != etcd.ErrKeyNotFound {
-		return err
-	}
-	if err == nil {
+	if !mustInit {
 		return nil
 	}
 
-	d.log.Infof("no data found in etcd, initializing")
-
 	// walsdata not found in etcd
+
+	var firstWal string
+	if dataStatus != nil {
+		firstWal = dataStatus.WalSequence
+	} else {
+		dataStatus, err = d.GetLastDataStatus()
+		if err != nil && err != ostypes.ErrNotExist {
+			return err
+		}
+		// set the first wal to import in etcd if there's a snapshot. In this way we'll
+		// ignore older wals (or wals left after an import)
+		if err == nil {
+			firstWal = dataStatus.WalSequence
+		}
+	}
 
 	// if there're some wals in the objectstorage this means etcd has been reset.
 	// So take all the wals in committed or checkpointed state starting from the
@@ -993,9 +1027,17 @@ func (d *DataManager) InitEtcd(ctx context.Context) error {
 	lastCommittedStorageWalSequence := ""
 	wroteWals := 0
 	for wal := range d.ListOSTWals("") {
+		// if there're wals in ost but not a datastatus return an error
+		if dataStatus == nil {
+			return errors.Errorf("no datastatus in etcd but some wals are present, this shouldn't happen")
+		}
 		d.log.Debugf("wal: %s", wal)
 		if wal.Err != nil {
 			return wal.Err
+		}
+
+		if wal.WalSequence < firstWal {
+			continue
 		}
 
 		lastCommittedStorageWalElem.Value = wal
@@ -1031,9 +1073,54 @@ func (d *DataManager) InitEtcd(ctx context.Context) error {
 		}
 	}
 
+	//  insert an empty wal and make it already committedstorage
+	walSequence, err := sequence.IncSequence(ctx, d.e, etcdWalSeqKey)
+	if err != nil {
+		return err
+	}
+
+	walDataFileID := uuid.NewV4().String()
+	walDataFilePath := d.storageWalDataFile(walDataFileID)
+	walKey := etcdWalKey(walSequence.String())
+
+	if err := d.ost.WriteObject(walDataFilePath, bytes.NewReader([]byte{}), 0, true); err != nil {
+		return err
+	}
+	d.log.Debugf("wrote wal file: %s", walDataFilePath)
+
+	walFilePath := d.storageWalStatusFile(walSequence.String())
+	d.log.Infof("syncing committed wal %q to storage", walSequence.String())
+	header := &WalHeader{
+		WalDataFileID:       walDataFileID,
+		PreviousWalSequence: lastCommittedStorageWalSequence,
+	}
+	headerj, err := json.Marshal(header)
+	if err != nil {
+		return err
+	}
+	walFileCommittedPath := walFilePath + ".committed"
+	if err := d.ost.WriteObject(walFileCommittedPath, bytes.NewReader(headerj), int64(len(headerj)), true); err != nil {
+		return err
+	}
+
+	walData := &WalData{
+		WalSequence:         walSequence.String(),
+		WalDataFileID:       walDataFileID,
+		WalStatus:           WalStatusCommittedStorage,
+		PreviousWalSequence: lastCommittedStorageWalSequence,
+	}
+
+	lastCommittedStorageWalSequence = walSequence.String()
+
 	walsData := &WalsData{
 		LastCommittedWalSequence: lastCommittedStorageWalSequence,
 	}
+
+	walDataj, err := json.Marshal(walData)
+	if err != nil {
+		return err
+	}
+
 	walsDataj, err := json.Marshal(walsData)
 	if err != nil {
 		return err
@@ -1049,13 +1136,19 @@ func (d *DataManager) InitEtcd(ctx context.Context) error {
 	cmp = append(cmp, etcdclientv3.Compare(etcdclientv3.CreateRevision(etcdWalsDataKey), "=", 0))
 	then = append(then, etcdclientv3.OpPut(etcdWalsDataKey, string(walsDataj)))
 	then = append(then, etcdclientv3.OpPut(etcdLastCommittedStorageWalSeqKey, lastCommittedStorageWalSequence))
+	then = append(then, etcdclientv3.OpPut(walKey, string(walDataj)))
 	txn = d.e.Client().Txn(ctx).If(cmp...).Then(then...)
 	tresp, err := txn.Commit()
 	if err != nil {
 		return etcd.FromEtcdError(err)
 	}
 	if !tresp.Succeeded {
-		return errors.Errorf("failed to sync etcd: waldata already written")
+		return errors.Errorf("failed to sync etcd: walsdata already written")
+	}
+
+	// force a checkpoint
+	if err := d.checkpoint(ctx, true); err != nil {
+		return err
 	}
 
 	return nil
