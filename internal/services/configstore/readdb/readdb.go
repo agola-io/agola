@@ -424,7 +424,6 @@ func (r *ReadDB) Run(ctx context.Context) error {
 	}
 	r.SetInitialized(true)
 
-	errCh := make(chan error)
 	for {
 		for {
 			initialized := r.IsInitialized()
@@ -441,6 +440,7 @@ func (r *ReadDB) Run(ctx context.Context) error {
 			time.Sleep(1 * time.Second)
 		}
 
+		errCh := make(chan error, 1)
 		ctx, cancel := context.WithCancel(ctx)
 		wg := &sync.WaitGroup{}
 
