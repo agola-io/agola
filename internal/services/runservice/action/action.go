@@ -120,10 +120,7 @@ func (h *ActionHandler) StopRun(ctx context.Context, req *RunStopRequest) error 
 	if r.Phase != types.RunPhaseRunning {
 		return errors.Errorf("run %s is not running but in %q phase", r.ID, r.Phase)
 	}
-	if !r.Result.IsSet() {
-		// stop only if the result is not setted yet
-		r.Stop = true
-	}
+	r.Stop = true
 
 	_, err = store.AtomicPutRun(ctx, h.e, r, nil, cgt)
 	return err
