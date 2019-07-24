@@ -20,7 +20,7 @@ import (
 	"regexp"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/mattn/go-sqlite3"
 	errors "golang.org/x/xerrors"
 )
 
@@ -29,6 +29,8 @@ type Type string
 const (
 	Sqlite3  Type = "sqlite3"
 	Postgres Type = "postgres"
+
+	maxTxRetries = 20
 )
 
 type dbData struct {
@@ -171,6 +173,25 @@ func (db *DB) NewTx() (*Tx, error) {
 }
 
 func (db *DB) Do(f func(tx *Tx) error) error {
+	retries := 0
+	for {
+		err := db.do(f)
+		if err != nil {
+			var sqerr sqlite3.Error
+			if errors.As(err, &sqerr) {
+				if sqerr.Code == sqlite3.ErrLocked {
+					retries++
+					if retries <= maxTxRetries {
+						continue
+					}
+				}
+			}
+		}
+		return err
+	}
+}
+
+func (db *DB) do(f func(tx *Tx) error) error {
 	tx, err := db.NewTx()
 	if err != nil {
 		return err
