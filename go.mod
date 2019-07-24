@@ -57,7 +57,7 @@ require (
 	go.uber.org/zap v1.9.1
 	golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2
 	golang.org/x/oauth2 v0.0.0-20190220154721-9b3c75971fc9
-	golang.org/x/xerrors v0.0.0-20190513163551-3ee3066db522
+	golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.42.0 // indirect
 	gopkg.in/src-d/go-billy.v4 v4.3.0
