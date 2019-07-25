@@ -558,3 +558,165 @@ func (d *DataManager) GetLastDataStatus() (*DataStatus, error) {
 
 	return dataStatus, dec.Decode(&dataStatus)
 }
+
+func (d *DataManager) Export(ctx context.Context, w io.Writer) error {
+	if err := d.checkpoint(ctx, true); err != nil {
+		return err
+	}
+
+	curDataStatus, err := d.GetLastDataStatus()
+	if err != nil {
+		return err
+	}
+
+	for _, dataType := range d.dataTypes {
+		var curDataStatusFiles []*DataStatusFile
+		if curDataStatus != nil {
+			curDataStatusFiles = curDataStatus.Files[dataType]
+		}
+		for _, dsf := range curDataStatusFiles {
+			dataf, err := d.ost.ReadObject(d.DataFilePath(dataType, dsf.ID))
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(w, dataf); err != nil {
+				dataf.Close()
+				return err
+			}
+
+			dataf.Close()
+		}
+	}
+
+	return nil
+}
+
+func (d *DataManager) Import(ctx context.Context, r io.Reader) error {
+	// delete contents in etcd
+	if err := d.deleteEtcd(ctx); err != nil {
+		return err
+	}
+
+	// we require all entries of the same datatypes grouped together
+	seenDataTypes := map[string]struct{}{}
+
+	// create a new sequence, we assume that it'll be greater than previous data sequences
+	dataSequence, err := sequence.IncSequence(ctx, d.e, etcdCheckpointSeqKey)
+	if err != nil {
+		return err
+	}
+
+	dataStatus := &DataStatus{
+		DataSequence: dataSequence.String(),
+		// no last wal sequence on import
+		WalSequence: "",
+		Files:       make(map[string][]*DataStatusFile),
+	}
+
+	dataStatusFiles := []*DataStatusFile{}
+
+	var lastEntryID string
+	var curDataType string
+	var buf bytes.Buffer
+	var pos int64
+	dataFileIndex := &DataFileIndex{
+		Index: make(map[string]int64),
+	}
+	dec := json.NewDecoder(r)
+
+	for {
+		var de *DataEntry
+
+		err := dec.Decode(&de)
+		if err == io.EOF {
+			dataFileID := uuid.NewV4().String()
+			if err := d.writeDataFile(ctx, &buf, int64(buf.Len()), dataFileIndex, dataFileID, curDataType); err != nil {
+				return err
+			}
+
+			dataStatusFiles = append(dataStatusFiles, &DataStatusFile{
+				ID:          dataFileID,
+				LastEntryID: lastEntryID,
+			})
+			dataStatus.Files[curDataType] = dataStatusFiles
+
+			break
+		}
+
+		if curDataType == "" {
+			curDataType = de.DataType
+			seenDataTypes[de.DataType] = struct{}{}
+		}
+
+		mustWrite := false
+		mustReset := false
+		if pos > d.maxDataFileSize {
+			mustWrite = true
+		}
+
+		if curDataType != de.DataType {
+			if _, ok := seenDataTypes[de.DataType]; ok {
+				return errors.Errorf("dataType %q already imported", de.DataType)
+			}
+			mustWrite = true
+			mustReset = true
+		}
+
+		if mustWrite {
+			dataFileID := uuid.NewV4().String()
+			if err := d.writeDataFile(ctx, &buf, int64(buf.Len()), dataFileIndex, dataFileID, curDataType); err != nil {
+				return err
+			}
+
+			dataStatusFiles = append(dataStatusFiles, &DataStatusFile{
+				ID:          dataFileID,
+				LastEntryID: lastEntryID,
+			})
+
+			if mustReset {
+				dataStatus.Files[curDataType] = dataStatusFiles
+
+				dataStatusFiles = []*DataStatusFile{}
+				curDataType = de.DataType
+				lastEntryID = ""
+			}
+
+			dataFileIndex = &DataFileIndex{
+				Index: make(map[string]int64),
+			}
+			buf = bytes.Buffer{}
+			pos = 0
+		}
+
+		if de.ID <= lastEntryID {
+			// entries for the same datatype must be unique and ordered
+			return errors.Errorf("entry id %q is less or equal than previous entry id %q", de.ID, lastEntryID)
+		}
+		lastEntryID = de.ID
+
+		dataEntryj, err := json.Marshal(de)
+		if err != nil {
+			return err
+		}
+		if _, err := buf.Write(dataEntryj); err != nil {
+			return err
+		}
+		dataFileIndex.Index[de.ID] = pos
+		pos += int64(len(dataEntryj))
+	}
+
+	dataStatusj, err := json.Marshal(dataStatus)
+	if err != nil {
+		return err
+	}
+	if err := d.ost.WriteObject(d.dataStatusPath(dataSequence.String()), bytes.NewReader(dataStatusj), int64(len(dataStatusj)), true); err != nil {
+		return err
+	}
+
+	// initialize etcd providing the specific datastatus
+	if err := d.InitEtcd(ctx, dataStatus); err != nil {
+		return err
+	}
+
+	return nil
+}
