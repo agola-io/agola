@@ -40,7 +40,13 @@ func (s *Scheduler) scheduleLoop(ctx context.Context) {
 		if err := s.schedule(ctx); err != nil {
 			log.Errorf("err: %+v", err)
 		}
-		time.Sleep(1 * time.Second)
+
+		sleepCh := time.NewTimer(1 * time.Second).C
+		select {
+		case <-ctx.Done():
+			return
+		case <-sleepCh:
+		}
 	}
 }
 
@@ -108,7 +114,13 @@ func (s *Scheduler) approveLoop(ctx context.Context) {
 		if err := s.approve(ctx); err != nil {
 			log.Errorf("err: %+v", err)
 		}
-		time.Sleep(1 * time.Second)
+
+		sleepCh := time.NewTimer(1 * time.Second).C
+		select {
+		case <-ctx.Done():
+			return
+		case <-sleepCh:
+		}
 	}
 }
 

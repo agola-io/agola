@@ -550,13 +550,12 @@ func (d *DataManager) syncLoop(ctx context.Context) {
 			d.log.Errorf("syncer error: %+v", err)
 		}
 
+		sleepCh := time.NewTimer(5 * time.Second).C
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case <-sleepCh:
 		}
-
-		time.Sleep(5 * time.Second)
 	}
 }
 
@@ -647,13 +646,12 @@ func (d *DataManager) checkpointLoop(ctx context.Context) {
 			d.log.Errorf("checkpoint error: %v", err)
 		}
 
+		sleepCh := time.NewTimer(d.checkpointInterval).C
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case <-sleepCh:
 		}
-
-		time.Sleep(d.checkpointInterval)
 	}
 }
 
@@ -730,13 +728,12 @@ func (d *DataManager) walCleanerLoop(ctx context.Context) {
 			d.log.Errorf("walcleaner error: %v", err)
 		}
 
+		sleepCh := time.NewTimer(2 * time.Second).C
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case <-sleepCh:
 		}
-
-		time.Sleep(2 * time.Second)
 	}
 }
 
@@ -805,13 +802,12 @@ func (d *DataManager) compactChangeGroupsLoop(ctx context.Context) {
 			d.log.Errorf("err: %+v", err)
 		}
 
+		sleepCh := time.NewTimer(1 * time.Second).C
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case <-sleepCh:
 		}
-
-		time.Sleep(1 * time.Second)
 	}
 }
 
@@ -891,13 +887,12 @@ func (d *DataManager) etcdPingerLoop(ctx context.Context) {
 			d.log.Errorf("err: %+v", err)
 		}
 
+		sleepCh := time.NewTimer(1 * time.Second).C
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case <-sleepCh:
 		}
-
-		time.Sleep(1 * time.Second)
 	}
 }
 

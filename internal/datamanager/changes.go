@@ -184,14 +184,13 @@ func (d *DataManager) watcherLoop(ctx context.Context) {
 			}
 		}
 
+		sleepCh := time.NewTimer(1 * time.Second).C
 		select {
 		case <-ctx.Done():
 			d.log.Infof("watcher exiting")
 			return
-		default:
+		case <-sleepCh:
 		}
-
-		time.Sleep(1 * time.Second)
 	}
 }
 

@@ -49,13 +49,12 @@ func (s *Runservice) etcdPingerLoop(ctx context.Context) {
 			log.Errorf("err: %+v", err)
 		}
 
+		sleepCh := time.NewTimer(1 * time.Second).C
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case <-sleepCh:
 		}
-
-		time.Sleep(1 * time.Second)
 	}
 }
 

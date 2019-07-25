@@ -419,7 +419,12 @@ func (r *ReadDB) Run(ctx context.Context) error {
 			}
 			r.log.Errorf("initialize err: %+v", err)
 
-			time.Sleep(1 * time.Second)
+			sleepCh := time.NewTimer(1 * time.Second).C
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-sleepCh:
+			}
 		}
 	}
 	r.SetInitialized(true)
@@ -437,17 +442,22 @@ func (r *ReadDB) Run(ctx context.Context) error {
 			}
 			r.log.Errorf("initialize err: %+v", err)
 
-			time.Sleep(1 * time.Second)
+			sleepCh := time.NewTimer(1 * time.Second).C
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-sleepCh:
+			}
 		}
 
 		errCh := make(chan error, 1)
-		ctx, cancel := context.WithCancel(ctx)
+		hctx, cancel := context.WithCancel(ctx)
 		wg := &sync.WaitGroup{}
 
 		wg.Add(1)
 		go func() {
 			r.log.Infof("starting handleEvents")
-			if err := r.handleEvents(ctx); err != nil {
+			if err := r.handleEvents(hctx); err != nil {
 				r.log.Errorf("handleEvents err: %+v", err)
 				errCh <- err
 			}
@@ -466,7 +476,12 @@ func (r *ReadDB) Run(ctx context.Context) error {
 			wg.Wait()
 		}
 
-		time.Sleep(1 * time.Second)
+		sleepCh := time.NewTimer(1 * time.Second).C
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-sleepCh:
+		}
 	}
 }
 
