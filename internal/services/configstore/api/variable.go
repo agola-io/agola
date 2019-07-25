@@ -67,7 +67,7 @@ func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for i, v := range variables {
 		resVariables[i] = &Variable{Variable: v}
 	}
-	err = h.readDB.Do(func(tx *db.Tx) error {
+	err = h.readDB.Do(ctx, func(tx *db.Tx) error {
 		// populate parent path
 		for _, v := range resVariables {
 			pp, err := h.readDB.GetPath(tx, v.Parent.Type, v.Parent.ID)

@@ -40,11 +40,12 @@ func NewOrgHandler(logger *zap.Logger, readDB *readdb.ReadDB) *OrgHandler {
 }
 
 func (h *OrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	vars := mux.Vars(r)
 	orgRef := vars["orgref"]
 
 	var org *types.Organization
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		org, err = h.readDB.GetOrg(tx, orgRef)
 		return err
@@ -105,7 +106,6 @@ func NewDeleteOrgHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteOr
 }
 
 func (h *DeleteOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	h.log.Infof("deleteorghandler")
 	ctx := r.Context()
 
 	vars := mux.Vars(r)
@@ -136,6 +136,7 @@ func NewOrgsHandler(logger *zap.Logger, readDB *readdb.ReadDB) *OrgsHandler {
 }
 
 func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	query := r.URL.Query()
 
 	limitS := query.Get("limit")
@@ -163,7 +164,7 @@ func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := query.Get("start")
 
 	var orgs []*types.Organization
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		orgs, err = h.readDB.GetOrgs(tx, start, limit, asc)
 		return err

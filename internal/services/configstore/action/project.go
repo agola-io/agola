@@ -72,7 +72,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, project *types.Projec
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		group, err := h.readDB.GetProjectGroup(tx, project.Parent.ID)
 		if err != nil {
@@ -167,7 +167,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, req *UpdateProjectReq
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		// check project exists
 		p, err := h.readDB.GetProject(tx, req.ProjectRef)
@@ -210,7 +210,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, req *UpdateProjectReq
 				return err
 			}
 			if ap != nil {
-				return util.NewErrBadRequest(errors.Errorf("project with name %q, path %q already exists", req.Project.Name,pp))
+				return util.NewErrBadRequest(errors.Errorf("project with name %q, path %q already exists", req.Project.Name, pp))
 			}
 		}
 
@@ -269,7 +269,7 @@ func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) er
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 
 		// check project existance

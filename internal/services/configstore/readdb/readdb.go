@@ -74,7 +74,7 @@ func NewReadDB(ctx context.Context, logger *zap.Logger, dataDir string, e *etcd.
 	}
 
 	// populate readdb
-	if err := rdb.Create(Stmts); err != nil {
+	if err := rdb.Create(ctx, Stmts); err != nil {
 		return nil, err
 	}
 
@@ -112,7 +112,7 @@ func (r *ReadDB) Initialize(ctx context.Context) error {
 	return nil
 }
 
-func (r *ReadDB) ResetDB() error {
+func (r *ReadDB) ResetDB(ctx context.Context) error {
 	// TODO(sgotti) this needs to be protected by a mutex
 	r.rdb.Close()
 
@@ -127,7 +127,7 @@ func (r *ReadDB) ResetDB() error {
 	}
 
 	// populate readdb
-	if err := rdb.Create(Stmts); err != nil {
+	if err := rdb.Create(ctx, Stmts); err != nil {
 		return err
 	}
 
@@ -136,7 +136,7 @@ func (r *ReadDB) ResetDB() error {
 	return nil
 }
 
-func (r *ReadDB) SyncFromDump() (string, error) {
+func (r *ReadDB) SyncFromDump(ctx context.Context) (string, error) {
 	dumpIndex, err := r.dm.GetLastDataStatus()
 	if err != nil && err != ostypes.ErrNotExist {
 		return "", err
@@ -168,7 +168,7 @@ func (r *ReadDB) SyncFromDump() (string, error) {
 			}
 			dumpf.Close()
 
-			err = r.rdb.Do(func(tx *db.Tx) error {
+			err = r.rdb.Do(ctx, func(tx *db.Tx) error {
 				for _, de := range dumpEntries {
 					action := &datamanager.Action{
 						ActionType: datamanager.ActionTypePut,
@@ -188,7 +188,7 @@ func (r *ReadDB) SyncFromDump() (string, error) {
 		}
 	}
 
-	err = r.rdb.Do(func(tx *db.Tx) error {
+	err = r.rdb.Do(ctx, func(tx *db.Tx) error {
 		if err := r.insertCommittedWalSequence(tx, dumpIndex.WalSequence); err != nil {
 			return err
 		}
@@ -201,9 +201,9 @@ func (r *ReadDB) SyncFromDump() (string, error) {
 	return dumpIndex.WalSequence, nil
 }
 
-func (r *ReadDB) SyncFromWals(startWalSeq, endWalSeq string) (string, error) {
+func (r *ReadDB) SyncFromWals(ctx context.Context, startWalSeq, endWalSeq string) (string, error) {
 	insertfunc := func(walFiles []*datamanager.WalFile) error {
-		err := r.rdb.Do(func(tx *db.Tx) error {
+		err := r.rdb.Do(ctx, func(tx *db.Tx) error {
 			for _, walFile := range walFiles {
 				walFilef, err := r.dm.ReadWal(walFile.WalSequence)
 				if err != nil {
@@ -263,7 +263,7 @@ func (r *ReadDB) SyncFromWals(startWalSeq, endWalSeq string) (string, error) {
 func (r *ReadDB) SyncRDB(ctx context.Context) error {
 	// get the last committed storage wal sequence saved in the rdb
 	curWalSeq := ""
-	err := r.rdb.Do(func(tx *db.Tx) error {
+	err := r.rdb.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		curWalSeq, err = r.GetCommittedWalSequence(tx)
 		if err != nil {
@@ -317,12 +317,12 @@ func (r *ReadDB) SyncRDB(ctx context.Context) error {
 
 	if doFullSync {
 		r.log.Infof("doing a full sync from dump")
-		if err := r.ResetDB(); err != nil {
+		if err := r.ResetDB(ctx); err != nil {
 			return err
 		}
 
 		var err error
-		curWalSeq, err = r.SyncFromDump()
+		curWalSeq, err = r.SyncFromDump(ctx)
 		if err != nil {
 			return err
 		}
@@ -335,7 +335,7 @@ func (r *ReadDB) SyncRDB(ctx context.Context) error {
 	// etcd since wals are first committed to objectstorage and then in etcd we
 	// would like to avoid to store in rdb something that is not yet marked as
 	// committedstorage in etcd
-	curWalSeq, err = r.SyncFromWals(curWalSeq, lastCommittedStorageWal)
+	curWalSeq, err = r.SyncFromWals(ctx, curWalSeq, lastCommittedStorageWal)
 	if err != nil {
 		return errors.Errorf("failed to sync from wals: %w", err)
 	}
@@ -358,7 +358,7 @@ func (r *ReadDB) SyncRDB(ctx context.Context) error {
 	}
 
 	r.log.Infof("syncing from wals")
-	err = r.rdb.Do(func(tx *db.Tx) error {
+	err = r.rdb.Do(ctx, func(tx *db.Tx) error {
 		if err := r.insertRevision(tx, revision); err != nil {
 			return err
 		}
@@ -406,7 +406,7 @@ func (r *ReadDB) SyncRDB(ctx context.Context) error {
 }
 
 func (r *ReadDB) Run(ctx context.Context) error {
-	revision, err := r.GetRevision()
+	revision, err := r.GetRevision(ctx)
 	if err != nil {
 		return err
 	}
@@ -475,7 +475,7 @@ func (r *ReadDB) Run(ctx context.Context) error {
 // lost/reset
 func (r *ReadDB) handleEvents(ctx context.Context) error {
 	var revision int64
-	err := r.rdb.Do(func(tx *db.Tx) error {
+	err := r.rdb.Do(ctx, func(tx *db.Tx) error {
 		err := tx.QueryRow("select revision from revision order by revision desc limit 1").Scan(&revision)
 		if err != nil {
 			if err == sql.ErrNoRows {
@@ -508,7 +508,7 @@ func (r *ReadDB) handleEvents(ctx context.Context) error {
 
 		// a single transaction for every response (every response contains all the
 		// events happened in an etcd revision).
-		err = r.rdb.Do(func(tx *db.Tx) error {
+		err = r.rdb.Do(ctx, func(tx *db.Tx) error {
 
 			// if theres a wal seq epoch change something happened to etcd, usually (if
 			// the user hasn't messed up with etcd keys) this means etcd has been reset
@@ -704,8 +704,8 @@ func (r *ReadDB) applyAction(tx *db.Tx, action *datamanager.Action) error {
 	return nil
 }
 
-func (r *ReadDB) Do(f func(tx *db.Tx) error) error {
-	return r.rdb.Do(f)
+func (r *ReadDB) Do(ctx context.Context, f func(tx *db.Tx) error) error {
+	return r.rdb.Do(ctx, f)
 }
 
 func (r *ReadDB) insertRevision(tx *db.Tx, revision int64) error {
@@ -724,10 +724,10 @@ func (r *ReadDB) insertRevision(tx *db.Tx, revision int64) error {
 	return nil
 }
 
-func (r *ReadDB) GetRevision() (int64, error) {
+func (r *ReadDB) GetRevision(ctx context.Context) (int64, error) {
 	var revision int64
 
-	err := r.rdb.Do(func(tx *db.Tx) error {
+	err := r.rdb.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		revision, err = r.getRevision(tx)
 		return err

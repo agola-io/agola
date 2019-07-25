@@ -323,12 +323,13 @@ func NewChangeGroupsUpdateTokensHandler(logger *zap.Logger, readDB *readdb.ReadD
 }
 
 func (h *ChangeGroupsUpdateTokensHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	query := r.URL.Query()
 	groups := query["changegroup"]
 
 	var cgt *types.ChangeGroupsUpdateToken
 
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, groups)
 		return err
@@ -372,6 +373,7 @@ func NewRunHandler(logger *zap.Logger, e *etcd.Store, dm *datamanager.DataManage
 }
 
 func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	vars := mux.Vars(r)
 	runID := vars["runid"]
 
@@ -381,7 +383,7 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var run *types.Run
 	var cgt *types.ChangeGroupsUpdateToken
 
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		run, err = h.readDB.GetRun(tx, runID)
 		if err != nil {
@@ -447,6 +449,7 @@ func NewRunsHandler(logger *zap.Logger, readDB *readdb.ReadDB) *RunsHandler {
 }
 
 func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	query := r.URL.Query()
 	phaseFilter := types.RunPhaseFromStringSlice(query["phase"])
 	resultFilter := types.RunResultFromStringSlice(query["result"])
@@ -482,7 +485,7 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var runs []*types.Run
 	var cgt *types.ChangeGroupsUpdateToken
 
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		runs, err = h.readDB.GetRuns(tx, groups, lastRun, phaseFilter, resultFilter, start, limit, sortOrder)
 		if err != nil {

@@ -15,6 +15,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 
 	sq "github.com/Masterminds/squirrel"
@@ -27,10 +28,10 @@ const dbVersionTableDDLTmpl = `
 
 const dbVersion = 1
 
-func (db *DB) Create(stmts []string) error {
+func (db *DB) Create(ctx context.Context, stmts []string) error {
 	sb := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
 
-	err := db.Do(func(tx *Tx) error {
+	err := db.Do(ctx, func(tx *Tx) error {
 		if _, err := tx.Exec(dbVersionTableDDLTmpl); err != nil {
 			return errors.Errorf("failed to create dbversion table: %w", err)
 		}
@@ -40,7 +41,7 @@ func (db *DB) Create(stmts []string) error {
 		return err
 	}
 
-	err = db.Do(func(tx *Tx) error {
+	err = db.Do(ctx, func(tx *Tx) error {
 		var version sql.NullInt64
 		q, args, err := sb.Select("max(version)").From("dbversion").ToSql()
 		if err != nil {

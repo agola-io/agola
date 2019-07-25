@@ -15,6 +15,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -43,18 +44,18 @@ type ProjectGroup struct {
 	GlobalVisibility types.Visibility
 }
 
-func projectGroupResponse(readDB *readdb.ReadDB, projectGroup *types.ProjectGroup) (*ProjectGroup, error) {
-	r, err := projectGroupsResponse(readDB, []*types.ProjectGroup{projectGroup})
+func projectGroupResponse(ctx context.Context, readDB *readdb.ReadDB, projectGroup *types.ProjectGroup) (*ProjectGroup, error) {
+	r, err := projectGroupsResponse(ctx, readDB, []*types.ProjectGroup{projectGroup})
 	if err != nil {
 		return nil, err
 	}
 	return r[0], nil
 }
 
-func projectGroupsResponse(readDB *readdb.ReadDB, projectGroups []*types.ProjectGroup) ([]*ProjectGroup, error) {
+func projectGroupsResponse(ctx context.Context, readDB *readdb.ReadDB, projectGroups []*types.ProjectGroup) ([]*ProjectGroup, error) {
 	resProjectGroups := make([]*ProjectGroup, len(projectGroups))
 
-	err := readDB.Do(func(tx *db.Tx) error {
+	err := readDB.Do(ctx, func(tx *db.Tx) error {
 		for i, projectGroup := range projectGroups {
 			pp, err := readDB.GetPath(tx, projectGroup.Parent.Type, projectGroup.Parent.ID)
 			if err != nil {
@@ -100,7 +101,9 @@ func NewProjectGroupHandler(logger *zap.Logger, readDB *readdb.ReadDB) *ProjectG
 }
 
 func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	vars := mux.Vars(r)
+
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
 		httpError(w, util.NewErrBadRequest(err))
@@ -108,7 +111,7 @@ func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var projectGroup *types.ProjectGroup
-	err = h.readDB.Do(func(tx *db.Tx) error {
+	err = h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		projectGroup, err = h.readDB.GetProjectGroup(tx, projectGroupRef)
 		return err
@@ -124,7 +127,7 @@ func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	resProjectGroup, err := projectGroupResponse(h.readDB, projectGroup)
+	resProjectGroup, err := projectGroupResponse(ctx, h.readDB, projectGroup)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
@@ -148,6 +151,7 @@ func NewProjectGroupProjectsHandler(logger *zap.Logger, ah *action.ActionHandler
 func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
+
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
 		httpError(w, util.NewErrBadRequest(err))
@@ -160,7 +164,7 @@ func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	resProjects, err := projectsResponse(h.readDB, projects)
+	resProjects, err := projectsResponse(ctx, h.readDB, projects)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
@@ -196,7 +200,7 @@ func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.
 		return
 	}
 
-	resProjectGroups, err := projectGroupsResponse(h.readDB, projectGroups)
+	resProjectGroups, err := projectGroupsResponse(ctx, h.readDB, projectGroups)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
@@ -233,7 +237,7 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	resProjectGroup, err := projectGroupResponse(h.readDB, projectGroup)
+	resProjectGroup, err := projectGroupResponse(ctx, h.readDB, projectGroup)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
@@ -281,7 +285,7 @@ func (h *UpdateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	resProjectGroup, err := projectGroupResponse(h.readDB, projectGroup)
+	resProjectGroup, err := projectGroupResponse(ctx, h.readDB, projectGroup)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return

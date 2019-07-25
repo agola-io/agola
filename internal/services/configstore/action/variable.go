@@ -29,7 +29,7 @@ import (
 
 func (h *ActionHandler) GetVariables(ctx context.Context, parentType types.ConfigType, parentRef string, tree bool) ([]*types.Variable, error) {
 	var variables []*types.Variable
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		parentID, err := h.readDB.ResolveConfigID(tx, parentType, parentRef)
 		if err != nil {
 			return err
@@ -81,7 +81,7 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, variable *types.Vari
 	cgNames := []string{util.EncodeSha256Hex("variablename-" + variable.Name)}
 
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
@@ -144,7 +144,7 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableR
 	// changegroup is the variable name
 
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 
 		parentID, err := h.readDB.ResolveConfigID(tx, req.Variable.Parent.Type, req.Variable.Parent.ID)
@@ -214,7 +214,7 @@ func (h *ActionHandler) DeleteVariable(ctx context.Context, parentType types.Con
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		parentID, err := h.readDB.ResolveConfigID(tx, parentType, parentRef)
 		if err != nil {

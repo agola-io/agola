@@ -40,11 +40,12 @@ func NewRemoteSourceHandler(logger *zap.Logger, readDB *readdb.ReadDB) *RemoteSo
 }
 
 func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	vars := mux.Vars(r)
 	rsRef := vars["remotesourceref"]
 
 	var remoteSource *types.RemoteSource
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		remoteSource, err = h.readDB.GetRemoteSource(tx, rsRef)
 		return err
@@ -171,6 +172,7 @@ func NewRemoteSourcesHandler(logger *zap.Logger, readDB *readdb.ReadDB) *RemoteS
 }
 
 func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	query := r.URL.Query()
 
 	limitS := query.Get("limit")
@@ -197,7 +199,7 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 
 	start := query.Get("start")
 
-	remoteSources, err := h.readDB.GetRemoteSources(start, limit, asc)
+	remoteSources, err := h.readDB.GetRemoteSources(ctx, start, limit, asc)
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
 		httpError(w, err)

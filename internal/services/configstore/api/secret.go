@@ -94,7 +94,7 @@ func (h *SecretsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		resSecrets[i] = &Secret{Secret: s}
 	}
 
-	err = h.readDB.Do(func(tx *db.Tx) error {
+	err = h.readDB.Do(ctx, func(tx *db.Tx) error {
 		// populate parent path
 		for _, s := range resSecrets {
 			pp, err := h.readDB.GetPath(tx, s.Parent.Type, s.Parent.ID)

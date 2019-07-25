@@ -41,11 +41,12 @@ func NewUserHandler(logger *zap.Logger, readDB *readdb.ReadDB) *UserHandler {
 }
 
 func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	vars := mux.Vars(r)
 	userRef := vars["userref"]
 
 	var user *types.User
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		user, err = h.readDB.GetUser(tx, userRef)
 		return err
@@ -198,6 +199,7 @@ func NewUsersHandler(logger *zap.Logger, readDB *readdb.ReadDB) *UsersHandler {
 }
 
 func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	query := r.URL.Query()
 
 	limitS := query.Get("limit")
@@ -232,7 +234,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "bytoken":
 		token := query.Get("token")
 		var user *types.User
-		err := h.readDB.Do(func(tx *db.Tx) error {
+		err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 			var err error
 			user, err = h.readDB.GetUserByTokenValue(tx, token)
 			return err
@@ -250,7 +252,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "bylinkedaccount":
 		linkedAccountID := query.Get("linkedaccountid")
 		var user *types.User
-		err := h.readDB.Do(func(tx *db.Tx) error {
+		err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 			var err error
 			user, err = h.readDB.GetUserByLinkedAccount(tx, linkedAccountID)
 			return err
@@ -269,7 +271,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		remoteUserID := query.Get("remoteuserid")
 		remoteSourceID := query.Get("remotesourceid")
 		var user *types.User
-		err := h.readDB.Do(func(tx *db.Tx) error {
+		err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 			var err error
 			user, err = h.readDB.GetUserByLinkedAccountRemoteUserIDandSource(tx, remoteUserID, remoteSourceID)
 			return err
@@ -286,7 +288,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		users = []*types.User{user}
 	default:
 		// default query
-		err := h.readDB.Do(func(tx *db.Tx) error {
+		err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 			var err error
 			users, err = h.readDB.GetUsers(tx, start, limit, asc)
 			return err

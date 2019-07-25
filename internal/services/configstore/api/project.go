@@ -15,6 +15,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -43,18 +44,18 @@ type Project struct {
 	GlobalVisibility types.Visibility
 }
 
-func projectResponse(readDB *readdb.ReadDB, project *types.Project) (*Project, error) {
-	r, err := projectsResponse(readDB, []*types.Project{project})
+func projectResponse(ctx context.Context, readDB *readdb.ReadDB, project *types.Project) (*Project, error) {
+	r, err := projectsResponse(ctx, readDB, []*types.Project{project})
 	if err != nil {
 		return nil, err
 	}
 	return r[0], nil
 }
 
-func projectsResponse(readDB *readdb.ReadDB, projects []*types.Project) ([]*Project, error) {
+func projectsResponse(ctx context.Context, readDB *readdb.ReadDB, projects []*types.Project) ([]*Project, error) {
 	resProjects := make([]*Project, len(projects))
 
-	err := readDB.Do(func(tx *db.Tx) error {
+	err := readDB.Do(ctx, func(tx *db.Tx) error {
 		for i, project := range projects {
 			pp, err := readDB.GetPath(tx, project.Parent.Type, project.Parent.ID)
 			if err != nil {
@@ -132,6 +133,7 @@ func NewProjectHandler(logger *zap.Logger, readDB *readdb.ReadDB) *ProjectHandle
 }
 
 func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	vars := mux.Vars(r)
 	projectRef, err := url.PathUnescape(vars["projectref"])
 	if err != nil {
@@ -140,7 +142,7 @@ func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var project *types.Project
-	err = h.readDB.Do(func(tx *db.Tx) error {
+	err = h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		project, err = h.readDB.GetProject(tx, projectRef)
 		return err
@@ -156,7 +158,7 @@ func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resProject, err := projectResponse(h.readDB, project)
+	resProject, err := projectResponse(ctx, h.readDB, project)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
@@ -193,7 +195,7 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	resProject, err := projectResponse(h.readDB, project)
+	resProject, err := projectResponse(ctx, h.readDB, project)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
@@ -241,7 +243,7 @@ func (h *UpdateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	resProject, err := projectResponse(h.readDB, project)
+	resProject, err := projectResponse(ctx, h.readDB, project)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return

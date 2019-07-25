@@ -99,9 +99,9 @@ func setupConfigstore(t *testing.T, ctx context.Context, dir string) (*Configsto
 	return cs, tetcd
 }
 
-func getProjects(cs *Configstore) ([]*types.Project, error) {
+func getProjects(ctx context.Context, cs *Configstore) ([]*types.Project, error) {
 	var projects []*types.Project
-	err := cs.readDB.Do(func(tx *db.Tx) error {
+	err := cs.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		projects, err = cs.readDB.GetAllProjects(tx)
 		return err
@@ -109,9 +109,9 @@ func getProjects(cs *Configstore) ([]*types.Project, error) {
 	return projects, err
 }
 
-func getUsers(cs *Configstore) ([]*types.User, error) {
+func getUsers(ctx context.Context, cs *Configstore) ([]*types.User, error) {
 	var users []*types.User
-	err := cs.readDB.Do(func(tx *db.Tx) error {
+	err := cs.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		users, err = cs.readDB.GetUsers(tx, "", 0, true)
 		return err
@@ -242,12 +242,12 @@ func TestResync(t *testing.T) {
 
 	time.Sleep(5 * time.Second)
 
-	users1, err := getUsers(cs1)
+	users1, err := getUsers(ctx, cs1)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
 
-	users2, err := getUsers(cs2)
+	users2, err := getUsers(ctx, cs2)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -275,12 +275,12 @@ func TestResync(t *testing.T) {
 
 	time.Sleep(5 * time.Second)
 
-	users1, err = getUsers(cs1)
+	users1, err = getUsers(ctx, cs1)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
 
-	users3, err := getUsers(cs3)
+	users3, err := getUsers(ctx, cs3)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -349,7 +349,7 @@ func TestUser(t *testing.T) {
 		}
 	})
 	t.Run("concurrent user with same name creation", func(t *testing.T) {
-		prevUsers, err := getUsers(cs)
+		prevUsers, err := getUsers(ctx, cs)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -364,7 +364,7 @@ func TestUser(t *testing.T) {
 
 		time.Sleep(5 * time.Second)
 
-		users, err := getUsers(cs)
+		users, err := getUsers(ctx, cs)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -494,7 +494,7 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 	})
 
 	t.Run("concurrent project with same name creation", func(t *testing.T) {
-		prevProjects, err := getProjects(cs)
+		prevProjects, err := getProjects(ctx, cs)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -511,7 +511,7 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 
 		time.Sleep(1 * time.Second)
 
-		projects, err := getProjects(cs)
+		projects, err := getProjects(ctx, cs)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
