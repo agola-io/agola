@@ -425,13 +425,12 @@ func (s *Runservice) compactChangeGroupsLoop(ctx context.Context) {
 			log.Errorf("err: %+v", err)
 		}
 
+		sleepCh := time.NewTimer(1 * time.Second).C
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case <-sleepCh:
 		}
-
-		time.Sleep(1 * time.Second)
 	}
 }
 
@@ -767,13 +766,12 @@ func (s *Runservice) executorTasksCleanerLoop(ctx context.Context) {
 			log.Errorf("err: %+v", err)
 		}
 
+		sleepCh := time.NewTimer(1 * time.Second).C
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case <-sleepCh:
 		}
-
-		time.Sleep(1 * time.Second)
 	}
 }
 
@@ -855,7 +853,12 @@ func (s *Runservice) runTasksUpdaterLoop(ctx context.Context) {
 			log.Errorf("err: %+v", err)
 		}
 
-		time.Sleep(10 * time.Second)
+		sleepCh := time.NewTimer(10 * time.Second).C
+		select {
+		case <-ctx.Done():
+			return
+		case <-sleepCh:
+		}
 	}
 }
 
@@ -1148,13 +1151,12 @@ func (s *Runservice) fetcherLoop(ctx context.Context) {
 			log.Errorf("err: %+v", err)
 		}
 
+		sleepCh := time.NewTimer(2 * time.Second).C
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case <-sleepCh:
 		}
-
-		time.Sleep(2 * time.Second)
 	}
 }
 
@@ -1217,13 +1219,12 @@ func (s *Runservice) runsSchedulerLoop(ctx context.Context) {
 			log.Errorf("err: %+v", err)
 		}
 
+		sleepCh := time.NewTimer(2 * time.Second).C
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case <-sleepCh:
 		}
-
-		time.Sleep(2 * time.Second)
 	}
 }
 
@@ -1260,13 +1261,12 @@ func (s *Runservice) finishedRunsArchiverLoop(ctx context.Context) {
 			log.Errorf("err: %+v", err)
 		}
 
+		sleepCh := time.NewTimer(2 * time.Second).C
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case <-sleepCh:
 		}
-
-		time.Sleep(2 * time.Second)
 	}
 }
 
@@ -1361,13 +1361,12 @@ func (s *Runservice) cacheCleanerLoop(ctx context.Context, cacheExpireInterval t
 			log.Errorf("err: %+v", err)
 		}
 
+		sleepCh := time.NewTimer(cacheCleanerInterval).C
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case <-sleepCh:
 		}
-
-		time.Sleep(cacheCleanerInterval)
 	}
 }
 

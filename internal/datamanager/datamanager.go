@@ -208,7 +208,13 @@ func (d *DataManager) Run(ctx context.Context, readyCh chan struct{}) error {
 				break
 			}
 			d.log.Errorf("failed to initialize etcd: %+v", err)
-			time.Sleep(1 * time.Second)
+
+			sleepCh := time.NewTimer(1 * time.Second).C
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-sleepCh:
+			}
 		}
 
 		readyCh <- struct{}{}

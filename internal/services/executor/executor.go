@@ -999,13 +999,12 @@ func (e *Executor) podsCleanerLoop(ctx context.Context) {
 			log.Errorf("err: %+v", err)
 		}
 
+		sleepCh := time.NewTimer(1 * time.Second).C
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case <-sleepCh:
 		}
-
-		time.Sleep(1 * time.Second)
 	}
 }
 
@@ -1056,13 +1055,12 @@ func (e *Executor) executorStatusSenderLoop(ctx context.Context) {
 			log.Errorf("err: %+v", err)
 		}
 
+		sleepCh := time.NewTimer(2 * time.Second).C
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case <-sleepCh:
 		}
-
-		time.Sleep(2 * time.Second)
 	}
 }
 
@@ -1090,13 +1088,12 @@ func (e *Executor) executorTasksStatusSenderLoop(ctx context.Context) {
 			rt.Unlock()
 		}
 
+		sleepCh := time.NewTimer(2 * time.Second).C
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case <-sleepCh:
 		}
-
-		time.Sleep(2 * time.Second)
 	}
 }
 
@@ -1108,13 +1105,12 @@ func (e *Executor) tasksUpdaterLoop(ctx context.Context) {
 			log.Errorf("err: %+v", err)
 		}
 
+		sleepCh := time.NewTimer(2 * time.Second).C
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case <-sleepCh:
 		}
-
-		time.Sleep(2 * time.Second)
 	}
 }
 
@@ -1188,13 +1184,12 @@ func (e *Executor) tasksDataCleanerLoop(ctx context.Context) {
 			log.Errorf("err: %+v", err)
 		}
 
+		sleepCh := time.NewTimer(2 * time.Second).C
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case <-sleepCh:
 		}
-
-		time.Sleep(2 * time.Second)
 	}
 }
 
