@@ -37,21 +37,27 @@ import (
 )
 
 type ActionHandler struct {
-	log    *zap.SugaredLogger
-	e      *etcd.Store
-	readDB *readdb.ReadDB
-	ost    *objectstorage.ObjStorage
-	dm     *datamanager.DataManager
+	log             *zap.SugaredLogger
+	e               *etcd.Store
+	readDB          *readdb.ReadDB
+	ost             *objectstorage.ObjStorage
+	dm              *datamanager.DataManager
+	maintenanceMode bool
 }
 
 func NewActionHandler(logger *zap.Logger, e *etcd.Store, readDB *readdb.ReadDB, ost *objectstorage.ObjStorage, dm *datamanager.DataManager) *ActionHandler {
 	return &ActionHandler{
-		log:    logger.Sugar(),
-		e:      e,
-		readDB: readDB,
-		ost:    ost,
-		dm:     dm,
+		log:             logger.Sugar(),
+		e:               e,
+		readDB:          readDB,
+		ost:             ost,
+		dm:              dm,
+		maintenanceMode: false,
 	}
+}
+
+func (h *ActionHandler) SetMaintenanceMode(maintenanceMode bool) {
+	h.maintenanceMode = maintenanceMode
 }
 
 type RunChangePhaseRequest struct {
