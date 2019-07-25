@@ -74,7 +74,7 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, remoteSource *ty
 	cgNames := []string{util.EncodeSha256Hex("remotesourcename-" + remoteSource.Name)}
 
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
@@ -129,7 +129,7 @@ func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, req *UpdateRemot
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 
 		// check remotesource exists
@@ -190,7 +190,7 @@ func (h *ActionHandler) DeleteRemoteSource(ctx context.Context, remoteSourceName
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 
 		// check remoteSource existance

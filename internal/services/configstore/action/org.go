@@ -44,7 +44,7 @@ func orgMemberResponse(orgUser *readdb.OrgUser) *OrgMemberResponse {
 
 func (h *ActionHandler) GetOrgMembers(ctx context.Context, orgRef string) ([]*OrgMemberResponse, error) {
 	var orgUsers []*readdb.OrgUser
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		org, err := h.readDB.GetOrg(tx, orgRef)
 		if err != nil {
@@ -85,7 +85,7 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) 
 	cgNames := []string{util.EncodeSha256Hex("orgname-" + org.Name)}
 
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
@@ -182,7 +182,7 @@ func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		// check org existance
 		org, err = h.readDB.GetOrgByName(tx, orgRef)
@@ -232,7 +232,7 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		// check existing org
 		org, err = h.readDB.GetOrg(tx, orgRef)
@@ -308,7 +308,7 @@ func (h *ActionHandler) RemoveOrgMember(ctx context.Context, orgRef, userRef str
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		// check existing org
 		org, err = h.readDB.GetOrg(tx, orgRef)

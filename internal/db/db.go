@@ -145,16 +145,17 @@ func NewDB(dbType Type, dbConnString string) (*DB, error) {
 // sql driver doesn't support concurrent statements on the same
 // connection/transaction)
 type Tx struct {
-	db *DB
-	tx *sql.Tx
+	db  *DB
+	tx  *sql.Tx
+	ctx context.Context
 }
 
 func (db *DB) Close() error {
 	return db.db.Close()
 }
 
-func (db *DB) Conn() (*sql.Conn, error) {
-	return db.db.Conn(context.TODO())
+func (db *DB) Conn(ctx context.Context) (*sql.Conn, error) {
+	return db.db.Conn(ctx)
 }
 
 func (db *DB) NewUnstartedTx() *Tx {
@@ -163,19 +164,19 @@ func (db *DB) NewUnstartedTx() *Tx {
 	}
 }
 
-func (db *DB) NewTx() (*Tx, error) {
+func (db *DB) NewTx(ctx context.Context) (*Tx, error) {
 	tx := db.NewUnstartedTx()
-	if err := tx.Start(); err != nil {
+	if err := tx.Start(ctx); err != nil {
 		return nil, err
 	}
 
 	return tx, nil
 }
 
-func (db *DB) Do(f func(tx *Tx) error) error {
+func (db *DB) Do(ctx context.Context, f func(tx *Tx) error) error {
 	retries := 0
 	for {
-		err := db.do(f)
+		err := db.do(ctx, f)
 		if err != nil {
 			var sqerr sqlite3.Error
 			if errors.As(err, &sqerr) {
@@ -191,8 +192,8 @@ func (db *DB) Do(f func(tx *Tx) error) error {
 	}
 }
 
-func (db *DB) do(f func(tx *Tx) error) error {
-	tx, err := db.NewTx()
+func (db *DB) do(ctx context.Context, f func(tx *Tx) error) error {
+	tx, err := db.NewTx(ctx)
 	if err != nil {
 		return err
 	}
@@ -209,7 +210,7 @@ func (db *DB) do(f func(tx *Tx) error) error {
 	return tx.Commit()
 }
 
-func (tx *Tx) Start() error {
+func (tx *Tx) Start(ctx context.Context) error {
 	wtx, err := tx.db.db.Begin()
 	if err != nil {
 		return err
@@ -221,6 +222,7 @@ func (tx *Tx) Start() error {
 		}
 	}
 	tx.tx = wtx
+	tx.ctx = ctx
 	return nil
 }
 
@@ -240,19 +242,19 @@ func (tx *Tx) Rollback() error {
 
 func (tx *Tx) Exec(query string, args ...interface{}) (sql.Result, error) {
 	query = tx.db.data.translate(query)
-	r, err := tx.tx.Exec(query, tx.db.data.translateArgs(args)...)
+	r, err := tx.tx.ExecContext(tx.ctx, query, tx.db.data.translateArgs(args)...)
 	return r, err
 }
 
 func (tx *Tx) Query(query string, args ...interface{}) (*sql.Rows, error) {
 	query = tx.db.data.translate(query)
-	r, err := tx.tx.Query(query, tx.db.data.translateArgs(args)...)
+	r, err := tx.tx.QueryContext(tx.ctx, query, tx.db.data.translateArgs(args)...)
 	return r, err
 }
 
 func (tx *Tx) QueryRow(query string, args ...interface{}) *sql.Row {
 	query = tx.db.data.translate(query)
-	return tx.tx.QueryRow(query, tx.db.data.translateArgs(args)...)
+	return tx.tx.QueryRowContext(tx.ctx, query, tx.db.data.translateArgs(args)...)
 }
 
 func (tx *Tx) CurTime() (time.Time, error) {

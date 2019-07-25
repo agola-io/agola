@@ -142,12 +142,12 @@ func (g *Gateway) Run(ctx context.Context) error {
 		return h
 	}
 
-if len(g.c.Web.AllowedOrigins) > 0 {
-	corsAllowedMethodsOptions := ghandlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "DELETE"})
-	corsAllowedHeadersOptions := ghandlers.AllowedHeaders([]string{"Accept", "Accept-Encoding", "Authorization", "Content-Length", "Content-Type", "X-CSRF-Token", "Authorization"})
-	corsAllowedOriginsOptions := ghandlers.AllowedOrigins(g.c.Web.AllowedOrigins)
-	corsHandler = ghandlers.CORS(corsAllowedMethodsOptions, corsAllowedHeadersOptions, corsAllowedOriginsOptions)
-}
+	if len(g.c.Web.AllowedOrigins) > 0 {
+		corsAllowedMethodsOptions := ghandlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "DELETE"})
+		corsAllowedHeadersOptions := ghandlers.AllowedHeaders([]string{"Accept", "Accept-Encoding", "Authorization", "Content-Length", "Content-Type", "X-CSRF-Token", "Authorization"})
+		corsAllowedOriginsOptions := ghandlers.AllowedOrigins(g.c.Web.AllowedOrigins)
+		corsHandler = ghandlers.CORS(corsAllowedMethodsOptions, corsAllowedHeadersOptions, corsAllowedOriginsOptions)
+	}
 
 	webhooksHandler := api.NewWebhooksHandler(logger, g.ah, g.configstoreClient, g.runserviceClient, g.c.APIExposedURL)
 

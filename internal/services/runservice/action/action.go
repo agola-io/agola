@@ -381,7 +381,7 @@ func (h *ActionHandler) saveRun(ctx context.Context, rb *types.RunBundle, runcgt
 	run := rb.Run
 	rc := rb.Rc
 
-	c, cgt, err := h.getRunCounter(run.Group)
+	c, cgt, err := h.getRunCounter(ctx, run.Group)
 	h.log.Debugf("c: %d, cgt: %s", c, util.Dump(cgt))
 	if err != nil {
 		return err
@@ -570,7 +570,7 @@ func (h *ActionHandler) DeleteExecutor(ctx context.Context, executorID string) e
 	return nil
 }
 
-func (h *ActionHandler) getRunCounter(group string) (uint64, *datamanager.ChangeGroupsUpdateToken, error) {
+func (h *ActionHandler) getRunCounter(ctx context.Context, group string) (uint64, *datamanager.ChangeGroupsUpdateToken, error) {
 	// use the first group dir after the root
 	pl := util.PathList(group)
 	if len(pl) < 2 {
@@ -579,7 +579,7 @@ func (h *ActionHandler) getRunCounter(group string) (uint64, *datamanager.Change
 
 	var c uint64
 	var cgt *datamanager.ChangeGroupsUpdateToken
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		c, err = h.readDB.GetRunCounterOST(tx, pl[1])
 		if err != nil {

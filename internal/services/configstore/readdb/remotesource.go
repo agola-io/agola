@@ -15,6 +15,7 @@
 package readdb
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 
@@ -139,7 +140,7 @@ func getRemoteSourcesFilteredQuery(startRemoteSourceName string, limit int, asc 
 	return s
 }
 
-func (r *ReadDB) GetRemoteSources(startRemoteSourceName string, limit int, asc bool) ([]*types.RemoteSource, error) {
+func (r *ReadDB) GetRemoteSources(ctx context.Context, startRemoteSourceName string, limit int, asc bool) ([]*types.RemoteSource, error) {
 	var remoteSources []*types.RemoteSource
 
 	s := getRemoteSourcesFilteredQuery(startRemoteSourceName, limit, asc)
@@ -149,7 +150,7 @@ func (r *ReadDB) GetRemoteSources(startRemoteSourceName string, limit int, asc b
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}
 
-	err = r.rdb.Do(func(tx *db.Tx) error {
+	err = r.rdb.Do(ctx, func(tx *db.Tx) error {
 		rows, err := tx.Query(q, args...)
 		if err != nil {
 			return err

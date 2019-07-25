@@ -30,7 +30,7 @@ import (
 
 func (h *ActionHandler) GetProjectGroupSubgroups(ctx context.Context, projectGroupRef string) ([]*types.ProjectGroup, error) {
 	var projectGroups []*types.ProjectGroup
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		projectGroup, err := h.readDB.GetProjectGroup(tx, projectGroupRef)
 		if err != nil {
@@ -53,7 +53,7 @@ func (h *ActionHandler) GetProjectGroupSubgroups(ctx context.Context, projectGro
 
 func (h *ActionHandler) GetProjectGroupProjects(ctx context.Context, projectGroupRef string) ([]*types.Project, error) {
 	var projects []*types.Project
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		projectGroup, err := h.readDB.GetProjectGroup(tx, projectGroupRef)
 		if err != nil {
@@ -112,7 +112,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, projectGroup *ty
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		parentProjectGroup, err := h.readDB.GetProjectGroup(tx, projectGroup.Parent.ID)
 		if err != nil {
 			return err
@@ -184,7 +184,7 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, req *UpdateProje
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		// check project exists
 		pg, err := h.readDB.GetProjectGroup(tx, req.ProjectGroupRef)
@@ -280,7 +280,7 @@ func (h *ActionHandler) DeleteProjectGroup(ctx context.Context, projectGroupRef 
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(func(tx *db.Tx) error {
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 
 		// check project group existance
