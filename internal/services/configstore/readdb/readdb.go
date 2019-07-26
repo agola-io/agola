@@ -68,20 +68,10 @@ func NewReadDB(ctx context.Context, logger *zap.Logger, dataDir string, e *etcd.
 	if err := os.MkdirAll(dataDir, 0770); err != nil {
 		return nil, err
 	}
-	rdb, err := db.NewDB(db.Sqlite3, filepath.Join(dataDir, "db"))
-	if err != nil {
-		return nil, err
-	}
-
-	// populate readdb
-	if err := rdb.Create(ctx, Stmts); err != nil {
-		return nil, err
-	}
 
 	readDB := &ReadDB{
 		log:     logger.Sugar(),
 		dataDir: dataDir,
-		rdb:     rdb,
 		e:       e,
 		ost:     ost,
 		dm:      dm,
@@ -114,7 +104,9 @@ func (r *ReadDB) Initialize(ctx context.Context) error {
 
 func (r *ReadDB) ResetDB(ctx context.Context) error {
 	// TODO(sgotti) this needs to be protected by a mutex
-	r.rdb.Close()
+	if r.rdb != nil {
+		r.rdb.Close()
+	}
 
 	// drop rdb
 	if err := os.Remove(filepath.Join(r.dataDir, "db")); err != nil {
@@ -406,6 +398,20 @@ func (r *ReadDB) SyncRDB(ctx context.Context) error {
 }
 
 func (r *ReadDB) Run(ctx context.Context) error {
+	if r.rdb != nil {
+		r.rdb.Close()
+	}
+	rdb, err := db.NewDB(db.Sqlite3, filepath.Join(r.dataDir, "db"))
+	if err != nil {
+		return err
+	}
+	r.rdb = rdb
+
+	// populate readdb
+	if err := r.rdb.Create(ctx, Stmts); err != nil {
+		return err
+	}
+
 	revision, err := r.GetRevision(ctx)
 	if err != nil {
 		return err
@@ -468,7 +474,6 @@ func (r *ReadDB) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			r.log.Infof("readdb exiting")
 			cancel()
-			r.rdb.Close()
 			return nil
 		case <-errCh:
 			// cancel context and wait for the all the goroutines to exit
