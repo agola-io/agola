@@ -437,7 +437,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 		cacheGroup = req.User.ID + "-" + req.UserRunRepoUUID
 	}
 
-	data, filename, err := h.fetchConfigFiles(req.GitSource, req.RepoPath, req.CommitSHA)
+	data, filename, err := h.fetchConfigFiles(ctx, req.GitSource, req.RepoPath, req.CommitSHA)
 	if err != nil {
 		return util.NewErrInternal(errors.Errorf("failed to fetch config file: %w", err))
 	}
@@ -498,10 +498,10 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 	return nil
 }
 
-func (h *ActionHandler) fetchConfigFiles(gitSource gitsource.GitSource, repopath, commitSHA string) ([]byte, string, error) {
+func (h *ActionHandler) fetchConfigFiles(ctx context.Context, gitSource gitsource.GitSource, repopath, commitSHA string) ([]byte, string, error) {
 	var data []byte
 	var filename string
-	err := util.ExponentialBackoff(util.FetchFileBackoff, func() (bool, error) {
+	err := util.ExponentialBackoff(ctx, util.FetchFileBackoff, func() (bool, error) {
 		for _, filename = range []string{agolaDefaultJsonnetConfigFile, agolaDefaultJsonConfigFile, agolaDefaultYamlConfigFile} {
 			var err error
 			data, err = gitSource.GetFile(repopath, commitSHA, path.Join(agolaDefaultConfigDir, filename))

@@ -15,6 +15,7 @@
 package util
 
 import (
+	"context"
 	"errors"
 	"math/rand"
 	"time"
@@ -87,7 +88,7 @@ type Backoff struct {
 //
 // If the condition never returns true, ErrWaitTimeout is returned. All other
 // errors terminate immediately.
-func ExponentialBackoff(backoff Backoff, condition ConditionFunc) error {
+func ExponentialBackoff(ctx context.Context,backoff Backoff, condition ConditionFunc) error {
 	duration := backoff.Duration
 	for i := 0; i < backoff.Steps; i++ {
 		if i != 0 {
@@ -95,7 +96,12 @@ func ExponentialBackoff(backoff Backoff, condition ConditionFunc) error {
 			if backoff.Jitter > 0.0 {
 				adjusted = Jitter(duration, backoff.Jitter)
 			}
-			time.Sleep(adjusted)
+			sleepCh := time.NewTimer(adjusted).C
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-sleepCh:
+			}
 			duration = time.Duration(float64(duration) * backoff.Factor)
 		}
 		if ok, err := condition(); err != nil || ok {
