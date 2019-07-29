@@ -15,6 +15,7 @@
 package configstore
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -216,7 +217,7 @@ func TestResync(t *testing.T) {
 	cancel2()
 
 	// Do some more changes
-	for i := 11; i < 20; i++ {
+	for i := 10; i < 20; i++ {
 		if _, err := cs1.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)}); err != nil {
 			t.Fatalf("err: %v", err)
 		}
@@ -245,6 +246,10 @@ func TestResync(t *testing.T) {
 	users1, err := getUsers(ctx, cs1)
 	if err != nil {
 		t.Fatalf("err: %v", err)
+	}
+	if len(users1) != 20 {
+		t.Logf("users1: %s", util.Dump(users1))
+		t.Fatalf("expected %d users, got %d users", 20, len(users1))
 	}
 
 	users2, err := getUsers(ctx, cs2)
@@ -275,10 +280,238 @@ func TestResync(t *testing.T) {
 
 	time.Sleep(5 * time.Second)
 
+	users3, err := getUsers(ctx, cs3)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
+	if !compareUsers(users1, users3) {
+		t.Logf("len(users1): %d", len(users1))
+		t.Logf("len(users3): %d", len(users3))
+		t.Logf("users1: %s", util.Dump(users1))
+		t.Logf("users3: %s", util.Dump(users3))
+		t.Fatalf("users are different between the two readdbs")
+	}
+}
+
+func TestExportImport(t *testing.T) {
+	dir, err := ioutil.TempDir("", "agola")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	etcdDir, err := ioutil.TempDir(dir, "etcd")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	tetcd := setupEtcd(t, etcdDir)
+	defer shutdownEtcd(tetcd)
+
+	listenAddress1, port1, err := testutil.GetFreePort(true, false)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	listenAddress2, port2, err := testutil.GetFreePort(true, false)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	listenAddress3, port3, err := testutil.GetFreePort(true, false)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	ctx := context.Background()
+
+	ostDir, err := ioutil.TempDir(dir, "ost")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	csDir1, err := ioutil.TempDir(dir, "cs1")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	csDir2, err := ioutil.TempDir(dir, "cs2")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	csDir3, err := ioutil.TempDir(dir, "cs3")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	baseConfig := config.Configstore{
+		Etcd: config.Etcd{
+			Endpoints: tetcd.Endpoint,
+		},
+		ObjectStorage: config.ObjectStorage{
+			Type: config.ObjectStorageTypePosix,
+			Path: ostDir,
+		},
+		Web: config.Web{},
+	}
+	cs1Config := baseConfig
+	cs1Config.DataDir = csDir1
+	cs1Config.Web.ListenAddress = net.JoinHostPort(listenAddress1, port1)
+
+	cs2Config := baseConfig
+	cs2Config.DataDir = csDir2
+	cs2Config.Web.ListenAddress = net.JoinHostPort(listenAddress2, port2)
+
+	cs3Config := baseConfig
+	cs3Config.DataDir = csDir3
+	cs3Config.Web.ListenAddress = net.JoinHostPort(listenAddress3, port3)
+
+	cs1, err := NewConfigstore(ctx, &cs1Config)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	cs2, err := NewConfigstore(ctx, &cs2Config)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	cs3, err := NewConfigstore(ctx, &cs3Config)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
+	ctx1 := context.Background()
+	ctx2, cancel2 := context.WithCancel(context.Background())
+	ctx3, cancel3 := context.WithCancel(context.Background())
+
+	t.Logf("starting cs1")
+	go func() { _ = cs1.Run(ctx1) }()
+	t.Logf("starting cs2")
+	go func() { _ = cs2.Run(ctx2) }()
+	t.Logf("starting cs3")
+	go func() { _ = cs3.Run(ctx3) }()
+
+	time.Sleep(1 * time.Second)
+
+	for i := 0; i < 10; i++ {
+		if _, err := cs1.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)}); err != nil {
+			t.Fatalf("err: %v", err)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	time.Sleep(5 * time.Second)
+
+	// stop cs2
+	log.Infof("stopping cs2")
+	cancel2()
+	// stop cs3
+	log.Infof("stopping cs3")
+	cancel3()
+
+	// Do some more changes
+	for i := 10; i < 20; i++ {
+		if _, err := cs1.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)}); err != nil {
+			t.Fatalf("err: %v", err)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	time.Sleep(5 * time.Second)
+
+	users1, err := getUsers(ctx, cs1)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if len(users1) != 20 {
+		t.Logf("users1: %s", util.Dump(users1))
+		t.Fatalf("expected %d users, got %d users", 20, len(users1))
+	}
+
+	var export bytes.Buffer
+	if err := cs1.ah.Export(ctx, &export); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	if err := cs1.ah.MaintenanceMode(ctx, true); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	time.Sleep(5 * time.Second)
+
+	if err := cs1.ah.Import(ctx, &export); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	if err := cs1.ah.MaintenanceMode(ctx, false); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	time.Sleep(5 * time.Second)
+
+	newUsers1, err := getUsers(ctx, cs1)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
+	if !compareUsers(users1, newUsers1) {
+		t.Logf("len(users1): %d", len(users1))
+		t.Logf("len(newUsers1): %d", len(newUsers1))
+		t.Logf("users1: %s", util.Dump(users1))
+		t.Logf("newUsers1: %s", util.Dump(newUsers1))
+		t.Fatalf("users are different between the two readdbs")
+	}
+
+	// start cs2
+	// it should do a full resync since we have imported new data and there's now wal in etcd
+	cs2, err = NewConfigstore(ctx, &cs2Config)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	log.Infof("starting cs2")
+	ctx2 = context.Background()
+	go func() { _ = cs2.Run(ctx2) }()
+
+	time.Sleep(5 * time.Second)
+
+	users2, err := getUsers(ctx, cs2)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
+	if !compareUsers(users1, users2) {
+		t.Logf("len(users1): %d", len(users1))
+		t.Logf("len(users2): %d", len(users2))
+		t.Logf("users1: %s", util.Dump(users1))
+		t.Logf("users2: %s", util.Dump(users2))
+		t.Fatalf("users are different between the two readdbs")
+	}
+
+	// Do some more changes
+	for i := 20; i < 30; i++ {
+		if _, err := cs1.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)}); err != nil {
+			t.Fatalf("err: %v", err)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	time.Sleep(5 * time.Second)
+
 	users1, err = getUsers(ctx, cs1)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
+	if len(users1) != 30 {
+		t.Logf("users1: %s", util.Dump(users1))
+		t.Fatalf("expected %d users, got %d users", 30, len(users1))
+	}
+
+	// start cs3
+	// it should do a full resync since we have imported new data and there're some wals with a different epoch
+	cs3, err = NewConfigstore(ctx, &cs3Config)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	log.Infof("starting cs3")
+	ctx3 = context.Background()
+	go func() { _ = cs3.Run(ctx3) }()
+
+	time.Sleep(5 * time.Second)
 
 	users3, err := getUsers(ctx, cs3)
 	if err != nil {
