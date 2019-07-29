@@ -554,21 +554,6 @@ func (h *ActionHandler) ApproveRunTask(ctx context.Context, req *RunTaskApproveR
 }
 
 func (h *ActionHandler) DeleteExecutor(ctx context.Context, executorID string) error {
-	// mark all executor tasks as failed
-	ets, err := store.GetExecutorTasks(ctx, h.e, executorID)
-	if err != nil {
-		return err
-	}
-
-	for _, et := range ets {
-		et.Status.Phase = types.ExecutorTaskPhaseFailed
-		et.FailError = "executor deleted"
-		if _, err := store.AtomicPutExecutorTask(ctx, h.e, et); err != nil {
-			return err
-		}
-	}
-
-	// delete the executor
 	if err := store.DeleteExecutor(ctx, h.e, executorID); err != nil {
 		return err
 	}

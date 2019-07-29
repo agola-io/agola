@@ -836,7 +836,15 @@ func (s *Runservice) executorTaskCleaner(ctx context.Context, et *types.Executor
 		}
 		if executor == nil {
 			log.Warnf("executor with id %q doesn't exist. marking executor task %q as failed", et.Status.ExecutorID, et.ID)
+			et.FailError = "executor deleted"
 			et.Status.Phase = types.ExecutorTaskPhaseFailed
+			et.Status.EndTime = util.TimePtr(time.Now())
+			for _, s := range et.Status.Steps {
+				if s.Phase == types.ExecutorTaskPhaseRunning {
+					s.Phase = types.ExecutorTaskPhaseFailed
+					s.EndTime = util.TimePtr(time.Now())
+				}
+			}
 			if _, err := store.AtomicPutExecutorTask(ctx, s.e, et); err != nil {
 				return err
 			}
@@ -1301,7 +1309,6 @@ func (s *Runservice) finishedRunsArchiver(ctx context.Context) error {
 // finishedRunArchiver archives a run if it's finished and all the fetching
 // phases (logs and archives) are marked as finished
 func (s *Runservice) finishedRunArchiver(ctx context.Context, r *types.Run) error {
-	//log.Debugf("r: %s", util.Dump(r))
 	if !r.Phase.IsFinished() {
 		return nil
 	}
