@@ -19,6 +19,7 @@ import (
 	"crypto/tls"
 	"net/http"
 	"path/filepath"
+	"sync"
 	"time"
 
 	scommon "agola.io/agola/internal/common"
@@ -35,6 +36,7 @@ import (
 
 	"github.com/gorilla/mux"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
+	"go.etcd.io/etcd/mvcc/mvccpb"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -65,13 +67,78 @@ func (s *Runservice) etcdPinger(ctx context.Context) error {
 	return nil
 }
 
+func (s *Runservice) maintenanceModeWatcherLoop(ctx context.Context, runCtxCancel context.CancelFunc, maintenanceModeEnabled bool) {
+	for {
+		log.Debugf("maintenanceModeWatcherLoop")
+
+		// at first watch restart from previous processed revision
+		if err := s.maintenanceModeWatcher(ctx, runCtxCancel, maintenanceModeEnabled); err != nil {
+			log.Errorf("err: %+v", err)
+		}
+
+		sleepCh := time.NewTimer(1 * time.Second).C
+		select {
+		case <-ctx.Done():
+			return
+		case <-sleepCh:
+		}
+	}
+}
+
+func (s *Runservice) maintenanceModeWatcher(ctx context.Context, runCtxCancel context.CancelFunc, maintenanceModeEnabled bool) error {
+	log.Infof("watcher: maintenance mode enabled: %t", maintenanceModeEnabled)
+	resp, err := s.e.Get(ctx, common.EtcdMaintenanceKey, 0)
+	if err != nil && err != etcd.ErrKeyNotFound {
+		return err
+	}
+
+	if len(resp.Kvs) > 0 {
+		log.Infof("maintenance mode key is present")
+		if !maintenanceModeEnabled {
+			runCtxCancel()
+		}
+	}
+
+	revision := resp.Header.Revision
+
+	wctx := etcdclientv3.WithRequireLeader(ctx)
+
+	// restart from previous processed revision
+	wch := s.e.Watch(wctx, common.EtcdMaintenanceKey, revision)
+
+	for wresp := range wch {
+		if wresp.Canceled {
+			return wresp.Err()
+		}
+
+		for _, ev := range wresp.Events {
+			switch ev.Type {
+			case mvccpb.PUT:
+				log.Infof("maintenance mode key set")
+				if !maintenanceModeEnabled {
+					runCtxCancel()
+				}
+
+			case mvccpb.DELETE:
+				log.Infof("maintenance mode key removed")
+				if maintenanceModeEnabled {
+					runCtxCancel()
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 type Runservice struct {
-	c      *config.Runservice
-	e      *etcd.Store
-	ost    *objectstorage.ObjStorage
-	dm     *datamanager.DataManager
-	readDB *readdb.ReadDB
-	ah     *action.ActionHandler
+	c               *config.Runservice
+	e               *etcd.Store
+	ost             *objectstorage.ObjStorage
+	dm              *datamanager.DataManager
+	readDB          *readdb.ReadDB
+	ah              *action.ActionHandler
+	maintenanceMode bool
 }
 
 func NewRunservice(ctx context.Context, c *config.Runservice) (*Runservice, error) {
@@ -137,31 +204,13 @@ func (s *Runservice) InitEtcd(ctx context.Context) error {
 	return nil
 }
 
-func (s *Runservice) Run(ctx context.Context) error {
-	errCh := make(chan error)
-	dmReadyCh := make(chan struct{})
-
-	go func() { errCh <- s.dm.Run(ctx, dmReadyCh) }()
-
-	// wait for dm to be ready
-	<-dmReadyCh
-
-	for {
-		err := s.InitEtcd(ctx)
-		if err == nil {
-			break
-		}
-		log.Errorf("failed to initialize etcd: %+v", err)
-		time.Sleep(1 * time.Second)
-	}
-
-	go func() { errCh <- s.readDB.Run(ctx) }()
-
-	ch := make(chan *types.ExecutorTask)
+func (s *Runservice) setupDefaultRouter(etCh chan *types.ExecutorTask) http.Handler {
+	maintenanceModeHandler := api.NewMaintenanceModeHandler(logger, s.ah, s.e)
+	exportHandler := api.NewExportHandler(logger, s.ah)
 
 	// executor dedicated api, only calls from executor should happen on these handlers
 	executorStatusHandler := api.NewExecutorStatusHandler(logger, s.e, s.ah)
-	executorTaskStatusHandler := api.NewExecutorTaskStatusHandler(s.e, ch)
+	executorTaskStatusHandler := api.NewExecutorTaskStatusHandler(s.e, etCh)
 	executorTaskHandler := api.NewExecutorTaskHandler(s.e)
 	executorTasksHandler := api.NewExecutorTasksHandler(s.e)
 	archivesHandler := api.NewArchivesHandler(logger, s.ost)
@@ -209,23 +258,55 @@ func (s *Runservice) Run(ctx context.Context) error {
 
 	apirouter.Handle("/changegroups", changeGroupsUpdateTokensHandler).Methods("GET")
 
+	apirouter.Handle("/maintenance", maintenanceModeHandler).Methods("PUT", "DELETE")
+
+	apirouter.Handle("/export", exportHandler).Methods("GET")
+
 	mainrouter := mux.NewRouter()
 	mainrouter.PathPrefix("/").Handler(router)
 
 	// Return a bad request when it doesn't match any route
 	mainrouter.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusBadRequest) })
 
-	go s.executorTasksCleanerLoop(ctx)
-	go s.runsSchedulerLoop(ctx)
-	go s.runTasksUpdaterLoop(ctx)
-	go s.fetcherLoop(ctx)
-	go s.finishedRunsArchiverLoop(ctx)
-	go s.compactChangeGroupsLoop(ctx)
-	go s.cacheCleanerLoop(ctx, s.c.RunCacheExpireInterval)
-	go s.executorTaskUpdateHandler(ctx, ch)
+	return mainrouter
+}
 
-	go s.etcdPingerLoop(ctx)
+func (s *Runservice) setupMaintenanceRouter() http.Handler {
+	maintenanceModeHandler := api.NewMaintenanceModeHandler(logger, s.ah, s.e)
+	exportHandler := api.NewExportHandler(logger, s.ah)
+	importHandler := api.NewImportHandler(logger, s.ah)
 
+	router := mux.NewRouter()
+	apirouter := router.PathPrefix("/api/v1alpha").Subrouter().UseEncodedPath()
+
+	apirouter.Handle("/maintenance", maintenanceModeHandler).Methods("PUT", "DELETE")
+
+	apirouter.Handle("/export", exportHandler).Methods("GET")
+	apirouter.Handle("/import", importHandler).Methods("POST")
+
+	mainrouter := mux.NewRouter()
+	mainrouter.PathPrefix("/").Handler(router)
+
+	return mainrouter
+}
+
+func (s *Runservice) Run(ctx context.Context) error {
+	for {
+		if err := s.run(ctx); err != nil {
+			log.Errorf("run error: %+v", err)
+		}
+
+		sleepCh := time.NewTimer(1 * time.Second).C
+		select {
+		case <-ctx.Done():
+			log.Infof("runservice exiting")
+			return nil
+		case <-sleepCh:
+		}
+	}
+}
+
+func (s *Runservice) run(ctx context.Context) error {
 	var tlsConfig *tls.Config
 	if s.c.Web.TLS {
 		var err error
@@ -236,32 +317,98 @@ func (s *Runservice) Run(ctx context.Context) error {
 		}
 	}
 
+	resp, err := s.e.Get(ctx, common.EtcdMaintenanceKey, 0)
+	if err != nil && err != etcd.ErrKeyNotFound {
+		return err
+	}
+
+	maintenanceMode := false
+	if len(resp.Kvs) > 0 {
+		log.Infof("maintenance mode key is present")
+		maintenanceMode = true
+	}
+
+	s.maintenanceMode = maintenanceMode
+	s.dm.SetMaintenanceMode(maintenanceMode)
+	s.ah.SetMaintenanceMode(maintenanceMode)
+
+	ctx, cancel := context.WithCancel(ctx)
+	errCh := make(chan error, 100)
+	var wg sync.WaitGroup
+	dmReadyCh := make(chan struct{})
+
+	var mainrouter http.Handler
+	if s.maintenanceMode {
+		mainrouter = s.setupMaintenanceRouter()
+		util.GoWait(&wg, func() { s.maintenanceModeWatcherLoop(ctx, cancel, s.maintenanceMode) })
+
+	} else {
+		ch := make(chan *types.ExecutorTask)
+		mainrouter = s.setupDefaultRouter(ch)
+
+		util.GoWait(&wg, func() { s.maintenanceModeWatcherLoop(ctx, cancel, s.maintenanceMode) })
+
+		// TODO(sgotti) wait for all goroutines exiting
+		util.GoWait(&wg, func() { errCh <- s.dm.Run(ctx, dmReadyCh) })
+
+		// wait for dm to be ready
+		<-dmReadyCh
+
+		for {
+			err := s.InitEtcd(ctx)
+			if err == nil {
+				break
+			}
+			log.Errorf("failed to initialize etcd: %+v", err)
+
+			sleepCh := time.NewTimer(1 * time.Second).C
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-sleepCh:
+			}
+		}
+
+		util.GoWait(&wg, func() { errCh <- s.readDB.Run(ctx) })
+
+		util.GoWait(&wg, func() { s.executorTasksCleanerLoop(ctx) })
+		util.GoWait(&wg, func() { s.runsSchedulerLoop(ctx) })
+		util.GoWait(&wg, func() { s.runTasksUpdaterLoop(ctx) })
+		util.GoWait(&wg, func() { s.fetcherLoop(ctx) })
+		util.GoWait(&wg, func() { s.finishedRunsArchiverLoop(ctx) })
+		util.GoWait(&wg, func() { s.compactChangeGroupsLoop(ctx) })
+		util.GoWait(&wg, func() { s.cacheCleanerLoop(ctx, s.c.RunCacheExpireInterval) })
+		util.GoWait(&wg, func() { s.executorTaskUpdateHandler(ctx, ch) })
+		util.GoWait(&wg, func() { s.etcdPingerLoop(ctx) })
+	}
+
 	httpServer := http.Server{
 		Addr:      s.c.Web.ListenAddress,
 		Handler:   mainrouter,
 		TLSConfig: tlsConfig,
 	}
 
-	lerrCh := make(chan error)
-	go func() {
+	lerrCh := make(chan error, 1)
+	util.GoWait(&wg, func() {
 		lerrCh <- httpServer.ListenAndServe()
-	}()
+	})
 
 	select {
 	case <-ctx.Done():
-		log.Infof("runservice scheduler exiting")
-		httpServer.Close()
-	case err := <-lerrCh:
+		log.Infof("runservice run exiting")
+	case err = <-lerrCh:
 		if err != nil {
 			log.Errorf("http server listen error: %v", err)
-			return err
 		}
 	case err := <-errCh:
 		if err != nil {
 			log.Errorf("error: %+v", err)
-			return err
 		}
 	}
 
-	return nil
+	cancel()
+	httpServer.Close()
+	wg.Wait()
+
+	return err
 }
