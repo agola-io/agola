@@ -19,23 +19,15 @@ import (
 	"net/http"
 	"net/url"
 
-	csapi "agola.io/agola/internal/services/configstore/api"
-	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
+	csapitypes "agola.io/agola/services/configstore/api/types"
+	cstypes "agola.io/agola/services/configstore/types"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 )
-
-type CreateProjectRequest struct {
-	Name                string             `json:"name,omitempty"`
-	ParentRef           string             `json:"parent_ref,omitempty"`
-	Visibility          cstypes.Visibility `json:"visibility,omitempty"`
-	RepoPath            string             `json:"repo_path,omitempty"`
-	RemoteSourceName    string             `json:"remote_source_name,omitempty"`
-	SkipSSHHostKeyCheck bool               `json:"skip_ssh_host_key_check,omitempty"`
-}
 
 type CreateProjectHandler struct {
 	log *zap.SugaredLogger
@@ -49,7 +41,7 @@ func NewCreateProjectHandler(logger *zap.Logger, ah *action.ActionHandler) *Crea
 func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var req CreateProjectRequest
+	var req gwapitypes.CreateProjectRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))
@@ -59,7 +51,7 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	areq := &action.CreateProjectRequest{
 		Name:                req.Name,
 		ParentRef:           req.ParentRef,
-		Visibility:          req.Visibility,
+		Visibility:          cstypes.Visibility(req.Visibility),
 		RepoPath:            req.RepoPath,
 		RemoteSourceName:    req.RemoteSourceName,
 		SkipSSHHostKeyCheck: req.SkipSSHHostKeyCheck,
@@ -75,11 +67,6 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	if err := httpResponse(w, http.StatusCreated, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
-}
-
-type UpdateProjectRequest struct {
-	Name       string             `json:"name,omitempty"`
-	Visibility cstypes.Visibility `json:"visibility,omitempty"`
 }
 
 type UpdateProjectHandler struct {
@@ -100,7 +87,7 @@ func (h *UpdateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var req UpdateProjectRequest
+	var req gwapitypes.UpdateProjectRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))
@@ -109,7 +96,7 @@ func (h *UpdateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 
 	areq := &action.UpdateProjectRequest{
 		Name:       req.Name,
-		Visibility: req.Visibility,
+		Visibility: cstypes.Visibility(req.Visibility),
 	}
 	project, err := h.ah.UpdateProject(ctx, projectRef, areq)
 	if httpError(w, err) {
@@ -239,33 +226,17 @@ func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type ProjectResponse struct {
-	ID               string             `json:"id,omitempty"`
-	Name             string             `json:"name,omitempty"`
-	Path             string             `json:"path,omitempty"`
-	ParentPath       string             `json:"parent_path,omitempty"`
-	Visibility       cstypes.Visibility `json:"visibility,omitempty"`
-	GlobalVisibility string             `json:"global_visibility,omitempty"`
-}
-
-func createProjectResponse(r *csapi.Project) *ProjectResponse {
-	res := &ProjectResponse{
+func createProjectResponse(r *csapitypes.Project) *gwapitypes.ProjectResponse {
+	res := &gwapitypes.ProjectResponse{
 		ID:               r.ID,
 		Name:             r.Name,
 		Path:             r.Path,
 		ParentPath:       r.ParentPath,
-		Visibility:       r.Visibility,
+		Visibility:       gwapitypes.Visibility(r.Visibility),
 		GlobalVisibility: string(r.GlobalVisibility),
 	}
 
 	return res
-}
-
-type ProjectCreateRunRequest struct {
-	Branch    string `json:"branch,omitempty"`
-	Tag       string `json:"tag,omitempty"`
-	Ref       string `json:"ref,omitempty"`
-	CommitSHA string `json:"commit_sha,omitempty"`
 }
 
 type ProjectCreateRunHandler struct {
@@ -286,7 +257,7 @@ func (h *ProjectCreateRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	var req ProjectCreateRunRequest
+	var req gwapitypes.ProjectCreateRunRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))

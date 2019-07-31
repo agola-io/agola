@@ -24,11 +24,11 @@ import (
 	gitsource "agola.io/agola/internal/gitsources"
 	"agola.io/agola/internal/runconfig"
 	"agola.io/agola/internal/services/common"
-	cstypes "agola.io/agola/internal/services/configstore/types"
-	rsapi "agola.io/agola/internal/services/runservice/api"
-	rstypes "agola.io/agola/internal/services/runservice/types"
 	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
+	cstypes "agola.io/agola/services/configstore/types"
+	rsapitypes "agola.io/agola/services/runservice/api/types"
+	rstypes "agola.io/agola/services/runservice/types"
 
 	errors "golang.org/x/xerrors"
 )
@@ -65,7 +65,7 @@ const (
 	AnnotationPullRequestLink = "pull_request_link"
 )
 
-func (h *ActionHandler) GetRun(ctx context.Context, runID string) (*rsapi.RunResponse, error) {
+func (h *ActionHandler) GetRun(ctx context.Context, runID string) (*rsapitypes.RunResponse, error) {
 	runResp, resp, err := h.runserviceClient.GetRun(ctx, runID, nil)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
@@ -92,7 +92,7 @@ type GetRunsRequest struct {
 	Asc          bool
 }
 
-func (h *ActionHandler) GetRuns(ctx context.Context, req *GetRunsRequest) (*rsapi.GetRunsResponse, error) {
+func (h *ActionHandler) GetRuns(ctx context.Context, req *GetRunsRequest) (*rsapitypes.GetRunsResponse, error) {
 	canGetRun, err := h.CanGetRun(ctx, req.Group)
 	if err != nil {
 		return nil, errors.Errorf("failed to determine permissions: %w", err)
@@ -155,7 +155,7 @@ type RunActionsRequest struct {
 	FromStart bool
 }
 
-func (h *ActionHandler) RunAction(ctx context.Context, req *RunActionsRequest) (*rsapi.RunResponse, error) {
+func (h *ActionHandler) RunAction(ctx context.Context, req *RunActionsRequest) (*rsapitypes.RunResponse, error) {
 	runResp, resp, err := h.runserviceClient.GetRun(ctx, req.RunID, nil)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
@@ -170,7 +170,7 @@ func (h *ActionHandler) RunAction(ctx context.Context, req *RunActionsRequest) (
 
 	switch req.ActionType {
 	case RunActionTypeRestart:
-		rsreq := &rsapi.RunCreateRequest{
+		rsreq := &rsapitypes.RunCreateRequest{
 			RunID:     req.RunID,
 			FromStart: req.FromStart,
 		}
@@ -181,8 +181,8 @@ func (h *ActionHandler) RunAction(ctx context.Context, req *RunActionsRequest) (
 		}
 
 	case RunActionTypeCancel:
-		rsreq := &rsapi.RunActionsRequest{
-			ActionType: rsapi.RunActionTypeChangePhase,
+		rsreq := &rsapitypes.RunActionsRequest{
+			ActionType: rsapitypes.RunActionTypeChangePhase,
 			Phase:      rstypes.RunPhaseCancelled,
 		}
 
@@ -192,8 +192,8 @@ func (h *ActionHandler) RunAction(ctx context.Context, req *RunActionsRequest) (
 		}
 
 	case RunActionTypeStop:
-		rsreq := &rsapi.RunActionsRequest{
-			ActionType: rsapi.RunActionTypeStop,
+		rsreq := &rsapitypes.RunActionsRequest{
+			ActionType: rsapitypes.RunActionTypeStop,
 		}
 
 		resp, err = h.runserviceClient.RunActions(ctx, req.RunID, rsreq)
@@ -271,8 +271,8 @@ func (h *ActionHandler) RunTaskAction(ctx context.Context, req *RunTaskActionsRe
 
 		annotations[common.ApproversAnnotation] = string(approversj)
 
-		rsreq := &rsapi.RunTaskActionsRequest{
-			ActionType:              rsapi.RunTaskActionTypeSetAnnotations,
+		rsreq := &rsapitypes.RunTaskActionsRequest{
+			ActionType:              rsapitypes.RunTaskActionTypeSetAnnotations,
 			Annotations:             annotations,
 			ChangeGroupsUpdateToken: runResp.ChangeGroupsUpdateToken,
 		}
@@ -461,7 +461,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 		// create a run (per config file) with a generic error since we cannot parse
 		// it and know how many runs are defined
 		setupErrors = append(setupErrors, err.Error())
-		createRunReq := &rsapi.RunCreateRequest{
+		createRunReq := &rsapitypes.RunCreateRequest{
 			RunConfigTasks:    nil,
 			Group:             runGroup,
 			SetupErrors:       setupErrors,
@@ -480,7 +480,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 	for _, run := range config.Runs {
 		rcts := runconfig.GenRunConfigTasks(util.DefaultUUIDGenerator{}, config, run.Name, variables, req.Branch, req.Tag, req.Ref)
 
-		createRunReq := &rsapi.RunCreateRequest{
+		createRunReq := &rsapitypes.RunCreateRequest{
 			RunConfigTasks:    rcts,
 			Group:             runGroup,
 			SetupErrors:       setupErrors,

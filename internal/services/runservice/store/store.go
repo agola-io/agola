@@ -26,8 +26,8 @@ import (
 	"agola.io/agola/internal/etcd"
 	ostypes "agola.io/agola/internal/objectstorage/types"
 	"agola.io/agola/internal/services/runservice/common"
-	"agola.io/agola/internal/services/runservice/types"
 	"agola.io/agola/internal/util"
+	"agola.io/agola/services/runservice/types"
 
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
 	errors "golang.org/x/xerrors"

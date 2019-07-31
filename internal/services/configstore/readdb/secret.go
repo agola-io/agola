@@ -19,8 +19,8 @@ import (
 	"encoding/json"
 
 	"agola.io/agola/internal/db"
-	"agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
+	"agola.io/agola/services/configstore/types"
 
 	sq "github.com/Masterminds/squirrel"
 	errors "golang.org/x/xerrors"

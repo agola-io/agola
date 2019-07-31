@@ -22,8 +22,8 @@ import (
 	"agola.io/agola/internal/datamanager"
 	"agola.io/agola/internal/db"
 	"agola.io/agola/internal/services/configstore/readdb"
-	"agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
+	"agola.io/agola/services/configstore/types"
 
 	uuid "github.com/satori/go.uuid"
 	errors "golang.org/x/xerrors"

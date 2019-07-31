@@ -17,8 +17,8 @@ package cmd
 import (
 	"context"
 
-	cstypes "agola.io/agola/internal/services/configstore/types"
-	"agola.io/agola/internal/services/gateway/api"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
+	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
@@ -71,18 +71,28 @@ func init() {
 	cmdProject.AddCommand(cmdProjectCreate)
 }
 
+func IsValidVisibility(v string) bool {
+	switch gwapitypes.Visibility(v) {
+	case gwapitypes.VisibilityPublic:
+	case gwapitypes.VisibilityPrivate:
+	default:
+		return false
+	}
+	return true
+}
+
 func projectCreate(cmd *cobra.Command, args []string) error {
-	gwclient := api.NewClient(gatewayURL, token)
+	gwclient := gwclient.NewClient(gatewayURL, token)
 
 	// TODO(sgotti) make this a custom pflag Value?
-	if !cstypes.IsValidVisibility(cstypes.Visibility(projectCreateOpts.visibility)) {
+	if !IsValidVisibility(projectCreateOpts.visibility) {
 		return errors.Errorf("invalid visibility %q", projectCreateOpts.visibility)
 	}
 
-	req := &api.CreateProjectRequest{
+	req := &gwapitypes.CreateProjectRequest{
 		Name:                projectCreateOpts.name,
 		ParentRef:           projectCreateOpts.parentPath,
-		Visibility:          cstypes.Visibility(projectCreateOpts.visibility),
+		Visibility:          gwapitypes.Visibility(projectCreateOpts.visibility),
 		RepoPath:            projectCreateOpts.repoPath,
 		RemoteSourceName:    projectCreateOpts.remoteSourceName,
 		SkipSSHHostKeyCheck: projectCreateOpts.skipSSHHostKeyCheck,

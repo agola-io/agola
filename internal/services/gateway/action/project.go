@@ -22,15 +22,15 @@ import (
 	"path"
 
 	gitsource "agola.io/agola/internal/gitsources"
-	csapi "agola.io/agola/internal/services/configstore/api"
-	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
+	csapitypes "agola.io/agola/services/configstore/api/types"
+	cstypes "agola.io/agola/services/configstore/types"
 
 	errors "golang.org/x/xerrors"
 )
 
-func (h *ActionHandler) GetProject(ctx context.Context, projectRef string) (*csapi.Project, error) {
+func (h *ActionHandler) GetProject(ctx context.Context, projectRef string) (*csapitypes.Project, error) {
 	project, resp, err := h.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
@@ -59,7 +59,7 @@ type CreateProjectRequest struct {
 	SkipSSHHostKeyCheck bool
 }
 
-func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectRequest) (*csapi.Project, error) {
+func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectRequest) (*csapitypes.Project, error) {
 	curUserID := h.CurrentUserID(ctx)
 
 	user, resp, err := h.configstoreClient.GetUser(ctx, curUserID)
@@ -184,7 +184,7 @@ type UpdateProjectRequest struct {
 	Visibility cstypes.Visibility
 }
 
-func (h *ActionHandler) UpdateProject(ctx context.Context, projectRef string, req *UpdateProjectRequest) (*csapi.Project, error) {
+func (h *ActionHandler) UpdateProject(ctx context.Context, projectRef string, req *UpdateProjectRequest) (*csapitypes.Project, error) {
 	p, resp, err := h.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
 		return nil, errors.Errorf("failed to get project %q: %w", projectRef, ErrFromRemote(resp, err))
@@ -211,7 +211,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, projectRef string, re
 	return rp, nil
 }
 
-func (h *ActionHandler) ProjectUpdateRepoLinkedAccount(ctx context.Context, projectRef string) (*csapi.Project, error) {
+func (h *ActionHandler) ProjectUpdateRepoLinkedAccount(ctx context.Context, projectRef string) (*csapitypes.Project, error) {
 	curUserID := h.CurrentUserID(ctx)
 
 	user, resp, err := h.configstoreClient.GetUser(ctx, curUserID)
@@ -270,7 +270,7 @@ func (h *ActionHandler) ProjectUpdateRepoLinkedAccount(ctx context.Context, proj
 	return rp, nil
 }
 
-func (h *ActionHandler) setupGitSourceRepo(ctx context.Context, rs *cstypes.RemoteSource, user *cstypes.User, la *cstypes.LinkedAccount, project *csapi.Project) error {
+func (h *ActionHandler) setupGitSourceRepo(ctx context.Context, rs *cstypes.RemoteSource, user *cstypes.User, la *cstypes.LinkedAccount, project *csapitypes.Project) error {
 	gitsource, err := h.GetGitSource(ctx, rs, user.Name, la)
 	if err != nil {
 		return errors.Errorf("failed to create gitsource client: %w", err)
@@ -306,7 +306,7 @@ func (h *ActionHandler) setupGitSourceRepo(ctx context.Context, rs *cstypes.Remo
 	return nil
 }
 
-func (h *ActionHandler) cleanupGitSourceRepo(ctx context.Context, rs *cstypes.RemoteSource, user *cstypes.User, la *cstypes.LinkedAccount, project *csapi.Project) error {
+func (h *ActionHandler) cleanupGitSourceRepo(ctx context.Context, rs *cstypes.RemoteSource, user *cstypes.User, la *cstypes.LinkedAccount, project *csapitypes.Project) error {
 	gitsource, err := h.GetGitSource(ctx, rs, user.Name, la)
 	if err != nil {
 		return errors.Errorf("failed to create gitsource client: %w", err)
@@ -333,7 +333,7 @@ func (h *ActionHandler) cleanupGitSourceRepo(ctx context.Context, rs *cstypes.Re
 	return nil
 }
 
-func (h *ActionHandler) genWebhookURL(project *csapi.Project) (string, error) {
+func (h *ActionHandler) genWebhookURL(project *csapitypes.Project) (string, error) {
 	baseWebhookURL := fmt.Sprintf("%s/webhooks", h.apiExposedURL)
 	webhookURL, err := url.Parse(baseWebhookURL)
 	if err != nil {

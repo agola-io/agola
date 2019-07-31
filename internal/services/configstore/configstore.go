@@ -32,8 +32,8 @@ import (
 	"agola.io/agola/internal/services/configstore/api"
 	"agola.io/agola/internal/services/configstore/common"
 	"agola.io/agola/internal/services/configstore/readdb"
-	"agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
+	"agola.io/agola/services/configstore/types"
 
 	"github.com/gorilla/mux"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"

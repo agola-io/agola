@@ -19,43 +19,29 @@ import (
 	"net/http"
 
 	"agola.io/agola/internal/services/common"
-	csapi "agola.io/agola/internal/services/configstore/api"
-	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
-	"go.uber.org/zap"
+	csapitypes "agola.io/agola/services/configstore/api/types"
+	cstypes "agola.io/agola/services/configstore/types"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
 
 	"github.com/gorilla/mux"
+	"go.uber.org/zap"
 )
 
-type VariableValue struct {
-	SecretName               string `json:"secret_name"`
-	SecretVar                string `json:"secret_var"`
-	MatchingSecretParentPath string `json:"matching_secret_parent_path"`
-
-	When *cstypes.When `json:"when"`
-}
-
-type VariableResponse struct {
-	ID         string          `json:"id"`
-	Name       string          `json:"name"`
-	Values     []VariableValue `json:"values"`
-	ParentPath string          `json:"parent_path"`
-}
-
-func createVariableResponse(v *csapi.Variable, secrets []*csapi.Secret) *VariableResponse {
-	nv := &VariableResponse{
+func createVariableResponse(v *csapitypes.Variable, secrets []*csapitypes.Secret) *gwapitypes.VariableResponse {
+	nv := &gwapitypes.VariableResponse{
 		ID:         v.ID,
 		Name:       v.Name,
-		Values:     make([]VariableValue, len(v.Values)),
+		Values:     make([]gwapitypes.VariableValue, len(v.Values)),
 		ParentPath: v.ParentPath,
 	}
 
 	for i, varvalue := range v.Values {
-		nv.Values[i] = VariableValue{
+		nv.Values[i] = gwapitypes.VariableValue{
 			SecretName: varvalue.SecretName,
 			SecretVar:  varvalue.SecretVar,
-			When:       varvalue.When,
+			When:       fromCsWhen(varvalue.When),
 		}
 		// get matching secret for var value
 		secret := common.GetVarValueMatchingSecret(varvalue, v.ParentPath, secrets)
@@ -100,7 +86,7 @@ func (h *VariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	variables := make([]*VariableResponse, len(csvars))
+	variables := make([]*gwapitypes.VariableResponse, len(csvars))
 	for i, v := range csvars {
 		variables[i] = createVariableResponse(v, cssecrets)
 	}
@@ -108,12 +94,6 @@ func (h *VariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := httpResponse(w, http.StatusOK, variables); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
-}
-
-type CreateVariableRequest struct {
-	Name string `json:"name,omitempty"`
-
-	Values []cstypes.VariableValue `json:"values,omitempty"`
 }
 
 type CreateVariableHandler struct {
@@ -133,7 +113,7 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	var req CreateVariableRequest
+	var req gwapitypes.CreateVariableRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))
@@ -143,7 +123,7 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		Name:       req.Name,
 		ParentType: parentType,
 		ParentRef:  parentRef,
-		Values:     req.Values,
+		Values:     fromApiVariableValues(req.Values),
 	}
 	csvar, cssecrets, err := h.ah.CreateVariable(ctx, areq)
 	if httpError(w, err) {
@@ -155,12 +135,6 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	if err := httpResponse(w, http.StatusCreated, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
-}
-
-type UpdateVariableRequest struct {
-	Name string `json:"name,omitempty"`
-
-	Values []cstypes.VariableValue `json:"values,omitempty"`
 }
 
 type UpdateVariableHandler struct {
@@ -183,19 +157,20 @@ func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	var req UpdateVariableRequest
+	var req gwapitypes.UpdateVariableRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
+
 	areq := &action.UpdateVariableRequest{
 		VariableName: variableName,
 
 		Name:       req.Name,
 		ParentType: parentType,
 		ParentRef:  parentRef,
-		Values:     req.Values,
+		Values:     fromApiVariableValues(req.Values),
 	}
 	csvar, cssecrets, err := h.ah.UpdateVariable(ctx, areq)
 	if httpError(w, err) {
@@ -237,5 +212,77 @@ func (h *DeleteVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
 		h.log.Errorf("err: %+v", err)
+	}
+}
+
+func fromApiVariableValues(apivalues []gwapitypes.VariableValueRequest) []cstypes.VariableValue {
+	values := make([]cstypes.VariableValue, len(apivalues))
+	for i, v := range apivalues {
+		values[i] = cstypes.VariableValue{
+			SecretName: v.SecretName,
+			SecretVar:  v.SecretVar,
+			When:       fromApiWhen(v.When),
+		}
+	}
+	return values
+}
+
+func fromApiWhenCondition(apiwc gwapitypes.WhenCondition) cstypes.WhenCondition {
+	return cstypes.WhenCondition{
+		Type:  cstypes.WhenConditionType(apiwc.Type),
+		Match: apiwc.Match,
+	}
+}
+
+func fromApiWhenConditions(apiwcs *gwapitypes.WhenConditions) *cstypes.WhenConditions {
+	wcs := &cstypes.WhenConditions{
+		Include: make([]cstypes.WhenCondition, len(apiwcs.Include)),
+		Exclude: make([]cstypes.WhenCondition, len(apiwcs.Exclude)),
+	}
+	for i, include := range apiwcs.Include {
+		wcs.Include[i] = fromApiWhenCondition(include)
+	}
+	for i, exclude := range apiwcs.Exclude {
+		wcs.Exclude[i] = fromApiWhenCondition(exclude)
+	}
+
+	return wcs
+}
+
+func fromApiWhen(apiwhen *gwapitypes.When) *cstypes.When {
+	return &cstypes.When{
+		Branch: fromApiWhenConditions(apiwhen.Branch),
+		Tag:    fromApiWhenConditions(apiwhen.Tag),
+		Ref:    fromApiWhenConditions(apiwhen.Ref),
+	}
+}
+
+func fromCsWhenCondition(apiwc cstypes.WhenCondition) gwapitypes.WhenCondition {
+	return gwapitypes.WhenCondition{
+		Type:  gwapitypes.WhenConditionType(apiwc.Type),
+		Match: apiwc.Match,
+	}
+}
+
+func fromCsWhenConditions(apiwcs *cstypes.WhenConditions) *gwapitypes.WhenConditions {
+	wcs := &gwapitypes.WhenConditions{
+		Include: make([]gwapitypes.WhenCondition, len(apiwcs.Include)),
+		Exclude: make([]gwapitypes.WhenCondition, len(apiwcs.Exclude)),
+	}
+	for i, include := range apiwcs.Include {
+		wcs.Include[i] = fromCsWhenCondition(include)
+	}
+	for i, exclude := range apiwcs.Exclude {
+		wcs.Exclude[i] = fromCsWhenCondition(exclude)
+	}
+
+	return wcs
+}
+
+func fromCsWhen(apiwhen *cstypes.When) *gwapitypes.When {
+	return &gwapitypes.When{
+		Branch: fromCsWhenConditions(apiwhen.Branch),
+		Tag:    fromCsWhenConditions(apiwhen.Tag),
+		Ref:    fromCsWhenConditions(apiwhen.Ref),
 	}
 }

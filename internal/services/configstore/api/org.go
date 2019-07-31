@@ -22,12 +22,13 @@ import (
 	"agola.io/agola/internal/db"
 	"agola.io/agola/internal/services/configstore/action"
 	"agola.io/agola/internal/services/configstore/readdb"
-	"agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
-	errors "golang.org/x/xerrors"
+	csapitypes "agola.io/agola/services/configstore/api/types"
+	"agola.io/agola/services/configstore/types"
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
+	errors "golang.org/x/xerrors"
 )
 
 type OrgHandler struct {
@@ -180,10 +181,6 @@ func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type AddOrgMemberRequest struct {
-	Role types.MemberRole
-}
-
 type AddOrgMemberHandler struct {
 	log *zap.SugaredLogger
 	ah  *action.ActionHandler
@@ -200,7 +197,7 @@ func (h *AddOrgMemberHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	orgRef := vars["orgref"]
 	userRef := vars["userref"]
 
-	var req AddOrgMemberRequest
+	var req csapitypes.AddOrgMemberRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))
@@ -245,13 +242,8 @@ func (h *RemoveOrgMemberHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-type OrgMemberResponse struct {
-	User *types.User
-	Role types.MemberRole
-}
-
-func orgMemberResponse(orgUser *action.OrgMemberResponse) *OrgMemberResponse {
-	return &OrgMemberResponse{
+func orgMemberResponse(orgUser *action.OrgMemberResponse) *csapitypes.OrgMemberResponse {
+	return &csapitypes.OrgMemberResponse{
 		User: orgUser.User,
 		Role: orgUser.Role,
 	}
@@ -277,7 +269,7 @@ func (h *OrgMembersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res := make([]*OrgMemberResponse, len(orgUsers))
+	res := make([]*csapitypes.OrgMemberResponse, len(orgUsers))
 	for i, orgUser := range orgUsers {
 		res[i] = orgMemberResponse(orgUser)
 	}

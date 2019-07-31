@@ -17,8 +17,8 @@ package action
 import (
 	"context"
 
-	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
+	cstypes "agola.io/agola/services/configstore/types"
 
 	errors "golang.org/x/xerrors"
 )

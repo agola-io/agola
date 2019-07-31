@@ -18,7 +18,9 @@ import (
 	"context"
 	"fmt"
 
-	"agola.io/agola/internal/services/gateway/api"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
+	gwclient "agola.io/agola/services/gateway/client"
+
 	"github.com/spf13/cobra"
 )
 
@@ -48,14 +50,14 @@ func init() {
 	cmdRemoteSource.AddCommand(cmdRemoteSourceList)
 }
 
-func printRemoteSources(remoteSources []*api.RemoteSourceResponse) {
+func printRemoteSources(remoteSources []*gwapitypes.RemoteSourceResponse) {
 	for _, rs := range remoteSources {
 		fmt.Printf("%s: Name: %s\n", rs.ID, rs.Name)
 	}
 }
 
 func remoteSourceList(cmd *cobra.Command, args []string) error {
-	gwclient := api.NewClient(gatewayURL, token)
+	gwclient := gwclient.NewClient(gatewayURL, token)
 
 	remouteSources, _, err := gwclient.GetRemoteSources(context.TODO(), remoteSourceListOpts.start, remoteSourceListOpts.limit, false)
 	if err != nil {

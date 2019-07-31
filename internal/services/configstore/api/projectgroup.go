@@ -24,27 +24,16 @@ import (
 	"agola.io/agola/internal/db"
 	"agola.io/agola/internal/services/configstore/action"
 	"agola.io/agola/internal/services/configstore/readdb"
-	"agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
-	errors "golang.org/x/xerrors"
+	csapitypes "agola.io/agola/services/configstore/api/types"
+	"agola.io/agola/services/configstore/types"
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
+	errors "golang.org/x/xerrors"
 )
 
-// ProjectGroup augments types.ProjectGroup with dynamic data
-type ProjectGroup struct {
-	*types.ProjectGroup
-
-	// dynamic data
-	OwnerType        types.ConfigType
-	OwnerID          string
-	Path             string
-	ParentPath       string
-	GlobalVisibility types.Visibility
-}
-
-func projectGroupResponse(ctx context.Context, readDB *readdb.ReadDB, projectGroup *types.ProjectGroup) (*ProjectGroup, error) {
+func projectGroupResponse(ctx context.Context, readDB *readdb.ReadDB, projectGroup *types.ProjectGroup) (*csapitypes.ProjectGroup, error) {
 	r, err := projectGroupsResponse(ctx, readDB, []*types.ProjectGroup{projectGroup})
 	if err != nil {
 		return nil, err
@@ -52,8 +41,8 @@ func projectGroupResponse(ctx context.Context, readDB *readdb.ReadDB, projectGro
 	return r[0], nil
 }
 
-func projectGroupsResponse(ctx context.Context, readDB *readdb.ReadDB, projectGroups []*types.ProjectGroup) ([]*ProjectGroup, error) {
-	resProjectGroups := make([]*ProjectGroup, len(projectGroups))
+func projectGroupsResponse(ctx context.Context, readDB *readdb.ReadDB, projectGroups []*types.ProjectGroup) ([]*csapitypes.ProjectGroup, error) {
+	resProjectGroups := make([]*csapitypes.ProjectGroup, len(projectGroups))
 
 	err := readDB.Do(ctx, func(tx *db.Tx) error {
 		for i, projectGroup := range projectGroups {
@@ -75,7 +64,7 @@ func projectGroupsResponse(ctx context.Context, readDB *readdb.ReadDB, projectGr
 
 			// we calculate the path here from parent path since the db could not yet be
 			// updated on create
-			resProjectGroups[i] = &ProjectGroup{
+			resProjectGroups[i] = &csapitypes.ProjectGroup{
 				ProjectGroup:     projectGroup,
 				OwnerType:        ownerType,
 				OwnerID:          ownerID,

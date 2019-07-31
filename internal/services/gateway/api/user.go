@@ -21,19 +21,15 @@ import (
 	"sort"
 	"strconv"
 
-	gitsource "agola.io/agola/internal/gitsources"
-	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
+	cstypes "agola.io/agola/services/configstore/types"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 	errors "golang.org/x/xerrors"
 )
-
-type CreateUserRequest struct {
-	UserName string `json:"username"`
-}
 
 type CreateUserHandler struct {
 	log *zap.SugaredLogger
@@ -47,7 +43,7 @@ func NewCreateUserHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateU
 func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var req CreateUserRequest
+	var req gwapitypes.CreateUserRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))
@@ -152,26 +148,12 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type UserResponse struct {
-	ID             string                   `json:"id"`
-	UserName       string                   `json:"username"`
-	Tokens         []string                 `json:"tokens"`
-	LinkedAccounts []*LinkedAccountResponse `json:"linked_accounts"`
-}
-
-type LinkedAccountResponse struct {
-	ID                  string `json:"id"`
-	RemoteSourceID      string `json:"remote_source_id"`
-	RemoteUserName      string `json:"remote_user_name"`
-	RemoteUserAvatarURL string `json:"remote_user_avatar_url"`
-}
-
-func createUserResponse(u *cstypes.User) *UserResponse {
-	user := &UserResponse{
+func createUserResponse(u *cstypes.User) *gwapitypes.UserResponse {
+	user := &gwapitypes.UserResponse{
 		ID:             u.ID,
 		UserName:       u.Name,
 		Tokens:         make([]string, 0, len(u.Tokens)),
-		LinkedAccounts: make([]*LinkedAccountResponse, 0, len(u.LinkedAccounts)),
+		LinkedAccounts: make([]*gwapitypes.LinkedAccountResponse, 0, len(u.LinkedAccounts)),
 	}
 	for tokenName := range u.Tokens {
 		user.Tokens = append(user.Tokens, tokenName)
@@ -179,7 +161,7 @@ func createUserResponse(u *cstypes.User) *UserResponse {
 	sort.Strings(user.Tokens)
 
 	for _, la := range u.LinkedAccounts {
-		user.LinkedAccounts = append(user.LinkedAccounts, &LinkedAccountResponse{
+		user.LinkedAccounts = append(user.LinkedAccounts, &gwapitypes.LinkedAccountResponse{
 			ID:                  la.ID,
 			RemoteSourceID:      la.RemoteSourceID,
 			RemoteUserName:      la.RemoteUserName,
@@ -239,7 +221,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	users := make([]*UserResponse, len(csusers))
+	users := make([]*gwapitypes.UserResponse, len(csusers))
 	for i, p := range csusers {
 		users[i] = createUserResponse(p)
 	}
@@ -247,17 +229,6 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := httpResponse(w, http.StatusOK, users); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
-}
-
-type CreateUserLARequest struct {
-	RemoteSourceName          string `json:"remote_source_name"`
-	RemoteSourceLoginName     string `json:"remote_source_login_name"`
-	RemoteSourceLoginPassword string `json:"remote_source_login_password"`
-}
-
-type CreateUserLAResponse struct {
-	LinkedAccount  *cstypes.LinkedAccount `json:"linked_account"`
-	Oauth2Redirect string                 `json:"oauth2_redirect"`
 }
 
 type CreateUserLAHandler struct {
@@ -274,7 +245,7 @@ func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	vars := mux.Vars(r)
 	userRef := vars["userref"]
 
-	var req *CreateUserLARequest
+	var req *gwapitypes.CreateUserLARequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))
@@ -292,7 +263,7 @@ func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-func (h *CreateUserLAHandler) createUserLA(ctx context.Context, userRef string, req *CreateUserLARequest) (*CreateUserLAResponse, error) {
+func (h *CreateUserLAHandler) createUserLA(ctx context.Context, userRef string, req *gwapitypes.CreateUserLARequest) (*gwapitypes.CreateUserLAResponse, error) {
 	creq := &action.CreateUserLARequest{
 		UserRef:          userRef,
 		RemoteSourceName: req.RemoteSourceName,
@@ -304,14 +275,20 @@ func (h *CreateUserLAHandler) createUserLA(ctx context.Context, userRef string, 
 		return nil, err
 	}
 	if cresp.Oauth2Redirect != "" {
-		return &CreateUserLAResponse{
+		return &gwapitypes.CreateUserLAResponse{
 			Oauth2Redirect: cresp.Oauth2Redirect,
 		}, nil
 	}
 	authresp := cresp.Response.(*action.CreateUserLAResponse)
 
-	resp := &CreateUserLAResponse{
-		LinkedAccount: authresp.LinkedAccount,
+	resp := &gwapitypes.CreateUserLAResponse{
+		LinkedAccount: &gwapitypes.LinkedAccount{
+			ID:                  authresp.LinkedAccount.ID,
+			RemoteUserID:        authresp.LinkedAccount.RemoteUserID,
+			RemoteUserName:      authresp.LinkedAccount.RemoteUserName,
+			RemoteUserAvatarURL: authresp.LinkedAccount.RemoteUserAvatarURL,
+			RemoteSourceID:      authresp.LinkedAccount.RemoteUserID,
+		},
 	}
 	h.log.Infof("linked account %q for user %q created", resp.LinkedAccount.ID, userRef)
 	return resp, nil
@@ -343,14 +320,6 @@ func (h *DeleteUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-type CreateUserTokenRequest struct {
-	TokenName string `json:"token_name"`
-}
-
-type CreateUserTokenResponse struct {
-	Token string `json:"token"`
-}
-
 type CreateUserTokenHandler struct {
 	log *zap.SugaredLogger
 	ah  *action.ActionHandler
@@ -365,7 +334,7 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	vars := mux.Vars(r)
 	userRef := vars["userref"]
 
-	var req CreateUserTokenRequest
+	var req gwapitypes.CreateUserTokenRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))
@@ -383,7 +352,7 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	res := &CreateUserTokenResponse{
+	res := &gwapitypes.CreateUserTokenResponse{
 		Token: token,
 	}
 
@@ -419,18 +388,9 @@ func (h *DeleteUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-type RegisterUserRequest struct {
-	CreateUserRequest
-	CreateUserLARequest
-}
-
 type RegisterUserHandler struct {
 	log *zap.SugaredLogger
 	ah  *action.ActionHandler
-}
-
-type RegisterUserResponse struct {
-	Oauth2Redirect string `json:"oauth2_redirect"`
 }
 
 func NewRegisterUserHandler(logger *zap.Logger, ah *action.ActionHandler) *RegisterUserHandler {
@@ -440,7 +400,7 @@ func NewRegisterUserHandler(logger *zap.Logger, ah *action.ActionHandler) *Regis
 func (h *RegisterUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var req *RegisterUserRequest
+	var req *gwapitypes.RegisterUserRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))
@@ -458,7 +418,7 @@ func (h *RegisterUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-func (h *RegisterUserHandler) registerUser(ctx context.Context, req *RegisterUserRequest) (*RegisterUserResponse, error) {
+func (h *RegisterUserHandler) registerUser(ctx context.Context, req *gwapitypes.RegisterUserRequest) (*gwapitypes.RegisterUserResponse, error) {
 	creq := &action.RegisterUserRequest{
 		UserName:         req.CreateUserRequest.UserName,
 		RemoteSourceName: req.CreateUserLARequest.RemoteSourceName,
@@ -469,25 +429,19 @@ func (h *RegisterUserHandler) registerUser(ctx context.Context, req *RegisterUse
 		return nil, err
 	}
 	if cresp.Oauth2Redirect != "" {
-		return &RegisterUserResponse{
+		return &gwapitypes.RegisterUserResponse{
 			Oauth2Redirect: cresp.Oauth2Redirect,
 		}, nil
 	}
 	//authresp := cresp.Response.(*action.RegisterUserResponse)
 
-	resp := &RegisterUserResponse{}
+	resp := &gwapitypes.RegisterUserResponse{}
 	return resp, nil
 }
 
 type AuthorizeHandler struct {
 	log *zap.SugaredLogger
 	ah  *action.ActionHandler
-}
-
-type AuthorizeResponse struct {
-	Oauth2Redirect   string              `json:"oauth2_redirect"`
-	RemoteUserInfo   *gitsource.UserInfo `json:"remote_user_info"`
-	RemoteSourceName string              `json:"remote_source_name"`
 }
 
 func NewAuthorizeHandler(logger *zap.Logger, ah *action.ActionHandler) *AuthorizeHandler {
@@ -497,7 +451,7 @@ func NewAuthorizeHandler(logger *zap.Logger, ah *action.ActionHandler) *Authoriz
 func (h *AuthorizeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var req *LoginUserRequest
+	var req *gwapitypes.LoginUserRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))
@@ -515,7 +469,7 @@ func (h *AuthorizeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *AuthorizeHandler) authorize(ctx context.Context, req *LoginUserRequest) (*AuthorizeResponse, error) {
+func (h *AuthorizeHandler) authorize(ctx context.Context, req *gwapitypes.LoginUserRequest) (*gwapitypes.AuthorizeResponse, error) {
 	creq := &action.LoginUserRequest{
 		RemoteSourceName: req.RemoteSourceName,
 	}
@@ -525,29 +479,21 @@ func (h *AuthorizeHandler) authorize(ctx context.Context, req *LoginUserRequest)
 		return nil, err
 	}
 	if cresp.Oauth2Redirect != "" {
-		return &AuthorizeResponse{
+		return &gwapitypes.AuthorizeResponse{
 			Oauth2Redirect: cresp.Oauth2Redirect,
 		}, nil
 	}
 	authresp := cresp.Response.(*action.AuthorizeResponse)
 
-	resp := &AuthorizeResponse{
-		RemoteUserInfo:   authresp.RemoteUserInfo,
+	resp := &gwapitypes.AuthorizeResponse{
+		RemoteUserInfo: &gwapitypes.UserInfo{
+			ID:        authresp.RemoteUserInfo.ID,
+			LoginName: authresp.RemoteUserInfo.LoginName,
+			Email:     authresp.RemoteUserInfo.Email,
+		},
 		RemoteSourceName: authresp.RemoteSourceName,
 	}
 	return resp, nil
-}
-
-type LoginUserRequest struct {
-	RemoteSourceName string `json:"remote_source_name"`
-	LoginName        string `json:"login_name"`
-	LoginPassword    string `json:"password"`
-}
-
-type LoginUserResponse struct {
-	Oauth2Redirect string        `json:"oauth2_redirect"`
-	Token          string        `json:"token"`
-	User           *UserResponse `json:"user"`
 }
 
 type LoginUserHandler struct {
@@ -562,7 +508,7 @@ func NewLoginUserHandler(logger *zap.Logger, ah *action.ActionHandler) *LoginUse
 func (h *LoginUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var req *LoginUserRequest
+	var req *gwapitypes.LoginUserRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))
@@ -580,7 +526,7 @@ func (h *LoginUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *LoginUserHandler) loginUser(ctx context.Context, req *LoginUserRequest) (*LoginUserResponse, error) {
+func (h *LoginUserHandler) loginUser(ctx context.Context, req *gwapitypes.LoginUserRequest) (*gwapitypes.LoginUserResponse, error) {
 	creq := &action.LoginUserRequest{
 		RemoteSourceName: req.RemoteSourceName,
 	}
@@ -591,25 +537,17 @@ func (h *LoginUserHandler) loginUser(ctx context.Context, req *LoginUserRequest)
 		return nil, err
 	}
 	if cresp.Oauth2Redirect != "" {
-		return &LoginUserResponse{
+		return &gwapitypes.LoginUserResponse{
 			Oauth2Redirect: cresp.Oauth2Redirect,
 		}, nil
 	}
 	authresp := cresp.Response.(*action.LoginUserResponse)
 
-	resp := &LoginUserResponse{
+	resp := &gwapitypes.LoginUserResponse{
 		Token: authresp.Token,
 		User:  createUserResponse(authresp.User),
 	}
 	return resp, nil
-}
-
-type UserCreateRunRequest struct {
-	RepoUUID  string `json:"repo_uuid,omitempty"`
-	RepoPath  string `json:"repo_path,omitempty"`
-	Branch    string `json:"branch,omitempty"`
-	CommitSHA string `json:"commit_sha,omitempty"`
-	Message   string `json:"message,omitempty"`
 }
 
 type UserCreateRunHandler struct {
@@ -624,7 +562,7 @@ func NewUserCreateRunHandler(logger *zap.Logger, ah *action.ActionHandler) *User
 func (h *UserCreateRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var req UserCreateRunRequest
+	var req gwapitypes.UserCreateRunRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))

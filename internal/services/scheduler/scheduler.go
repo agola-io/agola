@@ -23,8 +23,9 @@ import (
 	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/config"
-	rsapi "agola.io/agola/internal/services/runservice/api"
 	"agola.io/agola/internal/util"
+	rsapitypes "agola.io/agola/services/runservice/api/types"
+	rsclient "agola.io/agola/services/runservice/client"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -178,8 +179,8 @@ func (s *Scheduler) approveRunTasks(ctx context.Context, runID string) error {
 		}
 		// TODO(sgotti) change when we introduce a config the set the minimum number of required approvers
 		if len(approvers) > 0 {
-			rsreq := &rsapi.RunTaskActionsRequest{
-				ActionType:              rsapi.RunTaskActionTypeApprove,
+			rsreq := &rsapitypes.RunTaskActionsRequest{
+				ActionType:              rsapitypes.RunTaskActionTypeApprove,
 				ChangeGroupsUpdateToken: runResp.ChangeGroupsUpdateToken,
 			}
 			if _, err := s.runserviceClient.RunTaskActions(ctx, run.ID, rt.ID, rsreq); err != nil {
@@ -193,7 +194,7 @@ func (s *Scheduler) approveRunTasks(ctx context.Context, runID string) error {
 
 type Scheduler struct {
 	c                *config.Scheduler
-	runserviceClient *rsapi.Client
+	runserviceClient *rsclient.Client
 }
 
 func NewScheduler(c *config.Scheduler) (*Scheduler, error) {
@@ -203,7 +204,7 @@ func NewScheduler(c *config.Scheduler) (*Scheduler, error) {
 
 	return &Scheduler{
 		c:                c,
-		runserviceClient: rsapi.NewClient(c.RunserviceURL),
+		runserviceClient: rsclient.NewClient(c.RunserviceURL),
 	}, nil
 }
 

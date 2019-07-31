@@ -18,17 +18,17 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
-	"time"
 
 	"agola.io/agola/internal/db"
 	action "agola.io/agola/internal/services/configstore/action"
 	"agola.io/agola/internal/services/configstore/readdb"
-	"agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
-	errors "golang.org/x/xerrors"
+	csapitypes "agola.io/agola/services/configstore/api/types"
+	"agola.io/agola/services/configstore/types"
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
+	errors "golang.org/x/xerrors"
 )
 
 type UserHandler struct {
@@ -67,12 +67,6 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type CreateUserRequest struct {
-	UserName string `json:"user_name"`
-
-	CreateUserLARequest *CreateUserLARequest `json:"create_user_la_request"`
-}
-
 type CreateUserHandler struct {
 	log *zap.SugaredLogger
 	ah  *action.ActionHandler
@@ -85,7 +79,7 @@ func NewCreateUserHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateU
 func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var req *CreateUserRequest
+	var req *csapitypes.CreateUserRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))
@@ -118,10 +112,6 @@ func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type UpdateUserRequest struct {
-	UserName string `json:"user_name"`
-}
-
 type UpdateUserHandler struct {
 	log *zap.SugaredLogger
 	ah  *action.ActionHandler
@@ -137,7 +127,7 @@ func (h *UpdateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userRef := vars["userref"]
 
-	var req *UpdateUserRequest
+	var req *csapitypes.UpdateUserRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))
@@ -305,16 +295,6 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type CreateUserLARequest struct {
-	RemoteSourceName           string    `json:"remote_source_name"`
-	RemoteUserID               string    `json:"remote_user_id"`
-	RemoteUserName             string    `json:"remote_user_name"`
-	UserAccessToken            string    `json:"user_access_token"`
-	Oauth2AccessToken          string    `json:"oauth2_access_token"`
-	Oauth2RefreshToken         string    `json:"oauth2_refresh_token"`
-	Oauth2AccessTokenExpiresAt time.Time `json:"oauth_2_access_token_expires_at"`
-}
-
 type CreateUserLAHandler struct {
 	log *zap.SugaredLogger
 	ah  *action.ActionHandler
@@ -329,7 +309,7 @@ func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	vars := mux.Vars(r)
 	userRef := vars["userref"]
 
-	var req CreateUserLARequest
+	var req csapitypes.CreateUserLARequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))
@@ -381,15 +361,6 @@ func (h *DeleteUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-type UpdateUserLARequest struct {
-	RemoteUserID               string    `json:"remote_user_id"`
-	RemoteUserName             string    `json:"remote_user_name"`
-	UserAccessToken            string    `json:"user_access_token"`
-	Oauth2AccessToken          string    `json:"oauth2_access_token"`
-	Oauth2RefreshToken         string    `json:"oauth2_refresh_token"`
-	Oauth2AccessTokenExpiresAt time.Time `json:"oauth_2_access_token_expires_at"`
-}
-
 type UpdateUserLAHandler struct {
 	log *zap.SugaredLogger
 	ah  *action.ActionHandler
@@ -405,7 +376,7 @@ func (h *UpdateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	userRef := vars["userref"]
 	linkedAccountID := vars["laid"]
 
-	var req UpdateUserLARequest
+	var req csapitypes.UpdateUserLARequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))
@@ -433,14 +404,6 @@ func (h *UpdateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-type CreateUserTokenRequest struct {
-	TokenName string `json:"token_name"`
-}
-
-type CreateUserTokenResponse struct {
-	Token string `json:"token"`
-}
-
 type CreateUserTokenHandler struct {
 	log *zap.SugaredLogger
 	ah  *action.ActionHandler
@@ -455,7 +418,7 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	vars := mux.Vars(r)
 	userRef := vars["userref"]
 
-	var req CreateUserTokenRequest
+	var req csapitypes.CreateUserTokenRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))
@@ -468,7 +431,7 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	resp := &CreateUserTokenResponse{
+	resp := &csapitypes.CreateUserTokenResponse{
 		Token: token,
 	}
 	if err := httpResponse(w, http.StatusCreated, resp); err != nil {
@@ -501,13 +464,8 @@ func (h *DeleteUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-type UserOrgsResponse struct {
-	Organization *types.Organization
-	Role         types.MemberRole
-}
-
-func userOrgsResponse(userOrg *action.UserOrgsResponse) *UserOrgsResponse {
-	return &UserOrgsResponse{
+func userOrgsResponse(userOrg *action.UserOrgsResponse) *csapitypes.UserOrgsResponse {
+	return &csapitypes.UserOrgsResponse{
 		Organization: userOrg.Organization,
 		Role:         userOrg.Role,
 	}
@@ -533,7 +491,7 @@ func (h *UserOrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res := make([]*UserOrgsResponse, len(userOrgs))
+	res := make([]*csapitypes.UserOrgsResponse, len(userOrgs))
 	for i, userOrg := range userOrgs {
 		res[i] = userOrgsResponse(userOrg)
 	}

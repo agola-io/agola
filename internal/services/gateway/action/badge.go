@@ -20,7 +20,7 @@ import (
 	"path"
 
 	"agola.io/agola/internal/services/common"
-	rstypes "agola.io/agola/internal/services/runservice/types"
+	rstypes "agola.io/agola/services/runservice/types"
 )
 
 // GetBadge return a badge for a project branch

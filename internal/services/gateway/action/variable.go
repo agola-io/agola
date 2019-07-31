@@ -19,9 +19,9 @@ import (
 	"net/http"
 
 	"agola.io/agola/internal/services/common"
-	csapi "agola.io/agola/internal/services/configstore/api"
-	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
+	csapitypes "agola.io/agola/services/configstore/api/types"
+	cstypes "agola.io/agola/services/configstore/types"
 	errors "golang.org/x/xerrors"
 )
 
@@ -33,9 +33,9 @@ type GetVariablesRequest struct {
 	RemoveOverridden bool
 }
 
-func (h *ActionHandler) GetVariables(ctx context.Context, req *GetVariablesRequest) ([]*csapi.Variable, []*csapi.Secret, error) {
-	var csvars []*csapi.Variable
-	var cssecrets []*csapi.Secret
+func (h *ActionHandler) GetVariables(ctx context.Context, req *GetVariablesRequest) ([]*csapitypes.Variable, []*csapitypes.Secret, error) {
+	var csvars []*csapitypes.Variable
+	var cssecrets []*csapitypes.Secret
 
 	switch req.ParentType {
 	case cstypes.ConfigTypeProjectGroup:
@@ -79,7 +79,7 @@ type CreateVariableRequest struct {
 	Values []cstypes.VariableValue
 }
 
-func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateVariableRequest) (*csapi.Variable, []*csapi.Secret, error) {
+func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateVariableRequest) (*csapitypes.Variable, []*csapitypes.Secret, error) {
 	isVariableOwner, err := h.IsVariableOwner(ctx, req.ParentType, req.ParentRef)
 	if err != nil {
 		return nil, nil, errors.Errorf("failed to determine ownership: %w", err)
@@ -105,8 +105,8 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateVariableR
 		Values: req.Values,
 	}
 
-	var cssecrets []*csapi.Secret
-	var rv *csapi.Variable
+	var cssecrets []*csapitypes.Secret
+	var rv *csapitypes.Variable
 
 	switch req.ParentType {
 	case cstypes.ConfigTypeProjectGroup:
@@ -152,7 +152,7 @@ type UpdateVariableRequest struct {
 	Values []cstypes.VariableValue
 }
 
-func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableRequest) (*csapi.Variable, []*csapi.Secret, error) {
+func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableRequest) (*csapitypes.Variable, []*csapitypes.Secret, error) {
 	isVariableOwner, err := h.IsVariableOwner(ctx, req.ParentType, req.ParentRef)
 	if err != nil {
 		return nil, nil, errors.Errorf("failed to determine ownership: %w", err)
@@ -178,8 +178,8 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableR
 		Values: req.Values,
 	}
 
-	var cssecrets []*csapi.Secret
-	var rv *csapi.Variable
+	var cssecrets []*csapitypes.Secret
+	var rv *csapitypes.Variable
 
 	switch req.ParentType {
 	case cstypes.ConfigTypeProjectGroup:

@@ -19,7 +19,7 @@ import (
 
 	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/sequence"
-	"agola.io/agola/internal/services/runservice/types"
+	"agola.io/agola/services/runservice/types"
 )
 
 func NewRunEvent(ctx context.Context, e *etcd.Store, runID string, phase types.RunPhase, result types.RunResult) (*types.RunEvent, error) {

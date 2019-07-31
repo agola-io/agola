@@ -28,17 +28,17 @@ import (
 	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/configstore"
-	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/services/executor"
 	"agola.io/agola/internal/services/gateway"
-	gwapi "agola.io/agola/internal/services/gateway/api"
 	"agola.io/agola/internal/services/gitserver"
 	"agola.io/agola/internal/services/notification"
 	rsscheduler "agola.io/agola/internal/services/runservice"
-	rstypes "agola.io/agola/internal/services/runservice/types"
 	"agola.io/agola/internal/services/scheduler"
 	"agola.io/agola/internal/testutil"
 	"agola.io/agola/internal/util"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
+	gwclient "agola.io/agola/services/gateway/client"
+	rstypes "agola.io/agola/services/runservice/types"
 
 	gtypes "code.gitea.io/gitea/modules/structs"
 	"code.gitea.io/sdk/gitea"
@@ -348,20 +348,20 @@ func createLinkedAccount(ctx context.Context, t *testing.T, tgitea *testutil.Tes
 	}
 	t.Logf("created gitea user token: %s", giteaToken.Token)
 
-	gwClient := gwapi.NewClient(c.Gateway.APIExposedURL, "admintoken")
-	user, _, err := gwClient.CreateUser(ctx, &gwapi.CreateUserRequest{UserName: agolaUser01})
+	gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
+	user, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	t.Logf("created agola user: %s", user.UserName)
 
-	token, _, err := gwClient.CreateUserToken(ctx, agolaUser01, &gwapi.CreateUserTokenRequest{TokenName: "token01"})
+	token, _, err := gwClient.CreateUserToken(ctx, agolaUser01, &gwapitypes.CreateUserTokenRequest{TokenName: "token01"})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	t.Logf("created agola user token: %s", token.Token)
 
-	rs, _, err := gwClient.CreateRemoteSource(ctx, &gwapi.CreateRemoteSourceRequest{
+	rs, _, err := gwClient.CreateRemoteSource(ctx, &gwapitypes.CreateRemoteSourceRequest{
 		Name:                "gitea",
 		APIURL:              giteaAPIURL,
 		Type:                "gitea",
@@ -374,9 +374,9 @@ func createLinkedAccount(ctx context.Context, t *testing.T, tgitea *testutil.Tes
 	t.Logf("created agola remote source: %s", rs.Name)
 
 	// From now use the user token
-	gwClient = gwapi.NewClient(c.Gateway.APIExposedURL, token.Token)
+	gwClient = gwclient.NewClient(c.Gateway.APIExposedURL, token.Token)
 
-	la, _, err := gwClient.CreateUserLA(ctx, agolaUser01, &gwapi.CreateUserLARequest{
+	la, _, err := gwClient.CreateUserLA(ctx, agolaUser01, &gwapitypes.CreateUserLARequest{
 		RemoteSourceName:          "gitea",
 		RemoteSourceLoginName:     giteaUser01,
 		RemoteSourceLoginPassword: "password",
@@ -408,12 +408,12 @@ func TestCreateProject(t *testing.T) {
 	giteaToken, token := createLinkedAccount(ctx, t, tgitea, c)
 
 	giteaClient := gitea.NewClient(giteaAPIURL, giteaToken)
-	gwClient := gwapi.NewClient(c.Gateway.APIExposedURL, token)
+	gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, token)
 
 	createProject(ctx, t, giteaClient, gwClient)
 }
 
-func createProject(ctx context.Context, t *testing.T, giteaClient *gitea.Client, gwClient *gwapi.Client) (*gtypes.Repository, *gwapi.ProjectResponse) {
+func createProject(ctx context.Context, t *testing.T, giteaClient *gitea.Client, gwClient *gwclient.Client) (*gtypes.Repository, *gwapitypes.ProjectResponse) {
 	giteaRepo, err := giteaClient.CreateRepo(gtypes.CreateRepoOption{
 		Name: "repo01",
 	})
@@ -422,12 +422,12 @@ func createProject(ctx context.Context, t *testing.T, giteaClient *gitea.Client,
 	}
 	t.Logf("created gitea repo: %s", giteaRepo.Name)
 
-	project, _, err := gwClient.CreateProject(ctx, &gwapi.CreateProjectRequest{
+	project, _, err := gwClient.CreateProject(ctx, &gwapitypes.CreateProjectRequest{
 		Name:             "project01",
 		ParentRef:        path.Join("user", agolaUser01),
 		RemoteSourceName: "gitea",
 		RepoPath:         path.Join(giteaUser01, "repo01"),
-		Visibility:       cstypes.VisibilityPublic,
+		Visibility:       gwapitypes.VisibilityPublic,
 	})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -455,7 +455,7 @@ func TestRun(t *testing.T) {
 	giteaToken, token := createLinkedAccount(ctx, t, tgitea, c)
 
 	giteaClient := gitea.NewClient(giteaAPIURL, giteaToken)
-	gwClient := gwapi.NewClient(c.Gateway.APIExposedURL, token)
+	gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, token)
 
 	giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)
 
@@ -479,7 +479,7 @@ func TestRun(t *testing.T) {
               },
             ],
           },
-	  steps: [
+          steps: [
             { type: 'run', command: 'env' },
           ],
         },

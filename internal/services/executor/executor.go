@@ -35,9 +35,9 @@ import (
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/executor/driver"
 	"agola.io/agola/internal/services/executor/registry"
-	rsapi "agola.io/agola/internal/services/runservice/api"
-	"agola.io/agola/internal/services/runservice/types"
 	"agola.io/agola/internal/util"
+	rsclient "agola.io/agola/services/runservice/client"
+	"agola.io/agola/services/runservice/types"
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/gorilla/mux"
@@ -1304,7 +1304,7 @@ func (e *Executor) saveExecutorID(id string) error {
 
 type Executor struct {
 	c                *config.Executor
-	runserviceClient *rsapi.Client
+	runserviceClient *rsclient.Client
 	id               string
 	runningTasks     *runningTasks
 	driver           driver.Driver
@@ -1325,7 +1325,7 @@ func NewExecutor(c *config.Executor) (*Executor, error) {
 
 	e := &Executor{
 		c:                c,
-		runserviceClient: rsapi.NewClient(c.RunserviceURL),
+		runserviceClient: rsclient.NewClient(c.RunserviceURL),
 		runningTasks: &runningTasks{
 			tasks: make(map[string]*runningTask),
 		},

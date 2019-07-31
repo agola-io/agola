@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	"agola.io/agola/internal/services/common"
-	csapi "agola.io/agola/internal/services/configstore/api"
+	csclient "agola.io/agola/services/configstore/client"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	jwtrequest "github.com/dgrijalva/jwt-go/request"
@@ -32,7 +32,7 @@ type AuthHandler struct {
 	log  *zap.SugaredLogger
 	next http.Handler
 
-	configstoreClient *csapi.Client
+	configstoreClient *csclient.Client
 	adminToken        string
 
 	sd *common.TokenSigningData
@@ -40,7 +40,7 @@ type AuthHandler struct {
 	required bool
 }
 
-func NewAuthHandler(logger *zap.Logger, configstoreClient *csapi.Client, adminToken string, sd *common.TokenSigningData, required bool) func(http.Handler) http.Handler {
+func NewAuthHandler(logger *zap.Logger, configstoreClient *csclient.Client, adminToken string, sd *common.TokenSigningData, required bool) func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		return &AuthHandler{
 			log:               logger.Sugar(),

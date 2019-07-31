@@ -18,7 +18,8 @@ import (
 	"context"
 	"fmt"
 
-	"agola.io/agola/internal/services/gateway/api"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
+	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
@@ -58,9 +59,9 @@ func init() {
 }
 
 func userTokenCreate(cmd *cobra.Command, args []string) error {
-	gwclient := api.NewClient(gatewayURL, token)
+	gwclient := gwclient.NewClient(gatewayURL, token)
 
-	req := &api.CreateUserTokenRequest{
+	req := &gwapitypes.CreateUserTokenRequest{
 		TokenName: userTokenCreateOpts.tokenName,
 	}
 

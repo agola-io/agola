@@ -24,10 +24,6 @@ import (
 	"go.uber.org/zap"
 )
 
-type BadgeRequest struct {
-	Name string `json:"name"`
-}
-
 type BadgeHandler struct {
 	log *zap.SugaredLogger
 	ah  *action.ActionHandler

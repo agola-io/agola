@@ -26,8 +26,8 @@ import (
 	"strings"
 	"time"
 
-	"agola.io/agola/internal/common"
 	"agola.io/agola/internal/util"
+	"agola.io/agola/services/types"
 
 	"github.com/docker/docker/pkg/archive"
 	uuid "github.com/satori/go.uuid"
@@ -248,16 +248,16 @@ func (d *K8sDriver) Setup(ctx context.Context) error {
 	return nil
 }
 
-func (d *K8sDriver) Archs(ctx context.Context) ([]common.Arch, error) {
+func (d *K8sDriver) Archs(ctx context.Context) ([]types.Arch, error) {
 	// TODO(sgotti) use go client listers instead of querying every time
 	nodes, err := d.nodeLister.List(apilabels.SelectorFromSet(nil))
 	if err != nil {
 		return nil, err
 	}
-	archsMap := map[common.Arch]struct{}{}
-	archs := []common.Arch{}
+	archsMap := map[types.Arch]struct{}{}
+	archs := []types.Arch{}
 	for _, node := range nodes {
-		archsMap[common.ArchFromString(node.Status.NodeInfo.Architecture)] = struct{}{}
+		archsMap[types.ArchFromString(node.Status.NodeInfo.Architecture)] = struct{}{}
 	}
 	for arch := range archsMap {
 		archs = append(archs, arch)
@@ -489,12 +489,12 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 	}
 	osArch := strings.TrimSpace(stdout.String())
 
-	var arch common.Arch
+	var arch types.Arch
 	switch osArch {
 	case "x86_64":
-		arch = common.ArchAMD64
+		arch = types.ArchAMD64
 	case "aarch64":
-		arch = common.ArchARM64
+		arch = types.ArchARM64
 	default:
 		return nil, errors.Errorf("unsupported pod arch %q", osArch)
 	}

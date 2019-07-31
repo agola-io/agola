@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"time"
 
-	"agola.io/agola/internal/services/runservice/types"
+	"agola.io/agola/services/runservice/types"
 	"go.uber.org/zap"
 	errors "golang.org/x/xerrors"
 )

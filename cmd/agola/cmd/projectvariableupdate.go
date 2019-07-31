@@ -19,8 +19,8 @@ import (
 	"io/ioutil"
 	"os"
 
-	cstypes "agola.io/agola/internal/services/configstore/types"
-	"agola.io/agola/internal/services/gateway/api"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
+	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
@@ -68,7 +68,7 @@ func init() {
 }
 
 func variableUpdate(cmd *cobra.Command, ownertype string, args []string) error {
-	gwclient := api.NewClient(gatewayURL, token)
+	gwclient := gwclient.NewClient(gatewayURL, token)
 
 	// "github.com/ghodss/yaml" doesn't provide a streaming decoder
 	var data []byte
@@ -89,15 +89,15 @@ func variableUpdate(cmd *cobra.Command, ownertype string, args []string) error {
 	if err := yaml.Unmarshal(data, &values); err != nil {
 		log.Fatalf("failed to unmarshall values: %v", err)
 	}
-	rvalues := []cstypes.VariableValue{}
+	rvalues := []gwapitypes.VariableValueRequest{}
 	for _, value := range values {
-		rvalues = append(rvalues, cstypes.VariableValue{
+		rvalues = append(rvalues, gwapitypes.VariableValueRequest{
 			SecretName: value.SecretName,
 			SecretVar:  value.SecretVar,
-			When:       (*cstypes.When)(value.When),
+			When:       value.When,
 		})
 	}
-	req := &api.UpdateVariableRequest{
+	req := &gwapitypes.UpdateVariableRequest{
 		Name:   variableUpdateOpts.name,
 		Values: rvalues,
 	}

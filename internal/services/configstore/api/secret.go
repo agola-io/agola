@@ -21,20 +21,13 @@ import (
 	"agola.io/agola/internal/db"
 	"agola.io/agola/internal/services/configstore/action"
 	"agola.io/agola/internal/services/configstore/readdb"
-	"agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
+	csapitypes "agola.io/agola/services/configstore/api/types"
+	"agola.io/agola/services/configstore/types"
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 )
-
-// Secret augments types.Secret with dynamic data
-type Secret struct {
-	*types.Secret
-
-	// dynamic data
-	ParentPath string
-}
 
 type SecretHandler struct {
 	log    *zap.SugaredLogger
@@ -89,9 +82,9 @@ func (h *SecretsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resSecrets := make([]*Secret, len(secrets))
+	resSecrets := make([]*csapitypes.Secret, len(secrets))
 	for i, s := range secrets {
-		resSecrets[i] = &Secret{Secret: s}
+		resSecrets[i] = &csapitypes.Secret{Secret: s}
 	}
 
 	err = h.readDB.Do(ctx, func(tx *db.Tx) error {

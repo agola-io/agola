@@ -15,20 +15,20 @@
 package common
 
 import (
-	csapi "agola.io/agola/internal/services/configstore/api"
-	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
+	csapitypes "agola.io/agola/services/configstore/api/types"
+	cstypes "agola.io/agola/services/configstore/types"
 )
 
-func FilterOverriddenVariables(variables []*csapi.Variable) []*csapi.Variable {
-	variablesMap := map[string]*csapi.Variable{}
+func FilterOverriddenVariables(variables []*csapitypes.Variable) []*csapitypes.Variable {
+	variablesMap := map[string]*csapitypes.Variable{}
 	for _, v := range variables {
 		if _, ok := variablesMap[v.Name]; !ok {
 			variablesMap[v.Name] = v
 		}
 	}
 
-	filteredVariables := make([]*csapi.Variable, len(variablesMap))
+	filteredVariables := make([]*csapitypes.Variable, len(variablesMap))
 	i := 0
 	// keep the original order
 	for _, v := range variables {
@@ -43,9 +43,9 @@ func FilterOverriddenVariables(variables []*csapi.Variable) []*csapi.Variable {
 	return filteredVariables
 }
 
-func GetVarValueMatchingSecret(varval cstypes.VariableValue, varParentPath string, secrets []*csapi.Secret) *csapi.Secret {
+func GetVarValueMatchingSecret(varval cstypes.VariableValue, varParentPath string, secrets []*csapitypes.Secret) *csapitypes.Secret {
 	// get the secret value referenced by the variable, it must be a secret at the same level or a lower level
-	var secret *csapi.Secret
+	var secret *csapitypes.Secret
 	for _, s := range secrets {
 		// we assume the root path will be the same
 		if s.Name != varval.SecretName {

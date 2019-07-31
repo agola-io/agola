@@ -20,8 +20,9 @@ import (
 	"path"
 
 	gitsave "agola.io/agola/internal/git-save"
-	"agola.io/agola/internal/services/gateway/api"
 	"agola.io/agola/internal/util"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
+	gwclient "agola.io/agola/services/gateway/client"
 
 	uuid "github.com/satori/go.uuid"
 	"github.com/spf13/cobra"
@@ -62,7 +63,7 @@ func init() {
 }
 
 func directRunStart(cmd *cobra.Command, args []string) error {
-	gwclient := api.NewClient(gatewayURL, token)
+	gwclient := gwclient.NewClient(gatewayURL, token)
 
 	user, _, err := gwclient.GetCurrentUser(context.TODO())
 	if err != nil {
@@ -102,7 +103,7 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 	}
 
 	log.Infof("starting direct run")
-	req := &api.UserCreateRunRequest{
+	req := &gwapitypes.UserCreateRunRequest{
 		RepoUUID:  repoUUID,
 		RepoPath:  repoPath,
 		Branch:    branch,

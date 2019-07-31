@@ -18,9 +18,9 @@ import (
 	"context"
 
 	"agola.io/agola/internal/gitsources/github"
-	cstypes "agola.io/agola/internal/services/configstore/types"
-	"agola.io/agola/internal/services/gateway/api"
-	"agola.io/agola/internal/util"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
+	gwclient "agola.io/agola/services/gateway/client"
+	"agola.io/agola/util"
 
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
@@ -81,10 +81,10 @@ func init() {
 }
 
 func remoteSourceCreate(cmd *cobra.Command, args []string) error {
-	gwclient := api.NewClient(gatewayURL, token)
+	gwclient := gwclient.NewClient(gatewayURL, token)
 
 	// for github remote source type, set defaults for github.com
-	if remoteSourceCreateOpts.rsType == string(cstypes.RemoteSourceTypeGithub) {
+	if remoteSourceCreateOpts.rsType == "github" {
 		remoteSourceCreateOpts.apiURL = github.GitHubAPIURL
 		remoteSourceCreateOpts.sshHostKey = github.GitHubSSHHostKey
 	}
@@ -93,7 +93,7 @@ func remoteSourceCreate(cmd *cobra.Command, args []string) error {
 		return errors.Errorf(`required flag "api-url" not set`)
 	}
 
-	req := &api.CreateRemoteSourceRequest{
+	req := &gwapitypes.CreateRemoteSourceRequest{
 		Name:                remoteSourceCreateOpts.name,
 		Type:                remoteSourceCreateOpts.rsType,
 		AuthType:            remoteSourceCreateOpts.authType,

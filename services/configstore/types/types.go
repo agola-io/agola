@@ -20,7 +20,7 @@ import (
 	"regexp"
 	"time"
 
-	"agola.io/agola/internal/util"
+	"agola.io/agola/util"
 )
 
 // Configstore types

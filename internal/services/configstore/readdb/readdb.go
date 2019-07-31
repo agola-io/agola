@@ -30,8 +30,8 @@ import (
 	"agola.io/agola/internal/objectstorage"
 	ostypes "agola.io/agola/internal/objectstorage/types"
 	"agola.io/agola/internal/sequence"
-	"agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
+	"agola.io/agola/services/configstore/types"
 
 	sq "github.com/Masterminds/squirrel"
 	"go.uber.org/zap"

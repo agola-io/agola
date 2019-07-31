@@ -19,19 +19,15 @@ import (
 	"net/http"
 	"strconv"
 
-	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
+	cstypes "agola.io/agola/services/configstore/types"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
 	"go.uber.org/zap"
 	errors "golang.org/x/xerrors"
 
 	"github.com/gorilla/mux"
 )
-
-type CreateOrgRequest struct {
-	Name       string             `json:"name"`
-	Visibility cstypes.Visibility `json:"visibility"`
-}
 
 type CreateOrgHandler struct {
 	log *zap.SugaredLogger
@@ -51,7 +47,7 @@ func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		userID = userIDVal.(string)
 	}
 
-	var req CreateOrgRequest
+	var req gwapitypes.CreateOrgRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))
@@ -60,7 +56,7 @@ func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	creq := &action.CreateOrgRequest{
 		Name:          req.Name,
-		Visibility:    req.Visibility,
+		Visibility:    cstypes.Visibility(req.Visibility),
 		CreatorUserID: userID,
 	}
 
@@ -127,17 +123,11 @@ func (h *OrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type OrgResponse struct {
-	ID         string             `json:"id"`
-	Name       string             `json:"name"`
-	Visibility cstypes.Visibility `json:"visibility,omitempty"`
-}
-
-func createOrgResponse(o *cstypes.Organization) *OrgResponse {
-	org := &OrgResponse{
+func createOrgResponse(o *cstypes.Organization) *gwapitypes.OrgResponse {
+	org := &gwapitypes.OrgResponse{
 		ID:         o.ID,
 		Name:       o.Name,
-		Visibility: o.Visibility,
+		Visibility: gwapitypes.Visibility(o.Visibility),
 	}
 	return org
 }
@@ -190,7 +180,7 @@ func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	orgs := make([]*OrgResponse, len(csorgs))
+	orgs := make([]*gwapitypes.OrgResponse, len(csorgs))
 	for i, p := range csorgs {
 		orgs[i] = createOrgResponse(p)
 	}
@@ -199,20 +189,10 @@ func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type OrgMembersResponse struct {
-	Organization *OrgResponse         `json:"organization"`
-	Members      []*OrgMemberResponse `json:"members"`
-}
-
-type OrgMemberResponse struct {
-	User *UserResponse      `json:"user"`
-	Role cstypes.MemberRole `json:"role"`
-}
-
-func createOrgMemberResponse(user *cstypes.User, role cstypes.MemberRole) *OrgMemberResponse {
-	return &OrgMemberResponse{
+func createOrgMemberResponse(user *cstypes.User, role cstypes.MemberRole) *gwapitypes.OrgMemberResponse {
+	return &gwapitypes.OrgMemberResponse{
 		User: createUserResponse(user),
-		Role: role,
+		Role: gwapitypes.MemberRole(role),
 	}
 }
 
@@ -237,9 +217,9 @@ func (h *OrgMembersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res := &OrgMembersResponse{
+	res := &gwapitypes.OrgMembersResponse{
 		Organization: createOrgResponse(ares.Organization),
-		Members:      make([]*OrgMemberResponse, len(ares.Members)),
+		Members:      make([]*gwapitypes.OrgMemberResponse, len(ares.Members)),
 	}
 	for i, m := range ares.Members {
 		res.Members[i] = createOrgMemberResponse(m.User, m.Role)
@@ -249,23 +229,14 @@ func (h *OrgMembersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type AddOrgMemberResponse struct {
-	Organization *OrgResponse `json:"organization"`
-	OrgMemberResponse
-}
-
-func createAddOrgMemberResponse(org *cstypes.Organization, user *cstypes.User, role cstypes.MemberRole) *AddOrgMemberResponse {
-	return &AddOrgMemberResponse{
+func createAddOrgMemberResponse(org *cstypes.Organization, user *cstypes.User, role cstypes.MemberRole) *gwapitypes.AddOrgMemberResponse {
+	return &gwapitypes.AddOrgMemberResponse{
 		Organization: createOrgResponse(org),
-		OrgMemberResponse: OrgMemberResponse{
+		OrgMemberResponse: gwapitypes.OrgMemberResponse{
 			User: createUserResponse(user),
-			Role: role,
+			Role: gwapitypes.MemberRole(role),
 		},
 	}
-}
-
-type AddOrgMemberRequest struct {
-	Role cstypes.MemberRole `json:"role"`
 }
 
 type AddOrgMemberHandler struct {
@@ -284,14 +255,14 @@ func (h *AddOrgMemberHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	orgRef := vars["orgref"]
 	userRef := vars["userref"]
 
-	var req AddOrgMemberRequest
+	var req gwapitypes.AddOrgMemberRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
 
-	ares, err := h.ah.AddOrgMember(ctx, orgRef, userRef, req.Role)
+	ares, err := h.ah.AddOrgMember(ctx, orgRef, userRef, cstypes.MemberRole(req.Role))
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return

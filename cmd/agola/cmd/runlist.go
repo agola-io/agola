@@ -19,7 +19,8 @@ import (
 	"fmt"
 	"path"
 
-	"agola.io/agola/internal/services/gateway/api"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
+	gwclient "agola.io/agola/services/gateway/client"
 	errors "golang.org/x/xerrors"
 
 	"github.com/spf13/cobra"
@@ -59,7 +60,7 @@ func init() {
 	cmdRun.AddCommand(cmdRunList)
 }
 
-func printRuns(runs []*api.RunResponse) {
+func printRuns(runs []*gwapitypes.RunResponse) {
 	for _, run := range runs {
 		fmt.Printf("%s: Phase: %s, Result: %s\n", run.ID, run.Phase, run.Result)
 		for _, task := range run.Tasks {
@@ -69,7 +70,7 @@ func printRuns(runs []*api.RunResponse) {
 }
 
 func runList(cmd *cobra.Command, args []string) error {
-	gwclient := api.NewClient(gatewayURL, token)
+	gwclient := gwclient.NewClient(gatewayURL, token)
 
 	project, _, err := gwclient.GetProject(context.TODO(), runListOpts.projectRef)
 	if err != nil {
@@ -81,7 +82,7 @@ func runList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	runs := make([]*api.RunResponse, len(runsResp))
+	runs := make([]*gwapitypes.RunResponse, len(runsResp))
 	for i, runResponse := range runsResp {
 		run, _, err := gwclient.GetRun(context.TODO(), runResponse.ID)
 		if err != nil {

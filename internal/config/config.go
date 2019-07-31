@@ -20,9 +20,9 @@ import (
 	"regexp"
 	"strings"
 
-	"agola.io/agola/internal/common"
-	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
+	cstypes "agola.io/agola/services/configstore/types"
+	"agola.io/agola/services/types"
 
 	"github.com/ghodss/yaml"
 	"github.com/google/go-jsonnet"
@@ -83,7 +83,7 @@ type DockerRegistryAuth struct {
 
 type Runtime struct {
 	Type       RuntimeType  `json:"type,omitempty"`
-	Arch       common.Arch  `json:"arch,omitempty"`
+	Arch       types.Arch   `json:"arch,omitempty"`
 	Containers []*Container `json:"containers,omitempty"`
 }
 
@@ -702,7 +702,7 @@ func checkConfig(config *Config) error {
 				return errors.Errorf("task %q runtime: at least one container must be defined", task.Name)
 			}
 			if r.Arch != "" {
-				if !common.IsValidArch(r.Arch) {
+				if !types.IsValidArch(r.Arch) {
 					return errors.Errorf("task %q runtime: invalid arch %q", task.Name, r.Arch)
 				}
 			}

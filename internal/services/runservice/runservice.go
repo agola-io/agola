@@ -31,8 +31,8 @@ import (
 	"agola.io/agola/internal/services/runservice/api"
 	"agola.io/agola/internal/services/runservice/common"
 	"agola.io/agola/internal/services/runservice/readdb"
-	"agola.io/agola/internal/services/runservice/types"
 	"agola.io/agola/internal/util"
+	"agola.io/agola/services/runservice/types"
 
 	"github.com/gorilla/mux"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"

@@ -31,8 +31,9 @@ import (
 	"agola.io/agola/internal/services/runservice/common"
 	"agola.io/agola/internal/services/runservice/readdb"
 	"agola.io/agola/internal/services/runservice/store"
-	"agola.io/agola/internal/services/runservice/types"
 	"agola.io/agola/internal/util"
+	rsapitypes "agola.io/agola/services/runservice/api/types"
+	"agola.io/agola/services/runservice/types"
 
 	"github.com/gorilla/mux"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
@@ -350,12 +351,6 @@ func (h *ChangeGroupsUpdateTokensHandler) ServeHTTP(w http.ResponseWriter, r *ht
 	}
 }
 
-type RunResponse struct {
-	Run                     *types.Run       `json:"run"`
-	RunConfig               *types.RunConfig `json:"run_config"`
-	ChangeGroupsUpdateToken string           `json:"change_groups_update_tokens"`
-}
-
 type RunHandler struct {
 	log    *zap.SugaredLogger
 	e      *etcd.Store
@@ -415,7 +410,7 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res := &RunResponse{
+	res := &rsapitypes.RunResponse{
 		Run:                     run,
 		RunConfig:               rc,
 		ChangeGroupsUpdateToken: cgts,
@@ -430,11 +425,6 @@ const (
 	DefaultRunsLimit = 25
 	MaxRunsLimit     = 40
 )
-
-type GetRunsResponse struct {
-	Runs                    []*types.Run `json:"runs"`
-	ChangeGroupsUpdateToken string       `json:"change_groups_update_tokens"`
-}
 
 type RunsHandler struct {
 	log    *zap.SugaredLogger
@@ -507,34 +497,13 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res := &GetRunsResponse{
+	res := &rsapitypes.GetRunsResponse{
 		Runs:                    runs,
 		ChangeGroupsUpdateToken: cgts,
 	}
 	if err := httpResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
-}
-
-type RunCreateRequest struct {
-	// new run fields
-	RunConfigTasks    map[string]*types.RunConfigTask `json:"run_config_tasks"`
-	Name              string                          `json:"name"`
-	Group             string                          `json:"group"`
-	SetupErrors       []string                        `json:"setup_errors"`
-	StaticEnvironment map[string]string               `json:"static_environment"`
-	CacheGroup        string                          `json:"cache_group"`
-
-	// existing run fields
-	RunID      string   `json:"run_id"`
-	FromStart  bool     `json:"from_start"`
-	ResetTasks []string `json:"reset_tasks"`
-
-	// common fields
-	Environment map[string]string `json:"environment"`
-	Annotations map[string]string `json:"annotations"`
-
-	ChangeGroupsUpdateToken string `json:"changeup_update_tokens"`
 }
 
 type RunCreateHandler struct {
@@ -552,7 +521,7 @@ func NewRunCreateHandler(logger *zap.Logger, ah *action.ActionHandler) *RunCreat
 func (h *RunCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var req RunCreateRequest
+	var req rsapitypes.RunCreateRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -582,7 +551,7 @@ func (h *RunCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res := &RunResponse{
+	res := &rsapitypes.RunResponse{
 		Run:       rb.Run,
 		RunConfig: rb.Rc,
 	}
@@ -590,20 +559,6 @@ func (h *RunCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := httpResponse(w, http.StatusCreated, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
-}
-
-type RunActionType string
-
-const (
-	RunActionTypeChangePhase RunActionType = "changephase"
-	RunActionTypeStop        RunActionType = "stop"
-)
-
-type RunActionsRequest struct {
-	ActionType RunActionType `json:"action_type"`
-
-	Phase                   types.RunPhase `json:"phase"`
-	ChangeGroupsUpdateToken string         `json:"change_groups_update_tokens"`
 }
 
 type RunActionsHandler struct {
@@ -623,7 +578,7 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	runID := vars["runid"]
 
-	var req RunActionsRequest
+	var req rsapitypes.RunActionsRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -631,7 +586,7 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch req.ActionType {
-	case RunActionTypeChangePhase:
+	case rsapitypes.RunActionTypeChangePhase:
 		creq := &action.RunChangePhaseRequest{
 			RunID:                   runID,
 			Phase:                   req.Phase,
@@ -642,7 +597,7 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			httpError(w, err)
 			return
 		}
-	case RunActionTypeStop:
+	case rsapitypes.RunActionTypeStop:
 		creq := &action.RunStopRequest{
 			RunID:                   runID,
 			ChangeGroupsUpdateToken: req.ChangeGroupsUpdateToken,
@@ -656,23 +611,6 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
-}
-
-type RunTaskActionType string
-
-const (
-	RunTaskActionTypeSetAnnotations RunTaskActionType = "setannotations"
-	RunTaskActionTypeApprove        RunTaskActionType = "approve"
-)
-
-type RunTaskActionsRequest struct {
-	ActionType RunTaskActionType `json:"action_type"`
-
-	// set Annotations fields
-	Annotations map[string]string `json:"annotations,omitempty"`
-
-	// global fields
-	ChangeGroupsUpdateToken string `json:"change_groups_update_tokens"`
 }
 
 type RunTaskActionsHandler struct {
@@ -693,7 +631,7 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	runID := vars["runid"]
 	taskID := vars["taskid"]
 
-	var req RunTaskActionsRequest
+	var req rsapitypes.RunTaskActionsRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -701,7 +639,7 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	}
 
 	switch req.ActionType {
-	case RunTaskActionTypeSetAnnotations:
+	case rsapitypes.RunTaskActionTypeSetAnnotations:
 		creq := &action.RunTaskSetAnnotationsRequest{
 			RunID:                   runID,
 			TaskID:                  taskID,
@@ -714,7 +652,7 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 			return
 		}
 
-	case RunTaskActionTypeApprove:
+	case rsapitypes.RunTaskActionTypeApprove:
 		creq := &action.RunTaskApproveRequest{
 			RunID:                   runID,
 			TaskID:                  taskID,

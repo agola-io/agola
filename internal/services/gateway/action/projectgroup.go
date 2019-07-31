@@ -18,14 +18,14 @@ import (
 	"context"
 	"path"
 
-	csapi "agola.io/agola/internal/services/configstore/api"
-	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
+	csapitypes "agola.io/agola/services/configstore/api/types"
+	cstypes "agola.io/agola/services/configstore/types"
 
 	errors "golang.org/x/xerrors"
 )
 
-func (h *ActionHandler) GetProjectGroup(ctx context.Context, projectGroupRef string) (*csapi.ProjectGroup, error) {
+func (h *ActionHandler) GetProjectGroup(ctx context.Context, projectGroupRef string) (*csapitypes.ProjectGroup, error) {
 	projectGroup, resp, err := h.configstoreClient.GetProjectGroup(ctx, projectGroupRef)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
@@ -33,7 +33,7 @@ func (h *ActionHandler) GetProjectGroup(ctx context.Context, projectGroupRef str
 	return projectGroup, nil
 }
 
-func (h *ActionHandler) GetProjectGroupSubgroups(ctx context.Context, projectGroupRef string) ([]*csapi.ProjectGroup, error) {
+func (h *ActionHandler) GetProjectGroupSubgroups(ctx context.Context, projectGroupRef string) ([]*csapitypes.ProjectGroup, error) {
 	projectGroups, resp, err := h.configstoreClient.GetProjectGroupSubgroups(ctx, projectGroupRef)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
@@ -41,7 +41,7 @@ func (h *ActionHandler) GetProjectGroupSubgroups(ctx context.Context, projectGro
 	return projectGroups, nil
 }
 
-func (h *ActionHandler) GetProjectGroupProjects(ctx context.Context, projectGroupRef string) ([]*csapi.Project, error) {
+func (h *ActionHandler) GetProjectGroupProjects(ctx context.Context, projectGroupRef string) ([]*csapitypes.Project, error) {
 	projects, resp, err := h.configstoreClient.GetProjectGroupProjects(ctx, projectGroupRef)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
@@ -56,7 +56,7 @@ type CreateProjectGroupRequest struct {
 	Visibility    cstypes.Visibility
 }
 
-func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProjectGroupRequest) (*csapi.ProjectGroup, error) {
+func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProjectGroupRequest) (*csapitypes.ProjectGroup, error) {
 	if !util.ValidateName(req.Name) {
 		return nil, util.NewErrBadRequest(errors.Errorf("invalid projectGroup name %q", req.Name))
 	}
@@ -109,7 +109,7 @@ type UpdateProjectGroupRequest struct {
 	Visibility cstypes.Visibility
 }
 
-func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, projectGroupRef string, req *UpdateProjectGroupRequest) (*csapi.ProjectGroup, error) {
+func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, projectGroupRef string, req *UpdateProjectGroupRequest) (*csapitypes.ProjectGroup, error) {
 	pg, resp, err := h.configstoreClient.GetProjectGroup(ctx, projectGroupRef)
 	if err != nil {
 		return nil, errors.Errorf("failed to get project group %q: %w", projectGroupRef, ErrFromRemote(resp, err))

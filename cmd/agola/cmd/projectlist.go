@@ -18,7 +18,9 @@ import (
 	"context"
 	"fmt"
 
-	"agola.io/agola/internal/services/gateway/api"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
+	gwclient "agola.io/agola/services/gateway/client"
+
 	"github.com/spf13/cobra"
 )
 
@@ -50,14 +52,14 @@ func init() {
 	cmdProject.AddCommand(cmdProjectList)
 }
 
-func printProjects(projects []*api.ProjectResponse) {
+func printProjects(projects []*gwapitypes.ProjectResponse) {
 	for _, project := range projects {
 		fmt.Printf("%s: Name: %s\n", project.ID, project.Name)
 	}
 }
 
 func projectList(cmd *cobra.Command, args []string) error {
-	gwclient := api.NewClient(gatewayURL, token)
+	gwclient := gwclient.NewClient(gatewayURL, token)
 
 	projects, _, err := gwclient.GetProjectGroupProjects(context.TODO(), projectListOpts.parentPath)
 	if err != nil {

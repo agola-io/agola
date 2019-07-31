@@ -17,7 +17,7 @@ package cmd
 import (
 	"context"
 
-	"agola.io/agola/internal/services/gateway/api"
+	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
@@ -52,7 +52,7 @@ func init() {
 }
 
 func projectReconfig(cmd *cobra.Command, args []string) error {
-	gwclient := api.NewClient(gatewayURL, token)
+	gwclient := gwclient.NewClient(gatewayURL, token)
 
 	log.Infof("reconfiguring remote project")
 	if _, err := gwclient.ReconfigProject(context.TODO(), projectReconfigOpts.name); err != nil {

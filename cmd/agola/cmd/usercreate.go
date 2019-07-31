@@ -17,7 +17,8 @@ package cmd
 import (
 	"context"
 
-	"agola.io/agola/internal/services/gateway/api"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
+	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
@@ -52,9 +53,9 @@ func init() {
 }
 
 func userCreate(cmd *cobra.Command, args []string) error {
-	gwclient := api.NewClient(gatewayURL, token)
+	gwclient := gwclient.NewClient(gatewayURL, token)
 
-	req := &api.CreateUserRequest{
+	req := &gwapitypes.CreateUserRequest{
 		UserName: userCreateOpts.username,
 	}
 

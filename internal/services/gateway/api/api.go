@@ -19,8 +19,8 @@ import (
 	"net/http"
 	"net/url"
 
-	cstypes "agola.io/agola/internal/services/configstore/types"
-	"agola.io/agola/internal/util"
+	util "agola.io/agola/internal/util"
+	cstypes "agola.io/agola/services/configstore/types"
 
 	"github.com/gorilla/mux"
 	errors "golang.org/x/xerrors"
