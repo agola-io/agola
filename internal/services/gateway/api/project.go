@@ -20,8 +20,8 @@ import (
 	"net/url"
 
 	csapi "agola.io/agola/internal/services/configstore/api"
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/services/gateway/action"
-	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 
 	"github.com/gorilla/mux"
@@ -29,12 +29,12 @@ import (
 )
 
 type CreateProjectRequest struct {
-	Name                string           `json:"name,omitempty"`
-	ParentRef           string           `json:"parent_ref,omitempty"`
-	Visibility          types.Visibility `json:"visibility,omitempty"`
-	RepoPath            string           `json:"repo_path,omitempty"`
-	RemoteSourceName    string           `json:"remote_source_name,omitempty"`
-	SkipSSHHostKeyCheck bool             `json:"skip_ssh_host_key_check,omitempty"`
+	Name                string             `json:"name,omitempty"`
+	ParentRef           string             `json:"parent_ref,omitempty"`
+	Visibility          cstypes.Visibility `json:"visibility,omitempty"`
+	RepoPath            string             `json:"repo_path,omitempty"`
+	RemoteSourceName    string             `json:"remote_source_name,omitempty"`
+	SkipSSHHostKeyCheck bool               `json:"skip_ssh_host_key_check,omitempty"`
 }
 
 type CreateProjectHandler struct {
@@ -78,8 +78,8 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 }
 
 type UpdateProjectRequest struct {
-	Name       string           `json:"name,omitempty"`
-	Visibility types.Visibility `json:"visibility,omitempty"`
+	Name       string             `json:"name,omitempty"`
+	Visibility cstypes.Visibility `json:"visibility,omitempty"`
 }
 
 type UpdateProjectHandler struct {
@@ -240,12 +240,12 @@ func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type ProjectResponse struct {
-	ID               string           `json:"id,omitempty"`
-	Name             string           `json:"name,omitempty"`
-	Path             string           `json:"path,omitempty"`
-	ParentPath       string           `json:"parent_path,omitempty"`
-	Visibility       types.Visibility `json:"visibility,omitempty"`
-	GlobalVisibility string           `json:"global_visibility,omitempty"`
+	ID               string             `json:"id,omitempty"`
+	Name             string             `json:"name,omitempty"`
+	Path             string             `json:"path,omitempty"`
+	ParentPath       string             `json:"parent_path,omitempty"`
+	Visibility       cstypes.Visibility `json:"visibility,omitempty"`
+	GlobalVisibility string             `json:"global_visibility,omitempty"`
 }
 
 func createProjectResponse(r *csapi.Project) *ProjectResponse {

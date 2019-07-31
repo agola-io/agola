@@ -20,8 +20,8 @@ import (
 	"testing"
 
 	"agola.io/agola/internal/config"
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	rstypes "agola.io/agola/internal/services/runservice/types"
-	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 
 	"github.com/google/go-cmp/cmp"
@@ -706,11 +706,11 @@ func TestGenRunConfig(t *testing.T) {
 								IgnoreFailure: false,
 								Approval:      false,
 								When: &config.When{
-									Branch: &types.WhenConditions{Include: []types.WhenCondition{{Match: "master"}}},
-									Tag:    &types.WhenConditions{Include: []types.WhenCondition{{Match: "v1.x"}, {Match: "v2.x"}}},
-									Ref: &types.WhenConditions{
-										Include: []types.WhenCondition{{Match: "master"}},
-										Exclude: []types.WhenCondition{{Match: "branch01", Type: types.WhenConditionTypeRegExp}, {Match: "branch02"}},
+									Branch: &cstypes.WhenConditions{Include: []cstypes.WhenCondition{{Match: "master"}}},
+									Tag:    &cstypes.WhenConditions{Include: []cstypes.WhenCondition{{Match: "v1.x"}, {Match: "v2.x"}}},
+									Ref: &cstypes.WhenConditions{
+										Include: []cstypes.WhenCondition{{Match: "master"}},
+										Exclude: []cstypes.WhenCondition{{Match: "branch01", Type: cstypes.WhenConditionTypeRegExp}, {Match: "branch02"}},
 									},
 								},
 							},

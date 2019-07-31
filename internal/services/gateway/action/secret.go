@@ -19,14 +19,14 @@ import (
 	"net/http"
 
 	csapi "agola.io/agola/internal/services/configstore/api"
-	"agola.io/agola/internal/services/types"
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
 
 	errors "golang.org/x/xerrors"
 )
 
 type GetSecretsRequest struct {
-	ParentType types.ConfigType
+	ParentType cstypes.ConfigType
 	ParentRef  string
 
 	Tree bool
@@ -37,9 +37,9 @@ func (h *ActionHandler) GetSecrets(ctx context.Context, req *GetSecretsRequest) 
 	var resp *http.Response
 	var err error
 	switch req.ParentType {
-	case types.ConfigTypeProjectGroup:
+	case cstypes.ConfigTypeProjectGroup:
 		cssecrets, resp, err = h.configstoreClient.GetProjectGroupSecrets(ctx, req.ParentRef, req.Tree)
-	case types.ConfigTypeProject:
+	case cstypes.ConfigTypeProject:
 		cssecrets, resp, err = h.configstoreClient.GetProjectSecrets(ctx, req.ParentRef, req.Tree)
 	}
 	if err != nil {
@@ -52,10 +52,10 @@ func (h *ActionHandler) GetSecrets(ctx context.Context, req *GetSecretsRequest) 
 type CreateSecretRequest struct {
 	Name string
 
-	ParentType types.ConfigType
+	ParentType cstypes.ConfigType
 	ParentRef  string
 
-	Type types.SecretType
+	Type cstypes.SecretType
 
 	// internal secret
 	Data map[string]string
@@ -78,7 +78,7 @@ func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretReque
 		return nil, util.NewErrBadRequest(errors.Errorf("invalid secret name %q", req.Name))
 	}
 
-	s := &types.Secret{
+	s := &cstypes.Secret{
 		Name: req.Name,
 		Type: req.Type,
 		Data: req.Data,
@@ -87,10 +87,10 @@ func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretReque
 	var resp *http.Response
 	var rs *csapi.Secret
 	switch req.ParentType {
-	case types.ConfigTypeProjectGroup:
+	case cstypes.ConfigTypeProjectGroup:
 		h.log.Infof("creating project group secret")
 		rs, resp, err = h.configstoreClient.CreateProjectGroupSecret(ctx, req.ParentRef, s)
-	case types.ConfigTypeProject:
+	case cstypes.ConfigTypeProject:
 		h.log.Infof("creating project secret")
 		rs, resp, err = h.configstoreClient.CreateProjectSecret(ctx, req.ParentRef, s)
 	}
@@ -107,10 +107,10 @@ type UpdateSecretRequest struct {
 
 	Name string
 
-	ParentType types.ConfigType
+	ParentType cstypes.ConfigType
 	ParentRef  string
 
-	Type types.SecretType
+	Type cstypes.SecretType
 
 	// internal secret
 	Data map[string]string
@@ -133,7 +133,7 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretReque
 		return nil, util.NewErrBadRequest(errors.Errorf("invalid secret name %q", req.Name))
 	}
 
-	s := &types.Secret{
+	s := &cstypes.Secret{
 		Name: req.Name,
 		Type: req.Type,
 		Data: req.Data,
@@ -142,10 +142,10 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretReque
 	var resp *http.Response
 	var rs *csapi.Secret
 	switch req.ParentType {
-	case types.ConfigTypeProjectGroup:
+	case cstypes.ConfigTypeProjectGroup:
 		h.log.Infof("updating project group secret")
 		rs, resp, err = h.configstoreClient.UpdateProjectGroupSecret(ctx, req.ParentRef, req.SecretName, s)
-	case types.ConfigTypeProject:
+	case cstypes.ConfigTypeProject:
 		h.log.Infof("updating project secret")
 		rs, resp, err = h.configstoreClient.UpdateProjectSecret(ctx, req.ParentRef, req.SecretName, s)
 	}
@@ -157,7 +157,7 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretReque
 	return rs, nil
 }
 
-func (h *ActionHandler) DeleteSecret(ctx context.Context, parentType types.ConfigType, parentRef, name string) error {
+func (h *ActionHandler) DeleteSecret(ctx context.Context, parentType cstypes.ConfigType, parentRef, name string) error {
 	isVariableOwner, err := h.IsVariableOwner(ctx, parentType, parentRef)
 	if err != nil {
 		return errors.Errorf("failed to determine ownership: %w", err)
@@ -168,10 +168,10 @@ func (h *ActionHandler) DeleteSecret(ctx context.Context, parentType types.Confi
 
 	var resp *http.Response
 	switch parentType {
-	case types.ConfigTypeProjectGroup:
+	case cstypes.ConfigTypeProjectGroup:
 		h.log.Infof("deleting project group secret")
 		resp, err = h.configstoreClient.DeleteProjectGroupSecret(ctx, parentRef, name)
-	case types.ConfigTypeProject:
+	case cstypes.ConfigTypeProject:
 		h.log.Infof("deleting project secret")
 		resp, err = h.configstoreClient.DeleteProjectSecret(ctx, parentRef, name)
 	}

@@ -19,7 +19,7 @@ import (
 	"encoding/json"
 
 	"agola.io/agola/internal/db"
-	"agola.io/agola/internal/services/types"
+	"agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
 
 	sq "github.com/Masterminds/squirrel"

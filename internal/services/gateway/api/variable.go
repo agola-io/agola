@@ -20,8 +20,8 @@ import (
 
 	"agola.io/agola/internal/services/common"
 	csapi "agola.io/agola/internal/services/configstore/api"
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/services/gateway/action"
-	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 	"go.uber.org/zap"
 
@@ -33,7 +33,7 @@ type VariableValue struct {
 	SecretVar                string `json:"secret_var"`
 	MatchingSecretParentPath string `json:"matching_secret_parent_path"`
 
-	When *types.When `json:"when"`
+	When *cstypes.When `json:"when"`
 }
 
 type VariableResponse struct {
@@ -113,7 +113,7 @@ func (h *VariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 type CreateVariableRequest struct {
 	Name string `json:"name,omitempty"`
 
-	Values []types.VariableValue `json:"values,omitempty"`
+	Values []cstypes.VariableValue `json:"values,omitempty"`
 }
 
 type CreateVariableHandler struct {
@@ -160,7 +160,7 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 type UpdateVariableRequest struct {
 	Name string `json:"name,omitempty"`
 
-	Values []types.VariableValue `json:"values,omitempty"`
+	Values []cstypes.VariableValue `json:"values,omitempty"`
 }
 
 type UpdateVariableHandler struct {

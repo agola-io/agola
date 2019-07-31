@@ -17,13 +17,13 @@ package action
 import (
 	"context"
 
-	"agola.io/agola/internal/services/types"
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
 
 	errors "golang.org/x/xerrors"
 )
 
-func (h *ActionHandler) GetOrg(ctx context.Context, orgRef string) (*types.Organization, error) {
+func (h *ActionHandler) GetOrg(ctx context.Context, orgRef string) (*cstypes.Organization, error) {
 	org, resp, err := h.configstoreClient.GetOrg(ctx, orgRef)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
@@ -37,7 +37,7 @@ type GetOrgsRequest struct {
 	Asc   bool
 }
 
-func (h *ActionHandler) GetOrgs(ctx context.Context, req *GetOrgsRequest) ([]*types.Organization, error) {
+func (h *ActionHandler) GetOrgs(ctx context.Context, req *GetOrgsRequest) ([]*cstypes.Organization, error) {
 	orgs, resp, err := h.configstoreClient.GetOrgs(ctx, req.Start, req.Limit, req.Asc)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
@@ -46,13 +46,13 @@ func (h *ActionHandler) GetOrgs(ctx context.Context, req *GetOrgsRequest) ([]*ty
 }
 
 type OrgMembersResponse struct {
-	Organization *types.Organization
+	Organization *cstypes.Organization
 	Members      []*OrgMemberResponse
 }
 
 type OrgMemberResponse struct {
-	User *types.User
-	Role types.MemberRole
+	User *cstypes.User
+	Role cstypes.MemberRole
 }
 
 func (h *ActionHandler) GetOrgMembers(ctx context.Context, orgRef string) (*OrgMembersResponse, error) {
@@ -81,12 +81,12 @@ func (h *ActionHandler) GetOrgMembers(ctx context.Context, orgRef string) (*OrgM
 
 type CreateOrgRequest struct {
 	Name       string
-	Visibility types.Visibility
+	Visibility cstypes.Visibility
 
 	CreatorUserID string
 }
 
-func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*types.Organization, error) {
+func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*cstypes.Organization, error) {
 	if !h.IsUserLoggedOrAdmin(ctx) {
 		return nil, errors.Errorf("user not logged in")
 	}
@@ -98,7 +98,7 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*
 		return nil, util.NewErrBadRequest(errors.Errorf("invalid organization name %q", req.Name))
 	}
 
-	org := &types.Organization{
+	org := &cstypes.Organization{
 		Name:       req.Name,
 		Visibility: req.Visibility,
 	}
@@ -138,12 +138,12 @@ func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 }
 
 type AddOrgMemberResponse struct {
-	OrganizationMember *types.OrganizationMember
-	Org                *types.Organization
-	User               *types.User
+	OrganizationMember *cstypes.OrganizationMember
+	Org                *cstypes.Organization
+	User               *cstypes.User
 }
 
-func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string, role types.MemberRole) (*AddOrgMemberResponse, error) {
+func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string, role cstypes.MemberRole) (*AddOrgMemberResponse, error) {
 	org, resp, err := h.configstoreClient.GetOrg(ctx, orgRef)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)

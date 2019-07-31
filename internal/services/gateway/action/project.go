@@ -23,6 +23,7 @@ import (
 
 	gitsource "agola.io/agola/internal/gitsources"
 	csapi "agola.io/agola/internal/services/configstore/api"
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 
@@ -39,7 +40,7 @@ func (h *ActionHandler) GetProject(ctx context.Context, projectRef string) (*csa
 	if err != nil {
 		return nil, errors.Errorf("failed to determine ownership: %w", err)
 	}
-	if project.GlobalVisibility == types.VisibilityPublic {
+	if project.GlobalVisibility == cstypes.VisibilityPublic {
 		return project, nil
 	}
 	if !isProjectMember {
@@ -52,7 +53,7 @@ func (h *ActionHandler) GetProject(ctx context.Context, projectRef string) (*csa
 type CreateProjectRequest struct {
 	Name                string
 	ParentRef           string
-	Visibility          types.Visibility
+	Visibility          cstypes.Visibility
 	RemoteSourceName    string
 	RepoPath            string
 	SkipSSHHostKeyCheck bool
@@ -108,7 +109,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 	if err != nil {
 		return nil, errors.Errorf("failed to get remote source %q: %w", req.RemoteSourceName, ErrFromRemote(resp, err))
 	}
-	var la *types.LinkedAccount
+	var la *cstypes.LinkedAccount
 	for _, v := range user.LinkedAccounts {
 		if v.RemoteSourceID == rs.ID {
 			la = v
@@ -135,14 +136,14 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 		return nil, errors.Errorf("failed to generate ssh key pair: %w", err)
 	}
 
-	p := &types.Project{
+	p := &cstypes.Project{
 		Name: req.Name,
-		Parent: types.Parent{
-			Type: types.ConfigTypeProjectGroup,
+		Parent: cstypes.Parent{
+			Type: cstypes.ConfigTypeProjectGroup,
 			ID:   parentRef,
 		},
 		Visibility:                 req.Visibility,
-		RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeRemoteSource,
+		RemoteRepositoryConfigType: cstypes.RemoteRepositoryConfigTypeRemoteSource,
 		RemoteSourceID:             rs.ID,
 		LinkedAccountID:            la.ID,
 		RepositoryID:               repo.ID,
@@ -180,7 +181,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 
 type UpdateProjectRequest struct {
 	Name       string
-	Visibility types.Visibility
+	Visibility cstypes.Visibility
 }
 
 func (h *ActionHandler) UpdateProject(ctx context.Context, projectRef string, req *UpdateProjectRequest) (*csapi.Project, error) {
@@ -235,7 +236,7 @@ func (h *ActionHandler) ProjectUpdateRepoLinkedAccount(ctx context.Context, proj
 	if err != nil {
 		return nil, errors.Errorf("failed to get remote source %q: %w", p.RemoteSourceID, ErrFromRemote(resp, err))
 	}
-	var la *types.LinkedAccount
+	var la *cstypes.LinkedAccount
 	for _, v := range user.LinkedAccounts {
 		if v.RemoteSourceID == rs.ID {
 			la = v
@@ -269,7 +270,7 @@ func (h *ActionHandler) ProjectUpdateRepoLinkedAccount(ctx context.Context, proj
 	return rp, nil
 }
 
-func (h *ActionHandler) setupGitSourceRepo(ctx context.Context, rs *types.RemoteSource, user *types.User, la *types.LinkedAccount, project *csapi.Project) error {
+func (h *ActionHandler) setupGitSourceRepo(ctx context.Context, rs *cstypes.RemoteSource, user *cstypes.User, la *cstypes.LinkedAccount, project *csapi.Project) error {
 	gitsource, err := h.GetGitSource(ctx, rs, user.Name, la)
 	if err != nil {
 		return errors.Errorf("failed to create gitsource client: %w", err)
@@ -305,7 +306,7 @@ func (h *ActionHandler) setupGitSourceRepo(ctx context.Context, rs *types.Remote
 	return nil
 }
 
-func (h *ActionHandler) cleanupGitSourceRepo(ctx context.Context, rs *types.RemoteSource, user *types.User, la *types.LinkedAccount, project *csapi.Project) error {
+func (h *ActionHandler) cleanupGitSourceRepo(ctx context.Context, rs *cstypes.RemoteSource, user *cstypes.User, la *cstypes.LinkedAccount, project *csapi.Project) error {
 	gitsource, err := h.GetGitSource(ctx, rs, user.Name, la)
 	if err != nil {
 		return errors.Errorf("failed to create gitsource client: %w", err)
@@ -436,7 +437,7 @@ func (h *ActionHandler) ProjectCreateRun(ctx context.Context, projectRef, branch
 	if err != nil {
 		return errors.Errorf("failed to get remote source %q: %w", p.RemoteSourceID, ErrFromRemote(resp, err))
 	}
-	var la *types.LinkedAccount
+	var la *cstypes.LinkedAccount
 	for _, v := range user.LinkedAccounts {
 		if v.RemoteSourceID == rs.ID {
 			la = v
@@ -571,7 +572,7 @@ func (h *ActionHandler) ProjectCreateRun(ctx context.Context, projectRef, branch
 	return h.CreateRuns(ctx, req)
 }
 
-func (h *ActionHandler) getRemoteRepoAccessData(ctx context.Context, linkedAccountID string) (*types.User, *types.RemoteSource, *types.LinkedAccount, error) {
+func (h *ActionHandler) getRemoteRepoAccessData(ctx context.Context, linkedAccountID string) (*cstypes.User, *cstypes.RemoteSource, *cstypes.LinkedAccount, error) {
 	user, resp, err := h.configstoreClient.GetUserByLinkedAccount(ctx, linkedAccountID)
 	if err != nil {
 		return nil, nil, nil, errors.Errorf("failed to get user with linked account id %q: %w", linkedAccountID, ErrFromRemote(resp, err))

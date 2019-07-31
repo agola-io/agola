@@ -18,7 +18,7 @@ import (
 	"testing"
 
 	csapi "agola.io/agola/internal/services/configstore/api"
-	"agola.io/agola/internal/services/types"
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -39,37 +39,37 @@ func TestFilterOverriddenVariables(t *testing.T) {
 				// variables must be in depth (from leaves to root) order as returned by the
 				// configstore apis
 				&csapi.Variable{
-					Variable: &types.Variable{
+					Variable: &cstypes.Variable{
 						Name: "var04",
 					},
 					ParentPath: "org/org01/projectgroup02/projectgroup03/project02",
 				},
 				&csapi.Variable{
-					Variable: &types.Variable{
+					Variable: &cstypes.Variable{
 						Name: "var03",
 					},
 					ParentPath: "org/org01/projectgroup01/project01",
 				},
 				&csapi.Variable{
-					Variable: &types.Variable{
+					Variable: &cstypes.Variable{
 						Name: "var02",
 					},
 					ParentPath: "org/org01/projectgroup01/project01",
 				},
 				&csapi.Variable{
-					Variable: &types.Variable{
+					Variable: &cstypes.Variable{
 						Name: "var02",
 					},
 					ParentPath: "org/org01/projectgroup01",
 				},
 				&csapi.Variable{
-					Variable: &types.Variable{
+					Variable: &cstypes.Variable{
 						Name: "var01",
 					},
 					ParentPath: "org/org01/projectgroup01",
 				},
 				&csapi.Variable{
-					Variable: &types.Variable{
+					Variable: &cstypes.Variable{
 						Name: "var01",
 					},
 					ParentPath: "org/org01",
@@ -77,25 +77,25 @@ func TestFilterOverriddenVariables(t *testing.T) {
 			},
 			out: []*csapi.Variable{
 				&csapi.Variable{
-					Variable: &types.Variable{
+					Variable: &cstypes.Variable{
 						Name: "var04",
 					},
 					ParentPath: "org/org01/projectgroup02/projectgroup03/project02",
 				},
 				&csapi.Variable{
-					Variable: &types.Variable{
+					Variable: &cstypes.Variable{
 						Name: "var03",
 					},
 					ParentPath: "org/org01/projectgroup01/project01",
 				},
 				&csapi.Variable{
-					Variable: &types.Variable{
+					Variable: &cstypes.Variable{
 						Name: "var02",
 					},
 					ParentPath: "org/org01/projectgroup01/project01",
 				},
 				&csapi.Variable{
-					Variable: &types.Variable{
+					Variable: &cstypes.Variable{
 						Name: "var01",
 					},
 					ParentPath: "org/org01/projectgroup01",
@@ -118,14 +118,14 @@ func TestFilterOverriddenVariables(t *testing.T) {
 func TestGetVarValueMatchingSecret(t *testing.T) {
 	tests := []struct {
 		name          string
-		varValue      types.VariableValue
+		varValue      cstypes.VariableValue
 		varParentPath string
 		secrets       []*csapi.Secret
 		out           *csapi.Secret
 	}{
 		{
 			name: "test empty secrets",
-			varValue: types.VariableValue{
+			varValue: cstypes.VariableValue{
 				SecretName: "secret01",
 				SecretVar:  "secretvar01",
 			},
@@ -135,14 +135,14 @@ func TestGetVarValueMatchingSecret(t *testing.T) {
 		},
 		{
 			name: "test secret with different name",
-			varValue: types.VariableValue{
+			varValue: cstypes.VariableValue{
 				SecretName: "secret01",
 				SecretVar:  "secretvar01",
 			},
 			varParentPath: "org/org01/projectgroup01/projectgroup02",
 			secrets: []*csapi.Secret{
 				&csapi.Secret{
-					Secret: &types.Secret{
+					Secret: &cstypes.Secret{
 						Name: "secret02",
 					},
 					ParentPath: "org/org01/projectgroup01/projectgroup02",
@@ -152,14 +152,14 @@ func TestGetVarValueMatchingSecret(t *testing.T) {
 		},
 		{
 			name: "test secret with tree",
-			varValue: types.VariableValue{
+			varValue: cstypes.VariableValue{
 				SecretName: "secret01",
 				SecretVar:  "secretvar01",
 			},
 			varParentPath: "org/org01/projectgroup01/projectgroup02",
 			secrets: []*csapi.Secret{
 				&csapi.Secret{
-					Secret: &types.Secret{
+					Secret: &cstypes.Secret{
 						Name: "secret02",
 					},
 					ParentPath: "org/org01/projectgroup01/projectgroup03",
@@ -169,14 +169,14 @@ func TestGetVarValueMatchingSecret(t *testing.T) {
 		},
 		{
 			name: "test secret in child of variable parent",
-			varValue: types.VariableValue{
+			varValue: cstypes.VariableValue{
 				SecretName: "secret01",
 				SecretVar:  "secretvar01",
 			},
 			varParentPath: "org/org01/projectgroup01/projectgroup02",
 			secrets: []*csapi.Secret{
 				&csapi.Secret{
-					Secret: &types.Secret{
+					Secret: &cstypes.Secret{
 						Name: "secret01",
 					},
 					ParentPath: "org/org01/projectgroup01/projectgroup02/project01",
@@ -186,27 +186,27 @@ func TestGetVarValueMatchingSecret(t *testing.T) {
 		},
 		{
 			name: "test secret in same parent and also child of variable parent",
-			varValue: types.VariableValue{
+			varValue: cstypes.VariableValue{
 				SecretName: "secret01",
 				SecretVar:  "secretvar01",
 			},
 			varParentPath: "org/org01/projectgroup01/projectgroup02",
 			secrets: []*csapi.Secret{
 				&csapi.Secret{
-					Secret: &types.Secret{
+					Secret: &cstypes.Secret{
 						Name: "secret01",
 					},
 					ParentPath: "org/org01/projectgroup01/projectgroup02/project01",
 				},
 				&csapi.Secret{
-					Secret: &types.Secret{
+					Secret: &cstypes.Secret{
 						Name: "secret01",
 					},
 					ParentPath: "org/org01/projectgroup01/projectgroup02",
 				},
 			},
 			out: &csapi.Secret{
-				Secret: &types.Secret{
+				Secret: &cstypes.Secret{
 					Name: "secret01",
 				},
 				ParentPath: "org/org01/projectgroup01/projectgroup02",
@@ -214,21 +214,21 @@ func TestGetVarValueMatchingSecret(t *testing.T) {
 		},
 		{
 			name: "test secret in parent",
-			varValue: types.VariableValue{
+			varValue: cstypes.VariableValue{
 				SecretName: "secret01",
 				SecretVar:  "secretvar01",
 			},
 			varParentPath: "org/org01/projectgroup01/projectgroup02",
 			secrets: []*csapi.Secret{
 				&csapi.Secret{
-					Secret: &types.Secret{
+					Secret: &cstypes.Secret{
 						Name: "secret01",
 					},
 					ParentPath: "org/org01/projectgroup01",
 				},
 			},
 			out: &csapi.Secret{
-				Secret: &types.Secret{
+				Secret: &cstypes.Secret{
 					Name: "secret01",
 				},
 				ParentPath: "org/org01/projectgroup01",
@@ -236,7 +236,7 @@ func TestGetVarValueMatchingSecret(t *testing.T) {
 		},
 		{
 			name: "test multiple secrets in same branch and also child of variable parent",
-			varValue: types.VariableValue{
+			varValue: cstypes.VariableValue{
 				SecretName: "secret01",
 				SecretVar:  "secretvar01",
 			},
@@ -245,26 +245,26 @@ func TestGetVarValueMatchingSecret(t *testing.T) {
 				// secrets must be in depth (from leaves to root) order as returned by the
 				// configstore apis
 				&csapi.Secret{
-					Secret: &types.Secret{
+					Secret: &cstypes.Secret{
 						Name: "secret01",
 					},
 					ParentPath: "org/org01/projectgroup01/projectgroup02/project01",
 				},
 				&csapi.Secret{
-					Secret: &types.Secret{
+					Secret: &cstypes.Secret{
 						Name: "secret01",
 					},
 					ParentPath: "org/org01/projectgroup01/projectgroup02",
 				},
 				&csapi.Secret{
-					Secret: &types.Secret{
+					Secret: &cstypes.Secret{
 						Name: "secret01",
 					},
 					ParentPath: "org/org01/projectgroup01",
 				},
 			},
 			out: &csapi.Secret{
-				Secret: &types.Secret{
+				Secret: &cstypes.Secret{
 					Name: "secret01",
 				},
 				ParentPath: "org/org01/projectgroup01/projectgroup02",

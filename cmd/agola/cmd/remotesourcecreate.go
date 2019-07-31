@@ -18,8 +18,8 @@ import (
 	"context"
 
 	"agola.io/agola/internal/gitsources/github"
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/services/gateway/api"
-	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 
 	"github.com/spf13/cobra"
@@ -84,7 +84,7 @@ func remoteSourceCreate(cmd *cobra.Command, args []string) error {
 	gwclient := api.NewClient(gatewayURL, token)
 
 	// for github remote source type, set defaults for github.com
-	if remoteSourceCreateOpts.rsType == string(types.RemoteSourceTypeGithub) {
+	if remoteSourceCreateOpts.rsType == string(cstypes.RemoteSourceTypeGithub) {
 		remoteSourceCreateOpts.apiURL = github.GitHubAPIURL
 		remoteSourceCreateOpts.sshHostKey = github.GitHubSSHHostKey
 	}

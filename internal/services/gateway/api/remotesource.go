@@ -19,13 +19,13 @@ import (
 	"net/http"
 	"strconv"
 
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/services/gateway/action"
-	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 	"go.uber.org/zap"
-	errors "golang.org/x/xerrors"
 
 	"github.com/gorilla/mux"
+	errors "golang.org/x/xerrors"
 )
 
 type CreateRemoteSourceRequest struct {
@@ -152,7 +152,7 @@ type RemoteSourceResponse struct {
 	LoginEnabled        bool   `json:"login_enabled"`
 }
 
-func createRemoteSourceResponse(r *types.RemoteSource) *RemoteSourceResponse {
+func createRemoteSourceResponse(r *cstypes.RemoteSource) *RemoteSourceResponse {
 	rs := &RemoteSourceResponse{
 		ID:                  r.ID,
 		Name:                r.Name,

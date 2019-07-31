@@ -26,7 +26,7 @@ import (
 	"strconv"
 	"strings"
 
-	"agola.io/agola/internal/services/types"
+	"agola.io/agola/internal/services/configstore/types"
 
 	errors "golang.org/x/xerrors"
 )

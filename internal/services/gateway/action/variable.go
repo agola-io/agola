@@ -20,13 +20,13 @@ import (
 
 	"agola.io/agola/internal/services/common"
 	csapi "agola.io/agola/internal/services/configstore/api"
-	"agola.io/agola/internal/services/types"
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
 	errors "golang.org/x/xerrors"
 )
 
 type GetVariablesRequest struct {
-	ParentType types.ConfigType
+	ParentType cstypes.ConfigType
 	ParentRef  string
 
 	Tree             bool
@@ -38,7 +38,7 @@ func (h *ActionHandler) GetVariables(ctx context.Context, req *GetVariablesReque
 	var cssecrets []*csapi.Secret
 
 	switch req.ParentType {
-	case types.ConfigTypeProjectGroup:
+	case cstypes.ConfigTypeProjectGroup:
 		var err error
 		var resp *http.Response
 		csvars, resp, err = h.configstoreClient.GetProjectGroupVariables(ctx, req.ParentRef, req.Tree)
@@ -49,7 +49,7 @@ func (h *ActionHandler) GetVariables(ctx context.Context, req *GetVariablesReque
 		if err != nil {
 			return nil, nil, ErrFromRemote(resp, err)
 		}
-	case types.ConfigTypeProject:
+	case cstypes.ConfigTypeProject:
 		var err error
 		var resp *http.Response
 		csvars, resp, err = h.configstoreClient.GetProjectVariables(ctx, req.ParentRef, req.Tree)
@@ -73,10 +73,10 @@ func (h *ActionHandler) GetVariables(ctx context.Context, req *GetVariablesReque
 type CreateVariableRequest struct {
 	Name string
 
-	ParentType types.ConfigType
+	ParentType cstypes.ConfigType
 	ParentRef  string
 
-	Values []types.VariableValue
+	Values []cstypes.VariableValue
 }
 
 func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateVariableRequest) (*csapi.Variable, []*csapi.Secret, error) {
@@ -96,9 +96,9 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateVariableR
 		return nil, nil, util.NewErrBadRequest(errors.Errorf("empty variable values"))
 	}
 
-	v := &types.Variable{
+	v := &cstypes.Variable{
 		Name: req.Name,
-		Parent: types.Parent{
+		Parent: cstypes.Parent{
 			Type: req.ParentType,
 			ID:   req.ParentRef,
 		},
@@ -109,7 +109,7 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateVariableR
 	var rv *csapi.Variable
 
 	switch req.ParentType {
-	case types.ConfigTypeProjectGroup:
+	case cstypes.ConfigTypeProjectGroup:
 		var err error
 		var resp *http.Response
 		cssecrets, resp, err = h.configstoreClient.GetProjectGroupSecrets(ctx, req.ParentRef, true)
@@ -122,7 +122,7 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateVariableR
 		if err != nil {
 			return nil, nil, errors.Errorf("failed to create variable: %w", ErrFromRemote(resp, err))
 		}
-	case types.ConfigTypeProject:
+	case cstypes.ConfigTypeProject:
 		var err error
 		var resp *http.Response
 		cssecrets, resp, err = h.configstoreClient.GetProjectSecrets(ctx, req.ParentRef, true)
@@ -146,10 +146,10 @@ type UpdateVariableRequest struct {
 
 	Name string
 
-	ParentType types.ConfigType
+	ParentType cstypes.ConfigType
 	ParentRef  string
 
-	Values []types.VariableValue
+	Values []cstypes.VariableValue
 }
 
 func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableRequest) (*csapi.Variable, []*csapi.Secret, error) {
@@ -169,9 +169,9 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableR
 		return nil, nil, util.NewErrBadRequest(errors.Errorf("empty variable values"))
 	}
 
-	v := &types.Variable{
+	v := &cstypes.Variable{
 		Name: req.Name,
-		Parent: types.Parent{
+		Parent: cstypes.Parent{
 			Type: req.ParentType,
 			ID:   req.ParentRef,
 		},
@@ -182,7 +182,7 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableR
 	var rv *csapi.Variable
 
 	switch req.ParentType {
-	case types.ConfigTypeProjectGroup:
+	case cstypes.ConfigTypeProjectGroup:
 		var err error
 		var resp *http.Response
 		cssecrets, resp, err = h.configstoreClient.GetProjectGroupSecrets(ctx, req.ParentRef, true)
@@ -195,7 +195,7 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableR
 		if err != nil {
 			return nil, nil, errors.Errorf("failed to create variable: %w", ErrFromRemote(resp, err))
 		}
-	case types.ConfigTypeProject:
+	case cstypes.ConfigTypeProject:
 		var err error
 		var resp *http.Response
 		cssecrets, resp, err = h.configstoreClient.GetProjectSecrets(ctx, req.ParentRef, true)
@@ -214,7 +214,7 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableR
 	return rv, cssecrets, nil
 }
 
-func (h *ActionHandler) DeleteVariable(ctx context.Context, parentType types.ConfigType, parentRef, name string) error {
+func (h *ActionHandler) DeleteVariable(ctx context.Context, parentType cstypes.ConfigType, parentRef, name string) error {
 	isVariableOwner, err := h.IsVariableOwner(ctx, parentType, parentRef)
 	if err != nil {
 		return errors.Errorf("failed to determine ownership: %w", err)
@@ -225,10 +225,10 @@ func (h *ActionHandler) DeleteVariable(ctx context.Context, parentType types.Con
 
 	var resp *http.Response
 	switch parentType {
-	case types.ConfigTypeProjectGroup:
+	case cstypes.ConfigTypeProjectGroup:
 		h.log.Infof("deleting project group variable")
 		resp, err = h.configstoreClient.DeleteProjectGroupVariable(ctx, parentRef, name)
-	case types.ConfigTypeProject:
+	case cstypes.ConfigTypeProject:
 		h.log.Infof("deleting project variable")
 		resp, err = h.configstoreClient.DeleteProjectVariable(ctx, parentRef, name)
 	}

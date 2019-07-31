@@ -22,8 +22,8 @@ import (
 	"strconv"
 
 	gitsource "agola.io/agola/internal/gitsources"
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/services/gateway/action"
-	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 
 	"github.com/gorilla/mux"
@@ -166,7 +166,7 @@ type LinkedAccountResponse struct {
 	RemoteUserAvatarURL string `json:"remote_user_avatar_url"`
 }
 
-func createUserResponse(u *types.User) *UserResponse {
+func createUserResponse(u *cstypes.User) *UserResponse {
 	user := &UserResponse{
 		ID:             u.ID,
 		UserName:       u.Name,
@@ -256,8 +256,8 @@ type CreateUserLARequest struct {
 }
 
 type CreateUserLAResponse struct {
-	LinkedAccount  *types.LinkedAccount `json:"linked_account"`
-	Oauth2Redirect string               `json:"oauth2_redirect"`
+	LinkedAccount  *cstypes.LinkedAccount `json:"linked_account"`
+	Oauth2Redirect string                 `json:"oauth2_redirect"`
 }
 
 type CreateUserLAHandler struct {

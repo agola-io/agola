@@ -88,7 +88,7 @@ type Backoff struct {
 //
 // If the condition never returns true, ErrWaitTimeout is returned. All other
 // errors terminate immediately.
-func ExponentialBackoff(ctx context.Context,backoff Backoff, condition ConditionFunc) error {
+func ExponentialBackoff(ctx context.Context, backoff Backoff, condition ConditionFunc) error {
 	duration := backoff.Duration
 	for i := 0; i < backoff.Steps; i++ {
 		if i != 0 {
