@@ -779,9 +779,9 @@ func (e *Executor) executeTask(ctx context.Context, et *types.ExecutorTask) {
 	}()
 
 	et.Status.Phase = types.ExecutorTaskPhaseRunning
-	et.Status.StartTime = util.TimePtr(time.Now())
+	et.Status.StartTime = util.TimeP(time.Now())
 	et.Status.SetupStep.Phase = types.ExecutorTaskPhaseRunning
-	et.Status.SetupStep.StartTime = util.TimePtr(time.Now())
+	et.Status.SetupStep.StartTime = util.TimeP(time.Now())
 	if err := e.sendExecutorTaskStatus(ctx, et); err != nil {
 		log.Errorf("err: %+v", err)
 	}
@@ -789,9 +789,9 @@ func (e *Executor) executeTask(ctx context.Context, et *types.ExecutorTask) {
 	if err := e.setupTask(ctx, rt); err != nil {
 		log.Errorf("err: %+v", err)
 		et.Status.Phase = types.ExecutorTaskPhaseFailed
-		et.Status.EndTime = util.TimePtr(time.Now())
+		et.Status.EndTime = util.TimeP(time.Now())
 		et.Status.SetupStep.Phase = types.ExecutorTaskPhaseFailed
-		et.Status.SetupStep.EndTime = util.TimePtr(time.Now())
+		et.Status.SetupStep.EndTime = util.TimeP(time.Now())
 		if err := e.sendExecutorTaskStatus(ctx, et); err != nil {
 			log.Errorf("err: %+v", err)
 		}
@@ -800,7 +800,7 @@ func (e *Executor) executeTask(ctx context.Context, et *types.ExecutorTask) {
 	}
 
 	et.Status.SetupStep.Phase = types.ExecutorTaskPhaseSuccess
-	et.Status.SetupStep.EndTime = util.TimePtr(time.Now())
+	et.Status.SetupStep.EndTime = util.TimeP(time.Now())
 	if err := e.sendExecutorTaskStatus(ctx, et); err != nil {
 		log.Errorf("err: %+v", err)
 	}
@@ -817,7 +817,7 @@ func (e *Executor) executeTask(ctx context.Context, et *types.ExecutorTask) {
 		et.Status.Phase = types.ExecutorTaskPhaseSuccess
 	}
 
-	et.Status.EndTime = util.TimePtr(time.Now())
+	et.Status.EndTime = util.TimeP(time.Now())
 
 	if err := e.sendExecutorTaskStatus(ctx, et); err != nil {
 		log.Errorf("err: %+v", err)
@@ -916,7 +916,7 @@ func (e *Executor) executeTaskSteps(ctx context.Context, rt *runningTask, pod dr
 	for i, step := range rt.et.Steps {
 		rt.Lock()
 		rt.et.Status.Steps[i].Phase = types.ExecutorTaskPhaseRunning
-		rt.et.Status.Steps[i].StartTime = util.TimePtr(time.Now())
+		rt.et.Status.Steps[i].StartTime = util.TimeP(time.Now())
 		if err := e.sendExecutorTaskStatus(ctx, rt.et); err != nil {
 			log.Errorf("err: %+v", err)
 		}
@@ -961,7 +961,7 @@ func (e *Executor) executeTaskSteps(ctx context.Context, rt *runningTask, pod dr
 		var serr error
 
 		rt.Lock()
-		rt.et.Status.Steps[i].EndTime = util.TimePtr(time.Now())
+		rt.et.Status.Steps[i].EndTime = util.TimeP(time.Now())
 
 		rt.et.Status.Steps[i].Phase = types.ExecutorTaskPhaseSuccess
 
@@ -1162,12 +1162,12 @@ func (e *Executor) taskUpdater(ctx context.Context, et *types.ExecutorTask) {
 		if !ok {
 			log.Infof("marking executor task %s as failed since there's no running task", et.ID)
 			et.Status.Phase = types.ExecutorTaskPhaseFailed
-			et.Status.EndTime = util.TimePtr(time.Now())
+			et.Status.EndTime = util.TimeP(time.Now())
 			// mark in progress step as failed too
 			for _, s := range et.Status.Steps {
 				if s.Phase == types.ExecutorTaskPhaseRunning {
 					s.Phase = types.ExecutorTaskPhaseFailed
-					s.EndTime = util.TimePtr(time.Now())
+					s.EndTime = util.TimeP(time.Now())
 				}
 			}
 			if err := e.sendExecutorTaskStatus(ctx, et); err != nil {
