@@ -48,17 +48,6 @@ func genRuntime(c *config.Config, ce *config.Runtime, variables map[string]strin
 	}
 }
 
-func whenFromConfigWhen(cw *config.When) *cstypes.When {
-	if cw == nil {
-		return nil
-	}
-	return &cstypes.When{
-		Branch: cw.Branch,
-		Tag:    cw.Tag,
-		Ref:    cw.Ref,
-	}
-}
-
 func stepFromConfigStep(csi interface{}, variables map[string]string) interface{} {
 	switch cs := csi.(type) {
 	case *config.CloneStep:
@@ -194,7 +183,7 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string
 	rcts := map[string]*rstypes.RunConfigTask{}
 
 	for _, ct := range cr.Tasks {
-		include := cstypes.MatchWhen(whenFromConfigWhen(ct.When), branch, tag, ref)
+		include := cstypes.MatchWhen(ct.When.ToCSWhen(), branch, tag, ref)
 
 		steps := make(rstypes.Steps, len(ct.Steps))
 		for i, cpts := range ct.Steps {
