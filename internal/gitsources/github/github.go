@@ -437,7 +437,7 @@ func (c *Client) RefType(ref string) (gitsource.RefType, string, error) {
 
 	case pullRequestRefRegex.MatchString(ref):
 		m := pullRequestRefRegex.FindStringSubmatch(ref)
-		return gitsource.RefTypePullRequest, m[0], nil
+		return gitsource.RefTypePullRequest, m[1], nil
 
 	default:
 		return -1, "", fmt.Errorf("unsupported ref: %s", ref)

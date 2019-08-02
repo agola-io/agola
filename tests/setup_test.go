@@ -46,10 +46,13 @@ import (
 	"go.uber.org/zap/zapcore"
 	errors "golang.org/x/xerrors"
 	"gopkg.in/src-d/go-billy.v4/memfs"
+	"gopkg.in/src-d/go-billy.v4/osfs"
 	"gopkg.in/src-d/go-git.v4"
 	gitconfig "gopkg.in/src-d/go-git.v4/config"
+	"gopkg.in/src-d/go-git.v4/plumbing/cache"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 	"gopkg.in/src-d/go-git.v4/plumbing/transport/http"
+	"gopkg.in/src-d/go-git.v4/storage/filesystem"
 	"gopkg.in/src-d/go-git.v4/storage/memory"
 )
 
@@ -160,9 +163,9 @@ func setup(ctx context.Context, t *testing.T, dir string) (*testutil.TestEmbedde
 	if dockerBridgeAddress == "" {
 		dockerBridgeAddress = "172.17.0.1"
 	}
-	toolboxPath := os.Getenv("AGOLA_TOOLBOX_PATH")
-	if toolboxPath == "" {
-		t.Fatalf("env var AGOLA_TOOLBOX_PATH is undefined")
+	agolaBinDir := os.Getenv("AGOLA_BIN_DIR")
+	if agolaBinDir == "" {
+		t.Fatalf("env var AGOLA_BIN_DIR is undefined")
 	}
 
 	c := &config.Config{
@@ -218,7 +221,7 @@ func setup(ctx context.Context, t *testing.T, dir string) (*testutil.TestEmbedde
 			Debug:         false,
 			DataDir:       filepath.Join(dir, "executor"),
 			RunserviceURL: "",
-			ToolboxPath:   toolboxPath,
+			ToolboxPath:   agolaBinDir,
 			Web: config.Web{
 				ListenAddress: ":4001",
 				TLS:           false,
@@ -342,6 +345,17 @@ func TestCreateLinkedAccount(t *testing.T) {
 	createLinkedAccount(ctx, t, tgitea, c)
 }
 
+func createAgolaUserToken(ctx context.Context, t *testing.T, c *config.Config) string {
+	gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
+	token, _, err := gwClient.CreateUserToken(ctx, agolaUser01, &gwapitypes.CreateUserTokenRequest{TokenName: "token01"})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	t.Logf("created agola user token: %s", token.Token)
+
+	return token.Token
+}
+
 func createLinkedAccount(ctx context.Context, t *testing.T, tgitea *testutil.TestGitea, c *config.Config) (string, string) {
 	giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
 	giteaClient := gitea.NewClient(giteaAPIURL, "")
@@ -359,11 +373,7 @@ func createLinkedAccount(ctx context.Context, t *testing.T, tgitea *testutil.Tes
 	}
 	t.Logf("created agola user: %s", user.UserName)
 
-	token, _, err := gwClient.CreateUserToken(ctx, agolaUser01, &gwapitypes.CreateUserTokenRequest{TokenName: "token01"})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	t.Logf("created agola user token: %s", token.Token)
+	token := createAgolaUserToken(ctx, t, c)
 
 	rs, _, err := gwClient.CreateRemoteSource(ctx, &gwapitypes.CreateRemoteSourceRequest{
 		Name:                "gitea",
@@ -378,7 +388,7 @@ func createLinkedAccount(ctx context.Context, t *testing.T, tgitea *testutil.Tes
 	t.Logf("created agola remote source: %s", rs.Name)
 
 	// From now use the user token
-	gwClient = gwclient.NewClient(c.Gateway.APIExposedURL, token.Token)
+	gwClient = gwclient.NewClient(c.Gateway.APIExposedURL, token)
 
 	la, _, err := gwClient.CreateUserLA(ctx, agolaUser01, &gwapitypes.CreateUserLARequest{
 		RemoteSourceName:          "gitea",
@@ -390,7 +400,7 @@ func createLinkedAccount(ctx context.Context, t *testing.T, tgitea *testutil.Tes
 	}
 	t.Logf("created user linked account: %s", util.Dump(la))
 
-	return giteaToken.Token, token.Token
+	return giteaToken.Token, token
 }
 
 func TestCreateProject(t *testing.T) {
@@ -558,5 +568,174 @@ func TestRun(t *testing.T) {
 	}
 	if run.Result != rstypes.RunResultSuccess {
 		t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, run.Result)
+	}
+}
+
+func directRun(t *testing.T, dir, config, gatewayURL, token string, args ...string) {
+	agolaBinDir := os.Getenv("AGOLA_BIN_DIR")
+	if agolaBinDir == "" {
+		t.Fatalf("env var AGOLA_BIN_DIR is undefined")
+	}
+	agolaBinDir, err := filepath.Abs(agolaBinDir)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	repoDir, err := ioutil.TempDir(dir, "repo")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	gitfs := osfs.New(repoDir)
+	dot, _ := gitfs.Chroot(".git")
+
+	f, err := gitfs.Create(".agola/config.jsonnet")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if _, err = f.Write([]byte(config)); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	_, err = git.Init(filesystem.NewStorage(dot, cache.NewObjectLRUDefault()), gitfs)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	args = append([]string{"--gateway-url", gatewayURL, "--token", token, "directrun", "start", "--untracked", "false"}, args...)
+	cmd := exec.Command(filepath.Join(agolaBinDir, "agola"), args...)
+	cmd.Dir = repoDir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("unexpected err: %v, out: %s", err, out)
+	}
+	t.Logf("directrun start out: %s", out)
+}
+
+func TestDirectRun(t *testing.T) {
+	config := `
+      {
+        runs: [
+          {
+            name: 'run01',
+            tasks: [
+              {
+                name: 'task01',
+                runtime: {
+                  containers: [
+                    {
+                      image: 'alpine/git',
+                    },
+                  ],
+                },
+                steps: [
+                  { type: 'clone' },
+                  { type: 'run', command: 'env' },
+                ],
+              },
+            ],
+          },
+        ],
+      }
+    `
+
+	tests := []struct {
+		name        string
+		args        []string
+		annotations map[string]string
+	}{
+		{
+			name: "test direct run",
+			annotations: map[string]string{
+				"branch":   "master",
+				"ref":      "refs/heads/master",
+				"ref_type": "branch",
+			},
+		},
+		{
+			name: "test direct run with destination branch",
+			args: []string{"--branch", "develop"},
+			annotations: map[string]string{
+				"branch":   "develop",
+				"ref":      "refs/heads/develop",
+				"ref_type": "branch",
+			},
+		},
+		{
+			name: "test direct run with destination tag",
+			args: []string{"--tag", "v0.1.0"},
+			annotations: map[string]string{
+				"tag":      "v0.1.0",
+				"ref":      "refs/tags/v0.1.0",
+				"ref_type": "tag",
+			},
+		},
+		{
+			name: "test direct run with destination ref as a pr",
+			args: []string{"--ref", "refs/pull/1/head"},
+			annotations: map[string]string{
+				"pull_request_id": "1",
+				"ref":             "refs/pull/1/head",
+				"ref_type":        "pull_request",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir, err := ioutil.TempDir("", "agola")
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			defer os.RemoveAll(dir)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			tetcd, tgitea, c := setup(ctx, t, dir)
+			defer shutdownGitea(tgitea)
+			defer shutdownEtcd(tetcd)
+
+			gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
+			user, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			t.Logf("created agola user: %s", user.UserName)
+
+			token := createAgolaUserToken(ctx, t, c)
+
+			// From now use the user token
+			gwClient = gwclient.NewClient(c.Gateway.APIExposedURL, token)
+
+			directRun(t, dir, config, c.Gateway.APIExposedURL, token, tt.args...)
+
+			// TODO(sgotti) add an util to wait for a run phase
+			time.Sleep(10 * time.Second)
+
+			runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/user", user.ID)}, nil, "", 0, false)
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			t.Logf("runs: %s", util.Dump(runs))
+
+			if len(runs) != 1 {
+				t.Fatalf("expected 1 run got: %d", len(runs))
+			}
+
+			run := runs[0]
+			if run.Phase != rstypes.RunPhaseFinished {
+				t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, run.Phase)
+			}
+			if run.Result != rstypes.RunResultSuccess {
+				t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, run.Result)
+			}
+			for k, v := range tt.annotations {
+				if run.Annotations[k] != v {
+					t.Fatalf("expected run annotation %q value %q, got %q", k, v, run.Annotations[k])
+				}
+			}
+		})
 	}
 }

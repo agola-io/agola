@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -817,11 +818,24 @@ type UserCreateRunRequest struct {
 	RepoUUID  string
 	RepoPath  string
 	Branch    string
+	Tag       string
+	Ref       string
 	CommitSHA string
 	Message   string
+
+	PullRequestRefRegexes []string
 }
 
 func (h *ActionHandler) UserCreateRun(ctx context.Context, req *UserCreateRunRequest) error {
+	prRefRegexes := []*regexp.Regexp{}
+	for _, res := range req.PullRequestRefRegexes {
+		re, err := regexp.Compile(res)
+		if err != nil {
+			return fmt.Errorf("wrong regular expression %q: %v", res, err)
+		}
+		prRefRegexes = append(prRefRegexes, re)
+	}
+
 	curUserID := h.CurrentUserID(ctx)
 
 	user, resp, err := h.configstoreClient.GetUser(ctx, curUserID)
@@ -841,12 +855,72 @@ func (h *ActionHandler) UserCreateRun(ctx context.Context, req *UserCreateRunReq
 		return util.NewErrUnauthorized(errors.Errorf("repo %q not owned", req.RepoPath))
 	}
 
-	gitSource := agolagit.New(h.apiExposedURL + "/repos")
+	branch := req.Branch
+	tag := req.Tag
+	ref := req.Ref
+
+	set := 0
+	if branch != "" {
+		set++
+	}
+	if tag != "" {
+		set++
+	}
+	if ref != "" {
+		set++
+	}
+	if set == 0 {
+		return util.NewErrBadRequest(errors.Errorf("one of branch, tag or ref is required"))
+	}
+	if set > 1 {
+		return util.NewErrBadRequest(errors.Errorf("only one of branch, tag or ref can be provided"))
+	}
+
+	gitSource := agolagit.New(h.apiExposedURL+"/repos", prRefRegexes)
 	cloneURL := fmt.Sprintf("%s/%s.git", h.apiExposedURL+"/repos", req.RepoPath)
+
+	if ref == "" {
+		if branch != "" {
+			ref = gitSource.BranchRef(branch)
+		}
+		if tag != "" {
+			ref = gitSource.TagRef(tag)
+		}
+	}
+
+	gitRefType, name, err := gitSource.RefType(ref)
+	if err != nil {
+		return util.NewErrBadRequest(errors.Errorf("failed to get refType for ref %q: %w", ref, err))
+	}
+
+	var pullRequestID string
+
+	switch gitRefType {
+	case gitsource.RefTypeBranch:
+		branch = name
+	case gitsource.RefTypeTag:
+		tag = name
+	case gitsource.RefTypePullRequest:
+		pullRequestID = name
+	default:
+		return errors.Errorf("unsupported ref %q for manual run creation", ref)
+	}
+
+	var refType types.RunRefType
+
+	if branch != "" {
+		refType = types.RunRefTypeBranch
+	}
+	if tag != "" {
+		refType = types.RunRefTypeTag
+	}
+	if pullRequestID != "" {
+		refType = types.RunRefTypePullRequest
+	}
 
 	creq := &CreateRunRequest{
 		RunType:            types.RunTypeUser,
-		RefType:            types.RunRefTypeBranch,
+		RefType:            refType,
 		RunCreationTrigger: types.RunCreationTriggerTypeManual,
 
 		Project:       nil,
@@ -855,10 +929,10 @@ func (h *ActionHandler) UserCreateRun(ctx context.Context, req *UserCreateRunReq
 		GitSource:     gitSource,
 		CommitSHA:     req.CommitSHA,
 		Message:       req.Message,
-		Branch:        req.Branch,
-		Tag:           "",
-		PullRequestID: "",
-		Ref:           gitSource.BranchRef(req.Branch),
+		Branch:        branch,
+		Tag:           tag,
+		Ref:           ref,
+		PullRequestID: pullRequestID,
 		CloneURL:      cloneURL,
 
 		CommitLink:      "",

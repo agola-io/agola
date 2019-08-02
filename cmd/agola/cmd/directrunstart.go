@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"regexp"
 
 	gitsave "agola.io/agola/internal/git-save"
 	"agola.io/agola/internal/util"
@@ -39,12 +40,13 @@ var cmdDirectRunStart = &cobra.Command{
 }
 
 type directRunStartOptions struct {
-	statusFilter []string
-	labelFilter  []string
-	limit        int
-	start        string
-	untracked    bool
-	ignored      bool
+	untracked bool
+	ignored   bool
+
+	branch       string
+	tag          string
+	ref          string
+	prRefRegexes []string
 }
 
 var directRunStartOpts directRunStartOptions
@@ -52,18 +54,48 @@ var directRunStartOpts directRunStartOptions
 func init() {
 	flags := cmdDirectRunStart.Flags()
 
-	flags.StringSliceVarP(&directRunStartOpts.statusFilter, "status", "s", nil, "filter runs matching the provided status. This option can be repeated multiple times")
-	flags.StringArrayVarP(&directRunStartOpts.labelFilter, "label", "l", nil, "filter runs matching the provided label. This option can be repeated multiple times, in this case only runs matching all the labels will be returned")
-	flags.IntVar(&directRunStartOpts.limit, "limit", 10, "max number of runs to show")
-	flags.StringVar(&directRunStartOpts.start, "start", "", "starting run id (excluded) to fetch")
 	flags.BoolVar(&directRunStartOpts.untracked, "untracked", true, "push untracked files")
 	flags.BoolVar(&directRunStartOpts.ignored, "ignored", false, "push ignored files")
+	flags.StringVar(&directRunStartOpts.branch, "branch", "master", "branch to push to")
+	flags.StringVar(&directRunStartOpts.tag, "tag", "", "tag to push to")
+	flags.StringVar(&directRunStartOpts.ref, "ref", "", `ref to push to (i.e  "refs/heads/master" for a branch, "refs/tags/v1.0" for a tag)`)
+	flags.StringArrayVar(&directRunStartOpts.prRefRegexes, "pull-request-ref-regexes", []string{`refs/pull/(\d+)/head`, `refs/merge-requests/(\d+)/head`}, `regular expression to determine if a ref is a pull request`)
 
 	cmdDirectRun.AddCommand(cmdDirectRunStart)
 }
 
 func directRunStart(cmd *cobra.Command, args []string) error {
 	gwclient := gwclient.NewClient(gatewayURL, token)
+
+	for _, res := range directRunStartOpts.prRefRegexes {
+		if _, err := regexp.Compile(res); err != nil {
+			return fmt.Errorf("wrong regular expression %q: %v", res, err)
+		}
+	}
+
+	branch := directRunStartOpts.branch
+	tag := directRunStartOpts.tag
+	ref := directRunStartOpts.ref
+
+	set := 0
+
+	flags := cmd.Flags()
+	if flags.Changed("branch") {
+		set++
+	}
+	if tag != "" {
+		set++
+		// unset branch default value
+		branch = ""
+	}
+	if ref != "" {
+		set++
+		// unset branch default value
+		branch = ""
+	}
+	if set > 1 {
+		return fmt.Errorf(`only one of "--branch", "--tag" or "--ref" can be provided`)
+	}
 
 	user, _, err := gwclient.GetCurrentUser(context.TODO())
 	if err != nil {
@@ -85,10 +117,10 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 		AddIgnored:   directRunStartOpts.ignored,
 	})
 
-	branch := "gitsavebranch-" + uuid.NewV4().String()
+	localBranch := "gitsavebranch-" + uuid.NewV4().String()
 	message := "agola direct run"
 
-	commitSHA, err := gs.Save(message, branch)
+	commitSHA, err := gs.Save(message, localBranch)
 	if err != nil {
 		return err
 	}
@@ -98,17 +130,30 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 	repoURL := fmt.Sprintf("%s/repos/%s/%s.git", gatewayURL, user.ID, repoUUID)
 
 	// push to a branch with default branch refs "refs/heads/branch"
-	if err := gitsave.GitPush("", repoURL, fmt.Sprintf("%s:refs/heads/%s", path.Join(gs.RefsPrefix(), branch), branch)); err != nil {
-		return err
+	if branch != "" {
+		if err := gitsave.GitPush("", repoURL, fmt.Sprintf("%s:refs/heads/%s", path.Join(gs.RefsPrefix(), localBranch), branch)); err != nil {
+			return err
+		}
+	} else if tag != "" {
+		if err := gitsave.GitPush("", repoURL, fmt.Sprintf("%s:refs/tags/%s", path.Join(gs.RefsPrefix(), localBranch), tag)); err != nil {
+			return err
+		}
+	} else if ref != "" {
+		if err := gitsave.GitPush("", repoURL, fmt.Sprintf("%s:%s", path.Join(gs.RefsPrefix(), localBranch), ref)); err != nil {
+			return err
+		}
 	}
 
 	log.Infof("starting direct run")
 	req := &gwapitypes.UserCreateRunRequest{
-		RepoUUID:  repoUUID,
-		RepoPath:  repoPath,
-		Branch:    branch,
-		CommitSHA: commitSHA,
-		Message:   message,
+		RepoUUID:              repoUUID,
+		RepoPath:              repoPath,
+		Branch:                branch,
+		Tag:                   tag,
+		Ref:                   ref,
+		CommitSHA:             commitSHA,
+		Message:               message,
+		PullRequestRefRegexes: directRunStartOpts.prRefRegexes,
 	}
 	if _, err := gwclient.UserCreateRun(context.TODO(), req); err != nil {
 		return err
