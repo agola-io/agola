@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"strings"
 
-	"agola.io/agola/internal/services/runservice/types"
+	"agola.io/agola/services/runservice/types"
 	errors "golang.org/x/xerrors"
 
 	"github.com/google/go-containerregistry/pkg/name"

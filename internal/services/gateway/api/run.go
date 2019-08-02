@@ -19,103 +19,19 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"time"
 
 	"agola.io/agola/internal/services/gateway/action"
-	rstypes "agola.io/agola/internal/services/runservice/types"
 	"agola.io/agola/internal/util"
-	"go.uber.org/zap"
-	errors "golang.org/x/xerrors"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
+	rstypes "agola.io/agola/services/runservice/types"
 
 	"github.com/gorilla/mux"
+	"go.uber.org/zap"
+	errors "golang.org/x/xerrors"
 )
 
-type RunsResponse struct {
-	ID          string            `json:"id"`
-	Counter     uint64            `json:"counter"`
-	Name        string            `json:"name"`
-	Annotations map[string]string `json:"annotations"`
-	Phase       rstypes.RunPhase  `json:"phase"`
-	Result      rstypes.RunResult `json:"result"`
-
-	TasksWaitingApproval []string `json:"tasks_waiting_approval"`
-
-	EnqueueTime *time.Time `json:"enqueue_time"`
-	StartTime   *time.Time `json:"start_time"`
-	EndTime     *time.Time `json:"end_time"`
-}
-
-type RunResponse struct {
-	ID          string            `json:"id"`
-	Counter     uint64            `json:"counter"`
-	Name        string            `json:"name"`
-	Annotations map[string]string `json:"annotations"`
-	Phase       rstypes.RunPhase  `json:"phase"`
-	Result      rstypes.RunResult `json:"result"`
-	SetupErrors []string          `json:"setup_errors"`
-	Stopping    bool              `json:"stopping"`
-
-	Tasks                map[string]*RunResponseTask `json:"tasks"`
-	TasksWaitingApproval []string                    `json:"tasks_waiting_approval"`
-
-	EnqueueTime *time.Time `json:"enqueue_time"`
-	StartTime   *time.Time `json:"start_time"`
-	EndTime     *time.Time `json:"end_time"`
-
-	CanRestartFromScratch     bool `json:"can_restart_from_scratch"`
-	CanRestartFromFailedTasks bool `json:"can_restart_from_failed_tasks"`
-}
-
-type RunResponseTask struct {
-	ID      string                                  `json:"id"`
-	Name    string                                  `json:"name"`
-	Status  rstypes.RunTaskStatus                   `json:"status"`
-	Level   int                                     `json:"level"`
-	Depends map[string]*rstypes.RunConfigTaskDepend `json:"depends"`
-
-	WaitingApproval     bool              `json:"waiting_approval"`
-	Approved            bool              `json:"approved"`
-	ApprovalAnnotations map[string]string `json:"approval_annotations"`
-
-	StartTime *time.Time `json:"start_time"`
-	EndTime   *time.Time `json:"end_time"`
-}
-
-type RunTaskResponse struct {
-	ID     string                `json:"id"`
-	Name   string                `json:"name"`
-	Status rstypes.RunTaskStatus `json:"status"`
-
-	WaitingApproval     bool              `json:"waiting_approval"`
-	Approved            bool              `json:"approved"`
-	ApprovalAnnotations map[string]string `json:"approval_annotations"`
-
-	SetupStep *RunTaskResponseSetupStep `json:"setup_step"`
-	Steps     []*RunTaskResponseStep    `json:"steps"`
-
-	StartTime *time.Time `json:"start_time"`
-	EndTime   *time.Time `json:"end_time"`
-}
-
-type RunTaskResponseSetupStep struct {
-	Phase rstypes.ExecutorTaskPhase `json:"phase"`
-	Name  string                    `json:"name"`
-
-	StartTime *time.Time `json:"start_time"`
-	EndTime   *time.Time `json:"end_time"`
-}
-
-type RunTaskResponseStep struct {
-	Phase   rstypes.ExecutorTaskPhase `json:"phase"`
-	Name    string                    `json:"name"`
-	Command string                    `json:"command"`
-
-	StartTime *time.Time `json:"start_time"`
-	EndTime   *time.Time `json:"end_time"`
-}
-
-func createRunResponse(r *rstypes.Run, rc *rstypes.RunConfig) *RunResponse {
-	run := &RunResponse{
+func createRunResponse(r *rstypes.Run, rc *rstypes.RunConfig) *gwapitypes.RunResponse {
+	run := &gwapitypes.RunResponse{
 		ID:          r.ID,
 		Counter:     r.Counter,
 		Name:        r.Name,
@@ -125,7 +41,7 @@ func createRunResponse(r *rstypes.Run, rc *rstypes.RunConfig) *RunResponse {
 		Stopping:    r.Stop,
 		SetupErrors: rc.SetupErrors,
 
-		Tasks:                make(map[string]*RunResponseTask),
+		Tasks:                make(map[string]*gwapitypes.RunResponseTask),
 		TasksWaitingApproval: r.TasksWaitingApproval(),
 
 		EnqueueTime: r.EnqueueTime,
@@ -144,8 +60,8 @@ func createRunResponse(r *rstypes.Run, rc *rstypes.RunConfig) *RunResponse {
 	return run
 }
 
-func createRunResponseTask(r *rstypes.Run, rt *rstypes.RunTask, rct *rstypes.RunConfigTask) *RunResponseTask {
-	t := &RunResponseTask{
+func createRunResponseTask(r *rstypes.Run, rt *rstypes.RunTask, rct *rstypes.RunConfigTask) *gwapitypes.RunResponseTask {
+	t := &gwapitypes.RunResponseTask{
 		ID:     rt.ID,
 		Name:   rct.Name,
 		Status: rt.Status,
@@ -164,8 +80,8 @@ func createRunResponseTask(r *rstypes.Run, rt *rstypes.RunTask, rct *rstypes.Run
 	return t
 }
 
-func createRunTaskResponse(rt *rstypes.RunTask, rct *rstypes.RunConfigTask) *RunTaskResponse {
-	t := &RunTaskResponse{
+func createRunTaskResponse(rt *rstypes.RunTask, rct *rstypes.RunConfigTask) *gwapitypes.RunTaskResponse {
+	t := &gwapitypes.RunTaskResponse{
 		ID:     rt.ID,
 		Name:   rct.Name,
 		Status: rt.Status,
@@ -174,13 +90,13 @@ func createRunTaskResponse(rt *rstypes.RunTask, rct *rstypes.RunConfigTask) *Run
 		Approved:            rt.Approved,
 		ApprovalAnnotations: rt.Annotations,
 
-		Steps: make([]*RunTaskResponseStep, len(rt.Steps)),
+		Steps: make([]*gwapitypes.RunTaskResponseStep, len(rt.Steps)),
 
 		StartTime: rt.StartTime,
 		EndTime:   rt.EndTime,
 	}
 
-	t.SetupStep = &RunTaskResponseSetupStep{
+	t.SetupStep = &gwapitypes.RunTaskResponseSetupStep{
 		Name:      "Task setup",
 		Phase:     rt.SetupStep.Phase,
 		StartTime: rt.SetupStep.StartTime,
@@ -188,7 +104,7 @@ func createRunTaskResponse(rt *rstypes.RunTask, rct *rstypes.RunConfigTask) *Run
 	}
 
 	for i := 0; i < len(t.Steps); i++ {
-		s := &RunTaskResponseStep{
+		s := &gwapitypes.RunTaskResponseStep{
 			Phase:     rt.Steps[i].Phase,
 			StartTime: rt.Steps[i].StartTime,
 			EndTime:   rt.Steps[i].EndTime,
@@ -282,8 +198,8 @@ const (
 	MaxRunsLimit     = 40
 )
 
-func createRunsResponse(r *rstypes.Run) *RunsResponse {
-	run := &RunsResponse{
+func createRunsResponse(r *rstypes.Run) *gwapitypes.RunsResponse {
+	run := &gwapitypes.RunsResponse{
 		ID:          r.ID,
 		Counter:     r.Counter,
 		Name:        r.Name,
@@ -368,20 +284,13 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	runs := make([]*RunsResponse, len(runsResp.Runs))
+	runs := make([]*gwapitypes.RunsResponse, len(runsResp.Runs))
 	for i, r := range runsResp.Runs {
 		runs[i] = createRunsResponse(r)
 	}
 	if err := httpResponse(w, http.StatusOK, runs); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
-}
-
-type RunActionsRequest struct {
-	ActionType action.RunActionType `json:"action_type"`
-
-	// Restart
-	FromStart bool `json:"from_start"`
 }
 
 type RunActionsHandler struct {
@@ -398,7 +307,7 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	runID := vars["runid"]
 
-	var req RunActionsRequest
+	var req gwapitypes.RunActionsRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))
@@ -407,7 +316,7 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	areq := &action.RunActionsRequest{
 		RunID:      runID,
-		ActionType: req.ActionType,
+		ActionType: action.RunActionType(req.ActionType),
 		FromStart:  req.FromStart,
 	}
 
@@ -421,10 +330,6 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := httpResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
-}
-
-type RunTaskActionsRequest struct {
-	ActionType action.RunTaskActionType `json:"action_type"`
 }
 
 type RunTaskActionsHandler struct {
@@ -442,7 +347,7 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	runID := vars["runid"]
 	taskID := vars["taskid"]
 
-	var req RunTaskActionsRequest
+	var req gwapitypes.RunTaskActionsRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))
@@ -452,7 +357,7 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	areq := &action.RunTaskActionsRequest{
 		RunID:      runID,
 		TaskID:     taskID,
-		ActionType: req.ActionType,
+		ActionType: action.RunTaskActionType(req.ActionType),
 	}
 
 	err := h.ah.RunTaskAction(ctx, areq)

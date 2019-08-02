@@ -35,7 +35,6 @@ var (
 	tagRefPrefix    = "refs/tags/"
 )
 
-// Client represents a Gogs API client.
 type Client struct {
 	url    string
 	client *http.Client

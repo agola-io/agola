@@ -18,7 +18,7 @@ import (
 	"context"
 
 	"agola.io/agola/internal/services/common"
-	cstypes "agola.io/agola/internal/services/configstore/types"
+	cstypes "agola.io/agola/services/configstore/types"
 
 	errors "golang.org/x/xerrors"
 )

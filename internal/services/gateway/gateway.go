@@ -25,12 +25,12 @@ import (
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/config"
-	csapi "agola.io/agola/internal/services/configstore/api"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/services/gateway/api"
 	"agola.io/agola/internal/services/gateway/handlers"
-	rsapi "agola.io/agola/internal/services/runservice/api"
 	"agola.io/agola/internal/util"
+	csclient "agola.io/agola/services/configstore/client"
+	rsclient "agola.io/agola/services/runservice/client"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	ghandlers "github.com/gorilla/handlers"
@@ -52,8 +52,8 @@ type Gateway struct {
 	c *config.Gateway
 
 	ost               *objectstorage.ObjStorage
-	runserviceClient  *rsapi.Client
-	configstoreClient *csapi.Client
+	runserviceClient  *rsclient.Client
+	configstoreClient *csclient.Client
 	ah                *action.ActionHandler
 	sd                *common.TokenSigningData
 }
@@ -121,8 +121,8 @@ func NewGateway(gc *config.Config) (*Gateway, error) {
 		return nil, err
 	}
 
-	configstoreClient := csapi.NewClient(c.ConfigstoreURL)
-	runserviceClient := rsapi.NewClient(c.RunserviceURL)
+	configstoreClient := csclient.NewClient(c.ConfigstoreURL)
+	runserviceClient := rsclient.NewClient(c.RunserviceURL)
 
 	ah := action.NewActionHandler(logger, sd, configstoreClient, runserviceClient, gc.ID, c.APIExposedURL, c.WebExposedURL)
 

@@ -24,7 +24,7 @@ import (
 	"path"
 	"time"
 
-	rstypes "agola.io/agola/internal/services/runservice/types"
+	rstypes "agola.io/agola/services/runservice/types"
 
 	"go.etcd.io/etcd/clientv3/concurrency"
 	errors "golang.org/x/xerrors"

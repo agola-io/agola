@@ -18,23 +18,19 @@ import (
 	"net/http"
 
 	gitsource "agola.io/agola/internal/gitsources"
-	csapi "agola.io/agola/internal/services/configstore/api"
-	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
+	csclient "agola.io/agola/services/configstore/client"
+	cstypes "agola.io/agola/services/configstore/types"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 	errors "golang.org/x/xerrors"
 )
 
-type RemoteRepoResponse struct {
-	ID   string `json:"id,omitempty"`
-	Path string `json:"path,omitempty"`
-}
-
-func createRemoteRepoResponse(r *gitsource.RepoInfo) *RemoteRepoResponse {
-	rr := &RemoteRepoResponse{
+func createRemoteRepoResponse(r *gitsource.RepoInfo) *gwapitypes.RemoteRepoResponse {
+	rr := &gwapitypes.RemoteRepoResponse{
 		ID:   r.ID,
 		Path: r.Path,
 	}
@@ -45,10 +41,10 @@ func createRemoteRepoResponse(r *gitsource.RepoInfo) *RemoteRepoResponse {
 type UserRemoteReposHandler struct {
 	log               *zap.SugaredLogger
 	ah                *action.ActionHandler
-	configstoreClient *csapi.Client
+	configstoreClient *csclient.Client
 }
 
-func NewUserRemoteReposHandler(logger *zap.Logger, ah *action.ActionHandler, configstoreClient *csapi.Client) *UserRemoteReposHandler {
+func NewUserRemoteReposHandler(logger *zap.Logger, ah *action.ActionHandler, configstoreClient *csclient.Client) *UserRemoteReposHandler {
 	return &UserRemoteReposHandler{log: logger.Sugar(), ah: ah, configstoreClient: configstoreClient}
 }
 
@@ -105,7 +101,7 @@ func (h *UserRemoteReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	repos := make([]*RemoteRepoResponse, len(remoteRepos))
+	repos := make([]*gwapitypes.RemoteRepoResponse, len(remoteRepos))
 	for i, r := range remoteRepos {
 		repos[i] = createRemoteRepoResponse(r)
 	}

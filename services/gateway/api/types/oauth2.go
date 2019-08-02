@@ -12,33 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package common
+package types
 
-type Arch string
-
-const (
-	Arch386   Arch = "386"
-	ArchAMD64 Arch = "amd64"
-	ArchARM   Arch = "arm"
-	ArchARM64 Arch = "arm64"
-)
-
-var ValidArchs = []Arch{Arch386, ArchAMD64, ArchARM, ArchARM64}
-
-func IsValidArch(arch Arch) bool {
-	for _, va := range ValidArchs {
-		if arch == va {
-			return true
-		}
-	}
-	return false
-}
-
-func ArchFromString(arch string) Arch {
-	for _, va := range ValidArchs {
-		if arch == string(va) {
-			return va
-		}
-	}
-	return ""
+type RemoteSourceAuthResult struct {
+	RequestType string      `json:"request_type,omitempty"`
+	Response    interface{} `json:"response,omitempty"`
 }

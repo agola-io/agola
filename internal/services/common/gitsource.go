@@ -19,7 +19,7 @@ import (
 	"agola.io/agola/internal/gitsources/gitea"
 	"agola.io/agola/internal/gitsources/github"
 	"agola.io/agola/internal/gitsources/gitlab"
-	cstypes "agola.io/agola/internal/services/configstore/types"
+	cstypes "agola.io/agola/services/configstore/types"
 
 	errors "golang.org/x/xerrors"
 )

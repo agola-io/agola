@@ -17,8 +17,8 @@ package cmd
 import (
 	"context"
 
-	cstypes "agola.io/agola/internal/services/configstore/types"
-	"agola.io/agola/internal/services/gateway/api"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
+	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
@@ -60,17 +60,17 @@ func init() {
 }
 
 func projectGroupCreate(cmd *cobra.Command, args []string) error {
-	gwclient := api.NewClient(gatewayURL, token)
+	gwclient := gwclient.NewClient(gatewayURL, token)
 
 	// TODO(sgotti) make this a custom pflag Value?
-	if !cstypes.IsValidVisibility(cstypes.Visibility(projectCreateOpts.visibility)) {
-		return errors.Errorf("invalid visibility %q", projectCreateOpts.visibility)
+	if !IsValidVisibility(projectGroupCreateOpts.visibility) {
+		return errors.Errorf("invalid visibility %q", projectGroupCreateOpts.visibility)
 	}
 
-	req := &api.CreateProjectGroupRequest{
+	req := &gwapitypes.CreateProjectGroupRequest{
 		Name:       projectGroupCreateOpts.name,
 		ParentRef:  projectGroupCreateOpts.parentPath,
-		Visibility: cstypes.Visibility(projectCreateOpts.visibility),
+		Visibility: gwapitypes.Visibility(projectGroupCreateOpts.visibility),
 	}
 
 	log.Infof("creating project group")

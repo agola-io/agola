@@ -19,7 +19,7 @@ import (
 	"encoding/json"
 	"os"
 
-	"agola.io/agola/internal/services/gateway/api"
+	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
@@ -54,7 +54,7 @@ func init() {
 }
 
 func orgMemberList(cmd *cobra.Command, args []string) error {
-	gwclient := api.NewClient(gatewayURL, token)
+	gwclient := gwclient.NewClient(gatewayURL, token)
 
 	orgMembers, _, err := gwclient.GetOrgMembers(context.TODO(), orgMemberListOpts.orgname)
 	if err != nil {

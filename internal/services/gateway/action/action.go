@@ -18,9 +18,9 @@ import (
 	"net/http"
 
 	"agola.io/agola/internal/services/common"
-	csapi "agola.io/agola/internal/services/configstore/api"
-	rsapi "agola.io/agola/internal/services/runservice/api"
 	"agola.io/agola/internal/util"
+	csclient "agola.io/agola/services/configstore/client"
+	rsclient "agola.io/agola/services/runservice/client"
 
 	"go.uber.org/zap"
 )
@@ -28,14 +28,14 @@ import (
 type ActionHandler struct {
 	log               *zap.SugaredLogger
 	sd                *common.TokenSigningData
-	configstoreClient *csapi.Client
-	runserviceClient  *rsapi.Client
+	configstoreClient *csclient.Client
+	runserviceClient  *rsclient.Client
 	agolaID           string
 	apiExposedURL     string
 	webExposedURL     string
 }
 
-func NewActionHandler(logger *zap.Logger, sd *common.TokenSigningData, configstoreClient *csapi.Client, runserviceClient *rsapi.Client, agolaID, apiExposedURL, webExposedURL string) *ActionHandler {
+func NewActionHandler(logger *zap.Logger, sd *common.TokenSigningData, configstoreClient *csclient.Client, runserviceClient *rsclient.Client, agolaID, apiExposedURL, webExposedURL string) *ActionHandler {
 	return &ActionHandler{
 		log:               logger.Sugar(),
 		sd:                sd,

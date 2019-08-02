@@ -18,7 +18,9 @@ import (
 	"context"
 	"fmt"
 
-	"agola.io/agola/internal/services/gateway/api"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
+	gwclient "agola.io/agola/services/gateway/client"
+
 	"github.com/spf13/cobra"
 )
 
@@ -48,14 +50,14 @@ func init() {
 	cmdUser.AddCommand(cmdUserList)
 }
 
-func printUsers(users []*api.UserResponse) {
+func printUsers(users []*gwapitypes.UserResponse) {
 	for _, user := range users {
 		fmt.Printf("%s: Name: %s\n", user.ID, user.UserName)
 	}
 }
 
 func userList(cmd *cobra.Command, args []string) error {
-	gwclient := api.NewClient(gatewayURL, token)
+	gwclient := gwclient.NewClient(gatewayURL, token)
 
 	users, _, err := gwclient.GetUsers(context.TODO(), userListOpts.start, userListOpts.limit, false)
 	if err != nil {

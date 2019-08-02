@@ -19,6 +19,7 @@ import (
 
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
 
 	"go.uber.org/zap"
 )
@@ -26,11 +27,6 @@ import (
 type OAuth2CallbackHandler struct {
 	log *zap.SugaredLogger
 	ah  *action.ActionHandler
-}
-
-type RemoteSourceAuthResult struct {
-	RequestType string      `json:"request_type,omitempty"`
-	Response    interface{} `json:"response,omitempty"`
 }
 
 func NewOAuth2CallbackHandler(logger *zap.Logger, ah *action.ActionHandler) *OAuth2CallbackHandler {
@@ -54,29 +50,39 @@ func (h *OAuth2CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	switch cresp.RequestType {
 	case action.RemoteSourceRequestTypeCreateUserLA:
 		authresp := cresp.Response.(*action.CreateUserLAResponse)
-		response = &CreateUserLAResponse{
-			LinkedAccount: authresp.LinkedAccount,
+		response = &gwapitypes.CreateUserLAResponse{
+			LinkedAccount: &gwapitypes.LinkedAccount{
+				ID:                  authresp.LinkedAccount.ID,
+				RemoteUserID:        authresp.LinkedAccount.RemoteUserID,
+				RemoteUserName:      authresp.LinkedAccount.RemoteUserName,
+				RemoteUserAvatarURL: authresp.LinkedAccount.RemoteUserAvatarURL,
+				RemoteSourceID:      authresp.LinkedAccount.RemoteUserID,
+			},
 		}
 
 	case action.RemoteSourceRequestTypeLoginUser:
 		authresp := cresp.Response.(*action.LoginUserResponse)
-		response = &LoginUserResponse{
+		response = &gwapitypes.LoginUserResponse{
 			Token: authresp.Token,
 			User:  createUserResponse(authresp.User),
 		}
 
 	case action.RemoteSourceRequestTypeAuthorize:
 		authresp := cresp.Response.(*action.AuthorizeResponse)
-		response = &AuthorizeResponse{
-			RemoteUserInfo:   authresp.RemoteUserInfo,
+		response = &gwapitypes.AuthorizeResponse{
+			RemoteUserInfo: &gwapitypes.UserInfo{
+				ID:        authresp.RemoteUserInfo.ID,
+				LoginName: authresp.RemoteUserInfo.LoginName,
+				Email:     authresp.RemoteUserInfo.Email,
+			},
 			RemoteSourceName: authresp.RemoteSourceName,
 		}
 
 	case action.RemoteSourceRequestTypeRegisterUser:
-		response = &RegisterUserResponse{}
+		response = &gwapitypes.RegisterUserResponse{}
 	}
 
-	res := RemoteSourceAuthResult{
+	res := gwapitypes.RemoteSourceAuthResult{
 		RequestType: string(cresp.RequestType),
 		Response:    response,
 	}

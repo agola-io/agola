@@ -24,27 +24,16 @@ import (
 	"agola.io/agola/internal/db"
 	"agola.io/agola/internal/services/configstore/action"
 	"agola.io/agola/internal/services/configstore/readdb"
-	"agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
-	errors "golang.org/x/xerrors"
+	csapitypes "agola.io/agola/services/configstore/api/types"
+	"agola.io/agola/services/configstore/types"
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
+	errors "golang.org/x/xerrors"
 )
 
-// Project augments types.Project with dynamic data
-type Project struct {
-	*types.Project
-
-	// dynamic data
-	OwnerType        types.ConfigType
-	OwnerID          string
-	Path             string
-	ParentPath       string
-	GlobalVisibility types.Visibility
-}
-
-func projectResponse(ctx context.Context, readDB *readdb.ReadDB, project *types.Project) (*Project, error) {
+func projectResponse(ctx context.Context, readDB *readdb.ReadDB, project *types.Project) (*csapitypes.Project, error) {
 	r, err := projectsResponse(ctx, readDB, []*types.Project{project})
 	if err != nil {
 		return nil, err
@@ -52,8 +41,8 @@ func projectResponse(ctx context.Context, readDB *readdb.ReadDB, project *types.
 	return r[0], nil
 }
 
-func projectsResponse(ctx context.Context, readDB *readdb.ReadDB, projects []*types.Project) ([]*Project, error) {
-	resProjects := make([]*Project, len(projects))
+func projectsResponse(ctx context.Context, readDB *readdb.ReadDB, projects []*types.Project) ([]*csapitypes.Project, error) {
+	resProjects := make([]*csapitypes.Project, len(projects))
 
 	err := readDB.Do(ctx, func(tx *db.Tx) error {
 		for i, project := range projects {
@@ -75,7 +64,7 @@ func projectsResponse(ctx context.Context, readDB *readdb.ReadDB, projects []*ty
 
 			// we calculate the path here from parent path since the db could not yet be
 			// updated on create
-			resProjects[i] = &Project{
+			resProjects[i] = &csapitypes.Project{
 				Project:          project,
 				OwnerType:        ownerType,
 				OwnerID:          ownerID,

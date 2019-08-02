@@ -21,8 +21,8 @@ import (
 	"agola.io/agola/internal/etcd"
 	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/services/config"
-	csapi "agola.io/agola/internal/services/configstore/api"
-	rsapi "agola.io/agola/internal/services/runservice/api"
+	csclient "agola.io/agola/services/configstore/client"
+	rsclient "agola.io/agola/services/runservice/client"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -38,8 +38,8 @@ type NotificationService struct {
 
 	e *etcd.Store
 
-	runserviceClient  *rsapi.Client
-	configstoreClient *csapi.Client
+	runserviceClient  *rsclient.Client
+	configstoreClient *csclient.Client
 }
 
 func NewNotificationService(gc *config.Config) (*NotificationService, error) {
@@ -53,8 +53,8 @@ func NewNotificationService(gc *config.Config) (*NotificationService, error) {
 		return nil, err
 	}
 
-	configstoreClient := csapi.NewClient(c.ConfigstoreURL)
-	runserviceClient := rsapi.NewClient(c.RunserviceURL)
+	configstoreClient := csclient.NewClient(c.ConfigstoreURL)
+	runserviceClient := rsclient.NewClient(c.RunserviceURL)
 
 	return &NotificationService{
 		gc:                gc,

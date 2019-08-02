@@ -29,8 +29,8 @@ import (
 	"agola.io/agola/internal/services/runservice/common"
 	"agola.io/agola/internal/services/runservice/readdb"
 	"agola.io/agola/internal/services/runservice/store"
-	"agola.io/agola/internal/services/runservice/types"
 	"agola.io/agola/internal/util"
+	"agola.io/agola/services/runservice/types"
 
 	"go.uber.org/zap"
 	errors "golang.org/x/xerrors"

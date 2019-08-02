@@ -18,9 +18,9 @@ import (
 	"context"
 	"net/http"
 
-	csapi "agola.io/agola/internal/services/configstore/api"
-	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
+	csapitypes "agola.io/agola/services/configstore/api/types"
+	cstypes "agola.io/agola/services/configstore/types"
 
 	errors "golang.org/x/xerrors"
 )
@@ -32,8 +32,8 @@ type GetSecretsRequest struct {
 	Tree bool
 }
 
-func (h *ActionHandler) GetSecrets(ctx context.Context, req *GetSecretsRequest) ([]*csapi.Secret, error) {
-	var cssecrets []*csapi.Secret
+func (h *ActionHandler) GetSecrets(ctx context.Context, req *GetSecretsRequest) ([]*csapitypes.Secret, error) {
+	var cssecrets []*csapitypes.Secret
 	var resp *http.Response
 	var err error
 	switch req.ParentType {
@@ -65,7 +65,7 @@ type CreateSecretRequest struct {
 	Path             string
 }
 
-func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretRequest) (*csapi.Secret, error) {
+func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretRequest) (*csapitypes.Secret, error) {
 	isVariableOwner, err := h.IsVariableOwner(ctx, req.ParentType, req.ParentRef)
 	if err != nil {
 		return nil, errors.Errorf("failed to determine ownership: %w", err)
@@ -85,7 +85,7 @@ func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretReque
 	}
 
 	var resp *http.Response
-	var rs *csapi.Secret
+	var rs *csapitypes.Secret
 	switch req.ParentType {
 	case cstypes.ConfigTypeProjectGroup:
 		h.log.Infof("creating project group secret")
@@ -120,7 +120,7 @@ type UpdateSecretRequest struct {
 	Path             string
 }
 
-func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretRequest) (*csapi.Secret, error) {
+func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretRequest) (*csapitypes.Secret, error) {
 	isVariableOwner, err := h.IsVariableOwner(ctx, req.ParentType, req.ParentRef)
 	if err != nil {
 		return nil, errors.Errorf("failed to determine ownership: %w", err)
@@ -140,7 +140,7 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretReque
 	}
 
 	var resp *http.Response
-	var rs *csapi.Secret
+	var rs *csapitypes.Secret
 	switch req.ParentType {
 	case cstypes.ConfigTypeProjectGroup:
 		h.log.Infof("updating project group secret")

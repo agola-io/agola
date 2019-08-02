@@ -17,8 +17,8 @@ package action
 import (
 	"testing"
 
-	"agola.io/agola/internal/services/runservice/types"
 	"agola.io/agola/internal/util"
+	"agola.io/agola/services/runservice/types"
 	"github.com/google/go-cmp/cmp"
 )
 

@@ -36,8 +36,8 @@ import (
 	"agola.io/agola/internal/sequence"
 	"agola.io/agola/internal/services/runservice/common"
 	"agola.io/agola/internal/services/runservice/store"
-	"agola.io/agola/internal/services/runservice/types"
 	"agola.io/agola/internal/util"
+	"agola.io/agola/services/runservice/types"
 
 	sq "github.com/Masterminds/squirrel"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"

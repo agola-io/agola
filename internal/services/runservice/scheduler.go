@@ -31,8 +31,8 @@ import (
 	"agola.io/agola/internal/runconfig"
 	"agola.io/agola/internal/services/runservice/common"
 	"agola.io/agola/internal/services/runservice/store"
-	"agola.io/agola/internal/services/runservice/types"
 	"agola.io/agola/internal/util"
+	"agola.io/agola/services/runservice/types"
 
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/clientv3/concurrency"

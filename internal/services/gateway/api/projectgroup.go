@@ -19,21 +19,16 @@ import (
 	"net/http"
 	"net/url"
 
-	csapi "agola.io/agola/internal/services/configstore/api"
-	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
+	csapitypes "agola.io/agola/services/configstore/api/types"
+	cstypes "agola.io/agola/services/configstore/types"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
 	errors "golang.org/x/xerrors"
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 )
-
-type CreateProjectGroupRequest struct {
-	Name       string             `json:"name"`
-	ParentRef  string             `json:"parent_ref"`
-	Visibility cstypes.Visibility `json:"visibility"`
-}
 
 type CreateProjectGroupHandler struct {
 	log *zap.SugaredLogger
@@ -47,7 +42,7 @@ func NewCreateProjectGroupHandler(logger *zap.Logger, ah *action.ActionHandler) 
 func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var req CreateProjectGroupRequest
+	var req gwapitypes.CreateProjectGroupRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))
@@ -64,7 +59,7 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	creq := &action.CreateProjectGroupRequest{
 		Name:          req.Name,
 		ParentRef:     req.ParentRef,
-		Visibility:    req.Visibility,
+		Visibility:    cstypes.Visibility(req.Visibility),
 		CurrentUserID: userID,
 	}
 
@@ -78,11 +73,6 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	if err := httpResponse(w, http.StatusCreated, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
-}
-
-type UpdateProjectGroupRequest struct {
-	Name       string             `json:"name,omitempty"`
-	Visibility cstypes.Visibility `json:"visibility,omitempty"`
 }
 
 type UpdateProjectGroupHandler struct {
@@ -103,7 +93,7 @@ func (h *UpdateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	var req UpdateProjectGroupRequest
+	var req gwapitypes.UpdateProjectGroupRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))
@@ -112,7 +102,7 @@ func (h *UpdateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 
 	areq := &action.UpdateProjectGroupRequest{
 		Name:       req.Name,
-		Visibility: req.Visibility,
+		Visibility: cstypes.Visibility(req.Visibility),
 	}
 	projectGroup, err := h.ah.UpdateProjectGroup(ctx, projectGroupRef, areq)
 	if httpError(w, err) {
@@ -209,7 +199,7 @@ func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	projects := make([]*ProjectResponse, len(csprojects))
+	projects := make([]*gwapitypes.ProjectResponse, len(csprojects))
 	for i, p := range csprojects {
 		projects[i] = createProjectResponse(p)
 	}
@@ -243,7 +233,7 @@ func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.
 		return
 	}
 
-	subgroups := make([]*ProjectGroupResponse, len(cssubgroups))
+	subgroups := make([]*gwapitypes.ProjectGroupResponse, len(cssubgroups))
 	for i, g := range cssubgroups {
 		subgroups[i] = createProjectGroupResponse(g)
 	}
@@ -253,22 +243,13 @@ func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.
 	}
 }
 
-type ProjectGroupResponse struct {
-	ID               string             `json:"id"`
-	Name             string             `json:"name"`
-	Path             string             `json:"path"`
-	ParentPath       string             `json:"parent_path"`
-	Visibility       cstypes.Visibility `json:"visibility"`
-	GlobalVisibility string             `json:"global_visibility"`
-}
-
-func createProjectGroupResponse(r *csapi.ProjectGroup) *ProjectGroupResponse {
-	run := &ProjectGroupResponse{
+func createProjectGroupResponse(r *csapitypes.ProjectGroup) *gwapitypes.ProjectGroupResponse {
+	run := &gwapitypes.ProjectGroupResponse{
 		ID:               r.ID,
 		Name:             r.Name,
 		Path:             r.Path,
 		ParentPath:       r.ParentPath,
-		Visibility:       r.Visibility,
+		Visibility:       gwapitypes.Visibility(r.Visibility),
 		GlobalVisibility: string(r.GlobalVisibility),
 	}
 

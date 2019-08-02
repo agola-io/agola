@@ -20,9 +20,9 @@ import (
 	"testing"
 
 	"agola.io/agola/internal/config"
-	cstypes "agola.io/agola/internal/services/configstore/types"
-	rstypes "agola.io/agola/internal/services/runservice/types"
 	"agola.io/agola/internal/util"
+	cstypes "agola.io/agola/services/configstore/types"
+	rstypes "agola.io/agola/services/runservice/types"
 
 	"github.com/google/go-cmp/cmp"
 	errors "golang.org/x/xerrors"

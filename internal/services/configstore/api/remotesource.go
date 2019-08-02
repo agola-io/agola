@@ -22,12 +22,12 @@ import (
 	"agola.io/agola/internal/db"
 	"agola.io/agola/internal/services/configstore/action"
 	"agola.io/agola/internal/services/configstore/readdb"
-	"agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
-	errors "golang.org/x/xerrors"
+	"agola.io/agola/services/configstore/types"
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
+	errors "golang.org/x/xerrors"
 )
 
 type RemoteSourceHandler struct {

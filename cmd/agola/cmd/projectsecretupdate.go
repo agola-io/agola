@@ -19,8 +19,8 @@ import (
 	"io/ioutil"
 	"os"
 
-	cstypes "agola.io/agola/internal/services/configstore/types"
-	"agola.io/agola/internal/services/gateway/api"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
+	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
@@ -75,7 +75,7 @@ func init() {
 }
 
 func secretUpdate(cmd *cobra.Command, ownertype string, args []string) error {
-	gwclient := api.NewClient(gatewayURL, token)
+	gwclient := gwclient.NewClient(gatewayURL, token)
 
 	// "github.com/ghodss/yaml" doesn't provide a streaming decoder
 	var data []byte
@@ -96,9 +96,9 @@ func secretUpdate(cmd *cobra.Command, ownertype string, args []string) error {
 	if err := yaml.Unmarshal(data, &secretData); err != nil {
 		log.Fatalf("failed to unmarshal secret: %v", err)
 	}
-	req := &api.UpdateSecretRequest{
+	req := &gwapitypes.UpdateSecretRequest{
 		Name: secretUpdateOpts.name,
-		Type: cstypes.SecretTypeInternal,
+		Type: gwapitypes.SecretTypeInternal,
 		Data: secretData,
 	}
 

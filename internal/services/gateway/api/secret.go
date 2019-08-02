@@ -18,23 +18,18 @@ import (
 	"encoding/json"
 	"net/http"
 
-	csapi "agola.io/agola/internal/services/configstore/api"
-	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
+	csapitypes "agola.io/agola/services/configstore/api/types"
+	cstypes "agola.io/agola/services/configstore/types"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 )
 
-type SecretResponse struct {
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	ParentPath string `json:"parent_path"`
-}
-
-func createSecretResponse(s *csapi.Secret) *SecretResponse {
-	return &SecretResponse{
+func createSecretResponse(s *csapitypes.Secret) *gwapitypes.SecretResponse {
+	return &gwapitypes.SecretResponse{
 		ID:         s.ID,
 		Name:       s.Name,
 		ParentPath: s.ParentPath,
@@ -72,7 +67,7 @@ func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	secrets := make([]*SecretResponse, len(cssecrets))
+	secrets := make([]*gwapitypes.SecretResponse, len(cssecrets))
 	for i, s := range cssecrets {
 		secrets[i] = createSecretResponse(s)
 	}
@@ -80,19 +75,6 @@ func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := httpResponse(w, http.StatusOK, secrets); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
-}
-
-type CreateSecretRequest struct {
-	Name string `json:"name,omitempty"`
-
-	Type cstypes.SecretType `json:"type,omitempty"`
-
-	// internal secret
-	Data map[string]string `json:"data,omitempty"`
-
-	// external secret
-	SecretProviderID string `json:"secret_provider_id,omitempty"`
-	Path             string `json:"path,omitempty"`
 }
 
 type CreateSecretHandler struct {
@@ -111,7 +93,7 @@ func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var req CreateSecretRequest
+	var req gwapitypes.CreateSecretRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))
@@ -122,7 +104,7 @@ func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		Name:             req.Name,
 		ParentType:       parentType,
 		ParentRef:        parentRef,
-		Type:             req.Type,
+		Type:             cstypes.SecretType(req.Type),
 		Data:             req.Data,
 		SecretProviderID: req.SecretProviderID,
 		Path:             req.Path,
@@ -137,19 +119,6 @@ func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	if err := httpResponse(w, http.StatusCreated, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
-}
-
-type UpdateSecretRequest struct {
-	Name string `json:"name,omitempty"`
-
-	Type cstypes.SecretType `json:"type,omitempty"`
-
-	// internal secret
-	Data map[string]string `json:"data,omitempty"`
-
-	// external secret
-	SecretProviderID string `json:"secret_provider_id,omitempty"`
-	Path             string `json:"path,omitempty"`
 }
 
 type UpdateSecretHandler struct {
@@ -172,7 +141,7 @@ func (h *UpdateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var req UpdateSecretRequest
+	var req gwapitypes.UpdateSecretRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))
@@ -184,7 +153,7 @@ func (h *UpdateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		Name:             req.Name,
 		ParentType:       parentType,
 		ParentRef:        parentRef,
-		Type:             req.Type,
+		Type:             cstypes.SecretType(req.Type),
 		Data:             req.Data,
 		SecretProviderID: req.SecretProviderID,
 		Path:             req.Path,

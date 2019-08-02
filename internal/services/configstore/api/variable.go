@@ -21,20 +21,13 @@ import (
 	"agola.io/agola/internal/db"
 	"agola.io/agola/internal/services/configstore/action"
 	"agola.io/agola/internal/services/configstore/readdb"
-	"agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
+	csapitypes "agola.io/agola/services/configstore/api/types"
+	"agola.io/agola/services/configstore/types"
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 )
-
-// Variable augments types.Variable with dynamic data
-type Variable struct {
-	*types.Variable
-
-	// dynamic data
-	ParentPath string
-}
 
 type VariablesHandler struct {
 	log    *zap.SugaredLogger
@@ -63,9 +56,9 @@ func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resVariables := make([]*Variable, len(variables))
+	resVariables := make([]*csapitypes.Variable, len(variables))
 	for i, v := range variables {
-		resVariables[i] = &Variable{Variable: v}
+		resVariables[i] = &csapitypes.Variable{Variable: v}
 	}
 	err = h.readDB.Do(ctx, func(tx *db.Tx) error {
 		// populate parent path

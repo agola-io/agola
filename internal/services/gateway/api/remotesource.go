@@ -19,28 +19,15 @@ import (
 	"net/http"
 	"strconv"
 
-	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
+	cstypes "agola.io/agola/services/configstore/types"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
 	"go.uber.org/zap"
 
 	"github.com/gorilla/mux"
 	errors "golang.org/x/xerrors"
 )
-
-type CreateRemoteSourceRequest struct {
-	Name                string `json:"name"`
-	APIURL              string `json:"apiurl"`
-	Type                string `json:"type"`
-	AuthType            string `json:"auth_type"`
-	SkipVerify          bool   `json:"skip_verify"`
-	Oauth2ClientID      string `json:"oauth_2_client_id"`
-	Oauth2ClientSecret  string `json:"oauth_2_client_secret"`
-	SSHHostKey          string `json:"ssh_host_key"`
-	SkipSSHHostKeyCheck bool   `json:"skip_ssh_host_key_check"`
-	RegistrationEnabled *bool  `json:"registration_enabled"`
-	LoginEnabled        *bool  `json:"login_enabled"`
-}
 
 type CreateRemoteSourceHandler struct {
 	log *zap.SugaredLogger
@@ -54,7 +41,7 @@ func NewCreateRemoteSourceHandler(logger *zap.Logger, ah *action.ActionHandler) 
 func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var req CreateRemoteSourceRequest
+	var req gwapitypes.CreateRemoteSourceRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))
@@ -86,18 +73,6 @@ func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	}
 }
 
-type UpdateRemoteSourceRequest struct {
-	Name                *string `json:"name"`
-	APIURL              *string `json:"apiurl"`
-	SkipVerify          *bool   `json:"skip_verify"`
-	Oauth2ClientID      *string `json:"oauth_2_client_id"`
-	Oauth2ClientSecret  *string `json:"oauth_2_client_secret"`
-	SSHHostKey          *string `json:"ssh_host_key"`
-	SkipSSHHostKeyCheck *bool   `json:"skip_ssh_host_key_check"`
-	RegistrationEnabled *bool   `json:"registration_enabled"`
-	LoginEnabled        *bool   `json:"login_enabled"`
-}
-
 type UpdateRemoteSourceHandler struct {
 	log *zap.SugaredLogger
 	ah  *action.ActionHandler
@@ -112,7 +87,7 @@ func (h *UpdateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	vars := mux.Vars(r)
 	rsRef := vars["remotesourceref"]
 
-	var req UpdateRemoteSourceRequest
+	var req gwapitypes.UpdateRemoteSourceRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		httpError(w, util.NewErrBadRequest(err))
@@ -144,16 +119,8 @@ func (h *UpdateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	}
 }
 
-type RemoteSourceResponse struct {
-	ID                  string `json:"id"`
-	Name                string `json:"name"`
-	AuthType            string `json:"auth_type"`
-	RegistrationEnabled bool   `json:"registration_enabled"`
-	LoginEnabled        bool   `json:"login_enabled"`
-}
-
-func createRemoteSourceResponse(r *cstypes.RemoteSource) *RemoteSourceResponse {
-	rs := &RemoteSourceResponse{
+func createRemoteSourceResponse(r *cstypes.RemoteSource) *gwapitypes.RemoteSourceResponse {
+	rs := &gwapitypes.RemoteSourceResponse{
 		ID:                  r.ID,
 		Name:                r.Name,
 		AuthType:            string(r.AuthType),
@@ -237,7 +204,7 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	remoteSources := make([]*RemoteSourceResponse, len(csRemoteSources))
+	remoteSources := make([]*gwapitypes.RemoteSourceResponse, len(csRemoteSources))
 	for i, rs := range csRemoteSources {
 		remoteSources[i] = createRemoteSourceResponse(rs)
 	}

@@ -21,8 +21,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"agola.io/agola/internal/common"
 	"agola.io/agola/internal/services/executor/registry"
+	"agola.io/agola/services/types"
 )
 
 const (
@@ -53,7 +53,7 @@ type Driver interface {
 	GetPods(ctx context.Context, all bool) ([]Pod, error)
 	ExecutorGroup(ctx context.Context) (string, error)
 	GetExecutors(ctx context.Context) ([]string, error)
-	Archs(ctx context.Context) ([]common.Arch, error)
+	Archs(ctx context.Context) ([]types.Arch, error)
 }
 
 type Pod interface {
@@ -80,7 +80,7 @@ type PodConfig struct {
 	ID         string
 	TaskID     string
 	Containers []*ContainerConfig
-	Arch       common.Arch
+	Arch       types.Arch
 	// The container dir where the init volume will be mounted
 	InitVolumeDir string
 	DockerConfig  *registry.DockerConfig
@@ -106,7 +106,7 @@ type ExecConfig struct {
 	Tty         bool
 }
 
-func toolboxExecPath(toolboxDir string, arch common.Arch) (string, error) {
+func toolboxExecPath(toolboxDir string, arch types.Arch) (string, error) {
 	toolboxPath := filepath.Join(toolboxDir, fmt.Sprintf("%s-linux-%s", toolboxPrefix, arch))
 	_, err := os.Stat(toolboxPath)
 	if err != nil {

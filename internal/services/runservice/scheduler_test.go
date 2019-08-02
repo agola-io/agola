@@ -20,8 +20,8 @@ import (
 	"testing"
 	"time"
 
-	"agola.io/agola/internal/common"
-	"agola.io/agola/internal/services/runservice/types"
+	"agola.io/agola/services/runservice/types"
+	ctypes "agola.io/agola/services/types"
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -543,7 +543,7 @@ func TestGetTasksToRun(t *testing.T) {
 func TestChooseExecutor(t *testing.T) {
 	executorOK := &types.Executor{
 		ID:                   "executorOK",
-		Archs:                []common.Arch{common.ArchAMD64},
+		Archs:                []ctypes.Arch{ctypes.ArchAMD64},
 		ActiveTasksLimit:     2,
 		ActiveTasks:          0,
 		LastStatusUpdateTime: time.Now(),
@@ -566,7 +566,7 @@ func TestChooseExecutor(t *testing.T) {
 	executorOKMultipleArchs := func() *types.Executor {
 		e := executorOK.DeepCopy()
 		e.ID = "executorOKMultipleArchs"
-		e.Archs = []common.Arch{common.ArchAMD64, common.ArchARM64}
+		e.Archs = []ctypes.Arch{ctypes.ArchAMD64, ctypes.ArchARM64}
 		return e
 	}()
 
@@ -582,7 +582,7 @@ func TestChooseExecutor(t *testing.T) {
 		ID:   "task01",
 		Name: "task01",
 		Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
-			Arch: common.ArchAMD64,
+			Arch: ctypes.ArchAMD64,
 		},
 	}
 
@@ -590,7 +590,7 @@ func TestChooseExecutor(t *testing.T) {
 		ID:   "task01",
 		Name: "task01",
 		Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
-			Arch: common.ArchAMD64,
+			Arch: ctypes.ArchAMD64,
 			Containers: []*types.Container{
 				{
 					Privileged: true,
@@ -629,7 +629,7 @@ func TestChooseExecutor(t *testing.T) {
 			name: "test single executor with different arch",
 			executors: func() []*types.Executor {
 				e := executorOK.DeepCopy()
-				e.Archs = []common.Arch{common.ArchARM64}
+				e.Archs = []ctypes.Arch{ctypes.ArchARM64}
 				return []*types.Executor{e}
 			}(),
 			rct: rct,

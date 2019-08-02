@@ -20,8 +20,9 @@ import (
 	"fmt"
 	"time"
 
-	"agola.io/agola/internal/common"
-	"agola.io/agola/internal/util"
+	"agola.io/agola/services/types"
+	"agola.io/agola/util"
+
 	"github.com/mitchellh/copystructure"
 )
 
@@ -393,7 +394,7 @@ type DockerRegistryAuth struct {
 
 type Runtime struct {
 	Type       RuntimeType  `json:"type,omitempty"`
-	Arch       common.Arch  `json:"arch,omitempty"`
+	Arch       types.Arch   `json:"arch,omitempty"`
 	Containers []*Container `json:"containers,omitempty"`
 }
 
@@ -463,7 +464,7 @@ type ExecutorTask struct {
 	ID          string            `json:"id,omitempty"`
 	RunID       string            `json:"run_id,omitempty"`
 	TaskName    string            `json:"task_name,omitempty"`
-	Arch        common.Arch       `json:"arch,omitempty"`
+	Arch        types.Arch        `json:"arch,omitempty"`
 	Containers  []*Container      `json:"containers,omitempty"`
 	Environment map[string]string `json:"environment,omitempty"`
 	WorkingDir  string            `json:"working_dir,omitempty"`
@@ -612,7 +613,7 @@ type Executor struct {
 	ID        string `json:"id,omitempty"`
 	ListenURL string `json:"listenURL,omitempty"`
 
-	Archs []common.Arch `json:"archs,omitempty"`
+	Archs []types.Arch `json:"archs,omitempty"`
 
 	Labels map[string]string `json:"labels,omitempty"`
 

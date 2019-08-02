@@ -19,9 +19,8 @@ import (
 	"io/ioutil"
 	"os"
 
-	"agola.io/agola/internal/config"
-	cstypes "agola.io/agola/internal/services/configstore/types"
-	"agola.io/agola/internal/services/gateway/api"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
+	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
@@ -92,11 +91,11 @@ type VariableValue struct {
 	SecretName string `json:"secret_name,omitempty"`
 	SecretVar  string `json:"secret_var,omitempty"`
 
-	When *config.When `json:"when,omitempty"`
+	When *gwapitypes.When `json:"when,omitempty"`
 }
 
 func variableCreate(cmd *cobra.Command, ownertype string, args []string) error {
-	gwclient := api.NewClient(gatewayURL, token)
+	gwclient := gwclient.NewClient(gatewayURL, token)
 
 	// "github.com/ghodss/yaml" doesn't provide a streaming decoder
 	var data []byte
@@ -117,15 +116,15 @@ func variableCreate(cmd *cobra.Command, ownertype string, args []string) error {
 	if err := yaml.Unmarshal(data, &values); err != nil {
 		log.Fatalf("failed to unmarshal values: %v", err)
 	}
-	rvalues := []cstypes.VariableValue{}
+	rvalues := []gwapitypes.VariableValueRequest{}
 	for _, value := range values {
-		rvalues = append(rvalues, cstypes.VariableValue{
+		rvalues = append(rvalues, gwapitypes.VariableValueRequest{
 			SecretName: value.SecretName,
 			SecretVar:  value.SecretVar,
-			When:       (*cstypes.When)(value.When),
+			When:       value.When,
 		})
 	}
-	req := &api.CreateVariableRequest{
+	req := &gwapitypes.CreateVariableRequest{
 		Name:   variableCreateOpts.name,
 		Values: rvalues,
 	}

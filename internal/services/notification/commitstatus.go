@@ -22,7 +22,7 @@ import (
 	gitsource "agola.io/agola/internal/gitsources"
 	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/gateway/action"
-	rstypes "agola.io/agola/internal/services/runservice/types"
+	rstypes "agola.io/agola/services/runservice/types"
 
 	errors "golang.org/x/xerrors"
 )

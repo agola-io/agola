@@ -28,11 +28,11 @@ import (
 	"strings"
 	"time"
 
-	"agola.io/agola/internal/common"
 	"agola.io/agola/internal/services/executor/registry"
+	"agola.io/agola/services/types"
 	errors "golang.org/x/xerrors"
 
-	"github.com/docker/docker/api/types"
+	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
@@ -47,7 +47,7 @@ type DockerDriver struct {
 	initVolumeHostDir string
 	toolboxPath       string
 	executorID        string
-	arch              common.Arch
+	arch              types.Arch
 }
 
 func NewDockerDriver(logger *zap.Logger, executorID, initVolumeHostDir, toolboxPath string) (*DockerDriver, error) {
@@ -62,7 +62,7 @@ func NewDockerDriver(logger *zap.Logger, executorID, initVolumeHostDir, toolboxP
 		initVolumeHostDir: initVolumeHostDir,
 		toolboxPath:       toolboxPath,
 		executorID:        executorID,
-		arch:              common.ArchFromString(runtime.GOARCH),
+		arch:              types.ArchFromString(runtime.GOARCH),
 	}, nil
 }
 
@@ -76,7 +76,7 @@ func (d *DockerDriver) Setup(ctx context.Context) error {
 func (d *DockerDriver) CopyToolbox(ctx context.Context) error {
 	// by default always try to pull the image so we are sure only authorized users can fetch them
 	// see https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#alwayspullimages
-	reader, err := d.client.ImagePull(ctx, "busybox", types.ImagePullOptions{})
+	reader, err := d.client.ImagePull(ctx, "busybox", dockertypes.ImagePullOptions{})
 	if err != nil {
 		return err
 	}
@@ -97,7 +97,7 @@ func (d *DockerDriver) CopyToolbox(ctx context.Context) error {
 
 	containerID := resp.ID
 
-	if err := d.client.ContainerStart(ctx, containerID, types.ContainerStartOptions{}); err != nil {
+	if err := d.client.ContainerStart(ctx, containerID, dockertypes.ContainerStartOptions{}); err != nil {
 		return err
 	}
 
@@ -117,7 +117,7 @@ func (d *DockerDriver) CopyToolbox(ctx context.Context) error {
 	}
 	defer srcArchive.Close()
 
-	options := types.CopyToContainerOptions{
+	options := dockertypes.CopyToContainerOptions{
 		AllowOverwriteDirWithFile: false,
 		CopyUIDGID:                false,
 	}
@@ -127,14 +127,14 @@ func (d *DockerDriver) CopyToolbox(ctx context.Context) error {
 	}
 
 	// ignore remove error
-	_ = d.client.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{Force: true})
+	_ = d.client.ContainerRemove(ctx, containerID, dockertypes.ContainerRemoveOptions{Force: true})
 
 	return nil
 }
 
-func (d *DockerDriver) Archs(ctx context.Context) ([]common.Arch, error) {
+func (d *DockerDriver) Archs(ctx context.Context) ([]types.Arch, error) {
 	// since we are using the local docker driver we can return our go arch information
-	return []common.Arch{d.arch}, nil
+	return []types.Arch{d.arch}, nil
 }
 
 func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Writer) (Pod, error) {
@@ -155,7 +155,7 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 			mainContainerID = containerID
 		}
 
-		if err := d.client.ContainerStart(ctx, containerID, types.ContainerStartOptions{}); err != nil {
+		if err := d.client.ContainerStart(ctx, containerID, dockertypes.ContainerStartOptions{}); err != nil {
 			return nil, err
 		}
 	}
@@ -171,7 +171,7 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 	}
 
 	containers, err := d.client.ContainerList(ctx,
-		types.ContainerListOptions{
+		dockertypes.ContainerListOptions{
 			Filters: args,
 		})
 	if err != nil {
@@ -241,7 +241,7 @@ func (d *DockerDriver) fetchImage(ctx context.Context, image string, registryCon
 
 	// by default always try to pull the image so we are sure only authorized users can fetch them
 	// see https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#alwayspullimages
-	reader, err := d.client.ImagePull(ctx, image, types.ImagePullOptions{RegistryAuth: registryAuthEnc})
+	reader, err := d.client.ImagePull(ctx, image, dockertypes.ImagePullOptions{RegistryAuth: registryAuthEnc})
 	if err != nil {
 		return err
 	}
@@ -307,7 +307,7 @@ func (d *DockerDriver) GetPods(ctx context.Context, all bool) ([]Pod, error) {
 	args := filters.NewArgs()
 
 	containers, err := d.client.ContainerList(ctx,
-		types.ContainerListOptions{
+		dockertypes.ContainerListOptions{
 			Filters: args,
 			All:     all,
 		})
@@ -401,7 +401,7 @@ type DockerPod struct {
 
 type DockerContainer struct {
 	Index int
-	types.Container
+	dockertypes.Container
 }
 
 type ContainerSlice []*DockerContainer
@@ -439,7 +439,7 @@ func (dp *DockerPod) Stop(ctx context.Context) error {
 func (dp *DockerPod) Remove(ctx context.Context) error {
 	errs := []error{}
 	for _, container := range dp.containers {
-		if err := dp.client.ContainerRemove(ctx, container.ID, types.ContainerRemoveOptions{Force: true}); err != nil {
+		if err := dp.client.ContainerRemove(ctx, container.ID, dockertypes.ContainerRemoveOptions{Force: true}); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -451,7 +451,7 @@ func (dp *DockerPod) Remove(ctx context.Context) error {
 
 type DockerContainerExec struct {
 	execID string
-	hresp  *types.HijackedResponse
+	hresp  *dockertypes.HijackedResponse
 	client *client.Client
 	endCh  chan error
 
@@ -461,7 +461,7 @@ type DockerContainerExec struct {
 // Stdin is a wrapped HikackedResponse implementing io.WriteCloser so users can
 // easily close stdin. Internally it will close only the write side of the conn.
 type Stdin struct {
-	hresp *types.HijackedResponse
+	hresp *dockertypes.HijackedResponse
 }
 
 func (s *Stdin) Write(p []byte) (int, error) {
@@ -475,7 +475,7 @@ func (s *Stdin) Close() error {
 func (dp *DockerPod) Exec(ctx context.Context, execConfig *ExecConfig) (ContainerExec, error) {
 	endCh := make(chan error)
 
-	dockerExecConfig := types.ExecConfig{
+	dockerExecConfig := dockertypes.ExecConfig{
 		Cmd:          execConfig.Cmd,
 		Env:          makeEnvSlice(execConfig.Env),
 		Tty:          execConfig.Tty,
@@ -490,7 +490,7 @@ func (dp *DockerPod) Exec(ctx context.Context, execConfig *ExecConfig) (Containe
 	if err != nil {
 		return nil, err
 	}
-	execStartCheck := types.ExecStartCheck{
+	execStartCheck := dockertypes.ExecStartCheck{
 		Detach: dockerExecConfig.Detach,
 		Tty:    dockerExecConfig.Tty,
 	}

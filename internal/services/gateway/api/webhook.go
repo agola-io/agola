@@ -18,11 +18,11 @@ import (
 	"net/http"
 
 	"agola.io/agola/internal/services/common"
-	csapi "agola.io/agola/internal/services/configstore/api"
 	"agola.io/agola/internal/services/gateway/action"
-	rsapi "agola.io/agola/internal/services/runservice/api"
 	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
+	csclient "agola.io/agola/services/configstore/client"
+	rsclient "agola.io/agola/services/runservice/client"
 
 	"go.uber.org/zap"
 	errors "golang.org/x/xerrors"
@@ -31,12 +31,12 @@ import (
 type webhooksHandler struct {
 	log               *zap.SugaredLogger
 	ah                *action.ActionHandler
-	configstoreClient *csapi.Client
-	runserviceClient  *rsapi.Client
+	configstoreClient *csclient.Client
+	runserviceClient  *rsclient.Client
 	apiExposedURL     string
 }
 
-func NewWebhooksHandler(logger *zap.Logger, ah *action.ActionHandler, configstoreClient *csapi.Client, runserviceClient *rsapi.Client, apiExposedURL string) *webhooksHandler {
+func NewWebhooksHandler(logger *zap.Logger, ah *action.ActionHandler, configstoreClient *csclient.Client, runserviceClient *rsclient.Client, apiExposedURL string) *webhooksHandler {
 	return &webhooksHandler{
 		log:               logger.Sugar(),
 		ah:                ah,

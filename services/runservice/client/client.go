@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package api
+package client
 
 import (
 	"bytes"
@@ -26,13 +26,13 @@ import (
 	"strconv"
 	"strings"
 
-	rstypes "agola.io/agola/internal/services/runservice/types"
+	rsapitypes "agola.io/agola/services/runservice/api/types"
+	rstypes "agola.io/agola/services/runservice/types"
 	errors "golang.org/x/xerrors"
 )
 
 var jsonContent = http.Header{"Content-Type": []string{"application/json"}}
 
-// Client represents a Gogs API client.
 type Client struct {
 	url    string
 	client *http.Client
@@ -165,7 +165,7 @@ func (c *Client) PutCache(ctx context.Context, key string, size int64, r io.Read
 	return c.getResponse(ctx, "POST", fmt.Sprintf("/executor/caches/%s", url.PathEscape(key)), nil, size, nil, r)
 }
 
-func (c *Client) GetRuns(ctx context.Context, phaseFilter, resultFilter, groups []string, lastRun bool, changeGroups []string, start string, limit int, asc bool) (*GetRunsResponse, *http.Response, error) {
+func (c *Client) GetRuns(ctx context.Context, phaseFilter, resultFilter, groups []string, lastRun bool, changeGroups []string, start string, limit int, asc bool) (*rsapitypes.GetRunsResponse, *http.Response, error) {
 	q := url.Values{}
 	for _, phase := range phaseFilter {
 		q.Add("phase", phase)
@@ -192,47 +192,47 @@ func (c *Client) GetRuns(ctx context.Context, phaseFilter, resultFilter, groups 
 		q.Add("asc", "")
 	}
 
-	getRunsResponse := new(GetRunsResponse)
+	getRunsResponse := new(rsapitypes.GetRunsResponse)
 	resp, err := c.getParsedResponse(ctx, "GET", "/runs", q, jsonContent, nil, getRunsResponse)
 	return getRunsResponse, resp, err
 }
 
-func (c *Client) GetQueuedRuns(ctx context.Context, start string, limit int, changeGroups []string) (*GetRunsResponse, *http.Response, error) {
+func (c *Client) GetQueuedRuns(ctx context.Context, start string, limit int, changeGroups []string) (*rsapitypes.GetRunsResponse, *http.Response, error) {
 	return c.GetRuns(ctx, []string{"queued"}, nil, []string{}, false, changeGroups, start, limit, true)
 }
 
-func (c *Client) GetRunningRuns(ctx context.Context, start string, limit int, changeGroups []string) (*GetRunsResponse, *http.Response, error) {
+func (c *Client) GetRunningRuns(ctx context.Context, start string, limit int, changeGroups []string) (*rsapitypes.GetRunsResponse, *http.Response, error) {
 	return c.GetRuns(ctx, []string{"running"}, nil, []string{}, false, changeGroups, start, limit, true)
 }
 
-func (c *Client) GetGroupQueuedRuns(ctx context.Context, group string, limit int, changeGroups []string) (*GetRunsResponse, *http.Response, error) {
+func (c *Client) GetGroupQueuedRuns(ctx context.Context, group string, limit int, changeGroups []string) (*rsapitypes.GetRunsResponse, *http.Response, error) {
 	return c.GetRuns(ctx, []string{"queued"}, nil, []string{group}, false, changeGroups, "", limit, false)
 }
 
-func (c *Client) GetGroupRunningRuns(ctx context.Context, group string, limit int, changeGroups []string) (*GetRunsResponse, *http.Response, error) {
+func (c *Client) GetGroupRunningRuns(ctx context.Context, group string, limit int, changeGroups []string) (*rsapitypes.GetRunsResponse, *http.Response, error) {
 	return c.GetRuns(ctx, []string{"running"}, nil, []string{group}, false, changeGroups, "", limit, false)
 }
 
-func (c *Client) GetGroupFirstQueuedRuns(ctx context.Context, group string, changeGroups []string) (*GetRunsResponse, *http.Response, error) {
+func (c *Client) GetGroupFirstQueuedRuns(ctx context.Context, group string, changeGroups []string) (*rsapitypes.GetRunsResponse, *http.Response, error) {
 	return c.GetRuns(ctx, []string{"queued"}, nil, []string{group}, false, changeGroups, "", 1, true)
 }
 
-func (c *Client) GetGroupLastRun(ctx context.Context, group string, changeGroups []string) (*GetRunsResponse, *http.Response, error) {
+func (c *Client) GetGroupLastRun(ctx context.Context, group string, changeGroups []string) (*rsapitypes.GetRunsResponse, *http.Response, error) {
 	return c.GetRuns(ctx, nil, nil, []string{group}, false, changeGroups, "", 1, false)
 }
 
-func (c *Client) CreateRun(ctx context.Context, req *RunCreateRequest) (*RunResponse, *http.Response, error) {
+func (c *Client) CreateRun(ctx context.Context, req *rsapitypes.RunCreateRequest) (*rsapitypes.RunResponse, *http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	res := new(RunResponse)
+	res := new(rsapitypes.RunResponse)
 	resp, err := c.getParsedResponse(ctx, "POST", "/runs", nil, jsonContent, bytes.NewReader(reqj), res)
 	return res, resp, err
 }
 
-func (c *Client) RunActions(ctx context.Context, runID string, req *RunActionsRequest) (*http.Response, error) {
+func (c *Client) RunActions(ctx context.Context, runID string, req *rsapitypes.RunActionsRequest) (*http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
@@ -241,8 +241,8 @@ func (c *Client) RunActions(ctx context.Context, runID string, req *RunActionsRe
 }
 
 func (c *Client) StartRun(ctx context.Context, runID string, changeGroupsUpdateToken string) (*http.Response, error) {
-	req := &RunActionsRequest{
-		ActionType:              RunActionTypeChangePhase,
+	req := &rsapitypes.RunActionsRequest{
+		ActionType:              rsapitypes.RunActionTypeChangePhase,
 		Phase:                   rstypes.RunPhaseRunning,
 		ChangeGroupsUpdateToken: changeGroupsUpdateToken,
 	}
@@ -250,7 +250,7 @@ func (c *Client) StartRun(ctx context.Context, runID string, changeGroupsUpdateT
 	return c.RunActions(ctx, runID, req)
 }
 
-func (c *Client) RunTaskActions(ctx context.Context, runID, taskID string, req *RunTaskActionsRequest) (*http.Response, error) {
+func (c *Client) RunTaskActions(ctx context.Context, runID, taskID string, req *rsapitypes.RunTaskActionsRequest) (*http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
@@ -259,8 +259,8 @@ func (c *Client) RunTaskActions(ctx context.Context, runID, taskID string, req *
 }
 
 func (c *Client) RunTaskSetAnnotations(ctx context.Context, runID, taskID string, annotations map[string]string, changeGroupsUpdateToken string) (*http.Response, error) {
-	req := &RunTaskActionsRequest{
-		ActionType:              RunTaskActionTypeSetAnnotations,
+	req := &rsapitypes.RunTaskActionsRequest{
+		ActionType:              rsapitypes.RunTaskActionTypeSetAnnotations,
 		Annotations:             annotations,
 		ChangeGroupsUpdateToken: changeGroupsUpdateToken,
 	}
@@ -269,21 +269,21 @@ func (c *Client) RunTaskSetAnnotations(ctx context.Context, runID, taskID string
 }
 
 func (c *Client) ApproveRunTask(ctx context.Context, runID, taskID string, changeGroupsUpdateToken string) (*http.Response, error) {
-	req := &RunTaskActionsRequest{
-		ActionType:              RunTaskActionTypeApprove,
+	req := &rsapitypes.RunTaskActionsRequest{
+		ActionType:              rsapitypes.RunTaskActionTypeApprove,
 		ChangeGroupsUpdateToken: changeGroupsUpdateToken,
 	}
 
 	return c.RunTaskActions(ctx, runID, taskID, req)
 }
 
-func (c *Client) GetRun(ctx context.Context, runID string, changeGroups []string) (*RunResponse, *http.Response, error) {
+func (c *Client) GetRun(ctx context.Context, runID string, changeGroups []string) (*rsapitypes.RunResponse, *http.Response, error) {
 	q := url.Values{}
 	for _, changeGroup := range changeGroups {
 		q.Add("changegroup", changeGroup)
 	}
 
-	runResponse := new(RunResponse)
+	runResponse := new(rsapitypes.RunResponse)
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/runs/%s", runID), q, jsonContent, nil, runResponse)
 	return runResponse, resp, err
 }

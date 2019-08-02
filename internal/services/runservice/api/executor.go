@@ -29,7 +29,7 @@ import (
 	"agola.io/agola/internal/services/runservice/action"
 	"agola.io/agola/internal/services/runservice/common"
 	"agola.io/agola/internal/services/runservice/store"
-	"agola.io/agola/internal/services/runservice/types"
+	"agola.io/agola/services/runservice/types"
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"

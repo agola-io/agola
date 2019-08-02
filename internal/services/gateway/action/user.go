@@ -24,10 +24,10 @@ import (
 	gitsource "agola.io/agola/internal/gitsources"
 	"agola.io/agola/internal/gitsources/agolagit"
 	"agola.io/agola/internal/services/common"
-	csapi "agola.io/agola/internal/services/configstore/api"
-	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
+	csapitypes "agola.io/agola/services/configstore/api/types"
+	cstypes "agola.io/agola/services/configstore/types"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	errors "golang.org/x/xerrors"
@@ -90,7 +90,7 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 		return nil, util.NewErrBadRequest(errors.Errorf("invalid user name %q", req.UserName))
 	}
 
-	creq := &csapi.CreateUserRequest{
+	creq := &csapitypes.CreateUserRequest{
 		UserName: req.UserName,
 	}
 
@@ -137,7 +137,7 @@ func (h *ActionHandler) CreateUserToken(ctx context.Context, req *CreateUserToke
 	}
 
 	h.log.Infof("creating user token")
-	creq := &csapi.CreateUserTokenRequest{
+	creq := &csapitypes.CreateUserTokenRequest{
 		TokenName: req.TokenName,
 	}
 	res, resp, err := h.configstoreClient.CreateUserToken(ctx, userRef, creq)
@@ -197,7 +197,7 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 		return nil, errors.Errorf("empty remote user id for remote source %q", rs.ID)
 	}
 
-	creq := &csapi.CreateUserLARequest{
+	creq := &csapitypes.CreateUserLARequest{
 		RemoteSourceName:           req.RemoteSourceName,
 		RemoteUserID:               remoteUserInfo.ID,
 		RemoteUserName:             remoteUserInfo.LoginName,
@@ -233,7 +233,7 @@ func (h *ActionHandler) UpdateUserLA(ctx context.Context, userRef string, la *cs
 		return util.NewErrBadRequest(errors.Errorf("user %q doesn't have a linked account with id %q", userRef, la.ID))
 	}
 
-	creq := &csapi.UpdateUserLARequest{
+	creq := &csapitypes.UpdateUserLARequest{
 		RemoteUserID:               la.RemoteUserID,
 		RemoteUserName:             la.RemoteUserName,
 		UserAccessToken:            la.UserAccessToken,
@@ -333,9 +333,9 @@ func (h *ActionHandler) RegisterUser(ctx context.Context, req *RegisterUserReque
 		return nil, errors.Errorf("empty remote user id for remote source %q", rs.ID)
 	}
 
-	creq := &csapi.CreateUserRequest{
+	creq := &csapitypes.CreateUserRequest{
 		UserName: req.UserName,
-		CreateUserLARequest: &csapi.CreateUserLARequest{
+		CreateUserLARequest: &csapitypes.CreateUserLARequest{
 			RemoteSourceName:           req.RemoteSourceName,
 			RemoteUserID:               remoteUserInfo.ID,
 			RemoteUserName:             remoteUserInfo.LoginName,
@@ -420,7 +420,7 @@ func (h *ActionHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (*
 		la.Oauth2RefreshToken = req.Oauth2RefreshToken
 		la.UserAccessToken = req.UserAccessToken
 
-		creq := &csapi.UpdateUserLARequest{
+		creq := &csapitypes.UpdateUserLARequest{
 			RemoteUserID:               la.RemoteUserID,
 			RemoteUserName:             la.RemoteUserName,
 			UserAccessToken:            la.UserAccessToken,
