@@ -19,8 +19,8 @@ import (
 
 	gitsource "agola.io/agola/internal/gitsources"
 	csapi "agola.io/agola/internal/services/configstore/api"
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/services/gateway/action"
-	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 
 	"github.com/gorilla/mux"
@@ -76,7 +76,7 @@ func (h *UserRemoteReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	var la *types.LinkedAccount
+	var la *cstypes.LinkedAccount
 	for _, v := range user.LinkedAccounts {
 		if v.RemoteSourceID == rs.ID {
 			la = v

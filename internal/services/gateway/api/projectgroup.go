@@ -20,8 +20,8 @@ import (
 	"net/url"
 
 	csapi "agola.io/agola/internal/services/configstore/api"
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/services/gateway/action"
-	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 	errors "golang.org/x/xerrors"
 
@@ -30,9 +30,9 @@ import (
 )
 
 type CreateProjectGroupRequest struct {
-	Name       string           `json:"name"`
-	ParentRef  string           `json:"parent_ref"`
-	Visibility types.Visibility `json:"visibility"`
+	Name       string             `json:"name"`
+	ParentRef  string             `json:"parent_ref"`
+	Visibility cstypes.Visibility `json:"visibility"`
 }
 
 type CreateProjectGroupHandler struct {
@@ -81,8 +81,8 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 }
 
 type UpdateProjectGroupRequest struct {
-	Name       string           `json:"name,omitempty"`
-	Visibility types.Visibility `json:"visibility,omitempty"`
+	Name       string             `json:"name,omitempty"`
+	Visibility cstypes.Visibility `json:"visibility,omitempty"`
 }
 
 type UpdateProjectGroupHandler struct {
@@ -254,12 +254,12 @@ func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.
 }
 
 type ProjectGroupResponse struct {
-	ID               string           `json:"id"`
-	Name             string           `json:"name"`
-	Path             string           `json:"path"`
-	ParentPath       string           `json:"parent_path"`
-	Visibility       types.Visibility `json:"visibility"`
-	GlobalVisibility string           `json:"global_visibility"`
+	ID               string             `json:"id"`
+	Name             string             `json:"name"`
+	Path             string             `json:"path"`
+	ParentPath       string             `json:"parent_path"`
+	Visibility       cstypes.Visibility `json:"visibility"`
+	GlobalVisibility string             `json:"global_visibility"`
 }
 
 func createProjectGroupResponse(r *csapi.ProjectGroup) *ProjectGroupResponse {

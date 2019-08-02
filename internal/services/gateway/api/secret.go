@@ -19,12 +19,12 @@ import (
 	"net/http"
 
 	csapi "agola.io/agola/internal/services/configstore/api"
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/services/gateway/action"
-	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
-	"go.uber.org/zap"
 
 	"github.com/gorilla/mux"
+	"go.uber.org/zap"
 )
 
 type SecretResponse struct {
@@ -85,7 +85,7 @@ func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 type CreateSecretRequest struct {
 	Name string `json:"name,omitempty"`
 
-	Type types.SecretType `json:"type,omitempty"`
+	Type cstypes.SecretType `json:"type,omitempty"`
 
 	// internal secret
 	Data map[string]string `json:"data,omitempty"`
@@ -142,7 +142,7 @@ func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 type UpdateSecretRequest struct {
 	Name string `json:"name,omitempty"`
 
-	Type types.SecretType `json:"type,omitempty"`
+	Type cstypes.SecretType `json:"type,omitempty"`
 
 	// internal secret
 	Data map[string]string `json:"data,omitempty"`

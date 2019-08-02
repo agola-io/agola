@@ -20,8 +20,8 @@ import (
 	"os"
 
 	"agola.io/agola/internal/config"
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/services/gateway/api"
-	"agola.io/agola/internal/services/types"
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
@@ -117,12 +117,12 @@ func variableCreate(cmd *cobra.Command, ownertype string, args []string) error {
 	if err := yaml.Unmarshal(data, &values); err != nil {
 		log.Fatalf("failed to unmarshal values: %v", err)
 	}
-	rvalues := []types.VariableValue{}
+	rvalues := []cstypes.VariableValue{}
 	for _, value := range values {
-		rvalues = append(rvalues, types.VariableValue{
+		rvalues = append(rvalues, cstypes.VariableValue{
 			SecretName: value.SecretName,
 			SecretVar:  value.SecretVar,
-			When:       (*types.When)(value.When),
+			When:       (*cstypes.When)(value.When),
 		})
 	}
 	req := &api.CreateVariableRequest{

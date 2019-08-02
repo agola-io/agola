@@ -19,8 +19,8 @@ import (
 	"strings"
 
 	"agola.io/agola/internal/config"
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	rstypes "agola.io/agola/internal/services/runservice/types"
-	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 
 	errors "golang.org/x/xerrors"
@@ -48,11 +48,11 @@ func genRuntime(c *config.Config, ce *config.Runtime, variables map[string]strin
 	}
 }
 
-func whenFromConfigWhen(cw *config.When) *types.When {
+func whenFromConfigWhen(cw *config.When) *cstypes.When {
 	if cw == nil {
 		return nil
 	}
-	return &types.When{
+	return &cstypes.When{
 		Branch: cw.Branch,
 		Tag:    cw.Tag,
 		Ref:    cw.Ref,
@@ -194,7 +194,7 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string
 	rcts := map[string]*rstypes.RunConfigTask{}
 
 	for _, ct := range cr.Tasks {
-		include := types.MatchWhen(whenFromConfigWhen(ct.When), branch, tag, ref)
+		include := cstypes.MatchWhen(whenFromConfigWhen(ct.When), branch, tag, ref)
 
 		steps := make(rstypes.Steps, len(ct.Steps))
 		for i, cpts := range ct.Steps {

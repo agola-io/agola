@@ -16,7 +16,7 @@ package common
 
 import (
 	csapi "agola.io/agola/internal/services/configstore/api"
-	"agola.io/agola/internal/services/types"
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
 )
 
@@ -43,7 +43,7 @@ func FilterOverriddenVariables(variables []*csapi.Variable) []*csapi.Variable {
 	return filteredVariables
 }
 
-func GetVarValueMatchingSecret(varval types.VariableValue, varParentPath string, secrets []*csapi.Secret) *csapi.Secret {
+func GetVarValueMatchingSecret(varval cstypes.VariableValue, varParentPath string, secrets []*csapi.Secret) *csapi.Secret {
 	// get the secret value referenced by the variable, it must be a secret at the same level or a lower level
 	var secret *csapi.Secret
 	for _, s := range secrets {

@@ -32,7 +32,7 @@ import (
 	"agola.io/agola/internal/services/configstore/api"
 	"agola.io/agola/internal/services/configstore/common"
 	"agola.io/agola/internal/services/configstore/readdb"
-	"agola.io/agola/internal/services/types"
+	"agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
 
 	"github.com/gorilla/mux"

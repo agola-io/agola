@@ -19,7 +19,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"agola.io/agola/internal/services/types"
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
 
 	"github.com/gorilla/mux"
@@ -139,14 +139,14 @@ func httpErrorFromRemote(w http.ResponseWriter, resp *http.Response, err error) 
 	return false
 }
 
-func GetConfigTypeRef(r *http.Request) (types.ConfigType, string, error) {
+func GetConfigTypeRef(r *http.Request) (cstypes.ConfigType, string, error) {
 	vars := mux.Vars(r)
 	projectRef, err := url.PathUnescape(vars["projectref"])
 	if err != nil {
 		return "", "", util.NewErrBadRequest(errors.Errorf("wrong projectref %q: %w", vars["projectref"], err))
 	}
 	if projectRef != "" {
-		return types.ConfigTypeProject, projectRef, nil
+		return cstypes.ConfigTypeProject, projectRef, nil
 	}
 
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
@@ -154,7 +154,7 @@ func GetConfigTypeRef(r *http.Request) (types.ConfigType, string, error) {
 		return "", "", util.NewErrBadRequest(errors.Errorf("wrong projectgroupref %q: %w", vars["projectgroupref"], err))
 	}
 	if projectGroupRef != "" {
-		return types.ConfigTypeProjectGroup, projectGroupRef, nil
+		return cstypes.ConfigTypeProjectGroup, projectGroupRef, nil
 	}
 
 	return "", "", util.NewErrBadRequest(errors.Errorf("cannot get project or projectgroup ref"))

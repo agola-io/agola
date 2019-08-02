@@ -18,7 +18,7 @@ import (
 	"context"
 
 	"agola.io/agola/internal/services/common"
-	"agola.io/agola/internal/services/types"
+	cstypes "agola.io/agola/internal/services/configstore/types"
 
 	errors "golang.org/x/xerrors"
 )
@@ -68,7 +68,7 @@ func (h *ActionHandler) IsOrgOwner(ctx context.Context, orgID string) (bool, err
 		if userOrg.Organization.ID != orgID {
 			continue
 		}
-		if userOrg.Role == types.MemberRoleOwner {
+		if userOrg.Role == cstypes.MemberRoleOwner {
 			return true, nil
 		}
 	}
@@ -76,7 +76,7 @@ func (h *ActionHandler) IsOrgOwner(ctx context.Context, orgID string) (bool, err
 	return false, nil
 }
 
-func (h *ActionHandler) IsProjectOwner(ctx context.Context, ownerType types.ConfigType, ownerID string) (bool, error) {
+func (h *ActionHandler) IsProjectOwner(ctx context.Context, ownerType cstypes.ConfigType, ownerID string) (bool, error) {
 	isAdmin := h.IsUserAdmin(ctx)
 	if isAdmin {
 		return true, nil
@@ -87,13 +87,13 @@ func (h *ActionHandler) IsProjectOwner(ctx context.Context, ownerType types.Conf
 		return false, nil
 	}
 
-	if ownerType == types.ConfigTypeUser {
+	if ownerType == cstypes.ConfigTypeUser {
 		if userID == ownerID {
 			return true, nil
 		}
 	}
 
-	if ownerType == types.ConfigTypeOrg {
+	if ownerType == cstypes.ConfigTypeOrg {
 		userOrgs, resp, err := h.configstoreClient.GetUserOrgs(ctx, userID)
 		if err != nil {
 			return false, errors.Errorf("failed to get user orgs: %w", ErrFromRemote(resp, err))
@@ -103,7 +103,7 @@ func (h *ActionHandler) IsProjectOwner(ctx context.Context, ownerType types.Conf
 			if userOrg.Organization.ID != ownerID {
 				continue
 			}
-			if userOrg.Role == types.MemberRoleOwner {
+			if userOrg.Role == cstypes.MemberRoleOwner {
 				return true, nil
 			}
 		}
@@ -112,7 +112,7 @@ func (h *ActionHandler) IsProjectOwner(ctx context.Context, ownerType types.Conf
 	return false, nil
 }
 
-func (h *ActionHandler) IsProjectMember(ctx context.Context, ownerType types.ConfigType, ownerID string) (bool, error) {
+func (h *ActionHandler) IsProjectMember(ctx context.Context, ownerType cstypes.ConfigType, ownerID string) (bool, error) {
 	isAdmin := h.IsUserAdmin(ctx)
 	if isAdmin {
 		return true, nil
@@ -123,13 +123,13 @@ func (h *ActionHandler) IsProjectMember(ctx context.Context, ownerType types.Con
 		return false, nil
 	}
 
-	if ownerType == types.ConfigTypeUser {
+	if ownerType == cstypes.ConfigTypeUser {
 		if userID == ownerID {
 			return true, nil
 		}
 	}
 
-	if ownerType == types.ConfigTypeOrg {
+	if ownerType == cstypes.ConfigTypeOrg {
 		userOrgs, resp, err := h.configstoreClient.GetUserOrgs(ctx, userID)
 		if err != nil {
 			return false, errors.Errorf("failed to get user orgs: %w", ErrFromRemote(resp, err))
@@ -146,18 +146,18 @@ func (h *ActionHandler) IsProjectMember(ctx context.Context, ownerType types.Con
 	return false, nil
 }
 
-func (h *ActionHandler) IsVariableOwner(ctx context.Context, parentType types.ConfigType, parentRef string) (bool, error) {
-	var ownerType types.ConfigType
+func (h *ActionHandler) IsVariableOwner(ctx context.Context, parentType cstypes.ConfigType, parentRef string) (bool, error) {
+	var ownerType cstypes.ConfigType
 	var ownerID string
 	switch parentType {
-	case types.ConfigTypeProjectGroup:
+	case cstypes.ConfigTypeProjectGroup:
 		pg, resp, err := h.configstoreClient.GetProjectGroup(ctx, parentRef)
 		if err != nil {
 			return false, errors.Errorf("failed to get project group %q: %w", parentRef, ErrFromRemote(resp, err))
 		}
 		ownerType = pg.OwnerType
 		ownerID = pg.OwnerID
-	case types.ConfigTypeProject:
+	case cstypes.ConfigTypeProject:
 		p, resp, err := h.configstoreClient.GetProject(ctx, parentRef)
 		if err != nil {
 			return false, errors.Errorf("failed to get project  %q: %w", parentRef, ErrFromRemote(resp, err))
@@ -175,8 +175,8 @@ func (h *ActionHandler) CanGetRun(ctx context.Context, runGroup string) (bool, e
 		return false, err
 	}
 
-	var visibility types.Visibility
-	var ownerType types.ConfigType
+	var visibility cstypes.Visibility
+	var ownerType cstypes.ConfigType
 	var ownerID string
 	switch groupType {
 	case common.GroupTypeProject:
@@ -189,12 +189,12 @@ func (h *ActionHandler) CanGetRun(ctx context.Context, runGroup string) (bool, e
 		visibility = p.GlobalVisibility
 	case common.GroupTypeUser:
 		// user direct runs
-		ownerType = types.ConfigTypeUser
+		ownerType = cstypes.ConfigTypeUser
 		ownerID = groupID
-		visibility = types.VisibilityPrivate
+		visibility = cstypes.VisibilityPrivate
 	}
 
-	if visibility == types.VisibilityPublic {
+	if visibility == cstypes.VisibilityPublic {
 		return true, nil
 	}
 	isProjectMember, err := h.IsProjectMember(ctx, ownerType, ownerID)
@@ -213,7 +213,7 @@ func (h *ActionHandler) CanDoRunActions(ctx context.Context, runGroup string) (b
 		return false, err
 	}
 
-	var ownerType types.ConfigType
+	var ownerType cstypes.ConfigType
 	var ownerID string
 	switch groupType {
 	case common.GroupTypeProject:
@@ -225,7 +225,7 @@ func (h *ActionHandler) CanDoRunActions(ctx context.Context, runGroup string) (b
 		ownerID = p.OwnerID
 	case common.GroupTypeUser:
 		// user direct runs
-		ownerType = types.ConfigTypeUser
+		ownerType = cstypes.ConfigTypeUser
 		ownerID = groupID
 	}
 

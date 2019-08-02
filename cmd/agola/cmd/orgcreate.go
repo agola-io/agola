@@ -17,8 +17,8 @@ package cmd
 import (
 	"context"
 
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/services/gateway/api"
-	"agola.io/agola/internal/services/types"
 
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
@@ -58,13 +58,13 @@ func orgCreate(cmd *cobra.Command, args []string) error {
 	gwclient := api.NewClient(gatewayURL, token)
 
 	// TODO(sgotti) make this a custom pflag Value?
-	if !types.IsValidVisibility(types.Visibility(orgCreateOpts.visibility)) {
+	if !cstypes.IsValidVisibility(cstypes.Visibility(orgCreateOpts.visibility)) {
 		return errors.Errorf("invalid visibility %q", orgCreateOpts.visibility)
 	}
 
 	req := &api.CreateOrgRequest{
 		Name:       orgCreateOpts.name,
-		Visibility: types.Visibility(orgCreateOpts.visibility),
+		Visibility: cstypes.Visibility(orgCreateOpts.visibility),
 	}
 
 	log.Infof("creating org")

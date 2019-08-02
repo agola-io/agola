@@ -17,13 +17,13 @@ package action
 import (
 	"context"
 
-	"agola.io/agola/internal/services/types"
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
 
 	errors "golang.org/x/xerrors"
 )
 
-func (h *ActionHandler) GetRemoteSource(ctx context.Context, rsRef string) (*types.RemoteSource, error) {
+func (h *ActionHandler) GetRemoteSource(ctx context.Context, rsRef string) (*cstypes.RemoteSource, error) {
 	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, rsRef)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
@@ -37,7 +37,7 @@ type GetRemoteSourcesRequest struct {
 	Asc   bool
 }
 
-func (h *ActionHandler) GetRemoteSources(ctx context.Context, req *GetRemoteSourcesRequest) ([]*types.RemoteSource, error) {
+func (h *ActionHandler) GetRemoteSources(ctx context.Context, req *GetRemoteSourcesRequest) ([]*cstypes.RemoteSource, error) {
 	remoteSources, resp, err := h.configstoreClient.GetRemoteSources(ctx, req.Start, req.Limit, req.Asc)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
@@ -59,7 +59,7 @@ type CreateRemoteSourceRequest struct {
 	LoginEnabled        *bool
 }
 
-func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemoteSourceRequest) (*types.RemoteSource, error) {
+func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemoteSourceRequest) (*cstypes.RemoteSource, error) {
 	if !h.IsUserAdmin(ctx) {
 		return nil, errors.Errorf("user not admin")
 	}
@@ -82,11 +82,11 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemot
 	}
 
 	// validate if the remote source type supports the required auth type
-	if !types.SourceSupportsAuthType(types.RemoteSourceType(req.Type), types.RemoteSourceAuthType(req.AuthType)) {
+	if !cstypes.SourceSupportsAuthType(cstypes.RemoteSourceType(req.Type), cstypes.RemoteSourceAuthType(req.AuthType)) {
 		return nil, util.NewErrBadRequest(errors.Errorf("remotesource type %q doesn't support auth type %q", req.Type, req.AuthType))
 	}
 
-	if req.AuthType == string(types.RemoteSourceAuthTypeOauth2) {
+	if req.AuthType == string(cstypes.RemoteSourceAuthTypeOauth2) {
 		if req.Oauth2ClientID == "" {
 			return nil, util.NewErrBadRequest(errors.Errorf("remotesource oauth2 clientid required"))
 		}
@@ -95,10 +95,10 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemot
 		}
 	}
 
-	rs := &types.RemoteSource{
+	rs := &cstypes.RemoteSource{
 		Name:                req.Name,
-		Type:                types.RemoteSourceType(req.Type),
-		AuthType:            types.RemoteSourceAuthType(req.AuthType),
+		Type:                cstypes.RemoteSourceType(req.Type),
+		AuthType:            cstypes.RemoteSourceAuthType(req.AuthType),
 		APIURL:              req.APIURL,
 		SkipVerify:          req.SkipVerify,
 		Oauth2ClientID:      req.Oauth2ClientID,
@@ -133,7 +133,7 @@ type UpdateRemoteSourceRequest struct {
 	LoginEnabled        *bool
 }
 
-func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, req *UpdateRemoteSourceRequest) (*types.RemoteSource, error) {
+func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, req *UpdateRemoteSourceRequest) (*cstypes.RemoteSource, error) {
 	if !h.IsUserAdmin(ctx) {
 		return nil, errors.Errorf("user not admin")
 	}

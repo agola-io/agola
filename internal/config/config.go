@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"agola.io/agola/internal/common"
-	"agola.io/agola/internal/services/types"
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
 
 	"github.com/ghodss/yaml"
@@ -445,7 +445,7 @@ func (val *Value) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-type When types.When
+type When cstypes.When
 
 type when struct {
 	Branch interface{} `json:"branch"`
@@ -485,8 +485,8 @@ func (w *When) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func parseWhenConditions(wi interface{}) (*types.WhenConditions, error) {
-	w := &types.WhenConditions{}
+func parseWhenConditions(wi interface{}) (*cstypes.WhenConditions, error) {
+	w := &cstypes.WhenConditions{}
 
 	var err error
 	include := []string{}
@@ -534,12 +534,12 @@ func parseWhenConditions(wi interface{}) (*types.WhenConditions, error) {
 	return w, nil
 }
 
-func parseWhenConditionSlice(conds []string) ([]types.WhenCondition, error) {
+func parseWhenConditionSlice(conds []string) ([]cstypes.WhenCondition, error) {
 	if len(conds) == 0 {
 		return nil, nil
 	}
 
-	wcs := []types.WhenCondition{}
+	wcs := []cstypes.WhenCondition{}
 	for _, cond := range conds {
 		wc, err := parseWhenCondition(cond)
 		if err != nil {
@@ -551,7 +551,7 @@ func parseWhenConditionSlice(conds []string) ([]types.WhenCondition, error) {
 	return wcs, nil
 }
 
-func parseWhenCondition(s string) (*types.WhenCondition, error) {
+func parseWhenCondition(s string) (*cstypes.WhenCondition, error) {
 	isRegExp := false
 	if len(s) > 2 {
 		for _, d := range regExpDelimiters {
@@ -563,15 +563,15 @@ func parseWhenCondition(s string) (*types.WhenCondition, error) {
 		}
 	}
 
-	wc := &types.WhenCondition{Match: s}
+	wc := &cstypes.WhenCondition{Match: s}
 
 	if isRegExp {
 		if _, err := regexp.Compile(s); err != nil {
 			return nil, errors.Errorf("wrong regular expression: %w", err)
 		}
-		wc.Type = types.WhenConditionTypeRegExp
+		wc.Type = cstypes.WhenConditionTypeRegExp
 	} else {
-		wc.Type = types.WhenConditionTypeSimple
+		wc.Type = cstypes.WhenConditionTypeSimple
 	}
 	return wc, nil
 }

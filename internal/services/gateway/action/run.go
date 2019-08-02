@@ -24,6 +24,7 @@ import (
 	gitsource "agola.io/agola/internal/gitsources"
 	"agola.io/agola/internal/runconfig"
 	"agola.io/agola/internal/services/common"
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	rsapi "agola.io/agola/internal/services/runservice/api"
 	rstypes "agola.io/agola/internal/services/runservice/types"
 	"agola.io/agola/internal/services/types"
@@ -293,8 +294,8 @@ type CreateRunRequest struct {
 	RefType            types.RunRefType
 	RunCreationTrigger types.RunCreationTriggerType
 
-	Project             *types.Project
-	User                *types.User
+	Project             *cstypes.Project
+	User                *cstypes.User
 	RepoPath            string
 	GitSource           gitsource.GitSource
 	CommitSHA           string
@@ -537,9 +538,9 @@ func (h *ActionHandler) genRunVariables(ctx context.Context, req *CreateRunReque
 	}
 	for _, pvar := range pvars {
 		// find the value match
-		var varval types.VariableValue
+		var varval cstypes.VariableValue
 		for _, varval = range pvar.Values {
-			match := types.MatchWhen(varval.When, req.Branch, req.Tag, req.Ref)
+			match := cstypes.MatchWhen(varval.When, req.Branch, req.Tag, req.Ref)
 			if !match {
 				continue
 			}

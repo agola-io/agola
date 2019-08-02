@@ -19,8 +19,8 @@ import (
 	"io/ioutil"
 	"os"
 
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/services/gateway/api"
-	"agola.io/agola/internal/services/types"
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
@@ -96,7 +96,7 @@ func secretCreate(cmd *cobra.Command, ownertype string, args []string) error {
 	}
 	req := &api.CreateSecretRequest{
 		Name: secretCreateOpts.name,
-		Type: types.SecretTypeInternal,
+		Type: cstypes.SecretTypeInternal,
 		Data: secretData,
 	}
 

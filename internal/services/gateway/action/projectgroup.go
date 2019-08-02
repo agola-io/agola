@@ -19,7 +19,7 @@ import (
 	"path"
 
 	csapi "agola.io/agola/internal/services/configstore/api"
-	"agola.io/agola/internal/services/types"
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
 
 	errors "golang.org/x/xerrors"
@@ -53,7 +53,7 @@ type CreateProjectGroupRequest struct {
 	CurrentUserID string
 	Name          string
 	ParentRef     string
-	Visibility    types.Visibility
+	Visibility    cstypes.Visibility
 }
 
 func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProjectGroupRequest) (*csapi.ProjectGroup, error) {
@@ -85,10 +85,10 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProje
 		parentRef = path.Join("user", user.Name)
 	}
 
-	p := &types.ProjectGroup{
+	p := &cstypes.ProjectGroup{
 		Name: req.Name,
-		Parent: types.Parent{
-			Type: types.ConfigTypeProjectGroup,
+		Parent: cstypes.Parent{
+			Type: cstypes.ConfigTypeProjectGroup,
 			ID:   parentRef,
 		},
 		Visibility: req.Visibility,
@@ -106,7 +106,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProje
 
 type UpdateProjectGroupRequest struct {
 	Name       string
-	Visibility types.Visibility
+	Visibility cstypes.Visibility
 }
 
 func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, projectGroupRef string, req *UpdateProjectGroupRequest) (*csapi.ProjectGroup, error) {

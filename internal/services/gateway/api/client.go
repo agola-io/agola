@@ -27,7 +27,7 @@ import (
 	"strconv"
 	"strings"
 
-	"agola.io/agola/internal/services/types"
+	cstypes "agola.io/agola/internal/services/configstore/types"
 
 	errors "golang.org/x/xerrors"
 )
@@ -475,7 +475,7 @@ func (c *Client) DeleteOrg(ctx context.Context, orgRef string) (*http.Response, 
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/orgs/%s", orgRef), nil, jsonContent, nil)
 }
 
-func (c *Client) AddOrgMember(ctx context.Context, orgRef, userRef string, role types.MemberRole) (*AddOrgMemberResponse, *http.Response, error) {
+func (c *Client) AddOrgMember(ctx context.Context, orgRef, userRef string, role cstypes.MemberRole) (*AddOrgMemberResponse, *http.Response, error) {
 	req := &AddOrgMemberRequest{
 		Role: role,
 	}

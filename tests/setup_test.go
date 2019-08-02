@@ -28,6 +28,7 @@ import (
 	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/configstore"
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/services/executor"
 	"agola.io/agola/internal/services/gateway"
 	gwapi "agola.io/agola/internal/services/gateway/api"
@@ -36,7 +37,6 @@ import (
 	rsscheduler "agola.io/agola/internal/services/runservice"
 	rstypes "agola.io/agola/internal/services/runservice/types"
 	"agola.io/agola/internal/services/scheduler"
-	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/testutil"
 	"agola.io/agola/internal/util"
 
@@ -427,7 +427,7 @@ func createProject(ctx context.Context, t *testing.T, giteaClient *gitea.Client,
 		ParentRef:        path.Join("user", agolaUser01),
 		RemoteSourceName: "gitea",
 		RepoPath:         path.Join(giteaUser01, "repo01"),
-		Visibility:       types.VisibilityPublic,
+		Visibility:       cstypes.VisibilityPublic,
 	})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)

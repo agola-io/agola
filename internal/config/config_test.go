@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"testing"
 
-	"agola.io/agola/internal/services/types"
+	"agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
 
 	"github.com/google/go-cmp/cmp"

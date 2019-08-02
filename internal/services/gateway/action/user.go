@@ -25,6 +25,7 @@ import (
 	"agola.io/agola/internal/gitsources/agolagit"
 	"agola.io/agola/internal/services/common"
 	csapi "agola.io/agola/internal/services/configstore/api"
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 
@@ -43,7 +44,7 @@ func isAccessTokenExpired(expiresAt time.Time) bool {
 	return expiresAt.Add(-expireTimeRange).Before(time.Now())
 }
 
-func (h *ActionHandler) GetUser(ctx context.Context, userRef string) (*types.User, error) {
+func (h *ActionHandler) GetUser(ctx context.Context, userRef string) (*cstypes.User, error) {
 	if !h.IsUserLoggedOrAdmin(ctx) {
 		return nil, errors.Errorf("user not logged in")
 	}
@@ -61,7 +62,7 @@ type GetUsersRequest struct {
 	Asc   bool
 }
 
-func (h *ActionHandler) GetUsers(ctx context.Context, req *GetUsersRequest) ([]*types.User, error) {
+func (h *ActionHandler) GetUsers(ctx context.Context, req *GetUsersRequest) ([]*cstypes.User, error) {
 	if !h.IsUserAdmin(ctx) {
 		return nil, errors.Errorf("user not logged in")
 	}
@@ -77,7 +78,7 @@ type CreateUserRequest struct {
 	UserName string
 }
 
-func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) (*types.User, error) {
+func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) (*cstypes.User, error) {
 	if !h.IsUserAdmin(ctx) {
 		return nil, errors.Errorf("user not admin")
 	}
@@ -158,7 +159,7 @@ type CreateUserLARequest struct {
 	Oauth2AccessTokenExpiresAt time.Time
 }
 
-func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequest) (*types.LinkedAccount, error) {
+func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequest) (*cstypes.LinkedAccount, error) {
 	userRef := req.UserRef
 	user, resp, err := h.configstoreClient.GetUser(ctx, userRef)
 	if err != nil {
@@ -168,7 +169,7 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 	if err != nil {
 		return nil, errors.Errorf("failed to get remote source %q: %w", req.RemoteSourceName, ErrFromRemote(resp, err))
 	}
-	var la *types.LinkedAccount
+	var la *cstypes.LinkedAccount
 	for _, v := range user.LinkedAccounts {
 		if v.RemoteSourceID == rs.ID {
 			la = v
@@ -216,7 +217,7 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 	return la, nil
 }
 
-func (h *ActionHandler) UpdateUserLA(ctx context.Context, userRef string, la *types.LinkedAccount) error {
+func (h *ActionHandler) UpdateUserLA(ctx context.Context, userRef string, la *cstypes.LinkedAccount) error {
 	user, resp, err := h.configstoreClient.GetUser(ctx, userRef)
 	if err != nil {
 		return errors.Errorf("failed to get user %q: %w", userRef, ErrFromRemote(resp, err))
@@ -252,9 +253,9 @@ func (h *ActionHandler) UpdateUserLA(ctx context.Context, userRef string, la *ty
 }
 
 // RefreshLinkedAccount refreshed the linked account oauth2 access token and update linked account in the configstore
-func (h *ActionHandler) RefreshLinkedAccount(ctx context.Context, rs *types.RemoteSource, userName string, la *types.LinkedAccount) (*types.LinkedAccount, error) {
+func (h *ActionHandler) RefreshLinkedAccount(ctx context.Context, rs *cstypes.RemoteSource, userName string, la *cstypes.LinkedAccount) (*cstypes.LinkedAccount, error) {
 	switch rs.AuthType {
-	case types.RemoteSourceAuthTypeOauth2:
+	case cstypes.RemoteSourceAuthTypeOauth2:
 		// refresh access token if expired
 		if isAccessTokenExpired(la.Oauth2AccessTokenExpiresAt) {
 			userSource, err := common.GetOauth2Source(rs, "")
@@ -282,7 +283,7 @@ func (h *ActionHandler) RefreshLinkedAccount(ctx context.Context, rs *types.Remo
 
 // GetGitSource is a wrapper around common.GetGitSource that will also refresh
 // the oauth2 access token and update the linked account when needed
-func (h *ActionHandler) GetGitSource(ctx context.Context, rs *types.RemoteSource, userName string, la *types.LinkedAccount) (gitsource.GitSource, error) {
+func (h *ActionHandler) GetGitSource(ctx context.Context, rs *cstypes.RemoteSource, userName string, la *cstypes.LinkedAccount) (gitsource.GitSource, error) {
 	la, err := h.RefreshLinkedAccount(ctx, rs, userName, la)
 	if err != nil {
 		return nil, err
@@ -299,7 +300,7 @@ type RegisterUserRequest struct {
 	Oauth2AccessTokenExpiresAt time.Time
 }
 
-func (h *ActionHandler) RegisterUser(ctx context.Context, req *RegisterUserRequest) (*types.User, error) {
+func (h *ActionHandler) RegisterUser(ctx context.Context, req *RegisterUserRequest) (*cstypes.User, error) {
 	if req.UserName == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("user name required"))
 	}
@@ -365,7 +366,7 @@ type LoginUserRequest struct {
 
 type LoginUserResponse struct {
 	Token string
-	User  *types.User
+	User  *cstypes.User
 }
 
 func (h *ActionHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (*LoginUserResponse, error) {
@@ -399,7 +400,7 @@ func (h *ActionHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (*
 		return nil, errors.Errorf("failed to get user for remote user id %q and remote source %q: %w", remoteUserInfo.ID, rs.ID, ErrFromRemote(resp, err))
 	}
 
-	var la *types.LinkedAccount
+	var la *cstypes.LinkedAccount
 	for _, v := range user.LinkedAccounts {
 		if v.RemoteSourceID == rs.ID {
 			la = v
@@ -517,7 +518,7 @@ func (h *ActionHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSource
 			return nil, util.NewErrBadRequest(errors.Errorf("logged in user cannot create linked account for another user"))
 		}
 
-		var la *types.LinkedAccount
+		var la *cstypes.LinkedAccount
 		for _, v := range user.LinkedAccounts {
 			if v.RemoteSourceID == rs.ID {
 				la = v
@@ -539,7 +540,7 @@ func (h *ActionHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSource
 	}
 
 	switch rs.AuthType {
-	case types.RemoteSourceAuthTypeOauth2:
+	case cstypes.RemoteSourceAuthTypeOauth2:
 		oauth2Source, err := common.GetOauth2Source(rs, "")
 		if err != nil {
 			return nil, errors.Errorf("failed to create git source: %w", err)
@@ -557,7 +558,7 @@ func (h *ActionHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSource
 			Oauth2Redirect: redirect,
 		}, nil
 
-	case types.RemoteSourceAuthTypePassword:
+	case cstypes.RemoteSourceAuthTypePassword:
 		passwordSource, err := common.GetPasswordSource(rs, "")
 		if err != nil {
 			return nil, errors.Errorf("failed to create git source: %w", err)
@@ -602,7 +603,7 @@ type RemoteSourceAuthResult struct {
 }
 
 type CreateUserLAResponse struct {
-	LinkedAccount *types.LinkedAccount
+	LinkedAccount *cstypes.LinkedAccount
 }
 
 func (h *ActionHandler) HandleRemoteSourceAuthRequest(ctx context.Context, requestType RemoteSourceRequestType, requestString string, userAccessToken, oauth2AccessToken, oauth2RefreshToken string, oauth2AccessTokenExpiresAt time.Time) (*RemoteSourceAuthResult, error) {

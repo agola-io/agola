@@ -30,7 +30,7 @@ import (
 	"agola.io/agola/internal/db"
 	"agola.io/agola/internal/services/config"
 	action "agola.io/agola/internal/services/configstore/action"
-	"agola.io/agola/internal/services/types"
+	"agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/testutil"
 	"agola.io/agola/internal/util"
 

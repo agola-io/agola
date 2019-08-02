@@ -19,8 +19,8 @@ import (
 	"net/http"
 	"strconv"
 
+	cstypes "agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/services/gateway/action"
-	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 	"go.uber.org/zap"
 	errors "golang.org/x/xerrors"
@@ -29,8 +29,8 @@ import (
 )
 
 type CreateOrgRequest struct {
-	Name       string           `json:"name"`
-	Visibility types.Visibility `json:"visibility"`
+	Name       string             `json:"name"`
+	Visibility cstypes.Visibility `json:"visibility"`
 }
 
 type CreateOrgHandler struct {
@@ -128,12 +128,12 @@ func (h *OrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type OrgResponse struct {
-	ID         string           `json:"id"`
-	Name       string           `json:"name"`
-	Visibility types.Visibility `json:"visibility,omitempty"`
+	ID         string             `json:"id"`
+	Name       string             `json:"name"`
+	Visibility cstypes.Visibility `json:"visibility,omitempty"`
 }
 
-func createOrgResponse(o *types.Organization) *OrgResponse {
+func createOrgResponse(o *cstypes.Organization) *OrgResponse {
 	org := &OrgResponse{
 		ID:         o.ID,
 		Name:       o.Name,
@@ -205,11 +205,11 @@ type OrgMembersResponse struct {
 }
 
 type OrgMemberResponse struct {
-	User *UserResponse    `json:"user"`
-	Role types.MemberRole `json:"role"`
+	User *UserResponse      `json:"user"`
+	Role cstypes.MemberRole `json:"role"`
 }
 
-func createOrgMemberResponse(user *types.User, role types.MemberRole) *OrgMemberResponse {
+func createOrgMemberResponse(user *cstypes.User, role cstypes.MemberRole) *OrgMemberResponse {
 	return &OrgMemberResponse{
 		User: createUserResponse(user),
 		Role: role,
@@ -254,7 +254,7 @@ type AddOrgMemberResponse struct {
 	OrgMemberResponse
 }
 
-func createAddOrgMemberResponse(org *types.Organization, user *types.User, role types.MemberRole) *AddOrgMemberResponse {
+func createAddOrgMemberResponse(org *cstypes.Organization, user *cstypes.User, role cstypes.MemberRole) *AddOrgMemberResponse {
 	return &AddOrgMemberResponse{
 		Organization: createOrgResponse(org),
 		OrgMemberResponse: OrgMemberResponse{
@@ -265,7 +265,7 @@ func createAddOrgMemberResponse(org *types.Organization, user *types.User, role 
 }
 
 type AddOrgMemberRequest struct {
-	Role types.MemberRole `json:"role"`
+	Role cstypes.MemberRole `json:"role"`
 }
 
 type AddOrgMemberHandler struct {

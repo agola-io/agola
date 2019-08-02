@@ -23,7 +23,7 @@ import (
 	"agola.io/agola/internal/db"
 	action "agola.io/agola/internal/services/configstore/action"
 	"agola.io/agola/internal/services/configstore/readdb"
-	"agola.io/agola/internal/services/types"
+	"agola.io/agola/internal/services/configstore/types"
 	"agola.io/agola/internal/util"
 	errors "golang.org/x/xerrors"
 
