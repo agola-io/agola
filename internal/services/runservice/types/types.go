@@ -142,9 +142,9 @@ func (r *Run) ChangePhase(phase RunPhase) {
 	r.Phase = phase
 	switch {
 	case phase == RunPhaseRunning:
-		r.StartTime = util.TimePtr(time.Now())
+		r.StartTime = util.TimeP(time.Now())
 	case phase.IsFinished():
-		r.EndTime = util.TimePtr(time.Now())
+		r.EndTime = util.TimeP(time.Now())
 	}
 }
 

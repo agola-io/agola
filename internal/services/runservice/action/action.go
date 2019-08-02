@@ -395,7 +395,7 @@ func (h *ActionHandler) saveRun(ctx context.Context, rb *types.RunBundle, runcgt
 	c++
 	run.Counter = c
 
-	run.EnqueueTime = util.TimePtr(time.Now())
+	run.EnqueueTime = util.TimeP(time.Now())
 
 	actions := []*datamanager.Action{}
 
