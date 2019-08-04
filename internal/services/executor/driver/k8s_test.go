@@ -48,6 +48,10 @@ func TestK8sPod(t *testing.T) {
 
 	ctx := context.Background()
 
+	if err := d.Setup(ctx); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
 	t.Run("create a pod with one container", func(t *testing.T) {
 		pod, err := d.NewPod(ctx, &PodConfig{
 			ID:     uuid.NewV4().String(),

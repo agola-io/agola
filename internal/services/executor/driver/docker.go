@@ -22,6 +22,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strconv"
@@ -182,10 +183,11 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 	}
 
 	pod := &DockerPod{
-		id:         podConfig.ID,
-		client:     d.client,
-		executorID: d.executorID,
-		containers: []*DockerContainer{},
+		id:            podConfig.ID,
+		client:        d.client,
+		executorID:    d.executorID,
+		containers:    []*DockerContainer{},
+		initVolumeDir: podConfig.InitVolumeDir,
 	}
 
 	count := 0
@@ -333,6 +335,7 @@ func (d *DockerDriver) GetPods(ctx context.Context, all bool) ([]Pod, error) {
 				client:     d.client,
 				executorID: d.executorID,
 				containers: []*DockerContainer{},
+				// TODO(sgotti) initvolumeDir isn't set
 			}
 			podsMap[podID] = pod
 		}
@@ -397,6 +400,8 @@ type DockerPod struct {
 	labels     map[string]string
 	containers []*DockerContainer
 	executorID string
+
+	initVolumeDir string
 }
 
 type DockerContainer struct {
@@ -475,11 +480,20 @@ func (s *Stdin) Close() error {
 func (dp *DockerPod) Exec(ctx context.Context, execConfig *ExecConfig) (ContainerExec, error) {
 	endCh := make(chan error)
 
+	// old docker versions doesn't support providing Env (before api 1.25) and
+	// WorkingDir (before api 1.35) in exec command.
+	// Use a toolbox command that will set them up and then exec the real command.
+	envj, err := json.Marshal(execConfig.Env)
+	if err != nil {
+		return nil, err
+	}
+
+	cmd := []string{filepath.Join(dp.initVolumeDir, "agola-toolbox"), "exec", "-e", string(envj), "-w", execConfig.WorkingDir, "--"}
+	cmd = append(cmd, execConfig.Cmd...)
+
 	dockerExecConfig := dockertypes.ExecConfig{
-		Cmd:          execConfig.Cmd,
-		Env:          makeEnvSlice(execConfig.Env),
+		Cmd:          cmd,
 		Tty:          execConfig.Tty,
-		WorkingDir:   execConfig.WorkingDir,
 		AttachStdin:  execConfig.AttachStdin,
 		AttachStdout: execConfig.Stdout != nil,
 		AttachStderr: execConfig.Stderr != nil,
