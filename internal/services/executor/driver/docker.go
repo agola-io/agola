@@ -51,7 +51,7 @@ type DockerDriver struct {
 }
 
 func NewDockerDriver(logger *zap.Logger, executorID, initVolumeHostDir, toolboxPath string) (*DockerDriver, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.26"))
 	if err != nil {
 		return nil, err
 	}
