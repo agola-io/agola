@@ -17,16 +17,21 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"path"
 	"regexp"
+	"strings"
+	"unicode"
 
 	gitsave "agola.io/agola/internal/git-save"
 	"agola.io/agola/internal/util"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/ghodss/yaml"
 	uuid "github.com/satori/go.uuid"
 	"github.com/spf13/cobra"
+	errors "golang.org/x/xerrors"
 )
 
 var cmdDirectRunStart = &cobra.Command{
@@ -47,6 +52,9 @@ type directRunStartOptions struct {
 	tag          string
 	ref          string
 	prRefRegexes []string
+
+	vars     []string
+	varFiles []string
 }
 
 var directRunStartOpts directRunStartOptions
@@ -60,8 +68,28 @@ func init() {
 	flags.StringVar(&directRunStartOpts.tag, "tag", "", "tag to push to")
 	flags.StringVar(&directRunStartOpts.ref, "ref", "", `ref to push to (i.e  "refs/heads/master" for a branch, "refs/tags/v1.0" for a tag)`)
 	flags.StringArrayVar(&directRunStartOpts.prRefRegexes, "pull-request-ref-regexes", []string{`refs/pull/(\d+)/head`, `refs/merge-requests/(\d+)/head`}, `regular expression to determine if a ref is a pull request`)
+	flags.StringArrayVar(&directRunStartOpts.vars, "var", []string{}, `list of variables (name=value). This option can be repeated multiple times`)
+	flags.StringArrayVar(&directRunStartOpts.varFiles, "var-file", []string{}, `yaml file containing the variables as a yaml/json map. This option can be repeated multiple times`)
 
 	cmdDirectRun.AddCommand(cmdDirectRunStart)
+}
+
+func parseVariable(variable string) (string, string, error) {
+	// trim white spaces at the start
+	variable = strings.TrimLeftFunc(variable, unicode.IsSpace)
+	arr := strings.SplitN(variable, "=", 2)
+	if len(arr) != 2 {
+		return "", "", fmt.Errorf("invalid variable definition: %s", variable)
+	}
+	varname := arr[0]
+	varvalue := arr[1]
+	if varname == "" {
+		return "", "", fmt.Errorf("invalid variable definition: %s", variable)
+	}
+	if varvalue == "" {
+		return "", "", fmt.Errorf("invalid variable definition: %s", variable)
+	}
+	return varname, varvalue, nil
 }
 
 func directRunStart(cmd *cobra.Command, args []string) error {
@@ -100,6 +128,35 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 	user, _, err := gwclient.GetCurrentUser(context.TODO())
 	if err != nil {
 		return err
+	}
+
+	variables := map[string]string{}
+
+	// TODO(sgotti) currently vars overrides varFiles. Is this what we want or we
+	// want to handle var and varFiles in the order they appear in the command
+	// line?
+	for _, varFile := range directRunStartOpts.varFiles {
+		// "github.com/ghodss/yaml" doesn't provide a streaming decoder
+		var data []byte
+		var err error
+		data, err = ioutil.ReadFile(varFile)
+		if err != nil {
+			return err
+		}
+
+		if err := yaml.Unmarshal(data, &variables); err != nil {
+			return errors.Errorf("failed to unmarshal values: %v", err)
+		}
+
+		// TODO(sgotti) validate variable name
+	}
+
+	for _, variable := range directRunStartOpts.vars {
+		varname, varvalue, err := parseVariable(variable)
+		if err != nil {
+			return err
+		}
+		variables[varname] = varvalue
 	}
 
 	// setup unique local git repo uuid
@@ -154,6 +211,7 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 		CommitSHA:             commitSHA,
 		Message:               message,
 		PullRequestRefRegexes: directRunStartOpts.prRefRegexes,
+		Variables:             variables,
 	}
 	if _, err := gwclient.UserCreateRun(context.TODO(), req); err != nil {
 		return err

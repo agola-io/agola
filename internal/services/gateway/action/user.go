@@ -824,6 +824,7 @@ type UserCreateRunRequest struct {
 	Message   string
 
 	PullRequestRefRegexes []string
+	Variables             map[string]string
 }
 
 func (h *ActionHandler) UserCreateRun(ctx context.Context, req *UserCreateRunRequest) error {
@@ -941,6 +942,7 @@ func (h *ActionHandler) UserCreateRun(ctx context.Context, req *UserCreateRunReq
 		PullRequestLink: "",
 
 		UserRunRepoUUID: req.RepoUUID,
+		Variables:       req.Variables,
 	}
 
 	return h.CreateRuns(ctx, creq)

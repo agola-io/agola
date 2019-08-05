@@ -15,6 +15,7 @@
 package tests
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -800,6 +801,175 @@ func TestDirectRun(t *testing.T) {
 			for k, v := range tt.annotations {
 				if run.Annotations[k] != v {
 					t.Fatalf("expected run annotation %q value %q, got %q", k, v, run.Annotations[k])
+				}
+			}
+		})
+	}
+}
+
+func TestDirectRunVariables(t *testing.T) {
+	config := `
+      {
+        runs: [
+          {
+            name: 'run01',
+            tasks: [
+              {
+                name: 'task01',
+                runtime: {
+                  containers: [
+                    {
+                      image: 'alpine/git',
+                    },
+                  ],
+                },
+                environment: {
+                  ENV01: { from_variable: 'variable01' },
+                  ENV02: { from_variable: 'variable02' },
+                },
+                steps: [
+                  { type: 'clone' },
+                  { type: 'run', command: 'env' },
+                ],
+              },
+            ],
+          },
+        ],
+      }
+	`
+
+	varfile01 := `
+      variable01: "variable value 01"
+      variable02: variable value 02
+`
+
+	tests := []struct {
+		name string
+		args []string
+		env  map[string]string
+	}{
+		{
+			name: "test direct run without variables",
+			args: []string{},
+			env: map[string]string{
+				"ENV01": "",
+				"ENV02": "",
+			},
+		},
+		{
+			name: "test direct run with two variables",
+			args: []string{"--var", "variable01=VARIABLEVALUE01", "--var", "variable02=VARIABLEVALUE02"},
+			env: map[string]string{
+				"ENV01": "VARIABLEVALUE01",
+				"ENV02": "VARIABLEVALUE02",
+			},
+		},
+		{
+			name: "test direct run with a var file",
+			args: []string{"--var-file", "../varfile01.yml"},
+			env: map[string]string{
+				"ENV01": "variable value 01",
+				"ENV02": "variable value 02",
+			},
+		},
+		{
+			name: "test direct run with a var file and a var that overrides",
+			args: []string{"--var-file", "../varfile01.yml", "--var", "variable02=VARIABLEVALUE02"},
+			env: map[string]string{
+				"ENV01": "variable value 01",
+				"ENV02": "VARIABLEVALUE02",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir, err := ioutil.TempDir("", "agola")
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			defer os.RemoveAll(dir)
+
+			if err := ioutil.WriteFile(filepath.Join(dir, "varfile01.yml"), []byte(varfile01), 0644); err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			tetcd, tgitea, c := setup(ctx, t, dir)
+			defer shutdownGitea(tgitea)
+			defer shutdownEtcd(tetcd)
+
+			gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
+			user, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			t.Logf("created agola user: %s", user.UserName)
+
+			token := createAgolaUserToken(ctx, t, c)
+
+			// From now use the user token
+			gwClient = gwclient.NewClient(c.Gateway.APIExposedURL, token)
+
+			directRun(t, dir, config, c.Gateway.APIExposedURL, token, tt.args...)
+
+			// TODO(sgotti) add an util to wait for a run phase
+			time.Sleep(10 * time.Second)
+
+			runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/user", user.ID)}, nil, "", 0, false)
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			t.Logf("runs: %s", util.Dump(runs))
+
+			if len(runs) != 1 {
+				t.Fatalf("expected 1 run got: %d", len(runs))
+			}
+
+			run, _, err := gwClient.GetRun(ctx, runs[0].ID)
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			if run.Phase != rstypes.RunPhaseFinished {
+				t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, run.Phase)
+			}
+			if run.Result != rstypes.RunResultSuccess {
+				t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, run.Result)
+			}
+
+			var task *gwapitypes.RunResponseTask
+			for _, t := range run.Tasks {
+				if t.Name == "task01" {
+					task = t
+					break
+				}
+			}
+
+			resp, err := gwClient.GetLogs(ctx, run.ID, task.ID, false, 1)
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			defer resp.Body.Close()
+
+			logs, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			curEnv, err := testutil.ParseEnvs(bytes.NewReader(logs))
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			for n, e := range tt.env {
+				if ce, ok := curEnv[n]; !ok {
+					t.Fatalf("missing env var %s", n)
+				} else {
+					if ce != e {
+						t.Fatalf("different env var %s value, want: %q, got %q", n, e, ce)
+					}
 				}
 			}
 		})

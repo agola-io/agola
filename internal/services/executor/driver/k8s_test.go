@@ -23,6 +23,8 @@ import (
 	"testing"
 	"time"
 
+	"agola.io/agola/internal/testutil"
+
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -146,7 +148,7 @@ func TestK8sPod(t *testing.T) {
 			t.Fatalf("unexpected exit code: %d", code)
 		}
 
-		curEnv, err := parseEnvs(bytes.NewReader(buf.Bytes()))
+		curEnv, err := testutil.ParseEnvs(bytes.NewReader(buf.Bytes()))
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}

@@ -103,5 +103,6 @@ type UserCreateRunRequest struct {
 	CommitSHA string `json:"commit_sha,omitempty"`
 	Message   string `json:"message,omitempty"`
 
-	PullRequestRefRegexes []string
+	PullRequestRefRegexes []string          `json:"pull_request_ref_regexes,omitempty"`
+	Variables             map[string]string `json:"variables,omitempty"`
 }
