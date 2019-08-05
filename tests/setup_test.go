@@ -81,8 +81,8 @@ func shutdownEtcd(tetcd *testutil.TestEmbeddedEtcd) {
 	}
 }
 
-func setupGitea(t *testing.T, dir string) *testutil.TestGitea {
-	tgitea, err := testutil.NewTestGitea(t, logger, dir)
+func setupGitea(t *testing.T, dir, dockerBridgeAddress string) *testutil.TestGitea {
+	tgitea, err := testutil.NewTestGitea(t, logger, dir, dockerBridgeAddress)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -156,6 +156,10 @@ func startAgola(ctx context.Context, t *testing.T, dir string, c *config.Config)
 }
 
 func setup(ctx context.Context, t *testing.T, dir string) (*testutil.TestEmbeddedEtcd, *testutil.TestGitea, *config.Config) {
+	dockerBridgeAddress := os.Getenv("DOCKER_BRIDGE_ADDRESS")
+	if dockerBridgeAddress == "" {
+		dockerBridgeAddress = "172.17.0.1"
+	}
 	toolboxPath := os.Getenv("AGOLA_TOOLBOX_PATH")
 	if toolboxPath == "" {
 		t.Fatalf("env var AGOLA_TOOLBOX_PATH is undefined")
@@ -253,7 +257,7 @@ func setup(ctx context.Context, t *testing.T, dir string) (*testutil.TestEmbedde
 		},
 	}
 
-	tgitea := setupGitea(t, dir)
+	tgitea := setupGitea(t, dir, dockerBridgeAddress)
 
 	etcdDir := filepath.Join(dir, "etcd")
 	tetcd := setupEtcd(t, etcdDir)
@@ -282,16 +286,16 @@ func setup(ctx context.Context, t *testing.T, dir string) (*testutil.TestEmbedde
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	gwURL := fmt.Sprintf("http://%s:%s", listenAddress, gwPort)
+	gwURL := fmt.Sprintf("http://%s:%s", dockerBridgeAddress, gwPort)
 	csURL := fmt.Sprintf("http://%s:%s", listenAddress, csPort)
 	rsURL := fmt.Sprintf("http://%s:%s", listenAddress, rsPort)
-	gitServerURL := fmt.Sprintf("http://%s:%s", listenAddress, gitServerPort)
+	gitServerURL := fmt.Sprintf("http://%s:%s", dockerBridgeAddress, gitServerPort)
 
-	c.Gateway.Web.ListenAddress = fmt.Sprintf("%s:%s", listenAddress, gwPort)
+	c.Gateway.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, gwPort)
 	c.Configstore.Web.ListenAddress = fmt.Sprintf("%s:%s", listenAddress, csPort)
 	c.Runservice.Web.ListenAddress = fmt.Sprintf("%s:%s", listenAddress, rsPort)
 	c.Executor.Web.ListenAddress = fmt.Sprintf("%s:%s", listenAddress, exPort)
-	c.Gitserver.Web.ListenAddress = fmt.Sprintf("%s:%s", listenAddress, gitServerPort)
+	c.Gitserver.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, gitServerPort)
 
 	c.Gateway.APIExposedURL = gwURL
 	c.Gateway.WebExposedURL = gwURL
@@ -339,7 +343,7 @@ func TestCreateLinkedAccount(t *testing.T) {
 }
 
 func createLinkedAccount(ctx context.Context, t *testing.T, tgitea *testutil.TestGitea, c *config.Config) (string, string) {
-	giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.ListenAddress, tgitea.HTTPPort)
+	giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
 	giteaClient := gitea.NewClient(giteaAPIURL, "")
 
 	giteaToken, err := giteaClient.CreateAccessToken(giteaUser01, "password", gtypes.CreateAccessTokenOption{Name: "token01"})
@@ -403,7 +407,7 @@ func TestCreateProject(t *testing.T) {
 	defer shutdownGitea(tgitea)
 	defer shutdownEtcd(tetcd)
 
-	giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.ListenAddress, tgitea.HTTPPort)
+	giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
 
 	giteaToken, token := createLinkedAccount(ctx, t, tgitea, c)
 
@@ -450,7 +454,7 @@ func TestRun(t *testing.T) {
 	defer shutdownGitea(tgitea)
 	defer shutdownEtcd(tetcd)
 
-	giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.ListenAddress, tgitea.HTTPPort)
+	giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
 
 	giteaToken, token := createLinkedAccount(ctx, t, tgitea, c)
 
@@ -475,11 +479,12 @@ func TestRun(t *testing.T) {
           runtime: {
             containers: [
               {
-                image: 'busybox',
+                image: 'alpine/git',
               },
             ],
           },
           steps: [
+            { type: 'clone' },
             { type: 'run', command: 'env' },
           ],
         },
@@ -550,5 +555,8 @@ func TestRun(t *testing.T) {
 	run := runs[0]
 	if run.Phase != rstypes.RunPhaseFinished {
 		t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, run.Phase)
+	}
+	if run.Result != rstypes.RunResultSuccess {
+		t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, run.Result)
 	}
 }

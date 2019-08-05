@@ -360,9 +360,9 @@ TEMP_PATH = {{ .Data }}/gitea/uploads
 
 [server]
 APP_DATA_PATH    = {{ .Data }}/gitea
-SSH_DOMAIN       = {{ .ListenAddress }}
+SSH_DOMAIN       = {{ .SSHListenAddress }}
 HTTP_PORT        = {{ .HTTPPort }}
-ROOT_URL         = http://{{ .ListenAddress }}:{{ .HTTPPort }}/
+ROOT_URL         = http://{{ .HTTPListenAddress }}:{{ .HTTPPort }}/
 DISABLE_SSH      = false
 # Use built-in ssh server
 START_SSH_SERVER = true
@@ -432,24 +432,26 @@ ENABLE_OPENID_SIGNUP = true
 )
 
 type GiteaConfig struct {
-	Data          string
-	User          string
-	ListenAddress string
-	HTTPPort      string
-	SSHPort       string
+	Data              string
+	User              string
+	HTTPListenAddress string
+	HTTPPort          string
+	SSHListenAddress  string
+	SSHPort           string
 }
 
 type TestGitea struct {
 	Process
 
-	GiteaPath     string
-	ConfigPath    string
-	ListenAddress string
-	HTTPPort      string
-	SSHPort       string
+	GiteaPath         string
+	ConfigPath        string
+	HTTPListenAddress string
+	HTTPPort          string
+	SSHListenAddress  string
+	SSHPort           string
 }
 
-func NewTestGitea(t *testing.T, logger *zap.Logger, dir string, a ...string) (*TestGitea, error) {
+func NewTestGitea(t *testing.T, logger *zap.Logger, dir, dockerBridgeAddress string, a ...string) (*TestGitea, error) {
 	u := uuid.NewV4()
 	uid := fmt.Sprintf("%x", u[:4])
 
@@ -475,11 +477,12 @@ func NewTestGitea(t *testing.T, logger *zap.Logger, dir string, a ...string) (*T
 	}
 
 	giteaConfig := &GiteaConfig{
-		Data:          giteaDir,
-		User:          curUser.Username,
-		ListenAddress: listenAddress,
-		HTTPPort:      httpPort,
-		SSHPort:       sshPort,
+		Data:              giteaDir,
+		User:              curUser.Username,
+		HTTPListenAddress: listenAddress,
+		SSHListenAddress:  dockerBridgeAddress,
+		HTTPPort:          httpPort,
+		SSHPort:           sshPort,
 	}
 	tmpl, err := template.New("gitea").Parse(giteaAppIniTmpl)
 	if err != nil {
@@ -512,11 +515,12 @@ func NewTestGitea(t *testing.T, logger *zap.Logger, dir string, a ...string) (*T
 			bin:  giteaPath,
 			args: args,
 		},
-		GiteaPath:     giteaPath,
-		ConfigPath:    configPath,
-		ListenAddress: listenAddress,
-		HTTPPort:      httpPort,
-		SSHPort:       sshPort,
+		GiteaPath:         giteaPath,
+		ConfigPath:        configPath,
+		HTTPListenAddress: listenAddress,
+		HTTPPort:          httpPort,
+		SSHListenAddress:  dockerBridgeAddress,
+		SSHPort:           sshPort,
 	}
 
 	return tgitea, nil
