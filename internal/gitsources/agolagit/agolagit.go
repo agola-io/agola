@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -36,12 +37,13 @@ var (
 )
 
 type Client struct {
-	url    string
-	client *http.Client
+	url                   string
+	client                *http.Client
+	pullRequestRefRegexes []*regexp.Regexp
 }
 
 // NewClient initializes and returns a API client.
-func New(url string) *Client {
+func New(url string, pullRequestRefRegexes []*regexp.Regexp) *Client {
 	// copied from net/http until it has a clone function: https://github.com/golang/go/issues/26013
 	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
@@ -59,8 +61,9 @@ func New(url string) *Client {
 
 	httpClient := &http.Client{Transport: transport}
 	return &Client{
-		url:    strings.TrimSuffix(url, "/"),
-		client: httpClient,
+		url:                   strings.TrimSuffix(url, "/"),
+		client:                httpClient,
+		pullRequestRefRegexes: pullRequestRefRegexes,
 	}
 }
 
@@ -168,7 +171,22 @@ func (c *Client) GetRef(repopath, ref string) (*gitsource.Ref, error) {
 }
 
 func (c *Client) RefType(ref string) (gitsource.RefType, string, error) {
-	return -1, "", nil
+	if strings.HasPrefix(ref, branchRefPrefix) {
+		return gitsource.RefTypeBranch, strings.TrimPrefix(ref, branchRefPrefix), nil
+	}
+
+	if strings.HasPrefix(ref, tagRefPrefix) {
+		return gitsource.RefTypeTag, strings.TrimPrefix(ref, tagRefPrefix), nil
+	}
+
+	for _, re := range c.pullRequestRefRegexes {
+		if re.MatchString(ref) {
+			m := re.FindStringSubmatch(ref)
+			return gitsource.RefTypePullRequest, m[1], nil
+		}
+	}
+
+	return -1, "", fmt.Errorf("unsupported ref: %s", ref)
 }
 
 func (c *Client) GetCommit(repopath, commitSHA string) (*gitsource.Commit, error) {

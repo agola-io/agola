@@ -528,14 +528,12 @@ func (h *ActionHandler) ProjectCreateRun(ctx context.Context, projectRef, branch
 		refType = types.RunRefTypeBranch
 		message = commit.Message
 		branchLink = gitSource.BranchLink(repoInfo, branch)
-
 	}
 
 	if tag != "" {
-		refType = types.RunRefTypeBranch
+		refType = types.RunRefTypeTag
 		message = fmt.Sprintf("Tag %s", tag)
 		tagLink = gitSource.TagLink(repoInfo, tag)
-
 	}
 
 	// use remotesource skipSSHHostKeyCheck config and override with project config if set to true there

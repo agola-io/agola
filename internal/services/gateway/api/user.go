@@ -570,11 +570,14 @@ func (h *UserCreateRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	}
 
 	creq := &action.UserCreateRunRequest{
-		RepoUUID:  req.RepoUUID,
-		RepoPath:  req.RepoPath,
-		Branch:    req.Branch,
-		CommitSHA: req.CommitSHA,
-		Message:   req.Message,
+		RepoUUID:              req.RepoUUID,
+		RepoPath:              req.RepoPath,
+		Branch:                req.Branch,
+		Tag:                   req.Tag,
+		Ref:                   req.Ref,
+		CommitSHA:             req.CommitSHA,
+		Message:               req.Message,
+		PullRequestRefRegexes: req.PullRequestRefRegexes,
 	}
 	err := h.ah.UserCreateRun(ctx, creq)
 	if httpError(w, err) {

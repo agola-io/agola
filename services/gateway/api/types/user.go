@@ -98,6 +98,10 @@ type UserCreateRunRequest struct {
 	RepoUUID  string `json:"repo_uuid,omitempty"`
 	RepoPath  string `json:"repo_path,omitempty"`
 	Branch    string `json:"branch,omitempty"`
+	Tag       string `json:"tag,omitempty"`
+	Ref       string `json:"ref,omitempty"`
 	CommitSHA string `json:"commit_sha,omitempty"`
 	Message   string `json:"message,omitempty"`
+
+	PullRequestRefRegexes []string
 }
