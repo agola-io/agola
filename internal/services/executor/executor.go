@@ -1308,6 +1308,7 @@ type Executor struct {
 	id               string
 	runningTasks     *runningTasks
 	driver           driver.Driver
+	listenAddress    string
 	listenURL        string
 	dynamic          bool
 }
@@ -1348,6 +1349,8 @@ func NewExecutor(c *config.Executor) (*Executor, error) {
 
 	e.id = id
 
+	// TODO(sgotti) now the first available private ip will be used and the executor will bind to the wildcard address
+	// improve this to let the user define the bind and the advertize address
 	addr, err := sockaddr.GetPrivateIP()
 	if err != nil {
 		return nil, errors.Errorf("cannot discover executor listen address: %w", err)
@@ -1365,6 +1368,8 @@ func NewExecutor(c *config.Executor) (*Executor, error) {
 	}
 	u.Host = net.JoinHostPort(addr, port)
 	e.listenURL = u.String()
+
+	e.listenAddress = fmt.Sprintf(":%s", port)
 
 	var d driver.Driver
 	switch c.Driver.Type {
@@ -1413,7 +1418,7 @@ func (e *Executor) Run(ctx context.Context) error {
 	go e.handleTasks(ctx, ch)
 
 	httpServer := http.Server{
-		Addr:    e.c.Web.ListenAddress,
+		Addr:    e.listenAddress,
 		Handler: apirouter,
 	}
 	lerrCh := make(chan error)
