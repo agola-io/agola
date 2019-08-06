@@ -478,6 +478,11 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 	}
 
 	for _, run := range config.Runs {
+		if match := cstypes.MatchWhen(run.When.ToCSWhen(), req.Branch, req.Tag, req.Ref); !match {
+			h.log.Debugf("skipping run since when condition doesn't match")
+			continue
+		}
+
 		rcts := runconfig.GenRunConfigTasks(util.DefaultUUIDGenerator{}, config, run.Name, variables, req.Branch, req.Tag, req.Ref)
 
 		createRunReq := &rsapitypes.RunCreateRequest{

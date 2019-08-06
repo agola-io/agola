@@ -98,6 +98,7 @@ type Container struct {
 type Run struct {
 	Name                 string                         `json:"name"`
 	Tasks                []*Task                        `json:"tasks"`
+	When                 *When                          `json:"when"`
 	DockerRegistriesAuth map[string]*DockerRegistryAuth `json:"docker_registries_auth"`
 }
 
@@ -451,6 +452,17 @@ type when struct {
 	Branch interface{} `json:"branch"`
 	Tag    interface{} `json:"tag"`
 	Ref    interface{} `json:"ref"`
+}
+
+func (w *When) ToCSWhen() *cstypes.When {
+	if w == nil {
+		return nil
+	}
+	return &cstypes.When{
+		Branch: w.Branch,
+		Tag:    w.Tag,
+		Ref:    w.Ref,
+	}
 }
 
 func (w *When) UnmarshalJSON(b []byte) error {

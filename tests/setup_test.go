@@ -450,60 +450,13 @@ func createProject(ctx context.Context, t *testing.T, giteaClient *gitea.Client,
 	return giteaRepo, project
 }
 
-func TestRun(t *testing.T) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	tetcd, tgitea, c := setup(ctx, t, dir)
-	defer shutdownGitea(tgitea)
-	defer shutdownEtcd(tetcd)
-
-	giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
-
-	giteaToken, token := createLinkedAccount(ctx, t, tgitea, c)
-
-	giteaClient := gitea.NewClient(giteaAPIURL, giteaToken)
-	gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, token)
-
-	giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)
-
+func push(t *testing.T, config, cloneURL, remoteToken string) {
 	gitfs := memfs.New()
 	f, err := gitfs.Create(".agola/config.jsonnet")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	_, err = f.Write([]byte(
-		`{
-  runs: [
-    {
-      name: 'run01',
-      tasks: [
-        {
-          name: 'task01',
-          runtime: {
-            containers: [
-              {
-                image: 'alpine/git',
-              },
-            ],
-          },
-          steps: [
-            { type: 'clone' },
-            { type: 'run', command: 'env' },
-          ],
-        },
-      ],
-    },
-  ],
-}
-`))
-	if err != nil {
+	if _, err = f.Write([]byte(config)); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
@@ -514,7 +467,7 @@ func TestRun(t *testing.T) {
 
 	if _, err := r.CreateRemote(&gitconfig.RemoteConfig{
 		Name: "origin",
-		URLs: []string{giteaRepo.CloneURL},
+		URLs: []string{cloneURL},
 	}); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -537,37 +490,150 @@ func TestRun(t *testing.T) {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	t.Logf("sshurl: %s", giteaRepo.CloneURL)
+	t.Logf("sshurl: %s", cloneURL)
 	if err := r.Push(&git.PushOptions{
 		RemoteName: "origin",
 		Auth: &http.BasicAuth{
 			Username: giteaUser01,
-			Password: giteaToken,
+			Password: remoteToken,
 		},
 	}); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	// TODO(sgotti) add an util to wait for a run phase
-	time.Sleep(10 * time.Second)
+}
 
-	runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/project", project.ID)}, nil, "", 0, false)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
+func TestPush(t *testing.T) {
+	tests := []struct {
+		name        string
+		config      string
+		num         int
+		annotations map[string]string
+	}{
+		{
+			name: "test push",
+			config: `
+			{
+			  runs: [
+			    {
+			      name: 'run01',
+			      tasks: [
+			        {
+			          name: 'task01',
+			          runtime: {
+			            containers: [
+			              {
+			                image: 'alpine/git',
+			              },
+			            ],
+			          },
+			          steps: [
+			            { type: 'clone' },
+			            { type: 'run', command: 'env' },
+			          ],
+			        },
+			      ],
+			    },
+			  ],
+			}
+			`,
+			num: 1,
+			annotations: map[string]string{
+				"branch":   "master",
+				"ref":      "refs/heads/master",
+				"ref_type": "branch",
+			},
+		},
+		{
+			name: "test push with unmatched branch",
+			config: `
+			{
+			  runs: [
+			    {
+			      name: 'run01',
+			      tasks: [
+			        {
+			          name: 'task01',
+			          runtime: {
+			            containers: [
+			              {
+			                image: 'alpine/git',
+			              },
+			            ],
+			          },
+			          steps: [
+			            { type: 'clone' },
+			            { type: 'run', command: 'env' },
+			          ],
+			        },
+			      ],
+			      when: {
+			        branch: 'notmaster',
+			      },
+			    },
+			  ],
+			}
+			`,
+			num: 0,
+		},
 	}
 
-	t.Logf("runs: %s", util.Dump(runs))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 
-	if len(runs) != 1 {
-		t.Fatalf("expected 1 run got: %d", len(runs))
-	}
+			dir, err := ioutil.TempDir("", "agola")
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			defer os.RemoveAll(dir)
 
-	run := runs[0]
-	if run.Phase != rstypes.RunPhaseFinished {
-		t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, run.Phase)
-	}
-	if run.Result != rstypes.RunResultSuccess {
-		t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, run.Result)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			tetcd, tgitea, c := setup(ctx, t, dir)
+			defer shutdownGitea(tgitea)
+			defer shutdownEtcd(tetcd)
+
+			giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
+
+			giteaToken, token := createLinkedAccount(ctx, t, tgitea, c)
+
+			giteaClient := gitea.NewClient(giteaAPIURL, giteaToken)
+			gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, token)
+
+			giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)
+
+			push(t, tt.config, giteaRepo.CloneURL, giteaToken)
+
+			// TODO(sgotti) add an util to wait for a run phase
+			time.Sleep(10 * time.Second)
+
+			runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/project", project.ID)}, nil, "", 0, false)
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			t.Logf("runs: %s", util.Dump(runs))
+
+			if len(runs) != tt.num {
+				t.Fatalf("expected %d run got: %d", tt.num, len(runs))
+			}
+
+			if len(runs) > 0 {
+				run := runs[0]
+				if run.Phase != rstypes.RunPhaseFinished {
+					t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, run.Phase)
+				}
+				if run.Result != rstypes.RunResultSuccess {
+					t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, run.Result)
+				}
+				for k, v := range tt.annotations {
+					if run.Annotations[k] != v {
+						t.Fatalf("expected run annotation %q value %q, got %q", k, v, run.Annotations[k])
+					}
+				}
+			}
+		})
 	}
 }
 
