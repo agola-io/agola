@@ -410,6 +410,19 @@ func (c *Client) GetRuns(ctx context.Context, phaseFilter, resultFilter, groups,
 	return getRunsResponse, resp, err
 }
 
+func (c *Client) GetLogs(ctx context.Context, runID, taskID string, setup bool, step int) (*http.Response, error) {
+	q := url.Values{}
+	q.Add("runID", runID)
+	q.Add("taskID", taskID)
+	if setup {
+		q.Add("setup", "")
+	} else {
+		q.Add("step", strconv.Itoa(step))
+	}
+
+	return c.getResponse(ctx, "GET", "/logs", q, nil, nil)
+}
+
 func (c *Client) GetRemoteSource(ctx context.Context, rsRef string) (*gwapitypes.RemoteSourceResponse, *http.Response, error) {
 	rs := new(gwapitypes.RemoteSourceResponse)
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/remotesources/%s", rsRef), nil, jsonContent, nil, rs)

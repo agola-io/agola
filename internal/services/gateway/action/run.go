@@ -321,7 +321,9 @@ type CreateRunRequest struct {
 	// commit compare link
 	CompareLink string
 
+	// fields only used with user direct runs
 	UserRunRepoUUID string
+	Variables       map[string]string
 }
 
 func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) error {
@@ -391,13 +393,15 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 		env["AGOLA_SKIPSSHHOSTKEYCHECK"] = "1"
 	}
 
-	variables := map[string]string{}
+	var variables map[string]string
 	if req.RunType == types.RunTypeProject {
 		var err error
 		variables, err = h.genRunVariables(ctx, req)
 		if err != nil {
 			return err
 		}
+	} else {
+		variables = req.Variables
 	}
 
 	annotations := map[string]string{

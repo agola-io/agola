@@ -578,6 +578,7 @@ func (h *UserCreateRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		CommitSHA:             req.CommitSHA,
 		Message:               req.Message,
 		PullRequestRefRegexes: req.PullRequestRefRegexes,
+		Variables:             req.Variables,
 	}
 	err := h.ah.UserCreateRun(ctx, creq)
 	if httpError(w, err) {

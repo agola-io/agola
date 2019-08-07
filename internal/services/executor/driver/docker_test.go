@@ -15,21 +15,17 @@
 package driver
 
 import (
-	"bufio"
 	"bytes"
 	"context"
-	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
-	"strings"
 	"testing"
 	"time"
-	"unicode"
 
 	slog "agola.io/agola/internal/log"
 	"github.com/docker/docker/api/types"
 	uuid "github.com/satori/go.uuid"
+	"agola.io/agola/internal/testutil"
 
 	"github.com/google/go-cmp/cmp"
 	"go.uber.org/zap"
@@ -38,41 +34,6 @@ import (
 
 var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
 var logger = slog.New(level)
-
-func parseEnv(envvar string) (string, string, error) {
-	// trim white spaces at the start
-	envvar = strings.TrimLeftFunc(envvar, unicode.IsSpace)
-	arr := strings.SplitN(envvar, "=", 2)
-	varname := arr[0]
-	if varname == "" {
-		return "", "", fmt.Errorf("invalid environment variable definition: %s", envvar)
-	}
-	if len(arr) > 1 {
-		if arr[1] == "" {
-			return "", "", fmt.Errorf("invalid environment variable definition: %s", envvar)
-		}
-		return varname, arr[1], nil
-	}
-	return varname, "", nil
-}
-
-func parseEnvs(r io.Reader) (map[string]string, error) {
-	envs := map[string]string{}
-
-	scanner := bufio.NewScanner(r)
-	for scanner.Scan() {
-		envname, envvalue, err := parseEnv(scanner.Text())
-		if err != nil {
-			return nil, err
-		}
-		envs[envname] = envvalue
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-
-	return envs, nil
-}
 
 func TestDockerPod(t *testing.T) {
 	if os.Getenv("SKIP_DOCKER_TESTS") == "1" {
@@ -192,7 +153,7 @@ func TestDockerPod(t *testing.T) {
 			t.Fatalf("unexpected exit code: %d", code)
 		}
 
-		curEnv, err := parseEnvs(bytes.NewReader(buf.Bytes()))
+		curEnv, err := testutil.ParseEnvs(bytes.NewReader(buf.Bytes()))
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
