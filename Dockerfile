@@ -3,7 +3,7 @@
 #######
 
 # base build image
-FROM golang:1.11 AS build_base
+FROM golang:1.12-buster AS build_base
 
 WORKDIR /agola
 
@@ -16,10 +16,10 @@ COPY go.sum .
 
 RUN go mod download
 
-# This image builds the weavaite server
+# builds the agola binaries
 FROM build_base AS server_builder
 
-# copy all the source
+# copy all the sources
 COPY . .
 
 # copy the agola-web dist
@@ -31,7 +31,7 @@ RUN make WEBBUNDLE=1 WEBDISTPATH=/agola-web/dist
 #######
 ####### Build the final image
 #######
-FROM debian:stable AS agola
+FROM debian:buster AS agola
 
 WORKDIR /
 
