@@ -769,12 +769,11 @@ func checkConfig(config *Config) error {
 		for _, task := range run.Tasks {
 			parents := getTaskParents(run, task)
 			for _, parent := range parents {
-				allParents := getAllTaskParents(run, task)
 				allParentParents := getAllTaskParents(run, parent)
-				for _, p := range allParents {
+				for _, p := range parents {
 					for _, pp := range allParentParents {
 						if p.Name == pp.Name {
-							return errors.Errorf("task %s and its dependency %s have both a dependency on task %s", task.Name, parent.Name, p.Name)
+							return errors.Errorf("task %q and its dependency %q have both a dependency on task %q", task.Name, parent.Name, p.Name)
 						}
 					}
 				}

@@ -133,6 +133,71 @@ func TestParseConfig(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "test task parent same dep a -> b -> c, a -> c",
+			in: `
+                runs:
+                  - name: run01
+                    tasks:
+                      - name: task01
+                        runtime:
+                          type: pod
+                          containers:
+                            - image: busybox
+                      - name: task02
+                        runtime:
+                          type: pod
+                          containers:
+                            - image: busybox
+                        depends:
+                          - task01
+                      - name: task03
+                        runtime:
+                          type: pod
+                          containers:
+                            - image: busybox
+                        depends:
+                          - task02
+                          - task01
+                `,
+			err: errors.Errorf("task %q and its dependency %q have both a dependency on task %q", "task03", "task02", "task01"),
+		},
+		{
+			name: "test task parent same dep a -> b -> c -> d, a -> d",
+			in: `
+                runs:
+                  - name: run01
+                    tasks:
+                      - name: task01
+                        runtime:
+                          type: pod
+                          containers:
+                            - image: busybox
+                      - name: task02
+                        runtime:
+                          type: pod
+                          containers:
+                            - image: busybox
+                        depends:
+                          - task01
+                      - name: task03
+                        runtime:
+                          type: pod
+                          containers:
+                            - image: busybox
+                        depends:
+                          - task02
+                      - name: task04
+                        runtime:
+                          type: pod
+                          containers:
+                            - image: busybox
+                        depends:
+                          - task03
+                          - task01
+                `,
+			err: errors.Errorf("task %q and its dependency %q have both a dependency on task %q", "task04", "task03", "task01"),
+		},
 	}
 
 	for _, tt := range tests {
