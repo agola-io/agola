@@ -590,6 +590,63 @@ func TestCheckRunConfig(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "test task parent same dep a -> b -> c, a -> c",
+			in: []task{
+				{
+					ID:    "1",
+					Level: -1,
+				},
+				{
+					ID:    "2",
+					Level: -1,
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
+					},
+				},
+				{
+					ID:    "3",
+					Level: -1,
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
+						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
+					},
+				},
+			},
+			err: errors.Errorf("task %q and its parent %q have both a dependency on task %q", "task3", "task2", "task1"),
+		},
+		{
+			name: "test task parent same dep a -> b -> c -> d, a -> d",
+			in: []task{
+				{
+					ID:    "1",
+					Level: -1,
+				},
+				{
+					ID:    "2",
+					Level: -1,
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
+					},
+				},
+				{
+					ID:    "3",
+					Level: -1,
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
+					},
+				},
+				{
+					ID:    "4",
+					Level: -1,
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"3": &rstypes.RunConfigTaskDepend{TaskID: "3"},
+						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
+					},
+				},
+			},
+			err: errors.Errorf("task %q and its parent %q have both a dependency on task %q", "task4", "task3", "task1"),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

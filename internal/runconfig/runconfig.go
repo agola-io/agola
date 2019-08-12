@@ -316,12 +316,11 @@ func CheckRunConfigTasks(rcts map[string]*rstypes.RunConfigTask) error {
 	for _, t := range rcts {
 		parents := GetParents(rcts, t)
 		for _, parent := range parents {
-			allParents := GetAllParents(rcts, t)
 			allParentParents := GetAllParents(rcts, parent)
-			for _, p := range allParents {
+			for _, p := range parents {
 				for _, pp := range allParentParents {
 					if p.ID == pp.ID {
-						return errors.Errorf("task %s and its parent %s have both a dependency on task %s", t.Name, parent.Name, p.Name)
+						return errors.Errorf("task %q and its parent %q have both a dependency on task %q", t.Name, parent.Name, p.Name)
 					}
 				}
 			}
