@@ -28,11 +28,11 @@ make
 * Copy the `example/config.yml` where you prefer
 
 ```
-./bin/agola serve --toolbox-path $PWD/bin/agola-toolbox --embedded-etcd --config /path/to/your/config.yml --components all-base,executor
+./bin/agola serve --embedded-etcd --config /path/to/your/config.yml --components all-base,executor
 ```
 
 or use an external etcd (set it in the config.yml):
 
 ```
-./bin/agola serve --toolbox-path $PWD/bin/agola-toolbox --config /path/to/your/config.yml --components all-base,executor
+./bin/agola serve --config /path/to/your/config.yml --components all-base,executor
 ```
