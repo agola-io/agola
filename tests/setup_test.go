@@ -451,7 +451,7 @@ func createProject(ctx context.Context, t *testing.T, giteaClient *gitea.Client,
 	return giteaRepo, project
 }
 
-func push(t *testing.T, config, cloneURL, remoteToken string) {
+func push(t *testing.T, config, cloneURL, remoteToken, message string) {
 	gitfs := memfs.New()
 	f, err := gitfs.Create(".agola/config.jsonnet")
 	if err != nil {
@@ -480,7 +480,7 @@ func push(t *testing.T, config, cloneURL, remoteToken string) {
 	if _, err := wt.Add(".agola/config.jsonnet"); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	_, err = wt.Commit("commit", &git.CommitOptions{
+	_, err = wt.Commit(message, &git.CommitOptions{
 		Author: &object.Signature{
 			Name:  "user01",
 			Email: "user01@example.com",
@@ -510,6 +510,7 @@ func TestPush(t *testing.T) {
 		config      string
 		num         int
 		annotations map[string]string
+		message     string
 	}{
 		{
 			name: "test push",
@@ -544,6 +545,7 @@ func TestPush(t *testing.T) {
 				"ref":      "refs/heads/master",
 				"ref_type": "branch",
 			},
+			message: "commit",
 		},
 		{
 			name: "test push with unmatched branch",
@@ -575,7 +577,68 @@ func TestPush(t *testing.T) {
 			  ],
 			}
 			`,
-			num: 0,
+			num:     0,
+			message: "commit",
+		},
+		{
+			name: "test push with [ci skip] in subject",
+			config: `
+                        {
+                          runs: [
+                            {
+                              name: 'run01',
+                              tasks: [
+                                {
+                                  name: 'task01',
+                                  runtime: {
+                                    containers: [
+                                      {
+                                        image: 'alpine/git',
+                                      },
+                                    ],
+                                  },
+                                  steps: [
+                                    { type: 'clone' },
+                                    { type: 'run', command: 'env' },
+                                  ],
+                                },
+                              ],
+                            },
+                          ],
+                        }
+                        `,
+			num:     0,
+			message: "[ci skip] commit",
+		},
+		{
+			name: "test push with [ci skip] in body",
+			config: `
+                        {
+                          runs: [
+                            {
+                              name: 'run01',
+                              tasks: [
+                                {
+                                  name: 'task01',
+                                  runtime: {
+                                    containers: [
+                                      {
+                                        image: 'alpine/git',
+                                      },
+                                    ],
+                                  },
+                                  steps: [
+                                    { type: 'clone' },
+                                    { type: 'run', command: 'env' },
+                                  ],
+                                },
+                              ],
+                            },
+                          ],
+                        }
+                        `,
+			num:     0,
+			message: "commit\n\n[ci skip] body",
 		},
 	}
 
@@ -604,7 +667,7 @@ func TestPush(t *testing.T) {
 
 			giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)
 
-			push(t, tt.config, giteaRepo.CloneURL, giteaToken)
+			push(t, tt.config, giteaRepo.CloneURL, giteaToken, tt.message)
 
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
 				runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/project", project.ID)}, nil, "", 0, false)
