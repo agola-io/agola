@@ -23,9 +23,9 @@ import (
 	"time"
 
 	slog "agola.io/agola/internal/log"
+	"agola.io/agola/internal/testutil"
 	"github.com/docker/docker/api/types"
 	uuid "github.com/satori/go.uuid"
-	"agola.io/agola/internal/testutil"
 
 	"github.com/google/go-cmp/cmp"
 	"go.uber.org/zap"

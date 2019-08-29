@@ -235,6 +235,9 @@ func fromApiWhenCondition(apiwc gwapitypes.WhenCondition) cstypes.WhenCondition 
 }
 
 func fromApiWhenConditions(apiwcs *gwapitypes.WhenConditions) *cstypes.WhenConditions {
+	if apiwcs == nil {
+		return nil
+	}
 	wcs := &cstypes.WhenConditions{
 		Include: make([]cstypes.WhenCondition, len(apiwcs.Include)),
 		Exclude: make([]cstypes.WhenCondition, len(apiwcs.Exclude)),
@@ -265,6 +268,9 @@ func fromCsWhenCondition(apiwc cstypes.WhenCondition) gwapitypes.WhenCondition {
 }
 
 func fromCsWhenConditions(apiwcs *cstypes.WhenConditions) *gwapitypes.WhenConditions {
+	if apiwcs == nil {
+		return nil
+	}
 	wcs := &gwapitypes.WhenConditions{
 		Include: make([]gwapitypes.WhenCondition, len(apiwcs.Include)),
 		Exclude: make([]gwapitypes.WhenCondition, len(apiwcs.Exclude)),
