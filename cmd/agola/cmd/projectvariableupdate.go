@@ -94,7 +94,7 @@ func variableUpdate(cmd *cobra.Command, ownertype string, args []string) error {
 		rvalues = append(rvalues, gwapitypes.VariableValueRequest{
 			SecretName: value.SecretName,
 			SecretVar:  value.SecretVar,
-			When:       value.When,
+			When:       fromCsWhen(value.When.ToCSWhen()),
 		})
 	}
 	req := &gwapitypes.UpdateVariableRequest{
