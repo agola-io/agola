@@ -1,3 +1,7 @@
+ARG AGOLAWEB_IMAGE="agola-web"
+
+FROM $AGOLAWEB_IMAGE as agola-web
+
 #######
 ####### Build the backend
 #######
@@ -15,6 +19,7 @@ COPY go.mod .
 COPY go.sum .
 
 RUN go mod download
+
 
 # builds the agola binaries
 FROM build_base AS server_builder
