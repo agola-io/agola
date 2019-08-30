@@ -76,6 +76,39 @@ func (s *Runservice) runActiveExecutorTasks(ctx context.Context, runID string) (
 	return activeTasks, nil
 }
 
+func taskMatchesParentDependCondition(ctx context.Context, rt *types.RunTask, r *types.Run, rc *types.RunConfig) bool {
+	rct := rc.Tasks[rt.ID]
+	parents := runconfig.GetParents(rc.Tasks, rct)
+
+	matchedNum := 0
+	for _, p := range parents {
+		matched := false
+		rp := r.Tasks[p.ID]
+		conds := runconfig.GetParentDependConditions(rct, p)
+		for _, cond := range conds {
+			switch cond {
+			case types.RunConfigTaskDependConditionOnSuccess:
+				if rp.Status == types.RunTaskStatusSuccess {
+					matched = true
+				}
+			case types.RunConfigTaskDependConditionOnFailure:
+				if rp.Status == types.RunTaskStatusFailed {
+					matched = true
+				}
+			case types.RunConfigTaskDependConditionOnSkipped:
+				if rp.Status == types.RunTaskStatusSkipped {
+					matched = true
+				}
+			}
+		}
+		if matched {
+			matchedNum++
+		}
+	}
+
+	return len(parents) == matchedNum
+}
+
 func advanceRunTasks(ctx context.Context, curRun *types.Run, rc *types.RunConfig, activeExecutorTasks []*types.ExecutorTask) (*types.Run, error) {
 	log.Debugf("run: %s", util.Dump(curRun))
 	log.Debugf("rc: %s", util.Dump(rc))
@@ -117,6 +150,10 @@ func advanceRunTasks(ctx context.Context, curRun *types.Run, rc *types.RunConfig
 	}
 
 	// handle all tasks
+	// TODO(sgotti) process tasks by their level (from 0) so we'll calculate the
+	// final state in just one loop. Currently the call to this function won't
+	// calculate a deterministic final state since we could process the tasks in
+	// any order
 	for _, rt := range newRun.Tasks {
 		if rt.Skip {
 			continue
@@ -139,35 +176,11 @@ func advanceRunTasks(ctx context.Context, curRun *types.Run, rc *types.RunConfig
 		allParentsFinished := finishedParents == len(parents)
 
 		// if all parents are finished check if the task could be executed or be skipped
-		matchedNum := 0
 		if allParentsFinished {
-			for _, p := range parents {
-				matched := false
-				rp := curRun.Tasks[p.ID]
-				conds := runconfig.GetParentDependConditions(rct, p)
-				for _, cond := range conds {
-					switch cond {
-					case types.RunConfigTaskDependConditionOnSuccess:
-						if rp.Status == types.RunTaskStatusSuccess {
-							matched = true
-						}
-					case types.RunConfigTaskDependConditionOnFailure:
-						if rp.Status == types.RunTaskStatusFailed {
-							matched = true
-						}
-					case types.RunConfigTaskDependConditionOnSkipped:
-						if rp.Status == types.RunTaskStatusSkipped {
-							matched = true
-						}
-					}
-				}
-				if matched {
-					matchedNum++
-				}
-			}
+			matched := taskMatchesParentDependCondition(ctx, rt, curRun, rc)
 
 			// if all parents are matched then we can start it, otherwise we mark the step to be skipped
-			skip := len(parents) != matchedNum
+			skip := !matched
 			if skip {
 				rt.Status = types.RunTaskStatusSkipped
 				continue
@@ -210,6 +223,12 @@ func getTasksToRun(ctx context.Context, r *types.Run, rc *types.RunConfig) ([]*t
 		allParentsFinished := finishedParents == len(parents)
 
 		if allParentsFinished {
+			// TODO(sgotti) This could be removed when advanceRunTasks will calculate the
+			// state in a deterministic a complete way in one loop (see the related TODO)
+			if !taskMatchesParentDependCondition(ctx, rt, r, rc) {
+				continue
+			}
+
 			// Run only if approved (when needs approval)
 			if !rct.NeedsApproval || (rct.NeedsApproval && rt.Approved) {
 				tasksToRun = append(tasksToRun, rt)
