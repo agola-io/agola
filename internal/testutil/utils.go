@@ -526,6 +526,23 @@ func NewTestGitea(t *testing.T, logger *zap.Logger, dir, dockerBridgeAddress str
 	return tgitea, nil
 }
 
+type CheckFunc func() (bool, error)
+
+func Wait(timeout time.Duration, f CheckFunc) error {
+	start := time.Now()
+	for time.Now().Add(-timeout).Before(start) {
+		ok, err := f()
+		if err != nil {
+			return err
+		}
+		if ok {
+			return nil
+		}
+		time.Sleep(sleepInterval)
+	}
+	return fmt.Errorf("timeout")
+}
+
 func testFreeTCPPort(port int) error {
 	ln, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
 	if err != nil {
