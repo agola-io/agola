@@ -606,8 +606,22 @@ func TestPush(t *testing.T) {
 
 			push(t, tt.config, giteaRepo.CloneURL, giteaToken)
 
-			// TODO(sgotti) add an util to wait for a run phase
-			time.Sleep(10 * time.Second)
+			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+				runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/project", project.ID)}, nil, "", 0, false)
+				if err != nil {
+					return false, nil
+				}
+
+				if len(runs) == 0 {
+					return false, nil
+				}
+				run := runs[0]
+				if run.Phase != rstypes.RunPhaseFinished {
+					return false, nil
+				}
+
+				return true, nil
+			})
 
 			runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/project", project.ID)}, nil, "", 0, false)
 			if err != nil {
@@ -634,6 +648,7 @@ func TestPush(t *testing.T) {
 					}
 				}
 			}
+
 		})
 	}
 }
@@ -777,8 +792,23 @@ func TestDirectRun(t *testing.T) {
 
 			directRun(t, dir, config, c.Gateway.APIExposedURL, token, tt.args...)
 
-			// TODO(sgotti) add an util to wait for a run phase
-			time.Sleep(10 * time.Second)
+			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+				runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/user", user.ID)}, nil, "", 0, false)
+				if err != nil {
+					return false, nil
+				}
+
+				if len(runs) != 1 {
+					return false, nil
+				}
+
+				run := runs[0]
+				if run.Phase != rstypes.RunPhaseFinished {
+					return false, nil
+				}
+
+				return true, nil
+			})
 
 			runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/user", user.ID)}, nil, "", 0, false)
 			if err != nil {
@@ -916,7 +946,23 @@ func TestDirectRunVariables(t *testing.T) {
 			directRun(t, dir, config, c.Gateway.APIExposedURL, token, tt.args...)
 
 			// TODO(sgotti) add an util to wait for a run phase
-			time.Sleep(10 * time.Second)
+			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+				runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/user", user.ID)}, nil, "", 0, false)
+				if err != nil {
+					return false, nil
+				}
+
+				if len(runs) != 1 {
+					return false, nil
+				}
+
+				run := runs[0]
+				if run.Phase != rstypes.RunPhaseFinished {
+					return false, nil
+				}
+
+				return true, nil
+			})
 
 			runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/user", user.ID)}, nil, "", 0, false)
 			if err != nil {
