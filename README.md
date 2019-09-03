@@ -7,7 +7,11 @@ CI/CD redefined
 
 For an introduction to agola you can take a look at [this post](https://sorintoss.io/blog/agola-introduction/)
 
-![](https://agola.io/screenshots/screenshot_run_01.png)
+<p float="left" align="center">
+  <img src="https://agola.io/screenshots/screenshot_run_tasksgraph_01.png" height="340" />
+  <img src="https://agola.io/screenshots/screenshot_run_01.png" height="340" />
+</p>
+
 
 ## Try it
 
