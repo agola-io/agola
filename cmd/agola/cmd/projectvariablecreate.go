@@ -177,6 +177,9 @@ func fromCsWhenConditions(apiwcs *cstypes.WhenConditions) *gwapitypes.WhenCondit
 }
 
 func fromCsWhen(apiwhen *cstypes.When) *gwapitypes.When {
+	if apiwhen == nil {
+		return nil
+	}
 	return &gwapitypes.When{
 		Branch: fromCsWhenConditions(apiwhen.Branch),
 		Tag:    fromCsWhenConditions(apiwhen.Tag),
