@@ -20,8 +20,8 @@ import (
 
 	"agola.io/agola/internal/config"
 	"agola.io/agola/internal/util"
-	cstypes "agola.io/agola/services/configstore/types"
 	rstypes "agola.io/agola/services/runservice/types"
+	"agola.io/agola/services/types"
 
 	errors "golang.org/x/xerrors"
 )
@@ -183,7 +183,7 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string
 	rcts := map[string]*rstypes.RunConfigTask{}
 
 	for _, ct := range cr.Tasks {
-		include := cstypes.MatchWhen(ct.When.ToCSWhen(), branch, tag, ref)
+		include := types.MatchWhen(ct.When.ToWhen(), branch, tag, ref)
 
 		steps := make(rstypes.Steps, len(ct.Steps))
 		for i, cpts := range ct.Steps {

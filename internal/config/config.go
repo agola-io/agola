@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"agola.io/agola/internal/util"
-	cstypes "agola.io/agola/services/configstore/types"
 	"agola.io/agola/services/types"
 
 	"github.com/ghodss/yaml"
@@ -446,7 +445,7 @@ func (val *Value) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-type When cstypes.When
+type When types.When
 
 type when struct {
 	Branch interface{} `json:"branch"`
@@ -454,15 +453,8 @@ type when struct {
 	Ref    interface{} `json:"ref"`
 }
 
-func (w *When) ToCSWhen() *cstypes.When {
-	if w == nil {
-		return nil
-	}
-	return &cstypes.When{
-		Branch: w.Branch,
-		Tag:    w.Tag,
-		Ref:    w.Ref,
-	}
+func (w *When) ToWhen() *types.When {
+	return (*types.When)(w)
 }
 
 func (w *When) UnmarshalJSON(b []byte) error {
@@ -497,8 +489,8 @@ func (w *When) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func parseWhenConditions(wi interface{}) (*cstypes.WhenConditions, error) {
-	w := &cstypes.WhenConditions{}
+func parseWhenConditions(wi interface{}) (*types.WhenConditions, error) {
+	w := &types.WhenConditions{}
 
 	var err error
 	include := []string{}
@@ -546,12 +538,12 @@ func parseWhenConditions(wi interface{}) (*cstypes.WhenConditions, error) {
 	return w, nil
 }
 
-func parseWhenConditionSlice(conds []string) ([]cstypes.WhenCondition, error) {
+func parseWhenConditionSlice(conds []string) ([]types.WhenCondition, error) {
 	if len(conds) == 0 {
 		return nil, nil
 	}
 
-	wcs := []cstypes.WhenCondition{}
+	wcs := []types.WhenCondition{}
 	for _, cond := range conds {
 		wc, err := parseWhenCondition(cond)
 		if err != nil {
@@ -563,7 +555,7 @@ func parseWhenConditionSlice(conds []string) ([]cstypes.WhenCondition, error) {
 	return wcs, nil
 }
 
-func parseWhenCondition(s string) (*cstypes.WhenCondition, error) {
+func parseWhenCondition(s string) (*types.WhenCondition, error) {
 	isRegExp := false
 	if len(s) > 2 {
 		for _, d := range regExpDelimiters {
@@ -575,15 +567,15 @@ func parseWhenCondition(s string) (*cstypes.WhenCondition, error) {
 		}
 	}
 
-	wc := &cstypes.WhenCondition{Match: s}
+	wc := &types.WhenCondition{Match: s}
 
 	if isRegExp {
 		if _, err := regexp.Compile(s); err != nil {
 			return nil, errors.Errorf("wrong regular expression: %w", err)
 		}
-		wc.Type = cstypes.WhenConditionTypeRegExp
+		wc.Type = types.WhenConditionTypeRegExp
 	} else {
-		wc.Type = cstypes.WhenConditionTypeSimple
+		wc.Type = types.WhenConditionTypeSimple
 	}
 	return wc, nil
 }

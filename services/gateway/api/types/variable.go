@@ -14,11 +14,15 @@
 
 package types
 
+import (
+	"agola.io/agola/services/types"
+)
+
 type VariableValueRequest struct {
 	SecretName string `json:"secret_name"`
 	SecretVar  string `json:"secret_var"`
 
-	When *When `json:"when"`
+	When *types.When `json:"when"`
 }
 
 type VariableValue struct {
@@ -26,7 +30,7 @@ type VariableValue struct {
 	SecretVar                string `json:"secret_var"`
 	MatchingSecretParentPath string `json:"matching_secret_parent_path"`
 
-	When *When `json:"when"`
+	When *types.When `json:"when"`
 }
 
 type VariableResponse struct {

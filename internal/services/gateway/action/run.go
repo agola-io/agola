@@ -24,11 +24,12 @@ import (
 	gitsource "agola.io/agola/internal/gitsources"
 	"agola.io/agola/internal/runconfig"
 	"agola.io/agola/internal/services/common"
-	"agola.io/agola/internal/services/types"
+	itypes "agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 	cstypes "agola.io/agola/services/configstore/types"
 	rsapitypes "agola.io/agola/services/runservice/api/types"
 	rstypes "agola.io/agola/services/runservice/types"
+	"agola.io/agola/services/types"
 
 	errors "golang.org/x/xerrors"
 )
@@ -290,9 +291,9 @@ func (h *ActionHandler) RunTaskAction(ctx context.Context, req *RunTaskActionsRe
 }
 
 type CreateRunRequest struct {
-	RunType            types.RunType
-	RefType            types.RunRefType
-	RunCreationTrigger types.RunCreationTriggerType
+	RunType            itypes.RunType
+	RefType            itypes.RunRefType
+	RunCreationTrigger itypes.RunCreationTriggerType
 
 	Project             *cstypes.Project
 	User                *cstypes.User
@@ -341,7 +342,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 	var groupType common.GroupType
 	var group string
 
-	if req.RunType == types.RunTypeProject {
+	if req.RunType == itypes.RunTypeProject {
 		baseGroupType = common.GroupTypeProject
 		baseGroupID = req.Project.ID
 	} else {
@@ -350,13 +351,13 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 	}
 
 	switch req.RefType {
-	case types.RunRefTypeBranch:
+	case itypes.RunRefTypeBranch:
 		groupType = common.GroupTypeBranch
 		group = req.Branch
-	case types.RunRefTypeTag:
+	case itypes.RunRefTypeTag:
 		groupType = common.GroupTypeTag
 		group = req.Tag
-	case types.RunRefTypePullRequest:
+	case itypes.RunRefTypePullRequest:
 		groupType = common.GroupTypePullRequest
 		group = req.PullRequestID
 	}
@@ -394,7 +395,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 	}
 
 	var variables map[string]string
-	if req.RunType == types.RunTypeProject {
+	if req.RunType == itypes.RunTypeProject {
 		var err error
 		variables, err = h.genRunVariables(ctx, req)
 		if err != nil {
@@ -417,7 +418,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 		AnnotationCompareLink:        req.CompareLink,
 	}
 
-	if req.RunType == types.RunTypeProject {
+	if req.RunType == itypes.RunTypeProject {
 		annotations[AnnotationProjectID] = req.Project.ID
 	} else {
 		annotations[AnnotationUserID] = req.User.ID
@@ -438,7 +439,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 
 	// Since user belong to the same group (the user uuid) we needed another way to differentiate the cache. We'll use the user uuid + the user run repo uuid
 	var cacheGroup string
-	if req.RunType == types.RunTypeUser {
+	if req.RunType == itypes.RunTypeUser {
 		cacheGroup = req.User.ID + "-" + req.UserRunRepoUUID
 	}
 
@@ -482,7 +483,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 	}
 
 	for _, run := range config.Runs {
-		if match := cstypes.MatchWhen(run.When.ToCSWhen(), req.Branch, req.Tag, req.Ref); !match {
+		if match := types.MatchWhen(run.When.ToWhen(), req.Branch, req.Tag, req.Ref); !match {
 			h.log.Debugf("skipping run since when condition doesn't match")
 			continue
 		}
@@ -549,7 +550,7 @@ func (h *ActionHandler) genRunVariables(ctx context.Context, req *CreateRunReque
 		// find the value match
 		var varval cstypes.VariableValue
 		for _, varval = range pvar.Values {
-			match := cstypes.MatchWhen(varval.When, req.Branch, req.Tag, req.Ref)
+			match := types.MatchWhen(varval.When, req.Branch, req.Tag, req.Ref)
 			if !match {
 				continue
 			}

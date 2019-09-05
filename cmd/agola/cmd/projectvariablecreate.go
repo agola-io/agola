@@ -20,7 +20,6 @@ import (
 	"os"
 
 	config "agola.io/agola/internal/config"
-	cstypes "agola.io/agola/services/configstore/types"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
@@ -123,7 +122,7 @@ func variableCreate(cmd *cobra.Command, ownertype string, args []string) error {
 		rvalues = append(rvalues, gwapitypes.VariableValueRequest{
 			SecretName: value.SecretName,
 			SecretVar:  value.SecretVar,
-			When:       fromCsWhen(value.When.ToCSWhen()),
+			When:       value.When.ToWhen(),
 		})
 	}
 	req := &gwapitypes.CreateVariableRequest{
@@ -149,37 +148,4 @@ func variableCreate(cmd *cobra.Command, ownertype string, args []string) error {
 	}
 
 	return nil
-}
-
-func fromCsWhenCondition(apiwc cstypes.WhenCondition) gwapitypes.WhenCondition {
-	return gwapitypes.WhenCondition{
-		Type:  gwapitypes.WhenConditionType(apiwc.Type),
-		Match: apiwc.Match,
-	}
-}
-
-func fromCsWhenConditions(apiwcs *cstypes.WhenConditions) *gwapitypes.WhenConditions {
-	if apiwcs == nil {
-		return nil
-	}
-	wcs := &gwapitypes.WhenConditions{
-		Include: make([]gwapitypes.WhenCondition, len(apiwcs.Include)),
-		Exclude: make([]gwapitypes.WhenCondition, len(apiwcs.Exclude)),
-	}
-	for i, include := range apiwcs.Include {
-		wcs.Include[i] = fromCsWhenCondition(include)
-	}
-	for i, exclude := range apiwcs.Exclude {
-		wcs.Exclude[i] = fromCsWhenCondition(exclude)
-	}
-
-	return wcs
-}
-
-func fromCsWhen(apiwhen *cstypes.When) *gwapitypes.When {
-	return &gwapitypes.When{
-		Branch: fromCsWhenConditions(apiwhen.Branch),
-		Tag:    fromCsWhenConditions(apiwhen.Tag),
-		Ref:    fromCsWhenConditions(apiwhen.Ref),
-	}
 }
