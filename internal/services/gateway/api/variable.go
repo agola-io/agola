@@ -41,7 +41,7 @@ func createVariableResponse(v *csapitypes.Variable, secrets []*csapitypes.Secret
 		nv.Values[i] = gwapitypes.VariableValue{
 			SecretName: varvalue.SecretName,
 			SecretVar:  varvalue.SecretVar,
-			When:       fromCsWhen(varvalue.When),
+			When:       varvalue.When,
 		}
 		// get matching secret for var value
 		secret := common.GetVarValueMatchingSecret(varvalue, v.ParentPath, secrets)
@@ -221,74 +221,8 @@ func fromApiVariableValues(apivalues []gwapitypes.VariableValueRequest) []cstype
 		values[i] = cstypes.VariableValue{
 			SecretName: v.SecretName,
 			SecretVar:  v.SecretVar,
-			When:       fromApiWhen(v.When),
+			When:       v.When,
 		}
 	}
 	return values
-}
-
-func fromApiWhenCondition(apiwc gwapitypes.WhenCondition) cstypes.WhenCondition {
-	return cstypes.WhenCondition{
-		Type:  cstypes.WhenConditionType(apiwc.Type),
-		Match: apiwc.Match,
-	}
-}
-
-func fromApiWhenConditions(apiwcs *gwapitypes.WhenConditions) *cstypes.WhenConditions {
-	if apiwcs == nil {
-		return nil
-	}
-	wcs := &cstypes.WhenConditions{
-		Include: make([]cstypes.WhenCondition, len(apiwcs.Include)),
-		Exclude: make([]cstypes.WhenCondition, len(apiwcs.Exclude)),
-	}
-	for i, include := range apiwcs.Include {
-		wcs.Include[i] = fromApiWhenCondition(include)
-	}
-	for i, exclude := range apiwcs.Exclude {
-		wcs.Exclude[i] = fromApiWhenCondition(exclude)
-	}
-
-	return wcs
-}
-
-func fromApiWhen(apiwhen *gwapitypes.When) *cstypes.When {
-	return &cstypes.When{
-		Branch: fromApiWhenConditions(apiwhen.Branch),
-		Tag:    fromApiWhenConditions(apiwhen.Tag),
-		Ref:    fromApiWhenConditions(apiwhen.Ref),
-	}
-}
-
-func fromCsWhenCondition(apiwc cstypes.WhenCondition) gwapitypes.WhenCondition {
-	return gwapitypes.WhenCondition{
-		Type:  gwapitypes.WhenConditionType(apiwc.Type),
-		Match: apiwc.Match,
-	}
-}
-
-func fromCsWhenConditions(apiwcs *cstypes.WhenConditions) *gwapitypes.WhenConditions {
-	if apiwcs == nil {
-		return nil
-	}
-	wcs := &gwapitypes.WhenConditions{
-		Include: make([]gwapitypes.WhenCondition, len(apiwcs.Include)),
-		Exclude: make([]gwapitypes.WhenCondition, len(apiwcs.Exclude)),
-	}
-	for i, include := range apiwcs.Include {
-		wcs.Include[i] = fromCsWhenCondition(include)
-	}
-	for i, exclude := range apiwcs.Exclude {
-		wcs.Exclude[i] = fromCsWhenCondition(exclude)
-	}
-
-	return wcs
-}
-
-func fromCsWhen(apiwhen *cstypes.When) *gwapitypes.When {
-	return &gwapitypes.When{
-		Branch: fromCsWhenConditions(apiwhen.Branch),
-		Tag:    fromCsWhenConditions(apiwhen.Tag),
-		Ref:    fromCsWhenConditions(apiwhen.Ref),
-	}
 }

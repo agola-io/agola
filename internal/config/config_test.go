@@ -19,7 +19,7 @@ import (
 	"testing"
 
 	"agola.io/agola/internal/util"
-	"agola.io/agola/services/configstore/types"
+	"agola.io/agola/services/types"
 
 	"github.com/google/go-cmp/cmp"
 	errors "golang.org/x/xerrors"
