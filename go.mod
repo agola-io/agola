@@ -1,5 +1,7 @@
 module agola.io/agola
 
+go 1.12
+
 require (
 	code.gitea.io/gitea v1.9.0-dev.0.20190511102134-34eee25bd42d
 	code.gitea.io/sdk/gitea v0.0.0-20190602153954-7e711e06b588
