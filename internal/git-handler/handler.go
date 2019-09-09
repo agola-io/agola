@@ -207,7 +207,8 @@ func (h *GitSmartHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		res, err := InfoRefsResponse(ctx, repoAbsPath, serviceName)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			// we cannot return any http error since the http header has already been written
+			h.log.Errorf("git command error: %v", err)
 			return
 		}
 
@@ -218,7 +219,6 @@ func (h *GitSmartHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/x-git-upload-pack-result")
 
 		if err := gitService(ctx, w, body, repoAbsPath, "upload-pack"); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
 			// we cannot return any http error since the http header has already been written
 			h.log.Errorf("git command error: %v", err)
 		}
@@ -226,7 +226,6 @@ func (h *GitSmartHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/x-git-receive-pack-result")
 
 		if err := gitService(ctx, w, body, repoAbsPath, "receive-pack"); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
 			// we cannot return any http error since the http header has already been written
 			h.log.Errorf("git command error: %v", err)
 		}
