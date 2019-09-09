@@ -42,7 +42,8 @@ import (
 )
 
 const (
-	cacheCleanerInterval = 1 * 24 * time.Hour
+	cacheCleanerInterval     = 1 * 24 * time.Hour
+	workspaceCleanerInterval = 1 * 24 * time.Hour
 
 	defaultExecutorNotAliveInterval = 60 * time.Second
 )
@@ -1425,6 +1426,58 @@ func (s *Runservice) cacheCleaner(ctx context.Context, cacheExpireInterval time.
 			if err := s.ost.DeleteObject(object.Path); err != nil {
 				if err != ostypes.ErrNotExist {
 					log.Warnf("failed to delete cache object %q: %v", object.Path, err)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *Runservice) workspaceCleanerLoop(ctx context.Context, workspaceExpireInterval time.Duration) {
+	for {
+		if err := s.workspaceCleaner(ctx, workspaceExpireInterval); err != nil {
+			log.Errorf("err: %+v", err)
+		}
+
+		sleepCh := time.NewTimer(workspaceCleanerInterval).C
+		select {
+		case <-ctx.Done():
+			return
+		case <-sleepCh:
+		}
+	}
+}
+
+func (s *Runservice) workspaceCleaner(ctx context.Context, workspaceExpireInterval time.Duration) error {
+	log.Debugf("workspaceCleaner")
+
+	session, err := concurrency.NewSession(s.e.Client(), concurrency.WithTTL(5), concurrency.WithContext(ctx))
+	if err != nil {
+		return err
+	}
+	defer session.Close()
+
+	m := concurrency.NewMutex(session, common.EtcdWorkspaceCleanerLockKey)
+
+	// TODO(sgotti) find a way to use a trylock so we'll just return if already
+	// locked. Currently multiple workspacecleaners will enqueue and start when another
+	// finishes (unuseful and consume resources)
+	if err := m.Lock(ctx); err != nil {
+		return err
+	}
+	defer func() { _ = m.Unlock(ctx) }()
+
+	doneCh := make(chan struct{})
+	defer close(doneCh)
+	for object := range s.ost.List(store.OSTArchivesBaseDir()+"/", "", true, doneCh) {
+		if object.Err != nil {
+			return object.Err
+		}
+		if object.LastModified.Add(workspaceExpireInterval).Before(time.Now()) {
+			if err := s.ost.DeleteObject(object.Path); err != nil {
+				if err != ostypes.ErrNotExist {
+					log.Warnf("failed to delete workspace object %q: %v", object.Path, err)
 				}
 			}
 		}

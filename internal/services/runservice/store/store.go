@@ -135,8 +135,12 @@ func OSTRunTaskLogsRunPath(rtID, runID string) string {
 	return path.Join(OSTRunTaskLogsRunsDir(rtID), runID)
 }
 
+func OSTArchivesBaseDir() string {
+	return "workspacearchives"
+}
+
 func OSTRunTaskArchivesBaseDir(rtID string) string {
-	return path.Join("workspacearchives", rtID)
+	return path.Join(OSTArchivesBaseDir(), rtID)
 }
 
 func OSTRunTaskArchivesDataDir(rtID string) string {
@@ -153,6 +157,18 @@ func OSTRunTaskArchivePath(rtID string, step int) string {
 
 func OSTRunTaskArchivesRunPath(rtID, runID string) string {
 	return path.Join(OSTRunTaskArchivesRunsDir(rtID), runID)
+}
+
+func OSTRunTaskIDFromPath(archivePath string) (string, error) {
+	pl := util.PathList(archivePath)
+	if len(pl) < 2 {
+		return "", errors.Errorf("wrong archive path %q", archivePath)
+	}
+	fmt.Printf("pl: %q\n", pl)
+	if pl[0] != "workspacearchives" {
+		return "", errors.Errorf("wrong archive path %q", archivePath)
+	}
+	return pl[1], nil
 }
 
 func OSTCacheDir() string {
