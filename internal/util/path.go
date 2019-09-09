@@ -42,6 +42,7 @@ func PathHierarchy(p string) []string {
 // I.E. for a path like "path/to/file" or "/path/to/file" it'll return a slice of these elements:
 // "path", "to", "file"
 func PathList(p string) []string {
+	p = path.Clean(p)
 	paths := []string{}
 	for {
 		paths = append([]string{path.Base(p)}, paths...)

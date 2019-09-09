@@ -14,7 +14,39 @@
 
 package util
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
+
+func TestPathList(t *testing.T) {
+	tests := []struct {
+		in  string
+		out []string
+	}{
+		{"/path", []string{"path"}},
+		{"path", []string{"path"}},
+		{"/path/", []string{"path"}},
+		{"path/", []string{"path"}},
+		{"//path/", []string{"path"}},
+		{"///path///", []string{"path"}},
+		{"/path/to/file", []string{"path", "to", "file"}},
+		{"path/to/file", []string{"path", "to", "file"}},
+		{"/path/to/file/", []string{"path", "to", "file"}},
+		{"path/to/file/", []string{"path", "to", "file"}},
+		{"path/to/file///", []string{"path", "to", "file"}},
+		{"///path///to///file///", []string{"path", "to", "file"}},
+	}
+
+	for _, tt := range tests {
+		t.Run("test is parent path", func(t *testing.T) {
+			out := PathList(tt.in)
+			if !reflect.DeepEqual(out, tt.out) {
+				t.Errorf("got %q but wanted: %q", out, tt.out)
+			}
+		})
+	}
+}
 
 func TestIsParentPath(t *testing.T) {
 	tests := []struct {
