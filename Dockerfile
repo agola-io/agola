@@ -7,7 +7,7 @@ FROM $AGOLAWEB_IMAGE as agola-web
 #######
 
 # base build image
-FROM golang:1.12-buster AS build_base
+FROM golang:1.13-buster AS build_base
 
 WORKDIR /agola
 
