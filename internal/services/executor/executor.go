@@ -65,16 +65,26 @@ func (e *Executor) getAllPods(ctx context.Context, all bool) ([]driver.Pod, erro
 	return e.driver.GetPods(ctx, all)
 }
 
+func stepUser(t *types.ExecutorTask) string {
+	// use the container specified user and override with task user if defined
+	user := t.Containers[0].User
+	if t.User != "" {
+		user = t.User
+	}
+
+	return user
+}
+
 func (e *Executor) createFile(ctx context.Context, pod driver.Pod, command, user string, outf io.Writer) (string, error) {
 	cmd := []string{toolboxContainerPath, "createfile"}
 
 	var buf bytes.Buffer
 	execConfig := &driver.ExecConfig{
 		Cmd:         cmd,
+		User:        user,
 		AttachStdin: true,
 		Stdout:      &buf,
 		Stderr:      outf,
-		User:        user,
 	}
 
 	ce, err := pod.Exec(ctx, execConfig)
@@ -119,15 +129,9 @@ func (e *Executor) doRunStep(ctx context.Context, s *types.RunStep, t *types.Exe
 		shell = s.Shell
 	}
 
-	// use the container specified user and override with task user if defined
-	user := t.Containers[0].User
-	if t.User != "" {
-		user = t.User
-	}
-
 	var cmd []string
 	if s.Command != "" {
-		filename, err := e.createFile(ctx, pod, s.Command, user, outf)
+		filename, err := e.createFile(ctx, pod, s.Command, stepUser(t), outf)
 		if err != nil {
 			return -1, errors.Errorf("create file err: %v", err)
 		}
@@ -163,7 +167,7 @@ func (e *Executor) doRunStep(ctx context.Context, s *types.RunStep, t *types.Exe
 		Cmd:         cmd,
 		Env:         environment,
 		WorkingDir:  workingDir,
-		User:        user,
+		User:        stepUser(t),
 		AttachStdin: true,
 		Stdout:      outf,
 		Stderr:      outf,
@@ -214,6 +218,7 @@ func (e *Executor) doSaveToWorkspaceStep(ctx context.Context, s *types.SaveToWor
 		Cmd:         cmd,
 		Env:         t.Environment,
 		WorkingDir:  workingDir,
+		User:        stepUser(t),
 		AttachStdin: true,
 		Stdout:      archivef,
 		Stderr:      logf,
@@ -274,6 +279,7 @@ func (e *Executor) expandDir(ctx context.Context, t *types.ExecutorTask, pod dri
 	execConfig := &driver.ExecConfig{
 		Cmd:         cmd,
 		Env:         t.Environment,
+		User:        stepUser(t),
 		AttachStdin: true,
 		Stdout:      stdout,
 		Stderr:      logf,
@@ -302,6 +308,7 @@ func (e *Executor) mkdir(ctx context.Context, t *types.ExecutorTask, pod driver.
 	execConfig := &driver.ExecConfig{
 		Cmd:         cmd,
 		Env:         t.Environment,
+		User:        stepUser(t),
 		AttachStdin: true,
 		Stdout:      logf,
 		Stderr:      logf,
@@ -339,6 +346,7 @@ func (e *Executor) template(ctx context.Context, t *types.ExecutorTask, pod driv
 		Cmd:         cmd,
 		Env:         t.Environment,
 		WorkingDir:  workingDir,
+		User:        stepUser(t),
 		AttachStdin: true,
 		Stdout:      stdout,
 		Stderr:      logf,
@@ -386,6 +394,7 @@ func (e *Executor) unarchive(ctx context.Context, t *types.ExecutorTask, source 
 		Cmd:         cmd,
 		Env:         t.Environment,
 		WorkingDir:  workingDir,
+		User:        stepUser(t),
 		AttachStdin: true,
 		Stdout:      logf,
 		Stderr:      logf,
@@ -504,6 +513,7 @@ func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, 
 		Cmd:         cmd,
 		Env:         t.Environment,
 		WorkingDir:  workingDir,
+		User:        stepUser(t),
 		AttachStdin: true,
 		Stdout:      archivef,
 		Stderr:      logf,
