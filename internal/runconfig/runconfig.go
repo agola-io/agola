@@ -115,7 +115,6 @@ fi
 		rs.Environment = env
 		rs.WorkingDir = cs.WorkingDir
 		rs.Shell = cs.Shell
-		rs.User = cs.User
 		return rs
 
 	case *config.SaveToWorkspaceStep:

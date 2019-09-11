@@ -413,7 +413,6 @@ type RunStep struct {
 	Environment map[string]string `json:"environment,omitempty"`
 	WorkingDir  string            `json:"working_dir,omitempty"`
 	Shell       string            `json:"shell,omitempty"`
-	User        string            `json:"user,omitempty"`
 }
 
 type SaveContent struct {
