@@ -117,13 +117,10 @@ func (e *Executor) doRunStep(ctx context.Context, s *types.RunStep, t *types.Exe
 		shell = s.Shell
 	}
 
-	// try to use the container specified user
+	// use the container specified user and override with task user if defined
 	user := t.Containers[0].User
 	if t.User != "" {
 		user = t.User
-	}
-	if s.User != "" {
-		user = s.User
 	}
 
 	var cmd []string
