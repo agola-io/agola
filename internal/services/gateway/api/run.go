@@ -110,17 +110,32 @@ func createRunTaskResponse(rt *rstypes.RunTask, rct *rstypes.RunConfigTask) *gwa
 			EndTime:   rt.Steps[i].EndTime,
 		}
 		rcts := rct.Steps[i]
+		rts := rt.Steps[i]
 		switch rcts := rcts.(type) {
 		case *rstypes.RunStep:
+			s.Type = "run"
 			s.Name = rcts.Name
 			s.Command = rcts.Command
+
+			shell := rcts.Shell
+			if shell == "" {
+				shell = rct.Shell
+			}
+			s.Shell = shell
+
+			s.ExitStatus = rts.ExitStatus
+
 		case *rstypes.SaveToWorkspaceStep:
+			s.Type = "save_to_workspace"
 			s.Name = "save to workspace"
 		case *rstypes.RestoreWorkspaceStep:
+			s.Type = "restore_workspace"
 			s.Name = "restore workspace"
 		case *rstypes.SaveCacheStep:
+			s.Type = "save_cache"
 			s.Name = "save cache"
 		case *rstypes.RestoreCacheStep:
+			s.Type = "restore_cache"
 			s.Name = "restore cache"
 		}
 
