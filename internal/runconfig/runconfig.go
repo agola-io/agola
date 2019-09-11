@@ -26,6 +26,10 @@ import (
 	errors "golang.org/x/xerrors"
 )
 
+const (
+	defaultShell = "/bin/sh -e"
+)
+
 func genRuntime(c *config.Config, ce *config.Runtime, variables map[string]string) *rstypes.Runtime {
 	containers := []*rstypes.Container{}
 	for _, cc := range ce.Containers {
@@ -204,6 +208,10 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string
 			Skip:                 !include,
 			NeedsApproval:        ct.Approval,
 			DockerRegistriesAuth: make(map[string]rstypes.DockerRegistryAuth),
+		}
+
+		if t.Shell == "" {
+			t.Shell = defaultShell
 		}
 
 		if c.DockerRegistriesAuth != nil {
