@@ -585,3 +585,58 @@ func (h *ActionHandler) getRunCounter(ctx context.Context, group string) (uint64
 
 	return c, cgt, nil
 }
+
+func (h *ActionHandler) GetExecutorTask(ctx context.Context, etID string) (*types.ExecutorTask, error) {
+	et, err := store.GetExecutorTask(ctx, h.e, etID)
+	if err != nil && err != etcd.ErrKeyNotFound {
+		return nil, err
+	}
+	if et == nil {
+		return nil, util.NewErrNotFound(errors.Errorf("executor task %q not found", etID))
+	}
+
+	r, _, err := store.GetRun(ctx, h.e, et.Spec.RunID)
+	if err != nil {
+		return nil, errors.Errorf("cannot get run %q: %w", et.Spec.RunID, err)
+	}
+	rc, err := store.OSTGetRunConfig(h.dm, r.ID)
+	if err != nil {
+		return nil, errors.Errorf("cannot get run config %q: %w", r.ID, err)
+	}
+	rt, ok := r.Tasks[et.ID]
+	if !ok {
+		return nil, errors.Errorf("no such run task with id %s for run %s", et.ID, r.ID)
+	}
+
+	// generate ExecutorTaskSpecData
+	et.Spec.ExecutorTaskSpecData = common.GenExecutorTaskSpecData(r, rt, rc)
+
+	return et, nil
+}
+
+func (h *ActionHandler) GetExecutorTasks(ctx context.Context, executorID string) ([]*types.ExecutorTask, error) {
+	ets, err := store.GetExecutorTasks(ctx, h.e, executorID)
+	if err != nil && err != etcd.ErrKeyNotFound {
+		return nil, err
+	}
+
+	for _, et := range ets {
+		r, _, err := store.GetRun(ctx, h.e, et.Spec.RunID)
+		if err != nil {
+			return nil, errors.Errorf("cannot get run %q: %w", et.Spec.RunID, err)
+		}
+		rc, err := store.OSTGetRunConfig(h.dm, r.ID)
+		if err != nil {
+			return nil, errors.Errorf("cannot get run config %q: %w", r.ID, err)
+		}
+		rt, ok := r.Tasks[et.ID]
+		if !ok {
+			return nil, errors.Errorf("no such run task with id %s for run %s", et.ID, r.ID)
+		}
+
+		// generate ExecutorTaskSpecData
+		et.Spec.ExecutorTaskSpecData = common.GenExecutorTaskSpecData(r, rt, rc)
+	}
+
+	return ets, nil
+}

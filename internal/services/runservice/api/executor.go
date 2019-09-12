@@ -29,7 +29,9 @@ import (
 	"agola.io/agola/internal/services/runservice/action"
 	"agola.io/agola/internal/services/runservice/common"
 	"agola.io/agola/internal/services/runservice/store"
+	"agola.io/agola/internal/util"
 	"agola.io/agola/services/runservice/types"
+	errors "golang.org/x/xerrors"
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
@@ -137,11 +139,12 @@ func (h *ExecutorTaskStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 }
 
 type ExecutorTaskHandler struct {
-	e *etcd.Store
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewExecutorTaskHandler(e *etcd.Store) *ExecutorTaskHandler {
-	return &ExecutorTaskHandler{e: e}
+func NewExecutorTaskHandler(logger *zap.Logger, ah *action.ActionHandler) *ExecutorTaskHandler {
+	return &ExecutorTaskHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *ExecutorTaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -151,32 +154,28 @@ func (h *ExecutorTaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	// TODO(sgotti) Check authorized call from executors
 	etID := vars["taskid"]
 	if etID == "" {
-		http.Error(w, "", http.StatusBadRequest)
+		httpError(w, util.NewErrBadRequest(errors.Errorf("taskid is empty")))
 		return
 	}
 
-	et, err := store.GetExecutorTask(ctx, h.e, etID)
-	if err != nil && err != etcd.ErrKeyNotFound {
-		http.Error(w, "", http.StatusInternalServerError)
-		return
-	}
-	if et == nil {
-		http.Error(w, "", http.StatusNotFound)
+	et, err := h.ah.GetExecutorTask(ctx, etID)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(et); err != nil {
-		http.Error(w, "", http.StatusInternalServerError)
-		return
+	if err := httpResponse(w, http.StatusOK, et); err != nil {
+		h.log.Errorf("err: %+v", err)
 	}
 }
 
 type ExecutorTasksHandler struct {
-	e *etcd.Store
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
 }
 
-func NewExecutorTasksHandler(e *etcd.Store) *ExecutorTasksHandler {
-	return &ExecutorTasksHandler{e: e}
+func NewExecutorTasksHandler(logger *zap.Logger, ah *action.ActionHandler) *ExecutorTasksHandler {
+	return &ExecutorTasksHandler{log: logger.Sugar(), ah: ah}
 }
 
 func (h *ExecutorTasksHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -190,7 +189,7 @@ func (h *ExecutorTasksHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	ets, err := store.GetExecutorTasks(ctx, h.e, executorID)
+	ets, err := h.ah.GetExecutorTasks(ctx, executorID)
 	if err != nil {
 		http.Error(w, "", http.StatusInternalServerError)
 		return

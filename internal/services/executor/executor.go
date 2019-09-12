@@ -67,9 +67,9 @@ func (e *Executor) getAllPods(ctx context.Context, all bool) ([]driver.Pod, erro
 
 func stepUser(t *types.ExecutorTask) string {
 	// use the container specified user and override with task user if defined
-	user := t.Containers[0].User
-	if t.User != "" {
-		user = t.User
+	user := t.Spec.Containers[0].User
+	if t.Spec.User != "" {
+		user = t.Spec.User
 	}
 
 	return user
@@ -122,8 +122,8 @@ func (e *Executor) doRunStep(ctx context.Context, s *types.RunStep, t *types.Exe
 	// TODO(sgotti) this line is used only for old runconfig versions that don't
 	// set a task default shell in the runconfig
 	shell := defaultShell
-	if t.Shell != "" {
-		shell = t.Shell
+	if t.Spec.Shell != "" {
+		shell = t.Spec.Shell
 	}
 	if s.Shell != "" {
 		shell = s.Shell
@@ -143,14 +143,14 @@ func (e *Executor) doRunStep(ctx context.Context, s *types.RunStep, t *types.Exe
 	}
 
 	// override task working dir with runstep working dir if provided
-	workingDir := t.WorkingDir
+	workingDir := t.Spec.WorkingDir
 	if s.WorkingDir != "" {
 		workingDir = s.WorkingDir
 	}
 
 	// generate the environment using the task environment and then overriding with the runstep environment
 	environment := map[string]string{}
-	for envName, envValue := range t.Environment {
+	for envName, envValue := range t.Spec.Environment {
 		environment[envName] = envValue
 	}
 	for envName, envValue := range s.Environment {
@@ -208,15 +208,15 @@ func (e *Executor) doSaveToWorkspaceStep(ctx context.Context, s *types.SaveToWor
 	}
 	defer archivef.Close()
 
-	workingDir, err := e.expandDir(ctx, t, pod, logf, t.WorkingDir)
+	workingDir, err := e.expandDir(ctx, t, pod, logf, t.Spec.WorkingDir)
 	if err != nil {
-		_, _ = logf.WriteString(fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.WorkingDir, err))
+		_, _ = logf.WriteString(fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.Spec.WorkingDir, err))
 		return -1, err
 	}
 
 	execConfig := &driver.ExecConfig{
 		Cmd:         cmd,
-		Env:         t.Environment,
+		Env:         t.Spec.Environment,
 		WorkingDir:  workingDir,
 		User:        stepUser(t),
 		AttachStdin: true,
@@ -278,7 +278,7 @@ func (e *Executor) expandDir(ctx context.Context, t *types.ExecutorTask, pod dri
 
 	execConfig := &driver.ExecConfig{
 		Cmd:         cmd,
-		Env:         t.Environment,
+		Env:         t.Spec.Environment,
 		User:        stepUser(t),
 		AttachStdin: true,
 		Stdout:      stdout,
@@ -307,7 +307,7 @@ func (e *Executor) mkdir(ctx context.Context, t *types.ExecutorTask, pod driver.
 
 	execConfig := &driver.ExecConfig{
 		Cmd:         cmd,
-		Env:         t.Environment,
+		Env:         t.Spec.Environment,
 		User:        stepUser(t),
 		AttachStdin: true,
 		Stdout:      logf,
@@ -336,15 +336,15 @@ func (e *Executor) template(ctx context.Context, t *types.ExecutorTask, pod driv
 	// limit the template answer to max 1MiB
 	stdout := util.NewLimitedBuffer(1024 * 1024)
 
-	workingDir, err := e.expandDir(ctx, t, pod, logf, t.WorkingDir)
+	workingDir, err := e.expandDir(ctx, t, pod, logf, t.Spec.WorkingDir)
 	if err != nil {
-		_, _ = io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.WorkingDir, err))
+		_, _ = io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.Spec.WorkingDir, err))
 		return "", err
 	}
 
 	execConfig := &driver.ExecConfig{
 		Cmd:         cmd,
-		Env:         t.Environment,
+		Env:         t.Spec.Environment,
 		WorkingDir:  workingDir,
 		User:        stepUser(t),
 		AttachStdin: true,
@@ -384,15 +384,15 @@ func (e *Executor) unarchive(ctx context.Context, t *types.ExecutorTask, source 
 	}
 	cmd := append([]string{toolboxContainerPath, "unarchive"}, args...)
 
-	workingDir, err := e.expandDir(ctx, t, pod, logf, t.WorkingDir)
+	workingDir, err := e.expandDir(ctx, t, pod, logf, t.Spec.WorkingDir)
 	if err != nil {
-		_, _ = io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.WorkingDir, err))
+		_, _ = io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.Spec.WorkingDir, err))
 		return err
 	}
 
 	execConfig := &driver.ExecConfig{
 		Cmd:         cmd,
-		Env:         t.Environment,
+		Env:         t.Spec.Environment,
 		WorkingDir:  workingDir,
 		User:        stepUser(t),
 		AttachStdin: true,
@@ -432,7 +432,7 @@ func (e *Executor) doRestoreWorkspaceStep(ctx context.Context, s *types.RestoreW
 	}
 	defer logf.Close()
 
-	for _, op := range t.WorkspaceOperations {
+	for _, op := range t.Spec.WorkspaceOperations {
 		log.Debugf("unarchiving workspace for taskID: %s, step: %d", level, op.TaskID, op.Step)
 		resp, err := e.runserviceClient.GetArchive(ctx, op.TaskID, op.Step)
 		if err != nil {
@@ -473,7 +473,7 @@ func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, 
 	fmt.Fprintf(logf, "cache key %q\n", userKey)
 
 	// append cache prefix
-	key := t.CachePrefix + "-" + userKey
+	key := t.Spec.CachePrefix + "-" + userKey
 
 	// check that the cache key doesn't already exists
 	resp, err := e.runserviceClient.CheckCache(ctx, key, false)
@@ -503,15 +503,15 @@ func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, 
 	}
 	defer archivef.Close()
 
-	workingDir, err := e.expandDir(ctx, t, pod, logf, t.WorkingDir)
+	workingDir, err := e.expandDir(ctx, t, pod, logf, t.Spec.WorkingDir)
 	if err != nil {
-		_, _ = io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.WorkingDir, err))
+		_, _ = io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.Spec.WorkingDir, err))
 		return -1, err
 	}
 
 	execConfig := &driver.ExecConfig{
 		Cmd:         cmd,
-		Env:         t.Environment,
+		Env:         t.Spec.Environment,
 		WorkingDir:  workingDir,
 		User:        stepUser(t),
 		AttachStdin: true,
@@ -605,7 +605,7 @@ func (e *Executor) doRestoreCacheStep(ctx context.Context, s *types.RestoreCache
 		fmt.Fprintf(logf, "cache key %q\n", userKey)
 
 		// append cache prefix
-		key := t.CachePrefix + "-" + userKey
+		key := t.Spec.CachePrefix + "-" + userKey
 
 		resp, err := e.runserviceClient.GetCache(ctx, key, true)
 		if err != nil {
@@ -855,7 +855,7 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 
 	// error out if privileged containers are required but not allowed
 	requiresPrivilegedContainers := false
-	for _, c := range et.Containers {
+	for _, c := range et.Spec.Containers {
 		if c.Privileged {
 			requiresPrivilegedContainers = true
 			break
@@ -868,7 +868,7 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 
 	log.Debugf("starting pod")
 
-	dockerConfig, err := registry.GenDockerConfig(et.DockerRegistriesAuth, []string{et.Containers[0].Image})
+	dockerConfig, err := registry.GenDockerConfig(et.Spec.DockerRegistriesAuth, []string{et.Spec.Containers[0].Image})
 	if err != nil {
 		return err
 	}
@@ -878,12 +878,12 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 		// tasks failed to start and don't clash with existing pods)
 		ID:            uuid.NewV4().String(),
 		TaskID:        et.ID,
-		Arch:          et.Arch,
+		Arch:          et.Spec.Arch,
 		InitVolumeDir: toolboxContainerDir,
 		DockerConfig:  dockerConfig,
-		Containers:    make([]*driver.ContainerConfig, len(et.Containers)),
+		Containers:    make([]*driver.ContainerConfig, len(et.Spec.Containers)),
 	}
-	for i, c := range et.Containers {
+	for i, c := range et.Spec.Containers {
 		var cmd []string
 		if i == 0 {
 			cmd = []string{toolboxContainerPath, "sleeper"}
@@ -909,10 +909,10 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 	}
 	_, _ = outf.WriteString("Pod started.\n")
 
-	if et.WorkingDir != "" {
-		_, _ = outf.WriteString(fmt.Sprintf("Creating working dir %q.\n", et.WorkingDir))
-		if err := e.mkdir(ctx, et, pod, outf, et.WorkingDir); err != nil {
-			_, _ = outf.WriteString(fmt.Sprintf("Failed to create working dir %q. Error: %s\n", et.WorkingDir, err))
+	if et.Spec.WorkingDir != "" {
+		_, _ = outf.WriteString(fmt.Sprintf("Creating working dir %q.\n", et.Spec.WorkingDir))
+		if err := e.mkdir(ctx, et, pod, outf, et.Spec.WorkingDir); err != nil {
+			_, _ = outf.WriteString(fmt.Sprintf("Failed to create working dir %q. Error: %s\n", et.Spec.WorkingDir, err))
 			return err
 		}
 	}
@@ -922,7 +922,7 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 }
 
 func (e *Executor) executeTaskSteps(ctx context.Context, rt *runningTask, pod driver.Pod) (int, error) {
-	for i, step := range rt.et.Steps {
+	for i, step := range rt.et.Spec.Steps {
 		rt.Lock()
 		rt.et.Status.Steps[i].Phase = types.ExecutorTaskPhaseRunning
 		rt.et.Status.Steps[i].StartTime = util.TimeP(time.Now())
@@ -975,7 +975,7 @@ func (e *Executor) executeTaskSteps(ctx context.Context, rt *runningTask, pod dr
 		rt.et.Status.Steps[i].Phase = types.ExecutorTaskPhaseSuccess
 
 		if err != nil {
-			if rt.et.Stop {
+			if rt.et.Spec.Stop {
 				rt.et.Status.Steps[i].Phase = types.ExecutorTaskPhaseStopped
 			} else {
 				rt.et.Status.Steps[i].Phase = types.ExecutorTaskPhaseFailed
@@ -1154,11 +1154,11 @@ func (e *Executor) tasksUpdater(ctx context.Context) error {
 
 func (e *Executor) taskUpdater(ctx context.Context, et *types.ExecutorTask) {
 	log.Debugf("et: %v", util.Dump(et))
-	if et.Status.ExecutorID != e.id {
+	if et.Spec.ExecutorID != e.id {
 		return
 	}
 
-	if et.Stop {
+	if et.Spec.Stop {
 		e.stopTask(ctx, et)
 	}
 
