@@ -801,6 +801,7 @@ func TestGenRunConfig(t *testing.T) {
 							},
 						},
 					},
+					Shell: "/bin/sh -e",
 					Environment: map[string]string{
 						"ENV01":             "ENV01",
 						"ENVFROMVARIABLE01": "VARVALUE01",
@@ -876,6 +877,7 @@ func TestGenRunConfig(t *testing.T) {
 							},
 						},
 					},
+					Shell:       "/bin/sh -e",
 					Environment: map[string]string{},
 					Steps: rstypes.Steps{
 						&rstypes.RunStep{BaseStep: rstypes.BaseStep{Type: "run", Name: "command01"}, Command: "command01", Environment: map[string]string{}},
@@ -973,6 +975,7 @@ func TestGenRunConfig(t *testing.T) {
 							},
 						},
 					},
+					Shell:       "/bin/sh -e",
 					Environment: map[string]string{},
 					Steps: rstypes.Steps{
 						&rstypes.RunStep{BaseStep: rstypes.BaseStep{Type: "run", Name: "command01"}, Command: "command01", Environment: map[string]string{}},

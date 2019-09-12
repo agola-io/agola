@@ -109,6 +109,8 @@ func (e *Executor) doRunStep(ctx context.Context, s *types.RunStep, t *types.Exe
 	}
 	defer outf.Close()
 
+	// TODO(sgotti) this line is used only for old runconfig versions that don't
+	// set a task default shell in the runconfig
 	shell := defaultShell
 	if t.Shell != "" {
 		shell = t.Shell
