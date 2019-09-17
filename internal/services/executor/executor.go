@@ -983,8 +983,10 @@ func (e *Executor) executeTaskSteps(ctx context.Context, rt *runningTask, pod dr
 			serr = errors.Errorf("failed to execute step %s: %w", util.Dump(step), err)
 		} else if exitCode != 0 {
 			rt.et.Status.Steps[i].Phase = types.ExecutorTaskPhaseFailed
-			rt.et.Status.Steps[i].ExitCode = exitCode
+			rt.et.Status.Steps[i].ExitStatus = util.IntP(exitCode)
 			serr = errors.Errorf("step %q failed with exitcode %d", stepName, exitCode)
+		} else if exitCode == 0 {
+			rt.et.Status.Steps[i].ExitStatus = util.IntP(exitCode)
 		}
 
 		if err := e.sendExecutorTaskStatus(ctx, rt.et); err != nil {

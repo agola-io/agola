@@ -688,6 +688,7 @@ func (s *Runservice) updateRunTaskStatus(ctx context.Context, et *types.Executor
 
 	for i, s := range et.Status.Steps {
 		rt.Steps[i].Phase = s.Phase
+		rt.Steps[i].ExitStatus = s.ExitStatus
 		rt.Steps[i].StartTime = s.StartTime
 		rt.Steps[i].EndTime = s.EndTime
 	}

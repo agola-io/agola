@@ -277,6 +277,8 @@ type RunTaskStep struct {
 	// one logphase for every task step
 	LogPhase RunTaskFetchPhase `json:"log_phase,omitempty"`
 
+	ExitStatus *int `json:"exit_status"`
+
 	StartTime *time.Time `json:"start_time,omitempty"`
 	EndTime   *time.Time `json:"end_time,omitempty"`
 }
@@ -532,7 +534,7 @@ type ExecutorTaskStepStatus struct {
 	StartTime *time.Time `json:"start_time,omitempty"`
 	EndTime   *time.Time `json:"end_time,omitempty"`
 
-	ExitCode int `json:"exit_code,omitempty"`
+	ExitStatus *int `json:"exit_status,omitempty"`
 }
 
 type Container struct {
