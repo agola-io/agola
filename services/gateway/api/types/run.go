@@ -97,8 +97,12 @@ type RunTaskResponseSetupStep struct {
 
 type RunTaskResponseStep struct {
 	Phase   rstypes.ExecutorTaskPhase `json:"phase"`
+	Type    string                    `json:"type"`
 	Name    string                    `json:"name"`
 	Command string                    `json:"command"`
+	Shell   string                    `json:"shell"`
+
+	ExitStatus *int `json:"exit_status"`
 
 	StartTime *time.Time `json:"start_time"`
 	EndTime   *time.Time `json:"end_time"`
