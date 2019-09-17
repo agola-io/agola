@@ -211,8 +211,8 @@ func (s *Runservice) setupDefaultRouter(etCh chan *types.ExecutorTask) http.Hand
 	// executor dedicated api, only calls from executor should happen on these handlers
 	executorStatusHandler := api.NewExecutorStatusHandler(logger, s.e, s.ah)
 	executorTaskStatusHandler := api.NewExecutorTaskStatusHandler(s.e, etCh)
-	executorTaskHandler := api.NewExecutorTaskHandler(s.e)
-	executorTasksHandler := api.NewExecutorTasksHandler(s.e)
+	executorTaskHandler := api.NewExecutorTaskHandler(logger, s.ah)
+	executorTasksHandler := api.NewExecutorTasksHandler(logger, s.ah)
 	archivesHandler := api.NewArchivesHandler(logger, s.ost)
 	cacheHandler := api.NewCacheHandler(logger, s.ost)
 	cacheCreateHandler := api.NewCacheCreateHandler(logger, s.ost)

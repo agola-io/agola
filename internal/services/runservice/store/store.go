@@ -37,58 +37,6 @@ const (
 	MaxChangegroupNameLength = 256
 )
 
-func OSTSubGroupsAndGroupTypes(group string) []string {
-	h := util.PathHierarchy(group)
-	if len(h)%2 != 1 {
-		panic(fmt.Errorf("wrong group path %q", group))
-	}
-
-	return h
-}
-
-func OSTRootGroup(group string) string {
-	pl := util.PathList(group)
-	if len(pl) < 2 {
-		panic(fmt.Errorf("cannot determine root group name, wrong group path %q", group))
-	}
-
-	return pl[1]
-}
-
-func OSTSubGroups(group string) []string {
-	h := util.PathHierarchy(group)
-	if len(h)%2 != 1 {
-		panic(fmt.Errorf("wrong group path %q", group))
-	}
-
-	// remove group types
-	sg := []string{}
-	for i, g := range h {
-		if i%2 == 0 {
-			sg = append(sg, g)
-		}
-	}
-
-	return sg
-}
-
-func OSTSubGroupTypes(group string) []string {
-	h := util.PathHierarchy(group)
-	if len(h)%2 != 1 {
-		panic(fmt.Errorf("wrong group path %q", group))
-	}
-
-	// remove group names
-	sg := []string{}
-	for i, g := range h {
-		if i%2 == 1 {
-			sg = append(sg, g)
-		}
-	}
-
-	return sg
-}
-
 func OSTUpdateRunCounterAction(ctx context.Context, c uint64, group string) (*datamanager.Action, error) {
 	// use the first group dir after the root
 	pl := util.PathList(group)
@@ -364,7 +312,7 @@ func GetExecutorTasks(ctx context.Context, e *etcd.Store, executorID string) ([]
 			return nil, err
 		}
 		et.Revision = kv.ModRevision
-		if et.Status.ExecutorID == executorID {
+		if et.Spec.ExecutorID == executorID {
 			ets = append(ets, et)
 		}
 	}

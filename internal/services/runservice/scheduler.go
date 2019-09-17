@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sort"
 	"strconv"
 	"time"
 
@@ -51,12 +50,6 @@ const (
 var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
 var logger = slog.New(level)
 var log = logger.Sugar()
-
-func mergeEnv(dest, src map[string]string) {
-	for k, v := range src {
-		dest[k] = v
-	}
-}
 
 func (s *Runservice) runActiveExecutorTasks(ctx context.Context, runID string) ([]*types.ExecutorTask, error) {
 	// the real source of active tasks is the number of executor tasks in etcd
@@ -255,7 +248,7 @@ func (s *Runservice) submitRunTasks(ctx context.Context, r *types.Run, rc *types
 			return nil
 		}
 
-		et := s.genExecutorTask(ctx, r, rt, rc, executor)
+		et := common.GenExecutorTask(r, rt, rc, executor)
 		log.Debugf("et: %s", util.Dump(et))
 
 		// check that the executorTask wasn't already scheduled
@@ -333,107 +326,48 @@ func chooseExecutor(executors []*types.Executor, rct *types.RunConfigTask) *type
 	return nil
 }
 
-type parentsByLevelName []*types.RunConfigTask
-
-func (p parentsByLevelName) Len() int { return len(p) }
-func (p parentsByLevelName) Less(i, j int) bool {
-	if p[i].Level != p[j].Level {
-		return p[i].Level < p[j].Level
-	}
-	return p[i].Name < p[j].Name
-}
-func (p parentsByLevelName) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
-
-func (s *Runservice) genExecutorTask(ctx context.Context, r *types.Run, rt *types.RunTask, rc *types.RunConfig, executor *types.Executor) *types.ExecutorTask {
-	rct := rc.Tasks[rt.ID]
-
-	environment := map[string]string{}
-	if rct.Environment != nil {
-		environment = rct.Environment
-	}
-	mergeEnv(environment, rc.StaticEnvironment)
-	// run config Environment variables ovverride every other environment variable
-	mergeEnv(environment, rc.Environment)
-
-	cachePrefix := store.OSTRootGroup(r.Group)
-	if rc.CacheGroup != "" {
-		cachePrefix = rc.CacheGroup
-	}
-
-	et := &types.ExecutorTask{
-		// The executorTask ID must be the same as the runTask ID so we can detect if
-		// there's already an executorTask scheduled for that run task and we can get
-		// at most once task execution
-		ID:          rt.ID,
-		RunID:       r.ID,
-		TaskName:    rct.Name,
-		Arch:        rct.Runtime.Arch,
-		Containers:  rct.Runtime.Containers,
-		Environment: environment,
-		WorkingDir:  rct.WorkingDir,
-		Shell:       rct.Shell,
-		User:        rct.User,
-		Steps:       rct.Steps,
-		CachePrefix: cachePrefix,
-		Status: types.ExecutorTaskStatus{
-			Phase:      types.ExecutorTaskPhaseNotStarted,
-			Steps:      make([]*types.ExecutorTaskStepStatus, len(rct.Steps)),
-			ExecutorID: executor.ID,
-		},
-		DockerRegistriesAuth: rct.DockerRegistriesAuth,
-	}
-
-	for i := range et.Status.Steps {
-		et.Status.Steps[i] = &types.ExecutorTaskStepStatus{
-			Phase: types.ExecutorTaskPhaseNotStarted,
-		}
-	}
-
-	// calculate workspace operations
-	// TODO(sgotti) right now we don't support duplicated files. So it's not currently possibile to overwrite a file in a upper layer.
-	// this simplifies the workspaces extractions since they could be extracted in any order. We make them ordered just for reproducibility
-	wsops := []types.WorkspaceOperation{}
-	rctAllParents := runconfig.GetAllParents(rc.Tasks, rct)
-
-	// sort parents by level and name just for reproducibility
-	sort.Sort(parentsByLevelName(rctAllParents))
-
-	for _, rctParent := range rctAllParents {
-		log.Debugf("rctParent: %s", util.Dump(rctParent))
-		for _, archiveStep := range r.Tasks[rctParent.ID].WorkspaceArchives {
-			wsop := types.WorkspaceOperation{TaskID: rctParent.ID, Step: archiveStep}
-			wsops = append(wsops, wsop)
-		}
-	}
-
-	et.WorkspaceOperations = wsops
-
-	return et
-}
-
 // sendExecutorTask sends executor task to executor, if this fails the executor
 // will periodically fetch the executortask anyway
 func (s *Runservice) sendExecutorTask(ctx context.Context, et *types.ExecutorTask) error {
-	executor, err := store.GetExecutor(ctx, s.e, et.Status.ExecutorID)
+	executor, err := store.GetExecutor(ctx, s.e, et.Spec.ExecutorID)
 	if err != nil && err != etcd.ErrKeyNotFound {
 		return err
 	}
 	if executor == nil {
-		log.Warnf("executor with id %q doesn't exist", et.Status.ExecutorID)
+		log.Warnf("executor with id %q doesn't exist", et.Spec.ExecutorID)
 		return nil
 	}
+
+	r, _, err := store.GetRun(ctx, s.e, et.Spec.RunID)
+	if err != nil {
+		return err
+	}
+	rc, err := store.OSTGetRunConfig(s.dm, r.ID)
+	if err != nil {
+		return errors.Errorf("cannot get run config %q: %w", r.ID, err)
+	}
+	rt, ok := r.Tasks[et.ID]
+	if !ok {
+		return errors.Errorf("no such run task with id %s for run %s", et.ID, r.ID)
+	}
+
+	// take a copy to not change the input executorTask
+	et = et.DeepCopy()
+
+	// generate ExecutorTaskSpecData
+	et.Spec.ExecutorTaskSpecData = common.GenExecutorTaskSpecData(r, rt, rc)
 
 	etj, err := json.Marshal(et)
 	if err != nil {
 		return err
 	}
 
-	r, err := http.Post(executor.ListenURL+"/api/v1alpha/executor", "", bytes.NewReader(etj))
+	req, err := http.Post(executor.ListenURL+"/api/v1alpha/executor", "", bytes.NewReader(etj))
 	if err != nil {
 		return err
 	}
-	if r.StatusCode != http.StatusOK {
-		return errors.Errorf("received http status: %d", r.StatusCode)
+	if req.StatusCode != http.StatusOK {
+		return errors.Errorf("received http status: %d", req.StatusCode)
 	}
 
 	return nil
@@ -549,7 +483,7 @@ func (s *Runservice) scheduleRun(ctx context.Context, r *types.Run, rc *types.Ru
 	// if the run is set to stop, stop all tasks
 	if r.Stop {
 		for _, et := range activeExecutorTasks {
-			et.Stop = true
+			et.Spec.Stop = true
 			if _, err := store.AtomicPutExecutorTask(ctx, s.e, et); err != nil {
 				return err
 			}
@@ -664,7 +598,7 @@ func advanceRun(ctx context.Context, r *types.Run, rc *types.RunConfig, activeEx
 }
 
 func (s *Runservice) handleExecutorTaskUpdate(ctx context.Context, et *types.ExecutorTask) error {
-	r, _, err := store.GetRun(ctx, s.e, et.RunID)
+	r, _, err := store.GetRun(ctx, s.e, et.Spec.RunID)
 	if err != nil {
 		return err
 	}
@@ -819,7 +753,7 @@ func (s *Runservice) executorTasksCleaner(ctx context.Context) error {
 func (s *Runservice) executorTaskCleaner(ctx context.Context, et *types.ExecutorTask) error {
 	log.Debugf("et: %s", util.Dump(et))
 	if et.Status.Phase.IsFinished() {
-		r, _, err := store.GetRun(ctx, s.e, et.RunID)
+		r, _, err := store.GetRun(ctx, s.e, et.Spec.RunID)
 		if err != nil {
 			if err == etcd.ErrKeyNotFound {
 				// run doesn't exists, remove executor task
@@ -835,8 +769,8 @@ func (s *Runservice) executorTaskCleaner(ctx context.Context, et *types.Executor
 
 		if r.Phase.IsFinished() {
 			// if the run is finished mark the executor tasks to stop
-			if !et.Stop {
-				et.Stop = true
+			if !et.Spec.Stop {
+				et.Spec.Stop = true
 				if _, err := store.AtomicPutExecutorTask(ctx, s.e, et); err != nil {
 					return err
 				}
@@ -850,13 +784,13 @@ func (s *Runservice) executorTaskCleaner(ctx context.Context, et *types.Executor
 
 	if !et.Status.Phase.IsFinished() {
 		// if the executor doesn't exists anymore mark the not finished executor tasks as failed
-		executor, err := store.GetExecutor(ctx, s.e, et.Status.ExecutorID)
+		executor, err := store.GetExecutor(ctx, s.e, et.Spec.ExecutorID)
 		if err != nil && err != etcd.ErrKeyNotFound {
 			return err
 		}
 		if executor == nil {
-			log.Warnf("executor with id %q doesn't exist. marking executor task %q as failed", et.Status.ExecutorID, et.ID)
-			et.FailError = "executor deleted"
+			log.Warnf("executor with id %q doesn't exist. marking executor task %q as failed", et.Spec.ExecutorID, et.ID)
+			et.Status.FailError = "executor deleted"
 			et.Status.Phase = types.ExecutorTaskPhaseFailed
 			et.Status.EndTime = util.TimeP(time.Now())
 			for _, s := range et.Status.Steps {
@@ -947,12 +881,12 @@ func (s *Runservice) fetchLog(ctx context.Context, rt *types.RunTask, setup bool
 		}
 		return nil
 	}
-	executor, err := store.GetExecutor(ctx, s.e, et.Status.ExecutorID)
+	executor, err := store.GetExecutor(ctx, s.e, et.Spec.ExecutorID)
 	if err != nil && err != etcd.ErrKeyNotFound {
 		return err
 	}
 	if executor == nil {
-		log.Warnf("executor with id %q doesn't exist. Skipping fetching", et.Status.ExecutorID)
+		log.Warnf("executor with id %q doesn't exist. Skipping fetching", et.Spec.ExecutorID)
 		return nil
 	}
 
@@ -1107,12 +1041,12 @@ func (s *Runservice) fetchArchive(ctx context.Context, rt *types.RunTask, stepnu
 		log.Errorf("executor task with id %q doesn't exist. This shouldn't happen. Skipping fetching", rt.ID)
 		return nil
 	}
-	executor, err := store.GetExecutor(ctx, s.e, et.Status.ExecutorID)
+	executor, err := store.GetExecutor(ctx, s.e, et.Spec.ExecutorID)
 	if err != nil && err != etcd.ErrKeyNotFound {
 		return err
 	}
 	if executor == nil {
-		log.Warnf("executor with id %q doesn't exist. Skipping fetching", et.Status.ExecutorID)
+		log.Warnf("executor with id %q doesn't exist. Skipping fetching", et.Spec.ExecutorID)
 		return nil
 	}
 

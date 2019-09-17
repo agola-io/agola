@@ -244,12 +244,12 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 	if err != nil {
 		return err, true
 	}
-	executor, err := store.GetExecutor(ctx, h.e, et.Status.ExecutorID)
+	executor, err := store.GetExecutor(ctx, h.e, et.Spec.ExecutorID)
 	if err != nil && err != etcd.ErrKeyNotFound {
 		return err, true
 	}
 	if executor == nil {
-		return common.NewErrNotExist(errors.Errorf("executor with id %q doesn't exist", et.Status.ExecutorID)), true
+		return common.NewErrNotExist(errors.Errorf("executor with id %q doesn't exist", et.Spec.ExecutorID)), true
 	}
 
 	var url string
