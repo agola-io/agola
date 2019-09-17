@@ -92,7 +92,8 @@ type Runservice struct {
 	Etcd          Etcd          `yaml:"etcd"`
 	ObjectStorage ObjectStorage `yaml:"objectStorage"`
 
-	RunCacheExpireInterval time.Duration `yaml:"runCacheExpireInterval"`
+	RunCacheExpireInterval     time.Duration `yaml:"runCacheExpireInterval"`
+	RunWorkspaceExpireInterval time.Duration `yaml:"runWorkspaceExpireInterval"`
 }
 
 type Executor struct {
@@ -222,7 +223,8 @@ var defaultConfig = Config{
 		},
 	},
 	Runservice: Runservice{
-		RunCacheExpireInterval: 7 * 24 * time.Hour,
+		RunCacheExpireInterval:     7 * 24 * time.Hour,
+		RunWorkspaceExpireInterval: 7 * 24 * time.Hour,
 	},
 	Executor: Executor{
 		ActiveTasksLimit: 2,

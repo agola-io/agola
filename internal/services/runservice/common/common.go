@@ -52,6 +52,7 @@ var (
 
 	EtcdCompactChangeGroupsLockKey = path.Join(EtcdSchedulerBaseDir, "compactchangegroupslock")
 	EtcdCacheCleanerLockKey        = path.Join(EtcdSchedulerBaseDir, "locks", "cachecleaner")
+	EtcdWorkspaceCleanerLockKey    = path.Join(EtcdSchedulerBaseDir, "locks", "workspacecleaner")
 	EtcdTaskUpdaterLockKey         = path.Join(EtcdSchedulerBaseDir, "locks", "taskupdater")
 
 	EtcdMaintenanceKey = "maintenance"
