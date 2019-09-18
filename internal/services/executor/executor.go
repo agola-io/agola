@@ -778,6 +778,7 @@ func (e *Executor) executeTask(ctx context.Context, et *types.ExecutorTask) {
 
 	if !e.runningTasks.addIfNotExists(et.ID, rt) {
 		log.Debugf("task %s already running", et.ID)
+		rt.Unlock()
 		return
 	}
 
