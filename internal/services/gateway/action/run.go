@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"path"
+	"regexp"
 
 	"agola.io/agola/internal/config"
 	gitsource "agola.io/agola/internal/gitsources"
@@ -64,6 +65,10 @@ const (
 	AnnotationTagLink         = "tag_link"
 	AnnotationPullRequestID   = "pull_request_id"
 	AnnotationPullRequestLink = "pull_request_link"
+)
+
+var (
+	SkipRunMessage            = regexp.MustCompile(`.*\[ci skip\].*`)
 )
 
 func (h *ActionHandler) GetRun(ctx context.Context, runID string) (*rsapitypes.RunResponse, error) {
@@ -483,6 +488,11 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 	}
 
 	for _, run := range config.Runs {
+		if SkipRunMessage.MatchString(req.Message) {
+			h.log.Debugf("skipping run since special commit message")
+			continue
+		}
+
 		if match := types.MatchWhen(run.When.ToWhen(), req.Branch, req.Tag, req.Ref); !match {
 			h.log.Debugf("skipping run since when condition doesn't match")
 			continue
