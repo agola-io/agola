@@ -18,6 +18,7 @@ import (
 	"context"
 	"net/http"
 
+	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"
@@ -29,7 +30,8 @@ type GetSecretsRequest struct {
 	ParentType cstypes.ConfigType
 	ParentRef  string
 
-	Tree bool
+	Tree             bool
+	RemoveOverridden bool
 }
 
 func (h *ActionHandler) GetSecrets(ctx context.Context, req *GetSecretsRequest) ([]*csapitypes.Secret, error) {
@@ -44,6 +46,11 @@ func (h *ActionHandler) GetSecrets(ctx context.Context, req *GetSecretsRequest) 
 	}
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
+	}
+
+	if req.RemoveOverridden {
+		// remove overriden secrets
+		cssecrets = common.FilterOverriddenSecrets(cssecrets)
 	}
 
 	return cssecrets, nil
