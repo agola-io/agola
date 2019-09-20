@@ -49,6 +49,7 @@ func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	query := r.URL.Query()
 	_, tree := query["tree"]
+	_, removeoverridden := query["removeoverridden"]
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
 	if httpError(w, err) {
@@ -57,9 +58,10 @@ func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	areq := &action.GetSecretsRequest{
-		ParentType: parentType,
-		ParentRef:  parentRef,
-		Tree:       tree,
+		ParentType:       parentType,
+		ParentRef:        parentRef,
+		Tree:             tree,
+		RemoveOverridden: removeoverridden,
 	}
 	cssecrets, err := h.ah.GetSecrets(ctx, areq)
 	if httpError(w, err) {
