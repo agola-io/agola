@@ -24,8 +24,9 @@ type CreateProjectRequest struct {
 }
 
 type UpdateProjectRequest struct {
-	Name       string     `json:"name,omitempty"`
-	Visibility Visibility `json:"visibility,omitempty"`
+	Name       *string     `json:"name,omitempty"`
+	ParentRef  *string     `json:"parent_ref,omitempty"`
+	Visibility *Visibility `json:"visibility,omitempty"`
 }
 
 type ProjectResponse struct {
