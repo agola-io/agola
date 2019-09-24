@@ -30,7 +30,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
-	errors "golang.org/x/xerrors"
 )
 
 func projectResponse(ctx context.Context, readDB *readdb.ReadDB, project *types.Project) (*csapitypes.Project, error) {
@@ -114,11 +113,12 @@ func getGlobalVisibility(readDB *readdb.ReadDB, tx *db.Tx, curVisibility types.V
 
 type ProjectHandler struct {
 	log    *zap.SugaredLogger
+	ah     *action.ActionHandler
 	readDB *readdb.ReadDB
 }
 
-func NewProjectHandler(logger *zap.Logger, readDB *readdb.ReadDB) *ProjectHandler {
-	return &ProjectHandler{log: logger.Sugar(), readDB: readDB}
+func NewProjectHandler(logger *zap.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *ProjectHandler {
+	return &ProjectHandler{log: logger.Sugar(), ah: ah, readDB: readDB}
 }
 
 func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -130,20 +130,9 @@ func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var project *types.Project
-	err = h.readDB.Do(ctx, func(tx *db.Tx) error {
-		var err error
-		project, err = h.readDB.GetProject(tx, projectRef)
-		return err
-	})
-	if err != nil {
+	project, err := h.ah.GetProject(ctx, projectRef)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
-	}
-
-	if project == nil {
-		httpError(w, util.NewErrNotFound(errors.Errorf("project %q doesn't exist", projectRef)))
 		return
 	}
 

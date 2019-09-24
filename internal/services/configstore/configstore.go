@@ -184,7 +184,7 @@ func (s *Configstore) setupDefaultRouter() http.Handler {
 	updateProjectGroupHandler := api.NewUpdateProjectGroupHandler(logger, s.ah, s.readDB)
 	deleteProjectGroupHandler := api.NewDeleteProjectGroupHandler(logger, s.ah)
 
-	projectHandler := api.NewProjectHandler(logger, s.readDB)
+	projectHandler := api.NewProjectHandler(logger, s.ah, s.readDB)
 	createProjectHandler := api.NewCreateProjectHandler(logger, s.ah, s.readDB)
 	updateProjectHandler := api.NewUpdateProjectHandler(logger, s.ah, s.readDB)
 	deleteProjectHandler := api.NewDeleteProjectHandler(logger, s.ah)

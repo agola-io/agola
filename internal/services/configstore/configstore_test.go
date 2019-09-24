@@ -57,7 +57,7 @@ func shutdownEtcd(tetcd *testutil.TestEmbeddedEtcd) {
 	}
 }
 
-func setupConfigstore(t *testing.T, ctx context.Context, dir string) (*Configstore, *testutil.TestEmbeddedEtcd) {
+func setupConfigstore(ctx context.Context, t *testing.T, dir string) (*Configstore, *testutil.TestEmbeddedEtcd) {
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -550,7 +550,7 @@ func TestUser(t *testing.T) {
 
 	ctx := context.Background()
 
-	cs, tetcd := setupConfigstore(t, ctx, dir)
+	cs, tetcd := setupConfigstore(ctx, t, dir)
 	defer shutdownEtcd(tetcd)
 
 	t.Logf("starting cs")
@@ -608,7 +608,7 @@ func TestUser(t *testing.T) {
 	})
 }
 
-func TestProjectGroupsAndProjects(t *testing.T) {
+func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 	dir, err := ioutil.TempDir("", "agola")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -617,7 +617,7 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 
 	ctx := context.Background()
 
-	cs, tetcd := setupConfigstore(t, ctx, dir)
+	cs, tetcd := setupConfigstore(ctx,t, dir)
 	defer shutdownEtcd(tetcd)
 
 	t.Logf("starting cs")
@@ -755,6 +755,82 @@ func TestProjectGroupsAndProjects(t *testing.T) {
 	})
 }
 
+func TestProjectUpdate(t *testing.T) {
+	dir, err := ioutil.TempDir("", "agola")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	ctx := context.Background()
+
+	cs, tetcd := setupConfigstore(ctx,t, dir)
+	defer shutdownEtcd(tetcd)
+
+	t.Logf("starting cs")
+	go func() {
+		_ = cs.Run(ctx)
+	}()
+
+	// TODO(sgotti) change the sleep with a real check that all is ready
+	time.Sleep(2 * time.Second)
+
+	user, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// TODO(sgotti) change the sleep with a real check that user is in readdb
+	time.Sleep(2 * time.Second)
+
+	_, err = cs.ah.CreateProjectGroup(ctx, &types.ProjectGroup{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	p01 := &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}
+	_, err = cs.ah.CreateProject(ctx, p01)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	p02 := &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}
+	_, err = cs.ah.CreateProject(ctx, p02)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	p03 := &types.Project{Name: "project02", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}
+	_, err = cs.ah.CreateProject(ctx, p03)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	t.Run("rename project keeping same parent", func(t *testing.T) {
+		projectName := "project02"
+		p03.Name = "newproject02"
+		_, err := cs.ah.UpdateProject(ctx, &action.UpdateProjectRequest{ProjectRef: path.Join("user", user.Name, "projectgroup01", projectName), Project: p03})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+	})
+	t.Run("move project to project group having project with same name", func(t *testing.T) {
+		projectName := "project01"
+		expectedErr := fmt.Sprintf("project with name %q, path %q already exists", projectName, path.Join("user", user.Name, projectName))
+		p02.Parent.ID = path.Join("user", user.Name)
+		_, err := cs.ah.UpdateProject(ctx, &action.UpdateProjectRequest{ProjectRef: path.Join("user", user.Name, "projectgroup01", projectName), Project: p02})
+		if err.Error() != expectedErr {
+			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+		}
+	})
+	t.Run("move project to project group changing name", func(t *testing.T) {
+		projectName := "project01"
+		p02.Name = "newproject01"
+		p02.Parent.ID = path.Join("user", user.Name)
+		_, err := cs.ah.UpdateProject(ctx, &action.UpdateProjectRequest{ProjectRef: path.Join("user", user.Name, "projectgroup01", projectName), Project: p02})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+	})
+}
+
 func TestProjectGroupDelete(t *testing.T) {
 	dir, err := ioutil.TempDir("", "agola")
 	if err != nil {
@@ -764,7 +840,7 @@ func TestProjectGroupDelete(t *testing.T) {
 
 	ctx := context.Background()
 
-	cs, tetcd := setupConfigstore(t, ctx, dir)
+	cs, tetcd := setupConfigstore(ctx,t, dir)
 	defer shutdownEtcd(tetcd)
 
 	t.Logf("starting cs")
@@ -903,7 +979,7 @@ func TestOrgMembers(t *testing.T) {
 
 	ctx := context.Background()
 
-	cs, tetcd := setupConfigstore(t, ctx, dir)
+	cs, tetcd := setupConfigstore(ctx,t, dir)
 	defer shutdownEtcd(tetcd)
 
 	t.Logf("starting cs")
@@ -1139,7 +1215,7 @@ func TestRemoteSource(t *testing.T) {
 			}
 			ctx := context.Background()
 
-			cs, tetcd := setupConfigstore(t, ctx, dir)
+			cs, tetcd := setupConfigstore(ctx,t, dir)
 			defer shutdownEtcd(tetcd)
 
 			t.Logf("starting cs")

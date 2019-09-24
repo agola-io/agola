@@ -64,6 +64,24 @@ func (h *ActionHandler) ValidateProject(ctx context.Context, project *types.Proj
 	return nil
 }
 
+func (h *ActionHandler) GetProject(ctx context.Context, projectRef string) (*types.Project, error) {
+	var project *types.Project
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+		var err error
+		project, err = h.readDB.GetProject(tx, projectRef)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if project == nil {
+		return nil, util.NewErrNotFound(errors.Errorf("project %q doesn't exist", projectRef))
+	}
+
+	return project, nil
+}
+
 func (h *ActionHandler) CreateProject(ctx context.Context, project *types.Project) (*types.Project, error) {
 	if err := h.ValidateProject(ctx, project); err != nil {
 		return nil, err
@@ -190,12 +208,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, req *UpdateProjectReq
 		if group == nil {
 			return util.NewErrBadRequest(errors.Errorf("project group with id %q doesn't exist", req.Project.Parent.ID))
 		}
-
-		// currently we don't support changing parent
-		// TODO(sgotti) handle project move (changed parent project group)
-		if p.Parent.ID != req.Project.Parent.ID {
-			return util.NewErrBadRequest(errors.Errorf("changing project parent isn't supported"))
-		}
+		req.Project.Parent.ID = group.ID
 
 		groupPath, err := h.readDB.GetProjectGroupPath(tx, group)
 		if err != nil {
@@ -203,7 +216,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, req *UpdateProjectReq
 		}
 		pp := path.Join(groupPath, req.Project.Name)
 
-		if p.Name != req.Project.Name {
+		if p.Name != req.Project.Name || p.Parent.ID != req.Project.Parent.ID {
 			// check duplicate project name
 			ap, err := h.readDB.GetProjectByName(tx, req.Project.Parent.ID, req.Project.Name)
 			if err != nil {
@@ -217,6 +230,26 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, req *UpdateProjectReq
 		// changegroup is the project path. Use "projectpath" prefix as it must
 		// cover both projects and projectgroups
 		cgNames := []string{util.EncodeSha256Hex("projectpath-" + pp)}
+
+		// add new projectpath
+		if p.Parent.ID != req.Project.Parent.ID {
+			// get old parent project group
+			curGroup, err := h.readDB.GetProjectGroup(tx, p.Parent.ID)
+			if err != nil {
+				return err
+			}
+			if curGroup == nil {
+				return util.NewErrBadRequest(errors.Errorf("project group with id %q doesn't exist", p.Parent.ID))
+			}
+			curGroupPath, err := h.readDB.GetProjectGroupPath(tx, curGroup)
+			if err != nil {
+				return err
+			}
+			pp := path.Join(curGroupPath, req.Project.Name)
+
+			cgNames = append(cgNames, util.EncodeSha256Hex("projectpath-"+pp))
+		}
+
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
 			return err
