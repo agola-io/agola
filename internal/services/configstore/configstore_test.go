@@ -831,6 +831,156 @@ func TestProjectUpdate(t *testing.T) {
 	})
 }
 
+func TestProjectGroupUpdate(t *testing.T) {
+	dir, err := ioutil.TempDir("", "agola")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	ctx := context.Background()
+
+	cs, tetcd := setupConfigstore(ctx, t, dir)
+	defer shutdownEtcd(tetcd)
+
+	t.Logf("starting cs")
+	go func() {
+		_ = cs.Run(ctx)
+	}()
+
+	// TODO(sgotti) change the sleep with a real check that all is ready
+	time.Sleep(2 * time.Second)
+
+	user, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// TODO(sgotti) change the sleep with a real check that user is in readdb
+	time.Sleep(2 * time.Second)
+
+	pg01 := &types.ProjectGroup{Name: "pg01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic}
+	pg01, err = cs.ah.CreateProjectGroup(ctx, pg01)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	pg02 := &types.ProjectGroup{Name: "pg02", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic}
+	pg02, err = cs.ah.CreateProjectGroup(ctx, pg02)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	pg03 := &types.ProjectGroup{Name: "pg03", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic}
+	pg03, err = cs.ah.CreateProjectGroup(ctx, pg03)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	pg04 := &types.ProjectGroup{Name: "pg01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "pg01")}, Visibility: types.VisibilityPublic}
+	_, err = cs.ah.CreateProjectGroup(ctx, pg04)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	pg05 := &types.ProjectGroup{Name: "pg01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "pg02")}, Visibility: types.VisibilityPublic}
+	pg05, err = cs.ah.CreateProjectGroup(ctx, pg05)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	t.Run("rename project group keeping same parent", func(t *testing.T) {
+		projectGroupName := "pg03"
+		pg03.Name = "newpg03"
+		_, err := cs.ah.UpdateProjectGroup(ctx, &action.UpdateProjectGroupRequest{ProjectGroupRef: path.Join("user", user.Name, projectGroupName), ProjectGroup: pg03})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+	})
+	t.Run("move project to project group having project with same name", func(t *testing.T) {
+		projectGroupName := "pg01"
+		expectedErr := fmt.Sprintf("project group with name %q, path %q already exists", projectGroupName, path.Join("user", user.Name, projectGroupName))
+		pg05.Parent.ID = path.Join("user", user.Name)
+		_, err := cs.ah.UpdateProjectGroup(ctx, &action.UpdateProjectGroupRequest{ProjectGroupRef: path.Join("user", user.Name, "pg02", projectGroupName), ProjectGroup: pg05})
+		if err.Error() != expectedErr {
+			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+		}
+	})
+	t.Run("move project group to project group changing name", func(t *testing.T) {
+		projectGroupName := "pg01"
+		pg05.Name = "newpg01"
+		pg05.Parent.ID = path.Join("user", user.Name)
+		_, err := cs.ah.UpdateProjectGroup(ctx, &action.UpdateProjectGroupRequest{ProjectGroupRef: path.Join("user", user.Name, "pg02", projectGroupName), ProjectGroup: pg05})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+	})
+	t.Run("move project group inside itself", func(t *testing.T) {
+		projectGroupName := "pg02"
+		expectedErr := "cannot move project group inside itself or child project group"
+		pg02.Parent.ID = path.Join("user", user.Name, "pg02")
+		_, err := cs.ah.UpdateProjectGroup(ctx, &action.UpdateProjectGroupRequest{ProjectGroupRef: path.Join("user", user.Name, projectGroupName), ProjectGroup: pg02})
+		if err.Error() != expectedErr {
+			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+		}
+	})
+	t.Run("move project group to child project group", func(t *testing.T) {
+		projectGroupName := "pg01"
+		expectedErr := "cannot move project group inside itself or child project group"
+		pg01.Parent.ID = path.Join("user", user.Name, "pg01", "pg01")
+		_, err := cs.ah.UpdateProjectGroup(ctx, &action.UpdateProjectGroupRequest{ProjectGroupRef: path.Join("user", user.Name, projectGroupName), ProjectGroup: pg01})
+		if err.Error() != expectedErr {
+			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+		}
+	})
+	t.Run("change root project group parent", func(t *testing.T) {
+
+		var rootPG *types.ProjectGroup
+		rootPG, err := cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		rootPG.Parent.ID = path.Join("user", user.Name, "pg01")
+
+		expectedErr := "cannot change root project group parent type or id"
+		_, err = cs.ah.UpdateProjectGroup(ctx, &action.UpdateProjectGroupRequest{ProjectGroupRef: path.Join("user", user.Name), ProjectGroup: rootPG})
+		if err.Error() != expectedErr {
+			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+		}
+	})
+	t.Run("change root project group name", func(t *testing.T) {
+		var rootPG *types.ProjectGroup
+		rootPG, err := cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		rootPG.Name = "rootpgnewname"
+
+		expectedErr := "project group name for root project group must be empty"
+		_, err = cs.ah.UpdateProjectGroup(ctx, &action.UpdateProjectGroupRequest{ProjectGroupRef: path.Join("user", user.Name), ProjectGroup: rootPG})
+		if err.Error() != expectedErr {
+			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+		}
+	})
+	t.Run("change root project group visibility", func(t *testing.T) {
+		var rootPG *types.ProjectGroup
+		rootPG, err := cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		rootPG.Visibility = types.VisibilityPrivate
+
+		_, err = cs.ah.UpdateProjectGroup(ctx, &action.UpdateProjectGroupRequest{ProjectGroupRef: path.Join("user", user.Name), ProjectGroup: rootPG})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		rootPG, err = cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if rootPG.Visibility != types.VisibilityPrivate {
+			t.Fatalf("expected visiblity %q, got visibility: %q", types.VisibilityPublic, rootPG.Visibility)
+		}
+	})
+}
+
 func TestProjectGroupDelete(t *testing.T) {
 	dir, err := ioutil.TempDir("", "agola")
 	if err != nil {

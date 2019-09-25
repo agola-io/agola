@@ -177,7 +177,7 @@ func (s *Configstore) setupDefaultRouter() http.Handler {
 	maintenanceModeHandler := api.NewMaintenanceModeHandler(logger, s.ah, s.e)
 	exportHandler := api.NewExportHandler(logger, s.ah)
 
-	projectGroupHandler := api.NewProjectGroupHandler(logger, s.readDB)
+	projectGroupHandler := api.NewProjectGroupHandler(logger, s.ah, s.readDB)
 	projectGroupSubgroupsHandler := api.NewProjectGroupSubgroupsHandler(logger, s.ah, s.readDB)
 	projectGroupProjectsHandler := api.NewProjectGroupProjectsHandler(logger, s.ah, s.readDB)
 	createProjectGroupHandler := api.NewCreateProjectGroupHandler(logger, s.ah, s.readDB)
