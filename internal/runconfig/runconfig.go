@@ -57,10 +57,9 @@ func stepFromConfigStep(csi interface{}, variables map[string]string) interface{
 	case *config.CloneStep:
 		// transform a "clone" step in a "run" step command
 		rs := &config.RunStep{}
-
 		rs.Type = "run"
 		rs.Name = "Clone repository and checkout code"
-		rs.Command = `
+		rs.Command = fmt.Sprintf(`
 set -x
 
 mkdir ~/.ssh
@@ -96,7 +95,7 @@ Host $AGOLA_GIT_HOST
 EOF
 )
 
-git clone $AGOLA_REPOSITORY_URL .
+git clone %s $AGOLA_REPOSITORY_URL .
 git fetch origin $AGOLA_GIT_REF
 
 if [ -n "$AGOLA_GIT_COMMITSHA" ]; then
@@ -104,7 +103,7 @@ if [ -n "$AGOLA_GIT_COMMITSHA" ]; then
 else
 	git checkout FETCH_HEAD
 fi
-`
+`, genCloneOptions(cs))
 
 		return rs
 
@@ -443,4 +442,15 @@ func genValue(val config.Value, variables map[string]string) string {
 	default:
 		panic(fmt.Errorf("wrong value type: %q", val.Value))
 	}
+}
+
+func genCloneOptions(c *config.CloneStep) string {
+	cloneoptions := []string{}
+	if c.Depth != nil {
+		cloneoptions = append(cloneoptions, fmt.Sprintf("--depth %d", *c.Depth))
+	}
+	if c.RecurseSubmodules {
+		cloneoptions = append(cloneoptions, "--recurse-submodules")
+	}
+	return strings.Join(cloneoptions, " ")
 }

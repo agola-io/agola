@@ -142,7 +142,9 @@ type BaseStep struct {
 }
 
 type CloneStep struct {
-	BaseStep `json:",inline"`
+	BaseStep          `json:",inline"`
+	Depth             *int `json:"depth"`
+	RecurseSubmodules bool `json:"recurse_submodules"`
 }
 
 type RunStep struct {
@@ -793,6 +795,10 @@ func checkConfig(config *Config) error {
 				// TODO(sgotti) we could use the run step command as step name but when the
 				// command is very long or multi line it doesn't makes sense and will
 				// probably be quite unuseful/confusing from an UI point of view
+				case *CloneStep:
+					if step.Depth != nil && *step.Depth < 1 {
+						return errors.Errorf("depth value must be greater than 0 for clone step in task %q", task.Name)
+					}
 				case *RunStep:
 					if step.Command == "" {
 						return errors.Errorf("no command defined for step %d (run) in task %q", i, task.Name)
