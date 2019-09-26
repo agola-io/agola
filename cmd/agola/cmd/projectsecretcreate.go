@@ -29,8 +29,8 @@ import (
 
 var cmdProjectSecretCreate = &cobra.Command{
 	Use:   "create",
-	Short: "create a project local secret",
-	Long: `create a project local secret
+	Short: "create a project secret",
+	Long: `create a project secret
 
 The secret data should be provided by a yaml document. Examples:
 
@@ -57,7 +57,7 @@ func init() {
 
 	flags.StringVar(&secretCreateOpts.parentRef, "project", "", "project id or full path")
 	flags.StringVarP(&secretCreateOpts.name, "name", "n", "", "secret name")
-	flags.StringVarP(&secretCreateOpts.file, "file", "f", "", `yaml file containing the secret data (use "-" to read from stdin`)
+	flags.StringVarP(&secretCreateOpts.file, "file", "f", "", `yaml file containing the secret data (use "-" to read from stdin)`)
 
 	if err := cmdProjectSecretCreate.MarkFlagRequired("project"); err != nil {
 		log.Fatal(err)
