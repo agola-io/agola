@@ -186,6 +186,19 @@ func (c *Client) DeleteProjectGroupSecret(ctx context.Context, projectGroupRef, 
 	return c.getResponse(ctx, "DELETE", path.Join("/projectgroups", url.PathEscape(projectGroupRef), "secrets", secretName), nil, jsonContent, nil)
 }
 
+func (c *Client) GetProjectGroupSecrets(ctx context.Context, projectRef string, tree, removeoverridden bool) ([]*gwapitypes.SecretResponse, *http.Response, error) {
+	secrets := []*gwapitypes.SecretResponse{}
+	q := url.Values{}
+	if tree {
+		q.Add("tree", "")
+	}
+	if removeoverridden {
+		q.Add("removeoverridden", "")
+	}
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s/secrets", url.PathEscape(projectRef)), q, jsonContent, nil, &secrets)
+	return secrets, resp, err
+}
+
 func (c *Client) CreateProjectSecret(ctx context.Context, projectRef string, req *gwapitypes.CreateSecretRequest) (*gwapitypes.SecretResponse, *http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
@@ -210,6 +223,19 @@ func (c *Client) UpdateProjectSecret(ctx context.Context, projectRef, secretName
 
 func (c *Client) DeleteProjectSecret(ctx context.Context, projectRef, secretName string) (*http.Response, error) {
 	return c.getResponse(ctx, "DELETE", path.Join("/projects", url.PathEscape(projectRef), "secrets", secretName), nil, jsonContent, nil)
+}
+
+func (c *Client) GetProjectSecrets(ctx context.Context, projectRef string, tree, removeoverridden bool) ([]*gwapitypes.SecretResponse, *http.Response, error) {
+	secrets := []*gwapitypes.SecretResponse{}
+	q := url.Values{}
+	if tree {
+		q.Add("tree", "")
+	}
+	if removeoverridden {
+		q.Add("removeoverridden", "")
+	}
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s/secrets", url.PathEscape(projectRef)), q, jsonContent, nil, &secrets)
+	return secrets, resp, err
 }
 
 func (c *Client) CreateProjectGroupVariable(ctx context.Context, projectGroupRef string, req *gwapitypes.CreateVariableRequest) (*gwapitypes.VariableResponse, *http.Response, error) {
@@ -238,6 +264,19 @@ func (c *Client) DeleteProjectGroupVariable(ctx context.Context, projectGroupRef
 	return c.getResponse(ctx, "DELETE", path.Join("/projectgroups", url.PathEscape(projectGroupRef), "variables", variableName), nil, jsonContent, nil)
 }
 
+func (c *Client) GetProjectGroupVariables(ctx context.Context, projectRef string, tree, removeoverridden bool) ([]*gwapitypes.VariableResponse, *http.Response, error) {
+	variables := []*gwapitypes.VariableResponse{}
+	q := url.Values{}
+	if tree {
+		q.Add("tree", "")
+	}
+	if removeoverridden {
+		q.Add("removeoverridden", "")
+	}
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s/variables", url.PathEscape(projectRef)), q, jsonContent, nil, &variables)
+	return variables, resp, err
+}
+
 func (c *Client) CreateProjectVariable(ctx context.Context, projectRef string, req *gwapitypes.CreateVariableRequest) (*gwapitypes.VariableResponse, *http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
@@ -262,6 +301,19 @@ func (c *Client) UpdateProjectVariable(ctx context.Context, projectRef, variable
 
 func (c *Client) DeleteProjectVariable(ctx context.Context, projectRef, variableName string) (*http.Response, error) {
 	return c.getResponse(ctx, "DELETE", path.Join("/projects", url.PathEscape(projectRef), "variables", variableName), nil, jsonContent, nil)
+}
+
+func (c *Client) GetProjectVariables(ctx context.Context, projectRef string, tree, removeoverridden bool) ([]*gwapitypes.VariableResponse, *http.Response, error) {
+	variables := []*gwapitypes.VariableResponse{}
+	q := url.Values{}
+	if tree {
+		q.Add("tree", "")
+	}
+	if removeoverridden {
+		q.Add("removeoverridden", "")
+	}
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s/variables", url.PathEscape(projectRef)), q, jsonContent, nil, &variables)
+	return variables, resp, err
 }
 
 func (c *Client) DeleteProject(ctx context.Context, projectRef string) (*http.Response, error) {
