@@ -34,7 +34,7 @@ func init() {
 	flags.StringVar(&variableUpdateOpts.parentRef, "projectgroup", "", "project group id or full path")
 	flags.StringVarP(&variableUpdateOpts.name, "name", "n", "", "variable name")
 	flags.StringVarP(&variableUpdateOpts.newName, "new-name", "", "", "variable new name")
-	flags.StringVarP(&variableUpdateOpts.file, "file", "f", "", `yaml file containing the variable definition (use "-" to read from stdin`)
+	flags.StringVarP(&variableUpdateOpts.file, "file", "f", "", `yaml file containing the variable definition (use "-" to read from stdin)`)
 
 	if err := cmdProjectGroupVariableUpdate.MarkFlagRequired("projectgroup"); err != nil {
 		log.Fatal(err)

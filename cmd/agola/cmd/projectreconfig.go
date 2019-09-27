@@ -25,7 +25,7 @@ import (
 
 var cmdProjectReconfig = &cobra.Command{
 	Use:   "reconfig",
-	Short: "reconfigures a project remote (reinstalls ssh deploy key and webhooks",
+	Short: "reconfigures a project remote (reinstalls ssh deploy key and webhooks)",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := projectReconfig(cmd, args); err != nil {
 			log.Fatalf("err: %v", err)

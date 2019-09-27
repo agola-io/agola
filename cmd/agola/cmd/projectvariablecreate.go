@@ -30,8 +30,8 @@ import (
 
 var cmdProjectVariableCreate = &cobra.Command{
 	Use:   "create",
-	Short: "create a project group variable",
-	Long: `create a project group variable
+	Short: "create a project variable",
+	Long: `create a project variable
 
 The variable values should be provided by a yaml document. Examples:
 
@@ -73,7 +73,7 @@ func init() {
 
 	flags.StringVar(&variableCreateOpts.parentRef, "project", "", "project id or full path")
 	flags.StringVarP(&variableCreateOpts.name, "name", "n", "", "variable name")
-	flags.StringVarP(&variableCreateOpts.file, "file", "f", "", `yaml file containing the variable definition (use "-" to read from stdin`)
+	flags.StringVarP(&variableCreateOpts.file, "file", "f", "", `yaml file containing the variable definition (use "-" to read from stdin)`)
 
 	if err := cmdProjectVariableCreate.MarkFlagRequired("project"); err != nil {
 		log.Fatal(err)

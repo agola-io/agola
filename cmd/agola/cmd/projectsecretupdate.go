@@ -59,7 +59,7 @@ func init() {
 	flags.StringVar(&secretUpdateOpts.parentRef, "project", "", "project id or full path")
 	flags.StringVarP(&secretUpdateOpts.name, "name", "n", "", "secret name")
 	flags.StringVarP(&secretUpdateOpts.newName, "new-name", "", "", "secret new name")
-	flags.StringVarP(&secretUpdateOpts.file, "file", "f", "", `yaml file containing the secret data (use "-" to read from stdin`)
+	flags.StringVarP(&secretUpdateOpts.file, "file", "f", "", `yaml file containing the secret data (use "-" to read from stdin)`)
 
 	if err := cmdProjectSecretUpdate.MarkFlagRequired("project"); err != nil {
 		log.Fatal(err)

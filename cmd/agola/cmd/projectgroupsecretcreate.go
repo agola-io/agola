@@ -40,7 +40,7 @@ func init() {
 
 	flags.StringVar(&secretCreateOpts.parentRef, "projectgroup", "", "project group id or full path")
 	flags.StringVarP(&secretCreateOpts.name, "name", "n", "", "secret name")
-	flags.StringVarP(&secretCreateOpts.file, "file", "f", "", `yaml file containing the secret data (use "-" to read from stdin`)
+	flags.StringVarP(&secretCreateOpts.file, "file", "f", "", `yaml file containing the secret data (use "-" to read from stdin)`)
 
 	if err := cmdProjectGroupSecretCreate.MarkFlagRequired("projectgroup"); err != nil {
 		log.Fatal(err)
