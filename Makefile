@@ -7,7 +7,7 @@ REPO_PATH=agola.io/agola
 
 VERSION ?= $(shell scripts/git-version.sh)
 
-LD_FLAGS="-w -X $(REPO_PATH)/version.Version=$(VERSION)"
+LD_FLAGS="-w -X $(REPO_PATH)/cmd.Version=$(VERSION)"
 
 $(shell mkdir -p bin )
 $(shell mkdir -p tools/bin )
