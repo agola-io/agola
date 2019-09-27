@@ -180,8 +180,10 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 }
 
 type UpdateProjectRequest struct {
-	Name       string
-	Visibility cstypes.Visibility
+	Name      *string
+	ParentRef *string
+
+	Visibility *cstypes.Visibility
 }
 
 func (h *ActionHandler) UpdateProject(ctx context.Context, projectRef string, req *UpdateProjectRequest) (*csapitypes.Project, error) {
@@ -198,8 +200,15 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, projectRef string, re
 		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
-	p.Name = req.Name
-	p.Visibility = req.Visibility
+	if req.Name != nil {
+		p.Name = *req.Name
+	}
+	if req.ParentRef != nil {
+		p.Parent.ID = *req.ParentRef
+	}
+	if req.Visibility != nil {
+		p.Visibility = *req.Visibility
+	}
 
 	h.log.Infof("updating project")
 	rp, resp, err := h.configstoreClient.UpdateProject(ctx, p.ID, p.Project)

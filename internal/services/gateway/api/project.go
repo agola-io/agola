@@ -94,9 +94,16 @@ func (h *UpdateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	var visibility *cstypes.Visibility
+	if req.Visibility != nil {
+		v := cstypes.Visibility(*req.Visibility)
+		visibility = &v
+	}
+
 	areq := &action.UpdateProjectRequest{
 		Name:       req.Name,
-		Visibility: cstypes.Visibility(req.Visibility),
+		ParentRef:  req.ParentRef,
+		Visibility: visibility,
 	}
 	project, err := h.ah.UpdateProject(ctx, projectRef, areq)
 	if httpError(w, err) {
