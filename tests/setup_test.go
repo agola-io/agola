@@ -93,11 +93,32 @@ func setupGitea(t *testing.T, dir, dockerBridgeAddress string) *testutil.TestGit
 	if err := tgitea.Start(); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	time.Sleep(5 * time.Second)
 
-	cmd := exec.Command(tgitea.GiteaPath, "admin", "create-user", "--name", giteaUser01, "--email", giteaUser01+"@example.com", "--password", "password", "--admin", "--config", tgitea.ConfigPath)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("unexpected err: %v, out: %s", err, out)
+	// wait for gitea ready
+	err = testutil.Wait(30*time.Second, func() (bool, error) {
+		cmd := exec.Command(tgitea.GiteaPath, "admin", "create-user", "--name", giteaUser01, "--email", giteaUser01+"@example.com", "--password", "password", "--admin", "--config", tgitea.ConfigPath)
+		// just retry until no error
+		if err := cmd.Run(); err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
+	giteaClient := gitea.NewClient(giteaAPIURL, "")
+
+	// Wait for gitea api to be ready
+	err = testutil.Wait(30*time.Second, func() (bool, error) {
+		if _, err := giteaClient.ListAccessTokens(giteaUser01, "password"); err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
 	}
 
 	return tgitea
