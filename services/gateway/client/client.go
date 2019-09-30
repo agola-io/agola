@@ -160,6 +160,17 @@ func (c *Client) CreateProject(ctx context.Context, req *gwapitypes.CreateProjec
 	return project, resp, err
 }
 
+func (c *Client) UpdateProject(ctx context.Context, projectRef string, req *gwapitypes.UpdateProjectRequest) (*gwapitypes.ProjectResponse, *http.Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	project := new(gwapitypes.ProjectResponse)
+	resp, err := c.getParsedResponse(ctx, "PUT", path.Join("/projects", url.PathEscape(projectRef)), nil, jsonContent, bytes.NewReader(reqj), project)
+	return project, resp, err
+}
+
 func (c *Client) CreateProjectGroupSecret(ctx context.Context, projectGroupRef string, req *gwapitypes.CreateSecretRequest) (*gwapitypes.SecretResponse, *http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
