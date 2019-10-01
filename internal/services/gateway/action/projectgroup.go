@@ -105,8 +105,10 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProje
 }
 
 type UpdateProjectGroupRequest struct {
-	Name       string
-	Visibility cstypes.Visibility
+	Name      *string
+	ParentRef *string
+
+	Visibility *cstypes.Visibility
 }
 
 func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, projectGroupRef string, req *UpdateProjectGroupRequest) (*csapitypes.ProjectGroup, error) {
@@ -123,8 +125,15 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, projectGroupRef 
 		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
-	pg.Name = req.Name
-	pg.Visibility = req.Visibility
+	if req.Name != nil {
+		pg.Name = *req.Name
+	}
+	if req.ParentRef != nil {
+		pg.Parent.ID = *req.ParentRef
+	}
+	if req.Visibility != nil {
+		pg.Visibility = *req.Visibility
+	}
 
 	h.log.Infof("updating project group")
 	rp, resp, err := h.configstoreClient.UpdateProjectGroup(ctx, pg.ID, pg.ProjectGroup)

@@ -100,9 +100,16 @@ func (h *UpdateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	var visibility *cstypes.Visibility
+	if req.Visibility != nil {
+		v := cstypes.Visibility(*req.Visibility)
+		visibility = &v
+	}
+
 	areq := &action.UpdateProjectGroupRequest{
 		Name:       req.Name,
-		Visibility: cstypes.Visibility(req.Visibility),
+		ParentRef:  req.ParentRef,
+		Visibility: visibility,
 	}
 	projectGroup, err := h.ah.UpdateProjectGroup(ctx, projectGroupRef, areq)
 	if httpError(w, err) {
