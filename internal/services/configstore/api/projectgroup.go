@@ -30,7 +30,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
-	errors "golang.org/x/xerrors"
 )
 
 func projectGroupResponse(ctx context.Context, readDB *readdb.ReadDB, projectGroup *types.ProjectGroup) (*csapitypes.ProjectGroup, error) {
@@ -82,11 +81,12 @@ func projectGroupsResponse(ctx context.Context, readDB *readdb.ReadDB, projectGr
 
 type ProjectGroupHandler struct {
 	log    *zap.SugaredLogger
+	ah     *action.ActionHandler
 	readDB *readdb.ReadDB
 }
 
-func NewProjectGroupHandler(logger *zap.Logger, readDB *readdb.ReadDB) *ProjectGroupHandler {
-	return &ProjectGroupHandler{log: logger.Sugar(), readDB: readDB}
+func NewProjectGroupHandler(logger *zap.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *ProjectGroupHandler {
+	return &ProjectGroupHandler{log: logger.Sugar(), ah: ah, readDB: readDB}
 }
 
 func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -99,20 +99,9 @@ func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var projectGroup *types.ProjectGroup
-	err = h.readDB.Do(ctx, func(tx *db.Tx) error {
-		var err error
-		projectGroup, err = h.readDB.GetProjectGroup(tx, projectGroupRef)
-		return err
-	})
-	if err != nil {
+	projectGroup, err := h.ah.GetProjectGroup(ctx, projectGroupRef)
+	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
-		return
-	}
-
-	if projectGroup == nil {
-		httpError(w, util.NewErrNotFound(errors.Errorf("project group %q doesn't exist", projectGroupRef)))
 		return
 	}
 

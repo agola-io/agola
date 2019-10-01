@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"path"
+	"strings"
 
 	"agola.io/agola/internal/datamanager"
 	"agola.io/agola/internal/db"
@@ -27,6 +28,24 @@ import (
 	uuid "github.com/satori/go.uuid"
 	errors "golang.org/x/xerrors"
 )
+
+func (h *ActionHandler) GetProjectGroup(ctx context.Context, projectGroupRef string) (*types.ProjectGroup, error) {
+	var projectGroup *types.ProjectGroup
+	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+		var err error
+		projectGroup, err = h.readDB.GetProjectGroup(tx, projectGroupRef)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if projectGroup == nil {
+		return nil, util.NewErrNotFound(errors.Errorf("project group %q doesn't exist", projectGroupRef))
+	}
+
+	return projectGroup, nil
+}
 
 func (h *ActionHandler) GetProjectGroupSubgroups(ctx context.Context, projectGroupRef string) ([]*types.ProjectGroup, error) {
 	var projectGroups []*types.ProjectGroup
@@ -109,6 +128,10 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, projectGroup *ty
 		return nil, err
 	}
 
+	if projectGroup.Parent.Type != types.ConfigTypeProjectGroup {
+		return nil, util.NewErrBadRequest(errors.Errorf("wrong project group parent type %q", projectGroup.Parent.Type))
+	}
+
 	var cgt *datamanager.ChangeGroupsUpdateToken
 
 	// must do all the checks in a single transaction to avoid concurrent changes
@@ -120,6 +143,9 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, projectGroup *ty
 		if parentProjectGroup == nil {
 			return util.NewErrBadRequest(errors.Errorf("project group with id %q doesn't exist", projectGroup.Parent.ID))
 		}
+		// TODO(sgotti) now we are doing a very ugly thing setting the request
+		// projectgroup parent ID that can be both an ID or a ref. Then we are fixing
+		// it to an ID here. Change the request format to avoid this.
 		projectGroup.Parent.ID = parentProjectGroup.ID
 
 		groupPath, err := h.readDB.GetProjectGroupPath(tx, parentProjectGroup)
@@ -194,14 +220,28 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, req *UpdateProje
 		if pg == nil {
 			return util.NewErrBadRequest(errors.Errorf("project group with ref %q doesn't exist", req.ProjectGroupRef))
 		}
-		// check that the project.ID matches
+		// check that the project group ID matches
 		if pg.ID != req.ProjectGroup.ID {
 			return util.NewErrBadRequest(errors.Errorf("project group with ref %q has a different id", req.ProjectGroupRef))
 		}
 
-		// check parent exists
-		switch pg.Parent.Type {
+		if pg.Parent.Type != req.ProjectGroup.Parent.Type {
+			return util.NewErrBadRequest(errors.Errorf("changing project group parent type isn't supported"))
+		}
+
+		switch req.ProjectGroup.Parent.Type {
+		case types.ConfigTypeOrg:
+			fallthrough
+		case types.ConfigTypeUser:
+			// Cannot update root project group parent
+			if pg.Parent.Type != req.ProjectGroup.Parent.Type || pg.Parent.ID != req.ProjectGroup.Parent.ID {
+				return util.NewErrBadRequest(errors.Errorf("cannot change root project group parent type or id"))
+			}
+			// if the project group is a root project group force the name to be empty
+			req.ProjectGroup.Name = ""
+
 		case types.ConfigTypeProjectGroup:
+			// check parent exists
 			group, err := h.readDB.GetProjectGroup(tx, req.ProjectGroup.Parent.ID)
 			if err != nil {
 				return err
@@ -209,30 +249,25 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, req *UpdateProje
 			if group == nil {
 				return util.NewErrBadRequest(errors.Errorf("project group with id %q doesn't exist", req.ProjectGroup.Parent.ID))
 			}
+			// TODO(sgotti) now we are doing a very ugly thing setting the request
+			// projectgroup parent ID that can be both an ID or a ref. Then we are fixing
+			// it to an ID here. Change the request format to avoid this.
+			req.ProjectGroup.Parent.ID = group.ID
 		}
 
-		// currently we don't support changing parent
-		// TODO(sgotti) handle project move (changed parent project group)
-		if pg.Parent.Type != req.ProjectGroup.Parent.Type {
-			return util.NewErrBadRequest(errors.Errorf("changing project group parent isn't supported"))
-		}
-		if pg.Parent.ID != req.ProjectGroup.Parent.ID {
-			return util.NewErrBadRequest(errors.Errorf("changing project group parent isn't supported"))
-		}
-
-		// if the project group is a root project group force the name to be empty
-		if pg.Parent.Type == types.ConfigTypeOrg ||
-			pg.Parent.Type == types.ConfigTypeUser {
-			req.ProjectGroup.Name = ""
-		}
-
-		pgPath, err := h.readDB.GetProjectGroupPath(tx, pg)
+		curPGParentPath, err := h.readDB.GetPath(tx, pg.Parent.Type, pg.Parent.ID)
 		if err != nil {
 			return err
 		}
-		pgp := path.Join(path.Dir(pgPath), req.ProjectGroup.Name)
+		curPGP := path.Join(curPGParentPath, pg.Name)
 
-		if pg.Name != req.ProjectGroup.Name {
+		pgParentPath, err := h.readDB.GetPath(tx, req.ProjectGroup.Parent.Type, req.ProjectGroup.Parent.ID)
+		if err != nil {
+			return err
+		}
+		pgp := path.Join(pgParentPath, req.ProjectGroup.Name)
+
+		if pg.Name != req.ProjectGroup.Name || pg.Parent.ID != req.ProjectGroup.Parent.ID {
 			// check duplicate project group name
 			ap, err := h.readDB.GetProjectGroupByName(tx, req.ProjectGroup.Parent.ID, req.ProjectGroup.Name)
 			if err != nil {
@@ -241,11 +276,21 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, req *UpdateProje
 			if ap != nil {
 				return util.NewErrBadRequest(errors.Errorf("project group with name %q, path %q already exists", req.ProjectGroup.Name, pgp))
 			}
+			// Cannot move inside itself or a child project group
+			if strings.HasPrefix(pgp, curPGP+"/") {
+				return util.NewErrBadRequest(errors.Errorf("cannot move project group inside itself or child project group"))
+			}
 		}
 
 		// changegroup is the project group path. Use "projectpath" prefix as it must
 		// cover both projects and projectgroups
 		cgNames := []string{util.EncodeSha256Hex("projectpath-" + pgp)}
+
+		// add new projectpath
+		if pg.Parent.ID != req.ProjectGroup.Parent.ID {
+			cgNames = append(cgNames, util.EncodeSha256Hex("projectpath-"+pgp))
+		}
+
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
 			return err
