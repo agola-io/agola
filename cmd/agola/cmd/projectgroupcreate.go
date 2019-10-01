@@ -75,11 +75,11 @@ func projectGroupCreate(cmd *cobra.Command, args []string) error {
 
 	log.Infof("creating project group")
 
-	project, _, err := gwclient.CreateProjectGroup(context.TODO(), req)
+	projectGroup, _, err := gwclient.CreateProjectGroup(context.TODO(), req)
 	if err != nil {
 		return errors.Errorf("failed to create project group: %w", err)
 	}
-	log.Infof("project group %s created, ID: %s", project.Name, project.ID)
+	log.Infof("project group %s created, ID: %s", projectGroup.Name, projectGroup.ID)
 
 	return nil
 }
