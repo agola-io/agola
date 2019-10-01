@@ -292,6 +292,12 @@ func (h *ActionHandler) DeleteProjectGroup(ctx context.Context, projectGroupRef 
 			return util.NewErrBadRequest(errors.Errorf("project group %q doesn't exist", projectGroupRef))
 		}
 
+		// cannot delete root project group
+		if projectGroup.Parent.Type == types.ConfigTypeOrg ||
+			projectGroup.Parent.Type == types.ConfigTypeUser {
+			return util.NewErrBadRequest(errors.Errorf("cannot delete root project group"))
+		}
+
 		// changegroup is the project group id.
 		cgNames := []string{util.EncodeSha256Hex(projectGroup.ID)}
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
