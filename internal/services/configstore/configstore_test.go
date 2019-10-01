@@ -617,7 +617,7 @@ func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 
 	ctx := context.Background()
 
-	cs, tetcd := setupConfigstore(ctx,t, dir)
+	cs, tetcd := setupConfigstore(ctx, t, dir)
 	defer shutdownEtcd(tetcd)
 
 	t.Logf("starting cs")
@@ -764,7 +764,7 @@ func TestProjectUpdate(t *testing.T) {
 
 	ctx := context.Background()
 
-	cs, tetcd := setupConfigstore(ctx,t, dir)
+	cs, tetcd := setupConfigstore(ctx, t, dir)
 	defer shutdownEtcd(tetcd)
 
 	t.Logf("starting cs")
@@ -840,7 +840,7 @@ func TestProjectGroupDelete(t *testing.T) {
 
 	ctx := context.Background()
 
-	cs, tetcd := setupConfigstore(ctx,t, dir)
+	cs, tetcd := setupConfigstore(ctx, t, dir)
 	defer shutdownEtcd(tetcd)
 
 	t.Logf("starting cs")
@@ -851,10 +851,6 @@ func TestProjectGroupDelete(t *testing.T) {
 	// TODO(sgotti) change the sleep with a real check that all is ready
 	time.Sleep(2 * time.Second)
 
-	//user, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"})
-	//if err != nil {
-	//	t.Fatalf("unexpected err: %v", err)
-	//}
 	org, err := cs.ah.CreateOrg(ctx, &types.Organization{Name: "org01", Visibility: types.VisibilityPublic})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -869,7 +865,63 @@ func TestProjectGroupDelete(t *testing.T) {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	//create a child projectgroup in org root project group
+	// create a child projectgroup in org root project group
+	_, err = cs.ah.CreateProjectGroup(ctx, &types.ProjectGroup{Name: "subprojectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: pg01.ID}, Visibility: types.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	t.Run("delete root project group", func(t *testing.T) {
+		expectedErr := "cannot delete root project group"
+		err := cs.ah.DeleteProjectGroup(ctx, path.Join("org", org.Name))
+		if err.Error() != expectedErr {
+			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+		}
+	})
+
+	t.Run("delete project group", func(t *testing.T) {
+		err := cs.ah.DeleteProjectGroup(ctx, pg01.ID)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+	})
+}
+
+func TestProjectGroupDeleteDontSeeOldChildObjects(t *testing.T) {
+	dir, err := ioutil.TempDir("", "agola")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	ctx := context.Background()
+
+	cs, tetcd := setupConfigstore(ctx, t, dir)
+	defer shutdownEtcd(tetcd)
+
+	t.Logf("starting cs")
+	go func() {
+		_ = cs.Run(ctx)
+	}()
+
+	// TODO(sgotti) change the sleep with a real check that all is ready
+	time.Sleep(2 * time.Second)
+
+	org, err := cs.ah.CreateOrg(ctx, &types.Organization{Name: "org01", Visibility: types.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// TODO(sgotti) change the sleep with a real check that user is in readdb
+	time.Sleep(2 * time.Second)
+
+	// create a projectgroup in org root project group
+	pg01, err := cs.ah.CreateProjectGroup(ctx, &types.ProjectGroup{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// create a child projectgroup in org root project group
 	spg01, err := cs.ah.CreateProjectGroup(ctx, &types.ProjectGroup{Name: "subprojectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: pg01.ID}, Visibility: types.VisibilityPublic})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -892,7 +944,7 @@ func TestProjectGroupDelete(t *testing.T) {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	// delete root projectgroup
+	// delete projectgroup
 	if err = cs.ah.DeleteProjectGroup(ctx, pg01.ID); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -979,7 +1031,7 @@ func TestOrgMembers(t *testing.T) {
 
 	ctx := context.Background()
 
-	cs, tetcd := setupConfigstore(ctx,t, dir)
+	cs, tetcd := setupConfigstore(ctx, t, dir)
 	defer shutdownEtcd(tetcd)
 
 	t.Logf("starting cs")
@@ -1215,7 +1267,7 @@ func TestRemoteSource(t *testing.T) {
 			}
 			ctx := context.Background()
 
-			cs, tetcd := setupConfigstore(ctx,t, dir)
+			cs, tetcd := setupConfigstore(ctx, t, dir)
 			defer shutdownEtcd(tetcd)
 
 			t.Logf("starting cs")
