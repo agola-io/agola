@@ -32,7 +32,6 @@ import (
 	"agola.io/agola/internal/objectstorage/posix"
 	ostypes "agola.io/agola/internal/objectstorage/types"
 	"agola.io/agola/internal/testutil"
-	"agola.io/agola/internal/util"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -740,7 +739,6 @@ func testCheckpoint(t *testing.T, basePath string) {
 func checkDataFiles(ctx context.Context, t *testing.T, dm *DataManager, expectedEntriesMap map[string]*DataEntry) error {
 	// read the data file
 	curDataStatus, err := dm.GetLastDataStatus()
-	t.Logf("curDataStatus: %s", util.Dump(curDataStatus))
 	if err != nil {
 		return err
 	}
@@ -749,9 +747,7 @@ func checkDataFiles(ctx context.Context, t *testing.T, dm *DataManager, expected
 
 	for dataType := range curDataStatus.Files {
 		var prevLastEntryID string
-		t.Logf("dataType: %q", dataType)
 		for i, file := range curDataStatus.Files[dataType] {
-			t.Logf("data file: %d %q", i, file)
 			dataFileIndexf, err := dm.ost.ReadObject(dm.DataFileIndexPath(dataType, file.ID))
 			if err != nil {
 				return err
