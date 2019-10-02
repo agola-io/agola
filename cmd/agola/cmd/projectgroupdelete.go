@@ -23,41 +23,41 @@ import (
 	errors "golang.org/x/xerrors"
 )
 
-var cmdProjectDelete = &cobra.Command{
+var cmdProjectGroupDelete = &cobra.Command{
 	Use:   "delete",
-	Short: "delete a project",
+	Short: "delete a project group",
 	Run: func(cmd *cobra.Command, args []string) {
-		if err := projectDelete(cmd, args); err != nil {
+		if err := projectGroupDelete(cmd, args); err != nil {
 			log.Fatalf("err: %v", err)
 		}
 	},
 }
 
-type projectDeleteOptions struct {
+type projectGroupDeleteOptions struct {
 	ref string
 }
 
-var projectDeleteOpts projectDeleteOptions
+var projectGroupDeleteOpts projectGroupDeleteOptions
 
 func init() {
-	flags := cmdProjectDelete.Flags()
+	flags := cmdProjectGroupDelete.Flags()
 
-	flags.StringVar(&projectDeleteOpts.ref, "ref", "", "project path or id")
+	flags.StringVarP(&projectGroupDeleteOpts.ref, "ref", "", "", "current project group path or id")
 
-	if err := cmdProjectDelete.MarkFlagRequired("ref"); err != nil {
+	if err := cmdProjectGroupDelete.MarkFlagRequired("ref"); err != nil {
 		log.Fatal(err)
 	}
 
-	cmdProject.AddCommand(cmdProjectDelete)
+	cmdProjectGroup.AddCommand(cmdProjectGroupDelete)
 }
 
-func projectDelete(cmd *cobra.Command, args []string) error {
+func projectGroupDelete(cmd *cobra.Command, args []string) error {
 	gwclient := gwclient.NewClient(gatewayURL, token)
 
-	log.Infof("deleting project")
+	log.Infof("deleting project group")
 
-	if _, err := gwclient.DeleteProject(context.TODO(), projectDeleteOpts.ref); err != nil {
-		return errors.Errorf("failed to delete project: %w", err)
+	if _, err := gwclient.DeleteProjectGroup(context.TODO(), projectGroupDeleteOpts.ref); err != nil {
+		return errors.Errorf("failed to delete project group: %w", err)
 	}
 
 	return nil
