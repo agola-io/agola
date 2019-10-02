@@ -140,9 +140,20 @@ func (c *Client) CreateProjectGroup(ctx context.Context, req *gwapitypes.CreateP
 		return nil, nil, err
 	}
 
-	project := new(gwapitypes.ProjectResponse)
-	resp, err := c.getParsedResponse(ctx, "POST", "/projectgroups", nil, jsonContent, bytes.NewReader(reqj), project)
-	return project, resp, err
+	projectGroup := new(gwapitypes.ProjectResponse)
+	resp, err := c.getParsedResponse(ctx, "POST", "/projectgroups", nil, jsonContent, bytes.NewReader(reqj), projectGroup)
+	return projectGroup, resp, err
+}
+
+func (c *Client) UpdateProjectGroup(ctx context.Context, projectGroupRef string, req *gwapitypes.UpdateProjectGroupRequest) (*gwapitypes.ProjectResponse, *http.Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	projectGroup := new(gwapitypes.ProjectResponse)
+	resp, err := c.getParsedResponse(ctx, "PUT", path.Join("/projectgroups", url.PathEscape(projectGroupRef)), nil, jsonContent, bytes.NewReader(reqj), projectGroup)
+	return projectGroup, resp, err
 }
 
 func (c *Client) DeleteProjectGroup(ctx context.Context, projectGroupRef string) (*http.Response, error) {
