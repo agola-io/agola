@@ -125,7 +125,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	}
 	for _, ec := range serveOpts.components {
 		if !util.StringInSlice(componentsNames, ec) {
-			return errors.Errorf("unkown component name %q", ec)
+			return errors.Errorf("unknown component name %q", ec)
 		}
 	}
 
