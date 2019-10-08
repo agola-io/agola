@@ -584,3 +584,9 @@ func (c *Client) GetOrgMembers(ctx context.Context, orgRef string) (*gwapitypes.
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s/members", orgRef), nil, jsonContent, nil, &res)
 	return res, resp, err
 }
+
+func (c *Client) GetVersion(ctx context.Context) (*gwapitypes.VersionResponse, *http.Response, error) {
+	res := &gwapitypes.VersionResponse{}
+	resp, err := c.getParsedResponse(ctx, "GET", "/version", nil, jsonContent, nil, &res)
+	return res, resp, err
+}

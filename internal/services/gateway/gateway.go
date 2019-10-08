@@ -215,6 +215,8 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	badgeHandler := api.NewBadgeHandler(logger, g.ah)
 
+	versionHandler := api.NewVersionHandler(logger, g.ah)
+
 	reposHandler := api.NewReposHandler(logger, g.c.GitserverURL)
 
 	loginUserHandler := api.NewLoginUserHandler(logger, g.ah)
@@ -303,6 +305,8 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/user/remoterepos/{remotesourceref}", authForcedHandler(userRemoteReposHandler)).Methods("GET")
 
 	apirouter.Handle("/badges/{projectref}", badgeHandler).Methods("GET")
+
+	apirouter.Handle("/version", versionHandler).Methods("GET")
 
 	// TODO(sgotti) add auth to these requests
 	reposRouter.Handle("/repos/{rest:.*}", reposHandler).Methods("GET", "POST")
