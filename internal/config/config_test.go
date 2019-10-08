@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	errors "golang.org/x/xerrors"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 func TestParseConfig(t *testing.T) {
@@ -324,11 +325,18 @@ func TestParseOutput(t *testing.T) {
                           type: pod
                           containers:
                             - image: image01
+                              volumes:
+                                - path: /mnt/tmpfs
+                                  tmpfs:
+                                    size: 1Gi
                       - name: task04
                         runtime:
                           type: pod
                           containers:
                             - image: image01
+                              volumes:
+                                - path: /mnt/tmpfs
+                                  tmpfs: {}
           `,
 			out: &Config{
 				Runs: []*Run{
@@ -488,7 +496,8 @@ func TestParseOutput(t *testing.T) {
 									Arch: "",
 									Containers: []*Container{
 										&Container{
-											Image: "image01",
+											Image:   "image01",
+											Volumes: []Volume{{Path: "/mnt/tmpfs", TmpFS: &VolumeTmpFS{Size: resource.NewQuantity(1024*1024*1024, resource.BinarySI)}}},
 										},
 									},
 								},
@@ -503,7 +512,8 @@ func TestParseOutput(t *testing.T) {
 									Arch: "",
 									Containers: []*Container{
 										&Container{
-											Image: "image01",
+											Image:   "image01",
+											Volumes: []Volume{{Path: "/mnt/tmpfs", TmpFS: &VolumeTmpFS{}}},
 										},
 									},
 								},
@@ -524,7 +534,16 @@ func TestParseOutput(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if diff := cmp.Diff(tt.out, out); diff != "" {
+			if diff := cmp.Diff(tt.out, out, cmp.Comparer(func(x, y *resource.Quantity) bool {
+				if x == nil && y == nil {
+					return true
+				}
+				if x != nil && y != nil {
+					return x.Cmp(*y) == 0
+				}
+
+				return false
+			})); diff != "" {
 				t.Error(diff)
 			}
 		})

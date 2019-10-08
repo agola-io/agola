@@ -259,6 +259,49 @@ func TestK8sPod(t *testing.T) {
 		}
 	})
 
+	t.Run("test pod with a tmpfs volume", func(t *testing.T) {
+		pod, err := d.NewPod(ctx, &PodConfig{
+			ID:     uuid.NewV4().String(),
+			TaskID: uuid.NewV4().String(),
+			Containers: []*ContainerConfig{
+				&ContainerConfig{
+					Cmd:   []string{"cat"},
+					Image: "busybox",
+					Volumes: []Volume{
+						{
+							Path: "/mnt/tmpfs",
+							TmpFS: &VolumeTmpFS{
+								Size: 1024 * 1024,
+							},
+						},
+					},
+				},
+			},
+			InitVolumeDir: "/tmp/agola",
+		}, ioutil.Discard)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		defer func() { _ = pod.Remove(ctx) }()
+
+		var buf bytes.Buffer
+		ce, err := pod.Exec(ctx, &ExecConfig{
+			// k8s doesn't set size=1024k in the tmpf mount options but uses other modes to detect the size
+			Cmd:    []string{"sh", "-c", "if [ $(cat /proc/mounts | grep /mnt/tmpfs | wc -l ) -ne 1 ]; then exit 1; fi"},
+			Stdout: &buf,
+		})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		code, err := ce.Wait(ctx)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if code != 0 {
+			t.Fatalf("unexpected exit code: %d", code)
+		}
+	})
 }
 
 func TestParseGitVersion(t *testing.T) {

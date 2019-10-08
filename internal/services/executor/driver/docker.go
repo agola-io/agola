@@ -36,6 +36,7 @@ import (
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/stdcopy"
@@ -285,11 +286,28 @@ func (d *DockerDriver) createContainer(ctx context.Context, index int, podConfig
 	}
 	if index == 0 {
 		// main container requires the initvolume containing the toolbox
+		// TODO(sgotti) migrate this to cliHostConfig.Mounts
 		cliHostConfig.Binds = []string{fmt.Sprintf("%s:%s", d.initVolumeHostDir, podConfig.InitVolumeDir)}
 		cliHostConfig.ReadonlyPaths = []string{fmt.Sprintf("%s:%s", d.initVolumeHostDir, podConfig.InitVolumeDir)}
 	} else {
 		// attach other containers to maincontainer network
 		cliHostConfig.NetworkMode = container.NetworkMode(fmt.Sprintf("container:%s", maincontainerID))
+	}
+
+	for _, vol := range containerConfig.Volumes {
+		if vol.TmpFS != nil {
+			cliHostConfig.Mounts = []mount.Mount{
+				mount.Mount{
+					Type:   mount.TypeTmpfs,
+					Target: vol.Path,
+					TmpfsOptions: &mount.TmpfsOptions{
+						SizeBytes: vol.TmpFS.Size,
+					},
+				},
+			}
+		} else {
+			return nil, errors.Errorf("missing volume config")
+		}
 	}
 
 	resp, err := d.client.ContainerCreate(ctx, cliContainerConfig, cliHostConfig, nil, "")

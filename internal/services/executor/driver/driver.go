@@ -93,6 +93,17 @@ type ContainerConfig struct {
 	Image      string
 	User       string
 	Privileged bool
+	Volumes    []Volume
+}
+
+type Volume struct {
+	Path string
+
+	TmpFS *VolumeTmpFS
+}
+
+type VolumeTmpFS struct {
+	Size int64
 }
 
 type ExecConfig struct {
