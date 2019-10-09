@@ -26,6 +26,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/google/go-jsonnet"
 	errors "golang.org/x/xerrors"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const (
@@ -92,6 +93,17 @@ type Container struct {
 	User        string           `json:"user"`
 	Privileged  bool             `json:"privileged"`
 	Entrypoint  string           `json:"entrypoint"`
+	Volumes     []Volume         `json:"volumes"`
+}
+
+type Volume struct {
+	Path string `json:"path"`
+
+	TmpFS *VolumeTmpFS `json:"tmpfs"`
+}
+
+type VolumeTmpFS struct {
+	Size *resource.Quantity `json:"size"`
 }
 
 type Run struct {
@@ -709,6 +721,14 @@ func checkConfig(config *Config) error {
 			if r.Arch != "" {
 				if !types.IsValidArch(r.Arch) {
 					return errors.Errorf("task %q runtime: invalid arch %q", task.Name, r.Arch)
+				}
+			}
+
+			for _, container := range r.Containers {
+				for _, vol := range container.Volumes {
+					if vol.TmpFS == nil {
+						return errors.Errorf("no volume config specified")
+					}
 				}
 			}
 		}

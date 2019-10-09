@@ -893,13 +893,27 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 			cmd = strings.Split(c.Entrypoint, " ")
 		}
 
-		podConfig.Containers[i] = &driver.ContainerConfig{
+		containerConfig := &driver.ContainerConfig{
 			Image:      c.Image,
 			Cmd:        cmd,
 			Env:        c.Environment,
 			User:       c.User,
 			Privileged: c.Privileged,
+			Volumes:    make([]driver.Volume, len(c.Volumes)),
 		}
+
+		for vIndex, cVol := range c.Volumes {
+			containerConfig.Volumes[vIndex] = driver.Volume{
+				Path: cVol.Path,
+			}
+			if cVol.TmpFS != nil {
+				containerConfig.Volumes[vIndex].TmpFS = &driver.VolumeTmpFS{
+					Size: cVol.TmpFS.Size,
+				}
+			}
+		}
+
+		podConfig.Containers[i] = containerConfig
 	}
 
 	_, _ = outf.WriteString("Starting pod.\n")

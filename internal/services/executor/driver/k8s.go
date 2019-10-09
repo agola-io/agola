@@ -35,6 +35,7 @@ import (
 	errors "golang.org/x/xerrors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apilabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/watch"
@@ -416,6 +417,37 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 				},
 			}
 		}
+
+		for vIndex, cVol := range containerConfig.Volumes {
+			var vol corev1.Volume
+			var volMount corev1.VolumeMount
+			if cVol.TmpFS != nil {
+				name := fmt.Sprintf("volume-%d-%d", cIndex, vIndex)
+				var sizeLimit *resource.Quantity
+				if cVol.TmpFS.Size != 0 {
+					sizeLimit = resource.NewQuantity(cVol.TmpFS.Size, resource.BinarySI)
+				}
+				vol = corev1.Volume{
+					Name: name,
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{
+							Medium:    corev1.StorageMediumMemory,
+							SizeLimit: sizeLimit,
+						},
+					},
+				}
+				volMount = corev1.VolumeMount{
+					Name:      name,
+					MountPath: cVol.Path,
+				}
+			} else {
+				return nil, errors.Errorf("missing volume config")
+			}
+
+			pod.Spec.Volumes = append(pod.Spec.Volumes, vol)
+			c.VolumeMounts = append(c.VolumeMounts, volMount)
+		}
+
 		pod.Spec.Containers = append(pod.Spec.Containers, c)
 	}
 

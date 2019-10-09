@@ -23,6 +23,7 @@ import (
 	"agola.io/agola/internal/util"
 	rstypes "agola.io/agola/services/runservice/types"
 	"agola.io/agola/services/types"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/google/go-cmp/cmp"
 	errors "golang.org/x/xerrors"
@@ -721,6 +722,16 @@ func TestGenRunConfig(t *testing.T) {
 												"ENVFROMVARIABLE01": config.Value{Type: config.ValueTypeFromVariable, Value: "variable01"},
 											},
 											User: "",
+											Volumes: []config.Volume{
+												config.Volume{
+													Path:  "/mnt/vol01",
+													TmpFS: &config.VolumeTmpFS{},
+												},
+												config.Volume{
+													Path:  "/mnt/vol01",
+													TmpFS: &config.VolumeTmpFS{Size: resource.NewQuantity(1024*1024*1024, resource.BinarySI)},
+												},
+											},
 										},
 									},
 								},
@@ -798,6 +809,16 @@ func TestGenRunConfig(t *testing.T) {
 									"ENV01":             "ENV01",
 									"ENVFROMVARIABLE01": "VARVALUE01",
 								},
+								Volumes: []rstypes.Volume{
+									rstypes.Volume{
+										Path:  "/mnt/vol01",
+										TmpFS: &rstypes.VolumeTmpFS{},
+									},
+									rstypes.Volume{
+										Path:  "/mnt/vol01",
+										TmpFS: &rstypes.VolumeTmpFS{Size: 1024 * 1024 * 1024},
+									},
+								},
 							},
 						},
 					},
@@ -874,6 +895,7 @@ func TestGenRunConfig(t *testing.T) {
 							{
 								Image:       "image01",
 								Environment: map[string]string{},
+								Volumes:     []rstypes.Volume{},
 							},
 						},
 					},
@@ -972,6 +994,7 @@ func TestGenRunConfig(t *testing.T) {
 							{
 								Image:       "image01",
 								Environment: map[string]string{},
+								Volumes:     []rstypes.Volume{},
 							},
 						},
 					},
@@ -989,9 +1012,6 @@ func TestGenRunConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			out := GenRunConfigTasks(uuid, tt.in, "run01", tt.variables, "", "", "")
 
-			//if err != nil {
-			//	t.Fatalf("unexpected error: %v", err)
-			//}
 			if diff := cmp.Diff(tt.out, out); diff != "" {
 				t.Error(diff)
 			}

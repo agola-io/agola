@@ -40,8 +40,24 @@ func genRuntime(c *config.Config, ce *config.Runtime, variables map[string]strin
 			User:        cc.User,
 			Privileged:  cc.Privileged,
 			Entrypoint:  cc.Entrypoint,
+			Volumes:     make([]rstypes.Volume, len(cc.Volumes)),
 		}
 
+		for i, ccVol := range cc.Volumes {
+			container.Volumes[i] = rstypes.Volume{
+				Path: ccVol.Path,
+			}
+
+			if ccVol.TmpFS != nil {
+				var size int64
+				if ccVol.TmpFS.Size != nil {
+					size = ccVol.TmpFS.Size.Value()
+				}
+				container.Volumes[i].TmpFS = &rstypes.VolumeTmpFS{
+					Size: size,
+				}
+			}
+		}
 		containers = append(containers, container)
 	}
 

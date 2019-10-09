@@ -370,4 +370,84 @@ func TestDockerPod(t *testing.T) {
 			t.Fatalf("pod with id %q not found", pod.ID())
 		}
 	})
+
+	t.Run("test pod with a tmpfs volume with size limit", func(t *testing.T) {
+		pod, err := d.NewPod(ctx, &PodConfig{
+			ID:     uuid.NewV4().String(),
+			TaskID: uuid.NewV4().String(),
+			Containers: []*ContainerConfig{
+				&ContainerConfig{
+					Cmd:   []string{"cat"},
+					Image: "busybox",
+					Volumes: []Volume{
+						{
+							Path: "/mnt/tmpfs",
+							TmpFS: &VolumeTmpFS{
+								Size: 1024 * 1024,
+							},
+						},
+					},
+				},
+			},
+			InitVolumeDir: "/tmp/agola",
+		}, ioutil.Discard)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		defer func() { _ = pod.Remove(ctx) }()
+
+		ce, err := pod.Exec(ctx, &ExecConfig{
+			Cmd: []string{"sh", "-c", "if [ $(cat /proc/mounts | grep /mnt/tmpfs | grep size=1024k | wc -l ) -ne 1 ]; then exit 1; fi"},
+		})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		code, err := ce.Wait(ctx)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if code != 0 {
+			t.Fatalf("unexpected exit code: %d", code)
+		}
+	})
+
+	t.Run("test pod with a tmpfs volume without size limit", func(t *testing.T) {
+		pod, err := d.NewPod(ctx, &PodConfig{
+			ID:     uuid.NewV4().String(),
+			TaskID: uuid.NewV4().String(),
+			Containers: []*ContainerConfig{
+				&ContainerConfig{
+					Cmd:   []string{"cat"},
+					Image: "busybox",
+					Volumes: []Volume{
+						{
+							Path:  "/mnt/tmpfs",
+							TmpFS: &VolumeTmpFS{},
+						},
+					},
+				},
+			},
+			InitVolumeDir: "/tmp/agola",
+		}, ioutil.Discard)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		defer func() { _ = pod.Remove(ctx) }()
+
+		ce, err := pod.Exec(ctx, &ExecConfig{
+			Cmd: []string{"sh", "-c", "if [ $(cat /proc/mounts | grep /mnt/tmpfs | wc -l ) -ne 1 ]; then exit 1; fi"},
+		})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		code, err := ce.Wait(ctx)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if code != 0 {
+			t.Fatalf("unexpected exit code: %d", code)
+		}
+	})
 }

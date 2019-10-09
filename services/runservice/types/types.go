@@ -543,6 +543,17 @@ type Container struct {
 	User        string            `json:"user,omitempty"`
 	Privileged  bool              `json:"privileged"`
 	Entrypoint  string            `json:"entrypoint"`
+	Volumes     []Volume          `json:"volumes"`
+}
+
+type Volume struct {
+	Path string `json:"path"`
+
+	TmpFS *VolumeTmpFS `json:"tmpfs"`
+}
+
+type VolumeTmpFS struct {
+	Size int64 `json:"size"`
 }
 
 type WorkspaceOperation struct {
