@@ -495,7 +495,17 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 		configFormat = config.ConfigFormatJSON
 
 	}
-	config, err := config.ParseConfig([]byte(data), configFormat)
+
+	configContext := &config.ConfigContext{
+		RefType:       req.RefType,
+		Ref:           req.Ref,
+		Branch:        req.Branch,
+		Tag:           req.Tag,
+		PullRequestID: req.PullRequestID,
+		CommitSHA:     req.CommitSHA,
+	}
+
+	config, err := config.ParseConfig([]byte(data), configFormat, configContext)
 	if err != nil {
 		h.log.Errorf("failed to parse config: %+v", err)
 

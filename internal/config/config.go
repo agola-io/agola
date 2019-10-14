@@ -20,6 +20,7 @@ import (
 	"regexp"
 	"strings"
 
+	itypes "agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/types"
 
@@ -645,11 +646,28 @@ func (r *Run) Task(taskName string) *Task {
 
 var DefaultConfig = Config{}
 
-func ParseConfig(configData []byte, format ConfigFormat) (*Config, error) {
+// ConfigContext is the context to pass to the config generator. Fields are not marked as omitempty since
+// we want to provide all of them with empty value if not existing in such context
+// (i.e. pull_request_id will be an empty string when not a pull request)
+type ConfigContext struct {
+	RefType       itypes.RunRefType `json:"ref_type"`
+	Ref           string            `json:"ref"`
+	Branch        string            `json:"branch"`
+	Tag           string            `json:"tag"`
+	PullRequestID string            `json:"pull_request_id"`
+	CommitSHA     string            `json:"commit_sha"`
+}
+
+func ParseConfig(configData []byte, format ConfigFormat, configContext *ConfigContext) (*Config, error) {
 	// Generate json from jsonnet
 	if format == ConfigFormatJsonnet {
 		// TODO(sgotti) support custom import files inside the configdir ???
 		vm := jsonnet.MakeVM()
+		cj, err := json.Marshal(configContext)
+		if err != nil {
+			return nil, errors.Errorf("failed to marshal config context: %w", err)
+		}
+		vm.TLACode("ctx", string(cj))
 		out, err := vm.EvaluateSnippet("", string(configData))
 		if err != nil {
 			return nil, errors.Errorf("failed to evaluate jsonnet config: %w", err)
