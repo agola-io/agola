@@ -16,6 +16,8 @@ package types
 
 import (
 	"regexp"
+
+	itypes "agola.io/agola/internal/services/types"
 )
 
 type When struct {
@@ -41,12 +43,12 @@ type WhenCondition struct {
 	Match string            `json:"match,omitempty"`
 }
 
-func MatchWhen(when *When, branch, tag, ref string) bool {
+func MatchWhen(when *When, refType itypes.RunRefType, branch, tag, ref string) bool {
 	include := true
 	if when != nil {
 		include = false
 		// test only if branch is not empty, if empty mean that we are not in a branch
-		if when.Branch != nil && branch != "" {
+		if refType == itypes.RunRefTypeBranch && when.Branch != nil && branch != "" {
 			// first check includes and override with excludes
 			if matchCondition(when.Branch.Include, branch) {
 				include = true
@@ -56,7 +58,7 @@ func MatchWhen(when *When, branch, tag, ref string) bool {
 			}
 		}
 		// test only if tag is not empty, if empty mean that we are not in a tag
-		if when.Tag != nil && tag != "" {
+		if refType == itypes.RunRefTypeBranch && when.Tag != nil && tag != "" {
 			// first check includes and override with excludes
 			if matchCondition(when.Tag.Include, tag) {
 				include = true

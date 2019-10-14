@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"agola.io/agola/internal/config"
+	itypes "agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 	rstypes "agola.io/agola/services/runservice/types"
 	"agola.io/agola/services/types"
@@ -195,13 +196,13 @@ fi
 
 // GenRunConfigTasks generates a run config tasks from a run in the config, expanding all the references to tasks
 // this functions assumes that the config is already checked for possible errors (i.e referenced task must exits)
-func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string, variables map[string]string, branch, tag, ref string) map[string]*rstypes.RunConfigTask {
+func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string, variables map[string]string, refType itypes.RunRefType, branch, tag, ref string) map[string]*rstypes.RunConfigTask {
 	cr := c.Run(runName)
 
 	rcts := map[string]*rstypes.RunConfigTask{}
 
 	for _, ct := range cr.Tasks {
-		include := types.MatchWhen(ct.When.ToWhen(), branch, tag, ref)
+		include := types.MatchWhen(ct.When.ToWhen(), refType, branch, tag, ref)
 
 		steps := make(rstypes.Steps, len(ct.Steps))
 		for i, cpts := range ct.Steps {
