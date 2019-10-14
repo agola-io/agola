@@ -162,7 +162,6 @@ func webhookDataFromPullRequest(hook *pullRequestHook) *types.WebhookData {
 		SSHURL:          hook.Repo.SSHURL,
 		Ref:             fmt.Sprintf("refs/pull/%d/head", hook.Number),
 		CommitLink:      fmt.Sprintf("%s/commit/%s", hook.Repo.URL, hook.PullRequest.Head.Sha),
-		Branch:          hook.PullRequest.Base.Ref,
 		Message:         hook.PullRequest.Title,
 		Sender:          sender,
 		PullRequestID:   strconv.FormatInt(hook.PullRequest.ID, 10),
