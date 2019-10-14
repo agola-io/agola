@@ -1010,7 +1010,7 @@ func TestGenRunConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			out := GenRunConfigTasks(uuid, tt.in, "run01", tt.variables, "", "", "")
+			out := GenRunConfigTasks(uuid, tt.in, "run01", tt.variables, "", "", "", "")
 
 			if diff := cmp.Diff(tt.out, out); diff != "" {
 				t.Error(diff)

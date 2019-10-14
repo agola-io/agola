@@ -493,12 +493,12 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 			continue
 		}
 
-		if match := types.MatchWhen(run.When.ToWhen(), req.Branch, req.Tag, req.Ref); !match {
+		if match := types.MatchWhen(run.When.ToWhen(), req.RefType, req.Branch, req.Tag, req.Ref); !match {
 			h.log.Debugf("skipping run since when condition doesn't match")
 			continue
 		}
 
-		rcts := runconfig.GenRunConfigTasks(util.DefaultUUIDGenerator{}, config, run.Name, variables, req.Branch, req.Tag, req.Ref)
+		rcts := runconfig.GenRunConfigTasks(util.DefaultUUIDGenerator{}, config, run.Name, variables, req.RefType, req.Branch, req.Tag, req.Ref)
 
 		createRunReq := &rsapitypes.RunCreateRequest{
 			RunConfigTasks:    rcts,
@@ -560,7 +560,7 @@ func (h *ActionHandler) genRunVariables(ctx context.Context, req *CreateRunReque
 		// find the value match
 		var varval cstypes.VariableValue
 		for _, varval = range pvar.Values {
-			match := types.MatchWhen(varval.When, req.Branch, req.Tag, req.Ref)
+			match := types.MatchWhen(varval.When, req.RefType, req.Branch, req.Tag, req.Ref)
 			if !match {
 				continue
 			}
