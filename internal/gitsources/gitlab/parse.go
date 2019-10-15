@@ -104,9 +104,7 @@ func webhookDataFromPush(hook *pushHook) (*types.WebhookData, error) {
 		SSHURL:     hook.Project.SSHURL,
 		Ref:        hook.Ref,
 		CommitLink: hook.Commits[0].URL,
-		//CompareLink: hook.Compare,
-		//CommitLink: fmt.Sprintf("%s/commit/%s", hook.Repo.URL, hook.After),
-		Sender: sender,
+		Sender:     sender,
 
 		Repo: types.WebhookDataRepo{
 			Path:   hook.Project.PathWithNamespace,
@@ -142,18 +140,12 @@ func webhookDataFromPullRequest(hook *pullRequestHook) *types.WebhookData {
 	if sender == "" {
 		sender = hook.User.Username
 	}
-	//sender := hook.ObjectAttributes.LastCommit.Author.Name
-	//if sender == "" {
-	//	sender := hook.ObjectAttributes.LastCommit.Author.UserName
-	//}
 	build := &types.WebhookData{
-		Event:     types.WebhookEventPullRequest,
-		CommitSHA: hook.ObjectAttributes.LastCommit.ID,
-		SSHURL:    hook.Project.SSHURL,
-		Ref:       fmt.Sprintf("refs/merge-requests/%d/head", hook.ObjectAttributes.Iid),
-		//CommitLink:      fmt.Sprintf("%s/commit/%s", hook.Repo.URL, hook.PullRequest.Head.Sha),
+		Event:           types.WebhookEventPullRequest,
+		CommitSHA:       hook.ObjectAttributes.LastCommit.ID,
+		SSHURL:          hook.Project.SSHURL,
+		Ref:             fmt.Sprintf("refs/merge-requests/%d/head", hook.ObjectAttributes.Iid),
 		CommitLink:      hook.ObjectAttributes.LastCommit.URL,
-		Branch:          hook.ObjectAttributes.SourceBranch,
 		Message:         hook.ObjectAttributes.Title,
 		Sender:          sender,
 		PullRequestID:   strconv.Itoa(hook.ObjectAttributes.Iid),

@@ -123,7 +123,6 @@ func webhookDataFromPullRequest(hook *github.PullRequestEvent) (*types.WebhookDa
 		SSHURL:          *hook.Repo.SSHURL,
 		Ref:             fmt.Sprintf("refs/pull/%d/head", *hook.Number),
 		CommitLink:      fmt.Sprintf("%s/commit/%s", *hook.Repo.HTMLURL, *hook.PullRequest.Head.SHA),
-		Branch:          *hook.PullRequest.Base.Ref,
 		Message:         *hook.PullRequest.Title,
 		Sender:          *sender,
 		PullRequestID:   strconv.Itoa(*hook.PullRequest.Number),
