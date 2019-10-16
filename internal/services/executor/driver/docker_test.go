@@ -397,7 +397,7 @@ func TestDockerPod(t *testing.T) {
 		defer func() { _ = pod.Remove(ctx) }()
 
 		ce, err := pod.Exec(ctx, &ExecConfig{
-			Cmd: []string{"sh", "-c", "if [ $(cat /proc/mounts | grep /mnt/tmpfs | grep size=1024k | wc -l ) -ne 1 ]; then exit 1; fi"},
+			Cmd: []string{"sh", "-c", "if [ $(grep /mnt/tmpfs /proc/mounts | grep -c size=1024k) -ne 1 ]; then exit 1; fi"},
 		})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
@@ -436,7 +436,99 @@ func TestDockerPod(t *testing.T) {
 		defer func() { _ = pod.Remove(ctx) }()
 
 		ce, err := pod.Exec(ctx, &ExecConfig{
-			Cmd: []string{"sh", "-c", "if [ $(cat /proc/mounts | grep /mnt/tmpfs | wc -l ) -ne 1 ]; then exit 1; fi"},
+			Cmd: []string{"sh", "-c", "if [ $(grep -c /mnt/tmpfs /proc/mounts) -ne 1 ]; then exit 1; fi"},
+		})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		code, err := ce.Wait(ctx)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if code != 0 {
+			t.Fatalf("unexpected exit code: %d", code)
+		}
+	})
+
+	t.Run("test pod with two tmpfs volumes with size limit", func(t *testing.T) {
+		pod, err := d.NewPod(ctx, &PodConfig{
+			ID:     uuid.NewV4().String(),
+			TaskID: uuid.NewV4().String(),
+			Containers: []*ContainerConfig{
+				&ContainerConfig{
+					Cmd:   []string{"cat"},
+					Image: "busybox",
+					Volumes: []Volume{
+						{
+							Path: "/mnt/vol1",
+							TmpFS: &VolumeTmpFS{
+								Size: 1024 * 1024,
+							},
+						},
+						{
+							Path: "/mnt/vol2",
+							TmpFS: &VolumeTmpFS{
+								Size: 1024 * 1024,
+							},
+						},
+					},
+				},
+			},
+			InitVolumeDir: "/tmp/agola",
+		}, ioutil.Discard)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		defer func() { _ = pod.Remove(ctx) }()
+
+		ce, err := pod.Exec(ctx, &ExecConfig{
+			Cmd: []string{"sh", "-c", "if [ $(grep /mnt/vol1 /proc/mounts | grep -c size=1024k) -ne 1 -o $(grep /mnt/vol2 /proc/mounts | grep -c size=1024k) -ne 1 ]; then exit 1; fi"},
+		})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		code, err := ce.Wait(ctx)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if code != 0 {
+			t.Fatalf("unexpected exit code: %d", code)
+		}
+	})
+
+	t.Run("test pod with two tmpfs volumes one with size limit and one without", func(t *testing.T) {
+		pod, err := d.NewPod(ctx, &PodConfig{
+			ID:     uuid.NewV4().String(),
+			TaskID: uuid.NewV4().String(),
+			Containers: []*ContainerConfig{
+				&ContainerConfig{
+					Cmd:   []string{"cat"},
+					Image: "busybox",
+					Volumes: []Volume{
+						{
+							Path: "/mnt/vol1",
+							TmpFS: &VolumeTmpFS{
+								Size: 1024 * 1024,
+							},
+						},
+						{
+							Path:  "/mnt/vol2",
+							TmpFS: &VolumeTmpFS{},
+						},
+					},
+				},
+			},
+			InitVolumeDir: "/tmp/agola",
+		}, ioutil.Discard)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		defer func() { _ = pod.Remove(ctx) }()
+
+		ce, err := pod.Exec(ctx, &ExecConfig{
+			Cmd: []string{"sh", "-c", "if [ $(grep /mnt/vol1 /proc/mounts | grep -c size=1024k) -ne 1 -o $(grep -c /mnt/vol2 /proc/mounts) -ne 1 ]; then exit 1; fi"},
 		})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)

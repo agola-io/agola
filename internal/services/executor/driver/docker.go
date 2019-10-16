@@ -294,20 +294,23 @@ func (d *DockerDriver) createContainer(ctx context.Context, index int, podConfig
 		cliHostConfig.NetworkMode = container.NetworkMode(fmt.Sprintf("container:%s", maincontainerID))
 	}
 
+	var mounts []mount.Mount
+
 	for _, vol := range containerConfig.Volumes {
 		if vol.TmpFS != nil {
-			cliHostConfig.Mounts = []mount.Mount{
-				mount.Mount{
-					Type:   mount.TypeTmpfs,
-					Target: vol.Path,
-					TmpfsOptions: &mount.TmpfsOptions{
-						SizeBytes: vol.TmpFS.Size,
-					},
+			mounts = append(mounts, mount.Mount{
+				Type:   mount.TypeTmpfs,
+				Target: vol.Path,
+				TmpfsOptions: &mount.TmpfsOptions{
+					SizeBytes: vol.TmpFS.Size,
 				},
-			}
+			})
 		} else {
 			return nil, errors.Errorf("missing volume config")
 		}
+	}
+	if mounts != nil {
+		cliHostConfig.Mounts = mounts
 	}
 
 	resp, err := d.client.ContainerCreate(ctx, cliContainerConfig, cliHostConfig, nil, "")
