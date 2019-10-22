@@ -250,7 +250,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/projects/{projectref}", authForcedHandler(deleteProjectHandler)).Methods("DELETE")
 	apirouter.Handle("/projects/{projectref}/reconfig", authForcedHandler(projectReconfigHandler)).Methods("PUT")
 	apirouter.Handle("/projects/{projectref}/updaterepolinkedaccount", authForcedHandler(projectUpdateRepoLinkedAccountHandler)).Methods("PUT")
-	apirouter.Handle("/projects/{projectref}/createrun", authForcedHandler(projectCreateRunHandler)).Methods("PUT")
+	apirouter.Handle("/projects/{projectref}/createrun", authForcedHandler(projectCreateRunHandler)).Methods("POST")
 
 	apirouter.Handle("/projectgroups/{projectgroupref}/secrets", authForcedHandler(secretHandler)).Methods("GET")
 	apirouter.Handle("/projects/{projectref}/secrets", authForcedHandler(secretHandler)).Methods("GET")
