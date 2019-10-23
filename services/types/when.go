@@ -58,7 +58,7 @@ func MatchWhen(when *When, refType itypes.RunRefType, branch, tag, ref string) b
 			}
 		}
 		// test only if tag is not empty, if empty mean that we are not in a tag
-		if refType == itypes.RunRefTypeBranch && when.Tag != nil && tag != "" {
+		if refType == itypes.RunRefTypeTag && when.Tag != nil && tag != "" {
 			// first check includes and override with excludes
 			if matchCondition(when.Tag.Include, tag) {
 				include = true

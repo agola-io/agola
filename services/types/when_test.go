@@ -284,7 +284,7 @@ func TestMatchWhen(t *testing.T) {
 			out:     false,
 		},
 		{
-			name: "test only matching reftype",
+			name: "test only matching branch reftype",
 			when: &When{
 				Branch: &WhenConditions{
 					Include: []WhenCondition{
@@ -297,6 +297,21 @@ func TestMatchWhen(t *testing.T) {
 			branch: "master",
 			tag:    "master",
 			out:    false,
+		},
+		{
+			name: "test only matching tag reftype",
+			when: &When{
+				Tag: &WhenConditions{
+					Include: []WhenCondition{
+						{Type: WhenConditionTypeSimple, Match: "master"},
+					},
+				},
+			},
+			refType: itypes.RunRefTypeBranch,
+			branch:  "master",
+			// we provide also a value to tag (should not be done)
+			tag: "master",
+			out: false,
 		},
 	}
 
