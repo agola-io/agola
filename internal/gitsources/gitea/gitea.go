@@ -81,7 +81,7 @@ func fromCommitStatus(status gitsource.CommitStatus) gtypes.StatusState {
 	case gitsource.CommitStatusFailed:
 		return gtypes.StatusFailure
 	default:
-		panic(fmt.Errorf("unknown commit status %q", status))
+		panic(errors.Errorf("unknown commit status %q", status))
 	}
 }
 
@@ -410,12 +410,18 @@ func (c *Client) GetRef(repopath, ref string) (*gitsource.Ref, error) {
 		return nil, err
 	}
 
-	remoteRef, err := c.client.GetRepoRef(owner, reponame, ref)
+	remoteRefs, err := c.client.GetRepoRefs(owner, reponame, ref)
 	if err != nil {
 		return nil, err
 	}
+	if len(remoteRefs) == 0 {
+		return nil, errors.Errorf("no ref %q for repository %q", ref, repopath)
+	}
+	if len(remoteRefs) != 1 {
+		return nil, errors.Errorf("no exact match found for ref %q for repository %q", ref, repopath)
+	}
 
-	return fromGiteaRef(remoteRef)
+	return fromGiteaRef(remoteRefs[0])
 }
 
 func fromGiteaRef(remoteRef *gitea.Reference) (*gitsource.Ref, error) {
@@ -423,7 +429,7 @@ func fromGiteaRef(remoteRef *gitea.Reference) (*gitsource.Ref, error) {
 	switch t {
 	case "commit":
 	default:
-		return nil, fmt.Errorf("unsupported object type: %s", t)
+		return nil, errors.Errorf("unsupported object type: %s", t)
 	}
 
 	return &gitsource.Ref{
@@ -445,7 +451,7 @@ func (c *Client) RefType(ref string) (gitsource.RefType, string, error) {
 		return gitsource.RefTypePullRequest, m[1], nil
 
 	default:
-		return -1, "", fmt.Errorf("unsupported ref: %s", ref)
+		return -1, "", errors.Errorf("unsupported ref: %s", ref)
 	}
 }
 
