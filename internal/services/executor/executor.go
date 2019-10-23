@@ -171,7 +171,7 @@ func (e *Executor) doRunStep(ctx context.Context, s *types.RunStep, t *types.Exe
 		AttachStdin: true,
 		Stdout:      outf,
 		Stderr:      outf,
-		Tty:         true,
+		Tty:         *s.Tty,
 	}
 
 	ce, err := pod.Exec(ctx, execConfig)
