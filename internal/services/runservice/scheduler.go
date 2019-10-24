@@ -1303,7 +1303,7 @@ func (s *Runservice) runOSTArchiver(ctx context.Context, r *types.Run) error {
 		return err
 	}
 
-	actions := append([]*datamanager.Action{ra})
+	actions := []*datamanager.Action{ra}
 
 	if _, err = s.dm.WriteWal(ctx, actions, nil); err != nil {
 		return err

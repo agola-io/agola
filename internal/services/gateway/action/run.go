@@ -68,7 +68,7 @@ const (
 )
 
 var (
-	SkipRunMessage            = regexp.MustCompile(`.*\[ci skip\].*`)
+	SkipRunMessage = regexp.MustCompile(`.*\[ci skip\].*`)
 )
 
 func (h *ActionHandler) GetRun(ctx context.Context, runID string) (*rsapitypes.RunResponse, error) {

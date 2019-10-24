@@ -41,7 +41,6 @@ import (
 	gwclient "agola.io/agola/services/gateway/client"
 	rstypes "agola.io/agola/services/runservice/types"
 
-	gtypes "code.gitea.io/gitea/modules/structs"
 	"code.gitea.io/sdk/gitea"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -382,7 +381,7 @@ func createLinkedAccount(ctx context.Context, t *testing.T, tgitea *testutil.Tes
 	giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
 	giteaClient := gitea.NewClient(giteaAPIURL, "")
 
-	giteaToken, err := giteaClient.CreateAccessToken(giteaUser01, "password", gtypes.CreateAccessTokenOption{Name: "token01"})
+	giteaToken, err := giteaClient.CreateAccessToken(giteaUser01, "password", gitea.CreateAccessTokenOption{Name: "token01"})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -449,8 +448,8 @@ func TestCreateProject(t *testing.T) {
 	createProject(ctx, t, giteaClient, gwClient)
 }
 
-func createProject(ctx context.Context, t *testing.T, giteaClient *gitea.Client, gwClient *gwclient.Client) (*gtypes.Repository, *gwapitypes.ProjectResponse) {
-	giteaRepo, err := giteaClient.CreateRepo(gtypes.CreateRepoOption{
+func createProject(ctx context.Context, t *testing.T, giteaClient *gitea.Client, gwClient *gwclient.Client) (*gitea.Repository, *gwapitypes.ProjectResponse) {
+	giteaRepo, err := giteaClient.CreateRepo(gitea.CreateRepoOption{
 		Name: "repo01",
 	})
 	if err != nil {

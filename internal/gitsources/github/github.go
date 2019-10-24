@@ -30,7 +30,7 @@ import (
 
 	gitsource "agola.io/agola/internal/gitsources"
 
-	"github.com/google/go-github/v25/github"
+	"github.com/google/go-github/v28/github"
 	"golang.org/x/oauth2"
 	errors "golang.org/x/xerrors"
 )

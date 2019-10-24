@@ -30,7 +30,6 @@ import (
 
 	gitsource "agola.io/agola/internal/gitsources"
 
-	gtypes "code.gitea.io/gitea/modules/structs"
 	"code.gitea.io/sdk/gitea"
 	"golang.org/x/oauth2"
 	errors "golang.org/x/xerrors"
@@ -70,16 +69,16 @@ type Client struct {
 }
 
 // fromCommitStatus converts a gitsource commit status to a gitea commit status
-func fromCommitStatus(status gitsource.CommitStatus) gtypes.StatusState {
+func fromCommitStatus(status gitsource.CommitStatus) gitea.StatusState {
 	switch status {
 	case gitsource.CommitStatusPending:
-		return gtypes.StatusPending
+		return gitea.StatusPending
 	case gitsource.CommitStatusSuccess:
-		return gtypes.StatusSuccess
+		return gitea.StatusSuccess
 	case gitsource.CommitStatusError:
-		return gtypes.StatusError
+		return gitea.StatusError
 	case gitsource.CommitStatusFailed:
-		return gtypes.StatusFailure
+		return gitea.StatusFailure
 	default:
 		panic(errors.Errorf("unknown commit status %q", status))
 	}
@@ -197,7 +196,7 @@ func (c *Client) LoginPassword(username, password, tokenName string) (string, er
 		token, terr := c.client.CreateAccessToken(
 			username,
 			password,
-			gtypes.CreateAccessTokenOption{Name: tokenName},
+			gitea.CreateAccessTokenOption{Name: tokenName},
 		)
 		if terr != nil {
 			return "", terr
@@ -246,7 +245,7 @@ func (c *Client) CreateDeployKey(repopath, title, pubKey string, readonly bool) 
 	if err != nil {
 		return err
 	}
-	if _, err = c.client.CreateDeployKey(owner, reponame, gtypes.CreateKeyOption{
+	if _, err = c.client.CreateDeployKey(owner, reponame, gitea.CreateKeyOption{
 		Title:    title,
 		Key:      pubKey,
 		ReadOnly: readonly,
@@ -282,7 +281,7 @@ func (c *Client) UpdateDeployKey(repopath, title, pubKey string, readonly bool) 
 		}
 	}
 
-	if _, err := c.client.CreateDeployKey(owner, reponame, gtypes.CreateKeyOption{
+	if _, err := c.client.CreateDeployKey(owner, reponame, gitea.CreateKeyOption{
 		Title:    title,
 		Key:      pubKey,
 		ReadOnly: readonly,
@@ -320,7 +319,7 @@ func (c *Client) CreateRepoWebhook(repopath, url, secret string) error {
 		return err
 	}
 
-	opts := gtypes.CreateHookOption{
+	opts := gitea.CreateHookOption{
 		Type: "gitea",
 		Config: map[string]string{
 			"url":          url,
@@ -366,7 +365,7 @@ func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource
 	if err != nil {
 		return err
 	}
-	_, err = c.client.CreateStatus(owner, reponame, commitSHA, gtypes.CreateStatusOption{
+	_, err = c.client.CreateStatus(owner, reponame, commitSHA, gitea.CreateStatusOption{
 		State:       fromCommitStatus(status),
 		TargetURL:   targetURL,
 		Description: description,
