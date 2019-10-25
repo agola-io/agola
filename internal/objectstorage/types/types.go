@@ -33,9 +33,9 @@ type ReadSeekCloser interface {
 }
 
 type ObjectInfo struct {
-	Path string
-
+	Path         string
 	LastModified time.Time
+	Size         int64
 
 	Err error
 }

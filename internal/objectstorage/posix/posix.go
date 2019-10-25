@@ -73,7 +73,7 @@ func (s *PosixStorage) Stat(p string) (*types.ObjectInfo, error) {
 		return nil, err
 	}
 
-	return &types.ObjectInfo{Path: p, LastModified: fi.ModTime()}, nil
+	return &types.ObjectInfo{Path: p, LastModified: fi.ModTime(), Size: fi.Size()}, nil
 }
 
 func (s *PosixStorage) ReadObject(p string) (types.ReadSeekCloser, error) {
@@ -219,7 +219,7 @@ func (s *PosixStorage) List(prefix, startWith, delimiter string, doneCh <-chan s
 			if strings.HasPrefix(p, prefix) && p > startWith {
 				select {
 				// Send object content.
-				case objectCh <- types.ObjectInfo{Path: p, LastModified: info.ModTime()}:
+				case objectCh <- types.ObjectInfo{Path: p, LastModified: info.ModTime(), Size: info.Size()}:
 				// If receives done from the caller, return here.
 				case <-doneCh:
 					return io.EOF

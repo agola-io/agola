@@ -72,7 +72,7 @@ func (s *S3Storage) Stat(p string) (*types.ObjectInfo, error) {
 		return nil, merr
 	}
 
-	return &types.ObjectInfo{Path: p, LastModified: oi.LastModified}, nil
+	return &types.ObjectInfo{Path: p, LastModified: oi.LastModified, Size: oi.Size}, nil
 }
 
 func (s *S3Storage) ReadObject(filepath string) (types.ReadSeekCloser, error) {
@@ -157,7 +157,7 @@ func (s *S3Storage) List(prefix, startWith, delimiter string, doneCh <-chan stru
 			for _, object := range result.Contents {
 				select {
 				// Send object content.
-				case objectCh <- types.ObjectInfo{Path: object.Key, LastModified: object.LastModified}:
+				case objectCh <- types.ObjectInfo{Path: object.Key, LastModified: object.LastModified, Size: object.Size}:
 				// If receives done from the caller, return here.
 				case <-doneCh:
 					return
