@@ -92,7 +92,8 @@ func (s *S3Storage) WriteObject(filepath string, data io.Reader, size int64, per
 	// An alternative is to write the file locally so we can calculate the size and
 	// then put it. See commented out code below.
 	if size >= 0 {
-		_, err := s.minioClient.PutObject(s.bucket, filepath, data, size, minio.PutObjectOptions{ContentType: "application/octet-stream"})
+		lr := io.LimitReader(data, size)
+		_, err := s.minioClient.PutObject(s.bucket, filepath, lr, size, minio.PutObjectOptions{ContentType: "application/octet-stream"})
 		return err
 	}
 
