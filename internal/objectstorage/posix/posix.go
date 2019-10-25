@@ -98,9 +98,13 @@ func (s *PosixStorage) WriteObject(p string, data io.Reader, size int64, persist
 	if err := os.MkdirAll(path.Dir(fspath), 0770); err != nil {
 		return err
 	}
-	lr := io.LimitReader(data, size)
+
+	r := data
+	if size >= 0 {
+		r = io.LimitReader(data, size)
+	}
 	return common.WriteFileAtomicFunc(fspath, s.dataDir, s.tmpDir, 0660, persist, func(f io.Writer) error {
-		_, err := io.Copy(f, lr)
+		_, err := io.Copy(f, r)
 		return err
 	})
 }
