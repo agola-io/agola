@@ -49,5 +49,5 @@ Agola is an open source project under the Apache 2.0 license, and contributions 
 To submit your changes please open a pull request.
 ​
 ## Contacts
-* For bugs and feature requests file an [issue](https://github.com/agola-io/agola/issues/new)
+* For bugs and feature requests file an [issue](https://github.com/agola-io/agola/issues/new/choose)
 * For general discussion about using and developing Agola, join the [agola forum](https://talk.agola.io)
