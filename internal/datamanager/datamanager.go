@@ -34,9 +34,10 @@ import (
 // * Etcd cluster restored to a previous revision: really bad cause should detect that the revision is smaller than the current one
 
 const (
-	DefaultCheckpointInterval   = 10 * time.Second
-	DefaultEtcdWalsKeepNum      = 100
-	DefaultMinCheckpointWalsNum = 100
+	DefaultCheckpointInterval      = 10 * time.Second
+	DefaultCheckpointCleanInterval = 5 * time.Minute
+	DefaultEtcdWalsKeepNum         = 100
+	DefaultMinCheckpointWalsNum    = 100
 )
 
 var (
@@ -79,12 +80,13 @@ const (
 )
 
 type DataManagerConfig struct {
-	BasePath           string
-	E                  *etcd.Store
-	OST                *objectstorage.ObjStorage
-	DataTypes          []string
-	EtcdWalsKeepNum    int
-	CheckpointInterval time.Duration
+	BasePath                string
+	E                       *etcd.Store
+	OST                     *objectstorage.ObjStorage
+	DataTypes               []string
+	EtcdWalsKeepNum         int
+	CheckpointInterval      time.Duration
+	CheckpointCleanInterval time.Duration
 	// MinCheckpointWalsNum is the minimum number of wals required before doing a checkpoint
 	MinCheckpointWalsNum int
 	MaxDataFileSize      int64
@@ -92,17 +94,18 @@ type DataManagerConfig struct {
 }
 
 type DataManager struct {
-	basePath             string
-	log                  *zap.SugaredLogger
-	e                    *etcd.Store
-	ost                  *objectstorage.ObjStorage
-	changes              *WalChanges
-	dataTypes            []string
-	etcdWalsKeepNum      int
-	checkpointInterval   time.Duration
-	minCheckpointWalsNum int
-	maxDataFileSize      int64
-	maintenanceMode      bool
+	basePath                string
+	log                     *zap.SugaredLogger
+	e                       *etcd.Store
+	ost                     *objectstorage.ObjStorage
+	changes                 *WalChanges
+	dataTypes               []string
+	etcdWalsKeepNum         int
+	checkpointInterval      time.Duration
+	checkpointCleanInterval time.Duration
+	minCheckpointWalsNum    int
+	maxDataFileSize         int64
+	maintenanceMode         bool
 }
 
 func NewDataManager(ctx context.Context, logger *zap.Logger, conf *DataManagerConfig) (*DataManager, error) {
@@ -115,6 +118,9 @@ func NewDataManager(ctx context.Context, logger *zap.Logger, conf *DataManagerCo
 	if conf.CheckpointInterval == 0 {
 		conf.CheckpointInterval = DefaultCheckpointInterval
 	}
+	if conf.CheckpointCleanInterval == 0 {
+		conf.CheckpointCleanInterval = DefaultCheckpointCleanInterval
+	}
 	if conf.MinCheckpointWalsNum == 0 {
 		conf.MinCheckpointWalsNum = DefaultMinCheckpointWalsNum
 	}
@@ -126,17 +132,18 @@ func NewDataManager(ctx context.Context, logger *zap.Logger, conf *DataManagerCo
 	}
 
 	d := &DataManager{
-		basePath:             conf.BasePath,
-		log:                  logger.Sugar(),
-		e:                    conf.E,
-		ost:                  conf.OST,
-		changes:              NewWalChanges(conf.DataTypes),
-		dataTypes:            conf.DataTypes,
-		etcdWalsKeepNum:      conf.EtcdWalsKeepNum,
-		checkpointInterval:   conf.CheckpointInterval,
-		minCheckpointWalsNum: conf.MinCheckpointWalsNum,
-		maxDataFileSize:      conf.MaxDataFileSize,
-		maintenanceMode:      conf.MaintenanceMode,
+		basePath:                conf.BasePath,
+		log:                     logger.Sugar(),
+		e:                       conf.E,
+		ost:                     conf.OST,
+		changes:                 NewWalChanges(conf.DataTypes),
+		dataTypes:               conf.DataTypes,
+		etcdWalsKeepNum:         conf.EtcdWalsKeepNum,
+		checkpointInterval:      conf.CheckpointInterval,
+		checkpointCleanInterval: conf.CheckpointCleanInterval,
+		minCheckpointWalsNum:    conf.MinCheckpointWalsNum,
+		maxDataFileSize:         conf.MaxDataFileSize,
+		maintenanceMode:         conf.MaintenanceMode,
 	}
 
 	// add trailing slash the basepath
@@ -231,6 +238,7 @@ func (d *DataManager) Run(ctx context.Context, readyCh chan struct{}) error {
 		go d.watcherLoop(ctx)
 		go d.syncLoop(ctx)
 		go d.checkpointLoop(ctx)
+		go d.checkpointCleanLoop(ctx)
 		go d.walCleanerLoop(ctx)
 		go d.compactChangeGroupsLoop(ctx)
 		go d.etcdPingerLoop(ctx)

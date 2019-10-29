@@ -16,10 +16,13 @@ package datamanager
 
 import (
 	"bytes"
+	"container/ring"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"path"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -32,6 +35,12 @@ import (
 
 const (
 	DefaultMaxDataFileSize = 10 * 1024 * 1024
+	dataStatusToKeep       = 3
+)
+
+var (
+	DataFileRegexp       = regexp.MustCompile(`^([a-zA-Z0-9]+-[a-zA-Z0-9]+)-([a-zA-Z0-9-]+)\.(data|index)$`)
+	DataStatusFileRegexp = regexp.MustCompile(`^([a-zA-Z0-9]+-[a-zA-Z0-9]+)\.status$`)
 )
 
 type DataStatus struct {
@@ -527,33 +536,49 @@ func (d *DataManager) Read(dataType, id string) (io.Reader, error) {
 	return bytes.NewReader(de.Data), nil
 }
 
-func (d *DataManager) GetLastDataStatusPath() (string, error) {
+func (d *DataManager) GetLastDataStatusSequences(n int) ([]*sequence.Sequence, error) {
+	if n < 1 {
+		return nil, errors.Errorf("n must be greater than 0")
+	}
+	r := ring.New(n)
+	re := r
+
 	doneCh := make(chan struct{})
 	defer close(doneCh)
 
-	var dataStatusPath string
 	for object := range d.ost.List(d.storageDataDir()+"/", "", false, doneCh) {
 		if object.Err != nil {
-			return "", object.Err
+			return nil, object.Err
 		}
-		if strings.HasSuffix(object.Path, ".status") {
-			dataStatusPath = object.Path
+		if m := DataStatusFileRegexp.FindStringSubmatch(path.Base(object.Path)); m != nil {
+			seq, err := sequence.Parse(m[1])
+			if err != nil {
+				d.log.Warnf("cannot parse sequence for data status file %q", object.Path)
+				continue
+			}
+			re.Value = seq
+			re = re.Next()
+		} else {
+			d.log.Warnf("bad file %q found in storage data dir", object.Path)
 		}
-	}
-	if dataStatusPath == "" {
-		return "", ostypes.ErrNotExist
 	}
 
-	return dataStatusPath, nil
+	dataStatusSequences := []*sequence.Sequence{}
+	re.Do(func(x interface{}) {
+		if x != nil {
+			dataStatusSequences = append([]*sequence.Sequence{x.(*sequence.Sequence)}, dataStatusSequences...)
+		}
+	})
+
+	if len(dataStatusSequences) == 0 {
+		return nil, ostypes.ErrNotExist
+	}
+
+	return dataStatusSequences, nil
 }
 
-func (d *DataManager) GetLastDataStatus() (*DataStatus, error) {
-	dataStatusPath, err := d.GetLastDataStatusPath()
-	if err != nil {
-		return nil, err
-	}
-
-	dataStatusf, err := d.ost.ReadObject(dataStatusPath)
+func (d *DataManager) GetDataStatus(dataSequence *sequence.Sequence) (*DataStatus, error) {
+	dataStatusf, err := d.ost.ReadObject(d.dataStatusPath(dataSequence))
 	if err != nil {
 		return nil, err
 	}
@@ -562,6 +587,24 @@ func (d *DataManager) GetLastDataStatus() (*DataStatus, error) {
 	dec := json.NewDecoder(dataStatusf)
 
 	return dataStatus, dec.Decode(&dataStatus)
+}
+
+func (d *DataManager) GetLastDataStatusSequence() (*sequence.Sequence, error) {
+	dataStatusSequences, err := d.GetLastDataStatusSequences(1)
+	if err != nil {
+		return nil, err
+	}
+
+	return dataStatusSequences[0], nil
+}
+
+func (d *DataManager) GetLastDataStatus() (*DataStatus, error) {
+	dataStatusSequence, err := d.GetLastDataStatusSequence()
+	if err != nil {
+		return nil, err
+	}
+
+	return d.GetDataStatus(dataStatusSequence)
 }
 
 func (d *DataManager) Export(ctx context.Context, w io.Writer) error {
@@ -721,6 +764,129 @@ func (d *DataManager) Import(ctx context.Context, r io.Reader) error {
 	// initialize etcd providing the specific datastatus
 	if err := d.InitEtcd(ctx, dataStatus); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (d *DataManager) CleanOldCheckpoints(ctx context.Context) error {
+	dataStatusSequences, err := d.GetLastDataStatusSequences(dataStatusToKeep)
+	if err != nil {
+		return err
+	}
+
+	return d.cleanOldCheckpoints(ctx, dataStatusSequences)
+}
+
+func (d *DataManager) cleanOldCheckpoints(ctx context.Context, dataStatusSequences []*sequence.Sequence) error {
+	if len(dataStatusSequences) == 0 {
+		return nil
+	}
+
+	lastDataStatusSequence := dataStatusSequences[0]
+
+	// Remove old data status paths
+	if len(dataStatusSequences) >= dataStatusToKeep {
+		dataStatusPathsMap := map[string]struct{}{}
+		for _, seq := range dataStatusSequences {
+			dataStatusPathsMap[d.dataStatusPath(seq)] = struct{}{}
+		}
+
+		doneCh := make(chan struct{})
+		defer close(doneCh)
+		for object := range d.ost.List(d.storageDataDir()+"/", "", false, doneCh) {
+			if object.Err != nil {
+				return object.Err
+			}
+
+			skip := false
+			if m := DataStatusFileRegexp.FindStringSubmatch(path.Base(object.Path)); m != nil {
+				seq, err := sequence.Parse(m[1])
+				if err == nil && seq.String() > lastDataStatusSequence.String() {
+					d.log.Infof("skipping file %q since its sequence is greater than %q", object.Path, lastDataStatusSequence)
+					skip = true
+				}
+			}
+			if skip {
+				continue
+			}
+
+			if _, ok := dataStatusPathsMap[object.Path]; !ok {
+				d.log.Infof("removing %q", object.Path)
+				if err := d.ost.DeleteObject(object.Path); err != nil {
+					if err != ostypes.ErrNotExist {
+						return err
+					}
+				}
+			}
+		}
+	}
+
+	// A list of files to keep
+	files := map[string]struct{}{}
+
+	for _, dataStatusSequence := range dataStatusSequences {
+		dataStatus, err := d.GetDataStatus(dataStatusSequence)
+		if err != nil {
+			return err
+		}
+
+		for dataType := range dataStatus.Files {
+			for _, file := range dataStatus.Files[dataType] {
+				files[d.DataFileBasePath(dataType, file.ID)] = struct{}{}
+			}
+		}
+	}
+
+	doneCh := make(chan struct{})
+	defer close(doneCh)
+
+	for object := range d.ost.List(d.storageDataDir()+"/", "", true, doneCh) {
+		if object.Err != nil {
+			return object.Err
+		}
+
+		p := object.Path
+		// object file relative to the storageDataDir
+		pr := strings.TrimPrefix(p, d.storageDataDir()+"/")
+		// object file full path without final extension
+		pne := strings.TrimSuffix(p, path.Ext(p))
+		// object file base name
+		pb := path.Base(p)
+
+		// skip status files
+		if !strings.Contains(pr, "/") && strings.HasSuffix(pr, ".status") {
+			continue
+		}
+
+		// skip data files with a sequence greater than the last known sequence.
+		// this is to avoid possible conditions where there's a Clean concurrent
+		// with a running Checkpoint (also if protect by etcd locks, they cannot
+		// enforce these kind of operations that are acting on resources
+		// external to etcd during network errors) that will remove the objects
+		// created by this checkpoint since the data status file doesn't yet
+		// exist.
+		skip := false
+		// extract the data sequence from the object name
+		if m := DataFileRegexp.FindStringSubmatch(pb); m != nil {
+			seq, err := sequence.Parse(m[1])
+			if err == nil && seq.String() > lastDataStatusSequence.String() {
+				d.log.Infof("skipping file %q since its sequence is greater than %q", p, lastDataStatusSequence)
+				skip = true
+			}
+		}
+		if skip {
+			continue
+		}
+
+		if _, ok := files[pne]; !ok {
+			d.log.Infof("removing %q", object.Path)
+			if err := d.ost.DeleteObject(object.Path); err != nil {
+				if err != ostypes.ErrNotExist {
+					return err
+				}
+			}
+		}
 	}
 
 	return nil
