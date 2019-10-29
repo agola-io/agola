@@ -74,6 +74,10 @@ func (w walActions) Len() int           { return len(w) }
 func (w walActions) Less(i, j int) bool { return w[i].ID < w[j].ID }
 func (w walActions) Swap(i, j int)      { w[i], w[j] = w[j], w[i] }
 
+func (d *DataManager) dataFileID(dataSequence *sequence.Sequence, next string) string {
+	return fmt.Sprintf("%s-%s", dataSequence.String(), next)
+}
+
 func (d *DataManager) walIndex(ctx context.Context, wals []*WalData) (walIndex, error) {
 	wimap := map[string]map[string]*Action{}
 
@@ -168,7 +172,7 @@ func (d *DataManager) writeDataSnapshot(ctx context.Context, wals []*WalData) er
 		if curDataStatus != nil {
 			curDataStatusFiles = curDataStatus.Files[dataType]
 		}
-		dataStatusFiles, err := d.writeDataType(ctx, wi, dataType, curDataStatusFiles)
+		dataStatusFiles, err := d.writeDataType(ctx, wi, dataType, dataSequence, curDataStatusFiles)
 		if err != nil {
 			return err
 		}
@@ -179,7 +183,7 @@ func (d *DataManager) writeDataSnapshot(ctx context.Context, wals []*WalData) er
 	if err != nil {
 		return err
 	}
-	if err := d.ost.WriteObject(d.dataStatusPath(dataSequence.String()), bytes.NewReader(dataStatusj), int64(len(dataStatusj)), true); err != nil {
+	if err := d.ost.WriteObject(d.dataStatusPath(dataSequence), bytes.NewReader(dataStatusj), int64(len(dataStatusj)), true); err != nil {
 		return err
 	}
 
@@ -285,7 +289,7 @@ func (d *DataManager) actionGroups(ctx context.Context, wi walIndex, dataType st
 	return actionGroups, remainingDataStatusFiles
 }
 
-func (d *DataManager) writeDataType(ctx context.Context, wi walIndex, dataType string, curDataStatusFiles []*DataStatusFile) ([]*DataStatusFile, error) {
+func (d *DataManager) writeDataType(ctx context.Context, wi walIndex, dataType string, dataSequence *sequence.Sequence, curDataStatusFiles []*DataStatusFile) ([]*DataStatusFile, error) {
 	type SplitPoint struct {
 		pos         int64
 		lastEntryID string
@@ -443,7 +447,7 @@ func (d *DataManager) writeDataType(ctx context.Context, wi walIndex, dataType s
 			}
 			dataFileIndexes = append(dataFileIndexes, dataFileIndex)
 			for i, sp := range splitPoints {
-				curDataFileID := uuid.NewV4().String()
+				curDataFileID := d.dataFileID(dataSequence, uuid.NewV4().String())
 				if err := d.writeDataFile(ctx, &buf, sp.pos-curPos, dataFileIndexes[i], curDataFileID, dataType); err != nil {
 					return nil, err
 				}
@@ -629,7 +633,7 @@ func (d *DataManager) Import(ctx context.Context, r io.Reader) error {
 
 		err := dec.Decode(&de)
 		if err == io.EOF {
-			dataFileID := uuid.NewV4().String()
+			dataFileID := d.dataFileID(dataSequence, uuid.NewV4().String())
 			if err := d.writeDataFile(ctx, &buf, int64(buf.Len()), dataFileIndex, dataFileID, curDataType); err != nil {
 				return err
 			}
@@ -663,7 +667,7 @@ func (d *DataManager) Import(ctx context.Context, r io.Reader) error {
 		}
 
 		if mustWrite {
-			dataFileID := uuid.NewV4().String()
+			dataFileID := d.dataFileID(dataSequence, uuid.NewV4().String())
 			if err := d.writeDataFile(ctx, &buf, int64(buf.Len()), dataFileIndex, dataFileID, curDataType); err != nil {
 				return err
 			}
@@ -709,7 +713,7 @@ func (d *DataManager) Import(ctx context.Context, r io.Reader) error {
 	if err != nil {
 		return err
 	}
-	if err := d.ost.WriteObject(d.dataStatusPath(dataSequence.String()), bytes.NewReader(dataStatusj), int64(len(dataStatusj)), true); err != nil {
+	if err := d.ost.WriteObject(d.dataStatusPath(dataSequence), bytes.NewReader(dataStatusj), int64(len(dataStatusj)), true); err != nil {
 		return err
 	}
 
