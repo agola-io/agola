@@ -415,6 +415,7 @@ type RunStep struct {
 	Environment map[string]string `json:"environment,omitempty"`
 	WorkingDir  string            `json:"working_dir,omitempty"`
 	Shell       string            `json:"shell,omitempty"`
+	Tty         *bool             `json:"tty,omitempty"`
 }
 
 type SaveContent struct {
@@ -581,6 +582,9 @@ func (et *Steps) UnmarshalJSON(b []byte) error {
 			var s RunStep
 			if err := json.Unmarshal(step, &s); err != nil {
 				return err
+			}
+			if s.Tty == nil {
+				s.Tty = util.BoolP(true)
 			}
 			steps[i] = &s
 		case "save_to_workspace":

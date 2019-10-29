@@ -135,6 +135,7 @@ fi
 		rs.Environment = env
 		rs.WorkingDir = cs.WorkingDir
 		rs.Shell = cs.Shell
+		rs.Tty = cs.Tty
 		return rs
 
 	case *config.SaveToWorkspaceStep:

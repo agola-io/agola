@@ -165,6 +165,7 @@ type RunStep struct {
 	Environment map[string]Value `json:"environment,omitempty"`
 	WorkingDir  string           `json:"working_dir"`
 	Shell       string           `json:"shell"`
+	Tty         *bool            `json:"tty"`
 }
 
 type SaveToWorkspaceStep struct {
@@ -233,6 +234,9 @@ func (s *Steps) UnmarshalJSON(b []byte) error {
 				var s RunStep
 				if err := json.Unmarshal(stepRaw, &s); err != nil {
 					return err
+				}
+				if s.Tty == nil {
+					s.Tty = util.BoolP(true)
 				}
 				s.Type = stepType
 				step = &s
@@ -890,7 +894,10 @@ func checkConfig(config *Config) error {
 						}
 						step.Name = step.Command[:len]
 					}
-
+					// if tty is omitted its default is true
+					if step.Tty == nil {
+						step.Tty = util.BoolP(true)
+					}
 				case *SaveCacheStep:
 					for _, content := range step.Contents {
 						if len(content.Paths) == 0 {

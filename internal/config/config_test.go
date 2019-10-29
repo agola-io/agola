@@ -337,6 +337,23 @@ func TestParseOutput(t *testing.T) {
                               volumes:
                                 - path: /mnt/tmpfs
                                   tmpfs: {}
+                      - name: task05
+                        runtime:
+                          type: pod
+                          containers:
+                            - image: image01
+                        steps:
+                          - type: run
+                            name: command with default tty
+                            command: command01
+                          - type: run
+                            name: command with tty as true
+                            command: command02
+                            tty: true
+                          - type: run
+                            name: command with tty as false
+                            command: command03
+                            tty: false
           `,
 			out: &Config{
 				Runs: []*Run{
@@ -388,6 +405,7 @@ func TestParseOutput(t *testing.T) {
 											Name: "command01",
 										},
 										Command: "command01",
+										Tty:     util.BoolP(true),
 									},
 									&RunStep{
 										BaseStep: BaseStep{
@@ -395,6 +413,7 @@ func TestParseOutput(t *testing.T) {
 											Name: "name different than command",
 										},
 										Command: "command02",
+										Tty:     util.BoolP(true),
 									},
 									&RunStep{
 										BaseStep: BaseStep{
@@ -406,6 +425,7 @@ func TestParseOutput(t *testing.T) {
 											"ENV01":             Value{Type: ValueTypeString, Value: "ENV01"},
 											"ENVFROMVARIABLE01": Value{Type: ValueTypeFromVariable, Value: "variable01"},
 										},
+										Tty: util.BoolP(true),
 									},
 									&SaveCacheStep{
 										BaseStep: BaseStep{Type: "save_cache"},
@@ -419,6 +439,7 @@ func TestParseOutput(t *testing.T) {
 											Name: "command01",
 										},
 										Command: "command01",
+										Tty:     util.BoolP(true),
 									},
 									&RunStep{
 										BaseStep: BaseStep{
@@ -426,6 +447,7 @@ func TestParseOutput(t *testing.T) {
 											Name: "name different than command",
 										},
 										Command: "command02",
+										Tty:     util.BoolP(true),
 									},
 									&RunStep{
 										BaseStep: BaseStep{
@@ -437,6 +459,7 @@ func TestParseOutput(t *testing.T) {
 											"ENV01":             Value{Type: ValueTypeString, Value: "ENV01"},
 											"ENVFROMVARIABLE01": Value{Type: ValueTypeFromVariable, Value: "variable01"},
 										},
+										Tty: util.BoolP(true),
 									},
 									&SaveCacheStep{
 										BaseStep: BaseStep{Type: "save_cache"},
@@ -520,6 +543,46 @@ func TestParseOutput(t *testing.T) {
 								WorkingDir: defaultWorkingDir,
 								Steps:      nil,
 								Depends:    nil,
+							},
+							&Task{
+								Name: "task05",
+								Runtime: &Runtime{
+									Type: "pod",
+									Arch: "",
+									Containers: []*Container{
+										&Container{
+											Image: "image01",
+										},
+									},
+								},
+								WorkingDir: defaultWorkingDir,
+								Steps: Steps{
+									&RunStep{
+										BaseStep: BaseStep{
+											Type: "run",
+											Name: "command with default tty",
+										},
+										Command: "command01",
+										Tty:     util.BoolP(true),
+									},
+									&RunStep{
+										BaseStep: BaseStep{
+											Type: "run",
+											Name: "command with tty as true",
+										},
+										Command: "command02",
+										Tty:     util.BoolP(true),
+									},
+									&RunStep{
+										BaseStep: BaseStep{
+											Type: "run",
+											Name: "command with tty as false",
+										},
+										Command: "command03",
+										Tty:     util.BoolP(false),
+									},
+								},
+								Depends: nil,
 							},
 						},
 					},
