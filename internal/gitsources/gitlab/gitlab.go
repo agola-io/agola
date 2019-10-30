@@ -137,7 +137,7 @@ func (c *Client) RefreshOauth2Token(refreshToken string) (*oauth2.Token, error) 
 }
 
 func (c *Client) GetRepoInfo(repopath string) (*gitsource.RepoInfo, error) {
-	rr, _, err := c.client.Projects.GetProject(repopath)
+	rr, _, err := c.client.Projects.GetProject(repopath, nil)
 	if err != nil {
 		return nil, err
 	}

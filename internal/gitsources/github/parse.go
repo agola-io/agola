@@ -23,7 +23,7 @@ import (
 
 	"agola.io/agola/internal/services/types"
 
-	"github.com/google/go-github/v25/github"
+	"github.com/google/go-github/v28/github"
 	errors "golang.org/x/xerrors"
 )
 

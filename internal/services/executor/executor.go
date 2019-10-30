@@ -331,7 +331,7 @@ func (e *Executor) mkdir(ctx context.Context, t *types.ExecutorTask, pod driver.
 }
 
 func (e *Executor) template(ctx context.Context, t *types.ExecutorTask, pod driver.Pod, logf io.Writer, key string) (string, error) {
-	cmd := append([]string{toolboxContainerPath, "template"})
+	cmd := []string{toolboxContainerPath, "template"}
 
 	// limit the template answer to max 1MiB
 	stdout := util.NewLimitedBuffer(1024 * 1024)
