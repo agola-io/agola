@@ -23,6 +23,7 @@ import (
 
 	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/objectstorage"
+	"agola.io/agola/internal/sequence"
 
 	"go.uber.org/zap"
 	errors "golang.org/x/xerrors"
@@ -158,16 +159,24 @@ func (d *DataManager) storageDataDir() string {
 	return path.Join(d.basePath, storageDataDir)
 }
 
-func (d *DataManager) dataStatusPath(sequence string) string {
+func (d *DataManager) dataStatusPath(sequence *sequence.Sequence) string {
 	return fmt.Sprintf("%s/%s.status", d.storageDataDir(), sequence)
 }
 
-func (d *DataManager) DataFileIndexPath(dataType, id string) string {
-	return fmt.Sprintf("%s/%s/%s.index", d.storageDataDir(), dataType, id)
+func (d *DataManager) DataTypeDir(dataType string) string {
+	return fmt.Sprintf("%s/%s", d.storageDataDir(), dataType)
 }
 
-func (d *DataManager) DataFilePath(dataType, id string) string {
-	return fmt.Sprintf("%s/%s/%s.data", d.storageDataDir(), dataType, id)
+func (d *DataManager) DataFileBasePath(dataType, name string) string {
+	return fmt.Sprintf("%s/%s", d.DataTypeDir(dataType), name)
+}
+
+func (d *DataManager) DataFileIndexPath(dataType, name string) string {
+	return fmt.Sprintf("%s.index", d.DataFileBasePath(dataType, name))
+}
+
+func (d *DataManager) DataFilePath(dataType, name string) string {
+	return fmt.Sprintf("%s.data", d.DataFileBasePath(dataType, name))
 }
 
 func etcdWalKey(walSeq string) string {
