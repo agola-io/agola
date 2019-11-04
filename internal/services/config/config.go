@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"agola.io/agola/internal/util"
+
 	errors "golang.org/x/xerrors"
 	yaml "gopkg.in/yaml.v2"
 )
@@ -231,7 +232,7 @@ var defaultConfig = Config{
 	},
 }
 
-func Parse(configFile string) (*Config, error) {
+func Parse(configFile string, componentsNames []string) (*Config, error) {
 	configData, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		return nil, err
@@ -242,7 +243,7 @@ func Parse(configFile string) (*Config, error) {
 		return nil, err
 	}
 
-	return c, Validate(c)
+	return c, Validate(c, componentsNames)
 }
 
 func validateWeb(w *Web) error {
@@ -262,7 +263,7 @@ func validateWeb(w *Web) error {
 	return nil
 }
 
-func Validate(c *Config) error {
+func Validate(c *Config, componentsNames []string) error {
 	// Global
 	if len(c.ID) > maxIDLength {
 		return errors.Errorf("id too long")
@@ -272,78 +273,99 @@ func Validate(c *Config) error {
 	}
 
 	// Gateway
-	if c.Gateway.APIExposedURL == "" {
-		return errors.Errorf("gateway apiExposedURL is empty")
-	}
-	if c.Gateway.WebExposedURL == "" {
-		return errors.Errorf("gateway webExposedURL is empty")
-	}
-	if c.Gateway.ConfigstoreURL == "" {
-		return errors.Errorf("gateway configstoreURL is empty")
-	}
-	if c.Gateway.RunserviceURL == "" {
-		return errors.Errorf("gateway runserviceURL is empty")
-	}
-	if err := validateWeb(&c.Gateway.Web); err != nil {
-		return errors.Errorf("gateway web configuration error: %w", err)
+	if isComponentEnabled(componentsNames, "gateway") {
+		if c.Gateway.APIExposedURL == "" {
+			return errors.Errorf("gateway apiExposedURL is empty")
+		}
+		if c.Gateway.WebExposedURL == "" {
+			return errors.Errorf("gateway webExposedURL is empty")
+		}
+		if c.Gateway.ConfigstoreURL == "" {
+			return errors.Errorf("gateway configstoreURL is empty")
+		}
+		if c.Gateway.RunserviceURL == "" {
+			return errors.Errorf("gateway runserviceURL is empty")
+		}
+		if err := validateWeb(&c.Gateway.Web); err != nil {
+			return errors.Errorf("gateway web configuration error: %w", err)
+		}
 	}
 
 	// Configstore
-	if c.Configstore.DataDir == "" {
-		return errors.Errorf("configstore dataDir is empty")
-	}
-	if err := validateWeb(&c.Configstore.Web); err != nil {
-		return errors.Errorf("configstore web configuration error: %w", err)
+	if isComponentEnabled(componentsNames, "configstore") {
+		if c.Configstore.DataDir == "" {
+			return errors.Errorf("configstore dataDir is empty")
+		}
+		if err := validateWeb(&c.Configstore.Web); err != nil {
+			return errors.Errorf("configstore web configuration error: %w", err)
+		}
 	}
 
 	// Runservice
-	if c.Runservice.DataDir == "" {
-		return errors.Errorf("runservice dataDir is empty")
-	}
-	if err := validateWeb(&c.Runservice.Web); err != nil {
-		return errors.Errorf("runservice web configuration error: %w", err)
+	if isComponentEnabled(componentsNames, "runservice") {
+		if c.Runservice.DataDir == "" {
+			return errors.Errorf("runservice dataDir is empty")
+		}
+		if err := validateWeb(&c.Runservice.Web); err != nil {
+			return errors.Errorf("runservice web configuration error: %w", err)
+		}
 	}
 
 	// Executor
-	if c.Executor.DataDir == "" {
-		return errors.Errorf("executor dataDir is empty")
-	}
-	if c.Executor.ToolboxPath == "" {
-		return errors.Errorf("git server toolboxPath is empty")
-	}
-	if c.Executor.RunserviceURL == "" {
-		return errors.Errorf("executor runserviceURL is empty")
-	}
-	if c.Executor.Driver.Type == "" {
-		return errors.Errorf("executor driver type is empty")
-	}
-	switch c.Executor.Driver.Type {
-	case DriverTypeDocker:
-	case DriverTypeK8s:
-	default:
-		return errors.Errorf("executor driver type %q unknown", c.Executor.Driver.Type)
+	if isComponentEnabled(componentsNames, "executor") {
+		if c.Executor.DataDir == "" {
+			return errors.Errorf("executor dataDir is empty")
+		}
+		if c.Executor.ToolboxPath == "" {
+			return errors.Errorf("git server toolboxPath is empty")
+		}
+		if c.Executor.RunserviceURL == "" {
+			return errors.Errorf("executor runserviceURL is empty")
+		}
+		if c.Executor.Driver.Type == "" {
+			return errors.Errorf("executor driver type is empty")
+		}
+		switch c.Executor.Driver.Type {
+		case DriverTypeDocker:
+		case DriverTypeK8s:
+		default:
+			return errors.Errorf("executor driver type %q unknown", c.Executor.Driver.Type)
+		}
 	}
 
 	// Scheduler
-	if c.Scheduler.RunserviceURL == "" {
-		return errors.Errorf("scheduler runserviceURL is empty")
+	if isComponentEnabled(componentsNames, "scheduler") {
+		if c.Scheduler.RunserviceURL == "" {
+			return errors.Errorf("scheduler runserviceURL is empty")
+		}
 	}
 
 	// Notification
-	if c.Notification.WebExposedURL == "" {
-		return errors.Errorf("notification webExposedURL is empty")
-	}
-	if c.Notification.ConfigstoreURL == "" {
-		return errors.Errorf("notification configstoreURL is empty")
-	}
-	if c.Notification.RunserviceURL == "" {
-		return errors.Errorf("notification runserviceURL is empty")
+	if isComponentEnabled(componentsNames, "notification") {
+		if c.Notification.WebExposedURL == "" {
+			return errors.Errorf("notification webExposedURL is empty")
+		}
+		if c.Notification.ConfigstoreURL == "" {
+			return errors.Errorf("notification configstoreURL is empty")
+		}
+		if c.Notification.RunserviceURL == "" {
+			return errors.Errorf("notification runserviceURL is empty")
+		}
 	}
 
 	// Git server
-	if c.Gitserver.DataDir == "" {
-		return errors.Errorf("git server dataDir is empty")
+	if isComponentEnabled(componentsNames, "gitserver") {
+		if c.Gitserver.DataDir == "" {
+			return errors.Errorf("git server dataDir is empty")
+		}
 	}
 
 	return nil
+}
+
+func isComponentEnabled(componentsNames []string, name string) bool {
+	if util.StringInSlice(componentsNames, "all-base") && name != "executor" {
+		return true
+	}
+	return util.StringInSlice(componentsNames, name)
 }

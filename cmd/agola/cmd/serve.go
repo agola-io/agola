@@ -129,7 +129,7 @@ func serve(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	c, err := config.Parse(serveOpts.config)
+	c, err := config.Parse(serveOpts.config, serveOpts.components)
 	if err != nil {
 		return errors.Errorf("config error: %w", err)
 	}
