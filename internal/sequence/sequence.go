@@ -33,7 +33,7 @@ type Sequence struct {
 }
 
 func (s *Sequence) String() string {
-	// 1<<64 -1 in base 32 is "3w5e11264sgsf" and uses 13 chars
+	// 1<<64 -1 in base 32 is "fvvvvvvvvvvvv" and uses 13 chars
 	return fmt.Sprintf("%013s-%013s", strconv.FormatUint(s.Epoch, 32), strconv.FormatUint(s.C, 32))
 }
 
@@ -45,6 +45,10 @@ func (s *Sequence) Reverse() *Sequence {
 }
 
 func Parse(s string) (*Sequence, error) {
+	if len(s) != 13*2+1 {
+		return nil, errors.Errorf("bad sequence %q string length", s)
+	}
+
 	parts := strings.Split(s, "-")
 	if len(parts) != 2 {
 		return nil, errors.Errorf("bad sequence %q", s)
