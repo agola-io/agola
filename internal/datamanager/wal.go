@@ -923,7 +923,7 @@ func (d *DataManager) etcdPinger(ctx context.Context) error {
 }
 
 func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) error {
-	writeWal := func(wal *WalFile) error {
+	writeWal := func(wal *WalFile, prevWalSequence string) error {
 		walFile, err := d.ost.ReadObject(d.storageWalStatusFile(wal.WalSequence) + ".committed")
 		if err != nil {
 			return err
@@ -935,6 +935,12 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 			return err
 		}
 		walFile.Close()
+
+		if prevWalSequence != "" {
+			if header.PreviousWalSequence != "" && header.PreviousWalSequence != prevWalSequence {
+				return errors.Errorf("wal %q previousWalSequence %q is different than expected walSequence %q", wal.WalSequence, header.PreviousWalSequence, prevWalSequence)
+			}
+		}
 
 		walData := &WalData{
 			WalSequence:         wal.WalSequence,
@@ -1034,6 +1040,7 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 	// So take all the wals in committed or checkpointed state starting from the
 	// first not checkpointed wal and put them in etcd
 	lastCommittedStorageWalSequence := ""
+	previousWalSequence := ""
 	wroteWals := 0
 	for wal := range d.ListOSTWals("") {
 		// if there're wals in ost but not a datastatus return an error
@@ -1051,9 +1058,10 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 
 		lastCommittedStorageWalSequence = wal.WalSequence
 
-		if err := writeWal(wal); err != nil {
+		if err := writeWal(wal, previousWalSequence); err != nil {
 			return err
 		}
+		previousWalSequence = wal.WalSequence
 		wroteWals++
 
 	}
