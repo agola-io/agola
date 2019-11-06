@@ -16,6 +16,8 @@ package util
 
 import (
 	"strings"
+
+	errors "golang.org/x/xerrors"
 )
 
 // Errors is an error that contains multiple errors
@@ -75,23 +77,31 @@ func (*ErrBadRequest) Is(err error) bool {
 	return ok
 }
 
-// ErrNotFound represent a not found error
+func IsBadRequest(err error) bool {
+	return errors.Is(err, &ErrBadRequest{})
+}
+
+// ErrNotExist represent a not exist error
 // it's used to differentiate an internal error from an user error
-type ErrNotFound struct {
+type ErrNotExist struct {
 	Err error
 }
 
-func (e *ErrNotFound) Error() string {
+func (e *ErrNotExist) Error() string {
 	return e.Err.Error()
 }
 
-func NewErrNotFound(err error) *ErrNotFound {
-	return &ErrNotFound{Err: err}
+func NewErrNotExist(err error) *ErrNotExist {
+	return &ErrNotExist{Err: err}
 }
 
-func (*ErrNotFound) Is(err error) bool {
-	_, ok := err.(*ErrNotFound)
+func (*ErrNotExist) Is(err error) bool {
+	_, ok := err.(*ErrNotExist)
 	return ok
+}
+
+func IsNotExist(err error) bool {
+	return errors.Is(err, &ErrNotExist{})
 }
 
 // ErrForbidden represent an error caused by an forbidden operation
@@ -113,6 +123,10 @@ func (*ErrForbidden) Is(err error) bool {
 	return ok
 }
 
+func IsForbidden(err error) bool {
+	return errors.Is(err, &ErrForbidden{})
+}
+
 // ErrUnauthorized represent an error caused by an unauthorized request
 // it's used to differentiate an internal error from an user error
 type ErrUnauthorized struct {
@@ -132,6 +146,10 @@ func (*ErrUnauthorized) Is(err error) bool {
 	return ok
 }
 
+func IsUnauthorized(err error) bool {
+	return errors.Is(err, &ErrUnauthorized{})
+}
+
 type ErrInternal struct {
 	Err error
 }
@@ -148,4 +166,8 @@ func NewErrInternal(err error) *ErrInternal {
 func (*ErrInternal) Is(err error) bool {
 	_, ok := err.(*ErrInternal)
 	return ok
+}
+
+func IsInternal(err error) bool {
+	return errors.Is(err, &ErrInternal{})
 }

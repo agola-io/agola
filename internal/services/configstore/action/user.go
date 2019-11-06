@@ -651,7 +651,7 @@ func (h *ActionHandler) GetUserOrgs(ctx context.Context, userRef string) ([]*Use
 			return err
 		}
 		if user == nil {
-			return util.NewErrNotFound(errors.Errorf("user %q doesn't exist", userRef))
+			return util.NewErrNotExist(errors.Errorf("user %q doesn't exist", userRef))
 		}
 
 		userOrgs, err = h.readDB.GetUserOrgs(tx, user.ID)

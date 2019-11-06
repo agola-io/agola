@@ -39,7 +39,7 @@ func (h *ActionHandler) GetSecret(ctx context.Context, secretID string) (*types.
 	}
 
 	if secret == nil {
-		return nil, util.NewErrNotFound(errors.Errorf("secret %q doesn't exist", secretID))
+		return nil, util.NewErrNotExist(errors.Errorf("secret %q doesn't exist", secretID))
 	}
 
 	return secret, nil

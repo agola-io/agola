@@ -65,7 +65,7 @@ func (s *PosixStorage) Stat(p string) (*ObjectInfo, error) {
 	fi, err := os.Stat(fspath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, ErrNotExist
+			return nil, NewErrNotExist(errors.Errorf("object %q doesn't exist", p))
 		}
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func (s *PosixStorage) ReadObject(p string) (ReadSeekCloser, error) {
 
 	f, err := os.Open(fspath)
 	if err != nil && os.IsNotExist(err) {
-		return nil, ErrNotExist
+		return nil, NewErrNotExist(errors.Errorf("object %q doesn't exist", p))
 	}
 	return f, err
 }
@@ -114,7 +114,7 @@ func (s *PosixStorage) DeleteObject(p string) error {
 
 	if err := os.Remove(fspath); err != nil {
 		if os.IsNotExist(err) {
-			return ErrNotExist
+			return NewErrNotExist(errors.Errorf("object %q doesn't exist", p))
 		}
 		return err
 	}

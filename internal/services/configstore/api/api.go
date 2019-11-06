@@ -34,23 +34,23 @@ func ErrorResponseFromError(err error) *ErrorResponse {
 	var aerr error
 	// use inner errors if of these types
 	switch {
-	case errors.Is(err, &util.ErrBadRequest{}):
+	case util.IsBadRequest(err):
 		var cerr *util.ErrBadRequest
 		errors.As(err, &cerr)
 		aerr = cerr
-	case errors.Is(err, &util.ErrNotFound{}):
-		var cerr *util.ErrNotFound
+	case util.IsNotExist(err):
+		var cerr *util.ErrNotExist
 		errors.As(err, &cerr)
 		aerr = cerr
-	case errors.Is(err, &util.ErrForbidden{}):
+	case util.IsForbidden(err):
 		var cerr *util.ErrForbidden
 		errors.As(err, &cerr)
 		aerr = cerr
-	case errors.Is(err, &util.ErrUnauthorized{}):
+	case util.IsUnauthorized(err):
 		var cerr *util.ErrUnauthorized
 		errors.As(err, &cerr)
 		aerr = cerr
-	case errors.Is(err, &util.ErrInternal{}):
+	case util.IsInternal(err):
 		var cerr *util.ErrInternal
 		errors.As(err, &cerr)
 		aerr = cerr
@@ -76,19 +76,19 @@ func httpError(w http.ResponseWriter, err error) bool {
 		return true
 	}
 	switch {
-	case errors.Is(err, &util.ErrBadRequest{}):
+	case util.IsBadRequest(err):
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write(resj)
-	case errors.Is(err, &util.ErrNotFound{}):
+	case util.IsNotExist(err):
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = w.Write(resj)
-	case errors.Is(err, &util.ErrForbidden{}):
+	case util.IsForbidden(err):
 		w.WriteHeader(http.StatusForbidden)
 		_, _ = w.Write(resj)
-	case errors.Is(err, &util.ErrUnauthorized{}):
+	case util.IsUnauthorized(err):
 		w.WriteHeader(http.StatusUnauthorized)
 		_, _ = w.Write(resj)
-	case errors.Is(err, &util.ErrInternal{}):
+	case util.IsInternal(err):
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write(resj)
 	default:

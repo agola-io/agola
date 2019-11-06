@@ -28,6 +28,7 @@ import (
 	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/sequence"
+	"agola.io/agola/internal/util"
 
 	uuid "github.com/satori/go.uuid"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
@@ -123,7 +124,7 @@ func (d *DataManager) ReadObject(dataType, id string, cgNames []string) (io.Read
 				}
 			}
 		}
-		return nil, nil, errors.Errorf("no datatype %q, id %q in wal %s", dataType, id, walseq)
+		return nil, nil, util.NewErrNotExist(errors.Errorf("no datatype %q, id %q in wal %s", dataType, id, walseq))
 	}
 
 	f, err := d.Read(dataType, id)
@@ -132,7 +133,7 @@ func (d *DataManager) ReadObject(dataType, id string, cgNames []string) (io.Read
 
 func (d *DataManager) HasOSTWal(walseq string) (bool, error) {
 	_, err := d.ost.Stat(d.storageWalStatusFile(walseq) + ".committed")
-	if err == objectstorage.ErrNotExist {
+	if objectstorage.IsNotExist(err) {
 		return false, nil
 	}
 	if err != nil {
@@ -909,7 +910,7 @@ func (d *DataManager) storageWalCleaner(ctx context.Context) error {
 			walStatusFilePath := d.storageWalDataFile(header.WalDataFileID)
 			d.log.Infof("removing %q", walStatusFilePath)
 			if err := d.ost.DeleteObject(walStatusFilePath); err != nil {
-				if err != objectstorage.ErrNotExist {
+				if !objectstorage.IsNotExist(err) {
 					return err
 				}
 			}
@@ -917,7 +918,7 @@ func (d *DataManager) storageWalCleaner(ctx context.Context) error {
 			// then remove wal status files
 			d.log.Infof("removing %q", object.Path)
 			if err := d.ost.DeleteObject(object.Path); err != nil {
-				if err != objectstorage.ErrNotExist {
+				if !objectstorage.IsNotExist(err) {
 					return err
 				}
 			}
@@ -928,7 +929,7 @@ func (d *DataManager) storageWalCleaner(ctx context.Context) error {
 		if ext == ".checkpointed" {
 			d.log.Infof("removing %q", object.Path)
 			if err := d.ost.DeleteObject(object.Path); err != nil {
-				if err != objectstorage.ErrNotExist {
+				if !objectstorage.IsNotExist(err) {
 					return err
 				}
 			}
@@ -1149,7 +1150,7 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 		firstWal = dataStatus.WalSequence
 	} else {
 		dataStatus, err = d.GetLastDataStatus()
-		if err != nil && err != objectstorage.ErrNotExist {
+		if err != nil && !errors.Is(err, ErrNoDataStatus) {
 			return err
 		}
 		// set the first wal to import in etcd if there's a snapshot. In this way we'll

@@ -592,7 +592,7 @@ func (h *ActionHandler) GetExecutorTask(ctx context.Context, etID string) (*type
 		return nil, err
 	}
 	if et == nil {
-		return nil, util.NewErrNotFound(errors.Errorf("executor task %q not found", etID))
+		return nil, util.NewErrNotExist(errors.Errorf("executor task %q not found", etID))
 	}
 
 	r, _, err := store.GetRun(ctx, h.e, et.Spec.RunID)

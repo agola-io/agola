@@ -58,7 +58,7 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if user == nil {
-		httpError(w, util.NewErrNotFound(errors.Errorf("user %q doesn't exist", userRef)))
+		httpError(w, util.NewErrNotExist(errors.Errorf("user %q doesn't exist", userRef)))
 		return
 	}
 
@@ -235,7 +235,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if user == nil {
-			httpError(w, util.NewErrNotFound(errors.Errorf("user with required token doesn't exist")))
+			httpError(w, util.NewErrNotExist(errors.Errorf("user with required token doesn't exist")))
 			return
 		}
 		users = []*types.User{user}
@@ -253,7 +253,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if user == nil {
-			httpError(w, util.NewErrNotFound(errors.Errorf("user with linked account %q token doesn't exist", linkedAccountID)))
+			httpError(w, util.NewErrNotExist(errors.Errorf("user with linked account %q token doesn't exist", linkedAccountID)))
 			return
 		}
 		users = []*types.User{user}
@@ -272,7 +272,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if user == nil {
-			httpError(w, util.NewErrNotFound(errors.Errorf("user with remote user %q for remote source %q token doesn't exist", remoteUserID, remoteSourceID)))
+			httpError(w, util.NewErrNotExist(errors.Errorf("user with remote user %q for remote source %q token doesn't exist", remoteUserID, remoteSourceID)))
 			return
 		}
 		users = []*types.User{user}

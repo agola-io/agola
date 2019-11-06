@@ -34,7 +34,26 @@ type Storage interface {
 	List(prefix, startWith, delimiter string, doneCh <-chan struct{}) <-chan ObjectInfo
 }
 
-var ErrNotExist = errors.New("does not exist")
+type ErrNotExist struct {
+	err error
+}
+
+func NewErrNotExist(err error) error {
+	return &ErrNotExist{err: err}
+}
+
+func (e *ErrNotExist) Error() string {
+	return e.err.Error()
+}
+
+func (*ErrNotExist) Is(err error) bool {
+	_, ok := err.(*ErrNotExist)
+	return ok
+}
+
+func IsNotExist(err error) bool {
+	return errors.Is(err, &ErrNotExist{})
+}
 
 type ReadSeekCloser interface {
 	io.Reader

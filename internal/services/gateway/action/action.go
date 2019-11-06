@@ -57,7 +57,7 @@ func ErrFromRemote(resp *http.Response, err error) error {
 		case http.StatusBadRequest:
 			return util.NewErrBadRequest(err)
 		case http.StatusNotFound:
-			return util.NewErrNotFound(err)
+			return util.NewErrNotExist(err)
 		}
 	}
 

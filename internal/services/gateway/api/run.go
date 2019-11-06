@@ -197,7 +197,7 @@ func (h *RuntaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	rt, ok := run.Tasks[taskID]
 	if !ok {
-		httpError(w, util.NewErrNotFound(errors.Errorf("run %q task %q not found", runID, taskID)))
+		httpError(w, util.NewErrNotExist(errors.Errorf("run %q task %q not found", runID, taskID)))
 		return
 	}
 	rct := rc.Tasks[rt.ID]

@@ -57,7 +57,7 @@ func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if remoteSource == nil {
-		httpError(w, util.NewErrNotFound(errors.Errorf("remote source %q doesn't exist", rsRef)))
+		httpError(w, util.NewErrNotExist(errors.Errorf("remote source %q doesn't exist", rsRef)))
 		return
 	}
 
