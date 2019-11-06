@@ -406,6 +406,11 @@ func (d *DataManager) writeDataType(ctx context.Context, wi walIndex, dataType s
 			}
 
 			if de != nil {
+				var lastSplitPos int64
+				if len(splitPoints) > 0 {
+					lastSplitPos = splitPoints[len(splitPoints)-1].pos
+				}
+
 				lastEntryID = de.ID
 				dataEntryj, err := json.Marshal(de)
 				if err != nil {
@@ -414,13 +419,9 @@ func (d *DataManager) writeDataType(ctx context.Context, wi walIndex, dataType s
 				if _, err := buf.Write(dataEntryj); err != nil {
 					return nil, err
 				}
-				dataFileIndex.Index[de.ID] = pos
+				dataFileIndex.Index[de.ID] = pos - lastSplitPos
 				prevPos := pos
 				pos += int64(len(dataEntryj))
-				var lastSplitPos int64
-				if len(splitPoints) > 0 {
-					lastSplitPos = splitPoints[len(splitPoints)-1].pos
-				}
 				if pos-lastSplitPos > d.maxDataFileSize {
 					// add split point only if it's different (less) than the previous one
 					if lastSplitPos < prevPos {
@@ -434,7 +435,7 @@ func (d *DataManager) writeDataType(ctx context.Context, wi walIndex, dataType s
 			}
 		}
 
-		// save remaining data
+		// save data
 		if buf.Len() != 0 {
 			var curPos int64
 			var lastSplitPos int64
@@ -483,7 +484,7 @@ func (d *DataManager) Read(dataType, id string) (io.Reader, error) {
 
 	matchingDataFileID = curFiles[dataType][0].ID
 	for _, dataStatusFile := range curFiles[dataType] {
-		if dataStatusFile.LastEntryID > id {
+		if dataStatusFile.LastEntryID >= id {
 			matchingDataFileID = dataStatusFile.ID
 			break
 		}
