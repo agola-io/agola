@@ -32,6 +32,7 @@ import (
 	"agola.io/agola/internal/objectstorage/posix"
 	ostypes "agola.io/agola/internal/objectstorage/types"
 	"agola.io/agola/internal/testutil"
+	"github.com/google/go-cmp/cmp"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -501,6 +502,110 @@ func doAndCheckCheckpoint(t *testing.T, ctx context.Context, dm *DataManager, ac
 	return expectedEntries, nil
 }
 
+func checkDataFiles(ctx context.Context, t *testing.T, dm *DataManager, expectedEntriesMap map[string]*DataEntry) error {
+	// read the data file
+	curDataStatus, err := dm.GetLastDataStatus()
+	if err != nil {
+		return err
+	}
+
+	allEntriesMap := map[string]*DataEntry{}
+
+	for dataType := range curDataStatus.Files {
+		var prevLastEntryID string
+		for i, file := range curDataStatus.Files[dataType] {
+			dataFileIndexf, err := dm.ost.ReadObject(dm.DataFileIndexPath(dataType, file.ID))
+			if err != nil {
+				return err
+			}
+			var dataFileIndex *DataFileIndex
+			dec := json.NewDecoder(dataFileIndexf)
+			err = dec.Decode(&dataFileIndex)
+			if err != nil {
+				dataFileIndexf.Close()
+				return err
+			}
+
+			dataFileIndexf.Close()
+			dataEntriesMap := map[string]*DataEntry{}
+			dataEntries := []*DataEntry{}
+			dataf, err := dm.ost.ReadObject(dm.DataFilePath(dataType, file.ID))
+			if err != nil {
+				return err
+			}
+			dec = json.NewDecoder(dataf)
+			var prevEntryID string
+			for {
+				var de *DataEntry
+
+				err := dec.Decode(&de)
+				if err == io.EOF {
+					// all done
+					break
+				}
+				if err != nil {
+					dataf.Close()
+					return err
+				}
+				// check that there are no duplicate entries
+				if _, ok := allEntriesMap[de.ID]; ok {
+					return fmt.Errorf("duplicate entry id: %s", de.ID)
+				}
+				// check that the entries are in order
+				if de.ID < prevEntryID {
+					return fmt.Errorf("previous entry id: %s greater than entry id: %s", prevEntryID, de.ID)
+				}
+
+				dataEntriesMap[de.ID] = de
+				dataEntries = append(dataEntries, de)
+				allEntriesMap[de.ID] = de
+			}
+			dataf.Close()
+
+			// check that the index matches the entries
+			if len(dataFileIndex.Index) != len(dataEntriesMap) {
+				return fmt.Errorf("index entries: %d different than data entries: %d", len(dataFileIndex.Index), len(dataEntriesMap))
+			}
+			indexIDs := make([]string, len(dataFileIndex.Index))
+			entriesIDs := make([]string, len(dataEntriesMap))
+			for id := range dataFileIndex.Index {
+				indexIDs = append(indexIDs, id)
+			}
+			for id := range dataEntriesMap {
+				entriesIDs = append(entriesIDs, id)
+			}
+			sort.Strings(indexIDs)
+			sort.Strings(entriesIDs)
+			if !reflect.DeepEqual(indexIDs, entriesIDs) {
+				return fmt.Errorf("index entries ids don't match data entries ids: index: %v, data: %v", indexIDs, entriesIDs)
+			}
+
+			if file.LastEntryID != dataEntries[len(dataEntries)-1].ID {
+				return fmt.Errorf("lastEntryID for datafile %d: %s is different than real last entry id: %s", i, file.LastEntryID, dataEntries[len(dataEntries)-1].ID)
+			}
+
+			// check that all the files are in order
+			if file.LastEntryID == prevLastEntryID {
+				return fmt.Errorf("lastEntryID for datafile %d is equal than previous file lastEntryID: %s == %s", i, file.LastEntryID, prevLastEntryID)
+			}
+			if file.LastEntryID < prevLastEntryID {
+				return fmt.Errorf("lastEntryID for datafile %d is less than previous file lastEntryID: %s < %s", i, file.LastEntryID, prevLastEntryID)
+			}
+			prevLastEntryID = file.LastEntryID
+		}
+	}
+
+	// check that the number of entries is right
+	if len(allEntriesMap) != len(expectedEntriesMap) {
+		return fmt.Errorf("expected %d total entries, got %d", len(expectedEntriesMap), len(allEntriesMap))
+	}
+	if !reflect.DeepEqual(expectedEntriesMap, allEntriesMap) {
+		return fmt.Errorf("expected entries don't match current entries")
+	}
+
+	return nil
+}
+
 // TODO(sgotti) some fuzzy testing will be really good
 func TestCheckpoint(t *testing.T) {
 	tests := []struct {
@@ -734,6 +839,10 @@ func testCheckpoint(t *testing.T, basePath string) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
+
+	if err := dm.CleanOldCheckpoints(ctx); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 }
 
 func TestRead(t *testing.T) {
@@ -828,108 +937,251 @@ func TestRead(t *testing.T) {
 	}
 }
 
-func checkDataFiles(ctx context.Context, t *testing.T, dm *DataManager, expectedEntriesMap map[string]*DataEntry) error {
-	// read the data file
-	curDataStatus, err := dm.GetLastDataStatus()
-	if err != nil {
-		return err
+func TestClean(t *testing.T) {
+	tests := []struct {
+		name     string
+		basePath string
+	}{
+		{
+			name:     "test with empty basepath",
+			basePath: "",
+		},
+		{
+			name:     "test with relative basepath",
+			basePath: "base/path",
+		},
 	}
 
-	allEntriesMap := map[string]*DataEntry{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testClean(t, tt.basePath)
+		})
+	}
+}
 
-	for dataType := range curDataStatus.Files {
-		var prevLastEntryID string
-		for i, file := range curDataStatus.Files[dataType] {
-			dataFileIndexf, err := dm.ost.ReadObject(dm.DataFileIndexPath(dataType, file.ID))
-			if err != nil {
-				return err
-			}
-			var dataFileIndex *DataFileIndex
-			dec := json.NewDecoder(dataFileIndexf)
-			err = dec.Decode(&dataFileIndex)
-			if err != nil {
-				dataFileIndexf.Close()
-				return err
-			}
+func testClean(t *testing.T, basePath string) {
+	dir, err := ioutil.TempDir("", "agola")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	defer os.RemoveAll(dir)
 
-			dataFileIndexf.Close()
-			dataEntriesMap := map[string]*DataEntry{}
-			dataEntries := []*DataEntry{}
-			dataf, err := dm.ost.ReadObject(dm.DataFilePath(dataType, file.ID))
-			if err != nil {
-				return err
-			}
-			dec = json.NewDecoder(dataf)
-			var prevEntryID string
-			for {
-				var de *DataEntry
+	etcdDir, err := ioutil.TempDir(dir, "etcd")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	tetcd := setupEtcd(t, etcdDir)
+	defer shutdownEtcd(tetcd)
 
-				err := dec.Decode(&de)
-				if err == io.EOF {
-					// all done
-					break
-				}
-				if err != nil {
-					dataf.Close()
-					return err
-				}
-				// check that there are no duplicate entries
-				if _, ok := allEntriesMap[de.ID]; ok {
-					return fmt.Errorf("duplicate entry id: %s", de.ID)
-				}
-				// check that the entries are in order
-				if de.ID < prevEntryID {
-					return fmt.Errorf("previous entry id: %s greater than entry id: %s", prevEntryID, de.ID)
-				}
+	ctx := context.Background()
 
-				dataEntriesMap[de.ID] = de
-				dataEntries = append(dataEntries, de)
-				allEntriesMap[de.ID] = de
-			}
-			dataf.Close()
+	ostDir, err := ioutil.TempDir(dir, "ost")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	ost, err := posix.New(ostDir)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 
-			// check that the index matches the entries
-			if len(dataFileIndex.Index) != len(dataEntriesMap) {
-				return fmt.Errorf("index entries: %d different than data entries: %d", len(dataFileIndex.Index), len(dataEntriesMap))
-			}
-			indexIDs := make([]string, len(dataFileIndex.Index))
-			entriesIDs := make([]string, len(dataEntriesMap))
-			for id := range dataFileIndex.Index {
-				indexIDs = append(indexIDs, id)
-			}
-			for id := range dataEntriesMap {
-				entriesIDs = append(entriesIDs, id)
-			}
-			sort.Strings(indexIDs)
-			sort.Strings(entriesIDs)
-			if !reflect.DeepEqual(indexIDs, entriesIDs) {
-				return fmt.Errorf("index entries ids don't match data entries ids: index: %v, data: %v", indexIDs, entriesIDs)
-			}
+	dmConfig := &DataManagerConfig{
+		BasePath: basePath,
+		E:        tetcd.TestEtcd.Store,
+		OST:      objectstorage.NewObjStorage(ost, "/"),
+		// remove almost all wals to see that they are removed also from changes
+		EtcdWalsKeepNum: 1,
+		DataTypes:       []string{"datatype01"},
+		// checkpoint also with only one wal
+		MinCheckpointWalsNum: 1,
+		// use a small maxDataFileSize
+		MaxDataFileSize: 10 * 1024,
+	}
+	dm, err := NewDataManager(ctx, logger, dmConfig)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	dmReadyCh := make(chan struct{})
+	go func() { _ = dm.Run(ctx, dmReadyCh) }()
+	<-dmReadyCh
 
-			if file.LastEntryID != dataEntries[len(dataEntries)-1].ID {
-				return fmt.Errorf("lastEntryID for datafile %d: %s is different than real last entry id: %s", i, file.LastEntryID, dataEntries[len(dataEntries)-1].ID)
-			}
+	time.Sleep(5 * time.Second)
 
-			// check that all the files are in order
-			if file.LastEntryID == prevLastEntryID {
-				return fmt.Errorf("lastEntryID for datafile %d is equal than previous file lastEntryID: %s == %s", i, file.LastEntryID, prevLastEntryID)
+	contents := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+	var currentEntries map[string]*DataEntry
+	actions := []*Action{}
+	for n := 0; n < 10; n++ {
+		for i := 0; i < 400; i++ {
+			action := &Action{
+				ActionType: ActionTypePut,
+				ID:         fmt.Sprintf("object%04d", i),
+				DataType:   "datatype01",
+				Data:       []byte(fmt.Sprintf(`{ "ID": "%d", "Contents": %s }`, i, contents)),
 			}
-			if file.LastEntryID < prevLastEntryID {
-				return fmt.Errorf("lastEntryID for datafile %d is less than previous file lastEntryID: %s < %s", i, file.LastEntryID, prevLastEntryID)
-			}
-			prevLastEntryID = file.LastEntryID
+			actions = append(actions, action)
+		}
+
+		currentEntries, err = doAndCheckCheckpoint(t, ctx, dm, [][]*Action{actions}, currentEntries)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
 		}
 	}
 
-	// check that the number of entries is right
-	if len(allEntriesMap) != len(expectedEntriesMap) {
-		return fmt.Errorf("expected %d total entries, got %d", len(expectedEntriesMap), len(allEntriesMap))
-	}
-	if !reflect.DeepEqual(expectedEntriesMap, allEntriesMap) {
-		return fmt.Errorf("expected entries don't match current entries")
+	// get the last data status sequence
+	lastDataStatusSequences, err := dm.GetLastDataStatusSequences(dataStatusToKeep)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
 	}
 
-	return nil
+	if err := dm.CleanOldCheckpoints(ctx); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// check last data file
+	if err := checkDataFiles(ctx, t, dm, currentEntries); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// check that only the last dataStatusToKeep status files are left
+	curDataStatusSequences, err := dm.GetLastDataStatusSequences(1000)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(curDataStatusSequences) != dataStatusToKeep {
+		t.Fatalf("expected %d data status files, got %d: %s", dataStatusToKeep, len(curDataStatusSequences), curDataStatusSequences)
+	}
+	if diff := cmp.Diff(lastDataStatusSequences, curDataStatusSequences); diff != "" {
+		t.Fatalf("different data status sequences: %v", diff)
+	}
+}
+
+func TestCleanConcurrentCheckpoint(t *testing.T) {
+	tests := []struct {
+		name     string
+		basePath string
+	}{
+		{
+			name:     "test with empty basepath",
+			basePath: "",
+		},
+		{
+			name:     "test with relative basepath",
+			basePath: "base/path",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testCleanConcurrentCheckpoint(t, tt.basePath)
+		})
+	}
+}
+
+func testCleanConcurrentCheckpoint(t *testing.T, basePath string) {
+	dir, err := ioutil.TempDir("", "agola")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	etcdDir, err := ioutil.TempDir(dir, "etcd")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	tetcd := setupEtcd(t, etcdDir)
+	defer shutdownEtcd(tetcd)
+
+	ctx := context.Background()
+
+	ostDir, err := ioutil.TempDir(dir, "ost")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	ost, err := posix.New(ostDir)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	dmConfig := &DataManagerConfig{
+		BasePath: basePath,
+		E:        tetcd.TestEtcd.Store,
+		OST:      objectstorage.NewObjStorage(ost, "/"),
+		// remove almost all wals to see that they are removed also from changes
+		EtcdWalsKeepNum: 1,
+		DataTypes:       []string{"datatype01"},
+		// checkpoint also with only one wal
+		MinCheckpointWalsNum: 1,
+		// use a small maxDataFileSize
+		MaxDataFileSize: 10 * 1024,
+	}
+	dm, err := NewDataManager(ctx, logger, dmConfig)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	dmReadyCh := make(chan struct{})
+	go func() { _ = dm.Run(ctx, dmReadyCh) }()
+	<-dmReadyCh
+
+	time.Sleep(5 * time.Second)
+
+	contents := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+	var currentEntries map[string]*DataEntry
+	actions := []*Action{}
+	for n := 0; n < 10; n++ {
+		for i := 0; i < 400; i++ {
+			action := &Action{
+				ActionType: ActionTypePut,
+				ID:         fmt.Sprintf("object%04d", i),
+				DataType:   "datatype01",
+				Data:       []byte(fmt.Sprintf(`{ "ID": "%d", "Contents": %s }`, i, contents)),
+			}
+			actions = append(actions, action)
+		}
+
+		currentEntries, err = doAndCheckCheckpoint(t, ctx, dm, [][]*Action{actions}, currentEntries)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+	}
+
+	// get the current last data status sequences before doing other actions and checkpoints
+	dataStatusSequences, err := dm.GetLastDataStatusSequences(dataStatusToKeep)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	for i := 0; i < 400; i++ {
+		action := &Action{
+			ActionType: ActionTypePut,
+			ID:         fmt.Sprintf("object%04d", i),
+			DataType:   "datatype01",
+			Data:       []byte(fmt.Sprintf(`{ "ID": "%d", "Contents": %s }`, i, contents)),
+		}
+		actions = append(actions, action)
+	}
+
+	if _, err = doAndCheckCheckpoint(t, ctx, dm, [][]*Action{actions}, currentEntries); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	if err := dm.cleanOldCheckpoints(ctx, dataStatusSequences); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// check the datastatus after clean
+	curDataStatus, err := dm.GetLastDataStatus()
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if curDataStatus.DataSequence <= dataStatusSequences[0].String() {
+		t.Fatalf("expected data status sequence greater than %q", dataStatusSequences[0])
+	}
+
+	// check last data file
+	if err := checkDataFiles(ctx, t, dm, currentEntries); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 }
 
 func TestExportImport(t *testing.T) {

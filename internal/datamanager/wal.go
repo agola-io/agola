@@ -721,6 +721,46 @@ func (d *DataManager) checkpoint(ctx context.Context, force bool) error {
 	return nil
 }
 
+func (d *DataManager) checkpointCleanLoop(ctx context.Context) {
+	for {
+		d.log.Debugf("checkpointCleanLoop")
+		if err := d.checkpointClean(ctx); err != nil {
+			d.log.Errorf("checkpointClean error: %v", err)
+		}
+
+		sleepCh := time.NewTimer(d.checkpointCleanInterval).C
+		select {
+		case <-ctx.Done():
+			return
+		case <-sleepCh:
+		}
+	}
+}
+
+func (d *DataManager) checkpointClean(ctx context.Context) error {
+	session, err := concurrency.NewSession(d.e.Client(), concurrency.WithTTL(5), concurrency.WithContext(ctx))
+	if err != nil {
+		return err
+	}
+	defer session.Close()
+
+	m := concurrency.NewMutex(session, etcdCheckpointLockKey)
+
+	// TODO(sgotti) find a way to use a trylock so we'll just return if already
+	// locked. Currently multiple task updaters will enqueue and start when another
+	// finishes (unuseful and consume resources)
+	if err := m.Lock(ctx); err != nil {
+		return err
+	}
+	defer func() { _ = m.Unlock(ctx) }()
+
+	if err := d.CleanOldCheckpoints(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (d *DataManager) walCleanerLoop(ctx context.Context) {
 	for {
 		d.log.Debugf("walcleaner")
