@@ -24,21 +24,17 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-
-	"agola.io/agola/internal/objectstorage/posix"
-	"agola.io/agola/internal/objectstorage/posixflat"
-	"agola.io/agola/internal/objectstorage/s3"
 )
 
-func setupPosix(t *testing.T, dir string) (*posix.PosixStorage, error) {
-	return posix.New(path.Join(dir, "posix"))
+func setupPosix(t *testing.T, dir string) (*PosixStorage, error) {
+	return NewPosix(path.Join(dir, "posix"))
 }
 
-func setupPosixFlat(t *testing.T, dir string) (*posixflat.PosixFlatStorage, error) {
-	return posixflat.New(path.Join(dir, "posixflat"))
+func setupPosixFlat(t *testing.T, dir string) (*PosixFlatStorage, error) {
+	return NewPosixFlat(path.Join(dir, "posixflat"))
 }
 
-func setupS3(t *testing.T, dir string) (*s3.S3Storage, error) {
+func setupS3(t *testing.T, dir string) (*S3Storage, error) {
 	minioEndpoint := os.Getenv("MINIO_ENDPOINT")
 	minioAccessKey := os.Getenv("MINIO_ACCESSKEY")
 	minioSecretKey := os.Getenv("MINIO_SECRETKEY")
@@ -47,7 +43,7 @@ func setupS3(t *testing.T, dir string) (*s3.S3Storage, error) {
 		return nil, nil
 	}
 
-	return s3.New(filepath.Base(dir), "", minioEndpoint, minioAccessKey, minioSecretKey, false)
+	return NewS3(filepath.Base(dir), "", minioEndpoint, minioAccessKey, minioSecretKey, false)
 }
 
 func TestList(t *testing.T) {
@@ -272,7 +268,7 @@ func TestList(t *testing.T) {
 		for sname, s := range tt.s {
 			t.Run(fmt.Sprintf("test with storage type %s", sname), func(t *testing.T) {
 				switch s := s.(type) {
-				case *s3.S3Storage:
+				case *S3Storage:
 					if s == nil {
 						t.SkipNow()
 					}
@@ -336,7 +332,7 @@ func TestWriteObject(t *testing.T) {
 	for sname, s := range map[string]Storage{"posix": ps, "posixflat": pfs, "minio": s3s} {
 		t.Run(fmt.Sprintf("test with storage type %s", sname), func(t *testing.T) {
 			switch s := s.(type) {
-			case *s3.S3Storage:
+			case *S3Storage:
 				if s == nil {
 					t.SkipNow()
 				}

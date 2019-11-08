@@ -28,7 +28,6 @@ import (
 	"agola.io/agola/internal/db"
 	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/objectstorage"
-	ostypes "agola.io/agola/internal/objectstorage/types"
 	"agola.io/agola/internal/sequence"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
@@ -130,10 +129,10 @@ func (r *ReadDB) ResetDB(ctx context.Context) error {
 
 func (r *ReadDB) SyncFromDump(ctx context.Context) (string, error) {
 	dumpIndex, err := r.dm.GetLastDataStatus()
-	if err != nil && err != ostypes.ErrNotExist {
+	if err != nil && err != objectstorage.ErrNotExist {
 		return "", err
 	}
-	if err == ostypes.ErrNotExist {
+	if err == objectstorage.ErrNotExist {
 		return "", nil
 	}
 	for dataType, files := range dumpIndex.Files {

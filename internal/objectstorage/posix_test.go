@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package posix
+package objectstorage
 
 import (
 	"bytes"
@@ -22,7 +22,7 @@ import (
 	"testing"
 )
 
-func TestDeleteObject(t *testing.T) {
+func TestPosixDeleteObject(t *testing.T) {
 	objects := []string{"☺☺☺☺a☺☺☺☺☺☺b☺☺☺☺", "s3/is/nota/fil.fa", "s3/is/not/a/file///system/fi%l%%e01"}
 
 	dir, err := ioutil.TempDir("", "objectstorage")
@@ -31,7 +31,7 @@ func TestDeleteObject(t *testing.T) {
 	}
 	//defer os.RemoveAll(dir)
 
-	ls, err := New(dir)
+	ls, err := NewPosix(dir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}

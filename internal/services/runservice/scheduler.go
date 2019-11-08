@@ -26,7 +26,7 @@ import (
 	"agola.io/agola/internal/datamanager"
 	"agola.io/agola/internal/etcd"
 	slog "agola.io/agola/internal/log"
-	ostypes "agola.io/agola/internal/objectstorage/types"
+	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/runconfig"
 	"agola.io/agola/internal/services/runservice/common"
 	"agola.io/agola/internal/services/runservice/store"
@@ -865,7 +865,7 @@ func (s *Runservice) runTasksUpdater(ctx context.Context) error {
 
 func (s *Runservice) OSTFileExists(path string) (bool, error) {
 	_, err := s.ost.Stat(path)
-	if err != nil && err != ostypes.ErrNotExist {
+	if err != nil && err != objectstorage.ErrNotExist {
 		return false, err
 	}
 	return err == nil, nil
@@ -1359,7 +1359,7 @@ func (s *Runservice) cacheCleaner(ctx context.Context, cacheExpireInterval time.
 		}
 		if object.LastModified.Add(cacheExpireInterval).Before(time.Now()) {
 			if err := s.ost.DeleteObject(object.Path); err != nil {
-				if err != ostypes.ErrNotExist {
+				if err != objectstorage.ErrNotExist {
 					log.Warnf("failed to delete cache object %q: %v", object.Path, err)
 				}
 			}
@@ -1411,7 +1411,7 @@ func (s *Runservice) workspaceCleaner(ctx context.Context, workspaceExpireInterv
 		}
 		if object.LastModified.Add(workspaceExpireInterval).Before(time.Now()) {
 			if err := s.ost.DeleteObject(object.Path); err != nil {
-				if err != ostypes.ErrNotExist {
+				if err != objectstorage.ErrNotExist {
 					log.Warnf("failed to delete workspace object %q: %v", object.Path, err)
 				}
 			}

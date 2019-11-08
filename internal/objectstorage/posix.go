@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package posix
+package objectstorage
 
 import (
 	"io"
@@ -20,9 +20,6 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-
-	"agola.io/agola/internal/objectstorage/common"
-	"agola.io/agola/internal/objectstorage/types"
 
 	errors "golang.org/x/xerrors"
 )
@@ -37,7 +34,7 @@ type PosixStorage struct {
 	tmpDir  string
 }
 
-func New(baseDir string) (*PosixStorage, error) {
+func NewPosix(baseDir string) (*PosixStorage, error) {
 	if err := os.MkdirAll(baseDir, 0770); err != nil {
 		return nil, err
 	}
@@ -59,7 +56,7 @@ func (s *PosixStorage) fsPath(p string) (string, error) {
 	return filepath.Join(s.dataDir, p), nil
 }
 
-func (s *PosixStorage) Stat(p string) (*types.ObjectInfo, error) {
+func (s *PosixStorage) Stat(p string) (*ObjectInfo, error) {
 	fspath, err := s.fsPath(p)
 	if err != nil {
 		return nil, err
@@ -68,15 +65,15 @@ func (s *PosixStorage) Stat(p string) (*types.ObjectInfo, error) {
 	fi, err := os.Stat(fspath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, types.ErrNotExist
+			return nil, ErrNotExist
 		}
 		return nil, err
 	}
 
-	return &types.ObjectInfo{Path: p, LastModified: fi.ModTime(), Size: fi.Size()}, nil
+	return &ObjectInfo{Path: p, LastModified: fi.ModTime(), Size: fi.Size()}, nil
 }
 
-func (s *PosixStorage) ReadObject(p string) (types.ReadSeekCloser, error) {
+func (s *PosixStorage) ReadObject(p string) (ReadSeekCloser, error) {
 	fspath, err := s.fsPath(p)
 	if err != nil {
 		return nil, err
@@ -84,7 +81,7 @@ func (s *PosixStorage) ReadObject(p string) (types.ReadSeekCloser, error) {
 
 	f, err := os.Open(fspath)
 	if err != nil && os.IsNotExist(err) {
-		return nil, types.ErrNotExist
+		return nil, ErrNotExist
 	}
 	return f, err
 }
@@ -103,7 +100,7 @@ func (s *PosixStorage) WriteObject(p string, data io.Reader, size int64, persist
 	if size >= 0 {
 		r = io.LimitReader(data, size)
 	}
-	return common.WriteFileAtomicFunc(fspath, s.dataDir, s.tmpDir, 0660, persist, func(f io.Writer) error {
+	return writeFileAtomicFunc(fspath, s.dataDir, s.tmpDir, 0660, persist, func(f io.Writer) error {
 		_, err := io.Copy(f, r)
 		return err
 	})
@@ -117,7 +114,7 @@ func (s *PosixStorage) DeleteObject(p string) error {
 
 	if err := os.Remove(fspath); err != nil {
 		if os.IsNotExist(err) {
-			return types.ErrNotExist
+			return ErrNotExist
 		}
 		return err
 	}
@@ -151,16 +148,16 @@ func (s *PosixStorage) DeleteObject(p string) error {
 	return nil
 }
 
-func (s *PosixStorage) List(prefix, startWith, delimiter string, doneCh <-chan struct{}) <-chan types.ObjectInfo {
-	objectCh := make(chan types.ObjectInfo, 1)
+func (s *PosixStorage) List(prefix, startWith, delimiter string, doneCh <-chan struct{}) <-chan ObjectInfo {
+	objectCh := make(chan ObjectInfo, 1)
 
 	if len(delimiter) > 1 {
-		objectCh <- types.ObjectInfo{Err: errors.Errorf("wrong delimiter %q", delimiter)}
+		objectCh <- ObjectInfo{Err: errors.Errorf("wrong delimiter %q", delimiter)}
 		return objectCh
 	}
 
 	if startWith != "" && !strings.Contains(startWith, prefix) {
-		objectCh <- types.ObjectInfo{Err: errors.Errorf("wrong startwith value %q for prefix %q", startWith, prefix)}
+		objectCh <- ObjectInfo{Err: errors.Errorf("wrong startwith value %q for prefix %q", startWith, prefix)}
 		return objectCh
 	}
 
@@ -182,7 +179,7 @@ func (s *PosixStorage) List(prefix, startWith, delimiter string, doneCh <-chan s
 		startWith = strings.TrimPrefix(startWith, "/")
 	}
 
-	go func(objectCh chan<- types.ObjectInfo) {
+	go func(objectCh chan<- ObjectInfo) {
 		defer close(objectCh)
 		err := filepath.Walk(root, func(ep string, info os.FileInfo, err error) error {
 			if err != nil && !os.IsNotExist(err) {
@@ -219,7 +216,7 @@ func (s *PosixStorage) List(prefix, startWith, delimiter string, doneCh <-chan s
 			if strings.HasPrefix(p, prefix) && p > startWith {
 				select {
 				// Send object content.
-				case objectCh <- types.ObjectInfo{Path: p, LastModified: info.ModTime(), Size: info.Size()}:
+				case objectCh <- ObjectInfo{Path: p, LastModified: info.ModTime(), Size: info.Size()}:
 				// If receives done from the caller, return here.
 				case <-doneCh:
 					return io.EOF
@@ -229,7 +226,7 @@ func (s *PosixStorage) List(prefix, startWith, delimiter string, doneCh <-chan s
 			return nil
 		})
 		if err != nil && err != io.EOF {
-			objectCh <- types.ObjectInfo{
+			objectCh <- ObjectInfo{
 				Err: err,
 			}
 			return

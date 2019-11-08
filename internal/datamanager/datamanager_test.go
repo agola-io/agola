@@ -31,8 +31,6 @@ import (
 
 	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/objectstorage"
-	"agola.io/agola/internal/objectstorage/posix"
-	ostypes "agola.io/agola/internal/objectstorage/types"
 	"agola.io/agola/internal/testutil"
 	"github.com/google/go-cmp/cmp"
 	errors "golang.org/x/xerrors"
@@ -85,7 +83,7 @@ func TestEtcdReset(t *testing.T) {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	ost, err := posix.New(ostDir)
+	ost, err := objectstorage.NewPosix(ostDir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -195,7 +193,7 @@ func TestEtcdResetWalsGap(t *testing.T) {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	ost, err := posix.New(ostDir)
+	ost, err := objectstorage.NewPosix(ostDir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -324,7 +322,7 @@ func TestConcurrentUpdate(t *testing.T) {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	ost, err := posix.New(ostDir)
+	ost, err := objectstorage.NewPosix(ostDir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -415,7 +413,7 @@ func TestEtcdWalCleaner(t *testing.T) {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	ost, err := posix.New(ostDir)
+	ost, err := objectstorage.NewPosix(ostDir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -488,7 +486,7 @@ func TestReadObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	ost, err := posix.New(ostDir)
+	ost, err := objectstorage.NewPosix(ostDir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -560,8 +558,8 @@ func TestReadObject(t *testing.T) {
 
 	// should not exists
 	_, _, err = dm.ReadObject("datatype01", "object1", nil)
-	if err != ostypes.ErrNotExist {
-		t.Fatalf("expected err %v, got: %v", ostypes.ErrNotExist, err)
+	if err != objectstorage.ErrNotExist {
+		t.Fatalf("expected err %v, got: %v", objectstorage.ErrNotExist, err)
 	}
 	// should exist
 	_, _, err = dm.ReadObject("datatype01", "object19", nil)
@@ -584,8 +582,8 @@ func TestReadObject(t *testing.T) {
 
 	// should not exists
 	_, _, err = dm.ReadObject("datatype01", "object1", nil)
-	if err != ostypes.ErrNotExist {
-		t.Fatalf("expected err %v, got: %v", ostypes.ErrNotExist, err)
+	if err != objectstorage.ErrNotExist {
+		t.Fatalf("expected err %v, got: %v", objectstorage.ErrNotExist, err)
 	}
 	// should exist
 	_, _, err = dm.ReadObject("datatype01", "object19", nil)
@@ -781,7 +779,7 @@ func testCheckpoint(t *testing.T, basePath string) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	ost, err := posix.New(ostDir)
+	ost, err := objectstorage.NewPosix(ostDir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -997,7 +995,7 @@ func TestRead(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	ost, err := posix.New(ostDir)
+	ost, err := objectstorage.NewPosix(ostDir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -1111,7 +1109,7 @@ func testClean(t *testing.T, basePath string) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	ost, err := posix.New(ostDir)
+	ost, err := objectstorage.NewPosix(ostDir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -1229,7 +1227,7 @@ func testCleanConcurrentCheckpoint(t *testing.T, basePath string) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	ost, err := posix.New(ostDir)
+	ost, err := objectstorage.NewPosix(ostDir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -1358,7 +1356,7 @@ func testStorageWalCleaner(t *testing.T, basePath string) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	ost, err := posix.New(ostDir)
+	ost, err := objectstorage.NewPosix(ostDir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -1498,7 +1496,7 @@ func TestExportImport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	ost, err := posix.New(ostDir)
+	ost, err := objectstorage.NewPosix(ostDir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -1607,7 +1605,7 @@ func TestExportImport(t *testing.T) {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	ost, err = posix.New(ostDir)
+	ost, err = objectstorage.NewPosix(ostDir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
