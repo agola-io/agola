@@ -22,8 +22,10 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,6 +35,7 @@ import (
 	ostypes "agola.io/agola/internal/objectstorage/types"
 	"agola.io/agola/internal/testutil"
 	"github.com/google/go-cmp/cmp"
+	errors "golang.org/x/xerrors"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -168,6 +171,135 @@ func TestEtcdReset(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
+	}
+}
+
+func TestEtcdResetWalsGap(t *testing.T) {
+	dir, err := ioutil.TempDir("", "agola")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	etcdDir, err := ioutil.TempDir(dir, "etcd")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	tetcd := setupEtcd(t, etcdDir)
+	defer shutdownEtcd(tetcd)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	ostDir, err := ioutil.TempDir(dir, "ost")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	ost, err := posix.New(ostDir)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	dmConfig := &DataManagerConfig{
+		BasePath:        "basepath",
+		E:               tetcd.TestEtcd.Store,
+		OST:             objectstorage.NewObjStorage(ost, "/"),
+		EtcdWalsKeepNum: 10,
+		DataTypes:       []string{"datatype01"},
+	}
+	dm, err := NewDataManager(ctx, logger, dmConfig)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	dmReadyCh := make(chan struct{})
+
+	t.Logf("starting datamanager")
+	go func() { _ = dm.Run(ctx, dmReadyCh) }()
+	<-dmReadyCh
+
+	actions := []*Action{
+		{
+			ActionType: ActionTypePut,
+			DataType:   "datatype01",
+			Data:       []byte("{}"),
+		},
+	}
+
+	for i := 0; i < 20; i++ {
+		objectID := fmt.Sprintf("object%02d", i)
+		actions[0].ID = objectID
+		if _, err := dm.WriteWal(ctx, actions, nil); err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+	}
+
+	// wait for wal to be committed storage
+	time.Sleep(5 * time.Second)
+
+	t.Logf("stopping datamanager")
+	cancel()
+
+	t.Logf("stopping etcd")
+	// Reset etcd
+	shutdownEtcd(tetcd)
+	if err := tetcd.WaitDown(10 * time.Second); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	t.Logf("resetting etcd")
+	os.RemoveAll(etcdDir)
+	t.Logf("starting etcd")
+	tetcd = setupEtcd(t, etcdDir)
+	if err := tetcd.Start(); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	defer shutdownEtcd(tetcd)
+
+	// Remove a wal in the middle
+	doneCh := make(chan struct{})
+	defer close(doneCh)
+
+	walStatusFiles := []string{}
+	for object := range dm.ost.List(path.Join(dm.basePath, storageWalsStatusDir)+"/", "", true, doneCh) {
+		if object.Err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		walStatusFiles = append(walStatusFiles, object.Path)
+	}
+	if len(walStatusFiles) < 20 {
+		t.Fatalf("exptected at least 20 wals, got: %d wals", len(walStatusFiles))
+	}
+
+	removeIndex := 10
+	if err := dm.ost.DeleteObject(walStatusFiles[removeIndex]); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	errorWalSequence := strings.TrimSuffix(path.Base(walStatusFiles[removeIndex+1]), path.Ext(walStatusFiles[removeIndex+1]))
+	prevWalSequence := strings.TrimSuffix(path.Base(walStatusFiles[removeIndex]), path.Ext(walStatusFiles[removeIndex]))
+	expectedPrevWalSequence := strings.TrimSuffix(path.Base(walStatusFiles[removeIndex-1]), path.Ext(walStatusFiles[removeIndex-1]))
+
+	ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+	dmConfig = &DataManagerConfig{
+		BasePath:        "basepath",
+		E:               tetcd.TestEtcd.Store,
+		OST:             objectstorage.NewObjStorage(ost, "/"),
+		EtcdWalsKeepNum: 10,
+		DataTypes:       []string{"datatype01"},
+	}
+	dm, err = NewDataManager(ctx, logger, dmConfig)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	dmReadyCh = make(chan struct{})
+
+	expectedErr := errors.Errorf("wal %q previousWalSequence %q is different than expected walSequence %q", errorWalSequence, prevWalSequence, expectedPrevWalSequence)
+	err = dm.InitEtcd(ctx, nil)
+	if err == nil {
+		t.Fatalf("expected err: %q, got nil error", expectedErr)
+	}
+	if expectedErr.Error() != err.Error() {
+		t.Fatalf("expected err: %q, got err %q", expectedErr, err)
 	}
 }
 
