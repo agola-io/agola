@@ -529,6 +529,43 @@ func (d *DataManager) Read(dataType, id string) (io.Reader, error) {
 	return bytes.NewReader(de.Data), nil
 }
 
+func (d *DataManager) GetFirstDataStatusSequences(n int) ([]*sequence.Sequence, error) {
+	if n < 1 {
+		return nil, errors.Errorf("n must be greater than 0")
+	}
+
+	dataStatusSequences := []*sequence.Sequence{}
+	c := 0
+
+	doneCh := make(chan struct{})
+	defer close(doneCh)
+	for object := range d.ost.List(d.storageDataDir()+"/", "", false, doneCh) {
+		if object.Err != nil {
+			return nil, object.Err
+		}
+		if m := DataStatusFileRegexp.FindStringSubmatch(path.Base(object.Path)); m != nil {
+			seq, err := sequence.Parse(m[1])
+			if err != nil {
+				d.log.Warnf("cannot parse sequence for data status file %q", object.Path)
+				continue
+			}
+			dataStatusSequences = append(dataStatusSequences, seq)
+			c++
+		} else {
+			d.log.Warnf("bad file %q found in storage data dir", object.Path)
+		}
+		if c >= n {
+			break
+		}
+	}
+
+	if len(dataStatusSequences) == 0 {
+		return nil, ostypes.ErrNotExist
+	}
+
+	return dataStatusSequences, nil
+}
+
 func (d *DataManager) GetLastDataStatusSequences(n int) ([]*sequence.Sequence, error) {
 	if n < 1 {
 		return nil, errors.Errorf("n must be greater than 0")
@@ -582,6 +619,15 @@ func (d *DataManager) GetDataStatus(dataSequence *sequence.Sequence) (*DataStatu
 	return dataStatus, dec.Decode(&dataStatus)
 }
 
+func (d *DataManager) GetFirstDataStatusSequence() (*sequence.Sequence, error) {
+	dataStatusSequences, err := d.GetFirstDataStatusSequences(1)
+	if err != nil {
+		return nil, err
+	}
+
+	return dataStatusSequences[0], nil
+}
+
 func (d *DataManager) GetLastDataStatusSequence() (*sequence.Sequence, error) {
 	dataStatusSequences, err := d.GetLastDataStatusSequences(1)
 	if err != nil {
@@ -589,6 +635,15 @@ func (d *DataManager) GetLastDataStatusSequence() (*sequence.Sequence, error) {
 	}
 
 	return dataStatusSequences[0], nil
+}
+
+func (d *DataManager) GetFirstDataStatus() (*DataStatus, error) {
+	dataStatusSequence, err := d.GetFirstDataStatusSequence()
+	if err != nil {
+		return nil, err
+	}
+
+	return d.GetDataStatus(dataStatusSequence)
 }
 
 func (d *DataManager) GetLastDataStatus() (*DataStatus, error) {

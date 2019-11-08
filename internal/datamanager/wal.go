@@ -179,7 +179,7 @@ func (d *DataManager) ListOSTWals(start string) <-chan *WalFile {
 			startPath = d.storageWalStatusFile(start)
 		}
 
-		for object := range d.ost.List(path.Join(d.basePath, storageWalsStatusDir)+"/", startPath, true, doneCh) {
+		for object := range d.ost.List(d.storageWalStatusDir()+"/", startPath, true, doneCh) {
 			if object.Err != nil {
 				walCh <- &WalFile{
 					Err: object.Err,
@@ -547,7 +547,7 @@ func (d *DataManager) syncLoop(ctx context.Context) {
 			d.log.Errorf("syncer error: %+v", err)
 		}
 
-		sleepCh := time.NewTimer(5 * time.Second).C
+		sleepCh := time.NewTimer(DefaultSyncInterval).C
 		select {
 		case <-ctx.Done():
 			return
@@ -751,14 +751,14 @@ func (d *DataManager) checkpointClean(ctx context.Context) error {
 	return nil
 }
 
-func (d *DataManager) walCleanerLoop(ctx context.Context) {
+func (d *DataManager) etcdWalCleanerLoop(ctx context.Context) {
 	for {
-		d.log.Debugf("walcleaner")
-		if err := d.walCleaner(ctx); err != nil {
-			d.log.Errorf("walcleaner error: %v", err)
+		d.log.Debugf("etcdwalcleaner")
+		if err := d.etcdWalCleaner(ctx); err != nil {
+			d.log.Errorf("etcdwalcleaner error: %v", err)
 		}
 
-		sleepCh := time.NewTimer(2 * time.Second).C
+		sleepCh := time.NewTimer(DefaultEtcdWalCleanInterval).C
 		select {
 		case <-ctx.Done():
 			return
@@ -767,10 +767,10 @@ func (d *DataManager) walCleanerLoop(ctx context.Context) {
 	}
 }
 
-// walCleaner will clean already checkpointed wals from etcd
+// etcdWalCleaner will clean already checkpointed wals from etcd
 // it must always keep at least one wal that is needed for resync operations
 // from clients
-func (d *DataManager) walCleaner(ctx context.Context) error {
+func (d *DataManager) etcdWalCleaner(ctx context.Context) error {
 	session, err := concurrency.NewSession(d.e.Client(), concurrency.WithTTL(5), concurrency.WithContext(ctx))
 	if err != nil {
 		return err
@@ -826,13 +826,125 @@ func (d *DataManager) walCleaner(ctx context.Context) error {
 	return nil
 }
 
+func (d *DataManager) storageWalCleanerLoop(ctx context.Context) {
+	for {
+		d.log.Debugf("storagewalcleaner")
+		if err := d.storageWalCleaner(ctx); err != nil {
+			d.log.Errorf("storagewalcleaner error: %v", err)
+		}
+
+		sleepCh := time.NewTimer(DefaultStorageWalCleanInterval).C
+		select {
+		case <-ctx.Done():
+			return
+		case <-sleepCh:
+		}
+	}
+}
+
+// storageWalCleaner will clean unneeded wals from the storage
+func (d *DataManager) storageWalCleaner(ctx context.Context) error {
+	session, err := concurrency.NewSession(d.e.Client(), concurrency.WithTTL(5), concurrency.WithContext(ctx))
+	if err != nil {
+		return err
+	}
+	defer session.Close()
+
+	m := concurrency.NewMutex(session, etcdStorageWalCleanerLockKey)
+
+	// TODO(sgotti) find a way to use a trylock so we'll just return if already
+	// locked. Currently multiple task updaters will enqueue and start when another
+	// finishes (unuseful and consume resources)
+	if err := m.Lock(ctx); err != nil {
+		return err
+	}
+	defer func() { _ = m.Unlock(ctx) }()
+
+	firstDataStatus, err := d.GetFirstDataStatus()
+	if err != nil {
+		return err
+	}
+	firstWalSequence := firstDataStatus.WalSequence
+
+	// get the first wal in etcd (in any state) and use it's wal sequence if
+	// it's lesser than the first data status wal sequence
+	resp, err := d.e.List(ctx, etcdWalsDir+"/", "", 0)
+	if err != nil {
+		return err
+	}
+	if len(resp.Kvs) == 0 {
+		return errors.Errorf("no wals in etcd")
+	}
+	var walData WalData
+	if err := json.Unmarshal(resp.Kvs[0].Value, &walData); err != nil {
+		return err
+	}
+	if walData.WalSequence < firstWalSequence {
+		firstWalSequence = walData.WalSequence
+	}
+
+	doneCh := make(chan struct{})
+	defer close(doneCh)
+
+	for object := range d.ost.List(d.storageWalStatusDir()+"/", "", true, doneCh) {
+		if object.Err != nil {
+			return err
+		}
+		name := path.Base(object.Path)
+		ext := path.Ext(name)
+		walSequence := strings.TrimSuffix(name, ext)
+
+		// handle committed status file and related data file
+		if ext == ".committed" {
+			if walSequence >= firstWalSequence {
+				break
+			}
+
+			header, err := d.ReadWal(walSequence)
+			if err != nil {
+				return err
+			}
+
+			// first remove wal data file
+			walStatusFilePath := d.storageWalDataFile(header.WalDataFileID)
+			d.log.Infof("removing %q", walStatusFilePath)
+			if err := d.ost.DeleteObject(walStatusFilePath); err != nil {
+				if err != ostypes.ErrNotExist {
+					return err
+				}
+			}
+
+			// then remove wal status files
+			d.log.Infof("removing %q", object.Path)
+			if err := d.ost.DeleteObject(object.Path); err != nil {
+				if err != ostypes.ErrNotExist {
+					return err
+				}
+			}
+		}
+
+		// handle old checkpointed status file
+		// TODO(sgotti) remove this in future versions since .checkpointed files are not created anymore
+		if ext == ".checkpointed" {
+			d.log.Infof("removing %q", object.Path)
+			if err := d.ost.DeleteObject(object.Path); err != nil {
+				if err != ostypes.ErrNotExist {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 func (d *DataManager) compactChangeGroupsLoop(ctx context.Context) {
 	for {
 		if err := d.compactChangeGroups(ctx); err != nil {
 			d.log.Errorf("err: %+v", err)
 		}
 
-		sleepCh := time.NewTimer(1 * time.Second).C
+		sleepCh := time.NewTimer(DefaultCompactChangeGroupsInterval).C
 		select {
 		case <-ctx.Done():
 			return
@@ -917,7 +1029,7 @@ func (d *DataManager) etcdPingerLoop(ctx context.Context) {
 			d.log.Errorf("err: %+v", err)
 		}
 
-		sleepCh := time.NewTimer(1 * time.Second).C
+		sleepCh := time.NewTimer(DefaultEtcdPingerInterval).C
 		select {
 		case <-ctx.Done():
 			return

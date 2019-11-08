@@ -394,7 +394,7 @@ func TestConcurrentUpdate(t *testing.T) {
 	}
 }
 
-func TestWalCleaner(t *testing.T) {
+func TestEtcdWalCleaner(t *testing.T) {
 	dir, err := ioutil.TempDir("", "agola")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -455,7 +455,7 @@ func TestWalCleaner(t *testing.T) {
 	if err := dm.checkpoint(ctx, true); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	if err := dm.walCleaner(ctx); err != nil {
+	if err := dm.etcdWalCleaner(ctx); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
@@ -573,7 +573,7 @@ func TestReadObject(t *testing.T) {
 	if err := dm.checkpoint(ctx, true); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	if err := dm.walCleaner(ctx); err != nil {
+	if err := dm.etcdWalCleaner(ctx); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
@@ -1313,6 +1313,168 @@ func testCleanConcurrentCheckpoint(t *testing.T, basePath string) {
 	// check last data file
 	if err := checkDataFiles(ctx, t, dm, currentEntries); err != nil {
 		t.Fatalf("unexpected err: %v", err)
+	}
+}
+
+func TestStorageWalCleaner(t *testing.T) {
+	tests := []struct {
+		name     string
+		basePath string
+	}{
+		{
+			name:     "test with empty basepath",
+			basePath: "",
+		},
+		{
+			name:     "test with relative basepath",
+			basePath: "base/path",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testStorageWalCleaner(t, tt.basePath)
+		})
+	}
+}
+
+func testStorageWalCleaner(t *testing.T, basePath string) {
+	dir, err := ioutil.TempDir("", "agola")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	etcdDir, err := ioutil.TempDir(dir, "etcd")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	tetcd := setupEtcd(t, etcdDir)
+	defer shutdownEtcd(tetcd)
+
+	ctx := context.Background()
+
+	ostDir, err := ioutil.TempDir(dir, "ost")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	ost, err := posix.New(ostDir)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	dmConfig := &DataManagerConfig{
+		BasePath: basePath,
+		E:        tetcd.TestEtcd.Store,
+		OST:      objectstorage.NewObjStorage(ost, "/"),
+		// remove almost all wals to see that they are removed also from changes
+		EtcdWalsKeepNum: 1,
+		DataTypes:       []string{"datatype01"},
+		// checkpoint also with only one wal
+		MinCheckpointWalsNum: 1,
+		// use a small maxDataFileSize
+		MaxDataFileSize: 10 * 1024,
+	}
+	dm, err := NewDataManager(ctx, logger, dmConfig)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	dmReadyCh := make(chan struct{})
+	go func() { _ = dm.Run(ctx, dmReadyCh) }()
+	<-dmReadyCh
+
+	time.Sleep(5 * time.Second)
+
+	contents := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+	var currentEntries map[string]*DataEntry
+	actions := []*Action{}
+	for n := 0; n < 10; n++ {
+		for i := 0; i < 400; i++ {
+			action := &Action{
+				ActionType: ActionTypePut,
+				ID:         fmt.Sprintf("object%04d", i),
+				DataType:   "datatype01",
+				Data:       []byte(fmt.Sprintf(`{ "ID": "%d", "Contents": %s }`, i, contents)),
+			}
+			actions = append(actions, action)
+		}
+
+		currentEntries, err = doAndCheckCheckpoint(t, ctx, dm, [][]*Action{actions}, currentEntries)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+	}
+
+	// get the last data status sequence
+	lastDataStatusSequences, err := dm.GetLastDataStatusSequences(dataStatusToKeep)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// Use the first dataStatusToKeep data status
+	dataStatus, err := dm.GetDataStatus(lastDataStatusSequences[dataStatusToKeep-1])
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	// get the list of expected wals
+	doneCh := make(chan struct{})
+	defer close(doneCh)
+
+	expectedWalStatusFiles := []string{}
+	expectedWalDataFiles := []string{}
+	for object := range dm.ost.List(dm.storageWalStatusDir()+"/", "", true, doneCh) {
+		if object.Err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		name := path.Base(object.Path)
+		ext := path.Ext(name)
+		walSequence := strings.TrimSuffix(name, ext)
+
+		if walSequence < dataStatus.WalSequence {
+			continue
+		}
+		header, err := dm.ReadWal(walSequence)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		expectedWalStatusFiles = append(expectedWalStatusFiles, object.Path)
+		expectedWalDataFiles = append(expectedWalDataFiles, dm.storageWalDataFile(header.WalDataFileID))
+	}
+	sort.Strings(expectedWalDataFiles)
+
+	if err := dm.CleanOldCheckpoints(ctx); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	if err := dm.storageWalCleaner(ctx); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	currentWalStatusFiles := []string{}
+	currentWalDataFiles := []string{}
+	for object := range dm.ost.List(dm.storageWalStatusDir()+"/", "", true, doneCh) {
+		if object.Err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		currentWalStatusFiles = append(currentWalStatusFiles, object.Path)
+	}
+	for object := range dm.ost.List(dm.storageWalDataDir()+"/", "", true, doneCh) {
+		if object.Err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		currentWalDataFiles = append(currentWalDataFiles, object.Path)
+	}
+	sort.Strings(currentWalDataFiles)
+	if diff := cmp.Diff(currentWalStatusFiles, expectedWalStatusFiles); diff != "" {
+		t.Fatalf("different wal status files: %v", diff)
+	}
+	if diff := cmp.Diff(currentWalDataFiles, expectedWalDataFiles); diff != "" {
+		t.Fatalf("different wal data files: %v", diff)
 	}
 }
 
