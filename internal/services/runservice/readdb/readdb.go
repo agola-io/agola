@@ -735,17 +735,10 @@ func (r *ReadDB) SyncFromWals(ctx context.Context, startWalSeq, endWalSeq string
 	insertfunc := func(walFiles []*datamanager.WalFile) error {
 		err := r.rdb.Do(ctx, func(tx *db.Tx) error {
 			for _, walFile := range walFiles {
-				walFilef, err := r.dm.ReadWal(walFile.WalSequence)
+				header, err := r.dm.ReadWal(walFile.WalSequence)
 				if err != nil {
 					return err
 				}
-				dec := json.NewDecoder(walFilef)
-				var header *datamanager.WalHeader
-				if err = dec.Decode(&header); err != nil && err != io.EOF {
-					walFilef.Close()
-					return err
-				}
-				walFilef.Close()
 				if err := r.insertCommittedWalSequenceOST(tx, walFile.WalSequence); err != nil {
 					return err
 				}

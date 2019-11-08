@@ -91,17 +91,10 @@ func (d *DataManager) walIndex(ctx context.Context, wals []*WalData) (walIndex, 
 	wimap := map[string]map[string]*Action{}
 
 	for _, walData := range wals {
-		walFilef, err := d.ReadWal(walData.WalSequence)
+		header, err := d.ReadWal(walData.WalSequence)
 		if err != nil {
 			return nil, err
 		}
-		dec := json.NewDecoder(walFilef)
-		var header *WalHeader
-		if err = dec.Decode(&header); err != nil && err != io.EOF {
-			walFilef.Close()
-			return nil, err
-		}
-		walFilef.Close()
 
 		walFile, err := d.ReadWalData(header.WalDataFileID)
 		if err != nil {
@@ -109,7 +102,7 @@ func (d *DataManager) walIndex(ctx context.Context, wals []*WalData) (walIndex, 
 		}
 		defer walFile.Close()
 
-		dec = json.NewDecoder(walFile)
+		dec := json.NewDecoder(walFile)
 		for {
 			var action *Action
 
