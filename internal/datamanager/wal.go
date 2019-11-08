@@ -141,8 +141,19 @@ func (d *DataManager) HasOSTWal(walseq string) (bool, error) {
 	return true, nil
 }
 
-func (d *DataManager) ReadWal(walseq string) (io.ReadCloser, error) {
-	return d.ost.ReadObject(d.storageWalStatusFile(walseq) + ".committed")
+func (d *DataManager) ReadWal(walseq string) (*WalHeader, error) {
+	walFilef, err := d.ost.ReadObject(d.storageWalStatusFile(walseq) + ".committed")
+	if err != nil {
+		return nil, err
+	}
+	defer walFilef.Close()
+	dec := json.NewDecoder(walFilef)
+	var header *WalHeader
+	if err = dec.Decode(&header); err != nil {
+		return nil, err
+	}
+
+	return header, nil
 }
 
 func (d *DataManager) ReadWalData(walFileID string) (io.ReadCloser, error) {
