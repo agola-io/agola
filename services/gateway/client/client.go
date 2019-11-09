@@ -455,6 +455,12 @@ func (c *Client) GetRun(ctx context.Context, runID string) (*gwapitypes.RunRespo
 	return run, resp, err
 }
 
+func (c *Client) GetRunTask(ctx context.Context, runID, taskID string) (*gwapitypes.RunTaskResponse, *http.Response, error) {
+	task := new(gwapitypes.RunTaskResponse)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/run/%s/task/%s", runID, taskID), nil, jsonContent, nil, task)
+	return task, resp, err
+}
+
 func (c *Client) GetRuns(ctx context.Context, phaseFilter, resultFilter, groups, runGroups []string, start string, limit int, asc bool) ([]*gwapitypes.RunsResponse, *http.Response, error) {
 	q := url.Values{}
 	for _, phase := range phaseFilter {
@@ -495,6 +501,19 @@ func (c *Client) GetLogs(ctx context.Context, runID, taskID string, setup bool, 
 	}
 
 	return c.getResponse(ctx, "GET", "/logs", q, nil, nil)
+}
+
+func (c *Client) DeleteLogs(ctx context.Context, runID, taskID string, setup bool, step int) (*http.Response, error) {
+	q := url.Values{}
+	q.Add("runID", runID)
+	q.Add("taskID", taskID)
+	if setup {
+		q.Add("setup", "")
+	} else {
+		q.Add("step", strconv.Itoa(step))
+	}
+
+	return c.getResponse(ctx, "DELETE", "/logs", q, nil, nil)
 }
 
 func (c *Client) GetRemoteSource(ctx context.Context, rsRef string) (*gwapitypes.RemoteSourceResponse, *http.Response, error) {

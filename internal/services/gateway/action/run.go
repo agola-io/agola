@@ -145,6 +145,34 @@ func (h *ActionHandler) GetLogs(ctx context.Context, req *GetLogsRequest) (*http
 	return resp, nil
 }
 
+type DeleteLogsRequest struct {
+	RunID  string
+	TaskID string
+	Setup  bool
+	Step   int
+}
+
+func (h *ActionHandler) DeleteLogs(ctx context.Context, req *DeleteLogsRequest) error {
+	runResp, resp, err := h.runserviceClient.GetRun(ctx, req.RunID, nil)
+	if err != nil {
+		return ErrFromRemote(resp, err)
+	}
+	canDoRunActions, err := h.CanDoRunActions(ctx, runResp.RunConfig.Group)
+	if err != nil {
+		return errors.Errorf("failed to determine permissions: %w", err)
+	}
+	if !canDoRunActions {
+		return util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
+	resp, err = h.runserviceClient.DeleteLogs(ctx, req.RunID, req.TaskID, req.Setup, req.Step)
+	if err != nil {
+		return ErrFromRemote(resp, err)
+	}
+
+	return nil
+}
+
 type RunActionType string
 
 const (

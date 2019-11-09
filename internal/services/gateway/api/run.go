@@ -502,3 +502,63 @@ func sendLogs(w io.Writer, r io.Reader) error {
 		}
 	}
 }
+
+type LogsDeleteHandler struct {
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
+}
+
+func NewLogsDeleteHandler(logger *zap.Logger, ah *action.ActionHandler) *LogsDeleteHandler {
+	return &LogsDeleteHandler{log: logger.Sugar(), ah: ah}
+}
+
+func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	q := r.URL.Query()
+
+	runID := q.Get("runID")
+	if runID == "" {
+		httpError(w, util.NewErrBadRequest(errors.Errorf("empty run id")))
+		return
+	}
+	taskID := q.Get("taskID")
+	if taskID == "" {
+		httpError(w, util.NewErrBadRequest(errors.Errorf("empty task id")))
+		return
+	}
+
+	_, setup := q["setup"]
+	stepStr := q.Get("step")
+	if !setup && stepStr == "" {
+		httpError(w, util.NewErrBadRequest(errors.Errorf("no setup or step number provided")))
+		return
+	}
+	if setup && stepStr != "" {
+		httpError(w, util.NewErrBadRequest(errors.Errorf("both setup and step number provided")))
+		return
+	}
+
+	var step int
+	if stepStr != "" {
+		var err error
+		step, err = strconv.Atoi(stepStr)
+		if err != nil {
+			httpError(w, util.NewErrBadRequest(errors.Errorf("cannot parse step number: %w", err)))
+			return
+		}
+	}
+
+	areq := &action.DeleteLogsRequest{
+		RunID:  runID,
+		TaskID: taskID,
+		Setup:  setup,
+		Step:   step,
+	}
+
+	err := h.ah.DeleteLogs(ctx, areq)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+}

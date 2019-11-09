@@ -221,6 +221,7 @@ func (s *Runservice) setupDefaultRouter(etCh chan *types.ExecutorTask) http.Hand
 	executorDeleteHandler := api.NewExecutorDeleteHandler(logger, s.ah)
 
 	logsHandler := api.NewLogsHandler(logger, s.e, s.ost, s.dm)
+	logsDeleteHandler := api.NewLogsDeleteHandler(logger, s.e, s.ost, s.dm)
 
 	runHandler := api.NewRunHandler(logger, s.e, s.dm, s.readDB)
 	runTaskActionsHandler := api.NewRunTaskActionsHandler(logger, s.ah)
@@ -248,6 +249,7 @@ func (s *Runservice) setupDefaultRouter(etCh chan *types.ExecutorTask) http.Hand
 	apirouter.Handle("/executor/caches/{key}", cacheCreateHandler).Methods("POST")
 
 	apirouter.Handle("/logs", logsHandler).Methods("GET")
+	apirouter.Handle("/logs", logsDeleteHandler).Methods("DELETE")
 
 	apirouter.Handle("/runs/events", runEventsHandler).Methods("GET")
 	apirouter.Handle("/runs/{runid}", runHandler).Methods("GET")

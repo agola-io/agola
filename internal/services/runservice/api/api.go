@@ -323,6 +323,106 @@ func sendLogs(w http.ResponseWriter, r io.Reader) error {
 	}
 }
 
+type LogsDeleteHandler struct {
+	log *zap.SugaredLogger
+	e   *etcd.Store
+	ost *objectstorage.ObjStorage
+	dm  *datamanager.DataManager
+}
+
+func NewLogsDeleteHandler(logger *zap.Logger, e *etcd.Store, ost *objectstorage.ObjStorage, dm *datamanager.DataManager) *LogsDeleteHandler {
+	return &LogsDeleteHandler{
+		log: logger.Sugar(),
+		e:   e,
+		ost: ost,
+		dm:  dm,
+	}
+}
+
+func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	q := r.URL.Query()
+
+	runID := q.Get("runid")
+	if runID == "" {
+		httpError(w, util.NewErrBadRequest(errors.Errorf("runid is empty")))
+		return
+	}
+	taskID := q.Get("taskid")
+	if taskID == "" {
+		httpError(w, util.NewErrBadRequest(errors.Errorf("taskid is empty")))
+		return
+	}
+
+	_, setup := q["setup"]
+	stepStr := q.Get("step")
+	if !setup && stepStr == "" {
+		httpError(w, util.NewErrBadRequest(errors.Errorf("setup is false and step is empty")))
+		return
+	}
+	if setup && stepStr != "" {
+		httpError(w, util.NewErrBadRequest(errors.Errorf("setup is true and step is %s", stepStr)))
+		return
+	}
+
+	var step int
+	if stepStr != "" {
+		var err error
+		step, err = strconv.Atoi(stepStr)
+		if err != nil {
+			httpError(w, util.NewErrBadRequest(errors.Errorf("step %s is not a valid number", stepStr)))
+			return
+		}
+	}
+
+	if err := h.deleteTaskLogs(ctx, runID, taskID, setup, step, w); err != nil {
+		h.log.Errorf("err: %+v", err)
+		switch {
+		case util.IsNotExist(err):
+			httpError(w, util.NewErrNotExist(errors.Errorf("log doesn't exist: %w", err)))
+		default:
+			httpError(w, err)
+		}
+	}
+}
+
+func (h *LogsDeleteHandler) deleteTaskLogs(ctx context.Context, runID, taskID string, setup bool, step int, w http.ResponseWriter) error {
+	r, err := store.GetRunEtcdOrOST(ctx, h.e, h.dm, runID)
+	if err != nil {
+		return err
+	}
+	if r == nil {
+		return util.NewErrNotExist(errors.Errorf("no such run with id: %s", runID))
+	}
+
+	task, ok := r.Tasks[taskID]
+	if !ok {
+		return util.NewErrNotExist(errors.Errorf("no such task with ID %s in run %s", taskID, runID))
+	}
+	if len(task.Steps) <= step {
+		return util.NewErrNotExist(errors.Errorf("no such step for task %s in run %s", taskID, runID))
+	}
+
+	if task.Steps[step].LogPhase == types.RunTaskFetchPhaseFinished {
+		var logPath string
+		if setup {
+			logPath = store.OSTRunTaskSetupLogPath(task.ID)
+		} else {
+			logPath = store.OSTRunTaskStepLogPath(task.ID, step)
+		}
+		err := h.ost.DeleteObject(logPath)
+		if err != nil {
+			if objectstorage.IsNotExist(err) {
+				return util.NewErrNotExist(err)
+			}
+			return err
+		}
+		return nil
+	}
+	return util.NewErrBadRequest(errors.Errorf("Log for task %s in run %s is not yet archived", taskID, runID))
+}
+
 type ChangeGroupsUpdateTokensHandler struct {
 	log    *zap.SugaredLogger
 	readDB *readdb.ReadDB
