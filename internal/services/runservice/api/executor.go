@@ -25,7 +25,6 @@ import (
 
 	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/objectstorage"
-	ostypes "agola.io/agola/internal/objectstorage/types"
 	"agola.io/agola/internal/services/runservice/action"
 	"agola.io/agola/internal/services/runservice/common"
 	"agola.io/agola/internal/services/runservice/store"
@@ -249,7 +248,7 @@ func (h *ArchivesHandler) readArchive(rtID string, step int, w io.Writer) error 
 	archivePath := store.OSTRunTaskArchivePath(rtID, step)
 	f, err := h.ost.ReadObject(archivePath)
 	if err != nil {
-		if err == ostypes.ErrNotExist {
+		if err == objectstorage.ErrNotExist {
 			return common.NewErrNotExist(err)
 		}
 		return err
@@ -326,7 +325,7 @@ func matchCache(ost *objectstorage.ObjStorage, key string, prefix bool) (string,
 		defer close(doneCh)
 
 		// get the latest modified object
-		var lastObject *ostypes.ObjectInfo
+		var lastObject *objectstorage.ObjectInfo
 		for object := range ost.List(store.OSTCacheDir()+"/"+key, "", false, doneCh) {
 			if object.Err != nil {
 				return "", object.Err
@@ -345,7 +344,7 @@ func matchCache(ost *objectstorage.ObjStorage, key string, prefix bool) (string,
 	}
 
 	_, err := ost.Stat(cachePath)
-	if err == ostypes.ErrNotExist {
+	if err == objectstorage.ErrNotExist {
 		return "", nil
 	}
 	if err != nil {
@@ -358,7 +357,7 @@ func (h *CacheHandler) readCache(key string, w io.Writer) error {
 	cachePath := store.OSTCachePath(key)
 	f, err := h.ost.ReadObject(cachePath)
 	if err != nil {
-		if err == ostypes.ErrNotExist {
+		if err == objectstorage.ErrNotExist {
 			return common.NewErrNotExist(err)
 		}
 		return err

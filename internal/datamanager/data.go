@@ -26,7 +26,7 @@ import (
 	"sort"
 	"strings"
 
-	ostypes "agola.io/agola/internal/objectstorage/types"
+	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/sequence"
 
 	uuid "github.com/satori/go.uuid"
@@ -165,7 +165,7 @@ func (d *DataManager) writeDataSnapshot(ctx context.Context, wals []*WalData) er
 	}
 
 	curDataStatus, err := d.GetLastDataStatus()
-	if err != nil && err != ostypes.ErrNotExist {
+	if err != nil && err != objectstorage.ErrNotExist {
 		return err
 	}
 
@@ -321,10 +321,10 @@ func (d *DataManager) writeDataType(ctx context.Context, wi walIndex, dataType s
 		if actionGroup.DataStatusFile != nil {
 			// TODO(sgotti) instead of reading all entries in memory decode it's contents one by one when needed
 			oldDataf, err := d.ost.ReadObject(d.DataFilePath(dataType, actionGroup.DataStatusFile.ID))
-			if err != nil && err != ostypes.ErrNotExist {
+			if err != nil && err != objectstorage.ErrNotExist {
 				return nil, err
 			}
-			if err != ostypes.ErrNotExist {
+			if err != objectstorage.ErrNotExist {
 				dec := json.NewDecoder(oldDataf)
 				for {
 					var de *DataEntry
@@ -481,7 +481,7 @@ func (d *DataManager) Read(dataType, id string) (io.Reader, error) {
 	var matchingDataFileID string
 	// get the matching data file for the action entry ID
 	if len(curFiles[dataType]) == 0 {
-		return nil, ostypes.ErrNotExist
+		return nil, objectstorage.ErrNotExist
 	}
 
 	matchingDataFileID = curFiles[dataType][0].ID
@@ -507,7 +507,7 @@ func (d *DataManager) Read(dataType, id string) (io.Reader, error) {
 
 	pos, ok := dataFileIndex.Index[id]
 	if !ok {
-		return nil, ostypes.ErrNotExist
+		return nil, objectstorage.ErrNotExist
 	}
 
 	dataf, err := d.ost.ReadObject(d.DataFilePath(dataType, matchingDataFileID))
@@ -527,6 +527,43 @@ func (d *DataManager) Read(dataType, id string) (io.Reader, error) {
 	dataf.Close()
 
 	return bytes.NewReader(de.Data), nil
+}
+
+func (d *DataManager) GetFirstDataStatusSequences(n int) ([]*sequence.Sequence, error) {
+	if n < 1 {
+		return nil, errors.Errorf("n must be greater than 0")
+	}
+
+	dataStatusSequences := []*sequence.Sequence{}
+	c := 0
+
+	doneCh := make(chan struct{})
+	defer close(doneCh)
+	for object := range d.ost.List(d.storageDataDir()+"/", "", false, doneCh) {
+		if object.Err != nil {
+			return nil, object.Err
+		}
+		if m := DataStatusFileRegexp.FindStringSubmatch(path.Base(object.Path)); m != nil {
+			seq, err := sequence.Parse(m[1])
+			if err != nil {
+				d.log.Warnf("cannot parse sequence for data status file %q", object.Path)
+				continue
+			}
+			dataStatusSequences = append(dataStatusSequences, seq)
+			c++
+		} else {
+			d.log.Warnf("bad file %q found in storage data dir", object.Path)
+		}
+		if c >= n {
+			break
+		}
+	}
+
+	if len(dataStatusSequences) == 0 {
+		return nil, objectstorage.ErrNotExist
+	}
+
+	return dataStatusSequences, nil
 }
 
 func (d *DataManager) GetLastDataStatusSequences(n int) ([]*sequence.Sequence, error) {
@@ -564,7 +601,7 @@ func (d *DataManager) GetLastDataStatusSequences(n int) ([]*sequence.Sequence, e
 	})
 
 	if len(dataStatusSequences) == 0 {
-		return nil, ostypes.ErrNotExist
+		return nil, objectstorage.ErrNotExist
 	}
 
 	return dataStatusSequences, nil
@@ -582,6 +619,15 @@ func (d *DataManager) GetDataStatus(dataSequence *sequence.Sequence) (*DataStatu
 	return dataStatus, dec.Decode(&dataStatus)
 }
 
+func (d *DataManager) GetFirstDataStatusSequence() (*sequence.Sequence, error) {
+	dataStatusSequences, err := d.GetFirstDataStatusSequences(1)
+	if err != nil {
+		return nil, err
+	}
+
+	return dataStatusSequences[0], nil
+}
+
 func (d *DataManager) GetLastDataStatusSequence() (*sequence.Sequence, error) {
 	dataStatusSequences, err := d.GetLastDataStatusSequences(1)
 	if err != nil {
@@ -589,6 +635,15 @@ func (d *DataManager) GetLastDataStatusSequence() (*sequence.Sequence, error) {
 	}
 
 	return dataStatusSequences[0], nil
+}
+
+func (d *DataManager) GetFirstDataStatus() (*DataStatus, error) {
+	dataStatusSequence, err := d.GetFirstDataStatusSequence()
+	if err != nil {
+		return nil, err
+	}
+
+	return d.GetDataStatus(dataStatusSequence)
 }
 
 func (d *DataManager) GetLastDataStatus() (*DataStatus, error) {
@@ -807,7 +862,7 @@ func (d *DataManager) cleanOldCheckpoints(ctx context.Context, dataStatusSequenc
 			if _, ok := dataStatusPathsMap[object.Path]; !ok {
 				d.log.Infof("removing %q", object.Path)
 				if err := d.ost.DeleteObject(object.Path); err != nil {
-					if err != ostypes.ErrNotExist {
+					if err != objectstorage.ErrNotExist {
 						return err
 					}
 				}
@@ -875,7 +930,7 @@ func (d *DataManager) cleanOldCheckpoints(ctx context.Context, dataStatusSequenc
 		if _, ok := files[pne]; !ok {
 			d.log.Infof("removing %q", object.Path)
 			if err := d.ost.DeleteObject(object.Path); err != nil {
-				if err != ostypes.ErrNotExist {
+				if err != objectstorage.ErrNotExist {
 					return err
 				}
 			}

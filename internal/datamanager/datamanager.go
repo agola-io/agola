@@ -34,10 +34,15 @@ import (
 // * Etcd cluster restored to a previous revision: really bad cause should detect that the revision is smaller than the current one
 
 const (
-	DefaultCheckpointInterval      = 10 * time.Second
-	DefaultCheckpointCleanInterval = 5 * time.Minute
-	DefaultEtcdWalsKeepNum         = 100
-	DefaultMinCheckpointWalsNum    = 100
+	DefaultSyncInterval                = 5 * time.Second
+	DefaultCheckpointInterval          = 10 * time.Second
+	DefaultCheckpointCleanInterval     = 5 * time.Minute
+	DefaultEtcdWalCleanInterval        = 2 * time.Second
+	DefaultStorageWalCleanInterval     = 5 * time.Minute
+	DefaultCompactChangeGroupsInterval = 1 * time.Second
+	DefaultEtcdPingerInterval          = 1 * time.Second
+	DefaultEtcdWalsKeepNum             = 100
+	DefaultMinCheckpointWalsNum        = 100
 )
 
 var (
@@ -66,6 +71,7 @@ var (
 	etcdCompactChangeGroupsLockKey = path.Join(etcdWalBaseDir, "compactchangegroupslock")
 	etcdCheckpointLockKey          = path.Join(etcdWalBaseDir, "checkpointlock")
 	etcdWalCleanerLockKey          = path.Join(etcdWalBaseDir, "walcleanerlock")
+	etcdStorageWalCleanerLockKey   = path.Join(etcdWalBaseDir, "storagewalcleanerlock")
 
 	etcdChangeGroupsDir           = path.Join(etcdWalBaseDir, "changegroups")
 	etcdChangeGroupMinRevisionKey = path.Join(etcdWalBaseDir, "changegroupsminrev")
@@ -154,12 +160,20 @@ func NewDataManager(ctx context.Context, logger *zap.Logger, conf *DataManagerCo
 	return d, nil
 }
 
+func (d *DataManager) storageWalStatusDir() string {
+	return path.Join(d.basePath, storageWalsStatusDir)
+}
+
 func (d *DataManager) storageWalStatusFile(walSeq string) string {
-	return path.Join(d.basePath, storageWalsStatusDir, walSeq)
+	return path.Join(d.storageWalStatusDir(), walSeq)
+}
+
+func (d *DataManager) storageWalDataDir() string {
+	return path.Join(d.basePath, storageWalsDataDir)
 }
 
 func (d *DataManager) storageWalDataFile(walFileID string) string {
-	return path.Join(d.basePath, storageWalsDataDir, walFileID)
+	return path.Join(d.storageWalDataDir(), walFileID)
 }
 
 func (d *DataManager) storageDataDir() string {
@@ -239,7 +253,8 @@ func (d *DataManager) Run(ctx context.Context, readyCh chan struct{}) error {
 		go d.syncLoop(ctx)
 		go d.checkpointLoop(ctx)
 		go d.checkpointCleanLoop(ctx)
-		go d.walCleanerLoop(ctx)
+		go d.etcdWalCleanerLoop(ctx)
+		go d.storageWalCleanerLoop(ctx)
 		go d.compactChangeGroupsLoop(ctx)
 		go d.etcdPingerLoop(ctx)
 

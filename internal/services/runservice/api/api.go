@@ -26,7 +26,6 @@ import (
 	"agola.io/agola/internal/db"
 	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/objectstorage"
-	ostypes "agola.io/agola/internal/objectstorage/types"
 	"agola.io/agola/internal/services/runservice/action"
 	"agola.io/agola/internal/services/runservice/common"
 	"agola.io/agola/internal/services/runservice/readdb"
@@ -231,7 +230,7 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 		}
 		f, err := h.ost.ReadObject(logPath)
 		if err != nil {
-			if err == ostypes.ErrNotExist {
+			if err == objectstorage.ErrNotExist {
 				return common.NewErrNotExist(err), true
 			}
 			return err, true

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package common
+package objectstorage
 
 import (
 	"io"
@@ -22,12 +22,12 @@ import (
 	"strings"
 )
 
-// WriteFileAtomicFunc atomically writes a file, it achieves this by creating a
+// writeFileAtomicFunc atomically writes a file, it achieves this by creating a
 // temporary file and then moving it. writeFunc is the func that will write
 // data to the file.
 // TODO(sgotti) remove left over tmp files if process crashes before calling
 // os.Remove
-func WriteFileAtomicFunc(p, baseDir, tmpDir string, perm os.FileMode, persist bool, writeFunc func(f io.Writer) error) error {
+func writeFileAtomicFunc(p, baseDir, tmpDir string, perm os.FileMode, persist bool, writeFunc func(f io.Writer) error) error {
 	f, err := ioutil.TempFile(tmpDir, "tmpfile")
 	if err != nil {
 		return err
@@ -75,10 +75,12 @@ func WriteFileAtomicFunc(p, baseDir, tmpDir string, perm os.FileMode, persist bo
 	return nil
 }
 
-func WriteFileAtomic(filename, baseDir, tmpDir string, perm os.FileMode, persist bool, data []byte) error {
-	return WriteFileAtomicFunc(filename, baseDir, tmpDir, perm, persist,
+/*
+func writeFileAtomic(filename, baseDir, tmpDir string, perm os.FileMode, persist bool, data []byte) error {
+	return writeFileAtomicFunc(filename, baseDir, tmpDir, perm, persist,
 		func(f io.Writer) error {
 			_, err := f.Write(data)
 			return err
 		})
 }
+*/
