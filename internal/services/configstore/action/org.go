@@ -51,7 +51,7 @@ func (h *ActionHandler) GetOrgMembers(ctx context.Context, orgRef string) ([]*Or
 			return err
 		}
 		if org == nil {
-			return util.NewErrNotFound(errors.Errorf("org %q doesn't exist", orgRef))
+			return util.NewErrNotExist(errors.Errorf("org %q doesn't exist", orgRef))
 		}
 
 		orgUsers, err = h.readDB.GetOrgUsers(tx, org.ID)

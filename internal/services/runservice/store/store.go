@@ -504,7 +504,7 @@ func GetRunEtcdOrOST(ctx context.Context, e *etcd.Store, dm *datamanager.DataMan
 	}
 	if r == nil {
 		r, err = OSTGetRun(dm, runID)
-		if err != nil && err != objectstorage.ErrNotExist {
+		if err != nil && !objectstorage.IsNotExist(err) {
 			return nil, err
 		}
 	}

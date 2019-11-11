@@ -865,7 +865,7 @@ func (s *Runservice) runTasksUpdater(ctx context.Context) error {
 
 func (s *Runservice) OSTFileExists(path string) (bool, error) {
 	_, err := s.ost.Stat(path)
-	if err != nil && err != objectstorage.ErrNotExist {
+	if err != nil && !objectstorage.IsNotExist(err) {
 		return false, err
 	}
 	return err == nil, nil
@@ -1359,7 +1359,7 @@ func (s *Runservice) cacheCleaner(ctx context.Context, cacheExpireInterval time.
 		}
 		if object.LastModified.Add(cacheExpireInterval).Before(time.Now()) {
 			if err := s.ost.DeleteObject(object.Path); err != nil {
-				if err != objectstorage.ErrNotExist {
+				if !objectstorage.IsNotExist(err) {
 					log.Warnf("failed to delete cache object %q: %v", object.Path, err)
 				}
 			}
@@ -1411,7 +1411,7 @@ func (s *Runservice) workspaceCleaner(ctx context.Context, workspaceExpireInterv
 		}
 		if object.LastModified.Add(workspaceExpireInterval).Before(time.Now()) {
 			if err := s.ost.DeleteObject(object.Path); err != nil {
-				if err != objectstorage.ErrNotExist {
+				if !objectstorage.IsNotExist(err) {
 					log.Warnf("failed to delete workspace object %q: %v", object.Path, err)
 				}
 			}

@@ -58,7 +58,7 @@ func (h *OrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if org == nil {
-		httpError(w, util.NewErrNotFound(errors.Errorf("org %q doesn't exist", orgRef)))
+		httpError(w, util.NewErrNotExist(errors.Errorf("org %q doesn't exist", orgRef)))
 		return
 	}
 

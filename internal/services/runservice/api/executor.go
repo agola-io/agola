@@ -234,8 +234,8 @@ func (h *ArchivesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 
 	if err := h.readArchive(taskID, step, w); err != nil {
-		switch err.(type) {
-		case common.ErrNotExist:
+		switch {
+		case util.IsNotExist(err):
 			http.Error(w, err.Error(), http.StatusNotFound)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -248,8 +248,8 @@ func (h *ArchivesHandler) readArchive(rtID string, step int, w io.Writer) error 
 	archivePath := store.OSTRunTaskArchivePath(rtID, step)
 	f, err := h.ost.ReadObject(archivePath)
 	if err != nil {
-		if err == objectstorage.ErrNotExist {
-			return common.NewErrNotExist(err)
+		if objectstorage.IsNotExist(err) {
+			return util.NewErrNotExist(err)
 		}
 		return err
 	}
@@ -307,8 +307,8 @@ func (h *CacheHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 
 	if err := h.readCache(matchedKey, w); err != nil {
-		switch err.(type) {
-		case common.ErrNotExist:
+		switch {
+		case util.IsNotExist(err):
 			http.Error(w, err.Error(), http.StatusNotFound)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -344,7 +344,7 @@ func matchCache(ost *objectstorage.ObjStorage, key string, prefix bool) (string,
 	}
 
 	_, err := ost.Stat(cachePath)
-	if err == objectstorage.ErrNotExist {
+	if objectstorage.IsNotExist(err) {
 		return "", nil
 	}
 	if err != nil {
@@ -357,8 +357,8 @@ func (h *CacheHandler) readCache(key string, w io.Writer) error {
 	cachePath := store.OSTCachePath(key)
 	f, err := h.ost.ReadObject(cachePath)
 	if err != nil {
-		if err == objectstorage.ErrNotExist {
-			return common.NewErrNotExist(err)
+		if objectstorage.IsNotExist(err) {
+			return util.NewErrNotExist(err)
 		}
 		return err
 	}

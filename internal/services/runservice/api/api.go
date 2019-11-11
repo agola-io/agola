@@ -50,23 +50,23 @@ func ErrorResponseFromError(err error) *ErrorResponse {
 	var aerr error
 	// use inner errors if of these types
 	switch {
-	case errors.Is(err, &util.ErrBadRequest{}):
+	case util.IsBadRequest(err):
 		var cerr *util.ErrBadRequest
 		errors.As(err, &cerr)
 		aerr = cerr
-	case errors.Is(err, &util.ErrNotFound{}):
-		var cerr *util.ErrNotFound
+	case util.IsNotExist(err):
+		var cerr *util.ErrNotExist
 		errors.As(err, &cerr)
 		aerr = cerr
-	case errors.Is(err, &util.ErrForbidden{}):
+	case util.IsForbidden(err):
 		var cerr *util.ErrForbidden
 		errors.As(err, &cerr)
 		aerr = cerr
-	case errors.Is(err, &util.ErrUnauthorized{}):
+	case util.IsUnauthorized(err):
 		var cerr *util.ErrUnauthorized
 		errors.As(err, &cerr)
 		aerr = cerr
-	case errors.Is(err, &util.ErrInternal{}):
+	case util.IsInternal(err):
 		var cerr *util.ErrInternal
 		errors.As(err, &cerr)
 		aerr = cerr
@@ -92,19 +92,19 @@ func httpError(w http.ResponseWriter, err error) bool {
 		return true
 	}
 	switch {
-	case errors.Is(err, &util.ErrBadRequest{}):
+	case util.IsBadRequest(err):
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write(resj)
-	case errors.Is(err, &util.ErrNotFound{}):
+	case util.IsNotExist(err):
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = w.Write(resj)
-	case errors.Is(err, &util.ErrForbidden{}):
+	case util.IsForbidden(err):
 		w.WriteHeader(http.StatusForbidden)
 		_, _ = w.Write(resj)
-	case errors.Is(err, &util.ErrUnauthorized{}):
+	case util.IsUnauthorized(err):
 		w.WriteHeader(http.StatusUnauthorized)
 		_, _ = w.Write(resj)
-	case errors.Is(err, &util.ErrInternal{}):
+	case util.IsInternal(err):
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write(resj)
 	default:
@@ -193,8 +193,8 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err, sendError := h.readTaskLogs(ctx, runID, taskID, setup, step, w, follow); err != nil {
 		h.log.Errorf("err: %+v", err)
 		if sendError {
-			switch err.(type) {
-			case common.ErrNotExist:
+			switch {
+			case util.IsNotExist(err):
 				http.Error(w, err.Error(), http.StatusNotFound)
 			default:
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -230,8 +230,8 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 		}
 		f, err := h.ost.ReadObject(logPath)
 		if err != nil {
-			if err == objectstorage.ErrNotExist {
-				return common.NewErrNotExist(err), true
+			if objectstorage.IsNotExist(err) {
+				return util.NewErrNotExist(err), true
 			}
 			return err, true
 		}
@@ -248,7 +248,7 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 		return err, true
 	}
 	if executor == nil {
-		return common.NewErrNotExist(errors.Errorf("executor with id %q doesn't exist", et.Spec.ExecutorID)), true
+		return util.NewErrNotExist(errors.Errorf("executor with id %q doesn't exist", et.Spec.ExecutorID)), true
 	}
 
 	var url string
@@ -267,7 +267,7 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 	defer req.Body.Close()
 	if req.StatusCode != http.StatusOK {
 		if req.StatusCode == http.StatusNotFound {
-			return common.NewErrNotExist(errors.New("no log on executor")), true
+			return util.NewErrNotExist(errors.New("no log on executor")), true
 		}
 		return errors.Errorf("received http status: %d", req.StatusCode), true
 	}
@@ -393,7 +393,7 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if run == nil {
-		httpError(w, util.NewErrNotFound(errors.Errorf("run %q doesn't exist", runID)))
+		httpError(w, util.NewErrNotExist(errors.Errorf("run %q doesn't exist", runID)))
 		return
 	}
 

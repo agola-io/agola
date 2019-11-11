@@ -76,7 +76,7 @@ func (h *ActionHandler) GetProject(ctx context.Context, projectRef string) (*typ
 	}
 
 	if project == nil {
-		return nil, util.NewErrNotFound(errors.Errorf("project %q doesn't exist", projectRef))
+		return nil, util.NewErrNotExist(errors.Errorf("project %q doesn't exist", projectRef))
 	}
 
 	return project, nil

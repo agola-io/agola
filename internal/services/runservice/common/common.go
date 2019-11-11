@@ -28,18 +28,6 @@ const (
 	MaxCacheKeyLength = 200
 )
 
-type ErrNotExist struct {
-	err error
-}
-
-func NewErrNotExist(err error) error {
-	return ErrNotExist{err: err}
-}
-
-func (e ErrNotExist) Error() string {
-	return e.err.Error()
-}
-
 var (
 	EtcdSchedulerBaseDir = "scheduler"
 

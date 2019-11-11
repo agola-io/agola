@@ -41,7 +41,7 @@ func (h *ActionHandler) GetProjectGroup(ctx context.Context, projectGroupRef str
 	}
 
 	if projectGroup == nil {
-		return nil, util.NewErrNotFound(errors.Errorf("project group %q doesn't exist", projectGroupRef))
+		return nil, util.NewErrNotExist(errors.Errorf("project group %q doesn't exist", projectGroupRef))
 	}
 
 	return projectGroup, nil
@@ -57,7 +57,7 @@ func (h *ActionHandler) GetProjectGroupSubgroups(ctx context.Context, projectGro
 		}
 
 		if projectGroup == nil {
-			return util.NewErrNotFound(errors.Errorf("project group %q doesn't exist", projectGroupRef))
+			return util.NewErrNotExist(errors.Errorf("project group %q doesn't exist", projectGroupRef))
 		}
 
 		projectGroups, err = h.readDB.GetProjectGroupSubgroups(tx, projectGroup.ID)
@@ -80,7 +80,7 @@ func (h *ActionHandler) GetProjectGroupProjects(ctx context.Context, projectGrou
 		}
 
 		if projectGroup == nil {
-			return util.NewErrNotFound(errors.Errorf("project group %q doesn't exist", projectGroupRef))
+			return util.NewErrNotExist(errors.Errorf("project group %q doesn't exist", projectGroupRef))
 		}
 
 		projects, err = h.readDB.GetProjectGroupProjects(tx, projectGroup.ID)

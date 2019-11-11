@@ -667,11 +667,8 @@ func (r *ReadDB) SyncObjectStorage(ctx context.Context) error {
 
 func (r *ReadDB) SyncFromDump(ctx context.Context) (string, error) {
 	dumpIndex, err := r.dm.GetLastDataStatus()
-	if err != nil && err != objectstorage.ErrNotExist {
+	if err != nil {
 		return "", err
-	}
-	if err == objectstorage.ErrNotExist {
-		return "", nil
 	}
 	for dataType, files := range dumpIndex.Files {
 		for _, file := range files {
