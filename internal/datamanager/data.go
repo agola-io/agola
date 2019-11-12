@@ -163,13 +163,28 @@ func (d *DataManager) writeDataSnapshot(ctx context.Context, wals []*WalData) er
 		Files:        make(map[string][]*DataStatusFile),
 	}
 
-	wi, err := d.walIndex(ctx, wals)
-	if err != nil {
+	curDataStatus, err := d.GetLastDataStatus()
+	if err != nil && !errors.Is(err, ErrNoDataStatus) {
 		return err
 	}
 
-	curDataStatus, err := d.GetLastDataStatus()
-	if err != nil && !errors.Is(err, ErrNoDataStatus) {
+	startWalIndex := 0
+	if curDataStatus != nil {
+		// skip wals already checkpointed in this data status
+		for i, wal := range wals {
+			if wal.WalSequence <= curDataStatus.WalSequence {
+				continue
+			}
+
+			startWalIndex = i
+			break
+		}
+	}
+
+	wals = wals[startWalIndex:]
+
+	wi, err := d.walIndex(ctx, wals)
+	if err != nil {
 		return err
 	}
 
