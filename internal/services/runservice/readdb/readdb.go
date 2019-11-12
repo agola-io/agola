@@ -306,28 +306,28 @@ func (r *ReadDB) Run(ctx context.Context) error {
 			}
 		}
 
-		errCh := make(chan error, 2)
+		doneCh := make(chan struct{}, 2)
 		hctx, cancel := context.WithCancel(ctx)
 		wg := &sync.WaitGroup{}
 
-		wg.Add(1)
+		wg.Add(2)
+
 		go func() {
 			r.log.Infof("starting handleEvents")
 			if err := r.handleEvents(hctx); err != nil {
 				r.log.Errorf("handleEvents err: %+v", err)
-				errCh <- err
 			}
 			wg.Done()
+			doneCh <- struct{}{}
 		}()
 
-		wg.Add(1)
 		go func() {
 			r.log.Infof("starting handleEventsOST")
 			if err := r.handleEventsOST(hctx); err != nil {
 				r.log.Errorf("handleEventsOST err: %+v", err)
-				errCh <- err
 			}
 			wg.Done()
+			doneCh <- struct{}{}
 		}()
 
 		select {
@@ -335,7 +335,7 @@ func (r *ReadDB) Run(ctx context.Context) error {
 			r.log.Infof("readdb exiting")
 			cancel()
 			return nil
-		case <-errCh:
+		case <-doneCh:
 			// cancel context and wait for the all the goroutines to exit
 			cancel()
 			wg.Wait()
