@@ -106,6 +106,8 @@ type RunTaskResponseStep struct {
 
 	StartTime *time.Time `json:"start_time"`
 	EndTime   *time.Time `json:"end_time"`
+
+	LogArchived bool `json:"log_archived"`
 }
 
 type RunActionType string
