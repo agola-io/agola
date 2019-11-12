@@ -395,12 +395,12 @@ func (s *Runservice) compactChangeGroups(ctx context.Context) error {
 	}
 	defer session.Close()
 
-	m := concurrency.NewMutex(session, common.EtcdCompactChangeGroupsLockKey)
+	m := etcd.NewMutex(session, common.EtcdCompactChangeGroupsLockKey)
 
-	// TODO(sgotti) find a way to use a trylock so we'll just return if already
-	// locked. Currently multiple task updaters will enqueue and start when another
-	// finishes (unuseful and consume resources)
-	if err := m.Lock(ctx); err != nil {
+	if err := m.TryLock(ctx); err != nil {
+		if errors.Is(err, etcd.ErrLocked) {
+			return nil
+		}
 		return err
 	}
 	defer func() { _ = m.Unlock(ctx) }()
@@ -834,12 +834,12 @@ func (s *Runservice) runTasksUpdater(ctx context.Context) error {
 	}
 	defer session.Close()
 
-	m := concurrency.NewMutex(session, common.EtcdTaskUpdaterLockKey)
+	m := etcd.NewMutex(session, common.EtcdTaskUpdaterLockKey)
 
-	// TODO(sgotti) find a way to use a trylock so we'll just return if already
-	// locked. Currently multiple task updaters will enqueue and start when another
-	// finishes (unuseful and consume resources)
-	if err := m.Lock(ctx); err != nil {
+	if err := m.TryLock(ctx); err != nil {
+		if errors.Is(err, etcd.ErrLocked) {
+			return nil
+		}
 		return err
 	}
 	defer func() { _ = m.Unlock(ctx) }()
@@ -1341,12 +1341,12 @@ func (s *Runservice) cacheCleaner(ctx context.Context, cacheExpireInterval time.
 	}
 	defer session.Close()
 
-	m := concurrency.NewMutex(session, common.EtcdCacheCleanerLockKey)
+	m := etcd.NewMutex(session, common.EtcdCacheCleanerLockKey)
 
-	// TODO(sgotti) find a way to use a trylock so we'll just return if already
-	// locked. Currently multiple cachecleaners will enqueue and start when another
-	// finishes (unuseful and consume resources)
-	if err := m.Lock(ctx); err != nil {
+	if err := m.TryLock(ctx); err != nil {
+		if errors.Is(err, etcd.ErrLocked) {
+			return nil
+		}
 		return err
 	}
 	defer func() { _ = m.Unlock(ctx) }()
@@ -1393,12 +1393,12 @@ func (s *Runservice) workspaceCleaner(ctx context.Context, workspaceExpireInterv
 	}
 	defer session.Close()
 
-	m := concurrency.NewMutex(session, common.EtcdWorkspaceCleanerLockKey)
+	m := etcd.NewMutex(session, common.EtcdWorkspaceCleanerLockKey)
 
-	// TODO(sgotti) find a way to use a trylock so we'll just return if already
-	// locked. Currently multiple workspacecleaners will enqueue and start when another
-	// finishes (unuseful and consume resources)
-	if err := m.Lock(ctx); err != nil {
+	if err := m.TryLock(ctx); err != nil {
+		if errors.Is(err, etcd.ErrLocked) {
+			return nil
+		}
 		return err
 	}
 	defer func() { _ = m.Unlock(ctx) }()
