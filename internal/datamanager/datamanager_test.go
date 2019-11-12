@@ -128,10 +128,10 @@ func TestEtcdReset(t *testing.T) {
 	t.Logf("stopping datamanager")
 	cancel()
 
-	t.Logf("stopping etcd")
 	// Reset etcd
+	t.Logf("stopping etcd")
 	shutdownEtcd(tetcd)
-	if err := tetcd.WaitDown(10 * time.Second); err != nil {
+	if err := tetcd.WaitDown(20 * time.Second); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	t.Logf("resetting etcd")
