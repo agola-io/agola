@@ -44,10 +44,12 @@ var (
 
 	EtcdPingKey = path.Join(EtcdSchedulerBaseDir, "ping")
 
-	EtcdCompactChangeGroupsLockKey = path.Join(EtcdSchedulerBaseDir, "compactchangegroupslock")
-	EtcdCacheCleanerLockKey        = path.Join(EtcdSchedulerBaseDir, "locks", "cachecleaner")
-	EtcdWorkspaceCleanerLockKey    = path.Join(EtcdSchedulerBaseDir, "locks", "workspacecleaner")
-	EtcdTaskUpdaterLockKey         = path.Join(EtcdSchedulerBaseDir, "locks", "taskupdater")
+	EtcdLocksDir = path.Join(EtcdSchedulerBaseDir, "locks")
+
+	EtcdCompactChangeGroupsLockKey = path.Join(EtcdLocksDir, "compactchangegroups")
+	EtcdCacheCleanerLockKey        = path.Join(EtcdLocksDir, "cachecleaner")
+	EtcdWorkspaceCleanerLockKey    = path.Join(EtcdLocksDir, "workspacecleaner")
+	EtcdTaskUpdaterLockKey         = path.Join(EtcdLocksDir, "taskupdater")
 
 	EtcdMaintenanceKey = "maintenance"
 )
@@ -55,6 +57,9 @@ var (
 func EtcdRunKey(runID string) string       { return path.Join(EtcdRunsDir, runID) }
 func EtcdExecutorKey(taskID string) string { return path.Join(EtcdExecutorsDir, taskID) }
 func EtcdTaskKey(taskID string) string     { return path.Join(EtcdTasksDir, taskID) }
+func EtcdTaskFetcherLockKey(taskID string) string {
+	return path.Join(EtcdLocksDir, "taskfetcher", taskID)
+}
 
 const (
 	EtcdChangeGroupMinRevisionRange = 100
