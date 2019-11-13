@@ -24,6 +24,7 @@ import (
 	"path"
 	"time"
 
+	"agola.io/agola/internal/etcd"
 	rstypes "agola.io/agola/services/runservice/types"
 
 	"go.etcd.io/etcd/clientv3/concurrency"
@@ -56,12 +57,12 @@ func (n *NotificationService) runEventsHandler(ctx context.Context) error {
 	}
 	defer session.Close()
 
-	m := concurrency.NewMutex(session, etcdRunEventsLockKey)
+	m := etcd.NewMutex(session, etcdRunEventsLockKey)
 
-	// TODO(sgotti) find a way to use a trylock so we'll just return if already
-	// locked. Currently multiple task updaters will enqueue and start when another
-	// finishes (unuseful and consume resources)
-	if err := m.Lock(ctx); err != nil {
+	if err := m.TryLock(ctx); err != nil {
+		if errors.Is(err, etcd.ErrLocked) {
+			return nil
+		}
 		return err
 	}
 	defer func() { _ = m.Unlock(ctx) }()

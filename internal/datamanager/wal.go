@@ -564,12 +564,12 @@ func (d *DataManager) sync(ctx context.Context) error {
 	}
 	defer session.Close()
 
-	m := concurrency.NewMutex(session, etcdSyncLockKey)
+	m := etcd.NewMutex(session, etcdSyncLockKey)
 
-	// TODO(sgotti) find a way to use a trylock so we'll just return if already
-	// locked. Currently multiple task updaters will enqueue and start when another
-	// finishes (unuseful and consume resources)
-	if err := m.Lock(ctx); err != nil {
+	if err := m.TryLock(ctx); err != nil {
+		if errors.Is(err, etcd.ErrLocked) {
+			return nil
+		}
 		return err
 	}
 	defer func() { _ = m.Unlock(ctx) }()
@@ -653,12 +653,12 @@ func (d *DataManager) checkpoint(ctx context.Context, force bool) error {
 	}
 	defer session.Close()
 
-	m := concurrency.NewMutex(session, etcdCheckpointLockKey)
+	m := etcd.NewMutex(session, etcdCheckpointLockKey)
 
-	// TODO(sgotti) find a way to use a trylock so we'll just return if already
-	// locked. Currently multiple task updaters will enqueue and start when another
-	// finishes (unuseful and consume resources)
-	if err := m.Lock(ctx); err != nil {
+	if err := m.TryLock(ctx); err != nil {
+		if errors.Is(err, etcd.ErrLocked) {
+			return nil
+		}
 		return err
 	}
 	defer func() { _ = m.Unlock(ctx) }()
@@ -735,12 +735,12 @@ func (d *DataManager) checkpointClean(ctx context.Context) error {
 	}
 	defer session.Close()
 
-	m := concurrency.NewMutex(session, etcdCheckpointLockKey)
+	m := etcd.NewMutex(session, etcdCheckpointLockKey)
 
-	// TODO(sgotti) find a way to use a trylock so we'll just return if already
-	// locked. Currently multiple task updaters will enqueue and start when another
-	// finishes (unuseful and consume resources)
-	if err := m.Lock(ctx); err != nil {
+	if err := m.TryLock(ctx); err != nil {
+		if errors.Is(err, etcd.ErrLocked) {
+			return nil
+		}
 		return err
 	}
 	defer func() { _ = m.Unlock(ctx) }()
@@ -778,12 +778,12 @@ func (d *DataManager) etcdWalCleaner(ctx context.Context) error {
 	}
 	defer session.Close()
 
-	m := concurrency.NewMutex(session, etcdWalCleanerLockKey)
+	m := etcd.NewMutex(session, etcdWalCleanerLockKey)
 
-	// TODO(sgotti) find a way to use a trylock so we'll just return if already
-	// locked. Currently multiple task updaters will enqueue and start when another
-	// finishes (unuseful and consume resources)
-	if err := m.Lock(ctx); err != nil {
+	if err := m.TryLock(ctx); err != nil {
+		if errors.Is(err, etcd.ErrLocked) {
+			return nil
+		}
 		return err
 	}
 	defer func() { _ = m.Unlock(ctx) }()
@@ -851,12 +851,12 @@ func (d *DataManager) storageWalCleaner(ctx context.Context) error {
 	}
 	defer session.Close()
 
-	m := concurrency.NewMutex(session, etcdStorageWalCleanerLockKey)
+	m := etcd.NewMutex(session, etcdStorageWalCleanerLockKey)
 
-	// TODO(sgotti) find a way to use a trylock so we'll just return if already
-	// locked. Currently multiple task updaters will enqueue and start when another
-	// finishes (unuseful and consume resources)
-	if err := m.Lock(ctx); err != nil {
+	if err := m.TryLock(ctx); err != nil {
+		if errors.Is(err, etcd.ErrLocked) {
+			return nil
+		}
 		return err
 	}
 	defer func() { _ = m.Unlock(ctx) }()
@@ -961,12 +961,12 @@ func (d *DataManager) compactChangeGroups(ctx context.Context) error {
 	}
 	defer session.Close()
 
-	m := concurrency.NewMutex(session, etcdCompactChangeGroupsLockKey)
+	m := etcd.NewMutex(session, etcdCompactChangeGroupsLockKey)
 
-	// TODO(sgotti) find a way to use a trylock so we'll just return if already
-	// locked. Currently multiple task updaters will enqueue and start when another
-	// finishes (unuseful and consume resources)
-	if err := m.Lock(ctx); err != nil {
+	if err := m.TryLock(ctx); err != nil {
+		if errors.Is(err, etcd.ErrLocked) {
+			return nil
+		}
 		return err
 	}
 	defer func() { _ = m.Unlock(ctx) }()
@@ -1099,12 +1099,12 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 	}
 	defer session.Close()
 
-	m := concurrency.NewMutex(session, etcdInitEtcdLockKey)
+	m := etcd.NewMutex(session, etcdInitEtcdLockKey)
 
-	// TODO(sgotti) find a way to use a trylock so we'll just return if already
-	// locked. Currently multiple task updaters will enqueue and start when another
-	// finishes (unuseful and consume resources)
-	if err := m.Lock(ctx); err != nil {
+	if err := m.TryLock(ctx); err != nil {
+		if errors.Is(err, etcd.ErrLocked) {
+			return nil
+		}
 		return err
 	}
 	defer func() { _ = m.Unlock(ctx) }()
