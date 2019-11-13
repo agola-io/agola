@@ -111,6 +111,11 @@ func createRunTaskResponse(rt *rstypes.RunTask, rct *rstypes.RunConfigTask) *gwa
 		}
 		rcts := rct.Steps[i]
 		rts := rt.Steps[i]
+
+		if rts.LogPhase == rstypes.RunTaskFetchPhaseFinished {
+			s.LogArchived = true
+		}
+
 		switch rcts := rcts.(type) {
 		case *rstypes.RunStep:
 			s.Type = "run"
@@ -124,7 +129,6 @@ func createRunTaskResponse(rt *rstypes.RunTask, rct *rstypes.RunConfigTask) *gwa
 			s.Shell = shell
 
 			s.ExitStatus = rts.ExitStatus
-
 		case *rstypes.SaveToWorkspaceStep:
 			s.Type = "save_to_workspace"
 			s.Name = "save to workspace"
