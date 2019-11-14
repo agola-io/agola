@@ -195,9 +195,9 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if sendError {
 			switch {
 			case util.IsNotExist(err):
-				http.Error(w, err.Error(), http.StatusNotFound)
+				httpError(w, util.NewErrNotExist(errors.Errorf("log doesn't exist: %w", err)))
 			default:
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				httpError(w, err)
 			}
 		}
 	}
@@ -241,14 +241,17 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 
 	et, err := store.GetExecutorTask(ctx, h.e, task.ID)
 	if err != nil {
+		if err == etcd.ErrKeyNotFound {
+			return util.NewErrNotExist(errors.Errorf("executor task with id %q doesn't exist", task.ID)), true
+		}
 		return err, true
 	}
 	executor, err := store.GetExecutor(ctx, h.e, et.Spec.ExecutorID)
-	if err != nil && err != etcd.ErrKeyNotFound {
+	if err != nil {
+		if err == etcd.ErrKeyNotFound {
+			return util.NewErrNotExist(errors.Errorf("executor with id %q doesn't exist", et.Spec.ExecutorID)), true
+		}
 		return err, true
-	}
-	if executor == nil {
-		return util.NewErrNotExist(errors.Errorf("executor with id %q doesn't exist", et.Spec.ExecutorID)), true
 	}
 
 	var url string
