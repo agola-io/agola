@@ -451,8 +451,18 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// write and flush the headers so the client will receive the response
+	// header also if there're currently no lines to send
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+	w.WriteHeader(http.StatusOK)
+	var flusher http.Flusher
+	if fl, ok := w.(http.Flusher); ok {
+		flusher = fl
+	}
+	if flusher != nil {
+		flusher.Flush()
+	}
 
 	defer resp.Body.Close()
 	if err := sendLogs(w, resp.Body); err != nil {
