@@ -137,10 +137,17 @@ func (h *logsHandler) readLogs(taskID string, setup bool, step int, logPath stri
 		w.Header().Set("Content-Length", strconv.FormatInt(fi.Size(), 10))
 	}
 
+	// write and flush the headers so the client will receive the response
+	// header also if there're currently no lines to send
+	w.WriteHeader(http.StatusOK)
 	var flusher http.Flusher
 	if fl, ok := w.(http.Flusher); ok {
 		flusher = fl
 	}
+	if flusher != nil {
+		flusher.Flush()
+	}
+
 	stop := false
 	flushstop := false
 	for {

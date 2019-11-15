@@ -275,13 +275,23 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 		return errors.Errorf("received http status: %d", req.StatusCode), true
 	}
 
+	// write and flush the headers so the client will receive the response
+	// header also if there're currently no lines to send
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.WriteHeader(http.StatusOK)
+	var flusher http.Flusher
+	if fl, ok := w.(http.Flusher); ok {
+		flusher = fl
+	}
+	if flusher != nil {
+		flusher.Flush()
+	}
+
 	return sendLogs(w, req.Body), false
 }
 
 func sendLogs(w http.ResponseWriter, r io.Reader) error {
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-
 	buf := make([]byte, 406)
 
 	var flusher http.Flusher
