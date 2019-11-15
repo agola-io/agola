@@ -209,15 +209,15 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 		return err, true
 	}
 	if r == nil {
-		return errors.Errorf("no such run with id: %s", runID), true
+		return util.NewErrNotExist(errors.Errorf("no such run with id: %s", runID)), true
 	}
 
 	task, ok := r.Tasks[taskID]
 	if !ok {
-		return errors.Errorf("no such task with ID %s in run %s", taskID, runID), true
+		return util.NewErrNotExist(errors.Errorf("no such task with ID %s in run %s", taskID, runID)), true
 	}
 	if len(task.Steps) <= step {
-		return errors.Errorf("no such step for task %s in run %s", taskID, runID), true
+		return util.NewErrNotExist(errors.Errorf("no such step for task %s in run %s", taskID, runID)), true
 	}
 
 	// if the log has been already fetched use it, otherwise fetch it from the executor
