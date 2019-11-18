@@ -304,6 +304,19 @@ func (c *Client) GetLogs(ctx context.Context, runID, taskID string, setup bool, 
 	return c.getResponse(ctx, "GET", "/logs", q, -1, nil, nil)
 }
 
+func (c *Client) DeleteLogs(ctx context.Context, runID, taskID string, setup bool, step int) (*http.Response, error) {
+	q := url.Values{}
+	q.Add("runid", runID)
+	q.Add("taskid", taskID)
+	if setup {
+		q.Add("setup", "")
+	} else {
+		q.Add("step", strconv.Itoa(step))
+	}
+
+	return c.getResponse(ctx, "DELETE", "/logs", q, -1, nil, nil)
+}
+
 func (c *Client) GetRunEvents(ctx context.Context, startRunEventID string) (*http.Response, error) {
 	q := url.Values{}
 	q.Add("startruneventid", startRunEventID)

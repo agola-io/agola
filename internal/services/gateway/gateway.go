@@ -210,6 +210,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	runTaskActionsHandler := api.NewRunTaskActionsHandler(logger, g.ah)
 
 	logsHandler := api.NewLogsHandler(logger, g.ah)
+	logsDeleteHandler := api.NewLogsDeleteHandler(logger, g.ah)
 
 	userRemoteReposHandler := api.NewUserRemoteReposHandler(logger, g.ah, g.configstoreClient)
 
@@ -235,6 +236,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	router.PathPrefix("/api/v1alpha").Handler(apirouter)
 
 	apirouter.Handle("/logs", authOptionalHandler(logsHandler)).Methods("GET")
+	apirouter.Handle("/logs", authForcedHandler(logsDeleteHandler)).Methods("DELETE")
 
 	//apirouter.Handle("/projectgroups", authForcedHandler(projectsHandler)).Methods("GET")
 	apirouter.Handle("/projectgroups/{projectgroupref}", authForcedHandler(projectGroupHandler)).Methods("GET")

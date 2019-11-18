@@ -23,6 +23,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -1099,6 +1100,182 @@ func TestDirectRunVariables(t *testing.T) {
 					if ce != e {
 						t.Fatalf("different env var %s value, want: %q, got %q", n, e, ce)
 					}
+				}
+			}
+		})
+	}
+}
+
+func TestDirectRunLogs(t *testing.T) {
+	config := `
+      {
+        runs: [
+          {
+            name: 'run01',
+            tasks: [
+              {
+                name: 'task01',
+                runtime: {
+                  containers: [
+                    {
+                      image: 'alpine/git',
+                    },
+                  ],
+                },
+                steps: [
+                  { type: 'clone' },
+                  { type: 'run', command: 'echo STEPLOG' },
+                ],
+              },
+            ],
+          },
+        ],
+      }
+    `
+
+	tests := []struct {
+		name   string
+		setup  bool
+		step   int
+		delete bool
+		err    error
+	}{
+		{
+			name: "test get log step 1",
+			step: 1,
+		},
+		{
+			name:  "test get log setup",
+			setup: true,
+		},
+		{
+			name: "test get log with unexisting step",
+			step: 99,
+			err:  errors.Errorf("log doesn't exist"),
+		},
+		{
+			name:   "test delete log step 1",
+			step:   1,
+			delete: true,
+		},
+		{
+			name:   "test delete log setup",
+			setup:  true,
+			delete: true,
+		},
+		{
+			name:   "test delete log with unexisting step",
+			step:   99,
+			delete: true,
+			err:    errors.Errorf("log doesn't exist"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir, err := ioutil.TempDir("", "agola")
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			defer os.RemoveAll(dir)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			tetcd, tgitea, c := setup(ctx, t, dir)
+			defer shutdownGitea(tgitea)
+			defer shutdownEtcd(tetcd)
+
+			gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
+			user, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			t.Logf("created agola user: %s", user.UserName)
+
+			token := createAgolaUserToken(ctx, t, c)
+
+			// From now use the user token
+			gwClient = gwclient.NewClient(c.Gateway.APIExposedURL, token)
+
+			directRun(t, dir, config, c.Gateway.APIExposedURL, token)
+
+			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+				runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/user", user.ID)}, nil, "", 0, false)
+				if err != nil {
+					return false, nil
+				}
+
+				if len(runs) != 1 {
+					return false, nil
+				}
+
+				run := runs[0]
+				if run.Phase != rstypes.RunPhaseFinished {
+					return false, nil
+				}
+
+				return true, nil
+			})
+
+			runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/user", user.ID)}, nil, "", 0, false)
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			t.Logf("runs: %s", util.Dump(runs))
+
+			if len(runs) != 1 {
+				t.Fatalf("expected 1 run got: %d", len(runs))
+			}
+
+			run, _, err := gwClient.GetRun(ctx, runs[0].ID)
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			if run.Phase != rstypes.RunPhaseFinished {
+				t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, run.Phase)
+			}
+			if run.Result != rstypes.RunResultSuccess {
+				t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, run.Result)
+			}
+
+			var task *gwapitypes.RunResponseTask
+			for _, t := range run.Tasks {
+				if t.Name == "task01" {
+					task = t
+					break
+				}
+			}
+
+			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+				t, _, err := gwClient.GetRunTask(ctx, runs[0].ID, task.ID)
+				if err != nil {
+					return false, nil
+				}
+				if !t.Steps[tt.step].LogArchived {
+					return false, nil
+				}
+				return true, nil
+			})
+
+			if tt.delete {
+				_, err = gwClient.DeleteLogs(ctx, run.ID, task.ID, tt.setup, tt.step)
+			} else {
+				_, err = gwClient.GetLogs(ctx, run.ID, task.ID, tt.setup, tt.step)
+			}
+
+			if err != nil {
+				if tt.err == nil {
+					t.Fatalf("got error: %v, expected no error", err)
+				}
+				if !strings.HasPrefix(err.Error(), tt.err.Error()) {
+					t.Fatalf("got error: %v, want error: %v", err, tt.err)
+				}
+			} else {
+				if tt.err != nil {
+					t.Fatalf("got nil error, want error: %v", tt.err)
 				}
 			}
 		})
