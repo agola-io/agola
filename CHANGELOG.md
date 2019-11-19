@@ -1,5 +1,34 @@
 ## Changelog
 
+### v0.4.0
+
+- gateway/runservice: add api to delete step logs                                            [#157](https://github.com/agola-io/agola/pull/157)
+- *: write and flush header on log handlers (@sgotti)                                        [#180](https://github.com/agola-io/agola/pull/180)
+- runservice: improve errors in logsHandler (@sgotti)                                        [#179](https://github.com/agola-io/agola/pull/179)
+- runservice: use etcd mutex TryLock on fetching (@sgotti)                                   [#177](https://github.com/agola-io/agola/pull/177)
+- gateway: add api to get log status (@camandel)                                             [#175](https://github.com/agola-io/agola/pull/175)
+- *: use etcd mutex TryLock (@sgotti)                                                        [#176](https://github.com/agola-io/agola/pull/176)
+- datamanager: skip already applied wals in writeDataSnapshot (@sgotti)                      [#167](https://github.com/agola-io/agola/pull/167)
+- readdb: improve HandleEvents goroutine exiting (@sgotti)                                   [#172](https://github.com/agola-io/agola/pull/172)
+- datamanager tests: increase etcd waitdown timeout (@sgotti)                                [#174](https://github.com/agola-io/agola/pull/174)
+- *: improve error handling (@sgotti)                                                        [#169](https://github.com/agola-io/agola/pull/169)
+- objectstorage: use a single package (@sgotti)                                              [#170](https://github.com/agola-io/agola/pull/170)
+- datamanager: refactor ReadWal (@sgotti)                                                    [#168](https://github.com/agola-io/agola/pull/168)
+- datamanager: check wal previouswalsequence is correct in initEtcd (@sgotti)                [#165](https://github.com/agola-io/agola/pull/165)
+- datamanager: don't create ost wal checkpointed files (@sgotti)                             [#164](https://github.com/agola-io/agola/pull/164)
+- datamanager: clean old data files (@sgotti)                                                [#160](https://github.com/agola-io/agola/pull/160)
+- datamanager: fix index creation on multiple data files (@sgotti)                           [#163](https://github.com/agola-io/agola/pull/163)
+- services: check config only for enabled services (@camandel)                               [#162](https://github.com/agola-io/agola/pull/162)
+- datamanager: add data sequence to data file name (@sgotti)                                 [#158](https://github.com/agola-io/agola/pull/158)
+- sequence: add tests for String and Parse methods (@sgotti)                                 [#159](https://github.com/agola-io/agola/pull/159)
+- go.mod: update dependencies (@sgotti)                                                      [#150](https://github.com/agola-io/agola/pull/150)
+- run config: add tty option for run steps (@camandel)                                       [#149](https://github.com/agola-io/agola/pull/149)
+- README: issue link points to templates (@camandel)                                         [#156](https://github.com/agola-io/agola/pull/156)
+- objectstorage: add WriteObject tests (@sgotti)                                             [#155](https://github.com/agola-io/agola/pull/155)
+- objectstorage: return object size in objectinfo (@sgotti)                                  [#154](https://github.com/agola-io/agola/pull/154)
+- objectstorage posix: use limitreader only when size is specified. (@sgotti)                [#153](https://github.com/agola-io/agola/pull/153)
+- objectstorage s3: use limitreader in write object (@sgotti)                                [#152](https://github.com/agola-io/agola/pull/152)
+
 ### v0.3.0
 
 - gitea: use GetRepoRefs instead of GetRepoRef (@sgotti)                                     [#146](https://github.com/agola-io/agola/pull/146)

@@ -94,7 +94,7 @@ local task_build_push_images(name, target, push) =
         |||,
       },
     ]) + [
-      { type: 'run', command: '/kaniko/executor --context=dir:///kaniko/agola --build-arg AGOLAWEB_IMAGE=sorintlab/agola-web:v0.3.0 --target %s %s' % [target, options] },
+      { type: 'run', command: '/kaniko/executor --context=dir:///kaniko/agola --build-arg AGOLAWEB_IMAGE=sorintlab/agola-web:v0.4.0 --target %s %s' % [target, options] },
     ],
     depends: ['checkout code and save to workspace', 'integration tests', 'test docker driver'],
   };
