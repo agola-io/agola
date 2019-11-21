@@ -75,7 +75,8 @@ func projectUpdate(cmd *cobra.Command, args []string) error {
 		if !IsValidVisibility(projectUpdateOpts.visibility) {
 			return errors.Errorf("invalid visibility %q", projectUpdateOpts.visibility)
 		}
-		req.Name = &projectUpdateOpts.visibility
+		visibility := gwapitypes.Visibility(projectUpdateOpts.visibility)
+		req.Visibility = &visibility
 	}
 
 	log.Infof("updating project")
