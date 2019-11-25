@@ -1254,6 +1254,9 @@ func TestDirectRunLogs(t *testing.T) {
 				if err != nil {
 					return false, nil
 				}
+				if tt.step >= len(t.Steps) {
+					return true, nil
+				}
 				if !t.Steps[tt.step].LogArchived {
 					return false, nil
 				}
