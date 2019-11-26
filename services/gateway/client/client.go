@@ -490,7 +490,7 @@ func (c *Client) GetRuns(ctx context.Context, phaseFilter, resultFilter, groups,
 	return getRunsResponse, resp, err
 }
 
-func (c *Client) GetLogs(ctx context.Context, runID, taskID string, setup bool, step int) (*http.Response, error) {
+func (c *Client) GetLogs(ctx context.Context, runID, taskID string, setup bool, step int, follow bool) (*http.Response, error) {
 	q := url.Values{}
 	q.Add("runID", runID)
 	q.Add("taskID", taskID)
@@ -499,7 +499,9 @@ func (c *Client) GetLogs(ctx context.Context, runID, taskID string, setup bool, 
 	} else {
 		q.Add("step", strconv.Itoa(step))
 	}
-
+	if follow {
+		q.Add("follow", "")
+	}
 	return c.getResponse(ctx, "GET", "/logs", q, nil, nil)
 }
 

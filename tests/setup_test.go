@@ -1078,7 +1078,7 @@ func TestDirectRunVariables(t *testing.T) {
 				}
 			}
 
-			resp, err := gwClient.GetLogs(ctx, run.ID, task.ID, false, 1)
+			resp, err := gwClient.GetLogs(ctx, run.ID, task.ID, false, 1, false)
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
@@ -1266,7 +1266,7 @@ func TestDirectRunLogs(t *testing.T) {
 			if tt.delete {
 				_, err = gwClient.DeleteLogs(ctx, run.ID, task.ID, tt.setup, tt.step)
 			} else {
-				_, err = gwClient.GetLogs(ctx, run.ID, task.ID, tt.setup, tt.step)
+				_, err = gwClient.GetLogs(ctx, run.ID, task.ID, tt.setup, tt.step, false)
 			}
 
 			if err != nil {
