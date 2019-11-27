@@ -457,7 +457,7 @@ func (c *Client) GetRun(ctx context.Context, runID string) (*gwapitypes.RunRespo
 
 func (c *Client) GetRunTask(ctx context.Context, runID, taskID string) (*gwapitypes.RunTaskResponse, *http.Response, error) {
 	task := new(gwapitypes.RunTaskResponse)
-	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/run/%s/task/%s", runID, taskID), nil, jsonContent, nil, task)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/runs/%s/tasks/%s", runID, taskID), nil, jsonContent, nil, task)
 	return task, resp, err
 }
 
