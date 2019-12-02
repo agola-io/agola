@@ -75,7 +75,6 @@ func TestEtcdReset(t *testing.T) {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	tetcd := setupEtcd(t, etcdDir)
-	defer shutdownEtcd(tetcd)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -131,9 +130,7 @@ func TestEtcdReset(t *testing.T) {
 	// Reset etcd
 	t.Logf("stopping etcd")
 	shutdownEtcd(tetcd)
-	if err := tetcd.WaitDown(20 * time.Second); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+
 	t.Logf("resetting etcd")
 	os.RemoveAll(etcdDir)
 	t.Logf("starting etcd")
@@ -185,7 +182,6 @@ func TestEtcdResetWalsGap(t *testing.T) {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	tetcd := setupEtcd(t, etcdDir)
-	defer shutdownEtcd(tetcd)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -241,9 +237,7 @@ func TestEtcdResetWalsGap(t *testing.T) {
 	t.Logf("stopping etcd")
 	// Reset etcd
 	shutdownEtcd(tetcd)
-	if err := tetcd.WaitDown(10 * time.Second); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+
 	t.Logf("resetting etcd")
 	os.RemoveAll(etcdDir)
 	t.Logf("starting etcd")
@@ -1489,7 +1483,6 @@ func TestExportImport(t *testing.T) {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	tetcd := setupEtcd(t, etcdDir)
-	defer shutdownEtcd(tetcd)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -1589,9 +1582,7 @@ func TestExportImport(t *testing.T) {
 	t.Logf("stopping etcd")
 	// Reset etcd
 	shutdownEtcd(tetcd)
-	if err := tetcd.WaitDown(10 * time.Second); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+
 	t.Logf("resetting etcd")
 	os.RemoveAll(etcdDir)
 	t.Logf("starting etcd")
