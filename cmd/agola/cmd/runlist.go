@@ -77,7 +77,7 @@ func printRuns(runs []*runDetails) {
 	for _, run := range runs {
 		fmt.Printf("%s: Phase: %s, Result: %s\n", run.runResponse.ID, run.runResponse.Phase, run.runResponse.Result)
 		for _, task := range run.tasks {
-			fmt.Printf("\tTaskName: %s, Status: %s\n", task.runTaskResponse.Name, task.runTaskResponse.Status)
+			fmt.Printf("\tTaskName: %s, TaskID: %s, Status: %s\n", task.runTaskResponse.Name, task.runTaskResponse.ID, task.runTaskResponse.Status)
 			if task.retrieveError != nil {
 				fmt.Printf("\t\tfailed to retrieve task information: %v\n", task.retrieveError)
 			} else {
