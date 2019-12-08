@@ -37,10 +37,13 @@ The variable values should be provided by a yaml document. Examples:
   when:
     ref:
       include:
-        - '#/refs/pull/.*#'
-        - '#/refs/heads/devel.*#'
-      exclude: /refs/heads/develop
-
+        - type: regexp
+          match: 'refs/pull/*'
+        - type: regexp
+          match: 'refs/heads/devel*'
+      exclude:
+        - type: simple
+          match: 'refs/heads/develop'
 The above yaml document defines a variable that can have two different values depending on the first matching condition.
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
