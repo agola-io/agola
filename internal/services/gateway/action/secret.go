@@ -35,9 +35,16 @@ type GetSecretsRequest struct {
 }
 
 func (h *ActionHandler) GetSecrets(ctx context.Context, req *GetSecretsRequest) ([]*csapitypes.Secret, error) {
+	authorized, err := h.CanDoSecretAction(ctx, cstypes.ActionTypeGetSecret, req.ParentType, req.ParentRef)
+	if err != nil {
+		return nil, errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	var cssecrets []*csapitypes.Secret
 	var resp *http.Response
-	var err error
 	switch req.ParentType {
 	case cstypes.ConfigTypeProjectGroup:
 		cssecrets, resp, err = h.configstoreClient.GetProjectGroupSecrets(ctx, req.ParentRef, req.Tree)
@@ -73,11 +80,11 @@ type CreateSecretRequest struct {
 }
 
 func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretRequest) (*csapitypes.Secret, error) {
-	isVariableOwner, err := h.IsVariableOwner(ctx, req.ParentType, req.ParentRef)
+	authorized, err := h.CanDoSecretAction(ctx, cstypes.ActionTypeCreateSecret, req.ParentType, req.ParentRef)
 	if err != nil {
-		return nil, errors.Errorf("failed to determine ownership: %w", err)
+		return nil, errors.Errorf("failed to determine authorization: %w", err)
 	}
-	if !isVariableOwner {
+	if !authorized {
 		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
@@ -91,8 +98,8 @@ func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretReque
 		Data: req.Data,
 	}
 
-	var resp *http.Response
 	var rs *csapitypes.Secret
+	var resp *http.Response
 	switch req.ParentType {
 	case cstypes.ConfigTypeProjectGroup:
 		h.log.Infof("creating project group secret")
@@ -128,11 +135,11 @@ type UpdateSecretRequest struct {
 }
 
 func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretRequest) (*csapitypes.Secret, error) {
-	isVariableOwner, err := h.IsVariableOwner(ctx, req.ParentType, req.ParentRef)
+	authorized, err := h.CanDoSecretAction(ctx, cstypes.ActionTypeUpdateSecret, req.ParentType, req.ParentRef)
 	if err != nil {
-		return nil, errors.Errorf("failed to determine ownership: %w", err)
+		return nil, errors.Errorf("failed to determine authorization: %w", err)
 	}
-	if !isVariableOwner {
+	if !authorized {
 		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
@@ -146,8 +153,8 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretReque
 		Data: req.Data,
 	}
 
-	var resp *http.Response
 	var rs *csapitypes.Secret
+	var resp *http.Response
 	switch req.ParentType {
 	case cstypes.ConfigTypeProjectGroup:
 		h.log.Infof("updating project group secret")
@@ -165,11 +172,11 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretReque
 }
 
 func (h *ActionHandler) DeleteSecret(ctx context.Context, parentType cstypes.ConfigType, parentRef, name string) error {
-	isVariableOwner, err := h.IsVariableOwner(ctx, parentType, parentRef)
+	authorized, err := h.CanDoSecretAction(ctx, cstypes.ActionTypeDeleteSecret, parentType, parentRef)
 	if err != nil {
-		return errors.Errorf("failed to determine ownership: %w", err)
+		return errors.Errorf("failed to determine authorization: %w", err)
 	}
-	if !isVariableOwner {
+	if !authorized {
 		return util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 

@@ -48,131 +48,143 @@ func (h *ActionHandler) IsUserLoggedOrAdmin(ctx context.Context) bool {
 	return h.IsUserLogged(ctx) || h.IsUserAdmin(ctx)
 }
 
-func (h *ActionHandler) IsOrgOwner(ctx context.Context, orgID string) (bool, error) {
-	isAdmin := h.IsUserAdmin(ctx)
-	if isAdmin {
-		return true, nil
-	}
+func (h *ActionHandler) userActionsForUser(ctx context.Context, userRef string) ([]cstypes.ActionType, error) {
+	actions := []cstypes.ActionType{}
 
 	userID := h.CurrentUserID(ctx)
 	if userID == "" {
-		return false, nil
+		return actions, nil
 	}
 
-	userOrgs, resp, err := h.configstoreClient.GetUserOrgs(ctx, userID)
+	// By default any logged user can get an user
+	actions = append(actions, cstypes.ActionTypeGetUser)
+
+	// no existing user
+	if userRef == "" {
+		return actions, nil
+	}
+
+	user, resp, err := h.configstoreClient.GetUser(ctx, userRef)
 	if err != nil {
-		return false, errors.Errorf("failed to get user orgs: %w", ErrFromRemote(resp, err))
+		return nil, ErrFromRemote(resp, err)
 	}
 
-	for _, userOrg := range userOrgs {
-		if userOrg.Organization.ID != orgID {
-			continue
-		}
-		if userOrg.Role == cstypes.OrgMemberRoleOwner {
-			return true, nil
-		}
+	ownerActions, err := h.userActionsForOwner(ctx, cstypes.ConfigTypeUser, user.ID)
+	if err != nil {
+		return nil, err
 	}
+	actions = append(actions, ownerActions...)
 
-	return false, nil
+	return actions, nil
 }
 
-func (h *ActionHandler) IsProjectOwner(ctx context.Context, ownerType cstypes.ConfigType, ownerID string) (bool, error) {
-	isAdmin := h.IsUserAdmin(ctx)
-	if isAdmin {
-		return true, nil
-	}
+func (h *ActionHandler) userActionsForOrg(ctx context.Context, orgRef string) ([]cstypes.ActionType, error) {
+	actions := []cstypes.ActionType{}
 
 	userID := h.CurrentUserID(ctx)
 	if userID == "" {
-		return false, nil
+		return actions, nil
 	}
 
-	if ownerType == cstypes.ConfigTypeUser {
-		if userID == ownerID {
-			return true, nil
-		}
+	// By default any logged user can create an org
+	actions = append(actions, cstypes.ActionTypeCreateOrg)
+
+	// no existing org
+	if orgRef == "" {
+		return actions, nil
 	}
 
-	if ownerType == cstypes.ConfigTypeOrg {
-		userOrgs, resp, err := h.configstoreClient.GetUserOrgs(ctx, userID)
-		if err != nil {
-			return false, errors.Errorf("failed to get user orgs: %w", ErrFromRemote(resp, err))
-		}
-
-		for _, userOrg := range userOrgs {
-			if userOrg.Organization.ID != ownerID {
-				continue
-			}
-			if userOrg.Role == cstypes.OrgMemberRoleOwner {
-				return true, nil
-			}
-		}
+	org, resp, err := h.configstoreClient.GetOrg(ctx, orgRef)
+	if err != nil {
+		return nil, ErrFromRemote(resp, err)
 	}
 
-	return false, nil
+	if org.Visibility == cstypes.VisibilityPublic {
+		actions = append(actions, cstypes.OrgMemberActions...)
+	}
+
+	ownerRoles, err := h.userActionsForOwner(ctx, cstypes.ConfigTypeOrg, org.ID)
+	if err != nil {
+		return nil, err
+	}
+	actions = append(actions, ownerRoles...)
+
+	return actions, nil
 }
 
-func (h *ActionHandler) IsProjectMember(ctx context.Context, ownerType cstypes.ConfigType, ownerID string) (bool, error) {
-	isAdmin := h.IsUserAdmin(ctx)
-	if isAdmin {
-		return true, nil
-	}
+func (h *ActionHandler) userActionsForProjectGroup(ctx context.Context, projectGroupRef string) ([]cstypes.ActionType, error) {
+	actions := []cstypes.ActionType{}
 
 	userID := h.CurrentUserID(ctx)
 	if userID == "" {
-		return false, nil
+		return actions, nil
 	}
 
-	if ownerType == cstypes.ConfigTypeUser {
-		if userID == ownerID {
-			return true, nil
-		}
+	p, resp, err := h.configstoreClient.GetProjectGroup(ctx, projectGroupRef)
+	if err != nil {
+		return nil, ErrFromRemote(resp, err)
 	}
 
-	if ownerType == cstypes.ConfigTypeOrg {
-		userOrgs, resp, err := h.configstoreClient.GetUserOrgs(ctx, userID)
-		if err != nil {
-			return false, errors.Errorf("failed to get user orgs: %w", ErrFromRemote(resp, err))
-		}
-
-		for _, userOrg := range userOrgs {
-			if userOrg.Organization.ID != ownerID {
-				continue
-			}
-			return true, nil
-		}
+	if p.GlobalVisibility == cstypes.VisibilityPublic {
+		actions = append(actions, cstypes.ProjectReadActions...)
 	}
 
-	return false, nil
+	ownerRoles, err := h.userActionsForOwner(ctx, p.OwnerType, p.OwnerID)
+	if err != nil {
+		return nil, err
+	}
+	actions = append(actions, ownerRoles...)
+
+	return actions, nil
 }
 
-func (h *ActionHandler) IsVariableOwner(ctx context.Context, parentType cstypes.ConfigType, parentRef string) (bool, error) {
-	var ownerType cstypes.ConfigType
-	var ownerID string
+func (h *ActionHandler) userActionsForProject(ctx context.Context, projectRef string) ([]cstypes.ActionType, error) {
+	actions := []cstypes.ActionType{}
+
+	userID := h.CurrentUserID(ctx)
+	if userID == "" {
+		return actions, nil
+	}
+
+	p, resp, err := h.configstoreClient.GetProject(ctx, projectRef)
+	if err != nil {
+		return nil, ErrFromRemote(resp, err)
+	}
+
+	if p.GlobalVisibility == cstypes.VisibilityPublic {
+		actions = append(actions, cstypes.ProjectReadActions...)
+	}
+	ownerRoles, err := h.userActionsForOwner(ctx, p.OwnerType, p.OwnerID)
+	if err != nil {
+		return nil, err
+	}
+	actions = append(actions, ownerRoles...)
+
+	return actions, nil
+}
+
+func (h *ActionHandler) userActionsForVariable(ctx context.Context, parentType cstypes.ConfigType, parentRef string) ([]cstypes.ActionType, error) {
 	switch parentType {
 	case cstypes.ConfigTypeProjectGroup:
-		pg, resp, err := h.configstoreClient.GetProjectGroup(ctx, parentRef)
-		if err != nil {
-			return false, errors.Errorf("failed to get project group %q: %w", parentRef, ErrFromRemote(resp, err))
-		}
-		ownerType = pg.OwnerType
-		ownerID = pg.OwnerID
+		return h.userActionsForProjectGroup(ctx, parentRef)
 	case cstypes.ConfigTypeProject:
-		p, resp, err := h.configstoreClient.GetProject(ctx, parentRef)
-		if err != nil {
-			return false, errors.Errorf("failed to get project  %q: %w", parentRef, ErrFromRemote(resp, err))
-		}
-		ownerType = p.OwnerType
-		ownerID = p.OwnerID
+		return h.userActionsForProject(ctx, parentRef)
+	default:
+		return nil, errors.Errorf("wrong parent type: %q", parentType)
 	}
-
-	return h.IsProjectOwner(ctx, ownerType, ownerID)
 }
 
-func (h *ActionHandler) CanGetRun(ctx context.Context, runGroup string) (bool, error) {
+func (h *ActionHandler) userActionsForRun(ctx context.Context, runGroup string) ([]cstypes.ActionType, error) {
+	actions := []cstypes.ActionType{}
+
+	userID := h.CurrentUserID(ctx)
+	if userID == "" {
+		return actions, nil
+	}
+
 	groupType, groupID, err := common.GroupTypeIDFromRunGroup(runGroup)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
 	var visibility cstypes.Visibility
@@ -182,59 +194,137 @@ func (h *ActionHandler) CanGetRun(ctx context.Context, runGroup string) (bool, e
 	case common.GroupTypeProject:
 		p, resp, err := h.configstoreClient.GetProject(ctx, groupID)
 		if err != nil {
-			return false, ErrFromRemote(resp, err)
+			return nil, ErrFromRemote(resp, err)
 		}
 		ownerType = p.OwnerType
 		ownerID = p.OwnerID
 		visibility = p.GlobalVisibility
+
 	case common.GroupTypeUser:
 		// user direct runs
 		ownerType = cstypes.ConfigTypeUser
 		ownerID = groupID
 		visibility = cstypes.VisibilityPrivate
+	default:
+		return nil, errors.Errorf("wrong run group type: %q", runGroup)
 	}
 
 	if visibility == cstypes.VisibilityPublic {
-		return true, nil
+		actions = append(actions, cstypes.ProjectReadActions...)
 	}
-	isProjectMember, err := h.IsProjectMember(ctx, ownerType, ownerID)
+	ownerRoles, err := h.userActionsForOwner(ctx, ownerType, ownerID)
 	if err != nil {
-		return false, errors.Errorf("failed to determine ownership: %w", err)
+		return nil, err
 	}
-	if !isProjectMember {
-		return false, nil
-	}
-	return true, nil
+	actions = append(actions, ownerRoles...)
+
+	return actions, nil
 }
 
-func (h *ActionHandler) CanDoRunActions(ctx context.Context, runGroup string) (bool, error) {
-	groupType, groupID, err := common.GroupTypeIDFromRunGroup(runGroup)
+func (h *ActionHandler) userActionsForOwner(ctx context.Context, ownerType cstypes.ConfigType, ownerID string) ([]cstypes.ActionType, error) {
+	actions := []cstypes.ActionType{}
+
+	userID := h.CurrentUserID(ctx)
+	if userID == "" {
+		return actions, nil
+	}
+
+	switch ownerType {
+	case cstypes.ConfigTypeUser:
+		if userID == ownerID {
+			actions = append(actions, cstypes.UserOwnerActions...)
+		}
+	case cstypes.ConfigTypeOrg:
+		userOrgs, resp, err := h.configstoreClient.GetUserOrgs(ctx, userID)
+		if err != nil {
+			return nil, errors.Errorf("failed to get user orgs: %w", ErrFromRemote(resp, err))
+		}
+
+		for _, userOrg := range userOrgs {
+			if userOrg.Organization.ID != ownerID {
+				continue
+			}
+			if userOrg.Role == cstypes.OrgMemberRoleOwner {
+				actions = append(actions, cstypes.OrgOwnerActions...)
+			}
+			if userOrg.Role == cstypes.OrgMemberRoleMember {
+				actions = append(actions, cstypes.OrgMemberActions...)
+			}
+		}
+	}
+
+	return actions, nil
+}
+
+func (h *ActionHandler) CanDoUserAction(ctx context.Context, action cstypes.ActionType, userRef string) (bool, error) {
+	actions, err := h.userActionsForUser(ctx, userRef)
 	if err != nil {
 		return false, err
 	}
 
-	var ownerType cstypes.ConfigType
-	var ownerID string
-	switch groupType {
-	case common.GroupTypeProject:
-		p, resp, err := h.configstoreClient.GetProject(ctx, groupID)
-		if err != nil {
-			return false, ErrFromRemote(resp, err)
-		}
-		ownerType = p.OwnerType
-		ownerID = p.OwnerID
-	case common.GroupTypeUser:
-		// user direct runs
-		ownerType = cstypes.ConfigTypeUser
-		ownerID = groupID
+	return h.CanDoAction(ctx, actions, action)
+}
+
+func (h *ActionHandler) CanDoOrgAction(ctx context.Context, action cstypes.ActionType, orgRef string) (bool, error) {
+	actions, err := h.userActionsForOrg(ctx, orgRef)
+	if err != nil {
+		return false, err
 	}
 
-	isProjectOwner, err := h.IsProjectOwner(ctx, ownerType, ownerID)
+	return h.CanDoAction(ctx, actions, action)
+}
+
+func (h *ActionHandler) CanDoProjectGroupAction(ctx context.Context, action cstypes.ActionType, projectGroupRef string) (bool, error) {
+	actions, err := h.userActionsForProjectGroup(ctx, projectGroupRef)
 	if err != nil {
-		return false, errors.Errorf("failed to determine ownership: %w", err)
+		return false, err
 	}
-	if !isProjectOwner {
-		return false, nil
+
+	return h.CanDoAction(ctx, actions, action)
+}
+
+func (h *ActionHandler) CanDoProjectAction(ctx context.Context, action cstypes.ActionType, projectRef string) (bool, error) {
+	actions, err := h.userActionsForProject(ctx, projectRef)
+	if err != nil {
+		return false, err
 	}
-	return true, nil
+
+	return h.CanDoAction(ctx, actions, action)
+}
+
+func (h *ActionHandler) CanDoVariableAction(ctx context.Context, action cstypes.ActionType, parentType cstypes.ConfigType, parentRef string) (bool, error) {
+	actions, err := h.userActionsForVariable(ctx, parentType, parentRef)
+	if err != nil {
+		return false, err
+	}
+
+	return h.CanDoAction(ctx, actions, action)
+}
+func (h *ActionHandler) CanDoSecretAction(ctx context.Context, action cstypes.ActionType, parentType cstypes.ConfigType, parentRef string) (bool, error) {
+	return h.CanDoVariableAction(ctx, action, parentType, parentRef)
+}
+
+func (h *ActionHandler) CanDoRunAction(ctx context.Context, action cstypes.ActionType, runGroup string) (bool, error) {
+	actions, err := h.userActionsForRun(ctx, runGroup)
+	if err != nil {
+		return false, err
+	}
+
+	return h.CanDoAction(ctx, actions, action)
+}
+
+func (h *ActionHandler) CanDoAction(ctx context.Context, actions []cstypes.ActionType, action cstypes.ActionType) (bool, error) {
+	isAdmin := h.IsUserAdmin(ctx)
+	if isAdmin {
+		actions = append(actions, cstypes.AdminActions...)
+	}
+
+	for _, a := range actions {
+		if a != action {
+			continue
+		}
+		return true, nil
+	}
+
+	return false, nil
 }
