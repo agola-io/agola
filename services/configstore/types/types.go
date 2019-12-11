@@ -55,17 +55,17 @@ func IsValidVisibility(v Visibility) bool {
 	return true
 }
 
-type MemberRole string
+type OrgMemberRole string
 
 const (
-	MemberRoleOwner  MemberRole = "owner"
-	MemberRoleMember MemberRole = "member"
+	OrgMemberRoleOwner  OrgMemberRole = "owner"
+	OrgMemberRoleMember OrgMemberRole = "member"
 )
 
-func IsValidMemberRole(r MemberRole) bool {
+func IsValidOrgMemberRole(r OrgMemberRole) bool {
 	switch r {
-	case MemberRoleOwner:
-	case MemberRoleMember:
+	case OrgMemberRoleOwner:
+	case OrgMemberRoleMember:
 	default:
 		return false
 	}
@@ -126,7 +126,8 @@ type OrganizationMember struct {
 	OrganizationID string `json:"organization_id,omitempty"`
 	UserID         string `json:"user_id,omitempty"`
 
-	MemberRole MemberRole `json:"member_role,omitempty"`
+	// TODO(sgotti) rename to just Role (requires data upgrade)
+	MemberRole OrgMemberRole `json:"member_role,omitempty"`
 }
 
 type ProjectGroup struct {
@@ -355,3 +356,281 @@ type VariableValue struct {
 
 	When *types.When `json:"when,omitempty"`
 }
+
+type ActionType int
+
+const (
+	ActionTypeGetLog ActionType = iota
+	ActionTypeDeleteLog
+
+	ActionTypeGetRun
+	ActionTypeCreateRun
+	ActionTypeCancelRun
+	ActionTypeStopRun
+	ActionTypeRestartRun
+
+	ActionTypeApproveTask
+
+	ActionTypeGetUser
+	ActionTypeCreateUser
+	ActionTypeUpdateUser
+	ActionTypeDeleteUser
+
+	ActionTypeGetOrg
+	ActionTypeCreateOrg
+	ActionTypeUpdateOrg
+	ActionTypeDeleteOrg
+
+	ActionTypeGetOrgMembers
+	ActionTypeAddOrgMembers
+	ActionTypeUpdateOrgMembers
+	ActionTypeRemoveOrgMembers
+
+	ActionTypeGetProjectGroup
+	ActionTypeCreateProjectGroup
+	ActionTypeUpdateProjectGroup
+	ActionTypeDeleteProjectGroup
+
+	ActionTypeGetProject
+	ActionTypeCreateProject
+	ActionTypeUpdateProject
+	ActionTypeDeleteProject
+
+	ActionTypeGetVariable
+	ActionTypeCreateVariable
+	ActionTypeUpdateVariable
+	ActionTypeDeleteVariable
+
+	ActionTypeGetSecret
+	ActionTypeCreateSecret
+	ActionTypeUpdateSecret
+	ActionTypeDeleteSecret
+)
+
+// Predefined Roles
+var (
+	AdminActions = []ActionType{
+		ActionTypeGetLog,
+		ActionTypeDeleteLog,
+
+		ActionTypeGetRun,
+		ActionTypeCreateRun,
+		ActionTypeStopRun,
+		ActionTypeRestartRun,
+
+		ActionTypeApproveTask,
+
+		ActionTypeGetUser,
+		ActionTypeCreateUser,
+		ActionTypeUpdateUser,
+		ActionTypeDeleteUser,
+
+		ActionTypeGetOrg,
+		ActionTypeCreateOrg,
+		ActionTypeUpdateOrg,
+		ActionTypeDeleteOrg,
+
+		ActionTypeGetOrgMembers,
+		ActionTypeAddOrgMembers,
+		ActionTypeUpdateOrgMembers,
+		ActionTypeRemoveOrgMembers,
+
+		ActionTypeGetProjectGroup,
+		ActionTypeCreateProjectGroup,
+		ActionTypeUpdateProjectGroup,
+		ActionTypeDeleteProjectGroup,
+
+		ActionTypeGetProject,
+		ActionTypeCreateProject,
+		ActionTypeUpdateProject,
+		ActionTypeDeleteProject,
+
+		ActionTypeGetVariable,
+		ActionTypeCreateVariable,
+		ActionTypeUpdateVariable,
+		ActionTypeDeleteVariable,
+
+		ActionTypeGetSecret,
+		ActionTypeCreateSecret,
+		ActionTypeUpdateSecret,
+		ActionTypeDeleteSecret,
+	}
+
+	UserOwnerActions = []ActionType{
+		ActionTypeGetLog,
+		ActionTypeDeleteLog,
+
+		ActionTypeGetRun,
+		ActionTypeCreateRun,
+		ActionTypeStopRun,
+		ActionTypeRestartRun,
+
+		ActionTypeApproveTask,
+
+		ActionTypeGetUser,
+		ActionTypeUpdateUser,
+		ActionTypeDeleteUser,
+
+		ActionTypeGetOrg,
+		ActionTypeUpdateOrg,
+		ActionTypeDeleteOrg,
+
+		ActionTypeGetProjectGroup,
+		ActionTypeCreateProjectGroup,
+		ActionTypeUpdateProjectGroup,
+		ActionTypeDeleteProjectGroup,
+
+		ActionTypeGetProject,
+		ActionTypeCreateProject,
+		ActionTypeUpdateProject,
+		ActionTypeDeleteProject,
+
+		ActionTypeGetVariable,
+		ActionTypeCreateVariable,
+		ActionTypeUpdateVariable,
+		ActionTypeDeleteVariable,
+
+		ActionTypeGetSecret,
+		ActionTypeCreateSecret,
+		ActionTypeUpdateSecret,
+		ActionTypeDeleteSecret,
+	}
+
+	OrgOwnerActions = []ActionType{
+		ActionTypeGetLog,
+		ActionTypeDeleteLog,
+
+		ActionTypeGetRun,
+		ActionTypeCreateRun,
+		ActionTypeStopRun,
+		ActionTypeRestartRun,
+
+		ActionTypeApproveTask,
+
+		ActionTypeGetUser,
+
+		ActionTypeGetOrg,
+		ActionTypeUpdateOrg,
+		ActionTypeDeleteOrg,
+
+		ActionTypeGetOrgMembers,
+		ActionTypeAddOrgMembers,
+		ActionTypeUpdateOrgMembers,
+		ActionTypeRemoveOrgMembers,
+
+		ActionTypeGetProjectGroup,
+		ActionTypeCreateProjectGroup,
+		ActionTypeUpdateProjectGroup,
+		ActionTypeDeleteProjectGroup,
+
+		ActionTypeGetProject,
+		ActionTypeCreateProject,
+		ActionTypeUpdateProject,
+		ActionTypeDeleteProject,
+
+		ActionTypeGetVariable,
+		ActionTypeCreateVariable,
+		ActionTypeUpdateVariable,
+		ActionTypeDeleteVariable,
+
+		ActionTypeGetSecret,
+		ActionTypeCreateSecret,
+		ActionTypeUpdateSecret,
+		ActionTypeDeleteSecret,
+	}
+
+	OrgMemberActions = []ActionType{
+		ActionTypeGetLog,
+
+		ActionTypeGetRun,
+
+		ActionTypeGetUser,
+
+		ActionTypeGetOrg,
+
+		ActionTypeGetOrgMembers,
+
+		ActionTypeGetProjectGroup,
+
+		ActionTypeGetProject,
+
+		ActionTypeGetVariable,
+
+		ActionTypeGetSecret,
+	}
+
+	// Applies to both project groups and projects
+	ProjectAdminActions = []ActionType{
+		ActionTypeGetLog,
+		ActionTypeDeleteLog,
+
+		ActionTypeGetRun,
+		ActionTypeCreateRun,
+		ActionTypeStopRun,
+		ActionTypeRestartRun,
+
+		ActionTypeApproveTask,
+
+		ActionTypeGetProjectGroup,
+		ActionTypeCreateProjectGroup,
+		ActionTypeUpdateProjectGroup,
+		ActionTypeDeleteProjectGroup,
+
+		ActionTypeGetProject,
+		ActionTypeCreateProject,
+		ActionTypeUpdateProject,
+		ActionTypeDeleteProject,
+
+		ActionTypeGetVariable,
+		ActionTypeCreateVariable,
+		ActionTypeUpdateVariable,
+		ActionTypeDeleteVariable,
+
+		ActionTypeGetSecret,
+		ActionTypeCreateSecret,
+		ActionTypeUpdateSecret,
+		ActionTypeDeleteSecret,
+	}
+
+	ProjectReadActions = []ActionType{
+		ActionTypeGetLog,
+
+		ActionTypeGetRun,
+
+		ActionTypeGetProjectGroup,
+
+		ActionTypeGetProject,
+
+		ActionTypeGetVariable,
+
+		ActionTypeGetSecret,
+	}
+
+	// Applies to both project groups and projects
+	// Currently like ProjectAdminActions but without ProjectGroup/Project Create/Update/Deletion
+	ProjectMaintainActions = []ActionType{
+		ActionTypeGetLog,
+		ActionTypeDeleteLog,
+
+		ActionTypeGetRun,
+		ActionTypeCreateRun,
+		ActionTypeStopRun,
+		ActionTypeRestartRun,
+
+		ActionTypeApproveTask,
+
+		ActionTypeGetProjectGroup,
+
+		ActionTypeGetProject,
+
+		ActionTypeGetVariable,
+		ActionTypeCreateVariable,
+		ActionTypeUpdateVariable,
+		ActionTypeDeleteVariable,
+
+		ActionTypeGetSecret,
+		ActionTypeCreateSecret,
+		ActionTypeUpdateSecret,
+		ActionTypeDeleteSecret,
+	}
+)

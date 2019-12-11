@@ -52,7 +52,7 @@ type OrgMembersResponse struct {
 
 type OrgMemberResponse struct {
 	User *cstypes.User
-	Role cstypes.MemberRole
+	Role cstypes.OrgMemberRole
 }
 
 func (h *ActionHandler) GetOrgMembers(ctx context.Context, orgRef string) (*OrgMembersResponse, error) {
@@ -143,7 +143,7 @@ type AddOrgMemberResponse struct {
 	User               *cstypes.User
 }
 
-func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string, role cstypes.MemberRole) (*AddOrgMemberResponse, error) {
+func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string, role cstypes.OrgMemberRole) (*AddOrgMemberResponse, error) {
 	org, resp, err := h.configstoreClient.GetOrg(ctx, orgRef)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)

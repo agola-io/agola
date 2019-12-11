@@ -68,7 +68,7 @@ func (h *ActionHandler) IsOrgOwner(ctx context.Context, orgID string) (bool, err
 		if userOrg.Organization.ID != orgID {
 			continue
 		}
-		if userOrg.Role == cstypes.MemberRoleOwner {
+		if userOrg.Role == cstypes.OrgMemberRoleOwner {
 			return true, nil
 		}
 	}
@@ -103,7 +103,7 @@ func (h *ActionHandler) IsProjectOwner(ctx context.Context, ownerType cstypes.Co
 			if userOrg.Organization.ID != ownerID {
 				continue
 			}
-			if userOrg.Role == cstypes.MemberRoleOwner {
+			if userOrg.Role == cstypes.OrgMemberRoleOwner {
 				return true, nil
 			}
 		}

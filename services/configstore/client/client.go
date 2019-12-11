@@ -531,7 +531,7 @@ func (c *Client) DeleteOrg(ctx context.Context, orgRef string) (*http.Response, 
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/orgs/%s", orgRef), nil, jsonContent, nil)
 }
 
-func (c *Client) AddOrgMember(ctx context.Context, orgRef, userRef string, role cstypes.MemberRole) (*cstypes.OrganizationMember, *http.Response, error) {
+func (c *Client) AddOrgMember(ctx context.Context, orgRef, userRef string, role cstypes.OrgMemberRole) (*cstypes.OrganizationMember, *http.Response, error) {
 	req := &csapitypes.AddOrgMemberRequest{
 		Role: role,
 	}

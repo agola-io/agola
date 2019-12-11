@@ -19,10 +19,10 @@ import (
 )
 
 type AddOrgMemberRequest struct {
-	Role cstypes.MemberRole
+	Role cstypes.OrgMemberRole
 }
 
 type OrgMemberResponse struct {
 	User *cstypes.User
-	Role cstypes.MemberRole
+	Role cstypes.OrgMemberRole
 }

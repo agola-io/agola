@@ -632,7 +632,7 @@ func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName 
 
 type UserOrgsResponse struct {
 	Organization *types.Organization
-	Role         types.MemberRole
+	Role         types.OrgMemberRole
 }
 
 func userOrgsResponse(userOrg *readdb.UserOrg) *UserOrgsResponse {
