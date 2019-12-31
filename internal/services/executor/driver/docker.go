@@ -68,8 +68,41 @@ func NewDockerDriver(logger *zap.Logger, executorID, initVolumeHostDir, toolboxP
 	}, nil
 }
 
+func (d *DockerDriver) updateTimeToolboxLoop(ctx context.Context) {
+	for {
+		d.log.Debugf("updateTimeToolbox")
+
+		if err := d.updateTimeToolbox(ctx); err != nil {
+			d.log.Errorf("err: %+v", err)
+		}
+
+		sleepCh := time.NewTimer(24 * time.Hour).C
+		select {
+		case <-ctx.Done():
+			return
+		case <-sleepCh:
+		}
+	}
+}
+
+func (d *DockerDriver) updateTimeToolbox(ctx context.Context) error {
+	now := time.Now()
+
+	if err := os.Chtimes(filepath.Join(d.initVolumeHostDir, "agola-toolbox"), now, now); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (d *DockerDriver) Setup(ctx context.Context) error {
-	return d.CopyToolbox(ctx)
+	if err := d.CopyToolbox(ctx); err != nil {
+		return err
+	}
+
+	go d.updateTimeToolboxLoop(ctx)
+
+	return nil
 }
 
 // CopyToolbox is an hack needed when running the executor inside a docker
