@@ -1400,7 +1400,7 @@ func NewExecutor(c *config.Executor) (*Executor, error) {
 	var d driver.Driver
 	switch c.Driver.Type {
 	case config.DriverTypeDocker:
-		d, err = driver.NewDockerDriver(logger, e.id, "/tmp/agola/bin", e.c.ToolboxPath)
+		d, err = driver.NewDockerDriver(logger, e.id, e.c.ToolboxPath)
 		if err != nil {
 			return nil, errors.Errorf("failed to create docker driver: %w", err)
 		}

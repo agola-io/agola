@@ -37,6 +37,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/stdcopy"
@@ -44,46 +45,48 @@ import (
 )
 
 type DockerDriver struct {
-	log               *zap.SugaredLogger
-	client            *client.Client
-	initVolumeHostDir string
-	toolboxPath       string
-	executorID        string
-	arch              types.Arch
+	log         *zap.SugaredLogger
+	client      *client.Client
+	toolboxPath string
+	executorID  string
+	arch        types.Arch
 }
 
-func NewDockerDriver(logger *zap.Logger, executorID, initVolumeHostDir, toolboxPath string) (*DockerDriver, error) {
+func NewDockerDriver(logger *zap.Logger, executorID, toolboxPath string) (*DockerDriver, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.26"))
 	if err != nil {
 		return nil, err
 	}
 
 	return &DockerDriver{
-		log:               logger.Sugar(),
-		client:            cli,
-		initVolumeHostDir: initVolumeHostDir,
-		toolboxPath:       toolboxPath,
-		executorID:        executorID,
-		arch:              types.ArchFromString(runtime.GOARCH),
+		log:         logger.Sugar(),
+		client:      cli,
+		toolboxPath: toolboxPath,
+		executorID:  executorID,
+		arch:        types.ArchFromString(runtime.GOARCH),
 	}, nil
 }
 
 func (d *DockerDriver) Setup(ctx context.Context) error {
-	return d.CopyToolbox(ctx)
+	return nil
 }
 
-// CopyToolbox is an hack needed when running the executor inside a docker
-// container. It copies the agola-toolbox binaries from the container to an
-// host path so it can be bind mounted to the other containers
-func (d *DockerDriver) CopyToolbox(ctx context.Context) error {
-	// by default always try to pull the image so we are sure only authorized users can fetch them
-	// see https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#alwayspullimages
+func (d *DockerDriver) createToolboxVolume(ctx context.Context, podID string) (*dockertypes.Volume, error) {
 	reader, err := d.client.ImagePull(ctx, "busybox", dockertypes.ImagePullOptions{})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if _, err := io.Copy(os.Stdout, reader); err != nil {
-		return err
+		return nil, err
+	}
+
+	labels := map[string]string{}
+	labels[agolaLabelKey] = agolaLabelValue
+	labels[executorIDKey] = d.executorID
+	labels[podIDKey] = podID
+	toolboxVol, err := d.client.VolumeCreate(ctx, volume.VolumeCreateBody{Driver: "local", Labels: labels})
+	if err != nil {
+		return nil, err
 	}
 
 	resp, err := d.client.ContainerCreate(ctx, &container.Config{
@@ -91,31 +94,31 @@ func (d *DockerDriver) CopyToolbox(ctx context.Context) error {
 		Image:      "busybox",
 		Tty:        true,
 	}, &container.HostConfig{
-		Binds: []string{fmt.Sprintf("%s:%s", d.initVolumeHostDir, "/tmp/agola")},
+		Binds: []string{fmt.Sprintf("%s:%s", toolboxVol.Name, "/tmp/agola")},
 	}, nil, "")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	containerID := resp.ID
 
 	if err := d.client.ContainerStart(ctx, containerID, dockertypes.ContainerStartOptions{}); err != nil {
-		return err
+		return nil, err
 	}
 
 	toolboxExecPath, err := toolboxExecPath(d.toolboxPath, d.arch)
 	if err != nil {
-		return errors.Errorf("failed to get toolbox path for arch %q: %w", d.arch, err)
+		return nil, errors.Errorf("failed to get toolbox path for arch %q: %w", d.arch, err)
 	}
 	srcInfo, err := archive.CopyInfoSourcePath(toolboxExecPath, false)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	srcInfo.RebaseName = "agola-toolbox"
 
 	srcArchive, err := archive.TarResource(srcInfo)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer srcArchive.Close()
 
@@ -125,13 +128,13 @@ func (d *DockerDriver) CopyToolbox(ctx context.Context) error {
 	}
 
 	if err := d.client.CopyToContainer(ctx, containerID, "/tmp/agola", srcArchive, options); err != nil {
-		return err
+		return nil, err
 	}
 
 	// ignore remove error
 	_ = d.client.ContainerRemove(ctx, containerID, dockertypes.ContainerRemoveOptions{Force: true})
 
-	return nil
+	return &toolboxVol, nil
 }
 
 func (d *DockerDriver) Archs(ctx context.Context) ([]types.Arch, error) {
@@ -144,9 +147,14 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 		return nil, errors.Errorf("empty container config")
 	}
 
+	toolboxVol, err := d.createToolboxVolume(ctx, podConfig.ID)
+	if err != nil {
+		return nil, err
+	}
+
 	var mainContainerID string
 	for cindex := range podConfig.Containers {
-		resp, err := d.createContainer(ctx, cindex, podConfig, mainContainerID, out)
+		resp, err := d.createContainer(ctx, cindex, podConfig, mainContainerID, toolboxVol, out)
 		if err != nil {
 			return nil, err
 		}
@@ -184,11 +192,12 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 	}
 
 	pod := &DockerPod{
-		id:            podConfig.ID,
-		client:        d.client,
-		executorID:    d.executorID,
-		containers:    []*DockerContainer{},
-		initVolumeDir: podConfig.InitVolumeDir,
+		id:                podConfig.ID,
+		client:            d.client,
+		executorID:        d.executorID,
+		containers:        []*DockerContainer{},
+		toolboxVolumeName: toolboxVol.Name,
+		initVolumeDir:     podConfig.InitVolumeDir,
 	}
 
 	count := 0
@@ -253,7 +262,7 @@ func (d *DockerDriver) fetchImage(ctx context.Context, image string, registryCon
 	return err
 }
 
-func (d *DockerDriver) createContainer(ctx context.Context, index int, podConfig *PodConfig, maincontainerID string, out io.Writer) (*container.ContainerCreateCreatedBody, error) {
+func (d *DockerDriver) createContainer(ctx context.Context, index int, podConfig *PodConfig, maincontainerID string, toolboxVol *dockertypes.Volume, out io.Writer) (*container.ContainerCreateCreatedBody, error) {
 	containerConfig := podConfig.Containers[index]
 
 	if err := d.fetchImage(ctx, containerConfig.Image, podConfig.DockerConfig, out); err != nil {
@@ -287,8 +296,8 @@ func (d *DockerDriver) createContainer(ctx context.Context, index int, podConfig
 	if index == 0 {
 		// main container requires the initvolume containing the toolbox
 		// TODO(sgotti) migrate this to cliHostConfig.Mounts
-		cliHostConfig.Binds = []string{fmt.Sprintf("%s:%s", d.initVolumeHostDir, podConfig.InitVolumeDir)}
-		cliHostConfig.ReadonlyPaths = []string{fmt.Sprintf("%s:%s", d.initVolumeHostDir, podConfig.InitVolumeDir)}
+		cliHostConfig.Binds = []string{fmt.Sprintf("%s:%s", toolboxVol.Name, podConfig.InitVolumeDir)}
+		cliHostConfig.ReadonlyPaths = []string{fmt.Sprintf("%s:%s", toolboxVol.Name, podConfig.InitVolumeDir)}
 	} else {
 		// attach other containers to maincontainer network
 		cliHostConfig.NetworkMode = container.NetworkMode(fmt.Sprintf("container:%s", maincontainerID))
@@ -334,6 +343,11 @@ func (d *DockerDriver) GetPods(ctx context.Context, all bool) ([]Pod, error) {
 			Filters: args,
 			All:     all,
 		})
+	if err != nil {
+		return nil, err
+	}
+
+	volumes, err := d.client.VolumeList(ctx, args)
 	if err != nil {
 		return nil, err
 	}
@@ -406,6 +420,27 @@ func (d *DockerDriver) GetPods(ctx context.Context, all bool) ([]Pod, error) {
 		}
 	}
 
+	for _, vol := range volumes.Volumes {
+		executorID, ok := vol.Labels[executorIDKey]
+		if !ok || executorID != d.executorID {
+			// skip vol
+			continue
+		}
+		podID, ok := vol.Labels[podIDKey]
+		if !ok {
+			// skip vol
+			continue
+		}
+
+		pod, ok := podsMap[podID]
+		if !ok {
+			// skip vol
+			continue
+		}
+
+		pod.toolboxVolumeName = vol.Name
+	}
+
 	pods := make([]Pod, 0, len(podsMap))
 	for _, pod := range podsMap {
 		// put the containers in the right order based on their container index
@@ -416,11 +451,12 @@ func (d *DockerDriver) GetPods(ctx context.Context, all bool) ([]Pod, error) {
 }
 
 type DockerPod struct {
-	id         string
-	client     *client.Client
-	labels     map[string]string
-	containers []*DockerContainer
-	executorID string
+	id                string
+	client            *client.Client
+	labels            map[string]string
+	containers        []*DockerContainer
+	toolboxVolumeName string
+	executorID        string
 
 	initVolumeDir string
 }
@@ -466,6 +502,11 @@ func (dp *DockerPod) Remove(ctx context.Context) error {
 	errs := []error{}
 	for _, container := range dp.containers {
 		if err := dp.client.ContainerRemove(ctx, container.ID, dockertypes.ContainerRemoveOptions{Force: true}); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if dp.toolboxVolumeName != "" {
+		if err := dp.client.VolumeRemove(ctx, dp.toolboxVolumeName, true); err != nil {
 			errs = append(errs, err)
 		}
 	}

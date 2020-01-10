@@ -44,13 +44,7 @@ func TestDockerPod(t *testing.T) {
 		t.Fatalf("env var AGOLA_TOOLBOX_PATH is undefined")
 	}
 
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
-	d, err := NewDockerDriver(logger, "executorid01", dir, toolboxPath)
+	d, err := NewDockerDriver(logger, "executorid01", toolboxPath)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
