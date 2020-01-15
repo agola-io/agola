@@ -40,7 +40,7 @@ require (
 	github.com/mitchellh/copystructure v1.0.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mitchellh/reflectwalk v1.0.1 // indirect
-	github.com/opencontainers/runc v0.1.1 // indirect
+	github.com/opencontainers/runc v1.0.0-rc8 // indirect
 	github.com/prometheus/client_golang v1.2.1 // indirect
 	github.com/sanity-io/litter v1.2.0
 	github.com/satori/go.uuid v1.2.0
