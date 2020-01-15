@@ -197,10 +197,14 @@ type Scheduler struct {
 	runserviceClient *rsclient.Client
 }
 
-func NewScheduler(c *config.Scheduler) (*Scheduler, error) {
+func NewScheduler(ctx context.Context, l *zap.Logger, c *config.Scheduler) (*Scheduler, error) {
+	if l != nil {
+		logger = l
+	}
 	if c.Debug {
 		level.SetLevel(zapcore.DebugLevel)
 	}
+	log = logger.Sugar()
 
 	return &Scheduler{
 		c:                c,

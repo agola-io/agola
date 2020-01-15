@@ -15,13 +15,13 @@
 package driver
 
 import (
+	"bufio"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -76,7 +76,11 @@ func (d *DockerDriver) createToolboxVolume(ctx context.Context, podID string) (*
 	if err != nil {
 		return nil, err
 	}
-	if _, err := io.Copy(os.Stdout, reader); err != nil {
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		d.log.Infof("create toolbox volume image pull output: %s", scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
 		return nil, err
 	}
 

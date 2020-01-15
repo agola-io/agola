@@ -29,21 +29,17 @@ import (
 	"testing"
 	"time"
 
-	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/testutil"
 	"agola.io/agola/internal/util"
 
 	"github.com/google/go-cmp/cmp"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest"
 	errors "golang.org/x/xerrors"
 )
 
-var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
-var logger = slog.New(level)
-
-func setupEtcd(t *testing.T, dir string) *testutil.TestEmbeddedEtcd {
+func setupEtcd(t *testing.T, logger *zap.Logger, dir string) *testutil.TestEmbeddedEtcd {
 	tetcd, err := testutil.NewTestEmbeddedEtcd(t, logger, dir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -52,7 +48,7 @@ func setupEtcd(t *testing.T, dir string) *testutil.TestEmbeddedEtcd {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	if err := tetcd.WaitUp(30 * time.Second); err != nil {
-		t.Fatalf("error waiting on store up: %v", err)
+		t.Fatalf("error waiting on etcd up: %v", err)
 	}
 	return tetcd
 }
@@ -70,11 +66,13 @@ func TestEtcdReset(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	tetcd := setupEtcd(t, etcdDir)
+	tetcd := setupEtcd(t, logger, etcdDir)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -134,7 +132,7 @@ func TestEtcdReset(t *testing.T) {
 	t.Logf("resetting etcd")
 	os.RemoveAll(etcdDir)
 	t.Logf("starting etcd")
-	tetcd = setupEtcd(t, etcdDir)
+	tetcd = setupEtcd(t, logger, etcdDir)
 	if err := tetcd.Start(); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -177,11 +175,13 @@ func TestEtcdResetWalsGap(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	tetcd := setupEtcd(t, etcdDir)
+	tetcd := setupEtcd(t, logger, etcdDir)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -241,7 +241,7 @@ func TestEtcdResetWalsGap(t *testing.T) {
 	t.Logf("resetting etcd")
 	os.RemoveAll(etcdDir)
 	t.Logf("starting etcd")
-	tetcd = setupEtcd(t, etcdDir)
+	tetcd = setupEtcd(t, logger, etcdDir)
 	if err := tetcd.Start(); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -303,11 +303,13 @@ func TestConcurrentUpdate(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	tetcd := setupEtcd(t, etcdDir)
+	tetcd := setupEtcd(t, logger, etcdDir)
 	defer shutdownEtcd(tetcd)
 
 	ctx := context.Background()
@@ -394,11 +396,13 @@ func TestEtcdWalCleaner(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	tetcd := setupEtcd(t, etcdDir)
+	tetcd := setupEtcd(t, logger, etcdDir)
 	defer shutdownEtcd(tetcd)
 
 	ctx := context.Background()
@@ -468,11 +472,13 @@ func TestReadObject(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	tetcd := setupEtcd(t, etcdDir)
+	tetcd := setupEtcd(t, logger, etcdDir)
 	defer shutdownEtcd(tetcd)
 
 	ctx := context.Background()
@@ -761,11 +767,13 @@ func testCheckpoint(t *testing.T, basePath string) {
 	}
 	defer os.RemoveAll(dir)
 
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	tetcd := setupEtcd(t, etcdDir)
+	tetcd := setupEtcd(t, logger, etcdDir)
 	defer shutdownEtcd(tetcd)
 
 	ctx := context.Background()
@@ -977,11 +985,13 @@ func TestRead(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	tetcd := setupEtcd(t, etcdDir)
+	tetcd := setupEtcd(t, logger, etcdDir)
 	defer shutdownEtcd(tetcd)
 
 	ctx := context.Background()
@@ -1091,11 +1101,13 @@ func testClean(t *testing.T, basePath string) {
 	}
 	defer os.RemoveAll(dir)
 
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	tetcd := setupEtcd(t, etcdDir)
+	tetcd := setupEtcd(t, logger, etcdDir)
 	defer shutdownEtcd(tetcd)
 
 	ctx := context.Background()
@@ -1209,11 +1221,13 @@ func testCleanConcurrentCheckpoint(t *testing.T, basePath string) {
 	}
 	defer os.RemoveAll(dir)
 
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	tetcd := setupEtcd(t, etcdDir)
+	tetcd := setupEtcd(t, logger, etcdDir)
 	defer shutdownEtcd(tetcd)
 
 	ctx := context.Background()
@@ -1338,11 +1352,13 @@ func testStorageWalCleaner(t *testing.T, basePath string) {
 	}
 	defer os.RemoveAll(dir)
 
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	tetcd := setupEtcd(t, etcdDir)
+	tetcd := setupEtcd(t, logger, etcdDir)
 	defer shutdownEtcd(tetcd)
 
 	ctx := context.Background()
@@ -1478,11 +1494,13 @@ func TestExportImport(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	tetcd := setupEtcd(t, etcdDir)
+	tetcd := setupEtcd(t, logger, etcdDir)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -1586,7 +1604,7 @@ func TestExportImport(t *testing.T) {
 	t.Logf("resetting etcd")
 	os.RemoveAll(etcdDir)
 	t.Logf("starting etcd")
-	tetcd = setupEtcd(t, etcdDir)
+	tetcd = setupEtcd(t, logger, etcdDir)
 	if err := tetcd.Start(); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}

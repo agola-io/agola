@@ -42,11 +42,16 @@ type NotificationService struct {
 	configstoreClient *csclient.Client
 }
 
-func NewNotificationService(gc *config.Config) (*NotificationService, error) {
+func NewNotificationService(ctx context.Context, l *zap.Logger, gc *config.Config) (*NotificationService, error) {
 	c := &gc.Notification
+
+	if l != nil {
+		logger = l
+	}
 	if c.Debug {
 		level.SetLevel(zapcore.DebugLevel)
 	}
+	log = logger.Sugar()
 
 	e, err := common.NewEtcd(&c.Etcd, logger, "notification")
 	if err != nil {

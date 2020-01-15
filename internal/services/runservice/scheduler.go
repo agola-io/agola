@@ -25,7 +25,6 @@ import (
 
 	"agola.io/agola/internal/datamanager"
 	"agola.io/agola/internal/etcd"
-	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/runconfig"
 	"agola.io/agola/internal/services/runservice/common"
@@ -35,8 +34,6 @@ import (
 
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/clientv3/concurrency"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	errors "golang.org/x/xerrors"
 )
 
@@ -46,10 +43,6 @@ const (
 
 	defaultExecutorNotAliveInterval = 60 * time.Second
 )
-
-var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
-var logger = slog.New(level)
-var log = logger.Sugar()
 
 func (s *Runservice) runActiveExecutorTasks(ctx context.Context, runID string) ([]*types.ExecutorTask, error) {
 	// the real source of active tasks is the number of executor tasks in etcd

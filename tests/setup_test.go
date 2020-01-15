@@ -27,7 +27,6 @@ import (
 	"testing"
 	"time"
 
-	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/configstore"
 	"agola.io/agola/internal/services/executor"
@@ -44,7 +43,7 @@ import (
 
 	"code.gitea.io/sdk/gitea"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest"
 	errors "golang.org/x/xerrors"
 	"gopkg.in/src-d/go-billy.v4/memfs"
 	"gopkg.in/src-d/go-billy.v4/osfs"
@@ -57,15 +56,12 @@ import (
 	"gopkg.in/src-d/go-git.v4/storage/memory"
 )
 
-var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
-var logger = slog.New(level)
-
 const (
 	giteaUser01 = "user01"
 	agolaUser01 = "user01"
 )
 
-func setupEtcd(t *testing.T, dir string) *testutil.TestEmbeddedEtcd {
+func setupEtcd(t *testing.T, logger *zap.Logger, dir string) *testutil.TestEmbeddedEtcd {
 	tetcd, err := testutil.NewTestEmbeddedEtcd(t, logger, dir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -86,7 +82,7 @@ func shutdownEtcd(tetcd *testutil.TestEmbeddedEtcd) {
 }
 
 func setupGitea(t *testing.T, dir, dockerBridgeAddress string) *testutil.TestGitea {
-	tgitea, err := testutil.NewTestGitea(t, logger, dir, dockerBridgeAddress)
+	tgitea, err := testutil.NewTestGitea(t, dir, dockerBridgeAddress)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -128,38 +124,38 @@ func shutdownGitea(tgitea *testutil.TestGitea) {
 	tgitea.Kill()
 }
 
-func startAgola(ctx context.Context, t *testing.T, dir string, c *config.Config) (<-chan error, error) {
-	rs, err := rsscheduler.NewRunservice(ctx, &c.Runservice)
+func startAgola(ctx context.Context, t *testing.T, logger *zap.Logger, dir string, c *config.Config) (<-chan error, error) {
+	rs, err := rsscheduler.NewRunservice(ctx, logger, &c.Runservice)
 	if err != nil {
 		return nil, errors.Errorf("failed to start run service scheduler: %w", err)
 	}
 
-	ex, err := executor.NewExecutor(&c.Executor)
+	ex, err := executor.NewExecutor(ctx, logger, &c.Executor)
 	if err != nil {
 		return nil, errors.Errorf("failed to start run service executor: %w", err)
 	}
 
-	cs, err := configstore.NewConfigstore(ctx, &c.Configstore)
+	cs, err := configstore.NewConfigstore(ctx, logger, &c.Configstore)
 	if err != nil {
 		return nil, errors.Errorf("failed to start config store: %w", err)
 	}
 
-	sched, err := scheduler.NewScheduler(&c.Scheduler)
+	sched, err := scheduler.NewScheduler(ctx, logger, &c.Scheduler)
 	if err != nil {
 		return nil, errors.Errorf("failed to start scheduler: %w", err)
 	}
 
-	ns, err := notification.NewNotificationService(c)
+	ns, err := notification.NewNotificationService(ctx, logger, c)
 	if err != nil {
 		return nil, errors.Errorf("failed to start notification service: %w", err)
 	}
 
-	gw, err := gateway.NewGateway(c)
+	gw, err := gateway.NewGateway(ctx, logger, c)
 	if err != nil {
 		return nil, errors.Errorf("failed to start gateway: %w", err)
 	}
 
-	gs, err := gitserver.NewGitserver(&c.Gitserver)
+	gs, err := gitserver.NewGitserver(ctx, logger, &c.Gitserver)
 	if err != nil {
 		return nil, errors.Errorf("failed to start git server: %w", err)
 	}
@@ -181,6 +177,8 @@ func startAgola(ctx context.Context, t *testing.T, dir string, c *config.Config)
 }
 
 func setup(ctx context.Context, t *testing.T, dir string) (*testutil.TestEmbeddedEtcd, *testutil.TestGitea, *config.Config) {
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+
 	dockerBridgeAddress := os.Getenv("DOCKER_BRIDGE_ADDRESS")
 	if dockerBridgeAddress == "" {
 		dockerBridgeAddress = "172.17.0.1"
@@ -285,7 +283,7 @@ func setup(ctx context.Context, t *testing.T, dir string) (*testutil.TestEmbedde
 	tgitea := setupGitea(t, dir, dockerBridgeAddress)
 
 	etcdDir := filepath.Join(dir, "etcd")
-	tetcd := setupEtcd(t, etcdDir)
+	tetcd := setupEtcd(t, logger, etcdDir)
 
 	c.Runservice.Etcd.Endpoints = tetcd.Endpoint
 	c.Configstore.Etcd.Endpoints = tetcd.Endpoint
@@ -336,7 +334,7 @@ func setup(ctx context.Context, t *testing.T, dir string) (*testutil.TestEmbedde
 
 	c.Executor.RunserviceURL = rsURL
 
-	errCh, err := startAgola(ctx, t, dir, c)
+	errCh, err := startAgola(ctx, t, logger, dir, c)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}

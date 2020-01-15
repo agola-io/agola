@@ -1339,10 +1339,14 @@ type Executor struct {
 	dynamic          bool
 }
 
-func NewExecutor(c *config.Executor) (*Executor, error) {
+func NewExecutor(ctx context.Context, l *zap.Logger, c *config.Executor) (*Executor, error) {
+	if l != nil {
+		logger = l
+	}
 	if c.Debug {
 		level.SetLevel(zapcore.DebugLevel)
 	}
+	log = logger.Sugar()
 
 	var err error
 	c.ToolboxPath, err = filepath.Abs(c.ToolboxPath)

@@ -22,18 +22,14 @@ import (
 	"testing"
 	"time"
 
-	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/testutil"
+
 	"github.com/docker/docker/api/types"
-	uuid "github.com/satori/go.uuid"
-
 	"github.com/google/go-cmp/cmp"
+	uuid "github.com/satori/go.uuid"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest"
 )
-
-var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
-var logger = slog.New(level)
 
 func TestDockerPod(t *testing.T) {
 	if os.Getenv("SKIP_DOCKER_TESTS") == "1" {
@@ -43,6 +39,8 @@ func TestDockerPod(t *testing.T) {
 	if toolboxPath == "" {
 		t.Fatalf("env var AGOLA_TOOLBOX_PATH is undefined")
 	}
+
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
 
 	d, err := NewDockerDriver(logger, "executorid01", toolboxPath)
 	if err != nil {

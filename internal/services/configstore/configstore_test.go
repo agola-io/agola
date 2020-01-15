@@ -29,15 +29,17 @@ import (
 
 	"agola.io/agola/internal/db"
 	"agola.io/agola/internal/services/config"
-	action "agola.io/agola/internal/services/configstore/action"
+	"agola.io/agola/internal/services/configstore/action"
 	"agola.io/agola/internal/testutil"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
 
 	"github.com/google/go-cmp/cmp"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest"
 )
 
-func setupEtcd(t *testing.T, dir string) *testutil.TestEmbeddedEtcd {
+func setupEtcd(t *testing.T, logger *zap.Logger, dir string) *testutil.TestEmbeddedEtcd {
 	tetcd, err := testutil.NewTestEmbeddedEtcd(t, logger, dir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -57,12 +59,12 @@ func shutdownEtcd(tetcd *testutil.TestEmbeddedEtcd) {
 	}
 }
 
-func setupConfigstore(ctx context.Context, t *testing.T, dir string) (*Configstore, *testutil.TestEmbeddedEtcd) {
+func setupConfigstore(ctx context.Context, t *testing.T, logger *zap.Logger, dir string) (*Configstore, *testutil.TestEmbeddedEtcd) {
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	tetcd := setupEtcd(t, etcdDir)
+	tetcd := setupEtcd(t, logger, etcdDir)
 
 	listenAddress, port, err := testutil.GetFreePort(true, false)
 	if err != nil {
@@ -92,7 +94,7 @@ func setupConfigstore(ctx context.Context, t *testing.T, dir string) (*Configsto
 	csConfig.DataDir = csDir
 	csConfig.Web.ListenAddress = net.JoinHostPort(listenAddress, port)
 
-	cs, err := NewConfigstore(ctx, &csConfig)
+	cs, err := NewConfigstore(ctx, logger, &csConfig)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -127,11 +129,13 @@ func TestResync(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	tetcd := setupEtcd(t, etcdDir)
+	tetcd := setupEtcd(t, logger, etcdDir)
 	defer shutdownEtcd(tetcd)
 
 	listenAddress1, port1, err := testutil.GetFreePort(true, false)
@@ -184,11 +188,11 @@ func TestResync(t *testing.T) {
 	cs2Config.DataDir = csDir2
 	cs2Config.Web.ListenAddress = net.JoinHostPort(listenAddress2, port2)
 
-	cs1, err := NewConfigstore(ctx, &cs1Config)
+	cs1, err := NewConfigstore(ctx, logger.With(zap.String("name", "cs1")), &cs1Config)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	cs2, err := NewConfigstore(ctx, &cs2Config)
+	cs2, err := NewConfigstore(ctx, logger.With(zap.String("name", "cs2")), &cs2Config)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -233,7 +237,7 @@ func TestResync(t *testing.T) {
 
 	// start cs2
 	// it should resync from wals since the etcd revision as been compacted
-	cs2, err = NewConfigstore(ctx, &cs2Config)
+	cs2, err = NewConfigstore(ctx, logger.With(zap.String("name", "cs2")), &cs2Config)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -271,7 +275,7 @@ func TestResync(t *testing.T) {
 	cs3Config.Web.ListenAddress = net.JoinHostPort(listenAddress3, port3)
 
 	log.Infof("starting cs3")
-	cs3, err := NewConfigstore(ctx, &cs3Config)
+	cs3, err := NewConfigstore(ctx, logger, &cs3Config)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -301,11 +305,13 @@ func TestExportImport(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	tetcd := setupEtcd(t, etcdDir)
+	tetcd := setupEtcd(t, logger, etcdDir)
 	defer shutdownEtcd(tetcd)
 
 	listenAddress1, port1, err := testutil.GetFreePort(true, false)
@@ -362,15 +368,15 @@ func TestExportImport(t *testing.T) {
 	cs3Config.DataDir = csDir3
 	cs3Config.Web.ListenAddress = net.JoinHostPort(listenAddress3, port3)
 
-	cs1, err := NewConfigstore(ctx, &cs1Config)
+	cs1, err := NewConfigstore(ctx, logger.With(zap.String("name", "cs1")), &cs1Config)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	cs2, err := NewConfigstore(ctx, &cs2Config)
+	cs2, err := NewConfigstore(ctx, logger.With(zap.String("name", "cs2")), &cs2Config)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	cs3, err := NewConfigstore(ctx, &cs3Config)
+	cs3, err := NewConfigstore(ctx, logger.With(zap.String("name", "cs3")), &cs3Config)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -459,7 +465,7 @@ func TestExportImport(t *testing.T) {
 
 	// start cs2
 	// it should do a full resync since we have imported new data and there's now wal in etcd
-	cs2, err = NewConfigstore(ctx, &cs2Config)
+	cs2, err = NewConfigstore(ctx, logger.With(zap.String("name", "cs2")), &cs2Config)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -503,7 +509,7 @@ func TestExportImport(t *testing.T) {
 
 	// start cs3
 	// it should do a full resync since we have imported new data and there're some wals with a different epoch
-	cs3, err = NewConfigstore(ctx, &cs3Config)
+	cs3, err = NewConfigstore(ctx, logger.With(zap.String("name", "cs3")), &cs3Config)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -549,8 +555,9 @@ func TestUser(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	ctx := context.Background()
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
 
-	cs, tetcd := setupConfigstore(ctx, t, dir)
+	cs, tetcd := setupConfigstore(ctx, t, logger, dir)
 	defer shutdownEtcd(tetcd)
 
 	t.Logf("starting cs")
@@ -616,8 +623,9 @@ func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	ctx := context.Background()
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
 
-	cs, tetcd := setupConfigstore(ctx, t, dir)
+	cs, tetcd := setupConfigstore(ctx, t, logger, dir)
 	defer shutdownEtcd(tetcd)
 
 	t.Logf("starting cs")
@@ -763,8 +771,9 @@ func TestProjectUpdate(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	ctx := context.Background()
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
 
-	cs, tetcd := setupConfigstore(ctx, t, dir)
+	cs, tetcd := setupConfigstore(ctx, t, logger, dir)
 	defer shutdownEtcd(tetcd)
 
 	t.Logf("starting cs")
@@ -839,8 +848,9 @@ func TestProjectGroupUpdate(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	ctx := context.Background()
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
 
-	cs, tetcd := setupConfigstore(ctx, t, dir)
+	cs, tetcd := setupConfigstore(ctx, t, logger, dir)
 	defer shutdownEtcd(tetcd)
 
 	t.Logf("starting cs")
@@ -989,8 +999,9 @@ func TestProjectGroupDelete(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	ctx := context.Background()
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
 
-	cs, tetcd := setupConfigstore(ctx, t, dir)
+	cs, tetcd := setupConfigstore(ctx, t, logger, dir)
 	defer shutdownEtcd(tetcd)
 
 	t.Logf("starting cs")
@@ -1045,8 +1056,9 @@ func TestProjectGroupDeleteDontSeeOldChildObjects(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	ctx := context.Background()
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
 
-	cs, tetcd := setupConfigstore(ctx, t, dir)
+	cs, tetcd := setupConfigstore(ctx, t, logger, dir)
 	defer shutdownEtcd(tetcd)
 
 	t.Logf("starting cs")
@@ -1180,8 +1192,9 @@ func TestOrgMembers(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	ctx := context.Background()
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
 
-	cs, tetcd := setupConfigstore(ctx, t, dir)
+	cs, tetcd := setupConfigstore(ctx, t, logger, dir)
 	defer shutdownEtcd(tetcd)
 
 	t.Logf("starting cs")
@@ -1268,6 +1281,8 @@ func TestRemoteSource(t *testing.T) {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	defer os.RemoveAll(dir)
+
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
 
 	tests := []struct {
 		name string
@@ -1417,7 +1432,7 @@ func TestRemoteSource(t *testing.T) {
 			}
 			ctx := context.Background()
 
-			cs, tetcd := setupConfigstore(ctx, t, dir)
+			cs, tetcd := setupConfigstore(ctx, t, logger, dir)
 			defer shutdownEtcd(tetcd)
 
 			t.Logf("starting cs")
