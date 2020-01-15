@@ -167,6 +167,7 @@ func NewTestEmbeddedEtcd(t *testing.T, logger *zap.Logger, dir string, a ...stri
 	cfg.Name = uid
 	cfg.Dir = dataDir
 	cfg.Logger = "zap"
+	cfg.LogLevel = "fatal"
 	cfg.LogOutputs = []string{"stdout"}
 	lcurl, _ := url.Parse(fmt.Sprintf("http://%s:%s", listenAddress, port))
 	lpurl, _ := url.Parse(fmt.Sprintf("http://%s:%s", listenAddress2, port2))
@@ -451,7 +452,7 @@ type TestGitea struct {
 	SSHPort           string
 }
 
-func NewTestGitea(t *testing.T, logger *zap.Logger, dir, dockerBridgeAddress string, a ...string) (*TestGitea, error) {
+func NewTestGitea(t *testing.T, dir, dockerBridgeAddress string, a ...string) (*TestGitea, error) {
 	u := uuid.NewV4()
 	uid := fmt.Sprintf("%x", u[:4])
 

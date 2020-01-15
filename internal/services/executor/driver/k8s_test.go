@@ -26,6 +26,8 @@ import (
 	"agola.io/agola/internal/testutil"
 
 	uuid "github.com/satori/go.uuid"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest"
 )
 
 func TestK8sPod(t *testing.T) {
@@ -36,6 +38,8 @@ func TestK8sPod(t *testing.T) {
 	if toolboxPath == "" {
 		t.Fatalf("env var AGOLA_TOOLBOX_PATH is undefined")
 	}
+
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
 
 	d, err := NewK8sDriver(logger, "executorid01", toolboxPath)
 	if err != nil {

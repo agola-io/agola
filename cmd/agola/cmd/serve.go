@@ -142,7 +142,7 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	var rs *rsscheduler.Runservice
 	if isComponentEnabled("runservice") {
-		rs, err = rsscheduler.NewRunservice(ctx, &c.Runservice)
+		rs, err = rsscheduler.NewRunservice(ctx, nil, &c.Runservice)
 		if err != nil {
 			return errors.Errorf("failed to start run service scheduler: %w", err)
 		}
@@ -150,7 +150,7 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	var ex *rsexecutor.Executor
 	if isComponentEnabled("executor") {
-		ex, err = executor.NewExecutor(&c.Executor)
+		ex, err = executor.NewExecutor(ctx, nil, &c.Executor)
 		if err != nil {
 			return errors.Errorf("failed to start run service executor: %w", err)
 		}
@@ -158,7 +158,7 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	var cs *configstore.Configstore
 	if isComponentEnabled("configstore") {
-		cs, err = configstore.NewConfigstore(ctx, &c.Configstore)
+		cs, err = configstore.NewConfigstore(ctx, nil, &c.Configstore)
 		if err != nil {
 			return errors.Errorf("failed to start config store: %w", err)
 		}
@@ -166,7 +166,7 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	var sched *scheduler.Scheduler
 	if isComponentEnabled("scheduler") {
-		sched, err = scheduler.NewScheduler(&c.Scheduler)
+		sched, err = scheduler.NewScheduler(ctx, nil, &c.Scheduler)
 		if err != nil {
 			return errors.Errorf("failed to start scheduler: %w", err)
 		}
@@ -174,7 +174,7 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	var ns *notification.NotificationService
 	if isComponentEnabled("notification") {
-		ns, err = notification.NewNotificationService(c)
+		ns, err = notification.NewNotificationService(ctx, nil, c)
 		if err != nil {
 			return errors.Errorf("failed to start notification service: %w", err)
 		}
@@ -182,7 +182,7 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	var gw *gateway.Gateway
 	if isComponentEnabled("gateway") {
-		gw, err = gateway.NewGateway(c)
+		gw, err = gateway.NewGateway(ctx, nil, c)
 		if err != nil {
 			return errors.Errorf("failed to start gateway: %w", err)
 		}
@@ -190,7 +190,7 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	var gs *gitserver.Gitserver
 	if isComponentEnabled("gitserver") {
-		gs, err = gitserver.NewGitserver(&c.Gitserver)
+		gs, err = gitserver.NewGitserver(ctx, nil, &c.Gitserver)
 		if err != nil {
 			return errors.Errorf("failed to start git server: %w", err)
 		}

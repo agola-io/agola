@@ -58,11 +58,16 @@ type Gateway struct {
 	sd                *common.TokenSigningData
 }
 
-func NewGateway(gc *config.Config) (*Gateway, error) {
+func NewGateway(ctx context.Context, l *zap.Logger, gc *config.Config) (*Gateway, error) {
 	c := &gc.Gateway
+
+	if l != nil {
+		logger = l
+	}
 	if c.Debug {
 		level.SetLevel(zapcore.DebugLevel)
 	}
+	log = logger.Sugar()
 
 	if c.Web.ListenAddress == "" {
 		return nil, errors.Errorf("listen address undefined")

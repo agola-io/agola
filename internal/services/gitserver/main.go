@@ -130,10 +130,14 @@ type Gitserver struct {
 	c *config.Gitserver
 }
 
-func NewGitserver(c *config.Gitserver) (*Gitserver, error) {
+func NewGitserver(ctx context.Context, l *zap.Logger, c *config.Gitserver) (*Gitserver, error) {
+	if l != nil {
+		logger = l
+	}
 	if c.Debug {
 		level.SetLevel(zapcore.DebugLevel)
 	}
+	log = logger.Sugar()
 
 	return &Gitserver{
 		c: c,

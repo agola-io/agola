@@ -120,10 +120,14 @@ type Configstore struct {
 	maintenanceMode bool
 }
 
-func NewConfigstore(ctx context.Context, c *config.Configstore) (*Configstore, error) {
+func NewConfigstore(ctx context.Context, l *zap.Logger, c *config.Configstore) (*Configstore, error) {
+	if l != nil {
+		logger = l
+	}
 	if c.Debug {
 		level.SetLevel(zapcore.DebugLevel)
 	}
+	log = logger.Sugar()
 
 	ost, err := scommon.NewObjectStorage(&c.ObjectStorage)
 	if err != nil {

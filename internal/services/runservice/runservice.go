@@ -25,6 +25,7 @@ import (
 	scommon "agola.io/agola/internal/common"
 	"agola.io/agola/internal/datamanager"
 	"agola.io/agola/internal/etcd"
+	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/runservice/action"
@@ -37,8 +38,13 @@ import (
 	"github.com/gorilla/mux"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/mvcc/mvccpb"
+	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
+
+var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
+var logger = slog.New(level)
+var log = logger.Sugar()
 
 // etcdPingerLoop periodically updates a key.
 // This is used by watchers to inform the client of the current revision
@@ -141,10 +147,14 @@ type Runservice struct {
 	maintenanceMode bool
 }
 
-func NewRunservice(ctx context.Context, c *config.Runservice) (*Runservice, error) {
+func NewRunservice(ctx context.Context, l *zap.Logger, c *config.Runservice) (*Runservice, error) {
+	if l != nil {
+		logger = l
+	}
 	if c.Debug {
 		level.SetLevel(zapcore.DebugLevel)
 	}
+	log = logger.Sugar()
 
 	ost, err := scommon.NewObjectStorage(&c.ObjectStorage)
 	if err != nil {
