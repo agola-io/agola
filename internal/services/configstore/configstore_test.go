@@ -274,11 +274,11 @@ func TestResync(t *testing.T) {
 	cs3Config.DataDir = csDir3
 	cs3Config.Web.ListenAddress = net.JoinHostPort(listenAddress3, port3)
 
-	log.Infof("starting cs3")
-	cs3, err := NewConfigstore(ctx, logger, &cs3Config)
+	cs3, err := NewConfigstore(ctx, logger.With(zap.String("name", "cs3")), &cs3Config)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
+	log.Infof("starting cs3")
 	ctx3 := context.Background()
 	go func() { _ = cs3.Run(ctx3) }()
 
