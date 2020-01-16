@@ -27,7 +27,7 @@ import (
 
 var cmdUserTokenCreate = &cobra.Command{
 	Use:   "create",
-	Short: "create a user linkedaccount",
+	Short: "create a user token",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := userTokenCreate(cmd, args); err != nil {
 			log.Fatalf("err: %v", err)
