@@ -19,6 +19,8 @@ npm run serve
 
 ### Build the agola binary
 
+To build agola we usually test and support the latest two major versions of Go like in the [Go release policy](https://golang.org/doc/devel/release.html#policy).
+
 ```
 make
 ```
