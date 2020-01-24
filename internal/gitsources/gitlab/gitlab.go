@@ -311,7 +311,7 @@ func (c *Client) GetRef(repopath, ref string) (*gitsource.Ref, error) {
 		}, nil
 
 	case strings.HasPrefix(ref, "refs/tags/"):
-		tag := strings.TrimPrefix(ref, "refs/heads/")
+		tag := strings.TrimPrefix(ref, "refs/tags/")
 		remoteTag, _, err := c.client.Tags.GetTag(repopath, tag)
 		if err != nil {
 			return nil, err
