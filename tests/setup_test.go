@@ -49,6 +49,7 @@ import (
 	"gopkg.in/src-d/go-billy.v4/osfs"
 	"gopkg.in/src-d/go-git.v4"
 	gitconfig "gopkg.in/src-d/go-git.v4/config"
+	"gopkg.in/src-d/go-git.v4/plumbing"
 	"gopkg.in/src-d/go-git.v4/plumbing/cache"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 	"gopkg.in/src-d/go-git.v4/plumbing/transport/http"
@@ -58,6 +59,8 @@ import (
 
 const (
 	giteaUser01 = "user01"
+	giteaUser02 = "user02"
+
 	agolaUser01 = "user01"
 )
 
@@ -447,9 +450,64 @@ func TestCreateProject(t *testing.T) {
 	createProject(ctx, t, giteaClient, gwClient)
 }
 
+func TestUpdateProject(t *testing.T) {
+
+	tests := []struct {
+		name               string
+		passVarsToForkedPR bool
+		expected_pre       bool
+		expected_post      bool
+	}{
+		{
+			name:               "test project update with pass-vars-to-forked-pr true",
+			passVarsToForkedPR: true,
+			expected_pre:       false,
+			expected_post:      true,
+		},
+		{
+			name:               "test project update with pass-vars-to-forked-pr false",
+			passVarsToForkedPR: false,
+			expected_pre:       false,
+			expected_post:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		dir, err := ioutil.TempDir("", "agola")
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		defer os.RemoveAll(dir)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		tetcd, tgitea, c := setup(ctx, t, dir)
+		defer shutdownGitea(tgitea)
+		defer shutdownEtcd(tetcd)
+
+		giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
+
+		giteaToken, token := createLinkedAccount(ctx, t, tgitea, c)
+
+		giteaClient := gitea.NewClient(giteaAPIURL, giteaToken)
+		gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, token)
+
+		_, project := createProject(ctx, t, giteaClient, gwClient)
+		if project.PassVarsToForkedPR != tt.expected_pre {
+			t.Fatalf("expected PassVarsToForkedPR %v, got %v (pre-update)", tt.expected_pre, project.PassVarsToForkedPR)
+		}
+		project = updateProject(ctx, t, giteaClient, gwClient, project.ID, tt.passVarsToForkedPR)
+		if project.PassVarsToForkedPR != tt.expected_post {
+			t.Fatalf("expected PassVarsToForkedPR %v, got %v (port-update)", tt.expected_post, project.PassVarsToForkedPR)
+		}
+	}
+}
+
 func createProject(ctx context.Context, t *testing.T, giteaClient *gitea.Client, gwClient *gwclient.Client) (*gitea.Repository, *gwapitypes.ProjectResponse) {
 	giteaRepo, err := giteaClient.CreateRepo(gitea.CreateRepoOption{
-		Name: "repo01",
+		Name:    "repo01",
+		Private: false,
 	})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -470,7 +528,18 @@ func createProject(ctx context.Context, t *testing.T, giteaClient *gitea.Client,
 	return giteaRepo, project
 }
 
-func push(t *testing.T, config, cloneURL, remoteToken, message string) {
+func updateProject(ctx context.Context, t *testing.T, giteaClient *gitea.Client, gwClient *gwclient.Client, projectRef string, passVarsToForkedPR bool) *gwapitypes.ProjectResponse {
+	project, _, err := gwClient.UpdateProject(ctx, projectRef, &gwapitypes.UpdateProjectRequest{
+		PassVarsToForkedPR: util.BoolP(passVarsToForkedPR),
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	return project
+}
+
+func push(t *testing.T, config, cloneURL, remoteToken, message string, pushNewBranch bool) {
 	gitfs := memfs.New()
 	f, err := gitfs.Create(".agola/config.jsonnet")
 	if err != nil {
@@ -521,6 +590,52 @@ func push(t *testing.T, config, cloneURL, remoteToken, message string) {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
+	if pushNewBranch {
+		// change worktree and push to a new branch
+		headRef, err := r.Head()
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		ref := plumbing.NewHashReference("refs/heads/new-branch", headRef.Hash())
+		err = r.Storer.SetReference(ref)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		f, err = gitfs.Create("file1")
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if _, err = f.Write([]byte("my file content")); err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if _, err := wt.Add("file1"); err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		_, err = wt.Commit("add file1", &git.CommitOptions{
+			Author: &object.Signature{
+				Name:  "user01",
+				Email: "user01@example.com",
+				When:  time.Now(),
+			},
+		})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		if err := r.Push(&git.PushOptions{
+			RemoteName: "origin",
+			RefSpecs: []gitconfig.RefSpec{
+				gitconfig.RefSpec("refs/heads/new-branch:refs/heads/new-branch"),
+			},
+			Auth: &http.BasicAuth{
+				Username: giteaUser01,
+				Password: remoteToken,
+			},
+		}); err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+	}
 }
 
 func TestPush(t *testing.T) {
@@ -686,7 +801,7 @@ func TestPush(t *testing.T) {
 
 			giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)
 
-			push(t, tt.config, giteaRepo.CloneURL, giteaToken, tt.message)
+			push(t, tt.config, giteaRepo.CloneURL, giteaToken, tt.message, false)
 
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
 				runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/project", project.ID)}, nil, "", 0, false)
@@ -1277,6 +1392,289 @@ func TestDirectRunLogs(t *testing.T) {
 			} else {
 				if tt.err != nil {
 					t.Fatalf("got nil error, want error: %v", tt.err)
+				}
+			}
+		})
+	}
+}
+
+func TestPullRequest(t *testing.T) {
+	config := `
+       {
+         runs: [
+           {
+             name: 'run01',
+             tasks: [
+               {
+                 name: 'task01',
+                 runtime: {
+                   containers: [
+                     {
+                       image: 'alpine/git',
+                     },
+                   ],
+                 },
+                 environment: {
+                   MYPASSWORD: { from_variable: 'mypassword' },
+                 },
+                 steps: [
+                   { type: 'clone' },
+                   { type: 'run', command: 'echo -n $MYPASSWORD' },
+                 ],
+               },
+             ],
+             when: {
+               ref: '#refs/pull/\\d+/head#',
+             },
+           },
+         ],
+       }
+    `
+
+	tests := []struct {
+		name               string
+		passVarsToForkedPR bool
+		prFromSameRepo     bool
+		expected           string
+	}{
+		{
+			name:               "test PR from same repowith PassVarsToForkedPR set to false",
+			passVarsToForkedPR: false,
+			prFromSameRepo:     true,
+			expected:           "mysupersecretpassword",
+		},
+		{
+			name:               "test PR from same repo with PassVarsToForkedPR set to true",
+			passVarsToForkedPR: true,
+			prFromSameRepo:     true,
+			expected:           "mysupersecretpassword",
+		},
+		{
+			name:               "test PR from forked repo with PassVarsToForkedPR set to false",
+			passVarsToForkedPR: false,
+			prFromSameRepo:     false,
+			expected:           "",
+		},
+		{
+			name:               "test PR from forked repo with PassVarsToForkedPR set to true",
+			passVarsToForkedPR: true,
+			prFromSameRepo:     false,
+			expected:           "mysupersecretpassword",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			dir, err := ioutil.TempDir("", "agola")
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			defer os.RemoveAll(dir)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			tetcd, tgitea, c := setup(ctx, t, dir)
+			defer shutdownGitea(tgitea)
+			defer shutdownEtcd(tetcd)
+
+			giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
+
+			giteaToken, token := createLinkedAccount(ctx, t, tgitea, c)
+
+			giteaClient := gitea.NewClient(giteaAPIURL, giteaToken)
+			gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, token)
+
+			giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)
+			project = updateProject(ctx, t, giteaClient, gwClient, project.ID, tt.passVarsToForkedPR)
+
+			//create project secret
+			secretData := map[string]string{"mypassword": "mysupersecretpassword"}
+			sreq := &gwapitypes.CreateSecretRequest{
+				Name: "mysecret",
+				Type: gwapitypes.SecretTypeInternal,
+				Data: secretData,
+			}
+
+			secret, _, err := gwClient.CreateProjectSecret(context.TODO(), project.ID, sreq)
+			if err != nil {
+				t.Fatal("failed to create project secret: %w", err)
+			}
+
+			// create project variable
+			rvalues := []gwapitypes.VariableValueRequest{}
+			rvalues = append(rvalues, gwapitypes.VariableValueRequest{
+				SecretName: secret.Name,
+				SecretVar:  "mypassword",
+			})
+
+			vreq := &gwapitypes.CreateVariableRequest{
+				Name:   "mypassword",
+				Values: rvalues,
+			}
+
+			_, _, err = gwClient.CreateProjectVariable(context.TODO(), project.ID, vreq)
+			if err != nil {
+				t.Fatal("failed to create project variable: %w", err)
+			}
+
+			if tt.prFromSameRepo {
+				// create PR from branch on same repo
+				push(t, config, giteaRepo.CloneURL, giteaToken, "commit", true)
+
+				prOpts := gitea.CreatePullRequestOption{
+					Head:  "new-branch",
+					Base:  "master",
+					Title: "add file1 from new-branch on same repo",
+				}
+				_, err = giteaClient.CreatePullRequest(giteaUser01, "repo01", prOpts)
+				if err != nil {
+					t.Fatal("failed to create pull request: %w", err)
+				}
+			} else {
+				// create PR from forked repo
+				push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
+
+				userOpts := gitea.CreateUserOption{
+					Username:           giteaUser02,
+					Password:           "password",
+					Email:              "user02@example.com",
+					MustChangePassword: util.BoolP(false),
+				}
+				_, err := giteaClient.AdminCreateUser(userOpts)
+				if err != nil {
+					t.Fatal("failed to create user02: %w", err)
+				}
+
+				giteaUser02Token, err := giteaClient.CreateAccessToken(giteaUser02, "password", gitea.CreateAccessTokenOption{Name: "token01"})
+				if err != nil {
+					t.Fatalf("failed to create token for user02: %v", err)
+				}
+
+				giteaUser02Client := gitea.NewClient(giteaAPIURL, giteaUser02Token.Token)
+				giteaForkedRepo, err := giteaUser02Client.CreateFork(giteaUser01, "repo01", gitea.CreateForkOption{})
+				if err != nil {
+					t.Fatal("failed to fork repo01: %w", err)
+				}
+
+				gitfs := memfs.New()
+				r, err := git.Clone(memory.NewStorage(), gitfs, &git.CloneOptions{
+					Auth: &http.BasicAuth{
+						Username: giteaUser02,
+						Password: giteaUser02Token.Token,
+					},
+					URL: giteaForkedRepo.CloneURL,
+				})
+				if err != nil {
+					t.Fatalf("failed to clone forked repo: %v", err)
+				}
+
+				wt, err := r.Worktree()
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				f, err := gitfs.Create("file2")
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				if _, err = f.Write([]byte("file2 content")); err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				if _, err := wt.Add("file2"); err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				_, err = wt.Commit("commit from user02", &git.CommitOptions{
+					Author: &object.Signature{
+						Name:  giteaUser02,
+						Email: "user02@example.com",
+						When:  time.Now(),
+					},
+				})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				if err := r.Push(&git.PushOptions{
+					RemoteName: "origin",
+					RefSpecs: []gitconfig.RefSpec{
+						gitconfig.RefSpec("refs/heads/master:refs/heads/master"),
+					},
+					Auth: &http.BasicAuth{
+						Username: giteaUser02,
+						Password: giteaUser02Token.Token,
+					},
+				}); err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				prOpts := gitea.CreatePullRequestOption{
+					Head:  "user02:master",
+					Base:  "master",
+					Title: "add file1 from master on forked repo",
+				}
+				_, err = giteaUser02Client.CreatePullRequest(giteaUser01, "repo01", prOpts)
+				if err != nil {
+					t.Fatal("failed to create pull request: %w", err)
+				}
+			}
+			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+				runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/project", project.ID)}, nil, "", 0, false)
+				if err != nil {
+					return false, nil
+				}
+
+				if len(runs) == 0 {
+					return false, nil
+				}
+				run := runs[0]
+				if run.Phase != rstypes.RunPhaseFinished {
+					return false, nil
+				}
+
+				return true, nil
+			})
+
+			runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/project", project.ID)}, nil, "", 0, false)
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			t.Logf("runs: %s", util.Dump(runs))
+
+			run, _, err := gwClient.GetRun(ctx, runs[0].ID)
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			var task *gwapitypes.RunResponseTask
+			for _, t := range run.Tasks {
+				if t.Name == "task01" {
+					task = t
+					break
+				}
+			}
+
+			if len(runs) > 0 {
+				run := runs[0]
+				if run.Phase != rstypes.RunPhaseFinished {
+					t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, run.Phase)
+				}
+				if run.Result != rstypes.RunResultSuccess {
+					t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, run.Result)
+				}
+				resp, err := gwClient.GetLogs(ctx, run.ID, task.ID, false, 1, false)
+				if err != nil {
+					t.Fatalf("failed to get log: %v", err)
+				}
+				defer resp.Body.Close()
+
+				mypassword, err := ioutil.ReadAll(resp.Body)
+				if err != nil {
+					t.Fatalf("failed to read log: %v", err)
+				}
+				if tt.expected != string(mypassword) {
+					t.Fatalf("expected mypassword %q, got %q", tt.expected, string(mypassword))
 				}
 			}
 		})

@@ -37,9 +37,10 @@ var cmdProjectUpdate = &cobra.Command{
 type projectUpdateOptions struct {
 	ref string
 
-	name       string
-	parentPath string
-	visibility string
+	name               string
+	parentPath         string
+	visibility         string
+	passVarsToForkedPR bool
 }
 
 var projectUpdateOpts projectUpdateOptions
@@ -51,6 +52,7 @@ func init() {
 	flags.StringVarP(&projectUpdateOpts.name, "name", "n", "", "project name")
 	flags.StringVar(&projectUpdateOpts.parentPath, "parent", "", `parent project group path (i.e "org/org01" for root project group in org01, "user/user01/group01/subgroub01") or project group id where the project should be moved`)
 	flags.StringVar(&projectUpdateOpts.visibility, "visibility", "public", `project visibility (public or private)`)
+	flags.BoolVar(&projectUpdateOpts.passVarsToForkedPR, "pass-vars-to-forked-pr", false, `pass variables to run even if triggered by PR from forked repo`)
 
 	if err := cmdProjectUpdate.MarkFlagRequired("ref"); err != nil {
 		log.Fatal(err)
@@ -77,6 +79,9 @@ func projectUpdate(cmd *cobra.Command, args []string) error {
 		}
 		visibility := gwapitypes.Visibility(projectUpdateOpts.visibility)
 		req.Visibility = &visibility
+	}
+	if flags.Changed("pass-vars-to-forked-pr") {
+		req.PassVarsToForkedPR = &projectUpdateOpts.passVarsToForkedPR
 	}
 
 	log.Infof("updating project")

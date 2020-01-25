@@ -43,6 +43,7 @@ type WebhookData struct {
 	// use a string if on some platform (current or future) some PRs id will not be numbers
 	PullRequestID   string `json:"pull_request_id,omitempty"`
 	PullRequestLink string `json:"link,omitempty"` // Link to pull request
+	PRFromSameRepo  bool   `json:"pr_from_same_repo,omitempty"`
 
 	Repo WebhookDataRepo `json:"repo,omitempty"`
 }

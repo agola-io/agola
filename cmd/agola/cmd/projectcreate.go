@@ -41,6 +41,7 @@ type projectCreateOptions struct {
 	remoteSourceName    string
 	skipSSHHostKeyCheck bool
 	visibility          string
+	passVarsToForkedPR  bool
 }
 
 var projectCreateOpts projectCreateOptions
@@ -54,6 +55,7 @@ func init() {
 	flags.BoolVarP(&projectCreateOpts.skipSSHHostKeyCheck, "skip-ssh-host-key-check", "s", false, "skip ssh host key check")
 	flags.StringVar(&projectCreateOpts.parentPath, "parent", "", `parent project group path (i.e "org/org01" for root project group in org01, "user/user01/group01/subgroub01") or project group id where the project should be created`)
 	flags.StringVar(&projectCreateOpts.visibility, "visibility", "public", `project visibility (public or private)`)
+	flags.BoolVar(&projectCreateOpts.passVarsToForkedPR, "pass-vars-to-forked-pr", false, `pass variables to run even if triggered by PR from forked repo`)
 
 	if err := cmdProjectCreate.MarkFlagRequired("name"); err != nil {
 		log.Fatal(err)
@@ -96,6 +98,7 @@ func projectCreate(cmd *cobra.Command, args []string) error {
 		RepoPath:            projectCreateOpts.repoPath,
 		RemoteSourceName:    projectCreateOpts.remoteSourceName,
 		SkipSSHHostKeyCheck: projectCreateOpts.skipSSHHostKeyCheck,
+		PassVarsToForkedPR:  projectCreateOpts.passVarsToForkedPR,
 	}
 
 	log.Infof("creating project")

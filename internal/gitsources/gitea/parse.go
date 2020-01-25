@@ -156,6 +156,10 @@ func webhookDataFromPullRequest(hook *pullRequestHook) *types.WebhookData {
 	if sender == "" {
 		sender = hook.Sender.Login
 	}
+	prFromSameRepo := false
+	if hook.PullRequest.Base.Repo.URL == hook.PullRequest.Head.Repo.URL {
+		prFromSameRepo = true
+	}
 	whd := &types.WebhookData{
 		Event:           types.WebhookEventPullRequest,
 		CommitSHA:       hook.PullRequest.Head.Sha,
@@ -166,11 +170,13 @@ func webhookDataFromPullRequest(hook *pullRequestHook) *types.WebhookData {
 		Sender:          sender,
 		PullRequestID:   strconv.FormatInt(hook.PullRequest.ID, 10),
 		PullRequestLink: hook.PullRequest.URL,
+		PRFromSameRepo:  prFromSameRepo,
 
 		Repo: types.WebhookDataRepo{
 			Path:   path.Join(hook.Repo.Owner.Username, hook.Repo.Name),
 			WebURL: hook.Repo.URL,
 		},
 	}
+
 	return whd
 }
