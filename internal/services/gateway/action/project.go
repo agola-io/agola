@@ -57,6 +57,7 @@ type CreateProjectRequest struct {
 	RemoteSourceName    string
 	RepoPath            string
 	SkipSSHHostKeyCheck bool
+	PassVarsToForkedPR  bool
 }
 
 func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectRequest) (*csapitypes.Project, error) {
@@ -150,6 +151,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 		RepositoryPath:             req.RepoPath,
 		SkipSSHHostKeyCheck:        req.SkipSSHHostKeyCheck,
 		SSHPrivateKey:              string(privateKey),
+		PassVarsToForkedPR:         req.PassVarsToForkedPR,
 	}
 
 	h.log.Infof("creating project")
@@ -183,7 +185,8 @@ type UpdateProjectRequest struct {
 	Name      *string
 	ParentRef *string
 
-	Visibility *cstypes.Visibility
+	Visibility         *cstypes.Visibility
+	PassVarsToForkedPR *bool
 }
 
 func (h *ActionHandler) UpdateProject(ctx context.Context, projectRef string, req *UpdateProjectRequest) (*csapitypes.Project, error) {
@@ -208,6 +211,9 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, projectRef string, re
 	}
 	if req.Visibility != nil {
 		p.Visibility = *req.Visibility
+	}
+	if req.PassVarsToForkedPR != nil {
+		p.PassVarsToForkedPR = *req.PassVarsToForkedPR
 	}
 
 	h.log.Infof("updating project")

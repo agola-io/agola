@@ -140,7 +140,12 @@ func webhookDataFromPullRequest(hook *pullRequestHook) *types.WebhookData {
 	if sender == "" {
 		sender = hook.User.Username
 	}
-	build := &types.WebhookData{
+	prFromSameRepo := false
+	if hook.ObjectAttributes.Source.URL == hook.ObjectAttributes.Target.URL {
+		prFromSameRepo = true
+	}
+
+	whd := &types.WebhookData{
 		Event:           types.WebhookEventPullRequest,
 		CommitSHA:       hook.ObjectAttributes.LastCommit.ID,
 		SSHURL:          hook.Project.SSHURL,
@@ -150,11 +155,12 @@ func webhookDataFromPullRequest(hook *pullRequestHook) *types.WebhookData {
 		Sender:          sender,
 		PullRequestID:   strconv.Itoa(hook.ObjectAttributes.Iid),
 		PullRequestLink: hook.ObjectAttributes.URL,
+		PRFromSameRepo:  prFromSameRepo,
 
 		Repo: types.WebhookDataRepo{
 			Path:   hook.Project.PathWithNamespace,
 			WebURL: hook.Project.WebURL,
 		},
 	}
-	return build
+	return whd
 }

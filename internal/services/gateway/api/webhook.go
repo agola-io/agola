@@ -127,6 +127,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) error {
 		Branch:              webhookData.Branch,
 		Tag:                 webhookData.Tag,
 		PullRequestID:       webhookData.PullRequestID,
+		PRFromSameRepo:      webhookData.PRFromSameRepo,
 		Ref:                 webhookData.Ref,
 		SSHPrivKey:          sshPrivKey,
 		SSHHostKey:          sshHostKey,

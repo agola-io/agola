@@ -55,6 +55,7 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		RepoPath:            req.RepoPath,
 		RemoteSourceName:    req.RemoteSourceName,
 		SkipSSHHostKeyCheck: req.SkipSSHHostKeyCheck,
+		PassVarsToForkedPR:  req.PassVarsToForkedPR,
 	}
 
 	project, err := h.ah.CreateProject(ctx, areq)
@@ -101,9 +102,10 @@ func (h *UpdateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	}
 
 	areq := &action.UpdateProjectRequest{
-		Name:       req.Name,
-		ParentRef:  req.ParentRef,
-		Visibility: visibility,
+		Name:               req.Name,
+		ParentRef:          req.ParentRef,
+		Visibility:         visibility,
+		PassVarsToForkedPR: req.PassVarsToForkedPR,
 	}
 	project, err := h.ah.UpdateProject(ctx, projectRef, areq)
 	if httpError(w, err) {
@@ -235,12 +237,13 @@ func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func createProjectResponse(r *csapitypes.Project) *gwapitypes.ProjectResponse {
 	res := &gwapitypes.ProjectResponse{
-		ID:               r.ID,
-		Name:             r.Name,
-		Path:             r.Path,
-		ParentPath:       r.ParentPath,
-		Visibility:       gwapitypes.Visibility(r.Visibility),
-		GlobalVisibility: string(r.GlobalVisibility),
+		ID:                 r.ID,
+		Name:               r.Name,
+		Path:               r.Path,
+		ParentPath:         r.ParentPath,
+		Visibility:         gwapitypes.Visibility(r.Visibility),
+		GlobalVisibility:   string(r.GlobalVisibility),
+		PassVarsToForkedPR: r.PassVarsToForkedPR,
 	}
 
 	return res

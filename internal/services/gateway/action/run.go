@@ -338,6 +338,7 @@ type CreateRunRequest struct {
 	Tag                 string
 	Ref                 string
 	PullRequestID       string
+	PRFromSameRepo      bool
 	SSHPrivKey          string
 	SSHHostKey          string
 	SkipSSHHostKeyCheck bool
@@ -429,10 +430,12 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 
 	var variables map[string]string
 	if req.RunType == itypes.RunTypeProject {
-		var err error
-		variables, err = h.genRunVariables(ctx, req)
-		if err != nil {
-			return err
+		if req.RefType != itypes.RunRefTypePullRequest || req.PRFromSameRepo || req.Project.PassVarsToForkedPR {
+			var err error
+			variables, err = h.genRunVariables(ctx, req)
+			if err != nil {
+				return err
+			}
 		}
 	} else {
 		variables = req.Variables

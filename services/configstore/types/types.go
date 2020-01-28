@@ -307,6 +307,8 @@ type Project struct {
 	// Webhooksecret is the secret passed to git sources that support a
 	// secret/token for signing or verifying the webhook payload
 	WebhookSecret string `json:"webhook_secret,omitempty"`
+
+	PassVarsToForkedPR bool `json:"pass_vars_to_forked_pr,omitempty"`
 }
 
 type SecretType string
