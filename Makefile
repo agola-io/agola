@@ -36,10 +36,6 @@ all: build
 .PHONY: build
 build: agola agola-toolbox
 
-.PHONY: test
-test: gocovmerge
-	@scripts/test.sh
-
 # don't use existing file names and track go sources, let's do this to the go tool
 .PHONY: agola
 agola: $(AGOLA_DEPS)
