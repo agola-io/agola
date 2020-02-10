@@ -83,10 +83,16 @@ func init() {
 func remoteSourceCreate(cmd *cobra.Command, args []string) error {
 	gwclient := gwclient.NewClient(gatewayURL, token)
 
+	flags := cmd.Flags()
+
 	// for github remote source type, set defaults for github.com
 	if remoteSourceCreateOpts.rsType == "github" {
-		remoteSourceCreateOpts.apiURL = github.GitHubAPIURL
-		remoteSourceCreateOpts.sshHostKey = github.GitHubSSHHostKey
+		if !flags.Changed("api-url") {
+			remoteSourceCreateOpts.apiURL = github.GitHubAPIURL
+		}
+		if remoteSourceCreateOpts.apiURL == github.GitHubAPIURL && !flags.Changed("ssh-host-key") {
+			remoteSourceCreateOpts.sshHostKey = github.GitHubSSHHostKey
+		}
 	}
 
 	if remoteSourceCreateOpts.apiURL == "" {
