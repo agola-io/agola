@@ -51,10 +51,11 @@ type Opts struct {
 }
 
 type Client struct {
-	client         *gitlab.Client
-	APIURL         string
-	oauth2ClientID string
-	oauth2Secret   string
+	client           *gitlab.Client
+	oauth2HTTPClient *http.Client
+	APIURL           string
+	oauth2ClientID   string
+	oauth2Secret     string
 }
 
 // fromCommitStatus converts a gitsource commit status to a gitlab commit status
@@ -89,16 +90,18 @@ func New(opts Opts) (*Client, error) {
 		TLSClientConfig:       &tls.Config{InsecureSkipVerify: opts.SkipVerify},
 	}
 	httpClient := &http.Client{Transport: transport}
+
 	client := gitlab.NewOAuthClient(httpClient, opts.Token)
 	if err := client.SetBaseURL(opts.APIURL); err != nil {
 		return nil, errors.Errorf("failed to set gitlab client base url: %w", err)
 	}
 
 	return &Client{
-		client:         client,
-		APIURL:         opts.APIURL,
-		oauth2ClientID: opts.Oauth2ClientID,
-		oauth2Secret:   opts.Oauth2Secret,
+		client:           client,
+		oauth2HTTPClient: httpClient,
+		APIURL:           opts.APIURL,
+		oauth2ClientID:   opts.Oauth2ClientID,
+		oauth2Secret:     opts.Oauth2Secret,
 	}, nil
 }
 
@@ -121,8 +124,11 @@ func (c *Client) GetOauth2AuthorizationURL(callbackURL, state string) (string, e
 }
 
 func (c *Client) RequestOauth2Token(callbackURL, code string) (*oauth2.Token, error) {
+	ctx := context.TODO()
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, c.oauth2HTTPClient)
+
 	var config = c.oauth2Config(callbackURL)
-	token, err := config.Exchange(context.TODO(), code)
+	token, err := config.Exchange(ctx, code)
 	if err != nil {
 		return nil, errors.Errorf("cannot get oauth2 token: %w", err)
 	}
@@ -130,9 +136,12 @@ func (c *Client) RequestOauth2Token(callbackURL, code string) (*oauth2.Token, er
 }
 
 func (c *Client) RefreshOauth2Token(refreshToken string) (*oauth2.Token, error) {
+	ctx := context.TODO()
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, c.oauth2HTTPClient)
+
 	var config = c.oauth2Config("")
 	token := &oauth2.Token{RefreshToken: refreshToken}
-	ts := config.TokenSource(context.TODO(), token)
+	ts := config.TokenSource(ctx, token)
 	return ts.Token()
 }
 

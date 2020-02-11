@@ -61,12 +61,12 @@ type Opts struct {
 }
 
 type Client struct {
-	client         *github.Client
-	httpClient     *http.Client
-	APIURL         string
-	WebURL         string
-	oauth2ClientID string
-	oauth2Secret   string
+	client           *github.Client
+	oauth2HTTPClient *http.Client
+	APIURL           string
+	WebURL           string
+	oauth2ClientID   string
+	oauth2Secret     string
 }
 
 // fromCommitStatus converts a gitsource commit status to a github commit status
@@ -121,6 +121,7 @@ func New(opts Opts) (*Client, error) {
 		TLSClientConfig:       &tls.Config{InsecureSkipVerify: opts.SkipVerify},
 	}
 	httpClient := &http.Client{Transport: &TokenTransport{token: opts.Token, rt: transport}}
+	oauth2HTTPClient := &http.Client{Transport: transport}
 
 	isPublicGithub := false
 	// TODO(sgotti) improve detection of public github url (handle also trailing slash)
@@ -149,12 +150,12 @@ func New(opts Opts) (*Client, error) {
 	client.BaseURL, _ = url.Parse(opts.APIURL)
 
 	return &Client{
-		client:         client,
-		httpClient:     httpClient,
-		APIURL:         opts.APIURL,
-		WebURL:         opts.WebURL,
-		oauth2ClientID: opts.Oauth2ClientID,
-		oauth2Secret:   opts.Oauth2Secret,
+		client:           client,
+		oauth2HTTPClient: oauth2HTTPClient,
+		APIURL:           opts.APIURL,
+		WebURL:           opts.WebURL,
+		oauth2ClientID:   opts.Oauth2ClientID,
+		oauth2Secret:     opts.Oauth2Secret,
 	}, nil
 }
 
@@ -177,8 +178,11 @@ func (c *Client) GetOauth2AuthorizationURL(callbackURL, state string) (string, e
 }
 
 func (c *Client) RequestOauth2Token(callbackURL, code string) (*oauth2.Token, error) {
+	ctx := context.TODO()
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, c.oauth2HTTPClient)
+
 	var config = c.oauth2Config(callbackURL)
-	token, err := config.Exchange(context.TODO(), code)
+	token, err := config.Exchange(ctx, code)
 	if err != nil {
 		return nil, errors.Errorf("cannot get oauth2 token: %w", err)
 	}
@@ -186,9 +190,12 @@ func (c *Client) RequestOauth2Token(callbackURL, code string) (*oauth2.Token, er
 }
 
 func (c *Client) RefreshOauth2Token(refreshToken string) (*oauth2.Token, error) {
+	ctx := context.TODO()
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, c.oauth2HTTPClient)
+
 	var config = c.oauth2Config("")
 	token := &oauth2.Token{RefreshToken: refreshToken}
-	ts := config.TokenSource(context.TODO(), token)
+	ts := config.TokenSource(ctx, token)
 	return ts.Token()
 }
 
