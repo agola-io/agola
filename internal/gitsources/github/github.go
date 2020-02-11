@@ -197,11 +197,16 @@ func (c *Client) GetUserInfo() (*gitsource.UserInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &gitsource.UserInfo{
+
+	userInfo := &gitsource.UserInfo{
 		ID:        strconv.FormatInt(*user.ID, 10),
 		LoginName: *user.Login,
-		Email:     *user.Email,
-	}, nil
+	}
+	if user.Email != nil {
+		userInfo.Email = *user.Email
+	}
+
+	return userInfo, nil
 }
 
 func (c *Client) GetRepoInfo(repopath string) (*gitsource.RepoInfo, error) {
