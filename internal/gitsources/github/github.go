@@ -122,16 +122,31 @@ func New(opts Opts) (*Client, error) {
 	}
 	httpClient := &http.Client{Transport: &TokenTransport{token: opts.Token, rt: transport}}
 
+	isPublicGithub := false
+	// TODO(sgotti) improve detection of public github url (handle also trailing slash)
 	if opts.APIURL == GitHubAPIURL {
+		isPublicGithub = true
+	}
+
+	if isPublicGithub {
 		opts.WebURL = GitHubWebURL
+		if !strings.HasSuffix(opts.APIURL, "/") {
+			opts.APIURL += "/"
+		}
 	} else {
 		if opts.WebURL == "" {
 			opts.WebURL = opts.APIURL
 		}
+		if !strings.HasSuffix(opts.APIURL, "/") {
+			opts.APIURL += "/"
+		}
+		if !strings.HasSuffix(opts.APIURL, "/api/v3/") {
+			opts.APIURL += "api/v3/"
+		}
 	}
 
 	client := github.NewClient(httpClient)
-	client.BaseURL, _ = url.Parse(GitHubAPIURL + "/")
+	client.BaseURL, _ = url.Parse(opts.APIURL)
 
 	return &Client{
 		client:         client,
