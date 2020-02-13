@@ -154,6 +154,7 @@ type RemoteSourceAuthType string
 const (
 	RemoteSourceAuthTypePassword RemoteSourceAuthType = "password"
 	RemoteSourceAuthTypeOauth2   RemoteSourceAuthType = "oauth2"
+	RemoteSourceAuthTypeToken    RemoteSourceAuthType = "token"
 )
 
 type RemoteSource struct {
@@ -168,8 +169,9 @@ type RemoteSource struct {
 
 	SkipVerify bool `json:"skip_verify,omitempty"`
 
-	Type     RemoteSourceType     `json:"type,omitempty"`
-	AuthType RemoteSourceAuthType `json:"auth_type,omitempty"`
+	Type      RemoteSourceType     `json:"type,omitempty"`
+	AuthType  RemoteSourceAuthType `json:"auth_type,omitempty"`
+	AuthToken string               `json:"auth_token,omitempty"`
 
 	// Oauth2 data
 	Oauth2ClientID     string `json:"client_id,omitempty"`
@@ -205,7 +207,11 @@ func (rs *RemoteSource) UnmarshalJSON(b []byte) error {
 func SourceSupportedAuthTypes(rsType RemoteSourceType) []RemoteSourceAuthType {
 	switch rsType {
 	case RemoteSourceTypeGitea:
-		return []RemoteSourceAuthType{RemoteSourceAuthTypeOauth2, RemoteSourceAuthTypePassword}
+		return []RemoteSourceAuthType{
+			RemoteSourceAuthTypeOauth2,
+			RemoteSourceAuthTypePassword,
+			RemoteSourceAuthTypeToken,
+		}
 	case RemoteSourceTypeGithub:
 		fallthrough
 	case RemoteSourceTypeGitlab:

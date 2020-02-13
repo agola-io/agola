@@ -40,6 +40,7 @@ type remoteSourceCreateOptions struct {
 	name                string
 	rsType              string
 	authType            string
+	authToken           string
 	apiURL              string
 	skipVerify          bool
 	oauth2ClientID      string
@@ -58,6 +59,7 @@ func init() {
 	flags.StringVarP(&remoteSourceCreateOpts.name, "name", "n", "", "remotesource name")
 	flags.StringVar(&remoteSourceCreateOpts.rsType, "type", "", "remotesource type")
 	flags.StringVar(&remoteSourceCreateOpts.authType, "auth-type", "", "remote source auth type")
+	flags.StringVar(&remoteSourceCreateOpts.authToken, "auth-token", "", "remote source auth token")
 	flags.StringVar(&remoteSourceCreateOpts.apiURL, "api-url", "", `remotesource api url (when type is "github" defaults to "https://api.github.com")`)
 	flags.BoolVarP(&remoteSourceCreateOpts.skipVerify, "skip-verify", "", false, "skip remote source api tls certificate verification")
 	flags.StringVar(&remoteSourceCreateOpts.oauth2ClientID, "clientid", "", "remotesource oauth2 client id")
@@ -103,6 +105,7 @@ func remoteSourceCreate(cmd *cobra.Command, args []string) error {
 		Name:                remoteSourceCreateOpts.name,
 		Type:                remoteSourceCreateOpts.rsType,
 		AuthType:            remoteSourceCreateOpts.authType,
+		AuthToken:           remoteSourceCreateOpts.authToken,
 		APIURL:              remoteSourceCreateOpts.apiURL,
 		SkipVerify:          remoteSourceCreateOpts.skipVerify,
 		Oauth2ClientID:      remoteSourceCreateOpts.oauth2ClientID,

@@ -51,6 +51,7 @@ type CreateRemoteSourceRequest struct {
 	SkipVerify          bool
 	Type                string
 	AuthType            string
+	AuthToken           string
 	Oauth2ClientID      string
 	Oauth2ClientSecret  string
 	SSHHostKey          string
@@ -99,6 +100,7 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemot
 		Name:                req.Name,
 		Type:                cstypes.RemoteSourceType(req.Type),
 		AuthType:            cstypes.RemoteSourceAuthType(req.AuthType),
+		AuthToken:           req.AuthToken,
 		APIURL:              req.APIURL,
 		SkipVerify:          req.SkipVerify,
 		Oauth2ClientID:      req.Oauth2ClientID,

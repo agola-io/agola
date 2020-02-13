@@ -1,4 +1,4 @@
-ARG AGOLAWEB_IMAGE="agola-web"
+ARG AGOLAWEB_IMAGE="sorintlab/agola-web:v0.4.0"
 
 FROM $AGOLAWEB_IMAGE as agola-web
 

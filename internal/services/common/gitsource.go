@@ -56,7 +56,7 @@ func newGithub(rs *cstypes.RemoteSource, accessToken string) (*github.Client, er
 
 func GetAccessToken(rs *cstypes.RemoteSource, userAccessToken, oauth2AccessToken string) (string, error) {
 	switch rs.AuthType {
-	case cstypes.RemoteSourceAuthTypePassword:
+	case cstypes.RemoteSourceAuthTypePassword, cstypes.RemoteSourceAuthTypeToken:
 		return userAccessToken, nil
 	case cstypes.RemoteSourceAuthTypeOauth2:
 		return oauth2AccessToken, nil
@@ -99,6 +99,8 @@ func GetUserSource(rs *cstypes.RemoteSource, accessToken string) (gitsource.User
 		userSource, err = GetOauth2Source(rs, accessToken)
 	case cstypes.RemoteSourceAuthTypePassword:
 		userSource, err = GetPasswordSource(rs, accessToken)
+	case cstypes.RemoteSourceAuthTypeToken:
+		userSource, err = GetTokenSource(rs, accessToken)
 	default:
 		return nil, errors.Errorf("unknown remote source auth type")
 	}
@@ -134,4 +136,17 @@ func GetPasswordSource(rs *cstypes.RemoteSource, accessToken string) (gitsource.
 	}
 
 	return passwordSource, err
+}
+
+func GetTokenSource(rs *cstypes.RemoteSource, accessToken string) (gitsource.UserSource, error) {
+	var userSource gitsource.UserSource
+	var err error
+	switch rs.Type {
+	case cstypes.RemoteSourceTypeGitea:
+		userSource, err = newGitea(rs, accessToken)
+	default:
+		return nil, errors.Errorf("remote source %s isn't a valid oauth2 source", rs.Name)
+	}
+
+	return userSource, err
 }
