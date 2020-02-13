@@ -145,7 +145,7 @@ func GetTokenSource(rs *cstypes.RemoteSource, accessToken string) (gitsource.Use
 	case cstypes.RemoteSourceTypeGitea:
 		userSource, err = newGitea(rs, accessToken)
 	default:
-		return nil, errors.Errorf("remote source %s isn't a valid token source", rs.Name)
+		return nil, errors.Errorf("remote source %s isn't a valid oauth2 source", rs.Name)
 	}
 
 	return userSource, err
