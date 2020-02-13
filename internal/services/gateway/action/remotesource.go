@@ -132,6 +132,7 @@ type UpdateRemoteSourceRequest struct {
 
 	Name                *string
 	APIURL              *string
+	AuthToken           *string
 	SkipVerify          *bool
 	Oauth2ClientID      *string
 	Oauth2ClientSecret  *string
@@ -156,6 +157,9 @@ func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, req *UpdateRemot
 	}
 	if req.APIURL != nil {
 		rs.APIURL = *req.APIURL
+	}
+	if req.AuthToken != nil {
+		rs.AuthToken = *req.AuthToken
 	}
 	if req.SkipVerify != nil {
 		rs.SkipVerify = *req.SkipVerify

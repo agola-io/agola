@@ -39,6 +39,7 @@ type remoteSourceUpdateOptions struct {
 
 	newName             string
 	apiURL              string
+	authToken           string
 	skipVerify          bool
 	oauth2ClientID      string
 	oauth2ClientSecret  string
@@ -56,6 +57,7 @@ func init() {
 	flags.StringVarP(&remoteSourceUpdateOpts.ref, "ref", "", "", "current remotesource name or id")
 	flags.StringVarP(&remoteSourceUpdateOpts.newName, "new-name", "", "", "remotesource new name")
 	flags.StringVar(&remoteSourceUpdateOpts.apiURL, "api-url", "", "remotesource api url")
+	flags.StringVar(&remoteSourceUpdateOpts.authToken, "auth-token", "", "remotesource auth token")
 	flags.BoolVarP(&remoteSourceUpdateOpts.skipVerify, "skip-verify", "", false, "skip remote source api tls certificate verification")
 	flags.StringVar(&remoteSourceUpdateOpts.oauth2ClientID, "clientid", "", "remotesource oauth2 client id")
 	flags.StringVar(&remoteSourceUpdateOpts.oauth2ClientSecret, "secret", "", "remotesource oauth2 secret")
@@ -82,6 +84,9 @@ func remoteSourceUpdate(cmd *cobra.Command, args []string) error {
 	}
 	if flags.Changed("api-url") {
 		req.APIURL = &remoteSourceUpdateOpts.apiURL
+	}
+	if flags.Changed("auth-token") {
+		req.AuthToken = &remoteSourceUpdateOpts.authToken
 	}
 	if flags.Changed("skip-verify") {
 		req.SkipVerify = &remoteSourceUpdateOpts.skipVerify

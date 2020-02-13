@@ -100,6 +100,7 @@ func (h *UpdateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 
 		Name:                req.Name,
 		APIURL:              req.APIURL,
+		AuthToken:           req.AuthToken,
 		SkipVerify:          req.SkipVerify,
 		Oauth2ClientID:      req.Oauth2ClientID,
 		Oauth2ClientSecret:  req.Oauth2ClientSecret,
