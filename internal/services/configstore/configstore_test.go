@@ -37,6 +37,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
+	errors "golang.org/x/xerrors"
 )
 
 func setupEtcd(t *testing.T, logger *zap.Logger, dir string) *testutil.TestEmbeddedEtcd {
@@ -1419,6 +1420,24 @@ func TestRemoteSource(t *testing.T) {
 				_, err = cs.ah.UpdateRemoteSource(ctx, req)
 				if err.Error() != expectedError.Error() {
 					t.Fatalf("expected err: %v, got err: %v", expectedError.Error(), err.Error())
+				}
+			},
+		},
+		{
+			name: "test create remote source auth type token missing auth-token",
+			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
+				rs := &types.RemoteSource{
+					Name:     "rs01",
+					APIURL:   "https://api.example.com",
+					Type:     types.RemoteSourceTypeGitea,
+					AuthType: types.RemoteSourceAuthTypeToken,
+				}
+				_, err := cs.ah.CreateRemoteSource(ctx, rs)
+				if err == nil {
+					t.Fatalf("expected error, got nil.")
+				}
+				if !errors.Is(err, &util.ErrBadRequest{}) {
+					t.Fatalf("want ErrBadRequest, got: %v", err)
 				}
 			},
 		},

@@ -60,6 +60,11 @@ func (h *ActionHandler) ValidateRemoteSource(ctx context.Context, remoteSource *
 			return util.NewErrBadRequest(errors.Errorf("remotesource oauth2clientsecret required for auth type %q", types.RemoteSourceAuthTypeOauth2))
 		}
 	}
+	if remoteSource.AuthType == types.RemoteSourceAuthTypeToken {
+		if remoteSource.AuthToken == "" {
+			return util.NewErrBadRequest(errors.Errorf("remotesource auth-token required for auth type %q", types.RemoteSourceAuthTypeToken))
+		}
+	}
 
 	return nil
 }

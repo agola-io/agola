@@ -96,6 +96,12 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemot
 		}
 	}
 
+	if req.AuthType == string(cstypes.RemoteSourceAuthTypeToken) {
+		if req.AuthToken == "" {
+			return nil, util.NewErrBadRequest(errors.Errorf("remotesource auth token required"))
+		}
+	}
+
 	rs := &cstypes.RemoteSource{
 		Name:                req.Name,
 		Type:                cstypes.RemoteSourceType(req.Type),
