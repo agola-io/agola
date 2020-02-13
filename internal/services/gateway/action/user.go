@@ -584,6 +584,19 @@ func (h *ActionHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSource
 			Response: cres.Response,
 		}, nil
 
+	case cstypes.RemoteSourceAuthTypeToken:
+		requestj, err := json.Marshal(req)
+		if err != nil {
+			return nil, err
+		}
+		cres, err := h.HandleRemoteSourceAuthRequest(ctx, requestType, string(requestj), rs.AuthToken, "", "", time.Time{})
+		if err != nil {
+			return nil, err
+		}
+		return &RemoteSourceAuthResponse{
+			Response: cres.Response,
+		}, nil
+
 	default:
 		return nil, errors.Errorf("unknown remote source authentication type: %q", rs.AuthType)
 	}

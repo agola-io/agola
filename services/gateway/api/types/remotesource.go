@@ -19,6 +19,7 @@ type CreateRemoteSourceRequest struct {
 	APIURL              string `json:"apiurl"`
 	Type                string `json:"type"`
 	AuthType            string `json:"auth_type"`
+	AuthToken           string `json:"auth_token"`
 	SkipVerify          bool   `json:"skip_verify"`
 	Oauth2ClientID      string `json:"oauth_2_client_id"`
 	Oauth2ClientSecret  string `json:"oauth_2_client_secret"`

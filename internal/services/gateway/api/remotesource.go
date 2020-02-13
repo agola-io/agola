@@ -53,6 +53,7 @@ func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		APIURL:              req.APIURL,
 		Type:                req.Type,
 		AuthType:            req.AuthType,
+		AuthToken:           req.AuthToken,
 		SkipVerify:          req.SkipVerify,
 		Oauth2ClientID:      req.Oauth2ClientID,
 		Oauth2ClientSecret:  req.Oauth2ClientSecret,
