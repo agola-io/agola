@@ -80,3 +80,5 @@ require (
 )
 
 replace github.com/docker/docker v1.13.1 => github.com/docker/engine v0.0.0-20181106193140-f5749085e9cb
+
+replace github.com/Azure/go-autorest => github.com/Azure/go-autorest v13.3.3+incompatible
