@@ -1,5 +1,27 @@
 ## Changelog
 
+### v0.5.0
+
+- gitsources: handle skipverify also in oauth2 requests (@sgotti)                            [#208](https://github.com/agola-io/agola/pull/208)
+- github: handle nil user email (@sgotti)                                                    [#207](https://github.com/agola-io/agola/pull/207)
+- cmd: remotesource create don't force github defaults (@sgotti)                             [#205](https://github.com/agola-io/agola/pull/205)
+- github: use the provided api url (@sgotti)                                                 [#206](https://github.com/agola-io/agola/pull/206)
+- vendor: update gitea sdk (@6543)                                                           [#203](https://github.com/agola-io/agola/pull/203)
+- makefile: remove test target (@sgotti)                                                     [#202](https://github.com/agola-io/agola/pull/202)
+- cmd: project option to disable passing variables to PR from forked repo (@camandel)        [#198](https://github.com/agola-io/agola/pull/198)
+- doc: document supported go versions. (@sgotti)                                             [#201](https://github.com/agola-io/agola/pull/201)
+- Update github.com/opencontainers/runc (@MitaliBo)                                          [#195](https://github.com/agola-io/agola/pull/195)
+- cmd: fix token create help message (@camandel)                                             [#196](https://github.com/agola-io/agola/pull/196)
+- tests: add unique name for logs of the third ConfigStore instance (@camandel)              [#197](https://github.com/agola-io/agola/pull/197)
+- tests: improve services logging (@sgotti)                                                  [#194](https://github.com/agola-io/agola/pull/194)
+- docker: create a toolbox volume for every pod (@sgotti)                                    [#193](https://github.com/agola-io/agola/pull/193)
+- datamanager tests: don't wait for etcd down (@sgotti)                                      [#189](https://github.com/agola-io/agola/pull/189)
+- cmd: add TaskID to run list output (@camandel)                                             [#188](https://github.com/agola-io/agola/pull/188)
+- cmd: add details to run list (@camandel)                                                   [#185](https://github.com/agola-io/agola/pull/185)
+- cmd: add log get and delete subcommands (@camandel)                                        [#187](https://github.com/agola-io/agola/pull/187)
+- gateway: fix api used by GetRunTask (@camandel)                                            [#186](https://github.com/agola-io/agola/pull/186)
+- cmd: fix project visibility switch (@camandel)                                             [#184](https://github.com/agola-io/agola/pull/184)
+
 ### v0.4.0
 
 - gateway/runservice: add api to delete step logs                                            [#157](https://github.com/agola-io/agola/pull/157)
