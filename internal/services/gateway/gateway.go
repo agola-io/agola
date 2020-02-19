@@ -315,13 +315,13 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	apirouter.Handle("/version", versionHandler).Methods("GET")
 
+	apirouter.Handle("/auth/login", loginUserHandler).Methods("POST")
+	apirouter.Handle("/auth/authorize", authorizeHandler).Methods("POST")
+	apirouter.Handle("/auth/register", registerHandler).Methods("POST")
+	apirouter.Handle("/auth/oauth2/callback", oauth2callbackHandler).Methods("GET")
+
 	// TODO(sgotti) add auth to these requests
 	reposRouter.Handle("/repos/{rest:.*}", reposHandler).Methods("GET", "POST")
-
-	router.Handle("/api/login", loginUserHandler).Methods("POST")
-	router.Handle("/api/authorize", authorizeHandler).Methods("POST")
-	router.Handle("/api/register", registerHandler).Methods("POST")
-	router.Handle("/api/oauth2/callback", oauth2callbackHandler).Methods("GET")
 
 	router.Handle("/webhooks", webhooksHandler).Methods("POST")
 	router.PathPrefix("/").HandlerFunc(handlers.NewWebBundleHandlerFunc(g.c.APIExposedURL))
