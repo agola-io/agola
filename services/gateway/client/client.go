@@ -430,7 +430,7 @@ func (c *Client) RegisterUser(ctx context.Context, req *gwapitypes.RegisterUserR
 	}
 
 	res := new(gwapitypes.RegisterUserResponse)
-	resp, err := c.getParsedResponse(ctx, "POST", "/register", nil, jsonContent, bytes.NewReader(reqj), res)
+	resp, err := c.getParsedResponse(ctx, "POST", "/auth/register", nil, jsonContent, bytes.NewReader(reqj), res)
 	return res, resp, err
 }
 
