@@ -615,7 +615,7 @@ func (h *ActionHandler) GetExecutorTask(ctx context.Context, etID string) (*type
 }
 
 func (h *ActionHandler) GetExecutorTasks(ctx context.Context, executorID string) ([]*types.ExecutorTask, error) {
-	ets, err := store.GetExecutorTasks(ctx, h.e, executorID)
+	ets, err := store.GetExecutorTasksForExecutor(ctx, h.e, executorID)
 	if err != nil && err != etcd.ErrKeyNotFound {
 		return nil, err
 	}

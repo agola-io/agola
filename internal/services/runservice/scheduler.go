@@ -290,10 +290,16 @@ func (s *Runservice) chooseExecutor(ctx context.Context, rct *types.RunConfigTas
 	if err != nil {
 		return nil, err
 	}
-	return chooseExecutor(executors, rct), nil
+	// TODO(sgotti) find a way to avoid retrieving this for every chooseExecutor
+	// invocation (i.e. use an etcd watcher to keep this value updated)
+	executorTasksCount, err := store.GetExecutorTasksCountByExecutor(ctx, s.e)
+	if err != nil {
+		return nil, err
+	}
+	return chooseExecutor(executors, executorTasksCount, rct), nil
 }
 
-func chooseExecutor(executors []*types.Executor, rct *types.RunConfigTask) *types.Executor {
+func chooseExecutor(executors []*types.Executor, executorTasksCount map[string]int, rct *types.RunConfigTask) *types.Executor {
 	requiresPrivilegedContainers := false
 	for _, c := range rct.Runtime.Containers {
 		if c.Privileged {
@@ -326,7 +332,14 @@ func chooseExecutor(executors []*types.Executor, rct *types.RunConfigTask) *type
 		}
 
 		if e.ActiveTasksLimit != 0 {
-			if e.ActiveTasks >= e.ActiveTasksLimit {
+			// will be 0 when executorTasksCount[e.ID] doesn't exist
+			activeTasks := executorTasksCount[e.ID]
+			if e.ActiveTasks > activeTasks {
+				activeTasks = e.ActiveTasks
+			}
+			// calculate the active tasks by the max between the current scheduled
+			// tasks in the store and the executor reported tasks
+			if activeTasks >= e.ActiveTasksLimit {
 				continue
 			}
 		}
@@ -674,7 +687,7 @@ func (s *Runservice) updateRunTaskStatus(ctx context.Context, et *types.Executor
 		}
 	}
 	if wrongstatus {
-		log.Warnf("wrong executor task status: %s, rt status: %s", et.Status.Phase, rt.Status)
+		log.Warnf("wrong executor task %q status: %q, rt status: %q", et.ID, et.Status.Phase, rt.Status)
 		return nil
 	}
 
@@ -742,6 +755,7 @@ func (s *Runservice) executorTasksCleanerLoop(ctx context.Context) {
 }
 
 func (s *Runservice) executorTasksCleaner(ctx context.Context) error {
+	// TODO(sgotti) use paged List
 	resp, err := s.e.List(ctx, common.EtcdTasksDir, "", 0)
 	if err != nil {
 		return err
@@ -855,6 +869,7 @@ func (s *Runservice) runTasksUpdater(ctx context.Context) error {
 	}
 	defer func() { _ = m.Unlock(ctx) }()
 
+	// TODO(sgotti) use paged List
 	resp, err := s.e.List(ctx, common.EtcdTasksDir, "", 0)
 	if err != nil {
 		return err
