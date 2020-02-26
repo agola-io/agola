@@ -65,8 +65,9 @@ func TestAdvanceRunTasks(t *testing.T) {
 				Skip:        false,
 			},
 			"task04": &types.RunConfigTask{
-				ID:   "task04",
-				Name: "task04",
+				ID:      "task04",
+				Name:    "task04",
+				Depends: map[string]*types.RunConfigTaskDepend{},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},
 				},
@@ -353,6 +354,34 @@ func TestAdvanceRunTasks(t *testing.T) {
 				run.Tasks["task03"].Status = types.RunTaskStatusCancelled
 				run.Tasks["task04"].Status = types.RunTaskStatusSuccess
 				run.Tasks["task05"].Status = types.RunTaskStatusNotStarted
+				return run
+			}(),
+		},
+		{
+			name: "skip all not started tasks when run is set to stop",
+			rc: func() *types.RunConfig {
+				rc := rc.DeepCopy()
+				return rc
+			}(),
+			r: func() *types.Run {
+				run := run.DeepCopy()
+				run.Tasks["task01"].Status = types.RunTaskStatusRunning
+				run.Tasks["task04"].Status = types.RunTaskStatusSuccess
+				run.Tasks["task03"].Status = types.RunTaskStatusCancelled
+				run.Stop = true
+				return run
+			}(),
+			activeExecutorTasks: []*types.ExecutorTask{
+				&types.ExecutorTask{ID: "task01"},
+			},
+			out: func() *types.Run {
+				run := run.DeepCopy()
+				run.Stop = true
+				run.Tasks["task01"].Status = types.RunTaskStatusRunning
+				run.Tasks["task02"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task03"].Status = types.RunTaskStatusCancelled
+				run.Tasks["task04"].Status = types.RunTaskStatusSuccess
+				run.Tasks["task05"].Status = types.RunTaskStatusSkipped
 				return run
 			}(),
 		},
