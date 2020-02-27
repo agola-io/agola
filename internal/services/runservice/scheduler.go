@@ -103,6 +103,24 @@ func advanceRunTasks(ctx context.Context, curRun *types.Run, rc *types.RunConfig
 	// take a deepcopy of r so we do logic only on fixed status and not affeccted by current changes (due to random map iteration)
 	newRun := curRun.DeepCopy()
 
+	if newRun.Stop {
+		// if the run is set to stop, skip all not running tasks
+		for _, rt := range newRun.Tasks {
+			isScheduled := false
+			for _, et := range activeExecutorTasks {
+				if rt.ID == et.ID {
+					isScheduled = true
+				}
+			}
+			if isScheduled {
+				continue
+			}
+			if rt.Status == types.RunTaskStatusNotStarted {
+				rt.Status = types.RunTaskStatusSkipped
+			}
+		}
+	}
+
 	// handle root tasks
 	for _, rt := range newRun.Tasks {
 		if rt.Skip {
@@ -473,7 +491,7 @@ func (s *Runservice) scheduleRun(ctx context.Context, r *types.Run, rc *types.Ru
 		return err
 	}
 
-	// if the run is set to stop, stop all tasks
+	// if the run is set to stop, stop all active tasks
 	if r.Stop {
 		for _, et := range activeExecutorTasks {
 			et.Spec.Stop = true
