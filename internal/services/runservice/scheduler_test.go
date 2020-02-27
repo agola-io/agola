@@ -125,11 +125,11 @@ func TestAdvanceRunTasks(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                string
-		rc                  *types.RunConfig
-		r                   *types.Run
-		activeExecutorTasks []*types.ExecutorTask
-		out                 *types.Run
+		name                   string
+		rc                     *types.RunConfig
+		r                      *types.Run
+		scheduledExecutorTasks []*types.ExecutorTask
+		out                    *types.Run
 	}{
 		{
 			name: "test top level task not started",
@@ -343,7 +343,7 @@ func TestAdvanceRunTasks(t *testing.T) {
 				run.Tasks["task04"].Status = types.RunTaskStatusSuccess
 				return run
 			}(),
-			activeExecutorTasks: []*types.ExecutorTask{
+			scheduledExecutorTasks: []*types.ExecutorTask{
 				&types.ExecutorTask{ID: "task01"},
 			},
 			out: func() *types.Run {
@@ -371,7 +371,7 @@ func TestAdvanceRunTasks(t *testing.T) {
 				run.Stop = true
 				return run
 			}(),
-			activeExecutorTasks: []*types.ExecutorTask{
+			scheduledExecutorTasks: []*types.ExecutorTask{
 				&types.ExecutorTask{ID: "task01"},
 			},
 			out: func() *types.Run {
@@ -390,7 +390,7 @@ func TestAdvanceRunTasks(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			r, err := advanceRunTasks(ctx, tt.r, tt.rc, tt.activeExecutorTasks)
+			r, err := advanceRunTasks(ctx, tt.r, tt.rc, tt.scheduledExecutorTasks)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
