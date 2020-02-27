@@ -822,7 +822,11 @@ func (e *Executor) executeTask(ctx context.Context, et *types.ExecutorTask) {
 	rt.Lock()
 	if err != nil {
 		log.Errorf("err: %+v", err)
-		et.Status.Phase = types.ExecutorTaskPhaseFailed
+		if rt.et.Spec.Stop {
+			et.Status.Phase = types.ExecutorTaskPhaseStopped
+		} else {
+			et.Status.Phase = types.ExecutorTaskPhaseFailed
+		}
 	} else {
 		et.Status.Phase = types.ExecutorTaskPhaseSuccess
 	}
@@ -997,7 +1001,11 @@ func (e *Executor) executeTaskSteps(ctx context.Context, rt *runningTask, pod dr
 			}
 			serr = errors.Errorf("failed to execute step %s: %w", util.Dump(step), err)
 		} else if exitCode != 0 {
-			rt.et.Status.Steps[i].Phase = types.ExecutorTaskPhaseFailed
+			if rt.et.Spec.Stop {
+				rt.et.Status.Steps[i].Phase = types.ExecutorTaskPhaseStopped
+			} else {
+				rt.et.Status.Steps[i].Phase = types.ExecutorTaskPhaseFailed
+			}
 			rt.et.Status.Steps[i].ExitStatus = util.IntP(exitCode)
 			serr = errors.Errorf("step %q failed with exitcode %d", stepName, exitCode)
 		} else if exitCode == 0 {
