@@ -686,7 +686,7 @@ func TestChooseExecutor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			e := chooseExecutor(tt.executors, tt.rct)
+			e := chooseExecutor(tt.executors, map[string]int{}, tt.rct)
 			if e == nil && tt.out == nil {
 				return
 			}

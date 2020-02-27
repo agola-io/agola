@@ -211,6 +211,7 @@ func GetExecutor(ctx context.Context, e *etcd.Store, executorID string) (*types.
 }
 
 func GetExecutors(ctx context.Context, e *etcd.Store) ([]*types.Executor, error) {
+	// TODO(sgotti) use paged List
 	resp, err := e.List(ctx, common.EtcdExecutorsDir, "", 0)
 	if err != nil {
 		return nil, err
@@ -298,7 +299,28 @@ func DeleteExecutorTask(ctx context.Context, e *etcd.Store, etID string) error {
 	return e.Delete(ctx, common.EtcdTaskKey(etID))
 }
 
-func GetExecutorTasks(ctx context.Context, e *etcd.Store, executorID string) ([]*types.ExecutorTask, error) {
+func GetExecutorTasksCountByExecutor(ctx context.Context, e *etcd.Store) (map[string]int, error) {
+	// TODO(sgotti) use paged List
+	resp, err := e.List(ctx, common.EtcdTasksDir, "", 0)
+	if err != nil {
+		return nil, err
+	}
+
+	count := map[string]int{}
+
+	for _, kv := range resp.Kvs {
+		var et *types.ExecutorTask
+		if err := json.Unmarshal(kv.Value, &et); err != nil {
+			return nil, err
+		}
+		count[et.Spec.ExecutorID] = count[et.Spec.ExecutorID] + 1
+	}
+
+	return count, nil
+}
+
+func GetExecutorTasksForExecutor(ctx context.Context, e *etcd.Store, executorID string) ([]*types.ExecutorTask, error) {
+	// TODO(sgotti) use paged List
 	resp, err := e.List(ctx, common.EtcdTasksDir, "", 0)
 	if err != nil {
 		return nil, err
@@ -478,6 +500,7 @@ func DeleteRun(ctx context.Context, e *etcd.Store, runID string) error {
 }
 
 func GetRuns(ctx context.Context, e *etcd.Store) ([]*types.Run, error) {
+	// TODO(sgotti) use paged List
 	resp, err := e.List(ctx, common.EtcdRunsDir, "", 0)
 	if err != nil {
 		return nil, err
