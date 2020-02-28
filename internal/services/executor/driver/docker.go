@@ -614,7 +614,11 @@ func (dp *DockerPod) Exec(ctx context.Context, execConfig *ExecConfig) (Containe
 
 func (e *DockerContainerExec) Wait(ctx context.Context) (int, error) {
 	// ignore error, we'll use the exit code of the exec
-	<-e.endCh
+	select {
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	case <-e.endCh:
+	}
 
 	var exitCode int
 	for {
