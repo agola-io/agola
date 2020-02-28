@@ -1168,7 +1168,7 @@ func (e *Executor) taskUpdater(ctx context.Context, et *types.ExecutorTask) {
 		}()
 	}
 
-	if !et.Spec.Stop && et.Status.Phase == types.ExecutorTaskPhaseRunning {
+	if et.Status.Phase == types.ExecutorTaskPhaseRunning {
 		log.Infof("marking executor task %s as failed since there's no running task", et.ID)
 		et.Status.Phase = types.ExecutorTaskPhaseFailed
 		et.Status.EndTime = util.TimeP(time.Now())
