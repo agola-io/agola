@@ -656,11 +656,13 @@ func (s *Runservice) updateRunTaskStatus(ctx context.Context, et *types.Executor
 		}
 	case types.ExecutorTaskPhaseStopped:
 		if rt.Status != types.RunTaskStatusStopped &&
+			rt.Status != types.RunTaskStatusNotStarted &&
 			rt.Status != types.RunTaskStatusRunning {
 			wrongstatus = true
 		}
 	case types.ExecutorTaskPhaseSuccess:
 		if rt.Status != types.RunTaskStatusSuccess &&
+			rt.Status != types.RunTaskStatusNotStarted &&
 			rt.Status != types.RunTaskStatusRunning {
 			wrongstatus = true
 		}
@@ -672,7 +674,7 @@ func (s *Runservice) updateRunTaskStatus(ctx context.Context, et *types.Executor
 		}
 	}
 	if wrongstatus {
-		log.Warnf("wrong executor task %q status: %q, rt status: %q", et.ID, et.Status.Phase, rt.Status)
+		log.Warnf("ignoring wrong executor task %q status: %q, rt status: %q", et.ID, et.Status.Phase, rt.Status)
 		return nil
 	}
 
