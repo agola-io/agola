@@ -890,7 +890,7 @@ func (s *Runservice) fetchLog(ctx context.Context, rt *types.RunTask, setup bool
 		return err
 	}
 	if et == nil {
-		if !rt.Skip {
+		if rt.Status != types.RunTaskStatusSkipped {
 			log.Errorf("executor task with id %q doesn't exist. This shouldn't happen. Skipping fetching", rt.ID)
 		}
 		return nil
@@ -1053,7 +1053,9 @@ func (s *Runservice) fetchArchive(ctx context.Context, rt *types.RunTask, stepnu
 		return err
 	}
 	if et == nil {
-		log.Errorf("executor task with id %q doesn't exist. This shouldn't happen. Skipping fetching", rt.ID)
+		if rt.Status != types.RunTaskStatusSkipped {
+			log.Errorf("executor task with id %q doesn't exist. This shouldn't happen. Skipping fetching", rt.ID)
+		}
 		return nil
 	}
 	executor, err := store.GetExecutor(ctx, s.e, et.Spec.ExecutorID)
