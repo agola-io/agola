@@ -25,7 +25,6 @@ import (
 	"agola.io/agola/services/types"
 
 	"github.com/ghodss/yaml"
-	"github.com/google/go-jsonnet"
 	errors "golang.org/x/xerrors"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -44,6 +43,7 @@ const (
 	// ConfigFormatJSON handles both json or yaml format (since json is a subset of yaml)
 	ConfigFormatJSON ConfigFormat = iota
 	ConfigFormatJsonnet
+	ConfigFormatStarlark
 )
 
 var (
@@ -660,19 +660,19 @@ type ConfigContext struct {
 
 func ParseConfig(configData []byte, format ConfigFormat, configContext *ConfigContext) (*Config, error) {
 	// Generate json from jsonnet
-	if format == ConfigFormatJsonnet {
-		// TODO(sgotti) support custom import files inside the configdir ???
-		vm := jsonnet.MakeVM()
-		cj, err := json.Marshal(configContext)
+	switch format {
+	case ConfigFormatJsonnet:
+		var err error
+		configData, err = execJsonnet(configData, configContext)
 		if err != nil {
-			return nil, errors.Errorf("failed to marshal config context: %w", err)
+			return nil, errors.Errorf("failed to execute jsonnet: %w", err)
 		}
-		vm.TLACode("ctx", string(cj))
-		out, err := vm.EvaluateSnippet("", string(configData))
+	case ConfigFormatStarlark:
+		var err error
+		configData, err = execStarlark(configData, configContext)
 		if err != nil {
-			return nil, errors.Errorf("failed to evaluate jsonnet config: %w", err)
+			return nil, errors.Errorf("failed to execute starlark: %w", err)
 		}
-		configData = []byte(out)
 	}
 
 	config := DefaultConfig

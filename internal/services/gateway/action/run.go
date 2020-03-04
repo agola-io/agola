@@ -38,10 +38,11 @@ import (
 const (
 	defaultSSHPort = "22"
 
-	agolaDefaultConfigDir         = ".agola"
-	agolaDefaultJsonnetConfigFile = "config.jsonnet"
-	agolaDefaultJsonConfigFile    = "config.json"
-	agolaDefaultYamlConfigFile    = "config.yml"
+	agolaDefaultConfigDir          = ".agola"
+	agolaDefaultStarlarkConfigFile = "config.star"
+	agolaDefaultJsonnetConfigFile  = "config.jsonnet"
+	agolaDefaultJsonConfigFile     = "config.json"
+	agolaDefaultYamlConfigFile     = "config.yml"
 
 	// List of runs annotations
 	AnnotationRunType   = "run_type"
@@ -489,6 +490,8 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 
 	var configFormat config.ConfigFormat
 	switch path.Ext(filename) {
+	case ".star":
+		configFormat = config.ConfigFormatStarlark
 	case ".jsonnet":
 		configFormat = config.ConfigFormatJsonnet
 	case ".json":
@@ -566,7 +569,7 @@ func (h *ActionHandler) fetchConfigFiles(ctx context.Context, gitSource gitsourc
 	var data []byte
 	var filename string
 	err := util.ExponentialBackoff(ctx, util.FetchFileBackoff, func() (bool, error) {
-		for _, filename = range []string{agolaDefaultJsonnetConfigFile, agolaDefaultJsonConfigFile, agolaDefaultYamlConfigFile} {
+		for _, filename = range []string{agolaDefaultStarlarkConfigFile, agolaDefaultJsonnetConfigFile, agolaDefaultJsonConfigFile, agolaDefaultYamlConfigFile} {
 			var err error
 			data, err = gitSource.GetFile(repopath, commitSHA, path.Join(agolaDefaultConfigDir, filename))
 			if err == nil {
