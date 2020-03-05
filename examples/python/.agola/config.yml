@@ -1,0 +1,22 @@
+version: v0
+
+runs:
+  - name: python example
+    tasks:
+      - name: test
+        runtime:
+          type: pod
+          arch: amd64
+          containers:
+            - image: python:3.5.1-alpine
+        steps:
+          - clone:
+          - run: pip install --upgrade pip setuptools wheel
+          - run: pip wheel -r requirements.txt --wheel-dir=wheeldir --find-links=wheeldir
+          - run: pip wheel -r test-requirements.txt --wheel-dir=wheeldir --find-links=wheeldir
+          - run: pip install --no-index --find-links=wheeldir -r requirements.txt
+          - run: pip install --no-index --find-links=wheeldir -r test-requirements.txt
+          - run: python setup.py install
+          - run: flake8 .
+          - run: mkdir -p coverage
+          - run: nosetests -v tests/
