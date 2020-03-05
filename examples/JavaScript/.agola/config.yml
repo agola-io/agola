@@ -1,0 +1,15 @@
+version: v0
+
+runs:
+  - name: nodejs example
+    tasks:
+      - name: test
+        runtime:
+          type: pod
+          arch: amd64
+          containers:
+            - image: node
+        steps:
+          - clone:
+          - run: npm install
+          - run: npm test
