@@ -410,15 +410,16 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 
 	// this env vars overrides other env vars
 	env := map[string]string{
-		"CI":                   "true",
-		"AGOLA_SSHPRIVKEY":     req.SSHPrivKey,
-		"AGOLA_REPOSITORY_URL": req.CloneURL,
-		"AGOLA_GIT_HOST":       gitHost,
-		"AGOLA_GIT_PORT":       gitPort,
-		"AGOLA_GIT_BRANCH":     req.Branch,
-		"AGOLA_GIT_TAG":        req.Tag,
-		"AGOLA_GIT_REF":        req.Ref,
-		"AGOLA_GIT_COMMITSHA":  req.CommitSHA,
+		"CI":                    "true",
+		"AGOLA_SSHPRIVKEY":      req.SSHPrivKey,
+		"AGOLA_REPOSITORY_URL":  req.CloneURL,
+		"AGOLA_GIT_HOST":        gitHost,
+		"AGOLA_GIT_PORT":        gitPort,
+		"AGOLA_GIT_BRANCH":      req.Branch,
+		"AGOLA_GIT_TAG":         req.Tag,
+		"AGOLA_PULL_REQUEST_ID": req.PullRequestID,
+		"AGOLA_GIT_REF":         req.Ref,
+		"AGOLA_GIT_COMMITSHA":   req.CommitSHA,
 	}
 
 	if req.SSHHostKey != "" {
