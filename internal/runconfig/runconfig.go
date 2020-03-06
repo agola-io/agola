@@ -109,6 +109,7 @@ Host $AGOLA_GIT_HOST
 	HostName $AGOLA_GIT_HOST
 	Port $AGOLA_GIT_PORT
 	StrictHostKeyChecking ${STRICT_HOST_KEY_CHECKING}
+	PasswordAuthentication no
 EOF
 )
 
