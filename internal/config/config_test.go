@@ -58,7 +58,7 @@ func TestParseConfig(t *testing.T) {
                 runs:
                   - name: run01
                     tasks:
-                      - 
+                      -
                 `,
 			err: fmt.Errorf(`run "run01": task at index 0 is empty`),
 		},
@@ -203,7 +203,7 @@ func TestParseConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if _, err := ParseConfig([]byte(tt.in), ConfigFormatJSON); err != nil {
+			if _, err := ParseConfig([]byte(tt.in), ConfigFormatJSON, &ConfigContext{}); err != nil {
 				if tt.err == nil {
 					t.Fatalf("got error: %v, expected no error", err)
 				}
@@ -593,7 +593,7 @@ func TestParseOutput(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			out, err := ParseConfig([]byte(tt.in), ConfigFormatJSON)
+			out, err := ParseConfig([]byte(tt.in), ConfigFormatJSON, &ConfigContext{})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

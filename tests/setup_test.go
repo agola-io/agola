@@ -1680,3 +1680,189 @@ func TestPullRequest(t *testing.T) {
 		})
 	}
 }
+
+func TestConfigContext(t *testing.T) {
+	config := `
+function(ctx) {
+  runs: [
+    {
+      name: 'run01',
+      tasks: [
+        {
+          name: 'task01',
+          runtime: {
+            containers: [
+              {
+                image: 'alpine/git',
+              },
+            ],
+          },
+          environment: {
+            REF_TYPE: ctx.ref_type,
+            REF: ctx.ref,
+            BRANCH: ctx.branch,
+            TAG: ctx.tag,
+            PULL_REQUEST_ID: ctx.pull_request_id,
+            COMMIT_SHA: ctx.commit_sha,
+          },
+          steps: [
+            { type: 'clone' },
+            { type: 'run', command: 'env' },
+          ],
+        },
+      ],
+    },
+  ],
+}
+`
+
+	tests := []struct {
+		name string
+		args []string
+		env  map[string]string
+	}{
+		{
+			name: "test direct run branch",
+			env: map[string]string{
+				"REF_TYPE":        "branch",
+				"REF":             "refs/heads/master",
+				"BRANCH":          "master",
+				"TAG":             "",
+				"PULL_REQUEST_ID": "",
+				"COMMIT_SHA":      "",
+			},
+		},
+		{
+			name: "test direct run tag",
+			args: []string{"--tag", "v0.1.0"},
+			env: map[string]string{
+				"REF_TYPE":        "tag",
+				"REF":             "refs/tags/v0.1.0",
+				"BRANCH":          "",
+				"TAG":             "v0.1.0",
+				"PULL_REQUEST_ID": "",
+				"COMMIT_SHA":      "",
+			},
+		},
+		{
+			name: "test direct run with pr",
+			args: []string{"--ref", "refs/pull/1/head"},
+			env: map[string]string{
+				"REF_TYPE":        "pull_request",
+				"REF":             "refs/pull/1/head",
+				"BRANCH":          "",
+				"TAG":             "",
+				"PULL_REQUEST_ID": "1",
+				"COMMIT_SHA":      "",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir, err := ioutil.TempDir("", "agola")
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			defer os.RemoveAll(dir)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			tetcd, tgitea, c := setup(ctx, t, dir)
+			defer shutdownGitea(tgitea)
+			defer shutdownEtcd(tetcd)
+
+			gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
+			user, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			t.Logf("created agola user: %s", user.UserName)
+
+			token := createAgolaUserToken(ctx, t, c)
+
+			// From now use the user token
+			gwClient = gwclient.NewClient(c.Gateway.APIExposedURL, token)
+
+			directRun(t, dir, config, c.Gateway.APIExposedURL, token, tt.args...)
+
+			// TODO(sgotti) add an util to wait for a run phase
+			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+				runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/user", user.ID)}, nil, "", 0, false)
+				if err != nil {
+					return false, nil
+				}
+
+				if len(runs) != 1 {
+					return false, nil
+				}
+
+				run := runs[0]
+				if run.Phase != rstypes.RunPhaseFinished {
+					return false, nil
+				}
+
+				return true, nil
+			})
+
+			runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/user", user.ID)}, nil, "", 0, false)
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			t.Logf("runs: %s", util.Dump(runs))
+
+			if len(runs) != 1 {
+				t.Fatalf("expected 1 run got: %d", len(runs))
+			}
+
+			run, _, err := gwClient.GetRun(ctx, runs[0].ID)
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			if run.Phase != rstypes.RunPhaseFinished {
+				t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, run.Phase)
+			}
+			if run.Result != rstypes.RunResultSuccess {
+				t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, run.Result)
+			}
+
+			var task *gwapitypes.RunResponseTask
+			for _, t := range run.Tasks {
+				if t.Name == "task01" {
+					task = t
+					break
+				}
+			}
+
+			resp, err := gwClient.GetLogs(ctx, run.ID, task.ID, false, 1, false)
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			defer resp.Body.Close()
+
+			logs, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			curEnv, err := testutil.ParseEnvs(bytes.NewReader(logs))
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			// update commit sha from annotations since it will change at every test
+			tt.env["COMMIT_SHA"] = run.Annotations["commit_sha"]
+
+			for n, e := range tt.env {
+				if ce, ok := curEnv[n]; !ok {
+					t.Fatalf("missing env var %s", n)
+				} else {
+					if ce != e {
+						t.Fatalf("different env var %s value, want: %q, got %q", n, e, ce)
+					}
+				}
+			}
+		})
+	}
+}
