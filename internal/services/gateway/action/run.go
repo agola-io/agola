@@ -418,6 +418,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 		"AGOLA_GIT_BRANCH":      req.Branch,
 		"AGOLA_GIT_TAG":         req.Tag,
 		"AGOLA_PULL_REQUEST_ID": req.PullRequestID,
+		"AGOLA_GIT_REF_TYPE":    string(req.RefType),
 		"AGOLA_GIT_REF":         req.Ref,
 		"AGOLA_GIT_COMMITSHA":   req.CommitSHA,
 	}
