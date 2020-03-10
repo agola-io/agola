@@ -1,0 +1,22 @@
+version: v0
+
+runs:
+  - name: scala example
+    tasks:
+      - name: test
+        runtime:
+          type: pod
+          arch: amd64
+          containers:
+            - image: 1science/sbt:0.13.8-oracle-jre-8
+        steps:
+          - clone:
+          - restore_cache:
+              keys:
+                - cache-sum-{{ md5sum "/sbt/.ivy" }}
+              dest_dir: /sbt/.ivy
+          - run: sbt clean test assembly -Dsbt.ivy.home=/sbt/.ivy
+          - save_cache:
+              key: cache-sum-{{ md5sum "/sbt/.ivy" }}
+              contents:
+                - source_dir: /sbt/.ivy
