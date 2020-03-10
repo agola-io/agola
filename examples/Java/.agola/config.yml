@@ -1,0 +1,23 @@
+version: v0
+
+runs:
+  - name: java with ant example
+    tasks:
+      - name: test
+        runtime:
+          type: pod
+          arch: amd64
+          containers:
+            - image: webratio/java:8
+        steps:
+          - clone:
+          - run:
+            name: Install ant
+            command: wget -q http://www.us.apache.org/dist//ant/binaries/apache-ant-${ANT_VERSION}-bin.tar.gz && \
+            tar -xzf apache-ant-${ANT_VERSION}-bin.tar.gz && \
+            mv apache-ant-${ANT_VERSION} /usr/bin/ant && \
+            rm apache-ant-${ANT_VERSION}-bin.tar.gz
+          - run:
+            name: Build with ant
+            command: ant -noinput -buildfile build.xml
+
