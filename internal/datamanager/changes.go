@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"agola.io/agola/internal/etcd"
+	slog "agola.io/agola/internal/log"
 
 	etcdclientv3rpc "go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
 	"go.etcd.io/etcd/mvcc/mvccpb"
@@ -176,11 +177,11 @@ func (d *DataManager) watcherLoop(ctx context.Context) {
 		initialized := d.changes.initialized
 		if !initialized {
 			if err := d.initializeChanges(ctx); err != nil {
-				d.log.Errorf("watcher err: %+v", err)
+				d.log.Errorf("watcher err: %s", slog.FormatError(err))
 			}
 		} else {
 			if err := d.watcher(ctx); err != nil {
-				d.log.Errorf("watcher err: %+v", err)
+				d.log.Errorf("watcher err: %s", slog.FormatError(err))
 			}
 		}
 

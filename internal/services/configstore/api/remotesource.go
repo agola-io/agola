@@ -20,6 +20,7 @@ import (
 	"strconv"
 
 	"agola.io/agola/internal/db"
+	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/services/configstore/action"
 	"agola.io/agola/internal/services/configstore/readdb"
 	"agola.io/agola/internal/util"
@@ -51,7 +52,7 @@ func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return err
 	})
 	if err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		httpError(w, err)
 		return
 	}
@@ -62,7 +63,7 @@ func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err := httpResponse(w, http.StatusOK, remoteSource); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -87,12 +88,12 @@ func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 
 	remoteSource, err := h.ah.CreateRemoteSource(ctx, &req)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	if err := httpResponse(w, http.StatusCreated, remoteSource); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -124,12 +125,12 @@ func (h *UpdateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	}
 	remoteSource, err := h.ah.UpdateRemoteSource(ctx, areq)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	if err := httpResponse(w, http.StatusCreated, remoteSource); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -150,10 +151,10 @@ func (h *DeleteRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 
 	err := h.ah.DeleteRemoteSource(ctx, rsRef)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -201,12 +202,12 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 
 	remoteSources, err := h.readDB.GetRemoteSources(ctx, start, limit, asc)
 	if err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		httpError(w, err)
 		return
 	}
 
 	if err := httpResponse(w, http.StatusOK, remoteSources); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }

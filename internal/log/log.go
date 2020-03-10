@@ -21,6 +21,8 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+var errorFormat = "%v"
+
 func New(level zap.AtomicLevel) *zap.Logger {
 	config := zap.Config{
 		Level:             level,
@@ -40,4 +42,16 @@ func New(level zap.AtomicLevel) *zap.Logger {
 	}
 
 	return logger
+}
+
+func SetDetailedErrorFormat(enable bool) {
+	if enable {
+		errorFormat = "%+v"
+	} else {
+		errorFormat = "%v"
+	}
+}
+
+func FormatError(err error) string {
+	return fmt.Sprintf(errorFormat, err)
 }

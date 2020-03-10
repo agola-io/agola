@@ -25,6 +25,7 @@ import (
 
 	"agola.io/agola/internal/datamanager"
 	"agola.io/agola/internal/etcd"
+	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/runconfig"
 	"agola.io/agola/internal/services/runservice/common"
@@ -381,7 +382,7 @@ func (s *Runservice) sendExecutorTask(ctx context.Context, et *types.ExecutorTas
 func (s *Runservice) compactChangeGroupsLoop(ctx context.Context) {
 	for {
 		if err := s.compactChangeGroups(ctx); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
@@ -729,7 +730,7 @@ func (s *Runservice) executorTasksCleanerLoop(ctx context.Context) {
 		log.Debugf("executorTasksCleaner")
 
 		if err := s.executorTasksCleaner(ctx); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
@@ -751,12 +752,12 @@ func (s *Runservice) executorTasksCleaner(ctx context.Context) error {
 	for _, kv := range resp.Kvs {
 		var et *types.ExecutorTask
 		if err := json.Unmarshal(kv.Value, &et); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 			continue
 		}
 		et.Revision = kv.ModRevision
 		if err := s.executorTaskCleaner(ctx, et); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 	}
 
@@ -771,12 +772,12 @@ func (s *Runservice) executorTaskCleaner(ctx context.Context, et *types.Executor
 			if err == etcd.ErrKeyNotFound {
 				// run doesn't exists, remove executor task
 				if err := store.DeleteExecutorTask(ctx, s.e, et.ID); err != nil {
-					log.Errorf("err: %+v", err)
+					log.Errorf("err: %s", slog.FormatError(err))
 					return err
 				}
 				return nil
 			}
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 			return err
 		}
 
@@ -788,7 +789,7 @@ func (s *Runservice) executorTaskCleaner(ctx context.Context, et *types.Executor
 					return err
 				}
 				if err := s.sendExecutorTask(ctx, et); err != nil {
-					log.Errorf("err: %+v", err)
+					log.Errorf("err: %s", slog.FormatError(err))
 					return err
 				}
 			}
@@ -825,7 +826,7 @@ func (s *Runservice) runTasksUpdaterLoop(ctx context.Context) {
 		log.Debugf("runTasksUpdater")
 
 		if err := s.runTasksUpdater(ctx); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(10 * time.Second).C
@@ -869,7 +870,7 @@ func (s *Runservice) runTasksUpdater(ctx context.Context) error {
 		}
 		et.Revision = kv.ModRevision
 		if err := s.handleExecutorTaskUpdate(ctx, et); err != nil {
-			log.Errorf("err: %v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 	}
 
@@ -1023,10 +1024,10 @@ func (s *Runservice) fetchTaskLogs(ctx context.Context, runID string, rt *types.
 	// fetch setup log
 	if rt.SetupStep.LogPhase == types.RunTaskFetchPhaseNotStarted {
 		if err := s.fetchLog(ctx, rt, true, 0); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		} else {
 			if err := s.finishSetupLogPhase(ctx, runID, rt.ID); err != nil {
-				log.Errorf("err: %+v", err)
+				log.Errorf("err: %s", slog.FormatError(err))
 			}
 		}
 	}
@@ -1036,11 +1037,11 @@ func (s *Runservice) fetchTaskLogs(ctx context.Context, runID string, rt *types.
 		lp := rts.LogPhase
 		if lp == types.RunTaskFetchPhaseNotStarted {
 			if err := s.fetchLog(ctx, rt, false, i); err != nil {
-				log.Errorf("err: %+v", err)
+				log.Errorf("err: %s", slog.FormatError(err))
 				continue
 			}
 			if err := s.finishStepLogPhase(ctx, runID, rt.ID, i); err != nil {
-				log.Errorf("err: %+v", err)
+				log.Errorf("err: %s", slog.FormatError(err))
 				continue
 			}
 		}
@@ -1111,11 +1112,11 @@ func (s *Runservice) fetchTaskArchives(ctx context.Context, runID string, rt *ty
 		phase := rt.WorkspaceArchivesPhase[i]
 		if phase == types.RunTaskFetchPhaseNotStarted {
 			if err := s.fetchArchive(ctx, rt, stepnum); err != nil {
-				log.Errorf("err: %+v", err)
+				log.Errorf("err: %s", slog.FormatError(err))
 				continue
 			}
 			if err := s.finishArchivePhase(ctx, runID, rt.ID, stepnum); err != nil {
-				log.Errorf("err: %+v", err)
+				log.Errorf("err: %s", slog.FormatError(err))
 				continue
 			}
 		}
@@ -1127,7 +1128,7 @@ func (s *Runservice) fetcherLoop(ctx context.Context) {
 		log.Debugf("fetcher")
 
 		if err := s.fetcher(ctx); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(2 * time.Second).C
@@ -1182,10 +1183,10 @@ func (s *Runservice) taskFetcher(ctx context.Context, r *types.Run, rt *types.Ru
 	runIDPath := store.OSTRunTaskLogsRunPath(rt.ID, r.ID)
 	exists, err := s.OSTFileExists(runIDPath)
 	if err != nil {
-		log.Errorf("err: %+v", err)
+		log.Errorf("err: %s", slog.FormatError(err))
 	} else if !exists {
 		if err := s.ost.WriteObject(runIDPath, bytes.NewReader([]byte{}), 0, false); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 	}
 
@@ -1193,10 +1194,10 @@ func (s *Runservice) taskFetcher(ctx context.Context, r *types.Run, rt *types.Ru
 	runIDPath = store.OSTRunTaskArchivesRunPath(rt.ID, r.ID)
 	exists, err = s.OSTFileExists(runIDPath)
 	if err != nil {
-		log.Errorf("err: %+v", err)
+		log.Errorf("err: %s", slog.FormatError(err))
 	} else if !exists {
 		if err := s.ost.WriteObject(runIDPath, bytes.NewReader([]byte{}), 0, false); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 	}
 
@@ -1220,7 +1221,7 @@ func (s *Runservice) runsSchedulerLoop(ctx context.Context) {
 		log.Debugf("runsSchedulerLoop")
 
 		if err := s.runsScheduler(ctx); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(2 * time.Second).C
@@ -1240,7 +1241,7 @@ func (s *Runservice) runsScheduler(ctx context.Context) error {
 	}
 	for _, r := range runs {
 		if err := s.runScheduler(ctx, r); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 	}
 
@@ -1262,7 +1263,7 @@ func (s *Runservice) finishedRunsArchiverLoop(ctx context.Context) {
 		log.Debugf("finished run archiver loop")
 
 		if err := s.finishedRunsArchiver(ctx); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(2 * time.Second).C
@@ -1282,7 +1283,7 @@ func (s *Runservice) finishedRunsArchiver(ctx context.Context) error {
 	}
 	for _, r := range runs {
 		if err := s.finishedRunArchiver(ctx, r); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 	}
 
@@ -1294,7 +1295,7 @@ func (s *Runservice) finishedRunsArchiver(ctx context.Context) error {
 	for _, r := range runs {
 		if r.Archived {
 			if err := s.runOSTArchiver(ctx, r); err != nil {
-				log.Errorf("err: %+v", err)
+				log.Errorf("err: %s", slog.FormatError(err))
 			}
 		}
 	}
@@ -1361,7 +1362,7 @@ func (s *Runservice) runOSTArchiver(ctx context.Context, r *types.Run) error {
 func (s *Runservice) cacheCleanerLoop(ctx context.Context, cacheExpireInterval time.Duration) {
 	for {
 		if err := s.cacheCleaner(ctx, cacheExpireInterval); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(cacheCleanerInterval).C
@@ -1413,7 +1414,7 @@ func (s *Runservice) cacheCleaner(ctx context.Context, cacheExpireInterval time.
 func (s *Runservice) workspaceCleanerLoop(ctx context.Context, workspaceExpireInterval time.Duration) {
 	for {
 		if err := s.workspaceCleaner(ctx, workspaceExpireInterval); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(workspaceCleanerInterval).C

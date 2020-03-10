@@ -24,6 +24,7 @@ import (
 	"regexp"
 	"strings"
 
+	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/util"
 
 	"go.uber.org/zap"
@@ -188,7 +189,7 @@ func (h *GitSmartHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case RequestTypeInfoRefs:
 		if h.createRepo && !exists {
 			if output, err := git.Output(ctx, nil, "init", "--bare", repoAbsPath); err != nil {
-				h.log.Errorf("git error %v, output: %s", err, output)
+				h.log.Errorf("git error: %s, output: %s", slog.FormatError(err), output)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -208,7 +209,7 @@ func (h *GitSmartHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		res, err := InfoRefsResponse(ctx, repoAbsPath, serviceName)
 		if err != nil {
 			// we cannot return any http error since the http header has already been written
-			h.log.Errorf("git command error: %v", err)
+			h.log.Errorf("git command error: %s", slog.FormatError(err))
 			return
 		}
 
@@ -220,14 +221,14 @@ func (h *GitSmartHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		if err := gitService(ctx, w, body, repoAbsPath, "upload-pack"); err != nil {
 			// we cannot return any http error since the http header has already been written
-			h.log.Errorf("git command error: %v", err)
+			h.log.Errorf("git command error: %s", slog.FormatError(err))
 		}
 	case RequestTypeReceivePack:
 		w.Header().Set("Content-Type", "application/x-git-receive-pack-result")
 
 		if err := gitService(ctx, w, body, repoAbsPath, "receive-pack"); err != nil {
 			// we cannot return any http error since the http header has already been written
-			h.log.Errorf("git command error: %v", err)
+			h.log.Errorf("git command error: %s", slog.FormatError(err))
 		}
 	}
 }
@@ -268,6 +269,6 @@ func (h *FetchFileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := gitFetchFile(ctx, w, r.Body, repoAbsPath, fetchData.Ref, fetchData.Path); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		// we cannot return any http error since the http header has already been written
-		h.log.Errorf("git command error: %v", err)
+		h.log.Errorf("git command error: %s", slog.FormatError(err))
 	}
 }

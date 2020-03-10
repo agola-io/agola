@@ -18,6 +18,7 @@ import (
 	"net/http"
 
 	"agola.io/agola/internal/etcd"
+	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/services/runservice/action"
 
 	"go.uber.org/zap"
@@ -46,13 +47,13 @@ func (h *MaintenanceModeHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 
 	err := h.ah.MaintenanceMode(ctx, enable)
 	if err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		httpError(w, err)
 		return
 	}
 
 	if err := httpResponse(w, http.StatusOK, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 
 }
@@ -71,7 +72,7 @@ func (h *ExportHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	err := h.ah.Export(ctx, w)
 	if err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		// since we already answered with a 200 we cannot return another error code
 		// So abort the connection and the client will detect the missing ending chunk
 		// and consider this an error
@@ -95,13 +96,13 @@ func (h *ImportHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	err := h.ah.Import(ctx, r.Body)
 	if err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		httpError(w, err)
 		return
 	}
 
 	if err := httpResponse(w, http.StatusOK, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 
 }

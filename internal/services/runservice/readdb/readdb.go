@@ -31,6 +31,7 @@ import (
 	"agola.io/agola/internal/datamanager"
 	"agola.io/agola/internal/db"
 	"agola.io/agola/internal/etcd"
+	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/sequence"
 	"agola.io/agola/internal/services/runservice/common"
@@ -273,7 +274,7 @@ func (r *ReadDB) Run(ctx context.Context) error {
 			if err == nil {
 				break
 			}
-			r.log.Errorf("initialize err: %+v", err)
+			r.log.Errorf("initialize err: %s", slog.FormatError(err))
 
 			sleepCh := time.NewTimer(1 * time.Second).C
 			select {
@@ -296,7 +297,7 @@ func (r *ReadDB) Run(ctx context.Context) error {
 				r.SetInitialized(true)
 				break
 			}
-			r.log.Errorf("initialize err: %+v", err)
+			r.log.Errorf("initialize err: %s", slog.FormatError(err))
 
 			sleepCh := time.NewTimer(1 * time.Second).C
 			select {
@@ -315,7 +316,7 @@ func (r *ReadDB) Run(ctx context.Context) error {
 		go func() {
 			r.log.Infof("starting handleEvents")
 			if err := r.handleEvents(hctx); err != nil {
-				r.log.Errorf("handleEvents err: %+v", err)
+				r.log.Errorf("handleEvents err: %s", slog.FormatError(err))
 			}
 			wg.Done()
 			doneCh <- struct{}{}
@@ -324,7 +325,7 @@ func (r *ReadDB) Run(ctx context.Context) error {
 		go func() {
 			r.log.Infof("starting handleEventsOST")
 			if err := r.handleEventsOST(hctx); err != nil {
-				r.log.Errorf("handleEventsOST err: %+v", err)
+				r.log.Errorf("handleEventsOST err: %s", slog.FormatError(err))
 			}
 			wg.Done()
 			doneCh <- struct{}{}

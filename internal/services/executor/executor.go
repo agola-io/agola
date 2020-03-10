@@ -740,7 +740,7 @@ func (e *Executor) executeTask(rt *runningTask) {
 		<-ctx.Done()
 		if rt.pod != nil {
 			if err := rt.pod.Stop(context.Background()); err != nil {
-				log.Errorf("error stopping the pod: %+v", err)
+				log.Errorf("error stopping the pod: %s", slog.FormatError(err))
 			}
 		}
 	}()
@@ -758,17 +758,17 @@ func (e *Executor) executeTask(rt *runningTask) {
 	et.Status.SetupStep.Phase = types.ExecutorTaskPhaseRunning
 	et.Status.SetupStep.StartTime = util.TimeP(time.Now())
 	if err := e.sendExecutorTaskStatus(ctx, et); err != nil {
-		log.Errorf("err: %+v", err)
+		log.Errorf("err: %s", slog.FormatError(err))
 	}
 
 	if err := e.setupTask(ctx, rt); err != nil {
-		log.Errorf("err: %+v", err)
+		log.Errorf("err: %s", slog.FormatError(err))
 		et.Status.Phase = types.ExecutorTaskPhaseFailed
 		et.Status.EndTime = util.TimeP(time.Now())
 		et.Status.SetupStep.Phase = types.ExecutorTaskPhaseFailed
 		et.Status.SetupStep.EndTime = util.TimeP(time.Now())
 		if err := e.sendExecutorTaskStatus(ctx, et); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 		rt.Unlock()
 		return
@@ -777,7 +777,7 @@ func (e *Executor) executeTask(rt *runningTask) {
 	et.Status.SetupStep.Phase = types.ExecutorTaskPhaseSuccess
 	et.Status.SetupStep.EndTime = util.TimeP(time.Now())
 	if err := e.sendExecutorTaskStatus(ctx, et); err != nil {
-		log.Errorf("err: %+v", err)
+		log.Errorf("err: %s", slog.FormatError(err))
 	}
 
 	rt.Unlock()
@@ -786,7 +786,7 @@ func (e *Executor) executeTask(rt *runningTask) {
 
 	rt.Lock()
 	if err != nil {
-		log.Errorf("err: %+v", err)
+		log.Errorf("err: %s", slog.FormatError(err))
 		if rt.et.Spec.Stop {
 			et.Status.Phase = types.ExecutorTaskPhaseStopped
 		} else {
@@ -799,7 +799,7 @@ func (e *Executor) executeTask(rt *runningTask) {
 	et.Status.EndTime = util.TimeP(time.Now())
 
 	if err := e.sendExecutorTaskStatus(ctx, et); err != nil {
-		log.Errorf("err: %+v", err)
+		log.Errorf("err: %s", slog.FormatError(err))
 	}
 	rt.Unlock()
 }
@@ -911,7 +911,7 @@ func (e *Executor) executeTaskSteps(ctx context.Context, rt *runningTask, pod dr
 		rt.et.Status.Steps[i].Phase = types.ExecutorTaskPhaseRunning
 		rt.et.Status.Steps[i].StartTime = util.TimeP(time.Now())
 		if err := e.sendExecutorTaskStatus(ctx, rt.et); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 		rt.Unlock()
 
@@ -978,7 +978,7 @@ func (e *Executor) executeTaskSteps(ctx context.Context, rt *runningTask, pod dr
 		}
 
 		if err := e.sendExecutorTaskStatus(ctx, rt.et); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 		rt.Unlock()
 
@@ -995,7 +995,7 @@ func (e *Executor) podsCleanerLoop(ctx context.Context) {
 		log.Debugf("podsCleaner")
 
 		if err := e.podsCleaner(ctx); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
@@ -1051,7 +1051,7 @@ func (e *Executor) executorStatusSenderLoop(ctx context.Context) {
 		log.Debugf("executorStatusSenderLoop")
 
 		if err := e.sendExecutorStatus(ctx); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(2 * time.Second).C
@@ -1075,7 +1075,7 @@ func (e *Executor) executorTasksStatusSenderLoop(ctx context.Context) {
 
 			rt.Lock()
 			if err := e.sendExecutorTaskStatus(ctx, rt.et); err != nil {
-				log.Errorf("err: %+v", err)
+				log.Errorf("err: %s", slog.FormatError(err))
 				rt.Unlock()
 				continue
 			}
@@ -1104,7 +1104,7 @@ func (e *Executor) tasksUpdaterLoop(ctx context.Context) {
 		log.Debugf("tasksUpdater")
 
 		if err := e.tasksUpdater(ctx); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(2 * time.Second).C
@@ -1122,10 +1122,9 @@ func (e *Executor) tasksUpdaterLoop(ctx context.Context) {
 func (e *Executor) tasksUpdater(ctx context.Context) error {
 	ets, _, err := e.runserviceClient.GetExecutorTasks(ctx, e.id)
 	if err != nil {
-		log.Warnf("err: %v", err)
 		return err
 	}
-	log.Debugf("ets: %v", util.Dump(ets))
+	log.Debugf("ets: %s", util.Dump(ets))
 	for _, et := range ets {
 		e.taskUpdater(ctx, et)
 	}
@@ -1150,7 +1149,7 @@ func (e *Executor) tasksUpdater(ctx context.Context) error {
 }
 
 func (e *Executor) taskUpdater(ctx context.Context, et *types.ExecutorTask) {
-	log.Debugf("et: %v", util.Dump(et))
+	log.Debugf("et: %s", util.Dump(et))
 	if et.Spec.ExecutorID != e.id {
 		return
 	}
@@ -1178,7 +1177,7 @@ func (e *Executor) taskUpdater(ctx context.Context, et *types.ExecutorTask) {
 		et.Status.Phase = types.ExecutorTaskPhaseCancelled
 		go func() {
 			if err := e.sendExecutorTaskStatus(ctx, et); err != nil {
-				log.Errorf("err: %+v", err)
+				log.Errorf("err: %s", slog.FormatError(err))
 			}
 		}()
 	}
@@ -1196,7 +1195,7 @@ func (e *Executor) taskUpdater(ctx context.Context, et *types.ExecutorTask) {
 		}
 		go func() {
 			if err := e.sendExecutorTaskStatus(ctx, et); err != nil {
-				log.Errorf("err: %+v", err)
+				log.Errorf("err: %s", slog.FormatError(err))
 			}
 		}()
 	}
@@ -1229,7 +1228,7 @@ func (e *Executor) tasksDataCleanerLoop(ctx context.Context) {
 		log.Debugf("tasksDataCleaner")
 
 		if err := e.tasksDataCleaner(ctx); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(2 * time.Second).C
@@ -1484,7 +1483,7 @@ func (e *Executor) Run(ctx context.Context) error {
 		httpServer.Close()
 	case err := <-lerrCh:
 		if err != nil {
-			log.Errorf("http server listen error: %v", err)
+			log.Errorf("http server listen error: %s", slog.FormatError(err))
 			return err
 		}
 	}

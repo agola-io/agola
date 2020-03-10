@@ -22,6 +22,7 @@ import (
 	"path"
 
 	gitsource "agola.io/agola/internal/gitsources"
+	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
@@ -163,17 +164,17 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 
 	if serr := h.setupGitSourceRepo(ctx, rs, user, la, rp); serr != nil {
 		var err error
-		h.log.Errorf("failed to setup git source repo, trying to cleanup: %+v", ErrFromRemote(resp, err))
+		h.log.Errorf("failed to setup git source repo, trying to cleanup: %s", slog.FormatError(ErrFromRemote(resp, err)))
 		// try to cleanup gitsource configs and remove project
 		// we'll log but ignore errors
 		h.log.Infof("deleting project with ID: %q", rp.ID)
 		resp, err := h.configstoreClient.DeleteProject(ctx, rp.ID)
 		if err != nil {
-			h.log.Errorf("failed to delete project: %+v", ErrFromRemote(resp, err))
+			h.log.Errorf("failed to delete project: %s", slog.FormatError(ErrFromRemote(resp, err)))
 		}
 		h.log.Infof("cleanup git source repo")
 		if err := h.cleanupGitSourceRepo(ctx, rs, user, la, rp); err != nil {
-			h.log.Errorf("failed to cleanup git source repo: %+v", ErrFromRemote(resp, err))
+			h.log.Errorf("failed to cleanup git source repo: %s", slog.FormatError(ErrFromRemote(resp, err)))
 		}
 		return nil, errors.Errorf("failed to setup git source repo: %w", serr)
 	}
@@ -406,7 +407,7 @@ func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) er
 	user, rs, la, err := h.getRemoteRepoAccessData(ctx, p.LinkedAccountID)
 	if err != nil {
 		canDoRepCleanup = false
-		h.log.Errorf("failed to get remote repo access data: %+v", err)
+		h.log.Errorf("failed to get remote repo access data: %s", slog.FormatError(err))
 	}
 
 	h.log.Infof("deleting project with ID: %q", p.ID)
@@ -420,7 +421,7 @@ func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) er
 	if canDoRepCleanup {
 		h.log.Infof("cleanup git source repo")
 		if err := h.cleanupGitSourceRepo(ctx, rs, user, la, p); err != nil {
-			h.log.Errorf("failed to cleanup git source repo: %+v", ErrFromRemote(resp, err))
+			h.log.Errorf("failed to cleanup git source repo: %s", slog.FormatError(ErrFromRemote(resp, err)))
 		}
 	}
 

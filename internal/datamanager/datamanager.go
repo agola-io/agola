@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"agola.io/agola/internal/etcd"
+	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/sequence"
 
@@ -237,7 +238,7 @@ func (d *DataManager) Run(ctx context.Context, readyCh chan struct{}) error {
 			if err == nil {
 				break
 			}
-			d.log.Errorf("failed to initialize etcd: %+v", err)
+			d.log.Errorf("failed to initialize etcd: %s", slog.FormatError(err))
 
 			sleepCh := time.NewTimer(1 * time.Second).C
 			select {

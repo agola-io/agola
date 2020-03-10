@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
@@ -70,7 +71,7 @@ func (h *VariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
@@ -82,7 +83,7 @@ func (h *VariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	csvars, cssecrets, err := h.ah.GetVariables(ctx, areq)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
@@ -92,7 +93,7 @@ func (h *VariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := httpResponse(w, http.StatusOK, variables); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -109,7 +110,7 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	ctx := r.Context()
 	parentType, parentRef, err := GetConfigTypeRef(r)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
@@ -127,13 +128,13 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	}
 	csvar, cssecrets, err := h.ah.CreateVariable(ctx, areq)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	res := createVariableResponse(csvar, cssecrets)
 	if err := httpResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -153,7 +154,7 @@ func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
@@ -174,13 +175,13 @@ func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	}
 	csvar, cssecrets, err := h.ah.UpdateVariable(ctx, areq)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	res := createVariableResponse(csvar, cssecrets)
 	if err := httpResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -200,18 +201,18 @@ func (h *DeleteVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	err = h.ah.DeleteVariable(ctx, parentType, parentRef, variableName)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 

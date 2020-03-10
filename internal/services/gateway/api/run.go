@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"strconv"
 
+	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
@@ -165,13 +166,13 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	runResp, err := h.ah.GetRun(ctx, runID)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	res := createRunResponse(runResp.Run, runResp.RunConfig)
 	if err := httpResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -192,7 +193,7 @@ func (h *RuntaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	runResp, err := h.ah.GetRun(ctx, runID)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
@@ -208,7 +209,7 @@ func (h *RuntaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	res := createRunTaskResponse(rt, rct)
 	if err := httpResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -299,7 +300,7 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	runsResp, err := h.ah.GetRuns(ctx, areq)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
@@ -308,7 +309,7 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		runs[i] = createRunsResponse(r)
 	}
 	if err := httpResponse(w, http.StatusOK, runs); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -341,13 +342,13 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	runResp, err := h.ah.RunAction(ctx, areq)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	res := createRunResponse(runResp.Run, runResp.RunConfig)
 	if err := httpResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -381,7 +382,7 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 	err := h.ah.RunTaskAction(ctx, areq)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 }
@@ -447,7 +448,7 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := h.ah.GetLogs(ctx, areq)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
@@ -466,7 +467,7 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	defer resp.Body.Close()
 	if err := sendLogs(w, resp.Body); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 }
@@ -558,7 +559,7 @@ func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	err := h.ah.DeleteLogs(ctx, areq)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 }

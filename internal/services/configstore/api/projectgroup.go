@@ -22,6 +22,7 @@ import (
 	"path"
 
 	"agola.io/agola/internal/db"
+	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/services/configstore/action"
 	"agola.io/agola/internal/services/configstore/readdb"
 	"agola.io/agola/internal/util"
@@ -101,18 +102,18 @@ func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	projectGroup, err := h.ah.GetProjectGroup(ctx, projectGroupRef)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	resProjectGroup, err := projectGroupResponse(ctx, h.readDB, projectGroup)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	if err := httpResponse(w, http.StatusOK, resProjectGroup); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -138,18 +139,18 @@ func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 
 	projects, err := h.ah.GetProjectGroupProjects(ctx, projectGroupRef)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	resProjects, err := projectsResponse(ctx, h.readDB, projects)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	if err := httpResponse(w, http.StatusOK, resProjects); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -174,18 +175,18 @@ func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.
 
 	projectGroups, err := h.ah.GetProjectGroupSubgroups(ctx, projectGroupRef)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	resProjectGroups, err := projectGroupsResponse(ctx, h.readDB, projectGroups)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	if err := httpResponse(w, http.StatusOK, resProjectGroups); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -211,18 +212,18 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 
 	projectGroup, err := h.ah.CreateProjectGroup(ctx, &req)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	resProjectGroup, err := projectGroupResponse(ctx, h.readDB, projectGroup)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	if err := httpResponse(w, http.StatusCreated, resProjectGroup); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -259,18 +260,18 @@ func (h *UpdateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	}
 	projectGroup, err = h.ah.UpdateProjectGroup(ctx, areq)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	resProjectGroup, err := projectGroupResponse(ctx, h.readDB, projectGroup)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	if err := httpResponse(w, http.StatusCreated, resProjectGroup); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -295,9 +296,9 @@ func (h *DeleteProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 
 	err = h.ah.DeleteProjectGroup(ctx, projectGroupRef)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }

@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"agola.io/agola/internal/etcd"
+	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/sequence"
 	"agola.io/agola/internal/util"
@@ -535,7 +536,7 @@ func (d *DataManager) WriteWalAdditionalOps(ctx context.Context, actions []*Acti
 
 	// try to commit storage right now
 	if err := d.sync(ctx); err != nil {
-		d.log.Errorf("wal sync error: %+v", err)
+		d.log.Errorf("wal sync error: %s", slog.FormatError(err))
 	}
 
 	return ncgt, nil
@@ -545,7 +546,7 @@ func (d *DataManager) syncLoop(ctx context.Context) {
 	for {
 		d.log.Debugf("syncer")
 		if err := d.sync(ctx); err != nil {
-			d.log.Errorf("syncer error: %+v", err)
+			d.log.Errorf("syncer error: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(DefaultSyncInterval).C
@@ -634,7 +635,7 @@ func (d *DataManager) checkpointLoop(ctx context.Context) {
 	for {
 		d.log.Debugf("checkpointer")
 		if err := d.checkpoint(ctx, false); err != nil {
-			d.log.Errorf("checkpoint error: %v", err)
+			d.log.Errorf("checkpoint error: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(d.checkpointInterval).C
@@ -716,7 +717,7 @@ func (d *DataManager) checkpointCleanLoop(ctx context.Context) {
 	for {
 		d.log.Debugf("checkpointCleanLoop")
 		if err := d.checkpointClean(ctx); err != nil {
-			d.log.Errorf("checkpointClean error: %v", err)
+			d.log.Errorf("checkpointClean error: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(d.checkpointCleanInterval).C
@@ -756,7 +757,7 @@ func (d *DataManager) etcdWalCleanerLoop(ctx context.Context) {
 	for {
 		d.log.Debugf("etcdwalcleaner")
 		if err := d.etcdWalCleaner(ctx); err != nil {
-			d.log.Errorf("etcdwalcleaner error: %v", err)
+			d.log.Errorf("etcdwalcleaner error: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(DefaultEtcdWalCleanInterval).C
@@ -831,7 +832,7 @@ func (d *DataManager) storageWalCleanerLoop(ctx context.Context) {
 	for {
 		d.log.Debugf("storagewalcleaner")
 		if err := d.storageWalCleaner(ctx); err != nil {
-			d.log.Errorf("storagewalcleaner error: %v", err)
+			d.log.Errorf("storagewalcleaner error: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(DefaultStorageWalCleanInterval).C
@@ -942,7 +943,7 @@ func (d *DataManager) storageWalCleaner(ctx context.Context) error {
 func (d *DataManager) compactChangeGroupsLoop(ctx context.Context) {
 	for {
 		if err := d.compactChangeGroups(ctx); err != nil {
-			d.log.Errorf("err: %+v", err)
+			d.log.Errorf("err: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(DefaultCompactChangeGroupsInterval).C
@@ -1027,7 +1028,7 @@ func (d *DataManager) compactChangeGroups(ctx context.Context) error {
 func (d *DataManager) etcdPingerLoop(ctx context.Context) {
 	for {
 		if err := d.etcdPinger(ctx); err != nil {
-			d.log.Errorf("err: %+v", err)
+			d.log.Errorf("err: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(DefaultEtcdPingerInterval).C

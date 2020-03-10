@@ -21,6 +21,7 @@ import (
 	"sort"
 	"strconv"
 
+	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
 	cstypes "agola.io/agola/services/configstore/types"
@@ -56,13 +57,13 @@ func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	u, err := h.ah.CreateUser(ctx, creq)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	res := createUserResponse(u)
 	if err := httpResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -82,12 +83,12 @@ func (h *DeleteUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	err := h.ah.DeleteUser(ctx, userRef)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -112,13 +113,13 @@ func (h *CurrentUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.ah.GetUser(ctx, userID)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	res := createUserResponse(user)
 	if err := httpResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -138,13 +139,13 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.ah.GetUser(ctx, userRef)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	res := createUserResponse(user)
 	if err := httpResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -217,7 +218,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	csusers, err := h.ah.GetUsers(ctx, areq)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
@@ -227,7 +228,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := httpResponse(w, http.StatusOK, users); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -254,12 +255,12 @@ func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	res, err := h.createUserLA(ctx, userRef, req)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	if err := httpResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -311,12 +312,12 @@ func (h *DeleteUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	err := h.ah.DeleteUserLA(ctx, userRef, laID)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -348,7 +349,7 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	h.log.Infof("creating user %q token", userRef)
 	token, err := h.ah.CreateUserToken(ctx, creq)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
@@ -357,7 +358,7 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	}
 
 	if err := httpResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -379,12 +380,12 @@ func (h *DeleteUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	h.log.Infof("deleting user %q token %q", userRef, tokenName)
 	err := h.ah.DeleteUserToken(ctx, userRef, tokenName)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -409,12 +410,12 @@ func (h *RegisterUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	res, err := h.registerUser(ctx, req)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	if err := httpResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -460,12 +461,12 @@ func (h *AuthorizeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	res, err := h.authorize(ctx, req)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	if err := httpResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -517,12 +518,12 @@ func (h *LoginUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	res, err := h.loginUser(ctx, req)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	if err := httpResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -582,11 +583,11 @@ func (h *UserCreateRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	}
 	err := h.ah.UserCreateRun(ctx, creq)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	if err := httpResponse(w, http.StatusCreated, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }

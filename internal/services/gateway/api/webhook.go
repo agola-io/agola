@@ -17,6 +17,7 @@ package api
 import (
 	"net/http"
 
+	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/services/types"
@@ -49,12 +50,12 @@ func NewWebhooksHandler(logger *zap.Logger, ah *action.ActionHandler, configstor
 func (h *webhooksHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err := h.handleWebhook(r)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	if err := httpResponse(w, http.StatusOK, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 

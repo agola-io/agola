@@ -337,7 +337,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 		var err error
 		tlsConfig, err = util.NewTLSConfig(g.c.Web.TLSCertFile, g.c.Web.TLSKeyFile, "", false)
 		if err != nil {
-			log.Errorf("err: %+v")
+			log.Errorf("err: %s", slog.FormatError(err))
 			return err
 		}
 	}
@@ -359,7 +359,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 		httpServer.Close()
 	case err := <-lerrCh:
 		if err != nil {
-			log.Errorf("http server listen error: %v", err)
+			log.Errorf("http server listen error: %s", slog.FormatError(err))
 			return err
 		}
 	}

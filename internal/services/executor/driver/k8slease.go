@@ -19,6 +19,8 @@ import (
 	"encoding/json"
 	"time"
 
+	slog "agola.io/agola/internal/log"
+
 	errors "golang.org/x/xerrors"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -195,7 +197,7 @@ func (d *K8sDriver) cleanStaleExecutorsLease(ctx context.Context) error {
 			if lease.Spec.RenewTime.Add(staleExecutorLeaseInterval).Before(time.Now()) {
 				d.log.Infof("deleting stale lease %q", lease.Name)
 				if err := leaseClient.Delete(lease.Name, nil); err != nil {
-					d.log.Errorf("failed to delete stale lease %q, err: %v", lease.Name, err)
+					d.log.Errorf("failed to delete stale lease %q, err: %s", lease.Name, slog.FormatError(err))
 				}
 			}
 		}
@@ -225,7 +227,7 @@ func (d *K8sDriver) cleanStaleExecutorsLease(ctx context.Context) error {
 			if ld.RenewTime.Add(staleExecutorLeaseInterval).Before(time.Now()) {
 				d.log.Infof("deleting stale configmap lease %q", cm.Name)
 				if err := cmClient.Delete(cm.Name, nil); err != nil {
-					d.log.Errorf("failed to delete stale configmap lease %q, err: %v", cm.Name, err)
+					d.log.Errorf("failed to delete stale configmap lease %q, err: %s", cm.Name, slog.FormatError(err))
 				}
 			}
 		}

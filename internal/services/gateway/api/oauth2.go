@@ -17,6 +17,7 @@ package api
 import (
 	"net/http"
 
+	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
@@ -41,7 +42,7 @@ func (h *OAuth2CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 	cresp, err := h.ah.HandleOauth2Callback(ctx, code, state)
 	if err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		httpError(w, util.NewErrBadRequest(err))
 		return
 	}
@@ -87,6 +88,6 @@ func (h *OAuth2CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		Response:    response,
 	}
 	if err := httpResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }

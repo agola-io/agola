@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"time"
 
+	slog "agola.io/agola/internal/log"
 	"agola.io/agola/services/runservice/types"
 	"go.uber.org/zap"
 	errors "golang.org/x/xerrors"
@@ -97,7 +98,7 @@ func (h *logsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.readTaskLogs(taskID, setup, step, w, follow); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 

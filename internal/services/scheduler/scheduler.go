@@ -39,7 +39,7 @@ var log = logger.Sugar()
 func (s *Scheduler) scheduleLoop(ctx context.Context) {
 	for {
 		if err := s.schedule(ctx); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
@@ -75,7 +75,7 @@ func (s *Scheduler) schedule(ctx context.Context) error {
 
 	for groupID := range groups {
 		if err := s.scheduleRun(ctx, groupID); err != nil {
-			log.Errorf("scheduler err: %v", err)
+			log.Errorf("scheduler err: %s", slog.FormatError(err))
 		}
 	}
 
@@ -103,7 +103,7 @@ func (s *Scheduler) scheduleRun(ctx context.Context, groupID string) error {
 		log.Infof("starting run %s", run.ID)
 		log.Debugf("changegroups: %s", runningRunsResponse.ChangeGroupsUpdateToken)
 		if _, err := s.runserviceClient.StartRun(ctx, run.ID, runningRunsResponse.ChangeGroupsUpdateToken); err != nil {
-			log.Errorf("failed to start run %s: %v", run.ID, err)
+			log.Errorf("failed to start run %s: %s", run.ID, slog.FormatError(err))
 		}
 	}
 
@@ -113,7 +113,7 @@ func (s *Scheduler) scheduleRun(ctx context.Context, groupID string) error {
 func (s *Scheduler) approveLoop(ctx context.Context) {
 	for {
 		if err := s.approve(ctx); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
@@ -140,7 +140,7 @@ func (s *Scheduler) approve(ctx context.Context) error {
 		for _, run := range runningRunsResponse.Runs {
 			if err := s.approveRunTasks(ctx, run.ID); err != nil {
 				// just log error and continue with the other runs
-				log.Errorf("failed to approve run tasks for run %q: %+v", run.ID, err)
+				log.Errorf("failed to approve run tasks for run %q: %s", run.ID, slog.FormatError(err))
 			}
 		}
 

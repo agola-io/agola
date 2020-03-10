@@ -52,7 +52,7 @@ func (s *Configstore) maintenanceModeWatcherLoop(ctx context.Context, runCtxCanc
 
 		// at first watch restart from previous processed revision
 		if err := s.maintenanceModeWatcher(ctx, runCtxCancel, maintenanceModeEnabled); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
@@ -326,7 +326,7 @@ func (s *Configstore) setupMaintenanceRouter() http.Handler {
 func (s *Configstore) Run(ctx context.Context) error {
 	for {
 		if err := s.run(ctx); err != nil {
-			log.Errorf("run error: %+v", err)
+			log.Errorf("run error: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
@@ -345,7 +345,7 @@ func (s *Configstore) run(ctx context.Context) error {
 		var err error
 		tlsConfig, err = util.NewTLSConfig(s.c.Web.TLSCertFile, s.c.Web.TLSKeyFile, "", false)
 		if err != nil {
-			log.Errorf("err: %+v")
+			log.Errorf("err: %s", slog.FormatError(err))
 			return err
 		}
 	}
@@ -406,12 +406,12 @@ func (s *Configstore) run(ctx context.Context) error {
 		log.Infof("configstore run exiting")
 	case err := <-lerrCh:
 		if err != nil {
-			log.Errorf("http server listen error: %+v", err)
+			log.Errorf("http server listen error: %s", slog.FormatError(err))
 			return err
 		}
 	case err := <-errCh:
 		if err != nil {
-			log.Errorf("error: %+v", err)
+			log.Errorf("error: %s", slog.FormatError(err))
 			return err
 		}
 	}

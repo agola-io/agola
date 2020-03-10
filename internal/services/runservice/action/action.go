@@ -23,6 +23,7 @@ import (
 	"agola.io/agola/internal/datamanager"
 	"agola.io/agola/internal/db"
 	"agola.io/agola/internal/etcd"
+	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/runconfig"
 	"agola.io/agola/internal/sequence"
@@ -193,14 +194,14 @@ func (h *ActionHandler) newRun(ctx context.Context, req *RunCreateRequest) (*typ
 	id := seq.String()
 
 	if err := runconfig.CheckRunConfigTasks(rcts); err != nil {
-		h.log.Errorf("check run config tasks failed: %+v", err)
+		h.log.Errorf("check run config tasks failed: %s", slog.FormatError(err))
 		setupErrors = append(setupErrors, err.Error())
 	}
 
 	// generate tasks levels
 	if len(setupErrors) == 0 {
 		if err := runconfig.GenTasksLevels(rcts); err != nil {
-			h.log.Errorf("gen tasks leveles failed: %+v", err)
+			h.log.Errorf("gen tasks leveles failed: %s", slog.FormatError(err))
 			setupErrors = append(setupErrors, err.Error())
 		}
 	}

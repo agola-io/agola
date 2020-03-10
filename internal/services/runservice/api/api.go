@@ -25,6 +25,7 @@ import (
 	"agola.io/agola/internal/datamanager"
 	"agola.io/agola/internal/db"
 	"agola.io/agola/internal/etcd"
+	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/services/runservice/action"
 	"agola.io/agola/internal/services/runservice/common"
@@ -191,7 +192,7 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err, sendError := h.readTaskLogs(ctx, runID, taskID, setup, step, w, follow); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		if sendError {
 			switch {
 			case util.IsNotExist(err):
@@ -377,7 +378,7 @@ func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.deleteTaskLogs(ctx, runID, taskID, setup, step, w); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		switch {
 		case util.IsNotExist(err):
 			httpError(w, util.NewErrNotExist(errors.Errorf("log doesn't exist: %w", err)))
@@ -459,7 +460,7 @@ func (h *ChangeGroupsUpdateTokensHandler) ServeHTTP(w http.ResponseWriter, r *ht
 	}
 
 	if err := httpResponse(w, http.StatusOK, cgts); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -494,7 +495,7 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		run, err = h.readDB.GetRun(tx, runID)
 		if err != nil {
-			h.log.Errorf("err: %+v", err)
+			h.log.Errorf("err: %s", slog.FormatError(err))
 			return err
 		}
 
@@ -529,7 +530,7 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := httpResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -591,7 +592,7 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		runs, err = h.readDB.GetRuns(tx, groups, lastRun, phaseFilter, resultFilter, start, limit, sortOrder)
 		if err != nil {
-			h.log.Errorf("err: %+v", err)
+			h.log.Errorf("err: %s", slog.FormatError(err))
 			return err
 		}
 
@@ -614,7 +615,7 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ChangeGroupsUpdateToken: cgts,
 	}
 	if err := httpResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -658,7 +659,7 @@ func (h *RunCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	rb, err := h.ah.CreateRun(ctx, creq)
 	if err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		httpError(w, err)
 		return
 	}
@@ -669,7 +670,7 @@ func (h *RunCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := httpResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 
@@ -705,7 +706,7 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			ChangeGroupsUpdateToken: req.ChangeGroupsUpdateToken,
 		}
 		if err := h.ah.ChangeRunPhase(ctx, creq); err != nil {
-			h.log.Errorf("err: %+v", err)
+			h.log.Errorf("err: %s", slog.FormatError(err))
 			httpError(w, err)
 			return
 		}
@@ -715,7 +716,7 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			ChangeGroupsUpdateToken: req.ChangeGroupsUpdateToken,
 		}
 		if err := h.ah.StopRun(ctx, creq); err != nil {
-			h.log.Errorf("err: %+v", err)
+			h.log.Errorf("err: %s", slog.FormatError(err))
 			httpError(w, err)
 			return
 		}
@@ -759,7 +760,7 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 			ChangeGroupsUpdateToken: req.ChangeGroupsUpdateToken,
 		}
 		if err := h.ah.RunTaskSetAnnotations(ctx, creq); err != nil {
-			h.log.Errorf("err: %+v", err)
+			h.log.Errorf("err: %s", slog.FormatError(err))
 			httpError(w, err)
 			return
 		}
@@ -771,7 +772,7 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 			ChangeGroupsUpdateToken: req.ChangeGroupsUpdateToken,
 		}
 		if err := h.ah.ApproveRunTask(ctx, creq); err != nil {
-			h.log.Errorf("err: %+v", err)
+			h.log.Errorf("err: %s", slog.FormatError(err))
 			httpError(w, err)
 			return
 		}
@@ -808,7 +809,7 @@ func (h *RunEventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	startRunEventID := q.Get("startruneventid")
 
 	if err := h.sendRunEvents(ctx, startRunEventID, w); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 

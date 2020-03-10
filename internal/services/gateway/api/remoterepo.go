@@ -18,6 +18,7 @@ import (
 	"net/http"
 
 	gitsource "agola.io/agola/internal/gitsources"
+	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
 	csclient "agola.io/agola/services/configstore/client"
@@ -62,13 +63,13 @@ func (h *UserRemoteReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 
 	user, resp, err := h.configstoreClient.GetUser(ctx, userID)
 	if httpErrorFromRemote(w, resp, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, remoteSourceRef)
 	if httpErrorFromRemote(w, resp, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
@@ -82,14 +83,14 @@ func (h *UserRemoteReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	if la == nil {
 		err := util.NewErrBadRequest(errors.Errorf("user doesn't have a linked account for remote source %q", rs.Name))
 		httpError(w, err)
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	gitsource, err := h.ah.GetGitSource(ctx, rs, user.Name, la)
 	if err != nil {
 		httpError(w, err)
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
@@ -97,7 +98,7 @@ func (h *UserRemoteReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		err := util.NewErrBadRequest(errors.Errorf("failed to get user repositories from git source: %w", err))
 		httpError(w, err)
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
@@ -106,6 +107,6 @@ func (h *UserRemoteReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		repos[i] = createRemoteRepoResponse(r)
 	}
 	if err := httpResponse(w, http.StatusOK, repos); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }

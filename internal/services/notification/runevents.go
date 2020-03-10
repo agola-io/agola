@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"agola.io/agola/internal/etcd"
+	slog "agola.io/agola/internal/log"
 	rstypes "agola.io/agola/services/runservice/types"
 
 	"go.etcd.io/etcd/clientv3/concurrency"
@@ -38,7 +39,7 @@ var (
 func (n *NotificationService) runEventsHandlerLoop(ctx context.Context) {
 	for {
 		if err := n.runEventsHandler(ctx); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
@@ -111,7 +112,7 @@ func (n *NotificationService) runEventsHandler(ctx context.Context) error {
 			// their status to etcd so we can also do more logic like retrying and handle
 			// multiple kind of notifications (email etc...)
 			if err := n.updateCommitStatus(ctx, ev); err != nil {
-				log.Infof("failed to update commit status: %v", err)
+				log.Infof("failed to update commit status: %s", slog.FormatError(err))
 			}
 
 		default:

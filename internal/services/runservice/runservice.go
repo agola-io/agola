@@ -54,7 +54,7 @@ var log = logger.Sugar()
 func (s *Runservice) etcdPingerLoop(ctx context.Context) {
 	for {
 		if err := s.etcdPinger(ctx); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
@@ -79,7 +79,7 @@ func (s *Runservice) maintenanceModeWatcherLoop(ctx context.Context, runCtxCance
 
 		// at first watch restart from previous processed revision
 		if err := s.maintenanceModeWatcher(ctx, runCtxCancel, maintenanceModeEnabled); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Errorf("err: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
@@ -305,7 +305,7 @@ func (s *Runservice) setupMaintenanceRouter() http.Handler {
 func (s *Runservice) Run(ctx context.Context) error {
 	for {
 		if err := s.run(ctx); err != nil {
-			log.Errorf("run error: %+v", err)
+			log.Errorf("run error: %s", slog.FormatError(err))
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
@@ -324,7 +324,7 @@ func (s *Runservice) run(ctx context.Context) error {
 		var err error
 		tlsConfig, err = util.NewTLSConfig(s.c.Web.TLSCertFile, s.c.Web.TLSKeyFile, "", false)
 		if err != nil {
-			log.Errorf("err: %+v")
+			log.Errorf("err: %s", slog.FormatError(err))
 			return err
 		}
 	}
@@ -371,7 +371,7 @@ func (s *Runservice) run(ctx context.Context) error {
 			if err == nil {
 				break
 			}
-			log.Errorf("failed to initialize etcd: %+v", err)
+			log.Errorf("failed to initialize etcd: %s", slog.FormatError(err))
 
 			sleepCh := time.NewTimer(1 * time.Second).C
 			select {
@@ -411,11 +411,11 @@ func (s *Runservice) run(ctx context.Context) error {
 		log.Infof("runservice run exiting")
 	case err = <-lerrCh:
 		if err != nil {
-			log.Errorf("http server listen error: %v", err)
+			log.Errorf("http server listen error: %s", slog.FormatError(err))
 		}
 	case err := <-errCh:
 		if err != nil {
-			log.Errorf("error: %+v", err)
+			log.Errorf("error: %s", slog.FormatError(err))
 		}
 	}
 

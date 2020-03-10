@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/types"
 
@@ -189,7 +190,7 @@ func NewK8sDriver(logger *zap.Logger, executorID, toolboxPath string) (*K8sDrive
 	go func() {
 		for {
 			if err := d.updateLease(ctx); err != nil {
-				d.log.Errorf("failed to update executor lease: %+v", err)
+				d.log.Errorf("failed to update executor lease: %s", slog.FormatError(err))
 			}
 
 			select {
@@ -205,7 +206,7 @@ func NewK8sDriver(logger *zap.Logger, executorID, toolboxPath string) (*K8sDrive
 	go func() {
 		for {
 			if err := d.cleanStaleExecutorsLease(ctx); err != nil {
-				d.log.Errorf("failed to clean stale executors lease: %+v", err)
+				d.log.Errorf("failed to clean stale executors lease: %s", slog.FormatError(err))
 			}
 
 			select {

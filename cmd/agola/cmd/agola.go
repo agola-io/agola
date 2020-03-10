@@ -46,6 +46,10 @@ var cmdAgola = &cobra.Command{
 		if agolaOpts.debug {
 			level.SetLevel(zapcore.DebugLevel)
 		}
+
+		if agolaOpts.detailedErrors {
+			slog.SetDetailedErrorFormat(true)
+		}
 	},
 	Run: func(c *cobra.Command, args []string) {
 		if err := c.Help(); err != nil {
@@ -55,8 +59,9 @@ var cmdAgola = &cobra.Command{
 }
 
 type agolaOptions struct {
-	gatewayURL string
-	debug      bool
+	gatewayURL     string
+	debug          bool
+	detailedErrors bool
 }
 
 var agolaOpts agolaOptions
@@ -76,6 +81,7 @@ func init() {
 
 	flags.StringVarP(&agolaOpts.gatewayURL, "gateway-url", "u", gatewayURL, "agola gateway exposed url")
 	flags.StringVar(&token, "token", token, "api token")
+	flags.BoolVar(&agolaOpts.detailedErrors, "detailed-errors", false, "show detailed errors output")
 	flags.BoolVarP(&agolaOpts.debug, "debug", "d", false, "debug")
 }
 

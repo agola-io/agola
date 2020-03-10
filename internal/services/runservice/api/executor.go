@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"agola.io/agola/internal/etcd"
+	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/services/runservice/action"
 	"agola.io/agola/internal/services/runservice/common"
@@ -99,7 +100,7 @@ func (h *ExecutorStatusHandler) deleteStaleExecutors(ctx context.Context, curExe
 		}
 		if !active {
 			if err := h.ah.DeleteExecutor(ctx, executor.ID); err != nil {
-				h.log.Errorf("failed to delete executor %q: %v", executor.ID, err)
+				h.log.Errorf("failed to delete executor %q: %s", executor.ID, slog.FormatError(err))
 			}
 		}
 	}
@@ -159,12 +160,12 @@ func (h *ExecutorTaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	et, err := h.ah.GetExecutorTask(ctx, etID)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	if err := httpResponse(w, http.StatusOK, et); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }
 

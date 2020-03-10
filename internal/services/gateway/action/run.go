@@ -23,6 +23,7 @@ import (
 
 	"agola.io/agola/internal/config"
 	gitsource "agola.io/agola/internal/gitsources"
+	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/runconfig"
 	"agola.io/agola/internal/services/common"
 	itypes "agola.io/agola/internal/services/types"
@@ -512,7 +513,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 
 	config, err := config.ParseConfig([]byte(data), configFormat, configContext)
 	if err != nil {
-		h.log.Errorf("failed to parse config: %+v", err)
+		h.log.Errorf("failed to parse config: %s", slog.FormatError(err))
 
 		// create a run (per config file) with a generic error since we cannot parse
 		// it and know how many runs are defined
@@ -527,7 +528,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 		}
 
 		if _, _, err := h.runserviceClient.CreateRun(ctx, createRunReq); err != nil {
-			h.log.Errorf("failed to create run: %+v", err)
+			h.log.Errorf("failed to create run: %s", slog.FormatError(err))
 			return err
 		}
 		return nil
@@ -557,7 +558,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 		}
 
 		if _, _, err := h.runserviceClient.CreateRun(ctx, createRunReq); err != nil {
-			h.log.Errorf("failed to create run: %+v", err)
+			h.log.Errorf("failed to create run: %s", slog.FormatError(err))
 			return err
 		}
 	}
@@ -575,7 +576,7 @@ func (h *ActionHandler) fetchConfigFiles(ctx context.Context, gitSource gitsourc
 			if err == nil {
 				return true, nil
 			}
-			h.log.Errorf("get file err: %v", err)
+			h.log.Errorf("get file err: %s", slog.FormatError(err))
 		}
 		return false, nil
 	})

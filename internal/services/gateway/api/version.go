@@ -17,6 +17,7 @@ package api
 import (
 	"net/http"
 
+	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/services/gateway/action"
 
 	"go.uber.org/zap"
@@ -36,11 +37,11 @@ func (h *VersionHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	version, err := h.ah.GetVersion(ctx)
 	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 		return
 	}
 
 	if err := httpResponse(w, http.StatusOK, version); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Errorf("err: %s", slog.FormatError(err))
 	}
 }

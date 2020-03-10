@@ -22,6 +22,7 @@ import (
 	"agola.io/agola/internal/services/common"
 	csclient "agola.io/agola/services/configstore/client"
 
+	slog "agola.io/agola/internal/log"
 	jwt "github.com/dgrijalva/jwt-go"
 	jwtrequest "github.com/dgrijalva/jwt-go/request"
 	"go.uber.org/zap"
@@ -105,7 +106,7 @@ func (h *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return key, nil
 		})
 		if err != nil {
-			h.log.Errorf("err: %+v", err)
+			h.log.Errorf("err: %s", slog.FormatError(err))
 			http.Error(w, "", http.StatusUnauthorized)
 			return
 		}
