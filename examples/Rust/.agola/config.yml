@@ -1,0 +1,19 @@
+version: v0
+
+runs:
+  - name: rust example
+    tasks:
+      - name: build and test
+        runtime:
+          type: pod
+          arch: amd64
+          containers:
+            - image: rust:1.41-stretch
+        steps:
+          - clone:
+          - run:
+              name: build
+              command: cargo build --verbose
+          - run:
+              name: test
+              commad: cargo test --verbose
