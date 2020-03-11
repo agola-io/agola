@@ -64,6 +64,15 @@ const (
 	agolaUser01 = "user01"
 )
 
+type ConfigFormat string
+
+const (
+	// ConfigFormatJSON handles both json or yaml format (since json is a subset of yaml)
+	ConfigFormatJSON     ConfigFormat = "json"
+	ConfigFormatJsonnet  ConfigFormat = "jsonnet"
+	ConfigFormatStarlark ConfigFormat = "starlark"
+)
+
 func setupEtcd(t *testing.T, logger *zap.Logger, dir string) *testutil.TestEmbeddedEtcd {
 	tetcd, err := testutil.NewTestEmbeddedEtcd(t, logger, dir)
 	if err != nil {
@@ -850,7 +859,7 @@ func TestPush(t *testing.T) {
 	}
 }
 
-func directRun(t *testing.T, dir, config, gatewayURL, token string, args ...string) {
+func directRun(t *testing.T, dir, config string, configFormat ConfigFormat, gatewayURL, token string, args ...string) {
 	agolaBinDir := os.Getenv("AGOLA_BIN_DIR")
 	if agolaBinDir == "" {
 		t.Fatalf("env var AGOLA_BIN_DIR is undefined")
@@ -868,7 +877,15 @@ func directRun(t *testing.T, dir, config, gatewayURL, token string, args ...stri
 	gitfs := osfs.New(repoDir)
 	dot, _ := gitfs.Chroot(".git")
 
-	f, err := gitfs.Create(".agola/config.jsonnet")
+	var configPath string
+	switch configFormat {
+	case ConfigFormatJsonnet:
+		configPath = ".agola/config.jsonnet"
+	case ConfigFormatStarlark:
+		configPath = ".agola/config.star"
+	}
+
+	f, err := gitfs.Create(configPath)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -987,7 +1004,7 @@ func TestDirectRun(t *testing.T) {
 			// From now use the user token
 			gwClient = gwclient.NewClient(c.Gateway.APIExposedURL, token)
 
-			directRun(t, dir, config, c.Gateway.APIExposedURL, token, tt.args...)
+			directRun(t, dir, config, ConfigFormatJsonnet, c.Gateway.APIExposedURL, token, tt.args...)
 
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
 				runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/user", user.ID)}, nil, "", 0, false)
@@ -1140,7 +1157,7 @@ func TestDirectRunVariables(t *testing.T) {
 			// From now use the user token
 			gwClient = gwclient.NewClient(c.Gateway.APIExposedURL, token)
 
-			directRun(t, dir, config, c.Gateway.APIExposedURL, token, tt.args...)
+			directRun(t, dir, config, ConfigFormatJsonnet, c.Gateway.APIExposedURL, token, tt.args...)
 
 			// TODO(sgotti) add an util to wait for a run phase
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
@@ -1311,7 +1328,7 @@ func TestDirectRunLogs(t *testing.T) {
 			// From now use the user token
 			gwClient = gwclient.NewClient(c.Gateway.APIExposedURL, token)
 
-			directRun(t, dir, config, c.Gateway.APIExposedURL, token)
+			directRun(t, dir, config, ConfigFormatJsonnet, c.Gateway.APIExposedURL, token)
 
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
 				runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/user", user.ID)}, nil, "", 0, false)
@@ -1682,7 +1699,7 @@ func TestPullRequest(t *testing.T) {
 }
 
 func TestConfigContext(t *testing.T) {
-	config := `
+	jsonnetConfig := `
 function(ctx) {
   runs: [
     {
@@ -1713,6 +1730,41 @@ function(ctx) {
       ],
     },
   ],
+}
+`
+
+	starlarkConfig := `
+def main(ctx):
+  return {
+    "runs": [
+    {
+      "name": 'run01',
+      "tasks": [
+        {
+          "name": 'task01',
+          "runtime": {
+            "containers": [
+              {
+                "image": 'alpine/git',
+              }
+            ]
+          },
+          "environment": {
+            "REF_TYPE": ctx["ref_type"],
+            "REF": ctx["ref"],
+            "BRANCH": ctx["branch"],
+            "TAG": ctx["tag"],
+            "PULL_REQUEST_ID": ctx["pull_request_id"],
+            "COMMIT_SHA": ctx["commit_sha"]
+          },
+          "steps": [
+            { "type": 'clone' },
+            { "type": 'run', "command": 'env' }
+          ],
+        },
+      ],
+    },
+  ]
 }
 `
 
@@ -1758,111 +1810,121 @@ function(ctx) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			dir, err := ioutil.TempDir("", "agola")
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
-			defer os.RemoveAll(dir)
+	for _, configFormat := range []ConfigFormat{ConfigFormatJsonnet, ConfigFormatStarlark} {
+		for _, tt := range tests {
+			t.Run(fmt.Sprintf("%s with %s config", tt.name, configFormat), func(t *testing.T) {
+				var config string
+				switch configFormat {
+				case ConfigFormatJsonnet:
+					config = jsonnetConfig
+				case ConfigFormatStarlark:
+					config = starlarkConfig
+				}
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+				dir, err := ioutil.TempDir("", "agola")
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				defer os.RemoveAll(dir)
 
-			tetcd, tgitea, c := setup(ctx, t, dir)
-			defer shutdownGitea(tgitea)
-			defer shutdownEtcd(tetcd)
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
 
-			gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
-			user, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
-			t.Logf("created agola user: %s", user.UserName)
+				tetcd, tgitea, c := setup(ctx, t, dir)
+				defer shutdownGitea(tgitea)
+				defer shutdownEtcd(tetcd)
 
-			token := createAgolaUserToken(ctx, t, c)
+				gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
+				user, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				t.Logf("created agola user: %s", user.UserName)
 
-			// From now use the user token
-			gwClient = gwclient.NewClient(c.Gateway.APIExposedURL, token)
+				token := createAgolaUserToken(ctx, t, c)
 
-			directRun(t, dir, config, c.Gateway.APIExposedURL, token, tt.args...)
+				// From now use the user token
+				gwClient = gwclient.NewClient(c.Gateway.APIExposedURL, token)
 
-			// TODO(sgotti) add an util to wait for a run phase
-			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+				directRun(t, dir, config, configFormat, c.Gateway.APIExposedURL, token, tt.args...)
+
+				// TODO(sgotti) add an util to wait for a run phase
+				_ = testutil.Wait(30*time.Second, func() (bool, error) {
+					runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/user", user.ID)}, nil, "", 0, false)
+					if err != nil {
+						return false, nil
+					}
+
+					if len(runs) != 1 {
+						return false, nil
+					}
+
+					run := runs[0]
+					if run.Phase != rstypes.RunPhaseFinished {
+						return false, nil
+					}
+
+					return true, nil
+				})
+
 				runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/user", user.ID)}, nil, "", 0, false)
 				if err != nil {
-					return false, nil
+					t.Fatalf("unexpected err: %v", err)
 				}
+
+				t.Logf("runs: %s", util.Dump(runs))
 
 				if len(runs) != 1 {
-					return false, nil
+					t.Fatalf("expected 1 run got: %d", len(runs))
 				}
 
-				run := runs[0]
+				run, _, err := gwClient.GetRun(ctx, runs[0].ID)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
 				if run.Phase != rstypes.RunPhaseFinished {
-					return false, nil
+					t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, run.Phase)
+				}
+				if run.Result != rstypes.RunResultSuccess {
+					t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, run.Result)
 				}
 
-				return true, nil
-			})
-
-			runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/user", user.ID)}, nil, "", 0, false)
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
-
-			t.Logf("runs: %s", util.Dump(runs))
-
-			if len(runs) != 1 {
-				t.Fatalf("expected 1 run got: %d", len(runs))
-			}
-
-			run, _, err := gwClient.GetRun(ctx, runs[0].ID)
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
-			if run.Phase != rstypes.RunPhaseFinished {
-				t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, run.Phase)
-			}
-			if run.Result != rstypes.RunResultSuccess {
-				t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, run.Result)
-			}
-
-			var task *gwapitypes.RunResponseTask
-			for _, t := range run.Tasks {
-				if t.Name == "task01" {
-					task = t
-					break
-				}
-			}
-
-			resp, err := gwClient.GetLogs(ctx, run.ID, task.ID, false, 1, false)
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
-			defer resp.Body.Close()
-
-			logs, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
-			curEnv, err := testutil.ParseEnvs(bytes.NewReader(logs))
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
-
-			// update commit sha from annotations since it will change at every test
-			tt.env["COMMIT_SHA"] = run.Annotations["commit_sha"]
-
-			for n, e := range tt.env {
-				if ce, ok := curEnv[n]; !ok {
-					t.Fatalf("missing env var %s", n)
-				} else {
-					if ce != e {
-						t.Fatalf("different env var %s value, want: %q, got %q", n, e, ce)
+				var task *gwapitypes.RunResponseTask
+				for _, t := range run.Tasks {
+					if t.Name == "task01" {
+						task = t
+						break
 					}
 				}
-			}
-		})
+
+				resp, err := gwClient.GetLogs(ctx, run.ID, task.ID, false, 1, false)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				defer resp.Body.Close()
+
+				logs, err := ioutil.ReadAll(resp.Body)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				curEnv, err := testutil.ParseEnvs(bytes.NewReader(logs))
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				// update commit sha from annotations since it will change at every test
+				tt.env["COMMIT_SHA"] = run.Annotations["commit_sha"]
+
+				for n, e := range tt.env {
+					if ce, ok := curEnv[n]; !ok {
+						t.Fatalf("missing env var %s", n)
+					} else {
+						if ce != e {
+							t.Fatalf("different env var %s value, want: %q, got %q", n, e, ce)
+						}
+					}
+				}
+			})
+		}
 	}
 }

@@ -32,6 +32,7 @@ require (
 	github.com/spf13/cobra v0.0.5
 	github.com/xanzy/go-gitlab v0.26.0
 	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738
+	go.starlark.net v0.0.0-20200203144150-6677ee5c7211
 	go.uber.org/zap v1.13.0
 	golang.org/x/crypto v0.0.0-20200214034016-1d94cc7ab1c6
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
