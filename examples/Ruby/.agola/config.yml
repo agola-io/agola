@@ -1,0 +1,22 @@
+version: v0
+
+runs:
+  - name: ruby example
+    tasks:
+      - name: Build and test with Rake
+        runtime:
+          type: pod
+          arch: amd64
+          containers:
+            - image: ruby:2.6-stretch
+        steps:
+          - clone:
+          - run:
+              name: Install Bundler
+              command: gem install bundler
+          - run:
+              name: Install dependencies
+              commad: bundle install --jobs 4 --retry 3
+          - run:
+              name: Test with Rake
+              command: bundle exec rake
