@@ -1,0 +1,19 @@
+version: v0
+
+runs:
+  - name: crystal example
+    tasks:
+      - name: Test
+        runtime:
+          type: pod
+          arch: amd64
+          containers:
+            - image: crystallang/crystal
+        steps:
+          - clone:
+          - run:
+              name: Install dependencies
+              command: shards install
+          - run:
+              name: Run tests
+              commad: crystal spec
