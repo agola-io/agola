@@ -1,0 +1,19 @@
+version: v0
+
+runs:
+  - name: elixir example
+    tasks:
+      - name: build and test
+        runtime:
+          type: pod
+          arch: amd64
+          containers:
+            - image: elixir:latest
+        steps:
+          - clone:
+          - run:
+              name: Install dependencies
+              command: mix deps.get
+          - run:
+              name: Run tests
+              commad: mix test
