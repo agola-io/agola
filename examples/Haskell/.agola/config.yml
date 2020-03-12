@@ -1,0 +1,22 @@
+version: v0
+
+runs:
+  - name: haskell example
+    tasks:
+      - name: build and test
+        runtime:
+          type: pod
+          arch: amd64
+          containers:
+            - image: haskell:8
+        steps:
+          - clone:
+          - run:
+              name: Install dependencies
+              command: cabal update && cabal install --only-dependencies --enable-tests
+          - run:
+              name: Build
+              commad: cabal configure --enable-tests && cabal build
+          - run:
+              name: Run tests
+              command: cabal test
