@@ -1,0 +1,19 @@
+version: v0
+
+runs:
+  - name: erlang example
+    tasks:
+      - name: build and test
+        runtime:
+          type: pod
+          arch: amd64
+          containers:
+            - image: erlang:22.0.7
+        steps:
+          - clone:
+          - run:
+              name: Compile
+              command: rebar3 compile
+          - run:
+              name: Run tests
+              commad: rebar3 do eunit, ct
