@@ -1,0 +1,19 @@
+version: v0
+
+runs:
+  - name: clojure example
+    tasks:
+      - name: build and test
+        runtime:
+          type: pod
+          arch: amd64
+          containers:
+            - image: clojure:lein
+        steps:
+          - clone:
+          - run:
+              name: Install dependencies
+              command: lein deps
+          - run:
+              name: Run tests
+              commad: lein test
