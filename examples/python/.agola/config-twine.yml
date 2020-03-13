@@ -1,0 +1,30 @@
+version: v0
+
+runs:
+  - name: python twine example
+    tasks:
+      - name: Publish python package
+        environment:
+          TWINE_USERNAME:
+            from_variable: twine_username
+          TWINE_PASSWORD:
+            from_variable: twine_password
+        runtime:
+          type: pod
+          arch: amd64
+          containers:
+            - image: python:3-buster
+        steps:
+          - clone:
+          - run:
+              name: Upgrade pip
+              command: python -m pip install --upgrade pip
+          - run:
+              name: Install dependencies
+              command: pip install setuptools wheel twine
+          - run:
+              name: Build
+              command: python setup.py sdist bdist_wheel
+          - run:
+              name: Publish
+              command: twine upload dist/*
