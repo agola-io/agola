@@ -30,6 +30,7 @@ import (
 )
 
 const (
+	maxConfigSize     = 1024 * 1024 // 1MiB
 	maxRunNameLength  = 100
 	maxTaskNameLength = 100
 	maxStepNameLength = 100
@@ -659,20 +660,28 @@ type ConfigContext struct {
 }
 
 func ParseConfig(configData []byte, format ConfigFormat, configContext *ConfigContext) (*Config, error) {
-	// Generate json from jsonnet
+	// TODO(sgotti) execute jsonnet and starlark executor in a
+	// separate process to avoid issues with malformat config that
+	// could lead to infinite executions and memory exhaustion
 	switch format {
 	case ConfigFormatJsonnet:
+		// Generate json from jsonnet
 		var err error
 		configData, err = execJsonnet(configData, configContext)
 		if err != nil {
 			return nil, errors.Errorf("failed to execute jsonnet: %w", err)
 		}
 	case ConfigFormatStarlark:
+		// Generate json from starlark
 		var err error
 		configData, err = execStarlark(configData, configContext)
 		if err != nil {
 			return nil, errors.Errorf("failed to execute starlark: %w", err)
 		}
+	}
+
+	if len(configData) > maxConfigSize {
+		return nil, errors.Errorf("config size is greater than allowed max config size: %d > %d", len(configData), maxConfigSize)
 	}
 
 	config := DefaultConfig
