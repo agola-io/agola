@@ -73,8 +73,9 @@ func createRunResponseTask(r *rstypes.Run, rt *rstypes.RunTask, rct *rstypes.Run
 		Approved:            rt.Approved,
 		ApprovalAnnotations: rt.Annotations,
 
-		Level:   rct.Level,
-		Depends: rct.Depends,
+		GlobalLevel: rct.GlobalLevel,
+		Level:       rct.Level,
+		Depends:     rct.Depends,
 	}
 
 	return t

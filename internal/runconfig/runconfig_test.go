@@ -16,17 +16,16 @@ package runconfig
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
 
 	"agola.io/agola/internal/config"
 	"agola.io/agola/internal/util"
 	rstypes "agola.io/agola/services/runservice/types"
 	"agola.io/agola/services/types"
-	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/google/go-cmp/cmp"
 	errors "golang.org/x/xerrors"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 var uuid = &util.TestUUIDGenerator{}
@@ -47,8 +46,7 @@ func TestGenTasksLevels(t *testing.T) {
 			name: "test single task",
 			in: []task{
 				{
-					ID:    "1",
-					Level: -1,
+					ID: "1",
 				},
 			},
 			out: []task{
@@ -62,12 +60,10 @@ func TestGenTasksLevels(t *testing.T) {
 			name: "test multiple root tasks",
 			in: []task{
 				{
-					ID:    "1",
-					Level: -1,
+					ID: "1",
 				},
 				{
-					ID:    "2",
-					Level: -1,
+					ID: "2",
 				},
 			},
 			out: []task{
@@ -85,14 +81,12 @@ func TestGenTasksLevels(t *testing.T) {
 			name: "test dependency between two tasks",
 			in: []task{
 				{
-					ID:    "1",
-					Level: -1,
+					ID: "1",
 				},
 				{
-					ID:    "2",
-					Level: -1,
+					ID: "2",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
+						"1": {TaskID: "1"},
 					},
 				},
 			},
@@ -105,7 +99,7 @@ func TestGenTasksLevels(t *testing.T) {
 					ID:    "2",
 					Level: 1,
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
+						"1": {TaskID: "1"},
 					},
 				},
 			},
@@ -114,17 +108,15 @@ func TestGenTasksLevels(t *testing.T) {
 			name: "Test circular dependency between two tasks: a -> b -> a",
 			in: []task{
 				{
-					ID:    "1",
-					Level: -1,
+					ID: "1",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
+						"2": {TaskID: "2"},
 					},
 				},
 				{
-					ID:    "2",
-					Level: -1,
+					ID: "2",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
+						"1": {TaskID: "1"},
 					},
 				},
 			},
@@ -134,24 +126,21 @@ func TestGenTasksLevels(t *testing.T) {
 			name: "Test circular dependency between 3 tasks: a -> b -> c -> a",
 			in: []task{
 				{
-					ID:    "1",
-					Level: -1,
+					ID: "1",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
+						"2": {TaskID: "2"},
 					},
 				},
 				{
-					ID:    "2",
-					Level: -1,
+					ID: "2",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"3": &rstypes.RunConfigTaskDepend{TaskID: "3"},
+						"3": {TaskID: "3"},
 					},
 				},
 				{
-					ID:    "3",
-					Level: -1,
+					ID: "3",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
+						"1": {TaskID: "1"},
 					},
 				},
 			},
@@ -161,24 +150,21 @@ func TestGenTasksLevels(t *testing.T) {
 			name: "Test circular dependency between 3 tasks: a -> b -> c -> b",
 			in: []task{
 				{
-					ID:    "1",
-					Level: -1,
+					ID: "1",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
+						"2": {TaskID: "2"},
 					},
 				},
 				{
-					ID:    "2",
-					Level: -1,
+					ID: "2",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"3": &rstypes.RunConfigTaskDepend{TaskID: "3"},
+						"3": {TaskID: "3"},
 					},
 				},
 				{
-					ID:    "3",
-					Level: -1,
+					ID: "3",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
+						"2": {TaskID: "2"},
 					},
 				},
 			},
@@ -205,7 +191,7 @@ func TestGenTasksLevels(t *testing.T) {
 				}
 
 			}
-			if err := GenTasksLevels(inRcts); err != nil {
+			if err := genTasksLevels(inRcts); err != nil {
 				if err.Error() != tt.err.Error() {
 					t.Fatalf("got error: %v, want error: %v", err, tt.err)
 				}
@@ -214,8 +200,411 @@ func TestGenTasksLevels(t *testing.T) {
 			if tt.err != nil {
 				t.Fatalf("got nil error, want error: %v", tt.err)
 			}
-			if !reflect.DeepEqual(inRcts, outRcts) {
-				t.Fatalf("got %s, expected %s", util.Dump(inRcts), util.Dump(outRcts))
+			if diff := cmp.Diff(inRcts, outRcts); diff != "" {
+				t.Error(diff)
+			}
+		})
+	}
+}
+
+func TestGenTaskGroupsLevels(t *testing.T) {
+	type taskGroup struct {
+		Name    string
+		Level   int
+		Depends map[string]*rstypes.RunConfigTaskGroupDepend
+	}
+	tests := []struct {
+		name string
+		in   []taskGroup
+		out  []taskGroup
+		err  error
+	}{
+		{
+			name: "test single task group",
+			in: []taskGroup{
+				{
+					Name: "1",
+				},
+			},
+			out: []taskGroup{
+				{
+					Name:  "1",
+					Level: 0,
+				},
+			},
+		},
+		{
+			name: "test multiple root task groups",
+			in: []taskGroup{
+				{
+					Name: "1",
+				},
+				{
+					Name: "2",
+				},
+			},
+			out: []taskGroup{
+				{
+					Name:  "1",
+					Level: 0,
+				},
+				{
+					Name:  "2",
+					Level: 0,
+				},
+			},
+		},
+		{
+			name: "test dependency between two task groups",
+			in: []taskGroup{
+				{
+					Name: "1",
+				},
+				{
+					Name: "2",
+					Depends: map[string]*rstypes.RunConfigTaskGroupDepend{
+						"1": {TaskGroupName: "1"},
+					},
+				},
+			},
+			out: []taskGroup{
+				{
+					Name:  "1",
+					Level: 0,
+				},
+				{
+					Name:  "2",
+					Level: 1,
+					Depends: map[string]*rstypes.RunConfigTaskGroupDepend{
+						"1": {TaskGroupName: "1"},
+					},
+				},
+			},
+		},
+		{
+			name: "Test circular dependency between two task groups: a -> b -> a",
+			in: []taskGroup{
+				{
+					Name: "1",
+					Depends: map[string]*rstypes.RunConfigTaskGroupDepend{
+						"2": {TaskGroupName: "2"},
+					},
+				},
+				{
+					Name: "2",
+					Depends: map[string]*rstypes.RunConfigTaskGroupDepend{
+						"1": {TaskGroupName: "1"},
+					},
+				},
+			},
+			err: fmt.Errorf("circular dependency detected"),
+		},
+		{
+			name: "Test circular dependency between 3 task groups: a -> b -> c -> a",
+			in: []taskGroup{
+				{
+					Name: "1",
+					Depends: map[string]*rstypes.RunConfigTaskGroupDepend{
+						"2": {TaskGroupName: "2"},
+					},
+				},
+				{
+					Name: "2",
+					Depends: map[string]*rstypes.RunConfigTaskGroupDepend{
+						"3": {TaskGroupName: "3"},
+					},
+				},
+				{
+					Name: "3",
+					Depends: map[string]*rstypes.RunConfigTaskGroupDepend{
+						"1": {TaskGroupName: "1"},
+					},
+				},
+			},
+			err: fmt.Errorf("circular dependency detected"),
+		},
+		{
+			name: "Test circular dependency between 3 task groups: a -> b -> c -> b",
+			in: []taskGroup{
+				{
+					Name: "1",
+					Depends: map[string]*rstypes.RunConfigTaskGroupDepend{
+						"2": {TaskGroupName: "2"},
+					},
+				},
+				{
+					Name: "2",
+					Depends: map[string]*rstypes.RunConfigTaskGroupDepend{
+						"3": {TaskGroupName: "3"},
+					},
+				},
+				{
+					Name: "3",
+					Depends: map[string]*rstypes.RunConfigTaskGroupDepend{
+						"2": {TaskGroupName: "2"},
+					},
+				},
+			},
+			err: fmt.Errorf("circular dependency detected"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			inRctgs := map[string]*rstypes.RunConfigTaskGroup{}
+			for _, t := range tt.in {
+				inRctgs[t.Name] = &rstypes.RunConfigTaskGroup{
+					Name:    t.Name,
+					Level:   t.Level,
+					Depends: t.Depends,
+				}
+
+			}
+			outRctgs := map[string]*rstypes.RunConfigTaskGroup{}
+			for _, t := range tt.out {
+				outRctgs[t.Name] = &rstypes.RunConfigTaskGroup{
+					Name:    t.Name,
+					Level:   t.Level,
+					Depends: t.Depends,
+				}
+
+			}
+			if err := genTaskGroupsLevels(inRctgs); err != nil {
+				if err.Error() != tt.err.Error() {
+					t.Fatalf("got error: %v, want error: %v", err, tt.err)
+				}
+				return
+			}
+			if tt.err != nil {
+				t.Fatalf("got nil error, want error: %v", tt.err)
+			}
+			if diff := cmp.Diff(inRctgs, outRctgs); diff != "" {
+				t.Error(diff)
+			}
+		})
+	}
+}
+
+func TestGenTasksGlobalLevels(t *testing.T) {
+	type taskGroup struct {
+		Name    string
+		Level   int
+		Depends map[string]*rstypes.RunConfigTaskGroupDepend
+	}
+	type task struct {
+		ID          string
+		TaskGroup   string
+		GlobalLevel int
+		Level       int
+		Depends     map[string]*rstypes.RunConfigTaskDepend
+	}
+	tests := []struct {
+		name    string
+		inRctgs []taskGroup
+		inRcts  []task
+		out     []task
+		err     error
+	}{
+		{
+			name: "test single task group",
+			inRctgs: []taskGroup{
+				{
+					Name:  "1",
+					Level: 0,
+				},
+			},
+			inRcts: []task{
+				{
+					ID:        "1",
+					TaskGroup: "1",
+					Level:     0,
+				},
+				{
+					ID:        "2",
+					TaskGroup: "1",
+					Level:     0,
+				},
+				{
+					ID:        "3",
+					TaskGroup: "1",
+					Level:     1,
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"1": {TaskID: "1"},
+					},
+				},
+			},
+			out: []task{
+				{
+					ID:          "1",
+					TaskGroup:   "1",
+					GlobalLevel: 0,
+					Level:       0,
+				},
+				{
+					ID:          "2",
+					TaskGroup:   "1",
+					GlobalLevel: 0,
+					Level:       0,
+				},
+				{
+					ID:          "3",
+					TaskGroup:   "1",
+					GlobalLevel: 1,
+					Level:       1,
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"1": {TaskID: "1"},
+					},
+				},
+			},
+		},
+		{
+			name: "test multiple task groups",
+			inRctgs: []taskGroup{
+				{
+					Name:  "1",
+					Level: 0,
+				},
+				{
+					Name:  "2",
+					Level: 0,
+				},
+				{
+					Name:  "3",
+					Level: 1,
+				},
+				{
+					Name:  "4",
+					Level: 2,
+				},
+			},
+			inRcts: []task{
+				{
+					ID:        "1",
+					TaskGroup: "1",
+					Level:     0,
+				},
+				{
+					ID:        "2",
+					TaskGroup: "1",
+					Level:     1,
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"1": {TaskID: "1"},
+					},
+				},
+				{
+					ID:        "3",
+					TaskGroup: "2",
+					Level:     0,
+				},
+				{
+					ID:        "4",
+					TaskGroup: "3",
+					Level:     0,
+				},
+				{
+					ID:        "5",
+					TaskGroup: "4",
+					Level:     0,
+				},
+				{
+					ID:        "6",
+					TaskGroup: "4",
+					Level:     1,
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"3": {TaskID: "1"},
+					},
+				},
+			},
+			out: []task{
+				{
+					ID:          "1",
+					TaskGroup:   "1",
+					GlobalLevel: 0,
+					Level:       0,
+				},
+				{
+					ID:          "2",
+					TaskGroup:   "1",
+					GlobalLevel: 1,
+					Level:       1,
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"1": {TaskID: "1"},
+					},
+				},
+				{
+					ID:          "3",
+					TaskGroup:   "2",
+					GlobalLevel: 0,
+					Level:       0,
+				},
+				{
+					ID:          "4",
+					TaskGroup:   "3",
+					GlobalLevel: 2,
+					Level:       0,
+				},
+				{
+					ID:          "5",
+					TaskGroup:   "4",
+					GlobalLevel: 3,
+					Level:       0,
+				},
+				{
+					ID:          "6",
+					TaskGroup:   "4",
+					Level:       1,
+					GlobalLevel: 4,
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						"3": {TaskID: "1"},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			inRctgs := map[string]*rstypes.RunConfigTaskGroup{}
+			for _, t := range tt.inRctgs {
+				inRctgs[t.Name] = &rstypes.RunConfigTaskGroup{
+					Name:    t.Name,
+					Level:   t.Level,
+					Depends: t.Depends,
+				}
+
+			}
+			inRcts := map[string]*rstypes.RunConfigTask{}
+			for _, t := range tt.inRcts {
+				inRcts[t.ID] = &rstypes.RunConfigTask{
+					Name:        t.ID,
+					TaskGroup:   t.TaskGroup,
+					GlobalLevel: t.GlobalLevel,
+					Level:       t.Level,
+					Depends:     t.Depends,
+				}
+
+			}
+			outRcts := map[string]*rstypes.RunConfigTask{}
+			for _, t := range tt.out {
+				outRcts[t.ID] = &rstypes.RunConfigTask{
+					Name:        t.ID,
+					TaskGroup:   t.TaskGroup,
+					GlobalLevel: t.GlobalLevel,
+					Level:       t.Level,
+					Depends:     t.Depends,
+				}
+
+			}
+			if err := genTasksGlobalLevels(inRctgs, inRcts); err != nil {
+				if err.Error() != tt.err.Error() {
+					t.Fatalf("got error: %v, want error: %v", err, tt.err)
+				}
+				return
+			}
+			if tt.err != nil {
+				t.Fatalf("got nil error, want error: %v", tt.err)
+			}
+			if diff := cmp.Diff(inRcts, outRcts); diff != "" {
+				t.Error(diff)
 			}
 		})
 	}
@@ -224,7 +613,6 @@ func TestGenTasksLevels(t *testing.T) {
 func TestGetAllParents(t *testing.T) {
 	type task struct {
 		ID      string
-		Level   int
 		Depends map[string]*rstypes.RunConfigTaskDepend
 	}
 	tests := []struct {
@@ -236,8 +624,7 @@ func TestGetAllParents(t *testing.T) {
 			name: "test single task",
 			in: []task{
 				{
-					ID:    "1",
-					Level: -1,
+					ID: "1",
 				},
 			},
 			out: map[string][]string{
@@ -248,12 +635,10 @@ func TestGetAllParents(t *testing.T) {
 			name: "test multiple root tasks",
 			in: []task{
 				{
-					ID:    "1",
-					Level: -1,
+					ID: "1",
 				},
 				{
-					ID:    "2",
-					Level: -1,
+					ID: "2",
 				},
 			},
 			out: map[string][]string{
@@ -265,10 +650,9 @@ func TestGetAllParents(t *testing.T) {
 			name: "test dependency from a task to itself",
 			in: []task{
 				{
-					ID:    "1",
-					Level: -1,
+					ID: "1",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
+						"1": {TaskID: "1"},
 					},
 				},
 			},
@@ -280,14 +664,12 @@ func TestGetAllParents(t *testing.T) {
 			name: "test dependency between two tasks",
 			in: []task{
 				{
-					ID:    "1",
-					Level: -1,
+					ID: "1",
 				},
 				{
-					ID:    "2",
-					Level: -1,
+					ID: "2",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
+						"1": {TaskID: "1"},
 					},
 				},
 			},
@@ -300,34 +682,29 @@ func TestGetAllParents(t *testing.T) {
 			name: "Test dependency between 5 tasks: a -> (b, c) -> (d, e)",
 			in: []task{
 				{
-					ID:    "1",
-					Level: -1,
+					ID: "1",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
-						"3": &rstypes.RunConfigTaskDepend{TaskID: "3"},
+						"2": {TaskID: "2"},
+						"3": {TaskID: "3"},
 					},
 				},
 				{
-					ID:    "2",
-					Level: -1,
+					ID: "2",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"4": &rstypes.RunConfigTaskDepend{TaskID: "4"},
+						"4": {TaskID: "4"},
 					},
 				},
 				{
-					ID:    "3",
-					Level: -1,
+					ID: "3",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"5": &rstypes.RunConfigTaskDepend{TaskID: "5"},
+						"5": {TaskID: "5"},
 					},
 				},
 				{
-					ID:    "4",
-					Level: -1,
+					ID: "4",
 				},
 				{
-					ID:    "5",
-					Level: -1,
+					ID: "5",
 				},
 			},
 			out: map[string][]string{
@@ -342,17 +719,15 @@ func TestGetAllParents(t *testing.T) {
 			name: "Test circular dependency between two tasks: a -> b -> a",
 			in: []task{
 				{
-					ID:    "1",
-					Level: -1,
+					ID: "1",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
+						"2": {TaskID: "2"},
 					},
 				},
 				{
-					ID:    "2",
-					Level: -1,
+					ID: "2",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
+						"1": {TaskID: "1"},
 					},
 				},
 			},
@@ -365,24 +740,21 @@ func TestGetAllParents(t *testing.T) {
 			name: "Test circular dependency between 3 tasks: a -> b -> c -> a",
 			in: []task{
 				{
-					ID:    "1",
-					Level: -1,
+					ID: "1",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
+						"2": {TaskID: "2"},
 					},
 				},
 				{
-					ID:    "2",
-					Level: -1,
+					ID: "2",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"3": &rstypes.RunConfigTaskDepend{TaskID: "3"},
+						"3": {TaskID: "3"},
 					},
 				},
 				{
-					ID:    "3",
-					Level: -1,
+					ID: "3",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
+						"1": {TaskID: "1"},
 					},
 				},
 			},
@@ -396,24 +768,21 @@ func TestGetAllParents(t *testing.T) {
 			name: "Test circular dependency between 3 tasks: a -> b -> c -> b",
 			in: []task{
 				{
-					ID:    "1",
-					Level: -1,
+					ID: "1",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
+						"2": {TaskID: "2"},
 					},
 				},
 				{
-					ID:    "2",
-					Level: -1,
+					ID: "2",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"3": &rstypes.RunConfigTaskDepend{TaskID: "3"},
+						"3": {TaskID: "3"},
 					},
 				},
 				{
-					ID:    "3",
-					Level: -1,
+					ID: "3",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
+						"2": {TaskID: "2"},
 					},
 				},
 			},
@@ -431,14 +800,14 @@ func TestGetAllParents(t *testing.T) {
 			for _, t := range tt.in {
 				inRcts[t.ID] = &rstypes.RunConfigTask{
 					ID:      t.ID,
-					Level:   t.Level,
+					Level:   -1,
 					Depends: t.Depends,
 				}
 
 			}
 
 			for _, task := range inRcts {
-				allParents := GetAllParents(inRcts, task)
+				allParents := TaskAllParents(inRcts, task)
 
 				allParentsList := []string{}
 				for _, p := range allParents {
@@ -455,7 +824,6 @@ func TestGetAllParents(t *testing.T) {
 func TestCheckRunConfig(t *testing.T) {
 	type task struct {
 		ID      string
-		Level   int
 		Depends map[string]*rstypes.RunConfigTaskDepend
 	}
 	tests := []struct {
@@ -467,8 +835,7 @@ func TestCheckRunConfig(t *testing.T) {
 			name: "test single task",
 			in: []task{
 				{
-					ID:    "1",
-					Level: -1,
+					ID: "1",
 				},
 			},
 		},
@@ -476,12 +843,10 @@ func TestCheckRunConfig(t *testing.T) {
 			name: "test multiple root tasks",
 			in: []task{
 				{
-					ID:    "1",
-					Level: -1,
+					ID: "1",
 				},
 				{
-					ID:    "2",
-					Level: -1,
+					ID: "2",
 				},
 			},
 		},
@@ -489,14 +854,12 @@ func TestCheckRunConfig(t *testing.T) {
 			name: "test dependency between two tasks",
 			in: []task{
 				{
-					ID:    "1",
-					Level: -1,
+					ID: "1",
 				},
 				{
-					ID:    "2",
-					Level: -1,
+					ID: "2",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
+						"1": {TaskID: "1"},
 					},
 				},
 			},
@@ -505,24 +868,22 @@ func TestCheckRunConfig(t *testing.T) {
 			name: "Test circular dependency between two tasks: a -> b -> a",
 			in: []task{
 				{
-					ID:    "1",
-					Level: -1,
+					ID: "1",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
+						"2": {TaskID: "2"},
 					},
 				},
 				{
-					ID:    "2",
-					Level: -1,
+					ID: "2",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
+						"1": {TaskID: "1"},
 					},
 				},
 			},
 			err: &util.Errors{
 				Errs: []error{
-					errors.Errorf("circular dependency between task %q and tasks %q", "task1", "task2"),
-					errors.Errorf("circular dependency between task %q and tasks %q", "task2", "task1"),
+					errors.Errorf("circular dependency between task %q and tasks %q", "1", "2"),
+					errors.Errorf("circular dependency between task %q and tasks %q", "2", "1"),
 				},
 			},
 		},
@@ -530,32 +891,29 @@ func TestCheckRunConfig(t *testing.T) {
 			name: "Test circular dependency between 3 tasks: a -> b -> c -> a",
 			in: []task{
 				{
-					ID:    "1",
-					Level: -1,
+					ID: "1",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
+						"2": {TaskID: "2"},
 					},
 				},
 				{
-					ID:    "2",
-					Level: -1,
+					ID: "2",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"3": &rstypes.RunConfigTaskDepend{TaskID: "3"},
+						"3": {TaskID: "3"},
 					},
 				},
 				{
-					ID:    "3",
-					Level: -1,
+					ID: "3",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
+						"1": {TaskID: "1"},
 					},
 				},
 			},
 			err: &util.Errors{
 				Errs: []error{
-					errors.Errorf("circular dependency between task %q and tasks %q", "task1", "task3"),
-					errors.Errorf("circular dependency between task %q and tasks %q", "task2", "task1"),
-					errors.Errorf("circular dependency between task %q and tasks %q", "task3", "task2"),
+					errors.Errorf("circular dependency between task %q and tasks %q", "1", "3"),
+					errors.Errorf("circular dependency between task %q and tasks %q", "2", "1"),
+					errors.Errorf("circular dependency between task %q and tasks %q", "3", "2"),
 				},
 			},
 		},
@@ -563,31 +921,28 @@ func TestCheckRunConfig(t *testing.T) {
 			name: "Test circular dependency between 3 tasks: a -> b -> c -> b",
 			in: []task{
 				{
-					ID:    "1",
-					Level: -1,
+					ID: "1",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
+						"2": {TaskID: "2"},
 					},
 				},
 				{
-					ID:    "2",
-					Level: -1,
+					ID: "2",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"3": &rstypes.RunConfigTaskDepend{TaskID: "3"},
+						"3": {TaskID: "3"},
 					},
 				},
 				{
-					ID:    "3",
-					Level: -1,
+					ID: "3",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
+						"2": {TaskID: "2"},
 					},
 				},
 			},
 			err: &util.Errors{
 				Errs: []error{
-					errors.Errorf("circular dependency between task %q and tasks %q", "task2", "task3"),
-					errors.Errorf("circular dependency between task %q and tasks %q", "task3", "task2"),
+					errors.Errorf("circular dependency between task %q and tasks %q", "2", "3"),
+					errors.Errorf("circular dependency between task %q and tasks %q", "3", "2"),
 				},
 			},
 		},
@@ -595,58 +950,51 @@ func TestCheckRunConfig(t *testing.T) {
 			name: "test task parent same dep a -> b -> c, a -> c",
 			in: []task{
 				{
-					ID:    "1",
-					Level: -1,
+					ID: "1",
 				},
 				{
-					ID:    "2",
-					Level: -1,
+					ID: "2",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
+						"1": {TaskID: "1"},
 					},
 				},
 				{
-					ID:    "3",
-					Level: -1,
+					ID: "3",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
-						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
+						"2": {TaskID: "2"},
+						"1": {TaskID: "1"},
 					},
 				},
 			},
-			err: errors.Errorf("task %q and its parent %q have both a dependency on task %q", "task3", "task2", "task1"),
+			err: errors.Errorf("task %q and its parent %q have both a dependency on task %q", "3", "2", "1"),
 		},
 		{
 			name: "test task parent same dep a -> b -> c -> d, a -> d",
 			in: []task{
 				{
-					ID:    "1",
-					Level: -1,
+					ID: "1",
 				},
 				{
-					ID:    "2",
-					Level: -1,
+					ID: "2",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
+						"1": {TaskID: "1"},
 					},
 				},
 				{
-					ID:    "3",
-					Level: -1,
+					ID: "3",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"2": &rstypes.RunConfigTaskDepend{TaskID: "2"},
+						"2": {TaskID: "2"},
 					},
 				},
 				{
-					ID:    "4",
-					Level: -1,
+					ID: "4",
 					Depends: map[string]*rstypes.RunConfigTaskDepend{
-						"3": &rstypes.RunConfigTaskDepend{TaskID: "3"},
-						"1": &rstypes.RunConfigTaskDepend{TaskID: "1"},
+						"3": {TaskID: "3"},
+						"1": {TaskID: "1"},
 					},
 				},
 			},
-			err: errors.Errorf("task %q and its parent %q have both a dependency on task %q", "task4", "task3", "task1"),
+			err: errors.Errorf("task %q and its parent %q have both a dependency on task %q", "4", "3", "1"),
 		},
 	}
 	for _, tt := range tests {
@@ -656,13 +1004,13 @@ func TestCheckRunConfig(t *testing.T) {
 				inRcts[t.ID] = &rstypes.RunConfigTask{
 					Name:    fmt.Sprintf("task%s", t.ID),
 					ID:      t.ID,
-					Level:   t.Level,
+					Level:   -1,
 					Depends: t.Depends,
 				}
 
 			}
 
-			if err := CheckRunConfigTasks(inRcts); err != nil {
+			if err := checkRunConfigTasks(inRcts); err != nil {
 				if errs, ok := err.(*util.Errors); ok {
 					if !errs.Equal(tt.err) {
 						t.Fatalf("got error: %v, want error: %v", err, tt.err)
@@ -681,7 +1029,7 @@ func TestCheckRunConfig(t *testing.T) {
 	}
 }
 
-func TestGenRunConfig(t *testing.T) {
+func TestGenRunConfigTasks(t *testing.T) {
 	tests := []struct {
 		name      string
 		in        *config.Config
@@ -770,7 +1118,7 @@ func TestGenRunConfig(t *testing.T) {
 									},
 								},
 
-								Depends:       []*config.Depend{},
+								Depends:       []*config.TaskDepend{},
 								IgnoreFailure: false,
 								Approval:      false,
 								When: &config.When{
@@ -791,7 +1139,7 @@ func TestGenRunConfig(t *testing.T) {
 				"registry_username": "yourregistryusername",
 			},
 			out: map[string]*rstypes.RunConfigTask{
-				uuid.New("task01").String(): &rstypes.RunConfigTask{
+				uuid.New("task01").String(): {
 					ID:   uuid.New("task01").String(),
 					Name: "task01", Depends: map[string]*rstypes.RunConfigTaskDepend{},
 					DockerRegistriesAuth: map[string]rstypes.DockerRegistryAuth{
@@ -810,11 +1158,11 @@ func TestGenRunConfig(t *testing.T) {
 									"ENVFROMVARIABLE01": "VARVALUE01",
 								},
 								Volumes: []rstypes.Volume{
-									rstypes.Volume{
+									{
 										Path:  "/mnt/vol01",
 										TmpFS: &rstypes.VolumeTmpFS{},
 									},
-									rstypes.Volume{
+									{
 										Path:  "/mnt/vol01",
 										TmpFS: &rstypes.VolumeTmpFS{Size: 1024 * 1024 * 1024},
 									},
@@ -880,7 +1228,7 @@ func TestGenRunConfig(t *testing.T) {
 				"password":   "yourregistrypassword",
 			},
 			out: map[string]*rstypes.RunConfigTask{
-				uuid.New("task01").String(): &rstypes.RunConfigTask{
+				uuid.New("task01").String(): {
 					ID:   uuid.New("task01").String(),
 					Name: "task01", Depends: map[string]*rstypes.RunConfigTaskDepend{},
 					DockerRegistriesAuth: map[string]rstypes.DockerRegistryAuth{
@@ -969,7 +1317,7 @@ func TestGenRunConfig(t *testing.T) {
 				"password":          "myregistrypassword",
 			},
 			out: map[string]*rstypes.RunConfigTask{
-				uuid.New("task01").String(): &rstypes.RunConfigTask{
+				uuid.New("task01").String(): {
 					ID:   uuid.New("task01").String(),
 					Name: "task01", Depends: map[string]*rstypes.RunConfigTaskDepend{},
 					DockerRegistriesAuth: map[string]rstypes.DockerRegistryAuth{

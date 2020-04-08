@@ -28,11 +28,18 @@ import (
 func TestAdvanceRunTasks(t *testing.T) {
 	// a global run config for all tests
 	rc := &types.RunConfig{
+		TaskGroups: map[string]*types.RunConfigTaskGroup{
+			"taskgroup01": &types.RunConfigTaskGroup{
+				Name:    "taskgroup01",
+				Depends: map[string]*types.RunConfigTaskGroupDepend{},
+			},
+		},
 		Tasks: map[string]*types.RunConfigTask{
 			"task01": &types.RunConfigTask{
-				ID:      "task01",
-				Name:    "task01",
-				Depends: map[string]*types.RunConfigTaskDepend{},
+				ID:        "task01",
+				Name:      "task01",
+				TaskGroup: "taskgroup01",
+				Depends:   map[string]*types.RunConfigTaskDepend{},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},
 				},
@@ -41,10 +48,11 @@ func TestAdvanceRunTasks(t *testing.T) {
 				Skip:        false,
 			},
 			"task02": &types.RunConfigTask{
-				ID:   "task02",
-				Name: "task02",
+				ID:        "task02",
+				Name:      "task02",
+				TaskGroup: "taskgroup01",
 				Depends: map[string]*types.RunConfigTaskDepend{
-					"task01": &types.RunConfigTaskDepend{TaskID: "task01", Conditions: []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnSuccess}},
+					"task01": {TaskID: "task01", Conditions: []types.RunConfigDependCondition{types.RunConfigDependConditionOnSuccess}},
 				},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},
@@ -54,9 +62,10 @@ func TestAdvanceRunTasks(t *testing.T) {
 				Skip:        false,
 			},
 			"task03": &types.RunConfigTask{
-				ID:      "task03",
-				Name:    "task03",
-				Depends: map[string]*types.RunConfigTaskDepend{},
+				ID:        "task03",
+				Name:      "task03",
+				TaskGroup: "taskgroup01",
+				Depends:   map[string]*types.RunConfigTaskDepend{},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},
 				},
@@ -65,9 +74,10 @@ func TestAdvanceRunTasks(t *testing.T) {
 				Skip:        false,
 			},
 			"task04": &types.RunConfigTask{
-				ID:      "task04",
-				Name:    "task04",
-				Depends: map[string]*types.RunConfigTaskDepend{},
+				ID:        "task04",
+				Name:      "task04",
+				TaskGroup: "taskgroup01",
+				Depends:   map[string]*types.RunConfigTaskDepend{},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},
 				},
@@ -76,11 +86,12 @@ func TestAdvanceRunTasks(t *testing.T) {
 				Skip:        false,
 			},
 			"task05": &types.RunConfigTask{
-				ID:   "task05",
-				Name: "task05",
+				ID:        "task05",
+				Name:      "task05",
+				TaskGroup: "taskgroup01",
 				Depends: map[string]*types.RunConfigTaskDepend{
-					"task03": &types.RunConfigTaskDepend{TaskID: "task03", Conditions: []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnSuccess}},
-					"task04": &types.RunConfigTaskDepend{TaskID: "task04", Conditions: []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnSuccess}},
+					"task03": {TaskID: "task03", Conditions: []types.RunConfigDependCondition{types.RunConfigDependConditionOnSuccess}},
+					"task04": {TaskID: "task04", Conditions: []types.RunConfigDependCondition{types.RunConfigDependConditionOnSuccess}},
 				},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},
@@ -157,7 +168,7 @@ func TestAdvanceRunTasks(t *testing.T) {
 			}(),
 		},
 		{
-			name: "test task status set to skipped when all parent status is skipped",
+			name: "test task status set to skipped when all parents status is skipped",
 			rc: func() *types.RunConfig {
 				rc := rc.DeepCopy()
 				rc.Tasks["task03"].Skip = true
@@ -225,7 +236,7 @@ func TestAdvanceRunTasks(t *testing.T) {
 			rc: func() *types.RunConfig {
 				rc := rc.DeepCopy()
 				rc.Tasks["task03"].Skip = true
-				rc.Tasks["task05"].Depends["task03"].Conditions = []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnFailure}
+				rc.Tasks["task05"].Depends["task03"].Conditions = []types.RunConfigDependCondition{types.RunConfigDependConditionOnFailure}
 				return rc
 			}(),
 			r: func() *types.Run {
@@ -247,7 +258,7 @@ func TestAdvanceRunTasks(t *testing.T) {
 			rc: func() *types.RunConfig {
 				rc := rc.DeepCopy()
 				rc.Tasks["task03"].Skip = true
-				rc.Tasks["task05"].Depends["task03"].Conditions = []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnSkipped}
+				rc.Tasks["task05"].Depends["task03"].Conditions = []types.RunConfigDependCondition{types.RunConfigDependConditionOnSkipped}
 				return rc
 			}(),
 			r: func() *types.Run {
@@ -291,7 +302,7 @@ func TestAdvanceRunTasks(t *testing.T) {
 				rc := rc.DeepCopy()
 				rc.Tasks["task03"].Skip = true
 				rc.Tasks["task05"].NeedsApproval = true
-				rc.Tasks["task05"].Depends["task03"].Conditions = []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnSkipped}
+				rc.Tasks["task05"].Depends["task03"].Conditions = []types.RunConfigDependCondition{types.RunConfigDependConditionOnSkipped}
 				return rc
 			}(),
 			r: func() *types.Run {
@@ -401,14 +412,32 @@ func TestAdvanceRunTasks(t *testing.T) {
 	}
 }
 
-func TestGetTasksToRun(t *testing.T) {
+func TestAdvanceRunTasksTaskgroups(t *testing.T) {
 	// a global run config for all tests
 	rc := &types.RunConfig{
+		TaskGroups: map[string]*types.RunConfigTaskGroup{
+			"taskgroup01": &types.RunConfigTaskGroup{
+				Name:    "taskgroup01",
+				Depends: map[string]*types.RunConfigTaskGroupDepend{},
+			},
+			"taskgroup02": &types.RunConfigTaskGroup{
+				Name:    "taskgroup02",
+				Depends: map[string]*types.RunConfigTaskGroupDepend{},
+			},
+			"taskgroup03": &types.RunConfigTaskGroup{
+				Name: "taskgroup03",
+				Depends: map[string]*types.RunConfigTaskGroupDepend{
+					"taskgroup01": {TaskGroupName: "taskgroup01", Conditions: []types.RunConfigDependCondition{types.RunConfigDependConditionOnSuccess}},
+					"taskgroup02": {TaskGroupName: "taskgroup01", Conditions: []types.RunConfigDependCondition{types.RunConfigDependConditionOnSuccess}},
+				},
+			},
+		},
 		Tasks: map[string]*types.RunConfigTask{
 			"task01": &types.RunConfigTask{
-				ID:      "task01",
-				Name:    "task01",
-				Depends: map[string]*types.RunConfigTaskDepend{},
+				ID:        "task01",
+				Name:      "task01",
+				TaskGroup: "taskgroup01",
+				Depends:   map[string]*types.RunConfigTaskDepend{},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},
 				},
@@ -417,10 +446,11 @@ func TestGetTasksToRun(t *testing.T) {
 				Skip:        false,
 			},
 			"task02": &types.RunConfigTask{
-				ID:   "task02",
-				Name: "task02",
+				ID:        "task02",
+				Name:      "task02",
+				TaskGroup: "taskgroup01",
 				Depends: map[string]*types.RunConfigTaskDepend{
-					"task01": &types.RunConfigTaskDepend{TaskID: "task01", Conditions: []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnSuccess}},
+					"task01": {TaskID: "task01", Conditions: []types.RunConfigDependCondition{types.RunConfigDependConditionOnSuccess}},
 				},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},
@@ -430,9 +460,10 @@ func TestGetTasksToRun(t *testing.T) {
 				Skip:        false,
 			},
 			"task03": &types.RunConfigTask{
-				ID:      "task03",
-				Name:    "task03",
-				Depends: map[string]*types.RunConfigTaskDepend{},
+				ID:        "task03",
+				Name:      "task03",
+				TaskGroup: "taskgroup02",
+				Depends:   map[string]*types.RunConfigTaskDepend{},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},
 				},
@@ -441,8 +472,10 @@ func TestGetTasksToRun(t *testing.T) {
 				Skip:        false,
 			},
 			"task04": &types.RunConfigTask{
-				ID:   "task04",
-				Name: "task04",
+				ID:        "task04",
+				Name:      "task04",
+				TaskGroup: "taskgroup02",
+				Depends:   map[string]*types.RunConfigTaskDepend{},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},
 				},
@@ -451,11 +484,316 @@ func TestGetTasksToRun(t *testing.T) {
 				Skip:        false,
 			},
 			"task05": &types.RunConfigTask{
-				ID:   "task05",
-				Name: "task05",
+				ID:        "task05",
+				Name:      "task05",
+				TaskGroup: "taskgroup03",
+				Depends:   map[string]*types.RunConfigTaskDepend{},
+				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
+					Containers: []*types.Container{{Image: "image01"}},
+				},
+				Environment: map[string]string{},
+				Steps:       types.Steps{},
+				Skip:        false,
+			},
+			"task06": &types.RunConfigTask{
+				ID:        "task06",
+				Name:      "task06",
+				TaskGroup: "taskgroup03",
+				Depends:   map[string]*types.RunConfigTaskDepend{},
+				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
+					Containers: []*types.Container{{Image: "image01"}},
+				},
+				Environment: map[string]string{},
+				Steps:       types.Steps{},
+				Skip:        false,
+			},
+			"task07": &types.RunConfigTask{
+				ID:        "task07",
+				Name:      "task07",
+				TaskGroup: "taskgroup03",
 				Depends: map[string]*types.RunConfigTaskDepend{
-					"task03": &types.RunConfigTaskDepend{TaskID: "task03", Conditions: []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnSuccess}},
-					"task04": &types.RunConfigTaskDepend{TaskID: "task04", Conditions: []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnSuccess}},
+					"task03": {TaskID: "task05", Conditions: []types.RunConfigDependCondition{types.RunConfigDependConditionOnSuccess}},
+					"task04": {TaskID: "task06", Conditions: []types.RunConfigDependCondition{types.RunConfigDependConditionOnSuccess}},
+				},
+				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
+					Containers: []*types.Container{{Image: "image01"}},
+				},
+				Environment: map[string]string{},
+				Steps:       types.Steps{},
+				Skip:        false,
+			},
+		},
+	}
+
+	// initial run that matched the runconfig:
+	// * the run is in phase running with result unknown
+	// * all tasks are not started or skipped
+	// (if the runconfig task as Skip == true). This must match the status
+	// generated by command.genRun()
+	run := &types.Run{
+		Phase:  types.RunPhaseRunning,
+		Result: types.RunResultUnknown,
+		Tasks: map[string]*types.RunTask{
+			"task01": &types.RunTask{
+				ID:     "task01",
+				Status: types.RunTaskStatusNotStarted,
+			},
+			"task02": &types.RunTask{
+				ID:     "task02",
+				Status: types.RunTaskStatusNotStarted,
+			},
+			"task03": &types.RunTask{
+				ID:     "task03",
+				Status: types.RunTaskStatusNotStarted,
+			},
+			"task04": &types.RunTask{
+				ID:     "task04",
+				Status: types.RunTaskStatusNotStarted,
+			},
+			"task05": &types.RunTask{
+				ID:     "task05",
+				Status: types.RunTaskStatusNotStarted,
+			},
+			"task06": &types.RunTask{
+				ID:     "task06",
+				Status: types.RunTaskStatusNotStarted,
+			},
+			"task07": &types.RunTask{
+				ID:     "task07",
+				Status: types.RunTaskStatusNotStarted,
+			},
+		},
+	}
+
+	tests := []struct {
+		name                   string
+		rc                     *types.RunConfig
+		r                      *types.Run
+		scheduledExecutorTasks []*types.ExecutorTask
+		out                    *types.Run
+	}{
+		{
+			name: "test top level task not started",
+			rc:   rc,
+			r:    run.DeepCopy(),
+			out:  run.DeepCopy(),
+		},
+		{
+			name: "test tasks status set to skipped when all the parents task group status is skipped",
+			rc: func() *types.RunConfig {
+				rc := rc.DeepCopy()
+				rc.Tasks["task01"].Skip = true
+				rc.Tasks["task02"].Skip = true
+				rc.Tasks["task03"].Skip = true
+				rc.Tasks["task04"].Skip = true
+				return rc
+			}(),
+			r: func() *types.Run {
+				run := run.DeepCopy()
+				run.Tasks["task01"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task02"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task03"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task04"].Status = types.RunTaskStatusSkipped
+				return run
+			}(),
+			out: func() *types.Run {
+				run := run.DeepCopy()
+				run.Tasks["task01"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task02"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task03"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task04"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task05"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task06"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task07"].Status = types.RunTaskStatusSkipped
+				return run
+			}(),
+		},
+		{
+			name: "test tasks status set to skipped when only some parents task groups status is skipped",
+			rc: func() *types.RunConfig {
+				rc := rc.DeepCopy()
+				rc.Tasks["task01"].Skip = true
+				rc.Tasks["task02"].Skip = true
+				return rc
+			}(),
+			r: func() *types.Run {
+				run := run.DeepCopy()
+				run.Tasks["task01"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task02"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task03"].Status = types.RunTaskStatusSuccess
+				run.Tasks["task04"].Status = types.RunTaskStatusSuccess
+				return run
+			}(),
+			out: func() *types.Run {
+				run := run.DeepCopy()
+				run.Tasks["task01"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task02"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task03"].Status = types.RunTaskStatusSuccess
+				run.Tasks["task04"].Status = types.RunTaskStatusSuccess
+				run.Tasks["task05"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task06"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task07"].Status = types.RunTaskStatusSkipped
+				return run
+			}(),
+		},
+		{
+			name: "test tasks status set to skipped when one of the parents task groups don't match default conditions (on_success)",
+			rc: func() *types.RunConfig {
+				rc := rc.DeepCopy()
+				return rc
+			}(),
+			r: func() *types.Run {
+				run := run.DeepCopy()
+				run.Tasks["task01"].Status = types.RunTaskStatusFailed
+				run.Tasks["task02"].Status = types.RunTaskStatusSuccess
+				run.Tasks["task03"].Status = types.RunTaskStatusSuccess
+				run.Tasks["task04"].Status = types.RunTaskStatusSuccess
+				return run
+			}(),
+			out: func() *types.Run {
+				run := run.DeepCopy()
+				run.Tasks["task01"].Status = types.RunTaskStatusFailed
+				run.Tasks["task02"].Status = types.RunTaskStatusSuccess
+				run.Tasks["task03"].Status = types.RunTaskStatusSuccess
+				run.Tasks["task04"].Status = types.RunTaskStatusSuccess
+				run.Tasks["task05"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task06"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task07"].Status = types.RunTaskStatusSkipped
+				return run
+			}(),
+		},
+		{
+			name: "test tasks status set to skipped when one of the parents task groups don't match custom conditions",
+			rc: func() *types.RunConfig {
+				rc := rc.DeepCopy()
+				rc.TaskGroups["taskgroup03"].Depends["taskgroup01"].Conditions = []types.RunConfigDependCondition{types.RunConfigDependConditionOnFailure}
+				rc.Tasks["task01"].Skip = true
+				rc.Tasks["task02"].Skip = true
+				return rc
+			}(),
+			r: func() *types.Run {
+				run := run.DeepCopy()
+				run.Tasks["task01"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task02"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task03"].Status = types.RunTaskStatusSuccess
+				run.Tasks["task04"].Status = types.RunTaskStatusSuccess
+				return run
+			}(),
+			out: func() *types.Run {
+				run := run.DeepCopy()
+				run.Tasks["task01"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task02"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task03"].Status = types.RunTaskStatusSuccess
+				run.Tasks["task04"].Status = types.RunTaskStatusSuccess
+				run.Tasks["task05"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task06"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task07"].Status = types.RunTaskStatusSkipped
+				return run
+			}(),
+		},
+		{
+			name: "test task set to not skipped when one of the parent is skipped and task condition is on_skipped",
+			rc: func() *types.RunConfig {
+				rc := rc.DeepCopy()
+				rc.Tasks["task03"].Skip = true
+				rc.Tasks["task07"].Depends["task03"].Conditions = []types.RunConfigDependCondition{types.RunConfigDependConditionOnSkipped}
+				return rc
+			}(),
+			r: func() *types.Run {
+				run := run.DeepCopy()
+				run.Tasks["task03"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task04"].Status = types.RunTaskStatusSuccess
+				return run
+			}(),
+			out: func() *types.Run {
+				run := run.DeepCopy()
+				run.Tasks["task03"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task04"].Status = types.RunTaskStatusSuccess
+				return run
+			}(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			r, err := advanceRunTasks(ctx, tt.r, tt.rc, tt.scheduledExecutorTasks)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tt.out, r); diff != "" {
+				t.Error(diff)
+			}
+		})
+	}
+}
+
+func TestGetTasksToRun(t *testing.T) {
+	// a global run config for all tests
+	rc := &types.RunConfig{
+		TaskGroups: map[string]*types.RunConfigTaskGroup{
+			"taskgroup01": &types.RunConfigTaskGroup{
+				Name:    "taskgroup01",
+				Depends: map[string]*types.RunConfigTaskGroupDepend{},
+			},
+		},
+		Tasks: map[string]*types.RunConfigTask{
+			"task01": &types.RunConfigTask{
+				ID:        "task01",
+				Name:      "task01",
+				TaskGroup: "taskgroup01",
+				Depends:   map[string]*types.RunConfigTaskDepend{},
+				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
+					Containers: []*types.Container{{Image: "image01"}},
+				},
+				Environment: map[string]string{},
+				Steps:       types.Steps{},
+				Skip:        false,
+			},
+			"task02": &types.RunConfigTask{
+				ID:        "task02",
+				Name:      "task02",
+				TaskGroup: "taskgroup01",
+				Depends: map[string]*types.RunConfigTaskDepend{
+					"task01": &types.RunConfigTaskDepend{TaskID: "task01", Conditions: []types.RunConfigDependCondition{types.RunConfigDependConditionOnSuccess}},
+				},
+				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
+					Containers: []*types.Container{{Image: "image01"}},
+				},
+				Environment: map[string]string{},
+				Steps:       types.Steps{},
+				Skip:        false,
+			},
+			"task03": &types.RunConfigTask{
+				ID:        "task03",
+				Name:      "task03",
+				TaskGroup: "taskgroup01",
+				Depends:   map[string]*types.RunConfigTaskDepend{},
+				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
+					Containers: []*types.Container{{Image: "image01"}},
+				},
+				Environment: map[string]string{},
+				Steps:       types.Steps{},
+				Skip:        false,
+			},
+			"task04": &types.RunConfigTask{
+				ID:        "task04",
+				Name:      "task04",
+				TaskGroup: "taskgroup01",
+				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
+					Containers: []*types.Container{{Image: "image01"}},
+				},
+				Environment: map[string]string{},
+				Steps:       types.Steps{},
+				Skip:        false,
+			},
+			"task05": &types.RunConfigTask{
+				ID:        "task05",
+				Name:      "task05",
+				TaskGroup: "taskgroup01",
+				Depends: map[string]*types.RunConfigTaskDepend{
+					"task03": &types.RunConfigTaskDepend{TaskID: "task03", Conditions: []types.RunConfigDependCondition{types.RunConfigDependConditionOnSuccess}},
+					"task04": &types.RunConfigTaskDepend{TaskID: "task04", Conditions: []types.RunConfigDependCondition{types.RunConfigDependConditionOnSuccess}},
 				},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},
@@ -545,6 +883,253 @@ func TestGetTasksToRun(t *testing.T) {
 				return run
 			}(),
 			out: []string{"task01", "task03", "task04"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			tasks, err := getTasksToRun(ctx, tt.r, tt.rc)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			outTasks := []string{}
+			for _, t := range tasks {
+				outTasks = append(outTasks, t.ID)
+			}
+			sort.Strings(tt.out)
+			sort.Strings(outTasks)
+
+			if diff := cmp.Diff(tt.out, outTasks); diff != "" {
+				t.Error(diff)
+			}
+		})
+	}
+}
+
+func TestGetTasksToRunTaskgroups(t *testing.T) {
+	// a global run config for all tests
+	rc := &types.RunConfig{
+		TaskGroups: map[string]*types.RunConfigTaskGroup{
+			"taskgroup01": &types.RunConfigTaskGroup{
+				Name:    "taskgroup01",
+				Depends: map[string]*types.RunConfigTaskGroupDepend{},
+			},
+			"taskgroup02": &types.RunConfigTaskGroup{
+				Name: "taskgroup02",
+				Depends: map[string]*types.RunConfigTaskGroupDepend{
+					"taskgroup01": {TaskGroupName: "taskgroup01", Conditions: []types.RunConfigDependCondition{types.RunConfigDependConditionOnSuccess}},
+				},
+			},
+		},
+		Tasks: map[string]*types.RunConfigTask{
+			"task01": &types.RunConfigTask{
+				ID:        "task01",
+				Name:      "task01",
+				TaskGroup: "taskgroup01",
+				Depends:   map[string]*types.RunConfigTaskDepend{},
+				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
+					Containers: []*types.Container{{Image: "image01"}},
+				},
+				Environment: map[string]string{},
+				Steps:       types.Steps{},
+				Skip:        false,
+			},
+			"task02": &types.RunConfigTask{
+				ID:        "task02",
+				Name:      "task02",
+				TaskGroup: "taskgroup01",
+				Depends: map[string]*types.RunConfigTaskDepend{
+					"task01": &types.RunConfigTaskDepend{TaskID: "task01", Conditions: []types.RunConfigDependCondition{types.RunConfigDependConditionOnSuccess}},
+				},
+				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
+					Containers: []*types.Container{{Image: "image01"}},
+				},
+				Environment: map[string]string{},
+				Steps:       types.Steps{},
+				Skip:        false,
+			},
+			"task03": &types.RunConfigTask{
+				ID:        "task03",
+				Name:      "task03",
+				TaskGroup: "taskgroup02",
+				Depends:   map[string]*types.RunConfigTaskDepend{},
+				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
+					Containers: []*types.Container{{Image: "image01"}},
+				},
+				Environment: map[string]string{},
+				Steps:       types.Steps{},
+				Skip:        false,
+			},
+			"task04": &types.RunConfigTask{
+				ID:        "task04",
+				Name:      "task04",
+				TaskGroup: "taskgroup02",
+				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
+					Containers: []*types.Container{{Image: "image01"}},
+				},
+				Environment: map[string]string{},
+				Steps:       types.Steps{},
+				Skip:        false,
+			},
+			"task05": &types.RunConfigTask{
+				ID:        "task05",
+				Name:      "task05",
+				TaskGroup: "taskgroup02",
+				Depends: map[string]*types.RunConfigTaskDepend{
+					"task03": &types.RunConfigTaskDepend{TaskID: "task03", Conditions: []types.RunConfigDependCondition{types.RunConfigDependConditionOnSuccess}},
+					"task04": &types.RunConfigTaskDepend{TaskID: "task04", Conditions: []types.RunConfigDependCondition{types.RunConfigDependConditionOnSuccess}},
+				},
+				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
+					Containers: []*types.Container{{Image: "image01"}},
+				},
+				Environment: map[string]string{},
+				Steps:       types.Steps{},
+				Skip:        false,
+			},
+		},
+	}
+
+	// initial run that matched the runconfig, all tasks are not started or skipped
+	// (if the runconfig task as Skip == true). This must match the status
+	// generated by command.genRun()
+	run := &types.Run{
+		Tasks: map[string]*types.RunTask{
+			"task01": &types.RunTask{
+				ID:     "task01",
+				Status: types.RunTaskStatusNotStarted,
+			},
+			"task02": &types.RunTask{
+				ID:     "task02",
+				Status: types.RunTaskStatusNotStarted,
+			},
+			"task03": &types.RunTask{
+				ID:     "task03",
+				Status: types.RunTaskStatusNotStarted,
+			},
+			"task04": &types.RunTask{
+				ID:     "task04",
+				Status: types.RunTaskStatusNotStarted,
+			},
+			"task05": &types.RunTask{
+				ID:     "task05",
+				Status: types.RunTaskStatusNotStarted,
+			},
+		},
+	}
+
+	tests := []struct {
+		name string
+		rc   *types.RunConfig
+		r    *types.Run
+		out  []string
+	}{
+		{
+			name: "test run top level task group",
+			rc:   rc,
+			r:    run.DeepCopy(),
+			out:  []string{"task01"},
+		},
+		{
+			name: "test don't run taskgroup02 tasks since taskgroup01 isn't finished",
+			rc: func() *types.RunConfig {
+				rc := rc.DeepCopy()
+				return rc
+			}(),
+			r: func() *types.Run {
+				run := run.DeepCopy()
+				run.Tasks["task01"].Status = types.RunTaskStatusSuccess
+				run.Tasks["task02"].Status = types.RunTaskStatusRunning
+				return run
+			}(),
+			out: []string{},
+		},
+		{
+			name: "test run taskgroup02 tasks since taskgroup01 has success status",
+			rc: func() *types.RunConfig {
+				rc := rc.DeepCopy()
+				return rc
+			}(),
+			r: func() *types.Run {
+				run := run.DeepCopy()
+				run.Tasks["task01"].Status = types.RunTaskStatusSuccess
+				run.Tasks["task02"].Status = types.RunTaskStatusSuccess
+				return run
+			}(),
+			out: []string{"task03", "task04"},
+		},
+		{
+			name: "test don't run taskgroup02 tasks since taskgroup01 has failed status",
+			rc: func() *types.RunConfig {
+				rc := rc.DeepCopy()
+				return rc
+			}(),
+			r: func() *types.Run {
+				run := run.DeepCopy()
+				run.Tasks["task01"].Status = types.RunTaskStatusFailed
+				run.Tasks["task02"].Status = types.RunTaskStatusSuccess
+				return run
+			}(),
+			out: []string{},
+		},
+		{
+			name: "test don't run taskgroup02 tasks since taskgroup01 has skipped status",
+			rc: func() *types.RunConfig {
+				rc := rc.DeepCopy()
+				return rc
+			}(),
+			r: func() *types.Run {
+				run := run.DeepCopy()
+				run.Tasks["task01"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task02"].Status = types.RunTaskStatusSkipped
+				return run
+			}(),
+			out: []string{},
+		},
+		{
+			name: "test run taskgroup02 tasks since taskgroup01 has skipped status and condition is onSkipped",
+			rc: func() *types.RunConfig {
+				rc := rc.DeepCopy()
+				rc.TaskGroups["taskgroup02"].Depends["taskgroup01"].Conditions = []types.RunConfigDependCondition{types.RunConfigDependConditionOnSkipped}
+				return rc
+			}(),
+			r: func() *types.Run {
+				run := run.DeepCopy()
+				run.Tasks["task01"].Status = types.RunTaskStatusSkipped
+				run.Tasks["task02"].Status = types.RunTaskStatusSkipped
+				return run
+			}(),
+			out: []string{"task03", "task04"},
+		},
+		{
+			name: "test run taskgroup02 tasks since taskgroup01 has skipped status and condition is onFailure",
+			rc: func() *types.RunConfig {
+				rc := rc.DeepCopy()
+				rc.TaskGroups["taskgroup02"].Depends["taskgroup01"].Conditions = []types.RunConfigDependCondition{types.RunConfigDependConditionOnFailure}
+				return rc
+			}(),
+			r: func() *types.Run {
+				run := run.DeepCopy()
+				run.Tasks["task01"].Status = types.RunTaskStatusSuccess
+				run.Tasks["task02"].Status = types.RunTaskStatusFailed
+				return run
+			}(),
+			out: []string{"task03", "task04"},
+		},
+		{
+			name: "test run taskgroup02 tasks since taskgroup01 has success status since a failed task has ignoreFailure",
+			rc: func() *types.RunConfig {
+				rc := rc.DeepCopy()
+				rc.Tasks["task02"].IgnoreFailure = true
+				return rc
+			}(),
+			r: func() *types.Run {
+				run := run.DeepCopy()
+				run.Tasks["task01"].Status = types.RunTaskStatusSuccess
+				run.Tasks["task02"].Status = types.RunTaskStatusFailed
+				return run
+			}(),
+			out: []string{"task03", "task04"},
 		},
 	}
 

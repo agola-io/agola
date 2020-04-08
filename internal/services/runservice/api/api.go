@@ -641,12 +641,13 @@ func (h *RunCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	creq := &action.RunCreateRequest{
-		RunConfigTasks:    req.RunConfigTasks,
-		Name:              req.Name,
-		Group:             req.Group,
-		SetupErrors:       req.SetupErrors,
-		StaticEnvironment: req.StaticEnvironment,
-		CacheGroup:        req.CacheGroup,
+		RunConfigTaskGroups: req.RunConfigTaskGroups,
+		RunConfigTasks:      req.RunConfigTasks,
+		Name:                req.Name,
+		Group:               req.Group,
+		SetupErrors:         req.SetupErrors,
+		StaticEnvironment:   req.StaticEnvironment,
+		CacheGroup:          req.CacheGroup,
 
 		RunID:      req.RunID,
 		FromStart:  req.FromStart,

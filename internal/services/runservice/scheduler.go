@@ -44,26 +44,58 @@ const (
 	defaultExecutorNotAliveInterval = 60 * time.Second
 )
 
+func taskGroupMatchesParentDependCondition(ctx context.Context, rctg *types.RunConfigTaskGroup, tgrs map[string]types.RunTaskGroupResult, rc *types.RunConfig) bool {
+	parents := runconfig.TaskGroupParents(rc.TaskGroups, rctg)
+
+	matchedNum := 0
+	for _, p := range parents {
+		matched := false
+		tgr := tgrs[p.Name]
+		conds := runconfig.TaskGroupParentDependConditions(rctg, p)
+		for _, cond := range conds {
+			switch cond {
+			case types.RunConfigDependConditionOnSuccess:
+				if tgr == types.RunTaskGroupResultSuccess {
+					matched = true
+				}
+			case types.RunConfigDependConditionOnFailure:
+				if tgr == types.RunTaskGroupResultFailed {
+					matched = true
+				}
+			case types.RunConfigDependConditionOnSkipped:
+				if tgr == types.RunTaskGroupResultSkipped {
+					matched = true
+				}
+			}
+		}
+		if matched {
+			matchedNum++
+		}
+	}
+
+	return len(parents) == matchedNum
+}
+
 func taskMatchesParentDependCondition(ctx context.Context, rt *types.RunTask, r *types.Run, rc *types.RunConfig) bool {
 	rct := rc.Tasks[rt.ID]
-	parents := runconfig.GetParents(rc.Tasks, rct)
+	parents := runconfig.TaskParents(rc.Tasks, rct)
 
 	matchedNum := 0
 	for _, p := range parents {
 		matched := false
 		rp := r.Tasks[p.ID]
-		conds := runconfig.GetParentDependConditions(rct, p)
+		conds := runconfig.TaskParentDependConditions(rct, p)
 		for _, cond := range conds {
 			switch cond {
-			case types.RunConfigTaskDependConditionOnSuccess:
+			case types.RunConfigDependConditionOnSuccess:
 				if rp.Status == types.RunTaskStatusSuccess {
 					matched = true
 				}
-			case types.RunConfigTaskDependConditionOnFailure:
+			case types.RunConfigDependConditionOnFailure:
 				if rp.Status == types.RunTaskStatusFailed {
 					matched = true
 				}
-			case types.RunConfigTaskDependConditionOnSkipped:
+			case types.RunConfigDependConditionOnSkipped:
 				if rp.Status == types.RunTaskStatusSkipped {
 					matched = true
 				}
@@ -112,7 +144,14 @@ func advanceRunTasks(ctx context.Context, curRun *types.Run, rc *types.RunConfig
 		}
 
 		rct := rc.Tasks[rt.ID]
-		parents := runconfig.GetParents(rc.Tasks, rct)
+
+		rctg := rc.TaskGroups[rct.TaskGroup]
+		tgParents := runconfig.TaskGroupParents(rc.TaskGroups, rctg)
+		if len(tgParents) > 0 {
+			continue
+		}
+
+		parents := runconfig.TaskParents(rc.Tasks, rct)
 		if len(parents) > 0 {
 			continue
 		}
@@ -135,6 +174,11 @@ func advanceRunTasks(ctx context.Context, curRun *types.Run, rc *types.RunConfig
 		}
 	}
 
+	tgrs, err := taskGroupsResults(ctx, newRun, rc)
+	if err != nil {
+		return nil, err
+	}
+
 	// handle all tasks
 	// TODO(sgotti) process tasks by their level (from 0) so we'll calculate the
 	// final state in just one loop. Currently the call to this function won't
@@ -149,10 +193,34 @@ func advanceRunTasks(ctx context.Context, curRun *types.Run, rc *types.RunConfig
 		}
 
 		rct := rc.Tasks[rt.ID]
-		parents := runconfig.GetParents(rc.Tasks, rct)
+
+		// check if task task group can be executed
+		rctg := rc.TaskGroups[rct.TaskGroup]
+		tgParents := runconfig.TaskGroupParents(rc.TaskGroups, rctg)
+		finishedTGParents := 0
+		for _, p := range tgParents {
+			// use current run status to not be affected by previous changes to random map iteration
+			rp := tgrs[p.Name]
+			if rp.IsFinished() {
+				finishedTGParents++
+			}
+		}
+
+		allTGParentsFinished := finishedTGParents == len(tgParents)
+		if !allTGParentsFinished {
+			continue
+		}
+
+		// mark task status a skipped if task group doesn't match parent conditions
+		if !taskGroupMatchesParentDependCondition(ctx, rctg, tgrs, rc) {
+			rt.Status = types.RunTaskStatusSkipped
+			continue
+		}
+
+		parents := runconfig.TaskParents(rc.Tasks, rct)
 		finishedParents := 0
 		for _, p := range parents {
-			// use current run status to not be affected by previous changes to to random map iteration
+			// use current run status to not be affected by previous changes to random map iteration
 			rp := curRun.Tasks[p.ID]
 			if rp.Status.IsFinished() && rp.ArchivesFetchFinished() {
 				finishedParents++
@@ -186,6 +254,11 @@ func getTasksToRun(ctx context.Context, r *types.Run, rc *types.RunConfig) ([]*t
 	log.Debugf("run: %s", util.Dump(r))
 	log.Debugf("rc: %s", util.Dump(rc))
 
+	tgrs, err := taskGroupsResults(ctx, r, rc)
+	if err != nil {
+		return nil, err
+	}
+
 	tasksToRun := []*types.RunTask{}
 	// get tasks that can be executed
 	for _, rt := range r.Tasks {
@@ -197,7 +270,30 @@ func getTasksToRun(ctx context.Context, r *types.Run, rc *types.RunConfig) ([]*t
 		}
 
 		rct := rc.Tasks[rt.ID]
-		parents := runconfig.GetParents(rc.Tasks, rct)
+
+		// check if task task group can be executed
+		rctg := rc.TaskGroups[rct.TaskGroup]
+		tgParents := runconfig.TaskGroupParents(rc.TaskGroups, rctg)
+		finishedTGParents := 0
+		for _, p := range tgParents {
+			// use current run status to not be affected by previous changes to to random map iteration
+			rp := tgrs[p.Name]
+			if rp.IsFinished() {
+				finishedTGParents++
+			}
+		}
+
+		allTGParentsFinished := finishedTGParents == len(tgParents)
+		if !allTGParentsFinished {
+			continue
+		}
+
+		if !taskGroupMatchesParentDependCondition(ctx, rctg, tgrs, rc) {
+			log.Infof("task group doesn't match parent depend conditions")
+			continue
+		}
+
+		parents := runconfig.TaskParents(rc.Tasks, rct)
 		finishedParents := 0
 		for _, p := range parents {
 			rp := r.Tasks[p.ID]
@@ -210,7 +306,7 @@ func getTasksToRun(ctx context.Context, r *types.Run, rc *types.RunConfig) ([]*t
 
 		if allParentsFinished {
 			// TODO(sgotti) This could be removed when advanceRunTasks will calculate the
-			// state in a deterministic a complete way in one loop (see the related TODO)
+			// state in a deterministic and complete way in one loop (see the related TODO)
 			if !taskMatchesParentDependCondition(ctx, rt, r, rc) {
 				continue
 			}
@@ -262,6 +358,73 @@ func (s *Runservice) submitRunTasks(ctx context.Context, r *types.Run, rc *types
 	}
 
 	return nil
+}
+
+func taskGroupsResults(ctx context.Context, r *types.Run, rc *types.RunConfig) (map[string]types.RunTaskGroupResult, error) {
+	results := map[string]types.RunTaskGroupResult{}
+	for _, tg := range rc.TaskGroups {
+		result, err := taskGroupResult(ctx, tg.Name, r, rc)
+		if err != nil {
+			return nil, err
+		}
+		results[tg.Name] = result
+
+	}
+
+	return results, nil
+}
+
+// taskGroupResult returns the task group current result
+// * all of the tasks must be finished and with archives fetched or result will be unknown. It's
+// needed since we have to provide a fixed workspace so we cannot have tasks not yet started or running.
+// * if the all tasks are finished:
+//   * if one of the tasks is failed and the task and the task group
+//   doesn't have IgnoreFailure set then the task group result is
+//   failed
+//   * else if all the tasks are skipped then the task group result is skipped
+//   * else if all the tasks are finished then the task group result is success
+//   * else the result is unknown
+func taskGroupResult(ctx context.Context, taskGroup string, r *types.Run, rc *types.RunConfig) (types.RunTaskGroupResult, error) {
+	// fail task group if a task is failed
+	rctg := rc.TaskGroups[taskGroup]
+
+	// see if task group could be marked as success
+	finished := true
+	skipped := true
+	success := true
+	for _, rt := range r.Tasks {
+		rct := rc.Tasks[rt.ID]
+		if rct.TaskGroup != taskGroup {
+			continue
+		}
+		if !rt.Status.IsFinished() || !rt.ArchivesFetchFinished() {
+			finished = false
+			skipped = false
+			break
+		}
+		if rt.Status != types.RunTaskStatusSkipped {
+			skipped = false
+		}
+		if rt.Status == types.RunTaskStatusFailed {
+			if !rct.IgnoreFailure && !rctg.IgnoreFailure {
+				success = false
+			}
+		}
+
+	}
+	if !finished {
+		return types.RunTaskGroupResultUnknown, nil
+	}
+
+	// all task are finished
+	if skipped {
+		return types.RunTaskGroupResultSkipped, nil
+	}
+	if success {
+		return types.RunTaskGroupResultSuccess, nil
+	}
+
+	return types.RunTaskGroupResultFailed, nil
 }
 
 // chooseExecutor chooses the executor to schedule the task on. Now it's a very simple/dumb selection

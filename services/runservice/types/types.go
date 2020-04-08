@@ -195,6 +195,19 @@ func (r *Run) CanRestartFromFailedTasks() (bool, string) {
 	return true, ""
 }
 
+type RunTaskGroupResult string
+
+const (
+	RunTaskGroupResultUnknown RunTaskGroupResult = "unknown"
+	RunTaskGroupResultSkipped RunTaskGroupResult = "skipped"
+	RunTaskGroupResultSuccess RunTaskGroupResult = "success"
+	RunTaskGroupResultFailed  RunTaskGroupResult = "failed"
+)
+
+func (s RunTaskGroupResult) IsFinished() bool {
+	return s != RunTaskGroupResultUnknown
+}
+
 type RunTaskStatus string
 
 const (
@@ -316,7 +329,8 @@ type RunConfig struct {
 	// specific to this run)
 	Environment map[string]string `json:"environment,omitempty"`
 
-	Tasks map[string]*RunConfigTask `json:"tasks,omitempty"`
+	TaskGroups map[string]*RunConfigTaskGroup `json:"task_groups,omitempty"`
+	Tasks      map[string]*RunConfigTask      `json:"tasks,omitempty"`
 
 	// CacheGroup is the cache group where the run caches belongs
 	CacheGroup string `json:"cache_group,omitempty"`
@@ -330,10 +344,19 @@ func (rc *RunConfig) DeepCopy() *RunConfig {
 	return nrc.(*RunConfig)
 }
 
+type RunConfigTaskGroup struct {
+	Level         int                                  `json:"level,omitempty"`
+	Name          string                               `json:"name,omitempty"`
+	Depends       map[string]*RunConfigTaskGroupDepend `json:"depends"`
+	IgnoreFailure bool                                 `json:"ignore_failure,omitempty"`
+}
+
 type RunConfigTask struct {
+	GlobalLevel          int                             `json:"global_level,omitempty"`
 	Level                int                             `json:"level,omitempty"`
 	ID                   string                          `json:"id,omitempty"`
 	Name                 string                          `json:"name,omitempty"`
+	TaskGroup            string                          `json:"task_group"`
 	Depends              map[string]*RunConfigTaskDepend `json:"depends"`
 	Runtime              *Runtime                        `json:"runtime,omitempty"`
 	Environment          map[string]string               `json:"environment,omitempty"`
@@ -355,17 +378,22 @@ func (rct *RunConfigTask) DeepCopy() *RunConfigTask {
 	return nrct.(*RunConfigTask)
 }
 
-type RunConfigTaskDependCondition string
+type RunConfigDependCondition string
 
 const (
-	RunConfigTaskDependConditionOnSuccess RunConfigTaskDependCondition = "on_success"
-	RunConfigTaskDependConditionOnFailure RunConfigTaskDependCondition = "on_failure"
-	RunConfigTaskDependConditionOnSkipped RunConfigTaskDependCondition = "on_skipped"
+	RunConfigDependConditionOnSuccess RunConfigDependCondition = "on_success"
+	RunConfigDependConditionOnFailure RunConfigDependCondition = "on_failure"
+	RunConfigDependConditionOnSkipped RunConfigDependCondition = "on_skipped"
 )
 
+type RunConfigTaskGroupDepend struct {
+	TaskGroupName string                     `json:"task_group,omitempty"`
+	Conditions    []RunConfigDependCondition `json:"conditions,omitempty"`
+}
+
 type RunConfigTaskDepend struct {
-	TaskID     string                         `json:"task_id,omitempty"`
-	Conditions []RunConfigTaskDependCondition `json:"conditions,omitempty"`
+	TaskID     string                     `json:"task_id,omitempty"`
+	Conditions []RunConfigDependCondition `json:"conditions,omitempty"`
 }
 
 type RuntimeType string

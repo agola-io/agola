@@ -518,12 +518,13 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 		// it and know how many runs are defined
 		setupErrors = append(setupErrors, err.Error())
 		createRunReq := &rsapitypes.RunCreateRequest{
-			RunConfigTasks:    nil,
-			Group:             runGroup,
-			SetupErrors:       setupErrors,
-			Name:              rstypes.RunGenericSetupErrorName,
-			StaticEnvironment: env,
-			Annotations:       annotations,
+			RunConfigTaskGroups: nil,
+			RunConfigTasks:      nil,
+			Group:               runGroup,
+			SetupErrors:         setupErrors,
+			Name:                rstypes.RunGenericSetupErrorName,
+			StaticEnvironment:   env,
+			Annotations:         annotations,
 		}
 
 		if _, _, err := h.runserviceClient.CreateRun(ctx, createRunReq); err != nil {
@@ -544,16 +545,18 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 			continue
 		}
 
+		rctgs := runconfig.GenRunConfigTaskGroups(util.DefaultUUIDGenerator{}, config, run.Name)
 		rcts := runconfig.GenRunConfigTasks(util.DefaultUUIDGenerator{}, config, run.Name, variables, req.RefType, req.Branch, req.Tag, req.Ref)
 
 		createRunReq := &rsapitypes.RunCreateRequest{
-			RunConfigTasks:    rcts,
-			Group:             runGroup,
-			SetupErrors:       setupErrors,
-			Name:              run.Name,
-			StaticEnvironment: env,
-			Annotations:       annotations,
-			CacheGroup:        cacheGroup,
+			RunConfigTaskGroups: rctgs,
+			RunConfigTasks:      rcts,
+			Group:               runGroup,
+			SetupErrors:         setupErrors,
+			Name:                run.Name,
+			StaticEnvironment:   env,
+			Annotations:         annotations,
+			CacheGroup:          cacheGroup,
 		}
 
 		if _, _, err := h.runserviceClient.CreateRun(ctx, createRunReq); err != nil {

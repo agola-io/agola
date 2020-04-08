@@ -45,8 +45,9 @@ type RunResponse struct {
 	SetupErrors []string          `json:"setup_errors"`
 	Stopping    bool              `json:"stopping"`
 
-	Tasks                map[string]*RunResponseTask `json:"tasks"`
-	TasksWaitingApproval []string                    `json:"tasks_waiting_approval"`
+	TaskGroups           map[string]*RunResponseTaskGroup `json:"task_groups"`
+	Tasks                map[string]*RunResponseTask      `json:"tasks"`
+	TasksWaitingApproval []string                         `json:"tasks_waiting_approval"`
 
 	EnqueueTime *time.Time `json:"enqueue_time"`
 	StartTime   *time.Time `json:"start_time"`
@@ -56,12 +57,20 @@ type RunResponse struct {
 	CanRestartFromFailedTasks bool `json:"can_restart_from_failed_tasks"`
 }
 
+type RunResponseTaskGroup struct {
+	Name    string                                       `json:"name"`
+	Level   int                                          `json:"level"`
+	Depends map[string]*rstypes.RunConfigTaskGroupDepend `json:"depends"`
+}
+
 type RunResponseTask struct {
-	ID      string                                  `json:"id"`
-	Name    string                                  `json:"name"`
-	Status  rstypes.RunTaskStatus                   `json:"status"`
-	Level   int                                     `json:"level"`
-	Depends map[string]*rstypes.RunConfigTaskDepend `json:"depends"`
+	ID          string                                  `json:"id"`
+	TaskGroup   string                                  `json:"task_group"`
+	Name        string                                  `json:"name"`
+	Status      rstypes.RunTaskStatus                   `json:"status"`
+	GlobalLevel int                                     `json:"global_level"`
+	Level       int                                     `json:"level"`
+	Depends     map[string]*rstypes.RunConfigTaskDepend `json:"depends"`
 
 	WaitingApproval     bool              `json:"waiting_approval"`
 	Approved            bool              `json:"approved"`
@@ -72,9 +81,10 @@ type RunResponseTask struct {
 }
 
 type RunTaskResponse struct {
-	ID     string                `json:"id"`
-	Name   string                `json:"name"`
-	Status rstypes.RunTaskStatus `json:"status"`
+	ID        string                `json:"id"`
+	TaskGroup string                `json:"task_group"`
+	Name      string                `json:"name"`
+	Status    rstypes.RunTaskStatus `json:"status"`
 
 	WaitingApproval     bool              `json:"waiting_approval"`
 	Approved            bool              `json:"approved"`
