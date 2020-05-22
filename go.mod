@@ -3,7 +3,7 @@ module agola.io/agola
 go 1.12
 
 require (
-	code.gitea.io/sdk/gitea v0.11.0
+	code.gitea.io/sdk/gitea v0.12.0
 	github.com/Masterminds/squirrel v1.2.0
 	github.com/Microsoft/hcsshim v0.8.7 // indirect
 	github.com/bmatcuk/doublestar v1.2.2
