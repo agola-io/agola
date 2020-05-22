@@ -1566,7 +1566,8 @@ func TestPullRequest(t *testing.T) {
 					t.Fatal("failed to create user02: %w", err)
 				}
 
-				giteaUser02Token, err := giteaClient.CreateAccessToken(giteaUser02, "password", gitea.CreateAccessTokenOption{Name: "token01"})
+				giteaClient.SetBasicAuth(giteaUser02, "password")
+				giteaUser02Token, err := giteaClient.CreateAccessToken(gitea.CreateAccessTokenOption{Name: "token01"})
 				if err != nil {
 					t.Fatalf("failed to create token for user02: %v", err)
 				}
