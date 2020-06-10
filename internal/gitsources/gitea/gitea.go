@@ -37,7 +37,7 @@ import (
 
 const (
 	// TODO(sgotti) The gitea client doesn't provide an easy way to detect http response codes...
-	// we should probably use our own client implementation
+	// https://gitea.com/gitea/go-sdk/issues/303
 
 	ClientNotFound = "404 Not Found"
 )
@@ -165,6 +165,8 @@ func (c *Client) LoginPassword(username, password, tokenName string) (string, er
 	// try to get agola access token if it already exists
 	// use custom http call since gitea api client doesn't provide an easy way to
 	// guess if the username/password login failed
+	// https://gitea.com/gitea/go-sdk/issues/303
+
 	var accessToken string
 
 	tokens := make([]*gitea.AccessToken, 0, 10)
@@ -199,9 +201,8 @@ func (c *Client) LoginPassword(username, password, tokenName string) (string, er
 
 	// create access token
 	if accessToken == "" {
+		c.client.SetBasicAuth(username, password)
 		token, terr := c.client.CreateAccessToken(
-			username,
-			password,
 			gitea.CreateAccessTokenOption{Name: tokenName},
 		)
 		if terr != nil {
@@ -271,7 +272,7 @@ func (c *Client) UpdateDeployKey(repopath, title, pubKey string, readonly bool) 
 	// the same value it is correctly readded and the admin must force a
 	// authorized_keys regeneration on the server. To avoid this we update it only
 	// when the public key value has changed
-	keys, err := c.client.ListDeployKeys(owner, reponame)
+	keys, err := c.client.ListDeployKeys(owner, reponame, gitea.ListDeployKeysOptions{})
 	if err != nil {
 		return errors.Errorf("error retrieving existing deploy keys: %w", err)
 	}
@@ -303,7 +304,7 @@ func (c *Client) DeleteDeployKey(repopath, title string) error {
 	if err != nil {
 		return err
 	}
-	keys, err := c.client.ListDeployKeys(owner, reponame)
+	keys, err := c.client.ListDeployKeys(owner, reponame, gitea.ListDeployKeysOptions{})
 	if err != nil {
 		return errors.Errorf("error retrieving existing deploy keys: %w", err)
 	}
@@ -348,7 +349,7 @@ func (c *Client) DeleteRepoWebhook(repopath, u string) error {
 	if err != nil {
 		return err
 	}
-	hooks, err := c.client.ListRepoHooks(owner, reponame)
+	hooks, err := c.client.ListRepoHooks(owner, reponame, gitea.ListHooksOptions{})
 	if err != nil {
 		return errors.Errorf("error retrieving repository webhooks: %w", err)
 	}
@@ -381,7 +382,7 @@ func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource
 }
 
 func (c *Client) ListUserRepos() ([]*gitsource.RepoInfo, error) {
-	remoteRepos, err := c.client.ListMyRepos()
+	remoteRepos, err := c.client.ListMyRepos(gitea.ListReposOptions{})
 	if err != nil {
 		return nil, err
 	}

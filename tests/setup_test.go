@@ -120,7 +120,8 @@ func setupGitea(t *testing.T, dir, dockerBridgeAddress string) *testutil.TestGit
 
 	// Wait for gitea api to be ready
 	err = testutil.Wait(30*time.Second, func() (bool, error) {
-		if _, err := giteaClient.ListAccessTokens(giteaUser01, "password"); err != nil {
+		giteaClient.SetBasicAuth(giteaUser01, "password")
+		if _, err := giteaClient.ListAccessTokens(gitea.ListAccessTokensOptions{}); err != nil {
 			return false, nil
 		}
 		return true, nil
@@ -392,7 +393,8 @@ func createLinkedAccount(ctx context.Context, t *testing.T, tgitea *testutil.Tes
 	giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
 	giteaClient := gitea.NewClient(giteaAPIURL, "")
 
-	giteaToken, err := giteaClient.CreateAccessToken(giteaUser01, "password", gitea.CreateAccessTokenOption{Name: "token01"})
+	giteaClient.SetBasicAuth(giteaUser01, "password")
+	giteaToken, err := giteaClient.CreateAccessToken(gitea.CreateAccessTokenOption{Name: "token01"})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -1564,7 +1566,8 @@ func TestPullRequest(t *testing.T) {
 					t.Fatal("failed to create user02: %w", err)
 				}
 
-				giteaUser02Token, err := giteaClient.CreateAccessToken(giteaUser02, "password", gitea.CreateAccessTokenOption{Name: "token01"})
+				giteaClient.SetBasicAuth(giteaUser02, "password")
+				giteaUser02Token, err := giteaClient.CreateAccessToken(gitea.CreateAccessTokenOption{Name: "token01"})
 				if err != nil {
 					t.Fatalf("failed to create token for user02: %v", err)
 				}
