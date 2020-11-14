@@ -69,6 +69,7 @@ func NewWebBundleHandlerFunc(gatewayURL string) func(w http.ResponseWriter, r *h
 		// config.js is the external webapp config file not provided by the
 		// asset and not needed when served from the api server
 		if r.URL.Path == "/config.js" {
+			w.Header().Add("Content-Type", "application/javascript")
 			_, err := w.Write(config)
 			if err != nil {
 				http.Error(w, "", http.StatusInternalServerError)
