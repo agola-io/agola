@@ -1,5 +1,33 @@
 ## Changelog
 
+### v0.6.0
+
+- *: update to go 1.16 (@sgotti)                                                             [#257](https://github.com/agola-io/agola/pull/257)
+- gitserver: fix fetchfile error handling (@sgotti)                                          [#258](https://github.com/agola-io/agola/pull/258)
+- Remove WaitingApproval for stopped tasks (@camandel)                                       [#253](https://github.com/agola-io/agola/pull/253)
+- example: fix gitserverURL in example config (@sgotti)                                      [#250](https://github.com/agola-io/agola/pull/250)
+- add content-type header for /config.js (@ftsell)                                           [#249](https://github.com/agola-io/agola/pull/249)
+- vendor: update gitea sdk v0.11.0 -> 0.12.0 (@6543)                                         [#241](https://github.com/agola-io/agola/pull/241)
+- *: update to go 1.14 (@sgotti)                                                             [#217](https://github.com/agola-io/agola/pull/217)
+- config: check max config size (@sgotti)                                                    [#239](https://github.com/agola-io/agola/pull/239)
+- config: add starlark config support (@sgotti)                                              [#232](https://github.com/agola-io/agola/pull/232)
+- run: export also ref type environment variable to runs (@sgotti)                           [#231](https://github.com/agola-io/agola/pull/231)
+- run: export also pull request id environment variable to runs (@sgotti)                    [#230](https://github.com/agola-io/agola/pull/230)
+- config: provide jsonnet context top level argument (@sgotti)                               [#141](https://github.com/agola-io/agola/pull/141)
+- runconfig: disable password authentication in clone step (@sgotti)                         [#229](https://github.com/agola-io/agola/pull/229)
+- runservice: correctly handle skipped tasks in fetcher (@sgotti)                            [#226](https://github.com/agola-io/agola/pull/226)
+- github: add issue templates config (@sgotti)                                               [#227](https://github.com/agola-io/agola/pull/227)
+- runservice: fix handling of wrong executortask status (@sgotti)                            [#225](https://github.com/agola-io/agola/pull/225)
+- executor: use cancellable context in executetask (@sgotti)                                 [#224](https://github.com/agola-io/agola/pull/224)
+- executor: fix stopping of not running tasks (@sgotti)                                      [#223](https://github.com/agola-io/agola/pull/223)
+- runservice: use all scheduled tasks in scheduleRun (@sgotti)                               [#220](https://github.com/agola-io/agola/pull/220)
+- executor: fix reporting of stopped tasks and steps (@sgotti)                               [#222](https://github.com/agola-io/agola/pull/222)
+- executor: serialize task handling (@sgotti)                                                [#221](https://github.com/agola-io/agola/pull/221)
+- runservice: minimize scheduling of tasks that will be queued by the executor (@sgotti)     [#218](https://github.com/agola-io/agola/pull/218)
+- runservice: mark not running tasks as skipped when run marked to stop (@sgotti)            [#219](https://github.com/agola-io/agola/pull/219)
+- gateway: move authentication apis to /api/v1alpha/auth (@sgotti)                           [#215](https://github.com/agola-io/agola/pull/215)
+- go.mod: update dependencies (@sgotti)                                                      [#213](https://github.com/agola-io/agola/pull/213)
+
 ### v0.5.0
 
 - gitsources: handle skipverify also in oauth2 requests (@sgotti)                            [#208](https://github.com/agola-io/agola/pull/208)
