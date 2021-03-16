@@ -20,7 +20,6 @@ require (
 	github.com/gorilla/handlers v1.4.2
 	github.com/gorilla/mux v1.7.4
 	github.com/hashicorp/go-sockaddr v1.0.2
-	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
 	github.com/minio/minio-go/v6 v6.0.48
 	github.com/mitchellh/copystructure v1.0.0
@@ -28,7 +27,7 @@ require (
 	github.com/opencontainers/runc v0.1.1 // indirect
 	github.com/sanity-io/litter v1.2.0
 	github.com/satori/go.uuid v1.2.0
-	github.com/sgotti/gexpect v0.0.0-20161123102107-0afc6c19f50a
+	github.com/sgotti/gexpect v0.0.0-20210315095146-1ec64e69809b
 	github.com/spf13/cobra v0.0.5
 	github.com/xanzy/go-gitlab v0.26.0
 	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738

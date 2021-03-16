@@ -107,7 +107,7 @@ local task_build_push_images(name, target, push) =
         [
           task_build_go(version, arch),
         ]
-        for version in ['1.13', '1.14']
+        for version in ['1.15', '1.16']
         for arch in ['amd64' /*, 'arm64' */]
       ]) + [
         {
@@ -118,7 +118,7 @@ local task_build_push_images(name, target, push) =
             { type: 'run', command: 'SKIP_K8S_TESTS=1 AGOLA_TOOLBOX_PATH="./bin" ./bin/docker-tests -test.parallel 1 -test.v' },
           ],
           depends: [
-            'build go 1.14 amd64',
+            'build go 1.16 amd64',
           ],
         },
         {
@@ -140,7 +140,7 @@ local task_build_push_images(name, target, push) =
             { type: 'run', name: 'integration tests', command: 'AGOLA_BIN_DIR="./bin" GITEA_PATH=${PWD}/bin/gitea DOCKER_BRIDGE_ADDRESS="172.18.0.1" ./bin/integration-tests -test.parallel 1 -test.v' },
           ],
           depends: [
-            'build go 1.14 amd64',
+            'build go 1.16 amd64',
           ],
         },
         {
