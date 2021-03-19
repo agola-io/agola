@@ -403,7 +403,11 @@ func (s *Runservice) run(ctx context.Context) error {
 
 	lerrCh := make(chan error, 1)
 	util.GoWait(&wg, func() {
-		lerrCh <- httpServer.ListenAndServe()
+		if !s.c.Web.TLS {
+			lerrCh <- httpServer.ListenAndServe()
+		} else {
+			lerrCh <- httpServer.ListenAndServeTLS("", "")
+		}
 	})
 
 	select {

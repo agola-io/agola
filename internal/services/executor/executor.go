@@ -1475,7 +1475,11 @@ func (e *Executor) Run(ctx context.Context) error {
 	}
 	lerrCh := make(chan error)
 	go func() {
-		lerrCh <- httpServer.ListenAndServe()
+		if !e.c.Web.TLS {
+			lerrCh <- httpServer.ListenAndServe()
+		} else {
+			lerrCh <- httpServer.ListenAndServeTLS("", "")
+		}
 	}()
 
 	select {
