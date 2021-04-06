@@ -48,6 +48,8 @@ func (h *ActionHandler) GetRemoteSources(ctx context.Context, req *GetRemoteSour
 type CreateRemoteSourceRequest struct {
 	Name                string
 	APIURL              string
+	TlsClientKey        string
+	TlsClientCert       string
 	SkipVerify          bool
 	Type                string
 	AuthType            string
@@ -100,6 +102,8 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemot
 		Type:                cstypes.RemoteSourceType(req.Type),
 		AuthType:            cstypes.RemoteSourceAuthType(req.AuthType),
 		APIURL:              req.APIURL,
+		TlsClientKey:        req.TlsClientKey,
+		TlsClientCert:       req.TlsClientCert,
 		SkipVerify:          req.SkipVerify,
 		Oauth2ClientID:      req.Oauth2ClientID,
 		Oauth2ClientSecret:  req.Oauth2ClientSecret,
@@ -124,6 +128,8 @@ type UpdateRemoteSourceRequest struct {
 
 	Name                *string
 	APIURL              *string
+	TlsClientKey        *string
+	TlsClientCert       *string
 	SkipVerify          *bool
 	Oauth2ClientID      *string
 	Oauth2ClientSecret  *string
@@ -148,6 +154,12 @@ func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, req *UpdateRemot
 	}
 	if req.APIURL != nil {
 		rs.APIURL = *req.APIURL
+	}
+	if req.TlsClientKey != nil {
+		rs.TlsClientKey = *req.TlsClientKey
+	}
+	if req.TlsClientCert != nil {
+		rs.TlsClientCert = *req.TlsClientCert
 	}
 	if req.SkipVerify != nil {
 		rs.SkipVerify = *req.SkipVerify

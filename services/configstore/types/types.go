@@ -166,7 +166,9 @@ type RemoteSource struct {
 	Name   string `json:"name,omitempty"`
 	APIURL string `json:"apiurl,omitempty"`
 
-	SkipVerify bool `json:"skip_verify,omitempty"`
+	TlsClientKey  string `json:"tls_client_key,omitempty"`
+	TlsClientCert string `json:"tls_client_cert,omitempty"`
+	SkipVerify    bool `json:"skip_verify,omitempty"`
 
 	Type     RemoteSourceType     `json:"type,omitempty"`
 	AuthType RemoteSourceAuthType `json:"auth_type,omitempty"`

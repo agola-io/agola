@@ -16,6 +16,7 @@ package cmd
 
 import (
 	"context"
+	"io/ioutil"
 
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
@@ -39,6 +40,8 @@ type remoteSourceUpdateOptions struct {
 
 	newName             string
 	apiURL              string
+	tlsClientKeyFile    string
+	tlsClientCertFile   string
 	skipVerify          bool
 	oauth2ClientID      string
 	oauth2ClientSecret  string
@@ -56,6 +59,8 @@ func init() {
 	flags.StringVarP(&remoteSourceUpdateOpts.ref, "ref", "", "", "current remotesource name or id")
 	flags.StringVarP(&remoteSourceUpdateOpts.newName, "new-name", "", "", "remotesource new name")
 	flags.StringVar(&remoteSourceUpdateOpts.apiURL, "api-url", "", "remotesource api url")
+	flags.StringVar(&remoteSourceUpdateOpts.tlsClientKeyFile, "tls-client-key", "", "remotesource tls client key")
+	flags.StringVar(&remoteSourceUpdateOpts.tlsClientCertFile, "tls-client-cert", "", "remotesource tls client certificate")
 	flags.BoolVarP(&remoteSourceUpdateOpts.skipVerify, "skip-verify", "", false, "skip remote source api tls certificate verification")
 	flags.StringVar(&remoteSourceUpdateOpts.oauth2ClientID, "clientid", "", "remotesource oauth2 client id")
 	flags.StringVar(&remoteSourceUpdateOpts.oauth2ClientSecret, "secret", "", "remotesource oauth2 secret")
@@ -82,6 +87,20 @@ func remoteSourceUpdate(cmd *cobra.Command, args []string) error {
 	}
 	if flags.Changed("api-url") {
 		req.APIURL = &remoteSourceUpdateOpts.apiURL
+	}
+	if flags.Changed("tls-client-key") && flags.Changed("tls-client-cert") {
+		keyData, err := ioutil.ReadFile(remoteSourceUpdateOpts.tlsClientKeyFile)
+		if err != nil {
+			return err
+		}
+		certData, err := ioutil.ReadFile(remoteSourceUpdateOpts.tlsClientCertFile)
+		if err != nil {
+			return err
+		}
+		keyText := string(keyData)
+		certText := string(certData)
+		req.TlsClientKey = &keyText
+		req.TlsClientCert = &certText
 	}
 	if flags.Changed("skip-verify") {
 		req.SkipVerify = &remoteSourceUpdateOpts.skipVerify

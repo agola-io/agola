@@ -16,6 +16,7 @@ package cmd
 
 import (
 	"context"
+	"io/ioutil"
 
 	"agola.io/agola/internal/gitsources/github"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
@@ -41,6 +42,8 @@ type remoteSourceCreateOptions struct {
 	rsType              string
 	authType            string
 	apiURL              string
+	tlsClientKeyFile    string
+	tlsClientCertFile   string
 	skipVerify          bool
 	oauth2ClientID      string
 	oauth2ClientSecret  string
@@ -59,6 +62,8 @@ func init() {
 	flags.StringVar(&remoteSourceCreateOpts.rsType, "type", "", "remotesource type")
 	flags.StringVar(&remoteSourceCreateOpts.authType, "auth-type", "", "remote source auth type")
 	flags.StringVar(&remoteSourceCreateOpts.apiURL, "api-url", "", `remotesource api url (when type is "github" defaults to "https://api.github.com")`)
+	flags.StringVar(&remoteSourceCreateOpts.tlsClientKeyFile, "tls-client-key", "", "remotesource tls client key")
+	flags.StringVar(&remoteSourceCreateOpts.tlsClientCertFile, "tls-client-cert", "", "remotesource tls client certificate")
 	flags.BoolVarP(&remoteSourceCreateOpts.skipVerify, "skip-verify", "", false, "skip remote source api tls certificate verification")
 	flags.StringVar(&remoteSourceCreateOpts.oauth2ClientID, "clientid", "", "remotesource oauth2 client id")
 	flags.StringVar(&remoteSourceCreateOpts.oauth2ClientSecret, "secret", "", "remotesource oauth2 secret")
@@ -99,11 +104,28 @@ func remoteSourceCreate(cmd *cobra.Command, args []string) error {
 		return errors.Errorf(`required flag "api-url" not set`)
 	}
 
+	tlsClientKeyData := ""
+	tlsClientCertData := ""
+	if flags.Changed("tls-client-key") && flags.Changed("tls-client-cert") {
+		keyData, err := ioutil.ReadFile(remoteSourceCreateOpts.tlsClientKeyFile)
+		if err != nil {
+			return err
+		}
+		certData, err := ioutil.ReadFile(remoteSourceCreateOpts.tlsClientCertFile)
+		if err != nil {
+			return err
+		}
+		tlsClientKeyData = string(keyData)
+		tlsClientCertData = string(certData)
+	}
+
 	req := &gwapitypes.CreateRemoteSourceRequest{
 		Name:                remoteSourceCreateOpts.name,
 		Type:                remoteSourceCreateOpts.rsType,
 		AuthType:            remoteSourceCreateOpts.authType,
 		APIURL:              remoteSourceCreateOpts.apiURL,
+		TlsClientKey:        tlsClientKeyData,
+		TlsClientCert:       tlsClientCertData,
 		SkipVerify:          remoteSourceCreateOpts.skipVerify,
 		Oauth2ClientID:      remoteSourceCreateOpts.oauth2ClientID,
 		Oauth2ClientSecret:  remoteSourceCreateOpts.oauth2ClientSecret,

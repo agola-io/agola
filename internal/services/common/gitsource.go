@@ -27,6 +27,8 @@ import (
 func newGitea(rs *cstypes.RemoteSource, accessToken string) (*gitea.Client, error) {
 	return gitea.New(gitea.Opts{
 		APIURL:         rs.APIURL,
+		TlsClientKey:   rs.TlsClientKey,
+		TlsClientCert:  rs.TlsClientCert,
 		SkipVerify:     rs.SkipVerify,
 		Token:          accessToken,
 		Oauth2ClientID: rs.Oauth2ClientID,

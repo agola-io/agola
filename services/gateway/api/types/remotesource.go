@@ -19,6 +19,8 @@ type CreateRemoteSourceRequest struct {
 	APIURL              string `json:"apiurl"`
 	Type                string `json:"type"`
 	AuthType            string `json:"auth_type"`
+	TlsClientKey        string `json:"tls_client_key"`
+	TlsClientCert       string `json:"tls_client_cert"`
 	SkipVerify          bool   `json:"skip_verify"`
 	Oauth2ClientID      string `json:"oauth_2_client_id"`
 	Oauth2ClientSecret  string `json:"oauth_2_client_secret"`
@@ -31,6 +33,8 @@ type CreateRemoteSourceRequest struct {
 type UpdateRemoteSourceRequest struct {
 	Name                *string `json:"name"`
 	APIURL              *string `json:"apiurl"`
+	TlsClientKey        *string `json:"tls_client_key"`
+	TlsClientCert       *string `json:"tls_client_cert"`
 	SkipVerify          *bool   `json:"skip_verify"`
 	Oauth2ClientID      *string `json:"oauth_2_client_id"`
 	Oauth2ClientSecret  *string `json:"oauth_2_client_secret"`

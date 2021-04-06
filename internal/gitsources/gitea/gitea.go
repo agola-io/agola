@@ -55,6 +55,8 @@ var (
 type Opts struct {
 	APIURL         string
 	Token          string
+	TlsClientKey   string
+	TlsClientCert  string
 	SkipVerify     bool
 	Oauth2ClientID string
 	Oauth2Secret   string
@@ -93,6 +95,15 @@ func parseRepoPath(repopath string) (string, string, error) {
 }
 
 func New(opts Opts) (*Client, error) {
+	var clientCerts []tls.Certificate
+	if opts.TlsClientKey != "" && opts.TlsClientCert != "" {
+		clientCert, err := tls.X509KeyPair([]byte(opts.TlsClientCert), []byte(opts.TlsClientKey))
+		if err != nil {
+			return nil, err
+		}
+		clientCerts = []tls.Certificate{clientCert}
+	}
+
 	// copied from net/http until it has a clone function: https://github.com/golang/go/issues/26013
 	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
@@ -105,7 +116,7 @@ func New(opts Opts) (*Client, error) {
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
-		TLSClientConfig:       &tls.Config{InsecureSkipVerify: opts.SkipVerify},
+		TLSClientConfig:       &tls.Config{Certificates: clientCerts, InsecureSkipVerify: opts.SkipVerify},
 	}
 	httpClient := &http.Client{Transport: transport}
 
