@@ -3,7 +3,7 @@ module agola.io/agola
 go 1.12
 
 require (
-	code.gitea.io/sdk/gitea v0.13.1
+	code.gitea.io/sdk/gitea v0.14.0
 	github.com/Masterminds/squirrel v1.2.0
 	github.com/Microsoft/hcsshim v0.8.7 // indirect
 	github.com/bmatcuk/doublestar v1.2.2
@@ -20,6 +20,7 @@ require (
 	github.com/gorilla/handlers v1.4.2
 	github.com/gorilla/mux v1.7.4
 	github.com/hashicorp/go-sockaddr v1.0.2
+	github.com/hashicorp/go-version v1.3.0 // indirect
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
 	github.com/minio/minio-go/v6 v6.0.48
 	github.com/mitchellh/copystructure v1.0.0
