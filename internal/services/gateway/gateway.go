@@ -350,7 +350,11 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	lerrCh := make(chan error)
 	go func() {
-		lerrCh <- httpServer.ListenAndServe()
+		if !g.c.Web.TLS {
+			lerrCh <- httpServer.ListenAndServe()
+		} else {
+			lerrCh <- httpServer.ListenAndServeTLS("", "")
+		}
 	}()
 
 	select {

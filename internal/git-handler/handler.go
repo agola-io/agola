@@ -266,8 +266,13 @@ func (h *FetchFileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := gitFetchFile(ctx, w, r.Body, repoAbsPath, fetchData.Ref, fetchData.Path); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		// we cannot return any http error since the http header has already been written
 		h.log.Errorf("git command error: %v", err)
+
+		// since we already answered with a 200 we cannot return another error code
+		// So abort the connection and the client will detect the missing ending chunk
+		// and consider this an error
+		//
+		// this is the way to force close a request without logging the panic
+		panic(http.ErrAbortHandler)
 	}
 }

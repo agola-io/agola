@@ -127,6 +127,9 @@ func (h *ActionHandler) StopRun(ctx context.Context, req *RunStopRequest) error 
 		return errors.Errorf("run %s is not running but in %q phase", r.ID, r.Phase)
 	}
 	r.Stop = true
+	for _, t := range r.TasksWaitingApproval() {
+		r.Tasks[t].WaitingApproval = false
+	}
 
 	_, err = store.AtomicPutRun(ctx, h.e, r, nil, cgt)
 	return err
