@@ -364,23 +364,18 @@ APP_DATA_PATH    = {{ .Data }}/gitea
 SSH_DOMAIN       = {{ .SSHListenAddress }}
 HTTP_PORT        = {{ .HTTPPort }}
 ROOT_URL         = http://{{ .HTTPListenAddress }}:{{ .HTTPPort }}/
-DISABLE_SSH      = false
 # Use built-in ssh server
 START_SSH_SERVER = true
+DISABLE_SSH      = false
 SSH_PORT         = {{ .SSHPort }}
 LFS_CONTENT_PATH = {{ .Data }}/git/lfs
 DOMAIN           = localhost
 LFS_START_SERVER = true
 LFS_JWT_SECRET   = PI0Tfn0OcYpzpNb_u11JdoUfDbsMa2x6paWH2ckMVrw
-OFFLINE_MODE     = false
 
 [database]
 PATH     = {{ .Data }}/gitea/gitea.db
 DB_TYPE  = sqlite3
-HOST     =
-NAME     =
-USER     =
-PASSWD   =
 SSL_MODE = disable
 
 [indexer]
@@ -409,15 +404,6 @@ SECRET_KEY     = vRCH8usxWj6e8JGBPBaqycpfVyWm079xC3P3k76YsjKbrgBmyHhQD9UyzRFICKB
 INTERNAL_TOKEN = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYmYiOjE1NTc0MDI0MDZ9.27f4bakIxBIOoO48ORyLmbvpQprsJMEHLM6PyXIqB5g
 
 [service]
-DISABLE_REGISTRATION              = false
-REQUIRE_SIGNIN_VIEW               = false
-REGISTER_EMAIL_CONFIRM            = false
-ENABLE_NOTIFY_MAIL                = false
-ALLOW_ONLY_EXTERNAL_REGISTRATION  = false
-ENABLE_CAPTCHA                    = false
-DEFAULT_KEEP_EMAIL_PRIVATE        = false
-DEFAULT_ALLOW_CREATE_ORGANIZATION = true
-DEFAULT_ENABLE_TIMETRACKING       = true
 NO_REPLY_ADDRESS                  = noreply.example.org
 
 [oauth2]
@@ -429,7 +415,7 @@ ENABLED = false
 [openid]
 ENABLE_OPENID_SIGNIN = true
 ENABLE_OPENID_SIGNUP = true
-    `
+`
 )
 
 type GiteaConfig struct {
