@@ -115,18 +115,19 @@ func setupGitea(t *testing.T, dir, dockerBridgeAddress string) *testutil.TestGit
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
-	giteaClient, err := gitea.NewClient(giteaAPIURL)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-
 	// Wait for gitea api to be ready
 	err = testutil.Wait(30*time.Second, func() (bool, error) {
+		giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
+		giteaClient, err := gitea.NewClient(giteaAPIURL)
+		if err != nil {
+			return false, nil
+		}
+
 		giteaClient.SetBasicAuth(giteaUser01, "password")
 		if _, _, err := giteaClient.ListAccessTokens(gitea.ListAccessTokensOptions{}); err != nil {
 			return false, nil
 		}
+
 		return true, nil
 	})
 	if err != nil {
