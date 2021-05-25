@@ -42,7 +42,9 @@ func TestDockerPod(t *testing.T) {
 
 	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
 
-	d, err := NewDockerDriver(logger, "executorid01", toolboxPath)
+	initImage := "busybox"
+
+	d, err := NewDockerDriver(logger, "executorid01", toolboxPath, initImage)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
