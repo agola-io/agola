@@ -44,7 +44,7 @@ func TestDockerPod(t *testing.T) {
 
 	initImage := "busybox:stable"
 
-	d, err := NewDockerDriver(logger, "executorid01", toolboxPath, initImage)
+	d, err := NewDockerDriver(logger, "executorid01", toolboxPath, initImage, nil)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
