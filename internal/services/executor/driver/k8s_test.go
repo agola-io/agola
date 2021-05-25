@@ -41,7 +41,7 @@ func TestK8sPod(t *testing.T) {
 
 	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
 
-	initImage := "busybox"
+	initImage := "busybox:stable"
 
 	d, err := NewK8sDriver(logger, "executorid01", toolboxPath, initImage)
 	if err != nil {

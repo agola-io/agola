@@ -235,7 +235,7 @@ var defaultConfig = Config{
 	},
 	Executor: Executor{
 		InitImage: InitImage{
-			Image: "busybox",
+			Image: "busybox:stable",
 		},
 		ActiveTasksLimit: 2,
 	},
