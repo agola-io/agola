@@ -48,11 +48,12 @@ type DockerDriver struct {
 	log         *zap.SugaredLogger
 	client      *client.Client
 	toolboxPath string
+	initImage   string
 	executorID  string
 	arch        types.Arch
 }
 
-func NewDockerDriver(logger *zap.Logger, executorID, toolboxPath string) (*DockerDriver, error) {
+func NewDockerDriver(logger *zap.Logger, executorID, toolboxPath, initImage string) (*DockerDriver, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.26"))
 	if err != nil {
 		return nil, err
@@ -62,6 +63,7 @@ func NewDockerDriver(logger *zap.Logger, executorID, toolboxPath string) (*Docke
 		log:         logger.Sugar(),
 		client:      cli,
 		toolboxPath: toolboxPath,
+		initImage:   initImage,
 		executorID:  executorID,
 		arch:        types.ArchFromString(runtime.GOARCH),
 	}, nil
@@ -72,7 +74,7 @@ func (d *DockerDriver) Setup(ctx context.Context) error {
 }
 
 func (d *DockerDriver) createToolboxVolume(ctx context.Context, podID string) (*dockertypes.Volume, error) {
-	reader, err := d.client.ImagePull(ctx, "busybox", dockertypes.ImagePullOptions{})
+	reader, err := d.client.ImagePull(ctx, d.initImage, dockertypes.ImagePullOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +97,7 @@ func (d *DockerDriver) createToolboxVolume(ctx context.Context, podID string) (*
 
 	resp, err := d.client.ContainerCreate(ctx, &container.Config{
 		Entrypoint: []string{"cat"},
-		Image:      "busybox",
+		Image:      d.initImage,
 		Tty:        true,
 	}, &container.HostConfig{
 		Binds: []string{fmt.Sprintf("%s:%s", toolboxVol.Name, "/tmp/agola")},

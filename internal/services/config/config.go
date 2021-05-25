@@ -109,11 +109,17 @@ type Executor struct {
 
 	Driver Driver `yaml:"driver"`
 
+	InitImage InitImage `yaml:"initImage"`
+
 	Labels map[string]string `yaml:"labels"`
 	// ActiveTasksLimit is the max number of concurrent active tasks
 	ActiveTasksLimit int `yaml:"active_tasks_limit"`
 
 	AllowPrivilegedContainers bool `yaml:"allowPrivilegedContainers"`
+}
+
+type InitImage struct {
+	Image string `yaml:"image"`
 }
 
 type Configstore struct {
@@ -228,6 +234,9 @@ var defaultConfig = Config{
 		RunWorkspaceExpireInterval: 7 * 24 * time.Hour,
 	},
 	Executor: Executor{
+		InitImage: InitImage{
+			Image: "busybox",
+		},
 		ActiveTasksLimit: 2,
 	},
 }
@@ -258,6 +267,14 @@ func validateWeb(w *Web) error {
 		if w.TLSCertFile == "" {
 			return errors.Errorf("no tls cert file specified")
 		}
+	}
+
+	return nil
+}
+
+func validateInitImage(i *InitImage) error {
+	if i.Image == "" {
+		return errors.Errorf("image is empty")
 	}
 
 	return nil
@@ -330,6 +347,10 @@ func Validate(c *Config, componentsNames []string) error {
 		case DriverTypeK8s:
 		default:
 			return errors.Errorf("executor driver type %q unknown", c.Executor.Driver.Type)
+		}
+
+		if err := validateInitImage(&c.Executor.InitImage); err != nil {
+			return errors.Errorf("executor initImage configuration error: %w", err)
 		}
 	}
 

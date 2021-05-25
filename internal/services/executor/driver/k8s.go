@@ -74,6 +74,7 @@ type K8sDriver struct {
 	restconfig       *restclient.Config
 	client           *kubernetes.Clientset
 	toolboxPath      string
+	initImage        string
 	namespace        string
 	executorID       string
 	executorsGroupID string
@@ -95,7 +96,7 @@ type K8sPod struct {
 	initVolumeDir string
 }
 
-func NewK8sDriver(logger *zap.Logger, executorID, toolboxPath string) (*K8sDriver, error) {
+func NewK8sDriver(logger *zap.Logger, executorID, toolboxPath, initImage string) (*K8sDriver, error) {
 	kubeClientConfig := NewKubeClientConfig("", "", "")
 	kubecfg, err := kubeClientConfig.ClientConfig()
 	if err != nil {
@@ -112,13 +113,14 @@ func NewK8sDriver(logger *zap.Logger, executorID, toolboxPath string) (*K8sDrive
 	}
 
 	d := &K8sDriver{
-		log:          logger.Sugar(),
-		restconfig:   kubecfg,
-		client:       kubecli,
-		toolboxPath:  toolboxPath,
-		namespace:    namespace,
-		executorID:   executorID,
-		k8sLabelArch: corev1.LabelArchStable,
+		log:              logger.Sugar(),
+		restconfig:       kubecfg,
+		client:           kubecli,
+		toolboxPath:      toolboxPath,
+		initImage:        initImage,
+		namespace:        namespace,
+		executorID:       executorID,
+		k8sLabelArch:     corev1.LabelArchStable,
 	}
 
 	serverVersion, err := d.client.Discovery().ServerVersion()
@@ -361,7 +363,7 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 			InitContainers: []corev1.Container{
 				{
 					Name:  "initcontainer",
-					Image: "busybox",
+					Image: d.initImage,
 					// wait for a file named /tmp/done and then exit
 					Command: []string{"/bin/sh", "-c", "while true; do if [[ -f /tmp/done ]]; then exit; fi; sleep 1; done"},
 					Stdin:   true,
