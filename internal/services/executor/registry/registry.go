@@ -76,6 +76,14 @@ var (
 	}
 )
 
+func GetImageTagOrDigest(image string) (string, error) {
+	ref, err := name.ParseReference(image, name.WeakValidation)
+	if err != nil {
+		return "", err
+	}
+	return ref.Identifier(), nil
+}
+
 func GetRegistry(image string) (string, error) {
 	ref, err := name.ParseReference(image, name.WeakValidation)
 	if err != nil {

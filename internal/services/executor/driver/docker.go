@@ -15,7 +15,6 @@
 package driver
 
 import (
-	"bufio"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -73,16 +72,8 @@ func (d *DockerDriver) Setup(ctx context.Context) error {
 	return nil
 }
 
-func (d *DockerDriver) createToolboxVolume(ctx context.Context, podID string) (*dockertypes.Volume, error) {
-	reader, err := d.client.ImagePull(ctx, d.initImage, dockertypes.ImagePullOptions{})
-	if err != nil {
-		return nil, err
-	}
-	scanner := bufio.NewScanner(reader)
-	for scanner.Scan() {
-		d.log.Infof("create toolbox volume image pull output: %s", scanner.Text())
-	}
-	if err := scanner.Err(); err != nil {
+func (d *DockerDriver) createToolboxVolume(ctx context.Context, podID string, out io.Writer) (*dockertypes.Volume, error) {
+	if err := d.fetchImage(ctx, d.initImage, false, nil, out); err != nil {
 		return nil, err
 	}
 
@@ -153,7 +144,7 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 		return nil, errors.Errorf("empty container config")
 	}
 
-	toolboxVol, err := d.createToolboxVolume(ctx, podConfig.ID)
+	toolboxVol, err := d.createToolboxVolume(ctx, podConfig.ID, out)
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +231,7 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 	return pod, nil
 }
 
-func (d *DockerDriver) fetchImage(ctx context.Context, image string, registryConfig *registry.DockerConfig, out io.Writer) error {
+func (d *DockerDriver) fetchImage(ctx context.Context, image string, alwaysFetch bool, registryConfig *registry.DockerConfig, out io.Writer) error {
 	regName, err := registry.GetRegistry(image)
 	if err != nil {
 		return err
@@ -257,21 +248,39 @@ func (d *DockerDriver) fetchImage(ctx context.Context, image string, registryCon
 	}
 	registryAuthEnc := base64.URLEncoding.EncodeToString(buf)
 
-	// by default always try to pull the image so we are sure only authorized users can fetch them
-	// see https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#alwayspullimages
-	reader, err := d.client.ImagePull(ctx, image, dockertypes.ImagePullOptions{RegistryAuth: registryAuthEnc})
+	tag, err := registry.GetImageTagOrDigest(image)
 	if err != nil {
 		return err
 	}
 
-	_, err = io.Copy(out, reader)
-	return err
+	args := filters.NewArgs()
+	args.Add("reference", image)
+	img, err := d.client.ImageList(ctx, dockertypes.ImageListOptions{Filters: args})
+	if err != nil {
+		return err
+	}
+	exists := len(img) > 0
+
+	// fetch only if forced, is latest tag or image doesn't exist
+	if alwaysFetch || tag == "latest" || !exists {
+		reader, err := d.client.ImagePull(ctx, image, dockertypes.ImagePullOptions{RegistryAuth: registryAuthEnc})
+		if err != nil {
+			return err
+		}
+
+		_, err = io.Copy(out, reader)
+		return err
+	}
+
+	return nil
 }
 
 func (d *DockerDriver) createContainer(ctx context.Context, index int, podConfig *PodConfig, maincontainerID string, toolboxVol *dockertypes.Volume, out io.Writer) (*container.ContainerCreateCreatedBody, error) {
 	containerConfig := podConfig.Containers[index]
 
-	if err := d.fetchImage(ctx, containerConfig.Image, podConfig.DockerConfig, out); err != nil {
+	// by default always try to pull the image so we are sure only authorized users can fetch them
+	// see https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#alwayspullimages
+	if err := d.fetchImage(ctx, containerConfig.Image, true, podConfig.DockerConfig, out); err != nil {
 		return nil, err
 	}
 
