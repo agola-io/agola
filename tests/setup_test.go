@@ -265,7 +265,7 @@ func setup(ctx context.Context, t *testing.T, dir string) (*testutil.TestEmbedde
 			Labels:           map[string]string{},
 			ActiveTasksLimit: 2,
 			InitImage: config.InitImage{
-				Image: "busybox",
+				Image: "busybox:stable",
 			},
 		},
 		Configstore: config.Configstore{
