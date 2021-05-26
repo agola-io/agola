@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"agola.io/agola/internal/services/executor/registry"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/types"
 
@@ -75,6 +76,7 @@ type K8sDriver struct {
 	client           *kubernetes.Clientset
 	toolboxPath      string
 	initImage        string
+	initDockerConfig *registry.DockerConfig
 	namespace        string
 	executorID       string
 	executorsGroupID string
@@ -96,7 +98,7 @@ type K8sPod struct {
 	initVolumeDir string
 }
 
-func NewK8sDriver(logger *zap.Logger, executorID, toolboxPath, initImage string) (*K8sDriver, error) {
+func NewK8sDriver(logger *zap.Logger, executorID, toolboxPath, initImage string, initDockerConfig *registry.DockerConfig) (*K8sDriver, error) {
 	kubeClientConfig := NewKubeClientConfig("", "", "")
 	kubecfg, err := kubeClientConfig.ClientConfig()
 	if err != nil {
@@ -118,6 +120,7 @@ func NewK8sDriver(logger *zap.Logger, executorID, toolboxPath, initImage string)
 		client:           kubecli,
 		toolboxPath:      toolboxPath,
 		initImage:        initImage,
+		initDockerConfig: initDockerConfig,
 		namespace:        namespace,
 		executorID:       executorID,
 		k8sLabelArch:     corev1.LabelArchStable,
@@ -324,13 +327,18 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 	labels[executorIDKey] = d.executorID
 	labels[executorsGroupIDKey] = d.executorsGroupID
 
+	// pod and secret name, based on pod id
+	name := podNamePrefix + podConfig.ID
+
 	dockerconfigj, err := json.Marshal(podConfig.DockerConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	// pod and secret name, based on pod id
-	name := podNamePrefix + podConfig.ID
+	initDockerconfigj, err := json.Marshal(d.initDockerConfig)
+	if err != nil {
+		return nil, err
+	}
 
 	// secret that hold the docker registry auth
 	secret := &corev1.Secret{
@@ -339,7 +347,7 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 			Labels: labels,
 		},
 		Data: map[string][]byte{
-			".dockerconfigjson": dockerconfigj,
+			".dockerconfigjson": initDockerconfigj,
 		},
 		Type: corev1.SecretTypeDockerConfigJson,
 	}
@@ -487,6 +495,28 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 	}
 
 	fmt.Fprintf(out, "init container ready\n")
+
+	// Remove init container docker auth so it won't be used by user defined containers
+	dur := int64(0)
+	if err := secretClient.Delete(name, &metav1.DeleteOptions{GracePeriodSeconds: &dur}); err != nil {
+		return nil, err
+	}
+
+	secret = &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+		Data: map[string][]byte{
+			".dockerconfigjson": dockerconfigj,
+		},
+		Type: corev1.SecretTypeDockerConfigJson,
+	}
+
+	_, err = secretClient.Create(secret)
+	if err != nil {
+		return nil, err
+	}
 
 	coreclient, err := corev1client.NewForConfig(d.restconfig)
 	if err != nil {

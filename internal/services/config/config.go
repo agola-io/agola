@@ -120,6 +120,28 @@ type Executor struct {
 
 type InitImage struct {
 	Image string `yaml:"image"`
+
+	Auth *DockerRegistryAuth `yaml:"auth"`
+}
+
+type DockerRegistryAuthType string
+
+const (
+	DockerRegistryAuthTypeBasic       DockerRegistryAuthType = "basic"
+	DockerRegistryAuthTypeEncodedAuth DockerRegistryAuthType = "encodedauth"
+)
+
+type DockerRegistryAuth struct {
+	Type DockerRegistryAuthType `json:"type"`
+
+	// basic auth
+	Username string `json:"username"`
+	Password string `json:"password"`
+
+	// encoded auth string
+	Auth string `json:"auth"`
+
+	// future auths like aws ecr auth
 }
 
 type Configstore struct {

@@ -44,27 +44,29 @@ import (
 )
 
 type DockerDriver struct {
-	log         *zap.SugaredLogger
-	client      *client.Client
-	toolboxPath string
-	initImage   string
-	executorID  string
-	arch        types.Arch
+	log              *zap.SugaredLogger
+	client           *client.Client
+	toolboxPath      string
+	initImage        string
+	initDockerConfig *registry.DockerConfig
+	executorID       string
+	arch             types.Arch
 }
 
-func NewDockerDriver(logger *zap.Logger, executorID, toolboxPath, initImage string) (*DockerDriver, error) {
+func NewDockerDriver(logger *zap.Logger, executorID, toolboxPath, initImage string, initDockerConfig *registry.DockerConfig) (*DockerDriver, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.26"))
 	if err != nil {
 		return nil, err
 	}
 
 	return &DockerDriver{
-		log:         logger.Sugar(),
-		client:      cli,
-		toolboxPath: toolboxPath,
-		initImage:   initImage,
-		executorID:  executorID,
-		arch:        types.ArchFromString(runtime.GOARCH),
+		log:              logger.Sugar(),
+		client:           cli,
+		toolboxPath:      toolboxPath,
+		initImage:        initImage,
+		initDockerConfig: initDockerConfig,
+		executorID:       executorID,
+		arch:             types.ArchFromString(runtime.GOARCH),
 	}, nil
 }
 
@@ -73,7 +75,7 @@ func (d *DockerDriver) Setup(ctx context.Context) error {
 }
 
 func (d *DockerDriver) createToolboxVolume(ctx context.Context, podID string, out io.Writer) (*dockertypes.Volume, error) {
-	if err := d.fetchImage(ctx, d.initImage, false, nil, out); err != nil {
+	if err := d.fetchImage(ctx, d.initImage, false, d.initDockerConfig, out); err != nil {
 		return nil, err
 	}
 
