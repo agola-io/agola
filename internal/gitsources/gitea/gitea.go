@@ -382,21 +382,37 @@ func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource
 }
 
 func (c *Client) ListUserRepos() ([]*gitsource.RepoInfo, error) {
-	remoteRepos, err := c.client.ListMyRepos(gitea.ListReposOptions{})
-	if err != nil {
-		return nil, err
-	}
-
+	page := 1
 	repos := []*gitsource.RepoInfo{}
 
-	for _, rr := range remoteRepos {
-		// keep only repos with admin permissions
-		if !rr.Permissions.Admin {
-			continue
-		}
-		repos = append(repos, fromGiteaRepo(rr))
-	}
+	for {
+		remoteRepos, err := c.client.ListMyRepos(
+			gitea.ListReposOptions{
+				ListOptions: gitea.ListOptions{
+					Page:     page,
+					PageSize: 50, // Gitea SDK limit per page.
+				},
+			},
+		)
 
+		if err != nil {
+			return []*gitsource.RepoInfo{}, err
+		}
+
+		for _, repo := range remoteRepos {
+			if !repo.Permissions.Admin {
+				continue
+			}
+			repos = append(repos, fromGiteaRepo(repo))
+		}
+
+		// Check if no more repos are available
+		if len(remoteRepos) == 0 {
+			break
+		} else {
+			page = page + 1
+		}
+	}
 	return repos, nil
 }
 
