@@ -8,11 +8,11 @@ require (
 	github.com/Microsoft/hcsshim v0.8.7 // indirect
 	github.com/bmatcuk/doublestar v1.2.2
 	github.com/containerd/continuity v0.0.0-20200107194136-26c1120b8d41 // indirect
-	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/docker/docker v1.13.1
 	github.com/elazarl/go-bindata-assetfs v1.0.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-bindata/go-bindata v1.0.0
+	github.com/golang-jwt/jwt/v4 v4.0.0
 	github.com/google/go-cmp v0.4.0
 	github.com/google/go-containerregistry v0.0.0-20200212224832-c629a66d7231
 	github.com/google/go-github/v29 v29.0.3

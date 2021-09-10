@@ -32,7 +32,7 @@ import (
 	csclient "agola.io/agola/services/configstore/client"
 	rsclient "agola.io/agola/services/runservice/client"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v4"
 	ghandlers "github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"

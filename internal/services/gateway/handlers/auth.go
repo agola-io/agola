@@ -22,8 +22,8 @@ import (
 	"agola.io/agola/internal/services/common"
 	csclient "agola.io/agola/services/configstore/client"
 
-	jwt "github.com/dgrijalva/jwt-go"
-	jwtrequest "github.com/dgrijalva/jwt-go/request"
+	"github.com/golang-jwt/jwt/v4"
+	jwtrequest "github.com/golang-jwt/jwt/v4/request"
 	"go.uber.org/zap"
 	errors "golang.org/x/xerrors"
 )
