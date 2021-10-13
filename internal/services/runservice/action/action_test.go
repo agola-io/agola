@@ -53,7 +53,7 @@ func TestRecreateRun(t *testing.T) {
 				ID:   inuuid("task02"),
 				Name: "task02",
 				Depends: map[string]*types.RunConfigTaskDepend{
-					inuuid("task01"): &types.RunConfigTaskDepend{TaskID: inuuid("task01"), Conditions: []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnSuccess}},
+					inuuid("task01"): &types.RunConfigTaskDepend{TaskID: inuuid("task01"), Conditions: []types.RunConfigDependCondition{types.RunConfigDependConditionOnSuccess}},
 				},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},
@@ -87,8 +87,8 @@ func TestRecreateRun(t *testing.T) {
 				ID:   inuuid("task05"),
 				Name: "task05",
 				Depends: map[string]*types.RunConfigTaskDepend{
-					inuuid("task03"): &types.RunConfigTaskDepend{TaskID: inuuid("task03"), Conditions: []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnSuccess}},
-					inuuid("task04"): &types.RunConfigTaskDepend{TaskID: inuuid("task04"), Conditions: []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnSuccess}},
+					inuuid("task03"): &types.RunConfigTaskDepend{TaskID: inuuid("task03"), Conditions: []types.RunConfigDependCondition{types.RunConfigDependConditionOnSuccess}},
+					inuuid("task04"): &types.RunConfigTaskDepend{TaskID: inuuid("task04"), Conditions: []types.RunConfigDependCondition{types.RunConfigDependConditionOnSuccess}},
 				},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},
@@ -118,7 +118,7 @@ func TestRecreateRun(t *testing.T) {
 				ID:   outuuid("task02"),
 				Name: "task02",
 				Depends: map[string]*types.RunConfigTaskDepend{
-					outuuid("task01"): &types.RunConfigTaskDepend{TaskID: outuuid("task01"), Conditions: []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnSuccess}},
+					outuuid("task01"): &types.RunConfigTaskDepend{TaskID: outuuid("task01"), Conditions: []types.RunConfigDependCondition{types.RunConfigDependConditionOnSuccess}},
 				},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},
@@ -152,8 +152,8 @@ func TestRecreateRun(t *testing.T) {
 				ID:   outuuid("task05"),
 				Name: "task05",
 				Depends: map[string]*types.RunConfigTaskDepend{
-					outuuid("task03"): &types.RunConfigTaskDepend{TaskID: outuuid("task03"), Conditions: []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnSuccess}},
-					outuuid("task04"): &types.RunConfigTaskDepend{TaskID: outuuid("task04"), Conditions: []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnSuccess}},
+					outuuid("task03"): &types.RunConfigTaskDepend{TaskID: outuuid("task03"), Conditions: []types.RunConfigDependCondition{types.RunConfigDependConditionOnSuccess}},
+					outuuid("task04"): &types.RunConfigTaskDepend{TaskID: outuuid("task04"), Conditions: []types.RunConfigDependCondition{types.RunConfigDependConditionOnSuccess}},
 				},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},

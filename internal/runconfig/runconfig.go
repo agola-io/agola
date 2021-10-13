@@ -196,6 +196,58 @@ fi
 	}
 }
 
+// GenRunConfigTaskGroups generates a run config task groups from a run in the config, expanding all the references to task groups
+// this functions assumes that the config is already checked for possible errors (i.e referenced task group must exits)
+func GenRunConfigTaskGroups(uuid util.UUIDGenerator, c *config.Config, runName string) map[string]*rstypes.RunConfigTaskGroup {
+	cr := c.Run(runName)
+
+	rctgs := map[string]*rstypes.RunConfigTaskGroup{}
+
+	for _, ctg := range cr.TaskGroups {
+
+		tg := &rstypes.RunConfigTaskGroup{
+			Name:          ctg.Name,
+			IgnoreFailure: ctg.IgnoreFailure,
+		}
+
+		rctgs[tg.Name] = tg
+	}
+
+	// populate task groups depends
+	for _, rctg := range rctgs {
+		ctg := cr.TaskGroup(rctg.Name)
+
+		depends := make(map[string]*rstypes.RunConfigTaskGroupDepend, len(ctg.Depends))
+		for _, d := range ctg.Depends {
+			conditions := make([]rstypes.RunConfigDependCondition, len(d.Conditions))
+			// when no conditions are defined default to on_success
+			if len(d.Conditions) == 0 {
+				conditions = append(conditions, rstypes.RunConfigDependConditionOnSuccess)
+			} else {
+				for ic, c := range d.Conditions {
+					var condition rstypes.RunConfigDependCondition
+					switch c {
+					case config.DependConditionOnSuccess:
+						condition = rstypes.RunConfigDependConditionOnSuccess
+					case config.DependConditionOnFailure:
+						condition = rstypes.RunConfigDependConditionOnFailure
+					}
+					conditions[ic] = condition
+				}
+			}
+
+			depends[d.TaskGroupName] = &rstypes.RunConfigTaskGroupDepend{
+				TaskGroupName: d.TaskGroupName,
+				Conditions:    conditions,
+			}
+		}
+
+		rctg.Depends = depends
+	}
+
+	return rctgs
+}
+
 // GenRunConfigTasks generates a run config tasks from a run in the config, expanding all the references to tasks
 // this functions assumes that the config is already checked for possible errors (i.e referenced task must exits)
 func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string, variables map[string]string, refType itypes.RunRefType, branch, tag, ref string) map[string]*rstypes.RunConfigTask {
@@ -216,6 +268,7 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string
 		t := &rstypes.RunConfigTask{
 			ID:                   uuid.New(ct.Name).String(),
 			Name:                 ct.Name,
+			TaskGroup:            ct.TaskGroup,
 			Runtime:              genRuntime(c, ct.Runtime, variables),
 			Environment:          tEnv,
 			WorkingDir:           ct.WorkingDir,
@@ -273,24 +326,24 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string
 
 		depends := make(map[string]*rstypes.RunConfigTaskDepend, len(ct.Depends))
 		for _, d := range ct.Depends {
-			conditions := make([]rstypes.RunConfigTaskDependCondition, len(d.Conditions))
+			conditions := make([]rstypes.RunConfigDependCondition, len(d.Conditions))
 			// when no conditions are defined default to on_success
 			if len(d.Conditions) == 0 {
-				conditions = append(conditions, rstypes.RunConfigTaskDependConditionOnSuccess)
+				conditions = append(conditions, rstypes.RunConfigDependConditionOnSuccess)
 			} else {
 				for ic, c := range d.Conditions {
-					var condition rstypes.RunConfigTaskDependCondition
+					var condition rstypes.RunConfigDependCondition
 					switch c {
 					case config.DependConditionOnSuccess:
-						condition = rstypes.RunConfigTaskDependConditionOnSuccess
+						condition = rstypes.RunConfigDependConditionOnSuccess
 					case config.DependConditionOnFailure:
-						condition = rstypes.RunConfigTaskDependConditionOnFailure
+						condition = rstypes.RunConfigDependConditionOnFailure
 					}
 					conditions[ic] = condition
 				}
 			}
 
-			drct := getRunConfigTaskByName(rcts, d.TaskName)
+			drct := runConfigTaskByName(rcts, d.TaskName)
 			depends[drct.ID] = &rstypes.RunConfigTaskDepend{
 				TaskID:     drct.ID,
 				Conditions: conditions,
@@ -303,7 +356,7 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string
 	return rcts
 }
 
-func getRunConfigTaskByName(rcts map[string]*rstypes.RunConfigTask, name string) *rstypes.RunConfigTask {
+func runConfigTaskByName(rcts map[string]*rstypes.RunConfigTask, name string) *rstypes.RunConfigTask {
 	for _, rct := range rcts {
 		if rct.Name == name {
 			return rct
@@ -312,24 +365,127 @@ func getRunConfigTaskByName(rcts map[string]*rstypes.RunConfigTask, name string)
 	return nil
 }
 
-func CheckRunConfigTasks(rcts map[string]*rstypes.RunConfigTask) error {
+func CheckRunConfig(rctgs map[string]*rstypes.RunConfigTaskGroup, rcts map[string]*rstypes.RunConfigTask) error {
+	if err := checkRunConfigTasks(rcts); err != nil {
+		return errors.Errorf("check run config tasks failed: %w", err)
+	}
+	if err := checkRunConfigTaskGroups(rctgs); err != nil {
+		return errors.Errorf("check run config tasks failed: %w", err)
+	}
+
+	return nil
+}
+
+func checkRunConfigTaskGroups(rctgs map[string]*rstypes.RunConfigTaskGroup) error {
+	cerrs := &util.Errors{}
+
+	// check broken dependencies between task groups
+	// collect all task names
+	allTaskGroups := map[string]struct{}{}
+	for _, tg := range rctgs {
+		allTaskGroups[tg.Name] = struct{}{}
+	}
+
+	for _, tg := range rctgs {
+		for _, dep := range tg.Depends {
+			if _, ok := allTaskGroups[dep.TaskGroupName]; !ok {
+				cerrs.Append(errors.Errorf("task group %q needed by task group %q doesn't exist", dep.TaskGroupName, tg.Name))
+			}
+		}
+	}
+
 	// check circular dependencies
+	for _, tg := range rctgs {
+		allParents := TaskGroupAllParents(rctgs, tg)
+		for _, parent := range allParents {
+			if parent.Name == tg.Name {
+				// TODO(sgotti) get the parent that depends on task to report it
+				dep := []string{}
+				for _, parent := range allParents {
+					pparents := TaskGroupParents(rctgs, parent)
+					for _, pparent := range pparents {
+						if pparent.Name == tg.Name {
+							dep = append(dep, fmt.Sprintf("%q", parent.Name))
+						}
+					}
+				}
+				cerrs.Append(errors.Errorf("circular dependency between task group %q and task groups %s", tg.Name, strings.Join(dep, " ")))
+			}
+		}
+	}
+
+	// check that the task and its parent don't have a common dependency
+	for _, tg := range rctgs {
+		parents := TaskGroupParents(rctgs, tg)
+		for _, parent := range parents {
+			allParentParents := TaskGroupAllParents(rctgs, parent)
+			for _, p := range parents {
+				for _, pp := range allParentParents {
+					if p.Name == pp.Name {
+						cerrs.Append(errors.Errorf("task group %q and its parent %q have both a dependency on task group %q", tg.Name, parent.Name, p.Name))
+					}
+				}
+			}
+		}
+	}
+
+	// check duplicate task group dependencies
+	for _, tg := range rctgs {
+		// check duplicate dependencies in task
+		seenDependencies := map[string]struct{}{}
+		for _, dep := range tg.Depends {
+			if _, ok := seenDependencies[dep.TaskGroupName]; ok {
+				cerrs.Append(errors.Errorf("task group %q have a duplicate dependency on task group %q", tg.Name, dep.TaskGroupName))
+			}
+			seenDependencies[dep.TaskGroupName] = struct{}{}
+		}
+	}
+
+	if cerrs.IsErr() {
+		return cerrs
+	}
+
+	return nil
+}
+
+func checkRunConfigTasks(rcts map[string]*rstypes.RunConfigTask) error {
+
+	// check broken dependencies between tasks
+	// collect all task names
+	allTasks := map[string]struct{}{}
+	for _, t := range rcts {
+		allTasks[t.ID] = struct{}{}
+	}
+
 	cerrs := &util.Errors{}
 	for _, t := range rcts {
-		allParents := GetAllParents(rcts, t)
+		for _, dep := range t.Depends {
+			if _, ok := allTasks[dep.TaskID]; !ok {
+				cerrs.Append(errors.Errorf("run task %q needed by task %q doesn't exist", dep.TaskID, t.ID))
+			}
+		}
+	}
+	if cerrs.IsErr() {
+		return cerrs
+	}
+
+	// check circular dependencies
+	cerrs = &util.Errors{}
+	for _, t := range rcts {
+		allParents := TaskAllParents(rcts, t)
 		for _, parent := range allParents {
 			if parent.ID == t.ID {
 				// TODO(sgotti) get the parent that depends on task to report it
 				dep := []string{}
 				for _, parent := range allParents {
-					pparents := GetParents(rcts, parent)
+					pparents := TaskParents(rcts, parent)
 					for _, pparent := range pparents {
 						if pparent.ID == t.ID {
-							dep = append(dep, fmt.Sprintf("%q", parent.Name))
+							dep = append(dep, fmt.Sprintf("%q", parent.ID))
 						}
 					}
 				}
-				cerrs.Append(errors.Errorf("circular dependency between task %q and tasks %s", t.Name, strings.Join(dep, " ")))
+				cerrs.Append(errors.Errorf("circular dependency between task %q and tasks %s", t.ID, strings.Join(dep, " ")))
 			}
 		}
 	}
@@ -338,25 +494,118 @@ func CheckRunConfigTasks(rcts map[string]*rstypes.RunConfigTask) error {
 	}
 
 	// check that the task and its parent don't have a common dependency
+	cerrs = &util.Errors{}
 	for _, t := range rcts {
-		parents := GetParents(rcts, t)
+		parents := TaskParents(rcts, t)
 		for _, parent := range parents {
-			allParentParents := GetAllParents(rcts, parent)
+			allParentParents := TaskAllParents(rcts, parent)
 			for _, p := range parents {
 				for _, pp := range allParentParents {
 					if p.ID == pp.ID {
-						return errors.Errorf("task %q and its parent %q have both a dependency on task %q", t.Name, parent.Name, p.Name)
+						cerrs.Append(errors.Errorf("task %q and its parent %q have both a dependency on task %q", t.ID, parent.ID, p.ID))
 					}
 				}
 			}
 		}
 	}
+	if cerrs.IsErr() {
+		return cerrs
+	}
+
+	// check duplicate task dependencies
+	cerrs = &util.Errors{}
+	for _, t := range rcts {
+		// check duplicate dependencies in task
+		seenDependencies := map[string]struct{}{}
+		for _, dep := range t.Depends {
+			if _, ok := seenDependencies[dep.TaskID]; ok {
+				cerrs.Append(errors.Errorf("task %q have a duplicate dependency on task %q", t.ID, dep.TaskID))
+			}
+			seenDependencies[dep.TaskID] = struct{}{}
+		}
+	}
+	if cerrs.IsErr() {
+		return cerrs
+	}
+
+	// check task and all parent tasks have the same task group
+	cerrs = &util.Errors{}
+	for _, t := range rcts {
+		allParents := TaskAllParents(rcts, t)
+		for _, parent := range allParents {
+			if parent.TaskGroup != t.TaskGroup {
+				cerrs.Append(errors.Errorf("task %q and its dependency %q have different task group", t.ID, parent.ID))
+			}
+		}
+	}
+	if cerrs.IsErr() {
+		return cerrs
+	}
 
 	return nil
 }
 
-func GenTasksLevels(rcts map[string]*rstypes.RunConfigTask) error {
-	// reset all task level
+func GenLevels(rctgs map[string]*rstypes.RunConfigTaskGroup, rcts map[string]*rstypes.RunConfigTask) error {
+	if err := genTaskGroupsLevels(rctgs); err != nil {
+		return errors.Errorf("gen task groups levels failed: %w", err)
+	}
+	if err := genTasksLevels(rcts); err != nil {
+		return errors.Errorf("gen tasks levels failed: %w", err)
+	}
+	if err := genTasksGlobalLevels(rctgs, rcts); err != nil {
+		return errors.Errorf("gen tasks global levels failed: %w", err)
+	}
+
+	return nil
+}
+
+func genTaskGroupsLevels(rctgs map[string]*rstypes.RunConfigTaskGroup) error {
+	// reset task groups levels
+	for _, tg := range rctgs {
+		tg.Level = -1
+	}
+
+	level := 0
+	for {
+		c := 0
+		for _, tg := range rctgs {
+			// skip tasks with the level already set
+			if tg.Level != -1 {
+				continue
+			}
+
+			parents := TaskGroupParents(rctgs, tg)
+			ok := true
+			for _, p := range parents {
+				// * skip if the parent doesn't have a level yet
+				// * skip if the parent has a level equal than the current one (this happens when
+				// we have just set a level to a task in this same level loop)
+				if p.Level == -1 || p.Level >= level {
+					ok = false
+				}
+			}
+			if ok {
+				tg.Level = level
+				c++
+			}
+		}
+
+		// if no tasks were updated in this level we can stop here
+		if c == 0 {
+			break
+		}
+		level++
+	}
+	for _, tg := range rctgs {
+		if tg.Level == -1 {
+			return errors.Errorf("circular dependency detected")
+		}
+	}
+	return nil
+}
+
+func genTasksLevels(rcts map[string]*rstypes.RunConfigTask) error {
+	// reset tasks levels
 	for _, t := range rcts {
 		t.Level = -1
 	}
@@ -370,7 +619,7 @@ func GenTasksLevels(rcts map[string]*rstypes.RunConfigTask) error {
 				continue
 			}
 
-			parents := GetParents(rcts, t)
+			parents := TaskParents(rcts, t)
 			ok := true
 			for _, p := range parents {
 				// * skip if the parent doesn't have a level yet
@@ -400,8 +649,53 @@ func GenTasksLevels(rcts map[string]*rstypes.RunConfigTask) error {
 	return nil
 }
 
-// GetParents returns direct parents of task.
-func GetParents(rcts map[string]*rstypes.RunConfigTask, task *rstypes.RunConfigTask) []*rstypes.RunConfigTask {
+func genTasksGlobalLevels(rctgs map[string]*rstypes.RunConfigTaskGroup, rcts map[string]*rstypes.RunConfigTask) error {
+	tgMaxTasksLevelByLevel := map[int]int{}
+	for _, tg := range rctgs {
+		maxTasksLevel := 0
+		for _, t := range rcts {
+			if t.TaskGroup != tg.Name {
+				continue
+			}
+			if t.Level > maxTasksLevel {
+				maxTasksLevel = t.Level
+			}
+		}
+		if _, ok := tgMaxTasksLevelByLevel[tg.Level]; !ok {
+			tgMaxTasksLevelByLevel[tg.Level] = maxTasksLevel
+		} else {
+			if maxTasksLevel > tgMaxTasksLevelByLevel[tg.Level] {
+				tgMaxTasksLevelByLevel[tg.Level] = maxTasksLevel
+			}
+		}
+	}
+
+	// calculate the level of the parents task group
+	for _, t := range rcts {
+		tg := rctgs[t.TaskGroup]
+		gl := 0
+		for i := 0; i < tg.Level; i++ {
+			gl += tgMaxTasksLevelByLevel[i] + 1
+		}
+		t.GlobalLevel = t.Level + gl
+	}
+
+	return nil
+}
+
+// TaskGroupParents returns direct parents of task.
+func TaskGroupParents(rctgs map[string]*rstypes.RunConfigTaskGroup, taskGroup *rstypes.RunConfigTaskGroup) []*rstypes.RunConfigTaskGroup {
+	parents := []*rstypes.RunConfigTaskGroup{}
+	for _, tg := range rctgs {
+		if _, ok := taskGroup.Depends[tg.Name]; ok {
+			parents = append(parents, tg)
+		}
+	}
+	return parents
+}
+
+// TaskParents returns direct parents of task.
+func TaskParents(rcts map[string]*rstypes.RunConfigTask, task *rstypes.RunConfigTask) []*rstypes.RunConfigTask {
 	parents := []*rstypes.RunConfigTask{}
 	for _, t := range rcts {
 		if _, ok := task.Depends[t.ID]; ok {
@@ -411,12 +705,40 @@ func GetParents(rcts map[string]*rstypes.RunConfigTask, task *rstypes.RunConfigT
 	return parents
 }
 
-// GetAllParents returns all the parents (both direct and ancestors) of task.
-// In case of circular dependency it won't loop forever but will also return
-// task as parent of itself
-func GetAllParents(rcts map[string]*rstypes.RunConfigTask, task *rstypes.RunConfigTask) []*rstypes.RunConfigTask {
+// TaskGroupAllParents returns all the parents of the same task group (both
+// direct and ancestors) of task.
+// In case of circular dependency it won't loop forever but will also
+// return task as parent of itself
+func TaskGroupAllParents(rctgs map[string]*rstypes.RunConfigTaskGroup, tg *rstypes.RunConfigTaskGroup) []*rstypes.RunConfigTaskGroup {
+	pMap := map[string]*rstypes.RunConfigTaskGroup{}
+	nextParents := TaskGroupParents(rctgs, tg)
+
+	for len(nextParents) > 0 {
+		parents := nextParents
+		nextParents = []*rstypes.RunConfigTaskGroup{}
+		for _, parent := range parents {
+			if _, ok := pMap[parent.Name]; ok {
+				continue
+			}
+			pMap[parent.Name] = parent
+			nextParents = append(nextParents, TaskGroupParents(rctgs, parent)...)
+		}
+	}
+
+	parents := make([]*rstypes.RunConfigTaskGroup, 0, len(pMap))
+	for _, v := range pMap {
+		parents = append(parents, v)
+	}
+	return parents
+}
+
+// TaskAllParents returns all the parents of the same task group (both
+// direct and ancestors) of task.
+// In case of circular dependency it won't loop forever but will also
+// return task as parent of itself
+func TaskAllParents(rcts map[string]*rstypes.RunConfigTask, task *rstypes.RunConfigTask) []*rstypes.RunConfigTask {
 	pMap := map[string]*rstypes.RunConfigTask{}
-	nextParents := GetParents(rcts, task)
+	nextParents := TaskParents(rcts, task)
 
 	for len(nextParents) > 0 {
 		parents := nextParents
@@ -426,7 +748,7 @@ func GetAllParents(rcts map[string]*rstypes.RunConfigTask, task *rstypes.RunConf
 				continue
 			}
 			pMap[parent.ID] = parent
-			nextParents = append(nextParents, GetParents(rcts, parent)...)
+			nextParents = append(nextParents, TaskParents(rcts, parent)...)
 		}
 	}
 
@@ -437,7 +759,33 @@ func GetAllParents(rcts map[string]*rstypes.RunConfigTask, task *rstypes.RunConf
 	return parents
 }
 
-func GetParentDependConditions(t, pt *rstypes.RunConfigTask) []rstypes.RunConfigTaskDependCondition {
+// TaskAllParents returns all the global parents (both direct and
+// ancestors also from parent task groups) of task.
+// In case of circular dependency it won't loop forever but will also
+// return task as parent of itself
+func TaskAllGlobalParents(rctgs map[string]*rstypes.RunConfigTaskGroup, rcts map[string]*rstypes.RunConfigTask, task *rstypes.RunConfigTask) []*rstypes.RunConfigTask {
+	parents := TaskAllParents(rcts, task)
+
+	tgParents := TaskGroupParents(rctgs, rctgs[task.TaskGroup])
+
+	for _, tgParent := range tgParents {
+		for _, t := range rcts {
+			if t.TaskGroup == tgParent.Name {
+				parents = append(parents, t)
+			}
+		}
+	}
+	return parents
+}
+
+func TaskGroupParentDependConditions(tg, ptg *rstypes.RunConfigTaskGroup) []rstypes.RunConfigDependCondition {
+	if dt, ok := tg.Depends[ptg.Name]; ok {
+		return dt.Conditions
+	}
+	return nil
+}
+
+func TaskParentDependConditions(t, pt *rstypes.RunConfigTask) []rstypes.RunConfigDependCondition {
 	if dt, ok := t.Depends[pt.ID]; ok {
 		return dt.Conditions
 	}

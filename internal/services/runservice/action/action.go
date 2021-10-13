@@ -136,12 +136,13 @@ func (h *ActionHandler) StopRun(ctx context.Context, req *RunStopRequest) error 
 }
 
 type RunCreateRequest struct {
-	RunConfigTasks    map[string]*types.RunConfigTask
-	Name              string
-	Group             string
-	SetupErrors       []string
-	StaticEnvironment map[string]string
-	CacheGroup        string
+	RunConfigTaskGroups map[string]*types.RunConfigTaskGroup
+	RunConfigTasks      map[string]*types.RunConfigTask
+	Name                string
+	Group               string
+	SetupErrors         []string
+	StaticEnvironment   map[string]string
+	CacheGroup          string
 
 	// existing run fields
 	RunID      string
@@ -175,6 +176,7 @@ func (h *ActionHandler) CreateRun(ctx context.Context, req *RunCreateRequest) (*
 }
 
 func (h *ActionHandler) newRun(ctx context.Context, req *RunCreateRequest) (*types.RunBundle, error) {
+	rctgs := req.RunConfigTaskGroups
 	rcts := req.RunConfigTasks
 	setupErrors := req.SetupErrors
 
@@ -195,15 +197,15 @@ func (h *ActionHandler) newRun(ctx context.Context, req *RunCreateRequest) (*typ
 	}
 	id := seq.String()
 
-	if err := runconfig.CheckRunConfigTasks(rcts); err != nil {
-		h.log.Errorf("check run config tasks failed: %+v", err)
+	if err := runconfig.CheckRunConfig(rctgs, rcts); err != nil {
+		h.log.Errorf("check run config failed: %+v", err)
 		setupErrors = append(setupErrors, err.Error())
 	}
 
-	// generate tasks levels
+	// generate task groups and tasks levels
 	if len(setupErrors) == 0 {
-		if err := runconfig.GenTasksLevels(rcts); err != nil {
-			h.log.Errorf("gen tasks leveles failed: %+v", err)
+		if err := runconfig.GenLevels(rctgs, rcts); err != nil {
+			h.log.Errorf("gen levels failed: %+v", err)
 			setupErrors = append(setupErrors, err.Error())
 		}
 	}
@@ -213,6 +215,7 @@ func (h *ActionHandler) newRun(ctx context.Context, req *RunCreateRequest) (*typ
 		Name:              req.Name,
 		Group:             req.Group,
 		SetupErrors:       setupErrors,
+		TaskGroups:        rctgs,
 		Tasks:             rcts,
 		StaticEnvironment: req.StaticEnvironment,
 		Environment:       req.Environment,
@@ -329,7 +332,7 @@ func recreateRun(uuid util.UUIDGenerator, run *types.Run, rc *types.RunConfig, n
 	// runconfig task
 	rcTasksToRecreate := map[string]struct{}{}
 	for _, rct := range rc.Tasks {
-		parents := runconfig.GetAllParents(rc.Tasks, rct)
+		parents := runconfig.TaskAllParents(rc.Tasks, rct)
 		for _, parent := range parents {
 			if _, ok := recreatedRCTasks[parent.ID]; ok {
 				rcTasksToRecreate[rct.ID] = struct{}{}

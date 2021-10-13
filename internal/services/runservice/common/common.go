@@ -133,16 +133,16 @@ func OSTSubGroupTypes(group string) []string {
 	return sg
 }
 
-type parentsByLevelName []*types.RunConfigTask
+type parentsByGlobalLevelName []*types.RunConfigTask
 
-func (p parentsByLevelName) Len() int { return len(p) }
-func (p parentsByLevelName) Less(i, j int) bool {
-	if p[i].Level != p[j].Level {
-		return p[i].Level < p[j].Level
+func (p parentsByGlobalLevelName) Len() int { return len(p) }
+func (p parentsByGlobalLevelName) Less(i, j int) bool {
+	if p[i].GlobalLevel != p[j].GlobalLevel {
+		return p[i].GlobalLevel < p[j].GlobalLevel
 	}
 	return p[i].Name < p[j].Name
 }
-func (p parentsByLevelName) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
+func (p parentsByGlobalLevelName) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
 
 func mergeEnv(dest, src map[string]string) {
 	for k, v := range src {
@@ -186,10 +186,10 @@ func GenExecutorTaskSpecData(r *types.Run, rt *types.RunTask, rc *types.RunConfi
 	// TODO(sgotti) right now we don't support duplicated files. So it's not currently possibile to overwrite a file in a upper layer.
 	// this simplifies the workspaces extractions since they could be extracted in any order. We make them ordered just for reproducibility
 	wsops := []types.WorkspaceOperation{}
-	rctAllParents := runconfig.GetAllParents(rc.Tasks, rct)
+	rctAllParents := runconfig.TaskAllGlobalParents(rc.TaskGroups, rc.Tasks, rct)
 
 	// sort parents by level and name just for reproducibility
-	sort.Sort(parentsByLevelName(rctAllParents))
+	sort.Sort(parentsByGlobalLevelName(rctAllParents))
 
 	for _, rctParent := range rctAllParents {
 		for _, archiveStep := range r.Tasks[rctParent.ID].WorkspaceArchives {

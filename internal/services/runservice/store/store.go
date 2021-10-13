@@ -112,7 +112,6 @@ func OSTRunTaskIDFromPath(archivePath string) (string, error) {
 	if len(pl) < 2 {
 		return "", errors.Errorf("wrong archive path %q", archivePath)
 	}
-	fmt.Printf("pl: %q\n", pl)
 	if pl[0] != "workspacearchives" {
 		return "", errors.Errorf("wrong archive path %q", archivePath)
 	}

@@ -35,6 +35,7 @@ const (
 	maxTaskNameLength = 100
 	maxStepNameLength = 100
 
+	defaultTaskGroup  = "default"
 	defaultWorkingDir = "~/project"
 )
 
@@ -110,20 +111,28 @@ type VolumeTmpFS struct {
 
 type Run struct {
 	Name                 string                         `json:"name"`
+	TaskGroups           []*TaskGroup                   `json:"task_groups"`
 	Tasks                []*Task                        `json:"tasks"`
 	When                 *When                          `json:"when"`
 	DockerRegistriesAuth map[string]*DockerRegistryAuth `json:"docker_registries_auth"`
 }
 
+type TaskGroup struct {
+	Name          string           `json:"name"`
+	Depends       TaskGroupDepends `json:"depends"`
+	IgnoreFailure bool             `json:"ignore_failure"`
+}
+
 type Task struct {
 	Name                 string                         `json:"name"`
+	TaskGroup            string                         `json:"task_group"`
 	Runtime              *Runtime                       `json:"runtime"`
 	Environment          map[string]Value               `json:"environment,omitempty"`
 	WorkingDir           string                         `json:"working_dir"`
 	Shell                string                         `json:"shell"`
 	User                 string                         `json:"user"`
 	Steps                Steps                          `json:"steps"`
-	Depends              Depends                        `json:"depends"`
+	Depends              TaskDepends                    `json:"depends"`
 	IgnoreFailure        bool                           `json:"ignore_failure"`
 	Approval             bool                           `json:"approval"`
 	When                 *When                          `json:"when"`
@@ -138,9 +147,16 @@ const (
 	DependConditionOnSkipped DependCondition = "on_skipped"
 )
 
-type Depends []*Depend
+type TaskGroupDepends []*TaskGroupDepend
 
-type Depend struct {
+type TaskGroupDepend struct {
+	TaskGroupName string            `json:"task_group"`
+	Conditions    []DependCondition `json:"conditions"`
+}
+
+type TaskDepends []*TaskDepend
+
+type TaskDepend struct {
 	TaskName   string            `json:"task"`
 	Conditions []DependCondition `json:"conditions"`
 }
@@ -355,26 +371,26 @@ func (s *Steps) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func (d *Depends) UnmarshalJSON(b []byte) error {
+func (d *TaskDepends) UnmarshalJSON(b []byte) error {
 	var dependsRaw []json.RawMessage
 
 	if err := json.Unmarshal(b, &dependsRaw); err != nil {
 		return err
 	}
 
-	depends := make([]*Depend, len(dependsRaw))
+	depends := make([]*TaskDepend, len(dependsRaw))
 	for i, dependRaw := range dependsRaw {
 		var dependi interface{}
 		if err := json.Unmarshal(dependRaw, &dependi); err != nil {
 			return err
 		}
-		var depend *Depend
+		var depend *TaskDepend
 		isSimpler := false
 		switch de := dependi.(type) {
 		// handle simpler (for yaml) depends definition using format "taskname":
 		case string:
-			depend = &Depend{
-				TaskName: dependi.(string),
+			depend = &TaskDepend{
+				TaskName: de,
 			}
 		case map[string]interface{}:
 			if len(de) == 1 {
@@ -407,9 +423,79 @@ func (d *Depends) UnmarshalJSON(b []byte) error {
 					return errors.Errorf("unsupported depend entry format")
 				}
 				for k, v := range dl {
-					depend = &Depend{
+					depend = &TaskDepend{
 						TaskName:   k,
 						Conditions: v,
+					}
+				}
+			}
+
+		default:
+			return errors.Errorf("unsupported depend entry format")
+		}
+		depends[i] = depend
+	}
+
+	*d = depends
+
+	return nil
+}
+
+func (d *TaskGroupDepends) UnmarshalJSON(b []byte) error {
+	var dependsRaw []json.RawMessage
+
+	if err := json.Unmarshal(b, &dependsRaw); err != nil {
+		return err
+	}
+
+	depends := make([]*TaskGroupDepend, len(dependsRaw))
+	for i, dependRaw := range dependsRaw {
+		var dependi interface{}
+		if err := json.Unmarshal(dependRaw, &dependi); err != nil {
+			return err
+		}
+		var depend *TaskGroupDepend
+		isSimpler := false
+		switch de := dependi.(type) {
+		// handle simpler (for yaml) depends definition using format "taskname":
+		case string:
+			depend = &TaskGroupDepend{
+				TaskGroupName: de,
+			}
+		case map[string]interface{}:
+			if len(de) == 1 {
+				for _, v := range de {
+					switch v.(type) {
+					case []interface{}:
+						isSimpler = true
+					case string:
+					default:
+						return errors.Errorf("unsupported depend entry format")
+					}
+				}
+			}
+			if !isSimpler {
+				// handle default depends definition using format "task": "taskname", conditions: [ list of conditions ]
+				if err := json.Unmarshal(dependRaw, &depend); err != nil {
+					return err
+				}
+			} else {
+				// handle simpler (for yaml) depends definition using format "taskname": [ list of conditions ]
+				if len(de) != 1 {
+					return errors.Errorf("unsupported depend entry format")
+				}
+				type deplist map[string][]DependCondition
+				var dl deplist
+				if err := json.Unmarshal(dependRaw, &dl); err != nil {
+					return err
+				}
+				if len(dl) != 1 {
+					return errors.Errorf("unsupported depend entry format")
+				}
+				for k, v := range dl {
+					depend = &TaskGroupDepend{
+						TaskGroupName: k,
+						Conditions:    v,
 					}
 				}
 			}
@@ -636,6 +722,15 @@ func (c *Config) Run(runName string) *Run {
 	panic(fmt.Sprintf("run %q doesn't exists", runName))
 }
 
+func (r *Run) TaskGroup(taskGroupName string) *TaskGroup {
+	for _, tg := range r.TaskGroups {
+		if tg.Name == taskGroupName {
+			return tg
+		}
+	}
+	panic(fmt.Sprintf("task group %q for run %q doesn't exists", taskGroupName, r.Name))
+}
+
 func (r *Run) Task(taskName string) *Task {
 	for _, t := range r.Tasks {
 		if t.Name == taskName {
@@ -708,13 +803,39 @@ func checkConfig(config *Config) error {
 		}
 
 		if len(run.Name) > maxRunNameLength {
-			return errors.Errorf("run name %q too long", run.Name)
+			return errors.Errorf("run at index %d has run name %q too long", ri, run.Name)
 		}
 
 		if _, ok := seenRuns[run.Name]; ok {
-			return errors.Errorf("duplicate run name: %s", run.Name)
+			return errors.Errorf("run at index %d has duplicate run name: %s", ri, run.Name)
 		}
 		seenRuns[run.Name] = struct{}{}
+
+		seenTaskGroups := map[string]struct{}{}
+		// check that default task group isn't defined
+		for tgi, taskGroup := range run.TaskGroups {
+			if taskGroup == nil {
+				return errors.Errorf("run %q: task group at index %d is empty", run.Name, tgi)
+			}
+
+			if taskGroup.Name == "" {
+				return errors.Errorf("run %q: task group at index %d has empty name", run.Name, tgi)
+			}
+
+			if len(taskGroup.Name) > maxTaskNameLength {
+				return errors.Errorf("run %q: task group at index %d name %q too long", run.Name, tgi, taskGroup.Name)
+			}
+
+			if taskGroup.Name == defaultTaskGroup {
+				return errors.Errorf("run %q: task group at index %d has reserved name %q", run.Name, tgi, taskGroup.Name)
+			}
+
+			if _, ok := seenTaskGroups[taskGroup.Name]; ok {
+				return errors.Errorf("run %q: task group at index %d has duplicate task group name: %s", run.Name, tgi, taskGroup.Name)
+			}
+			seenTaskGroups[taskGroup.Name] = struct{}{}
+
+		}
 
 		seenTasks := map[string]struct{}{}
 		for ti, task := range run.Tasks {
@@ -727,45 +848,129 @@ func checkConfig(config *Config) error {
 			}
 
 			if len(task.Name) > maxTaskNameLength {
-				return errors.Errorf("task name %q too long", task.Name)
+				return errors.Errorf("run %q: task at index %d name %q too long", run.Name, ti, task.Name)
 			}
 
 			if _, ok := seenTasks[task.Name]; ok {
-				return errors.Errorf("duplicate task name: %s", task.Name)
+				return errors.Errorf("run %q: task at index %d has duplicate task name: %s", run.Name, ti, task.Name)
 			}
 			seenTasks[task.Name] = struct{}{}
 
+			// if task groups are defined then require that every task has a defined task group
+			if len(run.TaskGroups) > 0 {
+				if task.TaskGroup == "" {
+					return errors.Errorf("run %q: task at index %d has empty task group", run.Name, ti)
+				}
+				if _, ok := seenTaskGroups[task.TaskGroup]; !ok {
+					return errors.Errorf("run %q: task at index %d reference unexisting task group %q", run.Name, ti, task.TaskGroup)
+				}
+			}
+
 			// check tasks runtime
 			if task.Runtime == nil {
-				return errors.Errorf("task %q: runtime is not defined", task.Name)
+				return errors.Errorf("run %q: task %q: runtime is not defined", run.Name, task.Name)
 			}
 
 			r := task.Runtime
 			if r.Type != "" {
 				if r.Type != RuntimeTypePod {
-					return errors.Errorf("task %q runtime: wrong type %q", task.Name, r.Type)
+					return errors.Errorf("run %q: task %q runtime: wrong type %q", run.Name, task.Name, r.Type)
 				}
 			}
 			if len(r.Containers) == 0 {
-				return errors.Errorf("task %q runtime: at least one container must be defined", task.Name)
+				return errors.Errorf("run %q: task %q runtime: at least one container must be defined", run.Name, task.Name)
 			}
 			if r.Arch != "" {
 				if !types.IsValidArch(r.Arch) {
-					return errors.Errorf("task %q runtime: invalid arch %q", task.Name, r.Arch)
+					return errors.Errorf("run %q: task %q runtime: invalid arch %q", run.Name, task.Name, r.Arch)
 				}
 			}
 
-			for _, container := range r.Containers {
-				for _, vol := range container.Volumes {
+			for ci, container := range r.Containers {
+				for vi, vol := range container.Volumes {
 					if vol.TmpFS == nil {
-						return errors.Errorf("no volume config specified")
+						return errors.Errorf("run %q: task %q runtime: container at index %d: volume at index %d: no volume config specified", run.Name, task.Name, ci, vi)
 					}
 				}
 			}
 		}
 	}
 
-	// check broken dependencies
+	// check broken dependencies between task groups
+	for _, run := range config.Runs {
+		// collect all task names
+		allTaskGroups := map[string]struct{}{}
+		for _, taskGroup := range run.TaskGroups {
+			allTaskGroups[taskGroup.Name] = struct{}{}
+		}
+
+		for _, taskGroup := range run.TaskGroups {
+			for _, dep := range taskGroup.Depends {
+				if _, ok := allTaskGroups[dep.TaskGroupName]; !ok {
+					return errors.Errorf("run task group %q needed by task group %q doesn't exist", dep.TaskGroupName, taskGroup.Name)
+				}
+			}
+		}
+	}
+
+	// check circular dependencies between task groups
+	for _, run := range config.Runs {
+		cerrs := &util.Errors{}
+		for _, taskGroup := range run.TaskGroups {
+			allParents := allTaskGroupParents(run, taskGroup)
+			for _, parent := range allParents {
+				if parent.Name == taskGroup.Name {
+					// TODO(sgotti) get the parent that depends on task group to report it
+					dep := []string{}
+					for _, parent := range allParents {
+						pparents := taskGroupParents(run, parent)
+						for _, pparent := range pparents {
+							if pparent.Name == taskGroup.Name {
+								dep = append(dep, fmt.Sprintf("%q", parent.Name))
+							}
+						}
+					}
+					cerrs.Append(errors.Errorf("circular dependency between task group %q and task groups %s", taskGroup.Name, strings.Join(dep, " ")))
+				}
+			}
+		}
+		if cerrs.IsErr() {
+			return cerrs
+		}
+	}
+
+	// check that the task group and its parent don't have a common dependency
+	for _, run := range config.Runs {
+		for _, taskGroup := range run.TaskGroups {
+			parents := taskGroupParents(run, taskGroup)
+			for _, parent := range parents {
+				allParentParents := allTaskGroupParents(run, parent)
+				for _, p := range parents {
+					for _, pp := range allParentParents {
+						if p.Name == pp.Name {
+							return errors.Errorf("task group %q and its dependency %q have both a dependency on task group %q", taskGroup.Name, parent.Name, p.Name)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// check duplicate task group dependencies
+	for _, run := range config.Runs {
+		for _, taskGroup := range run.TaskGroups {
+			// check duplicate dependencies in task
+			seenDependencies := map[string]struct{}{}
+			for _, dep := range taskGroup.Depends {
+				if _, ok := seenDependencies[dep.TaskGroupName]; ok {
+					return errors.Errorf("duplicate task group dependency: %s", taskGroup.Name)
+				}
+				seenDependencies[dep.TaskGroupName] = struct{}{}
+			}
+		}
+	}
+
+	// check broken dependencies between tasks
 	for _, run := range config.Runs {
 		// collect all task names
 		allTasks := map[string]struct{}{}
@@ -782,17 +987,17 @@ func checkConfig(config *Config) error {
 		}
 	}
 
-	// check circular dependencies
+	// check circular dependencies between tasks
 	for _, run := range config.Runs {
 		cerrs := &util.Errors{}
 		for _, task := range run.Tasks {
-			allParents := getAllTaskParents(run, task)
+			allParents := allTaskParents(run, task)
 			for _, parent := range allParents {
 				if parent.Name == task.Name {
 					// TODO(sgotti) get the parent that depends on task to report it
 					dep := []string{}
 					for _, parent := range allParents {
-						pparents := getTaskParents(run, parent)
+						pparents := taskParents(run, parent)
 						for _, pparent := range pparents {
 							if pparent.Name == task.Name {
 								dep = append(dep, fmt.Sprintf("%q", parent.Name))
@@ -811,9 +1016,9 @@ func checkConfig(config *Config) error {
 	// check that the task and its parent don't have a common dependency
 	for _, run := range config.Runs {
 		for _, task := range run.Tasks {
-			parents := getTaskParents(run, task)
+			parents := taskParents(run, task)
 			for _, parent := range parents {
-				allParentParents := getAllTaskParents(run, parent)
+				allParentParents := allTaskParents(run, parent)
 				for _, p := range parents {
 					for _, pp := range allParentParents {
 						if p.Name == pp.Name {
@@ -835,6 +1040,18 @@ func checkConfig(config *Config) error {
 					return errors.Errorf("duplicate task dependency: %s", task.Name)
 				}
 				seenDependencies[dep.TaskName] = struct{}{}
+			}
+		}
+	}
+
+	// check task and all parent tasks have the same task group
+	for _, run := range config.Runs {
+		for _, task := range run.Tasks {
+			allParents := allTaskParents(run, task)
+			for _, parent := range allParents {
+				if parent.TaskGroup != task.TaskGroup {
+					return errors.Errorf("task %q and its dependency %q have different task group", task.Name, parent.Name)
+				}
 			}
 		}
 	}
@@ -883,7 +1100,14 @@ func checkConfig(config *Config) error {
 				registryAuth.Type = DockerRegistryAuthTypeBasic
 			}
 		}
+		// create default task group
+		run.TaskGroups = append(run.TaskGroups, &TaskGroup{Name: defaultTaskGroup})
 		for _, task := range run.Tasks {
+			// set task default task group
+			if task.TaskGroup == "" {
+				task.TaskGroup = defaultTaskGroup
+			}
+
 			// set auth type to basic if not specified
 			for _, registryAuth := range task.DockerRegistriesAuth {
 				if registryAuth.Type == "" {
@@ -940,8 +1164,51 @@ func checkConfig(config *Config) error {
 	return nil
 }
 
-// getTaskParents returns direct parents of task.
-func getTaskParents(run *Run, task *Task) []*Task {
+// taskGroupParents returns direct parents of task group.
+func taskGroupParents(run *Run, taskGroup *TaskGroup) []*TaskGroup {
+	parents := []*TaskGroup{}
+	for _, el := range run.TaskGroups {
+		isParent := false
+		for _, d := range taskGroup.Depends {
+			if d.TaskGroupName == el.Name {
+				isParent = true
+			}
+		}
+		if isParent {
+			parents = append(parents, el)
+		}
+	}
+	return parents
+}
+
+// allTaskGroupParents returns all the parents (both direct and ancestors) of a task group.
+// In case of circular dependency it won't loop forever but will also return
+// the task group as parent of itself
+func allTaskGroupParents(run *Run, taskGroup *TaskGroup) []*TaskGroup {
+	pMap := map[string]*TaskGroup{}
+	nextParents := taskGroupParents(run, taskGroup)
+
+	for len(nextParents) > 0 {
+		parents := nextParents
+		nextParents = []*TaskGroup{}
+		for _, parent := range parents {
+			if _, ok := pMap[parent.Name]; ok {
+				continue
+			}
+			pMap[parent.Name] = parent
+			nextParents = append(nextParents, taskGroupParents(run, parent)...)
+		}
+	}
+
+	parents := make([]*TaskGroup, 0, len(pMap))
+	for _, v := range pMap {
+		parents = append(parents, v)
+	}
+	return parents
+}
+
+// taskParents returns direct parents of task.
+func taskParents(run *Run, task *Task) []*Task {
 	parents := []*Task{}
 	for _, el := range run.Tasks {
 		isParent := false
@@ -957,12 +1224,12 @@ func getTaskParents(run *Run, task *Task) []*Task {
 	return parents
 }
 
-// getAllTaskParents returns all the parents (both direct and ancestors) of a task.
+// allTaskParents returns all the parents (both direct and ancestors) of a task.
 // In case of circular dependency it won't loop forever but will also return
 // the task as parent of itself
-func getAllTaskParents(run *Run, task *Task) []*Task {
+func allTaskParents(run *Run, task *Task) []*Task {
 	pMap := map[string]*Task{}
-	nextParents := getTaskParents(run, task)
+	nextParents := taskParents(run, task)
 
 	for len(nextParents) > 0 {
 		parents := nextParents
@@ -972,7 +1239,7 @@ func getAllTaskParents(run *Run, task *Task) []*Task {
 				continue
 			}
 			pMap[parent.Name] = parent
-			nextParents = append(nextParents, getTaskParents(run, parent)...)
+			nextParents = append(nextParents, taskParents(run, parent)...)
 		}
 	}
 

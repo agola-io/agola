@@ -31,12 +31,13 @@ type GetRunsResponse struct {
 
 type RunCreateRequest struct {
 	// new run fields
-	RunConfigTasks    map[string]*rstypes.RunConfigTask `json:"run_config_tasks"`
-	Name              string                            `json:"name"`
-	Group             string                            `json:"group"`
-	SetupErrors       []string                          `json:"setup_errors"`
-	StaticEnvironment map[string]string                 `json:"static_environment"`
-	CacheGroup        string                            `json:"cache_group"`
+	RunConfigTaskGroups map[string]*rstypes.RunConfigTaskGroup `json:"run_config_task_groups"`
+	RunConfigTasks      map[string]*rstypes.RunConfigTask      `json:"run_config_tasks"`
+	Name                string                                 `json:"name"`
+	Group               string                                 `json:"group"`
+	SetupErrors         []string                               `json:"setup_errors"`
+	StaticEnvironment   map[string]string                      `json:"static_environment"`
+	CacheGroup          string                                 `json:"cache_group"`
 
 	// existing run fields
 	RunID      string   `json:"run_id"`
