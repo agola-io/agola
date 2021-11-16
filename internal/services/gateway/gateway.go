@@ -19,6 +19,7 @@ import (
 	"crypto/tls"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 
 	scommon "agola.io/agola/internal/common"
 	slog "agola.io/agola/internal/log"
@@ -27,6 +28,7 @@ import (
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/services/gateway/api"
+	"agola.io/agola/internal/services/gateway/docs"
 	"agola.io/agola/internal/services/gateway/handlers"
 	"agola.io/agola/internal/util"
 	csclient "agola.io/agola/services/configstore/client"
@@ -38,6 +40,10 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	errors "golang.org/x/xerrors"
+
+	_ "agola.io/agola/internal/services/gateway/docs"
+	_ "github.com/swaggo/files"                  // swagger embed files
+	httpSwagger "github.com/swaggo/http-swagger" // http-swagger middleware
 )
 
 var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
@@ -58,6 +64,13 @@ type Gateway struct {
 	sd                *common.TokenSigningData
 }
 
+// @BasePath /api/v1alpha
+// @title agola
+// @version v0.6.0
+
+// @securityDefinitions.apiKey ApiKeyToken
+// @in header
+// @name Authorization
 func NewGateway(ctx context.Context, l *zap.Logger, gc *config.Config) (*Gateway, error) {
 	c := &gc.Gateway
 
@@ -232,6 +245,14 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	router := mux.NewRouter()
 	reposRouter := mux.NewRouter()
+
+	url, err := url.Parse(g.c.APIExposedURL)
+	if err == nil {
+		docs.SwaggerInfo.Host = url.Host
+		router.PathPrefix("/swagger").Handler(httpSwagger.WrapHandler)
+	} else {
+		log.Error("swagger not started")
+	}
 
 	apirouter := mux.NewRouter().PathPrefix("/api/v1alpha").Subrouter().UseEncodedPath()
 
