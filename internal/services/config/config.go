@@ -162,6 +162,9 @@ type Gitserver struct {
 	Web           Web           `yaml:"web"`
 	Etcd          Etcd          `yaml:"etcd"`
 	ObjectStorage ObjectStorage `yaml:"objectStorage"`
+
+	RepositoryCleanupInterval    time.Duration `yaml:"repositoryCleanupInterval"`
+	RepositoryRefsExpireInterval time.Duration `yaml:"repositoryRefsExpireInterval"`
 }
 
 type Web struct {
@@ -260,6 +263,10 @@ var defaultConfig = Config{
 			Image: "busybox:stable",
 		},
 		ActiveTasksLimit: 2,
+	},
+	Gitserver: Gitserver{
+		RepositoryCleanupInterval:    24 * time.Hour,
+		RepositoryRefsExpireInterval: 30 * 24 * time.Hour,
 	},
 }
 
