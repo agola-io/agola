@@ -28,6 +28,7 @@ import (
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
+	"agola.io/agola/services/configstore/types"
 	cstypes "agola.io/agola/services/configstore/types"
 )
 
@@ -589,4 +590,57 @@ func (c *Client) GetOrgMembers(ctx context.Context, orgRef string) ([]*csapitype
 	orgMembers := []*csapitypes.OrgMemberResponse{}
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s/members", orgRef), nil, jsonContent, nil, &orgMembers)
 	return orgMembers, resp, errors.WithStack(err)
+}
+
+func (c *Client) GetUserOrgInvitations(ctx context.Context, userRef string, limit int) ([]*cstypes.OrgInvitation, *http.Response, error) {
+	q := url.Values{}
+	if limit > 0 {
+		q.Add("limit", strconv.Itoa(limit))
+	}
+
+	orgInvitations := []*cstypes.OrgInvitation{}
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/users/%s/org_invitations", userRef), q, jsonContent, nil, &orgInvitations)
+	return orgInvitations, resp, err
+}
+
+func (c *Client) GetOrgInvitations(ctx context.Context, orgRef string, limit int) ([]*cstypes.OrgInvitation, *http.Response, error) {
+	q := url.Values{}
+	if limit > 0 {
+		q.Add("limit", strconv.Itoa(limit))
+	}
+
+	orgInvitations := []*cstypes.OrgInvitation{}
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s/invitations", orgRef), q, jsonContent, nil, &orgInvitations)
+	return orgInvitations, resp, err
+}
+
+func (c *Client) CreateOrgInvitation(ctx context.Context, orgRef string, req *csapitypes.CreateOrgInvitationRequest) (*types.OrgInvitation, *http.Response, error) {
+	oj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	orgInvitation := new(types.OrgInvitation)
+	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/orgs/%s/invitations", orgRef), nil, jsonContent, bytes.NewReader(oj), orgInvitation)
+	return orgInvitation, resp, err
+}
+
+func (c *Client) DeleteOrgInvitation(ctx context.Context, orgRef string, userRef string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/orgs/%s/invitations/%s", orgRef, userRef), nil, jsonContent, nil)
+}
+
+func (c *Client) GetOrgInvitation(ctx context.Context, orgRef string, userRef string) (*cstypes.OrgInvitation, *http.Response, error) {
+	orgInvitation := new(cstypes.OrgInvitation)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s/invitations/%s", orgRef, userRef), nil, jsonContent, nil, orgInvitation)
+	return orgInvitation, resp, errors.WithStack(err)
+}
+
+func (c *Client) UserOrgInvitationAction(ctx context.Context, userRef string, orgRef string, req *csapitypes.OrgInvitationActionRequest) (*http.Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	resp, err := c.getResponse(ctx, "PUT", fmt.Sprintf("/orgs/%s/invitations/%s/actions", orgRef, userRef), nil, jsonContent, bytes.NewReader(reqj))
+	return resp, errors.WithStack(err)
 }

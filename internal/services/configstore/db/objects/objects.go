@@ -15,4 +15,5 @@ var ObjectsInfo = []idb.ObjectInfo{
 	{Name: "Project", Table: "project"},
 	{Name: "Secret", Table: "secret"},
 	{Name: "Variable", Table: "variable"},
+	{Name: "OrgInvitation", Table: "orginvitation"},
 }

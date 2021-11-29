@@ -220,3 +220,22 @@ func (h *ActionHandler) CanDoRunActions(ctx context.Context, groupType scommon.G
 	}
 	return true, refID, nil
 }
+
+func (h *ActionHandler) IsOrgMember(ctx context.Context, userRef, orgRef string) (bool, error) {
+	user, err := h.GetUser(ctx, userRef)
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to get user %s:", userRef)
+	}
+
+	orgMembers, err := h.GetOrgMembers(ctx, orgRef)
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to get org %s members:", orgRef)
+	}
+	for _, member := range orgMembers.Members {
+		if member.User.ID == user.ID {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}

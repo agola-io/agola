@@ -537,3 +537,28 @@ func (h *UserOrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.log.Err(err).Send()
 	}
 }
+
+type UserOrgInvitationsHandler struct {
+	log zerolog.Logger
+	ah  *action.ActionHandler
+}
+
+func NewUserOrgInvitationsHandler(log zerolog.Logger, ah *action.ActionHandler) *UserOrgInvitationsHandler {
+	return &UserOrgInvitationsHandler{log: log, ah: ah}
+}
+
+func (h *UserOrgInvitationsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	userRef := vars["userref"]
+
+	userOrgInvitations, err := h.ah.GetUserOrgInvitations(ctx, userRef)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, userOrgInvitations); err != nil {
+		h.log.Err(err).Send()
+	}
+}

@@ -121,7 +121,7 @@ func NewGateway(ctx context.Context, log zerolog.Logger, gc *config.Config) (*Ga
 	configstoreClient := csclient.NewClient(c.ConfigstoreURL)
 	runserviceClient := rsclient.NewClient(c.RunserviceURL)
 
-	ah := action.NewActionHandler(log, sd, configstoreClient, runserviceClient, gc.ID, c.APIExposedURL, c.WebExposedURL)
+	ah := action.NewActionHandler(log, sd, configstoreClient, runserviceClient, gc.ID, c.APIExposedURL, c.WebExposedURL, action.OrganizationMemberAddingMode(c.OrganizationMemberAddingMode))
 
 	return &Gateway{
 		log:               log,
@@ -182,6 +182,8 @@ func (g *Gateway) Run(ctx context.Context) error {
 	deleteUserHandler := api.NewDeleteUserHandler(g.log, g.ah)
 	userCreateRunHandler := api.NewUserCreateRunHandler(g.log, g.ah)
 	userOrgsHandler := api.NewUserOrgsHandler(g.log, g.ah)
+	userOrgInvitationsHandler := api.NewUserOrgInvitationsHandler(g.log, g.ah)
+	userOrgInvitationActionHandler := api.NewUserOrgInvitationActionHandler(g.log, g.ah)
 
 	createUserLAHandler := api.NewCreateUserLAHandler(g.log, g.ah)
 	deleteUserLAHandler := api.NewDeleteUserLAHandler(g.log, g.ah)
@@ -199,6 +201,10 @@ func (g *Gateway) Run(ctx context.Context) error {
 	createOrgHandler := api.NewCreateOrgHandler(g.log, g.ah)
 	updateOrgHandler := api.NewUpdateOrgHandler(g.log, g.ah)
 	deleteOrgHandler := api.NewDeleteOrgHandler(g.log, g.ah)
+	createOrgInvitationHandler := api.NewCreateOrgInvitationHandler(g.log, g.ah)
+	orgInvitationsHandler := api.NewOrgInvitationsHandler(g.log, g.ah)
+	orgInvitationHandler := api.NewOrgInvitationHandler(g.log, g.ah)
+	deleteOrgInvitationHandler := api.NewDeleteOrgInvitationHandler(g.log, g.ah)
 
 	orgMembersHandler := api.NewOrgMembersHandler(g.log, g.ah)
 	addOrgMemberHandler := api.NewAddOrgMemberHandler(g.log, g.ah)
@@ -292,6 +298,8 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/users/{userref}", authForcedHandler(deleteUserHandler)).Methods("DELETE")
 	apirouter.Handle("/user/createrun", authForcedHandler(userCreateRunHandler)).Methods("POST")
 	apirouter.Handle("/user/orgs", authForcedHandler(userOrgsHandler)).Methods("GET")
+	apirouter.Handle("/user/org_invitations", authForcedHandler(userOrgInvitationsHandler)).Methods("GET")
+	apirouter.Handle("/user/org_invitations/{orgref}/actions", authForcedHandler(userOrgInvitationActionHandler)).Methods("PUT")
 
 	apirouter.Handle("/users/{userref}/runs", authForcedHandler(userRunsHandler)).Methods("GET")
 	apirouter.Handle("/users/{userref}/runs/{runnumber}", authOptionalHandler(userRunHandler)).Methods("GET")
@@ -320,6 +328,10 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/orgs/{orgref}/members", authForcedHandler(orgMembersHandler)).Methods("GET")
 	apirouter.Handle("/orgs/{orgref}/members/{userref}", authForcedHandler(addOrgMemberHandler)).Methods("PUT")
 	apirouter.Handle("/orgs/{orgref}/members/{userref}", authForcedHandler(removeOrgMemberHandler)).Methods("DELETE")
+	apirouter.Handle("/orgs/{orgref}/invitations", authForcedHandler(orgInvitationsHandler)).Methods("GET")
+	apirouter.Handle("/orgs/{orgref}/invitations", authForcedHandler(createOrgInvitationHandler)).Methods("POST")
+	apirouter.Handle("/orgs/{orgref}/invitations/{userref}", authForcedHandler(orgInvitationHandler)).Methods("GET")
+	apirouter.Handle("/orgs/{orgref}/invitations/{userref}", authForcedHandler(deleteOrgInvitationHandler)).Methods("DELETE")
 
 	apirouter.Handle("/user/remoterepos/{remotesourceref}", authForcedHandler(userRemoteReposHandler)).Methods("GET")
 

@@ -180,6 +180,10 @@ type AddOrgMemberResponse struct {
 }
 
 func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string, role cstypes.MemberRole) (*AddOrgMemberResponse, error) {
+	if h.organizationMemberAddingMode != OrganizationMemberAddingModeDirect && !common.IsUserAdmin(ctx) {
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot directly add user to organization"))
+	}
+
 	org, _, err := h.configstoreClient.GetOrg(ctx, orgRef)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
@@ -228,4 +232,201 @@ func (h *ActionHandler) RemoveOrgMember(ctx context.Context, orgRef, userRef str
 	}
 
 	return nil
+}
+
+type OrgInvitationResponse struct {
+	Organization  *cstypes.Organization
+	OrgInvitation *cstypes.OrgInvitation
+}
+
+func (h *ActionHandler) GetOrgInvitations(ctx context.Context, orgRef string, limit int) ([]*cstypes.OrgInvitation, error) {
+	if !common.IsUserLogged(ctx) {
+		return nil, errors.Errorf("user not logged in")
+	}
+
+	org, err := h.GetOrg(ctx, orgRef)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get org %s:", orgRef)
+	}
+
+	isOrgOwner, err := h.IsOrgOwner(ctx, org.ID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to determine ownership")
+	}
+	if !isOrgOwner {
+		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
+	}
+
+	orgInvitations, _, err := h.configstoreClient.GetOrgInvitations(ctx, orgRef, limit)
+	if err != nil {
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
+	}
+	return orgInvitations, nil
+}
+
+type CreateOrgInvitationRequest struct {
+	UserRef         string
+	OrganizationRef string
+	Role            cstypes.MemberRole
+}
+
+func (h *ActionHandler) CreateOrgInvitation(ctx context.Context, req *CreateOrgInvitationRequest) (*OrgInvitationResponse, error) {
+	if !common.IsUserLogged(ctx) {
+		return nil, errors.Errorf("user not logged in")
+	}
+
+	if h.organizationMemberAddingMode != OrganizationMemberAddingModeInvitation {
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user members can not added by invitation"))
+	}
+
+	if req.UserRef == "" {
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user id required"))
+	}
+	if req.OrganizationRef == "" {
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("organization id required"))
+	}
+	if req.Role == "" {
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("role is required"))
+	}
+
+	org, err := h.GetOrg(ctx, req.OrganizationRef)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get org %s:", req.OrganizationRef)
+	}
+
+	isOrgOwner, err := h.IsOrgOwner(ctx, org.ID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to determine ownership")
+	}
+	if !isOrgOwner {
+		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
+	}
+
+	isOrgMember, err := h.IsOrgMember(ctx, req.UserRef, req.OrganizationRef)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to determine membership")
+	}
+	if isOrgMember {
+		return nil, errors.Errorf("user is already an org member")
+	}
+
+	_, _, err = h.configstoreClient.GetOrgInvitation(ctx, req.OrganizationRef, req.UserRef)
+	if err != nil {
+		if !util.RemoteErrorIs(err, util.ErrNotExist) {
+			return nil, errors.Wrapf(err, "failed to determine if org invitation exists")
+		}
+	} else {
+		return nil, errors.Errorf("invitation already exists")
+	}
+
+	creq := &csapitypes.CreateOrgInvitationRequest{
+		UserRef: req.UserRef,
+		Role:    req.Role,
+	}
+
+	h.log.Info().Msgf("creating org invitation")
+	orgInvitation, _, err := h.configstoreClient.CreateOrgInvitation(ctx, org.ID, creq)
+	if err != nil {
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to create org invitation"))
+	}
+	h.log.Info().Msgf("org invitation created, ID: %s", orgInvitation.ID)
+
+	return &OrgInvitationResponse{
+		OrgInvitation: orgInvitation,
+		Organization:  org,
+	}, nil
+}
+
+type OrgInvitationActionRequest struct {
+	OrgRef string
+	Action csapitypes.OrgInvitationActionType `json:"action_type"`
+}
+
+func (h *ActionHandler) OrgInvitationAction(ctx context.Context, req *OrgInvitationActionRequest) error {
+	if !req.Action.IsValid() {
+		return errors.Errorf("action is not valid")
+	}
+
+	userID := common.CurrentUserID(ctx)
+	if userID == "" {
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user not authenticated"))
+	}
+
+	orgInvitation, _, err := h.configstoreClient.GetOrgInvitation(ctx, req.OrgRef, userID)
+	if err != nil {
+		return util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get org invitation"))
+	}
+	if orgInvitation == nil {
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("invitation for org %s user %s not found", req.OrgRef, userID))
+	}
+
+	if userID != orgInvitation.UserID {
+		return errors.Errorf("user not authorized")
+	}
+
+	org, err := h.GetOrg(ctx, req.OrgRef)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get org %s:", req.OrgRef)
+	}
+	if org == nil {
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("org %s not found", req.OrgRef))
+	}
+
+	creq := &csapitypes.OrgInvitationActionRequest{Action: req.Action}
+	_, err = h.configstoreClient.UserOrgInvitationAction(ctx, userID, req.OrgRef, creq)
+	if err != nil {
+		return util.NewAPIError(util.KindFromRemoteError(err), err)
+	}
+
+	return nil
+}
+
+func (h *ActionHandler) DeleteOrgInvitation(ctx context.Context, orgRef string, userRef string) error {
+	userID := common.CurrentUserID(ctx)
+	if userID == "" {
+		return errors.Errorf("user not authenticated")
+	}
+
+	orgInvitation, _, err := h.configstoreClient.GetOrgInvitation(ctx, orgRef, userRef)
+	if err != nil {
+		return util.NewAPIError(util.KindFromRemoteError(err), err)
+	}
+
+	org, err := h.GetOrg(ctx, orgInvitation.OrganizationID)
+	if err != nil {
+		return err
+	}
+
+	isOrgOwner, err := h.IsOrgOwner(ctx, org.ID)
+	if err != nil {
+		return util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "failed to determine ownership"))
+	}
+	if !isOrgOwner {
+		return util.NewAPIError(util.ErrForbidden, errors.Errorf("user is not owner"))
+	}
+
+	_, err = h.configstoreClient.DeleteOrgInvitation(ctx, orgRef, userRef)
+	if err != nil {
+		return util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to delete org invitation"))
+	}
+	return nil
+}
+
+func (h *ActionHandler) GetOrgInvitation(ctx context.Context, orgRef string, userRef string) (*OrgInvitationResponse, error) {
+	cOrgInvitation, _, err := h.configstoreClient.GetOrgInvitation(ctx, orgRef, userRef)
+	if err != nil {
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
+	}
+
+	org, _, err := h.configstoreClient.GetOrg(ctx, cOrgInvitation.OrganizationID)
+	if err != nil {
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
+	}
+
+	res := OrgInvitationResponse{
+		OrgInvitation: cOrgInvitation,
+		Organization:  org,
+	}
+
+	return &res, nil
 }

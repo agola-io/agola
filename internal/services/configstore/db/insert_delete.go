@@ -1282,3 +1282,130 @@ func (d *DB) deleteVariableData(tx *sql.Tx, id string) error {
 
 	return nil
 }
+
+func (d *DB) InsertOrUpdateOrgInvitation(tx *sql.Tx, v *types.OrgInvitation) error {
+	var err error
+	if v.Revision == 0 {
+		err = d.InsertOrgInvitation(tx, v)
+	} else {
+		err = d.UpdateOrgInvitation(tx, v)
+	}
+
+	return errors.WithStack(err)
+}
+
+func (d *DB) InsertOrgInvitation(tx *sql.Tx, v *types.OrgInvitation) error {
+	if v.Revision != 0 {
+		return errors.Errorf("expected revision 0 got %d", v.Revision)
+	}
+
+	data, err := d.insertOrgInvitationData(tx, v)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return d.insertOrgInvitationQ(tx, v, data)
+}
+
+func (d *DB) insertOrgInvitationData(tx *sql.Tx, v *types.OrgInvitation) ([]byte, error) {
+	v.Revision = 1
+
+	now := time.Now()
+	v.SetCreationTime(now)
+	v.SetUpdateTime(now)
+
+	data, err := json.Marshal(v)
+	if err != nil {
+		v.Revision = 0
+		return nil, errors.WithStack(err)
+	}
+
+	q := sb.Insert("orginvitation").Columns("id", "revision", "data").Values(v.ID, v.Revision, data)
+	if _, err := d.exec(tx, q); err != nil {
+		v.Revision = 0
+		return nil, errors.Wrap(err, "failed to insert orginvitation")
+	}
+
+	return data, nil
+}
+
+// insertRawOrgInvitationData should be used only for import.
+// It won't update object times.
+func (d *DB) insertRawOrgInvitationData(tx *sql.Tx, v *types.OrgInvitation) ([]byte, error) {
+	v.Revision = 1
+
+	data, err := json.Marshal(v)
+	if err != nil {
+		v.Revision = 0
+		return nil, errors.WithStack(err)
+	}
+
+	q := sb.Insert("orginvitation").Columns("id", "revision", "data").Values(v.ID, v.Revision, data)
+	if _, err := d.exec(tx, q); err != nil {
+		v.Revision = 0
+		return nil, errors.Wrap(err, "failed to insert orginvitation")
+	}
+
+	return data, nil
+}
+
+func (d *DB) UpdateOrgInvitation(tx *sql.Tx, v *types.OrgInvitation) error {
+	data, err := d.updateOrgInvitationData(tx, v)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return d.updateOrgInvitationQ(tx, v, data)
+}
+
+func (d *DB) updateOrgInvitationData(tx *sql.Tx, v *types.OrgInvitation) ([]byte, error) {
+	if v.Revision < 1 {
+		return nil, errors.Errorf("expected revision > 0 got %d", v.Revision)
+	}
+
+	curRevision := v.Revision
+	v.Revision++
+
+	v.SetUpdateTime(time.Now())
+
+	data, err := json.Marshal(v)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	q := sb.Update("orginvitation").SetMap(map[string]interface{}{"id": v.ID, "revision": v.Revision, "data": data}).Where(sq.Eq{"id": v.ID, "revision": curRevision})
+	res, err := d.exec(tx, q)
+	if err != nil {
+		v.Revision = curRevision
+		return nil, errors.Wrap(err, "failed to update orginvitation")
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		v.Revision = curRevision
+		return nil, errors.Wrap(err, "failed to update orginvitation")
+	}
+
+	if rows != 1 {
+		v.Revision = curRevision
+		return nil, idb.ErrConcurrent
+	}
+
+	return data, nil
+}
+
+func (d *DB) DeleteOrgInvitation(tx *sql.Tx, id string) error {
+	if err := d.deleteOrgInvitationData(tx, id); err != nil {
+		return errors.WithStack(err)
+	}
+
+	return d.deleteOrgInvitationQ(tx, id)
+}
+
+func (d *DB) deleteOrgInvitationData(tx *sql.Tx, id string) error {
+	if _, err := tx.Exec("delete from orginvitation where id = $1", id); err != nil {
+		return errors.Wrap(err, "failed to delete orginvitation")
+	}
+
+	return nil
+}

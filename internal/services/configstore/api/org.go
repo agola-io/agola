@@ -320,3 +320,161 @@ func (h *OrgMembersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.log.Err(err).Send()
 	}
 }
+
+type OrgInvitationsHandler struct {
+	log zerolog.Logger
+	ah  *action.ActionHandler
+}
+
+func NewOrgInvitationsHandler(log zerolog.Logger, ah *action.ActionHandler) *OrgInvitationsHandler {
+	return &OrgInvitationsHandler{log: log, ah: ah}
+}
+
+func (h *OrgInvitationsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	orgRef := vars["orgref"]
+
+	orgInvitations, err := h.ah.GetOrgInvitations(ctx, orgRef)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, orgInvitations); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+type CreateOrgInvitationHandler struct {
+	log zerolog.Logger
+	ah  *action.ActionHandler
+}
+
+func NewCreateOrgInvitationHandler(log zerolog.Logger, ah *action.ActionHandler) *CreateOrgInvitationHandler {
+	return &CreateOrgInvitationHandler{log: log, ah: ah}
+}
+
+func (h *CreateOrgInvitationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	orgRef := vars["orgref"]
+
+	var req csapitypes.CreateOrgInvitationRequest
+	d := json.NewDecoder(r.Body)
+	if err := d.Decode(&req); err != nil {
+		h.log.Err(err).Send()
+		return
+	}
+
+	creq := &action.CreateOrgInvitationRequest{
+		UserRef:         req.UserRef,
+		OrganizationRef: orgRef,
+		Role:            req.Role,
+	}
+
+	orgInvitation, err := h.ah.CreateOrgInvitation(ctx, creq)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusCreated, orgInvitation); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+type DeleteOrgInvitationHandler struct {
+	log zerolog.Logger
+	ah  *action.ActionHandler
+}
+
+func NewDeleteOrgInvitationHandler(log zerolog.Logger, ah *action.ActionHandler) *DeleteOrgInvitationHandler {
+	return &DeleteOrgInvitationHandler{log: log, ah: ah}
+}
+
+func (h *DeleteOrgInvitationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	vars := mux.Vars(r)
+	orgRef := vars["orgref"]
+	userRef := vars["userref"]
+
+	err := h.ah.DeleteOrgInvitation(ctx, orgRef, userRef)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+type OrgInvitationHandler struct {
+	log zerolog.Logger
+	ah  *action.ActionHandler
+}
+
+func NewOrgInvitationHandler(log zerolog.Logger, ah *action.ActionHandler) *OrgInvitationHandler {
+	return &OrgInvitationHandler{log: log, ah: ah}
+}
+
+func (h *OrgInvitationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	orgRef := vars["orgref"]
+	userRef := vars["userref"]
+
+	orgInvitation, err := h.ah.GetOrgInvitationByUserRef(ctx, orgRef, userRef)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+	if orgInvitation == nil {
+		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("invitation for org %q user %q doesn't exist", orgRef, userRef)))
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, orgInvitation); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+type OrgInvitationActionHandler struct {
+	log zerolog.Logger
+	ah  *action.ActionHandler
+}
+
+func NewOrgInvitationActionHandler(log zerolog.Logger, ah *action.ActionHandler) *OrgInvitationActionHandler {
+	return &OrgInvitationActionHandler{log: log, ah: ah}
+}
+
+func (h *OrgInvitationActionHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	orgRef := vars["orgref"]
+	userRef := vars["userref"]
+
+	var req csapitypes.OrgInvitationActionRequest
+	d := json.NewDecoder(r.Body)
+	if err := d.Decode(&req); err != nil {
+		h.log.Err(err).Send()
+		return
+	}
+
+	creq := &action.OrgInvitationActionRequest{
+		UserRef: userRef,
+		OrgRef:  orgRef,
+		Action:  req.Action,
+	}
+
+	err := h.ah.OrgInvitationAction(ctx, creq)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, nil); err != nil {
+		h.log.Err(err).Send()
+	}
+}

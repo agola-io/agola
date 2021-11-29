@@ -40,6 +40,8 @@ import (
 	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/testutil"
 	"agola.io/agola/internal/util"
+	csapitypes "agola.io/agola/services/configstore/api/types"
+	cstypes "agola.io/agola/services/configstore/types"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 	"agola.io/agola/services/runservice/types"
@@ -221,6 +223,12 @@ type setupOption func(*setupContext)
 func withGitea(gitea bool) func(*setupContext) {
 	return func(s *setupContext) {
 		s.withGitea = gitea
+	}
+}
+
+func withOrganizationMemberAddingMode(organizationMemberAddingMode config.OrganizationMemberAddingMode) func(*setupContext) {
+	return func(s *setupContext) {
+		s.config.Gateway.OrganizationMemberAddingMode = organizationMemberAddingMode
 	}
 }
 
@@ -2524,5 +2532,496 @@ func TestUpdateOrganization(t *testing.T) {
 	}
 	if diff := cmp.Diff(expectedOrgResponse, org); diff != "" {
 		t.Fatalf("org mismatch (-want +got):\n%s", diff)
+	}
+}
+
+type testOrgInvitationConfig struct {
+	sc             *setupContext
+	tokenUser01    string
+	tokenUser02    string
+	gwAdminClient  *gwclient.Client
+	gwClientUser01 *gwclient.Client
+	gwClientUser02 *gwclient.Client
+}
+
+func TestOrgInvitation(t *testing.T) {
+	tests := []struct {
+		name                 string
+		orgInvitationEnabled bool
+		f                    func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig)
+	}{
+		{
+			name:                 "test create org invitation",
+			orgInvitationEnabled: true,
+			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
+				invitation, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, "org01", &gwapitypes.CreateOrgInvitationRequest{UserRef: "user02", Role: cstypes.MemberRoleMember})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				i, _, err := tc.gwClientUser01.GetOrgInvitation(ctx, "org01", "user02")
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				if diff := cmp.Diff(i, invitation); diff != "" {
+					t.Fatalf("invitation mismatch (-want +got):\n%s", diff)
+				}
+			},
+		},
+		{
+			name:                 "test user org invitation creation with already existing invitation",
+			orgInvitationEnabled: true,
+			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
+				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, "org01", &gwapitypes.CreateOrgInvitationRequest{UserRef: "user02", Role: cstypes.MemberRoleMember})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				_, _, err = tc.gwClientUser01.CreateOrgInvitation(ctx, "org01", &gwapitypes.CreateOrgInvitationRequest{UserRef: "user02", Role: cstypes.MemberRoleMember})
+				expectedErr := "remote error internal"
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", expectedErr)
+				}
+				if err.Error() != expectedErr {
+					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+				}
+			},
+		},
+		{
+			name:                 "test get user invitations",
+			orgInvitationEnabled: true,
+			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
+				invitation, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, "org01", &gwapitypes.CreateOrgInvitationRequest{UserRef: "user02", Role: cstypes.MemberRoleMember})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				_, _, err = tc.gwAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: "user03"})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				_, _, err = tc.gwClientUser01.CreateOrgInvitation(ctx, "org01", &gwapitypes.CreateOrgInvitationRequest{UserRef: "user03", Role: cstypes.MemberRoleMember})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				userInvitations, _, err := tc.gwClientUser02.GetUserOrgInvitations(ctx)
+				expectedUserInvitations := []*gwapitypes.OrgInvitationResponse{invitation}
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				if len(userInvitations) != 1 {
+					t.Fatalf("expected 1 invitation got: %d", len(userInvitations))
+				}
+				if diff := cmp.Diff(expectedUserInvitations, userInvitations); diff != "" {
+					t.Fatalf("user invitations mismatch (-want +got):\n%s", diff)
+				}
+			},
+		},
+		{
+			name:                 "test user not owner create invitation",
+			orgInvitationEnabled: true,
+			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
+				_, _, err := tc.gwClientUser02.CreateOrgInvitation(ctx, "org01", &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser01, Role: cstypes.MemberRoleMember})
+				expectedErr := "remote error forbidden"
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", expectedErr)
+				}
+				if err.Error() != expectedErr {
+					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+				}
+			},
+		},
+		{
+			name:                 "test user reject invitation",
+			orgInvitationEnabled: true,
+			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
+				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, "org01", &gwapitypes.CreateOrgInvitationRequest{UserRef: "user02", Role: cstypes.MemberRoleMember})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				_, err = tc.gwClientUser02.UserOrgInvitationAction(ctx, "org01", &gwapitypes.OrgInvitationActionRequest{Action: csapitypes.Reject})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				_, _, err = tc.gwClientUser02.GetOrgInvitation(ctx, "org01", "user02")
+				expectedErr := "remote error notexist"
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", expectedErr)
+				}
+				if err.Error() != expectedErr {
+					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+				}
+			},
+		},
+		{
+			name:                 "test user owner delete invitation",
+			orgInvitationEnabled: true,
+			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
+				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, "org01", &gwapitypes.CreateOrgInvitationRequest{UserRef: "user02", Role: cstypes.MemberRoleMember})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				_, err = tc.gwClientUser01.DeleteOrgInvitation(ctx, "org01", "user02")
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				_, _, err = tc.gwClientUser01.GetOrgInvitation(ctx, "org01", "user02")
+				expectedErr := "remote error notexist"
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", expectedErr)
+				}
+				if err.Error() != expectedErr {
+					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+				}
+			},
+		},
+		{
+			name:                 "test user accept invitation",
+			orgInvitationEnabled: true,
+			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
+				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, "org01", &gwapitypes.CreateOrgInvitationRequest{UserRef: "user02", Role: cstypes.MemberRoleMember})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				_, err = tc.gwClientUser02.UserOrgInvitationAction(ctx, "org01", &gwapitypes.OrgInvitationActionRequest{Action: csapitypes.Accept})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				_, _, err = tc.gwClientUser02.GetOrgInvitation(ctx, "org01", "user02")
+				expectedErr := "remote error notexist"
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", expectedErr)
+				}
+				if err.Error() != expectedErr {
+					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+				}
+
+				org01Members, _, err := tc.gwClientUser01.GetOrgMembers(ctx, "org01")
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				if len(org01Members.Members) != 2 {
+					t.Fatalf("expected 2 members got: %d", len(org01Members.Members))
+				}
+			},
+		},
+		{
+			name:                 "test create invitation org not exists",
+			orgInvitationEnabled: true,
+			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
+				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, "org02", &gwapitypes.CreateOrgInvitationRequest{UserRef: "user02", Role: cstypes.MemberRoleMember})
+				expectedErr := "remote error notexist"
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", expectedErr)
+				}
+				if err.Error() != expectedErr {
+					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+				}
+			},
+		},
+		{
+			name:                 "test create invitation user already org member",
+			orgInvitationEnabled: true,
+			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
+				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, "org01", &gwapitypes.CreateOrgInvitationRequest{UserRef: "user02", Role: cstypes.MemberRoleMember})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				_, err = tc.gwClientUser02.UserOrgInvitationAction(ctx, "org01", &gwapitypes.OrgInvitationActionRequest{Action: csapitypes.Accept})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				_, _, err = tc.gwClientUser01.CreateOrgInvitation(ctx, "org01", &gwapitypes.CreateOrgInvitationRequest{UserRef: "user02", Role: cstypes.MemberRoleMember})
+				expectedErr := "remote error internal"
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", expectedErr)
+				}
+				if err.Error() != expectedErr {
+					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+				}
+			},
+		},
+		{
+			name:                 "test create invitation user doesn't exist",
+			orgInvitationEnabled: true,
+			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
+				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, "org01", &gwapitypes.CreateOrgInvitationRequest{UserRef: "user03", Role: cstypes.MemberRoleMember})
+				expectedErr := "remote error notexist"
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", expectedErr)
+				}
+				if err.Error() != expectedErr {
+					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+				}
+			},
+		},
+		{
+			name:                 "test user deletion with existing org invitations",
+			orgInvitationEnabled: true,
+			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
+				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, "org01", &gwapitypes.CreateOrgInvitationRequest{UserRef: "user02", Role: cstypes.MemberRoleMember})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				_, err = tc.gwAdminClient.DeleteUser(ctx, "user02")
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				org01Invitations, _, err := tc.gwClientUser01.GetOrgInvitations(ctx, "org01")
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				if len(org01Invitations) != 0 {
+					t.Fatalf("expected org01 invitations len 0, found: %d", len(org01Invitations))
+				}
+			},
+		},
+		{
+			name:                 "test org deletion with existing org invitations",
+			orgInvitationEnabled: true,
+			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
+				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, "org01", &gwapitypes.CreateOrgInvitationRequest{UserRef: "user02", Role: cstypes.MemberRoleMember})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				_, err = tc.gwClientUser01.DeleteOrg(ctx, "org01")
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				orgInvitations, _, err := tc.gwClientUser01.GetOrgInvitations(ctx, "org01")
+				expectedErr := "remote error internal"
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", expectedErr)
+				}
+				if len(orgInvitations) != 0 {
+					t.Fatalf("expected org invitations len 0, found: %d", len(orgInvitations))
+				}
+			},
+		},
+		{
+			name:                 "test create org invitation and accept after invitations disabled",
+			orgInvitationEnabled: true,
+			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
+				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, "org01", &gwapitypes.CreateOrgInvitationRequest{UserRef: "user02", Role: cstypes.MemberRoleMember})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				// disable invitations in agola config
+				tc.sc.config.Gateway.OrganizationMemberAddingMode = config.OrganizationMemberAddingModeInvitation
+				err = tc.sc.restartAgola()
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				gwClientUser01 := gwclient.NewClient(tc.sc.config.Gateway.APIExposedURL, tc.tokenUser01)
+				gwClientUser02 := gwclient.NewClient(tc.sc.config.Gateway.APIExposedURL, tc.tokenUser02)
+
+				_, err = gwClientUser02.UserOrgInvitationAction(ctx, "org01", &gwapitypes.OrgInvitationActionRequest{Action: csapitypes.Accept})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				_, _, err = gwClientUser01.GetOrgInvitation(ctx, "org01", "user02")
+				expectedErr := "remote error notexist"
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", expectedErr)
+				}
+				if err.Error() != expectedErr {
+					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+				}
+
+				orgMembers, _, err := gwClientUser01.GetOrgMembers(ctx, "org01")
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				if len(orgMembers.Members) != 2 {
+					t.Fatalf("expected 2 members got: %d", len(orgMembers.Members))
+				}
+			},
+		},
+		{
+			name:                 "test user owner create org invitation with invitations disabled",
+			orgInvitationEnabled: false,
+			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
+				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, "org01", &gwapitypes.CreateOrgInvitationRequest{UserRef: "user02", Role: cstypes.MemberRoleMember})
+				expectedErr := "remote error badrequest"
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", expectedErr)
+				}
+				if err.Error() != expectedErr {
+					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+				}
+			},
+		},
+		{
+			name:                 "test user owner add org member directly with invitations enabled",
+			orgInvitationEnabled: true,
+			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
+				_, _, err := tc.gwClientUser01.AddOrgMember(ctx, "org01", "user02", gwapitypes.MemberRoleMember)
+				expectedErr := "remote error badrequest"
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", expectedErr)
+				}
+				if err.Error() != expectedErr {
+					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+				}
+			},
+		},
+		{
+			name:                 "test user owner add org member with existing org invitation",
+			orgInvitationEnabled: true,
+			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
+				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, "org01", &gwapitypes.CreateOrgInvitationRequest{UserRef: "user02", Role: cstypes.MemberRoleMember})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				// disable invitations in agola config
+				tc.sc.config.Gateway.OrganizationMemberAddingMode = config.OrganizationMemberAddingModeDirect
+				err = tc.sc.restartAgola()
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				gwClientUser01 := gwclient.NewClient(tc.sc.config.Gateway.APIExposedURL, tc.tokenUser01)
+
+				_, _, err = gwClientUser01.AddOrgMember(ctx, "org01", "user02", gwapitypes.MemberRoleMember)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				orgInvitations, _, err := gwClientUser01.GetOrgInvitations(ctx, "org01")
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				if len(orgInvitations) != 0 {
+					t.Fatalf("expected org invitations len 0, found: %d", len(orgInvitations))
+				}
+			},
+		},
+		{
+			name:                 "test user admin add org member directly with existing org invitation",
+			orgInvitationEnabled: true,
+			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
+				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, "org01", &gwapitypes.CreateOrgInvitationRequest{UserRef: "user02", Role: cstypes.MemberRoleMember})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				_, _, err = tc.gwAdminClient.AddOrgMember(ctx, "org01", "user02", gwapitypes.MemberRoleMember)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				orgInvitations, _, err := tc.gwClientUser01.GetOrgInvitations(ctx, "org01")
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				if len(orgInvitations) != 0 {
+					t.Fatalf("expected org invitations len 0, found: %d", len(orgInvitations))
+				}
+			},
+		},
+		{
+			name:                 "test user owner get org invitations",
+			orgInvitationEnabled: true,
+			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
+				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, "org01", &gwapitypes.CreateOrgInvitationRequest{UserRef: "user02", Role: cstypes.MemberRoleMember})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				orgInvitations, _, err := tc.gwClientUser01.GetOrgInvitations(ctx, "org01")
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				if len(orgInvitations) != 1 {
+					t.Fatalf("expected org invitations len 1, found: %d", len(orgInvitations))
+				}
+
+				_, _, err = tc.gwClientUser02.GetOrgInvitations(ctx, "org01")
+				expectedErr := "remote error forbidden"
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", expectedErr)
+				}
+				if err.Error() != expectedErr {
+					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			var sc *setupContext
+			if tt.orgInvitationEnabled {
+				sc = setup(ctx, t, dir, withOrganizationMemberAddingMode(config.OrganizationMemberAddingModeInvitation))
+			} else {
+				sc = setup(ctx, t, dir)
+			}
+			defer sc.stop()
+
+			gwAdminClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
+
+			_, _, err := gwAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			tokenUser01, _, err := gwAdminClient.CreateUserToken(ctx, agolaUser01, &gwapitypes.CreateUserTokenRequest{TokenName: "test"})
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			_, _, err = gwAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: "user02"})
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			tokenUser02, _, err := gwAdminClient.CreateUserToken(ctx, "user02", &gwapitypes.CreateUserTokenRequest{TokenName: "test"})
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			_, _, err = gwAdminClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: "org01", Visibility: gwapitypes.VisibilityPublic})
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			_, _, err = gwAdminClient.AddOrgMember(ctx, "org01", "user01", gwapitypes.MemberRoleOwner)
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			gwClientUser01 := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01.Token)
+			gwClientUser02 := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser02.Token)
+
+			tc := &testOrgInvitationConfig{
+				sc:             sc,
+				tokenUser01:    tokenUser01.Token,
+				tokenUser02:    tokenUser02.Token,
+				gwClientUser01: gwClientUser01,
+				gwClientUser02: gwClientUser02,
+				gwAdminClient:  gwAdminClient,
+			}
+
+			tt.f(ctx, t, tc)
+		})
 	}
 }
