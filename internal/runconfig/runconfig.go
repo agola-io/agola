@@ -285,6 +285,8 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string
 						condition = rstypes.RunConfigTaskDependConditionOnSuccess
 					case config.DependConditionOnFailure:
 						condition = rstypes.RunConfigTaskDependConditionOnFailure
+					case config.DependConditionOnSkipped:
+						condition = rstypes.RunConfigTaskDependConditionOnSkipped
 					}
 					conditions[ic] = condition
 				}
