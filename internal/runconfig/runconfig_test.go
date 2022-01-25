@@ -1099,7 +1099,7 @@ func TestGenRunConfig(t *testing.T) {
 				DockerRegistriesAuth: map[string]*config.DockerRegistryAuth{
 					"index.docker.io": {
 						Type: config.DockerRegistryAuthTypeEncodedAuth,
-						Auth: "dXNlcm5hbWU6cGFzc3dvcmQ=",
+						Auth: config.Value{Type: config.ValueTypeString, Value: "dXNlcm5hbWU6cGFzc3dvcmQ="},
 					},
 				},
 				Runs: []*config.Run{
@@ -1159,7 +1159,7 @@ func TestGenRunConfig(t *testing.T) {
 				DockerRegistriesAuth: map[string]*config.DockerRegistryAuth{
 					"index.docker.io": {
 						Type: config.DockerRegistryAuthTypeEncodedAuth,
-						Auth: "dXNlcm5hbWU6cGFzc3dvcmQy",
+						Auth: config.Value{Type: config.ValueTypeString, Value: "dXNlcm5hbWU6cGFzc3dvcmQy"},
 					},
 				},
 				Runs: []*config.Run{
@@ -1168,7 +1168,7 @@ func TestGenRunConfig(t *testing.T) {
 						DockerRegistriesAuth: map[string]*config.DockerRegistryAuth{
 							"index.docker.io": {
 								Type: config.DockerRegistryAuthTypeEncodedAuth,
-								Auth: "dXNlcm5hbWUxOnBhc3N3b3JkMQ==",
+								Auth: config.Value{Type: config.ValueTypeString, Value: "dXNlcm5hbWUxOnBhc3N3b3JkMQ=="},
 							},
 						},
 						Tasks: []*config.Task{
@@ -1225,7 +1225,7 @@ func TestGenRunConfig(t *testing.T) {
 				DockerRegistriesAuth: map[string]*config.DockerRegistryAuth{
 					"index.docker.io": {
 						Type: config.DockerRegistryAuthTypeEncodedAuth,
-						Auth: "dXNlcm5hbWU6cGFzc3dvcmQy",
+						Auth: config.Value{Type: config.ValueTypeString, Value: "dXNlcm5hbWU6cGFzc3dvcmQy"},
 					},
 				},
 				Runs: []*config.Run{
@@ -1234,7 +1234,7 @@ func TestGenRunConfig(t *testing.T) {
 						DockerRegistriesAuth: map[string]*config.DockerRegistryAuth{
 							"index.docker.io": {
 								Type: config.DockerRegistryAuthTypeEncodedAuth,
-								Auth: "dXNlcm5hbWUxOnBhc3N3b3JkMQ==",
+								Auth: config.Value{Type: config.ValueTypeString, Value: "dXNlcm5hbWUxOnBhc3N3b3JkMQ=="},
 							},
 						},
 						Tasks: []*config.Task{
@@ -1243,7 +1243,7 @@ func TestGenRunConfig(t *testing.T) {
 								DockerRegistriesAuth: map[string]*config.DockerRegistryAuth{
 									"index.docker.io": {
 										Type: config.DockerRegistryAuthTypeEncodedAuth,
-										Auth: "dXNlcm5hbWUyOnBhc3N3b3JkMg==",
+										Auth: config.Value{Type: config.ValueTypeString, Value: "dXNlcm5hbWUyOnBhc3N3b3JkMg=="},
 									},
 								},
 								Runtime: &config.Runtime{
@@ -1288,6 +1288,73 @@ func TestGenRunConfig(t *testing.T) {
 					Skip:        false,
 					Steps:       rstypes.Steps{},
 					Shell:       "/bin/sh -e",
+				},
+			},
+		},
+		{
+			name: "test runconfig generation with encoded value type",
+			in: &config.Config{
+				Runs: []*config.Run{
+					&config.Run{
+						Name: "run01",
+						DockerRegistriesAuth: map[string]*config.DockerRegistryAuth{
+							"index.docker.io": {
+								Type: config.DockerRegistryAuthTypeEncodedAuth,
+								Auth: config.Value{Type: config.ValueTypeString, Value: "yourregistryusername:password2"},
+							},
+						},
+						Tasks: []*config.Task{
+							&config.Task{
+								Name: "task01",
+								DockerRegistriesAuth: map[string]*config.DockerRegistryAuth{
+									"index.docker.io": {
+										Type: config.DockerRegistryAuthTypeEncodedAuth,
+										Auth: config.Value{Type: config.ValueTypeFromVariable, Value: "auth"},
+									},
+								},
+								Runtime: &config.Runtime{
+									Type: "pod",
+									Containers: []*config.Container{
+										&config.Container{
+											Image: "image01",
+											User:  "",
+										},
+									},
+								},
+								Depends:       []*config.Depend{},
+								IgnoreFailure: false,
+								Approval:      false,
+							},
+						},
+					},
+				},
+			},
+			variables: map[string]string{
+				"auth": "eW91cnJlZ2lzdHJ5dXNlcm5hbWU6cGFzc3dvcmQy",
+			},
+			out: map[string]*rstypes.RunConfigTask{
+				uuid.New("task01").String(): &rstypes.RunConfigTask{
+					ID:   uuid.New("task01").String(),
+					Name: "task01", Depends: map[string]*rstypes.RunConfigTaskDepend{},
+					DockerRegistriesAuth: map[string]rstypes.DockerRegistryAuth{
+						"index.docker.io": {
+							Type: rstypes.DockerRegistryAuthTypeEncodedAuth,
+							Auth: "eW91cnJlZ2lzdHJ5dXNlcm5hbWU6cGFzc3dvcmQy",
+						},
+					},
+					Runtime: &rstypes.Runtime{Type: rstypes.RuntimeType("pod"),
+						Containers: []*rstypes.Container{
+							{
+								Image:       "image01",
+								Environment: map[string]string{},
+								Volumes:     []rstypes.Volume{},
+							},
+						},
+					},
+					Shell:       "/bin/sh -e",
+					Environment: map[string]string{},
+					Steps:       rstypes.Steps{},
+					Skip:        false,
 				},
 			},
 		},

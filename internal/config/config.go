@@ -77,8 +77,8 @@ type DockerRegistryAuth struct {
 	Username Value `json:"username"`
 	Password Value `json:"password"`
 
-	// encoded auth string
-	Auth string `json:"auth"`
+	// encoded auth
+	Auth Value `json:"auth"`
 
 	// future auths like aws ecr auth
 }
