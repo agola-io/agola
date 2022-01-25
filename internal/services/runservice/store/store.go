@@ -24,7 +24,11 @@ import (
 )
 
 func OSTRunTaskLogsBaseDir(rtID string) string {
-	return path.Join("logs", rtID)
+	return path.Join(OSTLogsBaseDir(), rtID)
+}
+
+func OSTLogsBaseDir() string {
+	return "logs"
 }
 
 func OSTRunTaskLogsDataDir(rtID string) string {

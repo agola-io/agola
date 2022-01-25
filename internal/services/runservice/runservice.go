@@ -286,6 +286,7 @@ func (s *Runservice) run(ctx context.Context) error {
 		util.GoWait(&wg, func() { s.compactChangeGroupsLoop(ctx) })
 		util.GoWait(&wg, func() { s.cacheCleanerLoop(ctx, s.c.RunCacheExpireInterval) })
 		util.GoWait(&wg, func() { s.workspaceCleanerLoop(ctx, s.c.RunWorkspaceExpireInterval) })
+		util.GoWait(&wg, func() { s.logCleanerLoop(ctx, s.c.RunLogExpireInterval) })
 		util.GoWait(&wg, func() { s.executorTaskUpdateHandler(ctx, ch) })
 	}
 

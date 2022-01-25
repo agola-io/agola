@@ -39,6 +39,7 @@ const (
 	changeGroupCompactorInterval = 1 * time.Minute
 	cacheCleanerInterval         = 1 * 24 * time.Hour
 	workspaceCleanerInterval     = 1 * 24 * time.Hour
+	logCleanerInterval           = 1 * 24 * time.Hour
 
 	defaultExecutorNotAliveInterval = 60 * time.Second
 
@@ -1589,7 +1590,7 @@ func (s *Runservice) cacheCleaner(ctx context.Context, cacheExpireInterval time.
 
 func (s *Runservice) workspaceCleanerLoop(ctx context.Context, workspaceExpireInterval time.Duration) {
 	for {
-		if err := s.workspaceCleaner(ctx, workspaceExpireInterval); err != nil {
+		if err := s.objectsCleaner(ctx, store.OSTArchivesBaseDir(), common.WorkspaceCleanerLockKey, workspaceExpireInterval); err != nil {
 			s.log.Err(err).Send()
 		}
 
@@ -1602,25 +1603,42 @@ func (s *Runservice) workspaceCleanerLoop(ctx context.Context, workspaceExpireIn
 	}
 }
 
-func (s *Runservice) workspaceCleaner(ctx context.Context, workspaceExpireInterval time.Duration) error {
-	s.log.Debug().Msgf("workspaceCleaner")
+func (s *Runservice) logCleanerLoop(ctx context.Context, logExpireInterval time.Duration) {
+	s.log.Debug().Msgf("logCleanerLoop")
+
+	for {
+		if err := s.objectsCleaner(ctx, store.OSTLogsBaseDir(), common.LogCleanerLockKey, logExpireInterval); err != nil {
+			s.log.Warn().Msgf("objectsCleaner error: %v", err)
+		}
+
+		sleepCh := time.NewTimer(logCleanerInterval).C
+		select {
+		case <-ctx.Done():
+			return
+		case <-sleepCh:
+		}
+	}
+}
+
+func (s *Runservice) objectsCleaner(ctx context.Context, prefix string, etcdLockKey string, objectExpireInterval time.Duration) error {
+	s.log.Debug().Msgf("objectsCleaner")
 
 	l := s.lf.NewLock(common.WorkspaceCleanerLockKey)
 	if err := l.Lock(ctx); err != nil {
-		return errors.Wrap(err, "failed to acquire workspace cleaner lock")
+		return errors.Wrap(err, "failed to acquire object cleaner lock")
 	}
 	defer func() { _ = l.Unlock() }()
 
 	doneCh := make(chan struct{})
 	defer close(doneCh)
-	for object := range s.ost.List(store.OSTArchivesBaseDir()+"/", "", true, doneCh) {
+	for object := range s.ost.List(prefix+"/", "", true, doneCh) {
 		if object.Err != nil {
 			return object.Err
 		}
-		if object.LastModified.Add(workspaceExpireInterval).Before(time.Now()) {
+		if object.LastModified.Add(objectExpireInterval).Before(time.Now()) {
 			if err := s.ost.DeleteObject(object.Path); err != nil {
 				if !objectstorage.IsNotExist(err) {
-					s.log.Warn().Msgf("failed to delete workspace object %q: %v", object.Path, err)
+					s.log.Warn().Msgf("failed to delete object %q: %v", object.Path, err)
 				}
 			}
 		}

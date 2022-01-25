@@ -26,8 +26,11 @@ import (
 	"time"
 
 	"agola.io/agola/internal/errors"
+	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/runservice/action"
+	"agola.io/agola/internal/services/runservice/common"
+	"agola.io/agola/internal/services/runservice/store"
 	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/testutil"
 	"agola.io/agola/internal/util"
@@ -278,5 +281,39 @@ func TestGetRunsLastRun(t *testing.T) {
 		if r.Sequence != er.Sequence {
 			t.Fatalf("expected run sequence %d runs, got %d", er.Sequence, r.Sequence)
 		}
+	}
+}
+
+func TestLogleaner(t *testing.T) {
+	dir := t.TempDir()
+	ctx := context.Background()
+	log := testutil.NewLogger(t)
+
+	rs := setupRunservice(ctx, t, log, dir)
+	rs.c.RunCacheExpireInterval = 604800000000000
+
+	body := ioutil.NopCloser(bytes.NewBufferString("log test"))
+	logPath := store.OSTRunTaskStepLogPath("task01", 0)
+
+	err := rs.ost.WriteObject(logPath, body, -1, false)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	_, err = rs.ost.ReadObject(logPath)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	time.Sleep(1 * time.Second)
+
+	err = rs.objectsCleaner(ctx, store.OSTLogsBaseDir(), common.LogCleanerLockKey, 1*time.Millisecond)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	_, err = rs.ost.ReadObject(logPath)
+	if err == nil || !objectstorage.IsNotExist(err) {
+		t.Fatalf("expected err NotExists, got: %v", err)
 	}
 }
