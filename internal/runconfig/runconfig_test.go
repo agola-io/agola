@@ -1006,6 +1006,92 @@ func TestGenRunConfig(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "test run task depends on_skipped",
+			in: &config.Config{
+				Runs: []*config.Run{
+					&config.Run{
+						Name: "run01",
+						Tasks: []*config.Task{
+							&config.Task{
+								Name: "task01",
+								Runtime: &config.Runtime{
+									Type: "pod",
+									Arch: "",
+									Containers: []*config.Container{
+										&config.Container{
+											Image: "image01",
+										},
+									},
+								},
+							},
+							&config.Task{
+								Name: "task02",
+								Runtime: &config.Runtime{
+									Type: "pod",
+									Arch: "",
+									Containers: []*config.Container{
+										&config.Container{
+											Image: "image01",
+										},
+									},
+								},
+								Depends: config.Depends{
+									&config.Depend{
+										TaskName: "task01",
+										Conditions: []config.DependCondition{
+											config.DependConditionOnSkipped,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			out: map[string]*rstypes.RunConfigTask{
+				uuid.New("task01").String(): &rstypes.RunConfigTask{
+					ID:   uuid.New("task01").String(),
+					Name: "task01", Depends: map[string]*rstypes.RunConfigTaskDepend{},
+					Runtime: &rstypes.Runtime{Type: rstypes.RuntimeType("pod"),
+						Containers: []*rstypes.Container{
+							{
+								Image:       "image01",
+								Environment: map[string]string{},
+								Volumes:     []rstypes.Volume{},
+							},
+						},
+					},
+					DockerRegistriesAuth: map[string]rstypes.DockerRegistryAuth{},
+					Shell:                "/bin/sh -e",
+					Environment:          map[string]string{},
+					Steps:                rstypes.Steps{},
+				},
+				uuid.New("task02").String(): &rstypes.RunConfigTask{
+					ID:   uuid.New("task02").String(),
+					Name: "task02",
+					Depends: map[string]*rstypes.RunConfigTaskDepend{
+						uuid.New("task01").String(): &rstypes.RunConfigTaskDepend{
+							TaskID:     uuid.New("task01").String(),
+							Conditions: []rstypes.RunConfigTaskDependCondition{rstypes.RunConfigTaskDependConditionOnSkipped},
+						},
+					},
+					DockerRegistriesAuth: map[string]rstypes.DockerRegistryAuth{},
+					Runtime: &rstypes.Runtime{Type: rstypes.RuntimeType("pod"),
+						Containers: []*rstypes.Container{
+							{
+								Image:       "image01",
+								Environment: map[string]string{},
+								Volumes:     []rstypes.Volume{},
+							},
+						},
+					},
+					Shell:       "/bin/sh -e",
+					Environment: map[string]string{},
+					Steps:       rstypes.Steps{},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
