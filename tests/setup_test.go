@@ -293,6 +293,7 @@ func setup(ctx context.Context, t *testing.T, dir string) (*testutil.TestEmbedde
 			Etcd: config.Etcd{
 				Endpoints: "",
 			},
+			RepositoryCleanupInterval: 24 * time.Hour,
 		},
 	}
 

@@ -179,6 +179,9 @@ func (s *Gitserver) Run(ctx context.Context) error {
 		}
 	}()
 
+	//TODO a lock is needed or it'll cause some concurrency issues if repo cleaner runs when someone at the same time is pushing
+	go s.repoCleanerLoop(ctx)
+
 	select {
 	case <-ctx.Done():
 		log.Infof("gitserver exiting")
