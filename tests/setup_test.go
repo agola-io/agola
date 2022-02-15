@@ -104,7 +104,7 @@ func setupGitea(t *testing.T, dir, dockerBridgeAddress string) *testutil.TestGit
 
 	// wait for gitea ready
 	err = testutil.Wait(30*time.Second, func() (bool, error) {
-		cmd := exec.Command(tgitea.GiteaPath, "admin", "create-user", "--name", giteaUser01, "--email", giteaUser01+"@example.com", "--password", "password", "--admin", "--config", tgitea.ConfigPath)
+		cmd := exec.Command(tgitea.GiteaPath, "admin", "user", "create", "--name", giteaUser01, "--email", giteaUser01+"@example.com", "--password", "password", "--admin", "--config", tgitea.ConfigPath)
 		// just retry until no error
 		if err := cmd.Run(); err != nil {
 			return false, nil

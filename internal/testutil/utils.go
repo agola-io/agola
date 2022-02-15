@@ -377,11 +377,6 @@ OFFLINE_MODE     = false
 [database]
 PATH     = {{ .Data }}/gitea/gitea.db
 DB_TYPE  = sqlite3
-HOST     =
-NAME     =
-USER     =
-PASSWD   =
-SSL_MODE = disable
 
 [indexer]
 ISSUE_INDEXER_PATH = {{ .Data }}/gitea/indexers/issues.bleve
