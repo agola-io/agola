@@ -70,8 +70,9 @@ configstore:
 runservice:
   #debug: true
   dataDir: /opt/data/agola/runservice
-  etcd:
-    endpoints: "http://localhost:2379"
+  db:
+    type: sqlite3
+    connString: /opt/data/agola/runservice/db
   objectStorage:
     type: posix
     path: /agola/runservice/ost
@@ -135,8 +136,9 @@ configstore:
 
 runservice:
   dataDir: /data/agola/runservice
-  etcd:
-    endpoints: "http://localhost:2379"
+  db:
+    type: sqlite3
+    connString: /opt/data/agola/runservice/db
   objectStorage:
     type: posix
     path: /agola/runservice/ost

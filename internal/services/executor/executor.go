@@ -130,7 +130,7 @@ func (e *Executor) doRunStep(ctx context.Context, s *types.RunStep, t *types.Exe
 	if s.Command != "" {
 		filename, err := e.createFile(ctx, pod, s.Command, stepUser(t), outf)
 		if err != nil {
-			return -1, errors.Errorf("create file err: %v", err)
+			return -1, errors.Wrapf(err, "create file err")
 		}
 
 		args := strings.Split(shell, " ")
@@ -698,7 +698,7 @@ func (e *Executor) sendExecutorStatus(ctx context.Context) error {
 	}
 
 	executor := &types.Executor{
-		ID:                        e.id,
+		ExecutorID:                e.id,
 		Archs:                     archs,
 		AllowPrivilegedContainers: e.c.AllowPrivilegedContainers,
 		ListenURL:                 e.listenURL,

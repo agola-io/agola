@@ -3,6 +3,9 @@ package main
 import (
 	"os"
 	"text/template"
+
+	idb "agola.io/agola/internal/db"
+	rsobjects "agola.io/agola/internal/services/runservice/db/objects"
 )
 
 func genInsertDelete() {
@@ -14,7 +17,14 @@ func genInsertDelete() {
 	defer f.Close()
 
 	switch componentName {
-	// generator for the components
+	case "runservice":
+		err = insertDeleteTemplate.Execute(f, struct {
+			ObjectInfos []idb.ObjectInfo
+			TypesPath   string
+		}{
+			ObjectInfos: rsobjects.ObjectsInfo,
+			TypesPath:   "agola.io/agola/services/runservice/types",
+		})
 	}
 	if err != nil {
 		panic(err)

@@ -15,18 +15,24 @@
 package common
 
 import (
-	"context"
-
 	"agola.io/agola/internal/errors"
-	"agola.io/agola/internal/etcd"
-	"agola.io/agola/internal/sequence"
+	"agola.io/agola/internal/services/runservice/db"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/services/runservice/types"
 )
 
-func NewRunEvent(ctx context.Context, e *etcd.Store, runID string, phase types.RunPhase, result types.RunResult) (*types.RunEvent, error) {
-	seq, err := sequence.IncSequence(ctx, e, EtcdRunEventSequenceKey)
+func NewRunEvent(d *db.DB, tx *sql.Tx, runID string, phase types.RunPhase, result types.RunResult) (*types.RunEvent, error) {
+	runEvent := types.NewRunEvent()
+	runEvent.RunID = runID
+	runEvent.Phase = phase
+	runEvent.Result = result
+
+	runEventSequence, err := d.NextSequence(tx, types.SequenceTypeRunEvent)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	return &types.RunEvent{Sequence: seq.String(), RunID: runID, Phase: phase, Result: result}, nil
+
+	runEvent.Sequence = runEventSequence
+
+	return runEvent, nil
 }

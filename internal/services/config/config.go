@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"agola.io/agola/internal/errors"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
 
 	yaml "gopkg.in/yaml.v2"
@@ -88,9 +89,12 @@ type Notification struct {
 type Runservice struct {
 	Debug bool `yaml:"debug"`
 
-	DataDir       string        `yaml:"dataDir"`
-	Web           Web           `yaml:"web"`
-	Etcd          Etcd          `yaml:"etcd"`
+	DataDir string `yaml:"dataDir"`
+
+	DB DB `yaml:"db"`
+
+	Web Web `yaml:"web"`
+
 	ObjectStorage ObjectStorage `yaml:"objectStorage"`
 
 	RunCacheExpireInterval     time.Duration `yaml:"runCacheExpireInterval"`
@@ -184,6 +188,11 @@ type Web struct {
 
 	// CORS allowed origins
 	AllowedOrigins []string `yaml:"allowedOrigins"`
+}
+
+type DB struct {
+	Type       sql.Type `yaml:"type"`
+	ConnString string   `yaml:"connString"`
 }
 
 type ObjectStorageType string
@@ -284,6 +293,24 @@ func Parse(configFile string, componentsNames []string) (*Config, error) {
 	return c, Validate(c, componentsNames)
 }
 
+func validateDB(db *DB) error {
+	switch db.Type {
+	case sql.Sqlite3:
+	case sql.Postgres:
+	default:
+		if db.Type == "" {
+			return errors.Errorf("type is not defined")
+		}
+		return errors.Errorf("unknown type %q", db.Type)
+	}
+
+	if db.ConnString == "" {
+		return errors.Errorf("db connection string undefined")
+	}
+
+	return nil
+}
+
 func validateWeb(w *Web) error {
 	if w.ListenAddress == "" {
 		return errors.Errorf("listen address undefined")
@@ -349,6 +376,9 @@ func Validate(c *Config, componentsNames []string) error {
 
 	// Runservice
 	if isComponentEnabled(componentsNames, "runservice") {
+		if err := validateDB(&c.Runservice.DB); err != nil {
+			return errors.Wrapf(err, "db configuration error")
+		}
 		if c.Runservice.DataDir == "" {
 			return errors.Errorf("runservice dataDir is empty")
 		}

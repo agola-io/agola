@@ -36,6 +36,7 @@ import (
 	"agola.io/agola/internal/services/notification"
 	rsscheduler "agola.io/agola/internal/services/runservice"
 	"agola.io/agola/internal/services/scheduler"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/testutil"
 	"agola.io/agola/internal/util"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
@@ -242,16 +243,17 @@ func setup(ctx context.Context, t *testing.T, dir string, gitea bool) (*testutil
 		Runservice: config.Runservice{
 			Debug:   false,
 			DataDir: filepath.Join(dir, "runservice"),
+			DB: config.DB{
+				Type:       sql.Sqlite3,
+				ConnString: filepath.Join(dir, "runservice", "db"),
+			},
 			Web: config.Web{
 				ListenAddress: ":4000",
 				TLS:           false,
 			},
-			Etcd: config.Etcd{
-				Endpoints: "",
-			},
 			ObjectStorage: config.ObjectStorage{
 				Type: "posix",
-				Path: filepath.Join(dir, "runservice/ost"),
+				Path: filepath.Join(dir, "runservice", "ost"),
 			},
 			RunCacheExpireInterval: 604800000000000,
 		},
@@ -310,7 +312,6 @@ func setup(ctx context.Context, t *testing.T, dir string, gitea bool) (*testutil
 	etcdDir := filepath.Join(dir, "etcd")
 	tetcd := setupEtcd(t, log, etcdDir)
 
-	c.Runservice.Etcd.Endpoints = tetcd.Endpoint
 	c.Configstore.Etcd.Endpoints = tetcd.Endpoint
 
 	_, gwPort, err := testutil.GetFreePort(true, false)

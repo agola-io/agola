@@ -23,29 +23,29 @@ import (
 	"strconv"
 	"time"
 
-	"agola.io/agola/internal/datamanager"
 	"agola.io/agola/internal/errors"
-	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/runconfig"
 	"agola.io/agola/internal/services/runservice/common"
 	"agola.io/agola/internal/services/runservice/store"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/runservice/types"
-	"github.com/rs/zerolog"
 
-	etcdclientv3 "go.etcd.io/etcd/clientv3"
-	"go.etcd.io/etcd/clientv3/concurrency"
+	"github.com/rs/zerolog"
 )
 
 const (
-	cacheCleanerInterval     = 1 * 24 * time.Hour
-	workspaceCleanerInterval = 1 * 24 * time.Hour
+	changeGroupCompactorInterval = 1 * time.Minute
+	cacheCleanerInterval         = 1 * 24 * time.Hour
+	workspaceCleanerInterval     = 1 * 24 * time.Hour
 
 	defaultExecutorNotAliveInterval = 60 * time.Second
+
+	changeGroupMinDuration = 5 * time.Minute
 )
 
-func taskMatchesParentDependCondition(ctx context.Context, rt *types.RunTask, r *types.Run, rc *types.RunConfig) bool {
+func taskMatchesParentDependCondition(rt *types.RunTask, r *types.Run, rc *types.RunConfig) bool {
 	rct := rc.Tasks[rt.ID]
 	parents := runconfig.GetParents(rc.Tasks, rct)
 
@@ -78,11 +78,11 @@ func taskMatchesParentDependCondition(ctx context.Context, rt *types.RunTask, r 
 	return len(parents) == matchedNum
 }
 
-func advanceRunTasks(ctx context.Context, log zerolog.Logger, curRun *types.Run, rc *types.RunConfig, scheduledExecutorTasks []*types.ExecutorTask) (*types.Run, error) {
+func advanceRunTasks(log zerolog.Logger, curRun *types.Run, rc *types.RunConfig, scheduledExecutorTasks []*types.ExecutorTask) (*types.Run, error) {
 	log.Debug().Msgf("run: %s", util.Dump(curRun))
 	log.Debug().Msgf("rc: %s", util.Dump(rc))
 
-	// take a deepcopy of r so we do logic only on fixed status and not affeccted by current changes (due to random map iteration)
+	// take a deepcopy of r so we do logic only on fixed status and not affected by current changes (due to random map iteration)
 	newRun := curRun.DeepCopy()
 
 	if newRun.Stop {
@@ -90,7 +90,7 @@ func advanceRunTasks(ctx context.Context, log zerolog.Logger, curRun *types.Run,
 		for _, rt := range newRun.Tasks {
 			isScheduled := false
 			for _, et := range scheduledExecutorTasks {
-				if rt.ID == et.ID {
+				if rt.ID == et.Spec.RunTaskID {
 					isScheduled = true
 				}
 			}
@@ -122,7 +122,7 @@ func advanceRunTasks(ctx context.Context, log zerolog.Logger, curRun *types.Run,
 		if curRun.Result.IsSet() {
 			isScheduled := false
 			for _, et := range scheduledExecutorTasks {
-				if rt.ID == et.ID {
+				if rt.ID == et.Spec.RunTaskID {
 					isScheduled = true
 				}
 			}
@@ -164,7 +164,7 @@ func advanceRunTasks(ctx context.Context, log zerolog.Logger, curRun *types.Run,
 
 		// if all parents are finished check if the task could be executed or be skipped
 		if allParentsFinished {
-			matched := taskMatchesParentDependCondition(ctx, rt, curRun, rc)
+			matched := taskMatchesParentDependCondition(rt, curRun, rc)
 
 			// if all parents are matched then we can start it, otherwise we mark the step to be skipped
 			skip := !matched
@@ -183,7 +183,7 @@ func advanceRunTasks(ctx context.Context, log zerolog.Logger, curRun *types.Run,
 	return newRun, nil
 }
 
-func getTasksToRun(ctx context.Context, log zerolog.Logger, r *types.Run, rc *types.RunConfig) ([]*types.RunTask, error) {
+func getTasksToRun(log zerolog.Logger, r *types.Run, rc *types.RunConfig) ([]*types.RunTask, error) {
 	log.Debug().Msgf("run: %s", util.Dump(r))
 	log.Debug().Msgf("rc: %s", util.Dump(rc))
 
@@ -212,7 +212,7 @@ func getTasksToRun(ctx context.Context, log zerolog.Logger, r *types.Run, rc *ty
 		if allParentsFinished {
 			// TODO(sgotti) This could be removed when advanceRunTasks will calculate the
 			// state in a deterministic a complete way in one loop (see the related TODO)
-			if !taskMatchesParentDependCondition(ctx, rt, r, rc) {
+			if !taskMatchesParentDependCondition(rt, r, rc) {
 				continue
 			}
 
@@ -232,6 +232,26 @@ func (s *Runservice) submitRunTasks(ctx context.Context, r *types.Run, rc *types
 	for _, rt := range tasks {
 		rct := rc.Tasks[rt.ID]
 
+		// check that the executorTask for this runTask id wasn't already scheduled
+		var executorTask *types.ExecutorTask
+		err := s.d.Do(ctx, func(tx *sql.Tx) error {
+			var err error
+
+			executorTask, err = s.d.GetExecutorTaskByRunTask(tx, r.ID, rt.ID)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+
+			return nil
+		})
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		if executorTask != nil {
+			continue
+		}
+
 		executor, err := s.chooseExecutor(ctx, rct)
 		if err != nil {
 			return errors.WithStack(err)
@@ -241,24 +261,38 @@ func (s *Runservice) submitRunTasks(ctx context.Context, r *types.Run, rc *types
 			return nil
 		}
 
-		et := common.GenExecutorTask(r, rt, rc, executor)
-		s.log.Debug().Msgf("et: %s", util.Dump(et))
+		executorTask = common.GenExecutorTask(r, rt, rc, executor)
+		s.log.Debug().Msgf("et: %s", util.Dump(executorTask))
 
-		// check that the executorTask wasn't already scheduled
-		// just a check but it's not really needed since the call to
-		// atomicPutExecutorTask will fail if it already exists
-		tet, err := store.GetExecutorTask(ctx, s.e, et.ID)
-		if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
+		// check again that the executorTask for this runTask id wasn't already scheduled
+		// if not existing, save and submit it
+		var shouldSend bool
+		err = s.d.Do(ctx, func(tx *sql.Tx) error {
+			curExecutorTask, err := s.d.GetExecutorTaskByRunTask(tx, r.ID, rt.ID)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+
+			if curExecutorTask != nil {
+				return nil
+			}
+
+			if err := s.d.InsertExecutorTask(tx, executorTask); err != nil {
+				return errors.WithStack(err)
+			}
+
+			shouldSend = true
+
+			return nil
+		})
+		if err != nil {
 			return errors.WithStack(err)
 		}
-		if tet != nil {
-			continue
-		}
-		if _, err := store.AtomicPutExecutorTask(ctx, s.e, et); err != nil {
-			return errors.WithStack(err)
-		}
-		if err := s.sendExecutorTask(ctx, et); err != nil {
-			return errors.WithStack(err)
+
+		if shouldSend {
+			if err := s.sendExecutorTask(ctx, executorTask); err != nil {
+				return errors.WithStack(err)
+			}
 		}
 	}
 
@@ -268,16 +302,32 @@ func (s *Runservice) submitRunTasks(ctx context.Context, r *types.Run, rc *types
 // chooseExecutor chooses the executor to schedule the task on. Now it's a very simple/dumb selection
 // TODO(sgotti) improve this to use executor statistic, labels (arch type) etc...
 func (s *Runservice) chooseExecutor(ctx context.Context, rct *types.RunConfigTask) (*types.Executor, error) {
-	executors, err := store.GetExecutors(ctx, s.e)
+	var executors []*types.Executor
+	executorTasksCount := map[string]int{}
+	err := s.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+
+		executors, err = s.d.GetExecutors(tx)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		// TODO(sgotti) implement a db method that just returns the count
+		for _, executor := range executors {
+			executorTasks, err := s.d.GetExecutorTasksByExecutor(tx, executor.ExecutorID)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+
+			executorTasksCount[executor.ExecutorID] = len(executorTasks)
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	// TODO(sgotti) find a way to avoid retrieving this for every chooseExecutor
-	// invocation (i.e. use an etcd watcher to keep this value updated)
-	executorTasksCount, err := store.GetExecutorTasksCountByExecutor(ctx, s.e)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
+
 	return chooseExecutor(executors, executorTasksCount, rct), nil
 }
 
@@ -291,7 +341,7 @@ func chooseExecutor(executors []*types.Executor, executorTasksCount map[string]i
 	}
 
 	for _, e := range executors {
-		if e.LastStatusUpdateTime.Add(defaultExecutorNotAliveInterval).Before(time.Now()) {
+		if time.Since(e.UpdateTime) > defaultExecutorNotAliveInterval {
 			continue
 		}
 
@@ -314,8 +364,8 @@ func chooseExecutor(executors []*types.Executor, executorTasksCount map[string]i
 		}
 
 		if e.ActiveTasksLimit != 0 {
-			// will be 0 when executorTasksCount[e.ID] doesn't exist
-			activeTasks := executorTasksCount[e.ID]
+			// will be 0 when executorTasksCount[e.ExecutorID] doesn't exist
+			activeTasks := executorTasksCount[e.ExecutorID]
 			if e.ActiveTasks > activeTasks {
 				activeTasks = e.ActiveTasks
 			}
@@ -335,26 +385,49 @@ func chooseExecutor(executors []*types.Executor, executorTasksCount map[string]i
 // sendExecutorTask sends executor task to executor, if this fails the executor
 // will periodically fetch the executortask anyway
 func (s *Runservice) sendExecutorTask(ctx context.Context, et *types.ExecutorTask) error {
-	executor, err := store.GetExecutor(ctx, s.e, et.Spec.ExecutorID)
-	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
+	var executor *types.Executor
+	var r *types.Run
+	var rc *types.RunConfig
+	err := s.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+
+		executor, err = s.d.GetExecutorByExecutorID(tx, et.Spec.ExecutorID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		r, err = s.d.GetRun(tx, et.Spec.RunID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		if r == nil {
+			return errors.Errorf("run with id %q doesn't exist", et.Spec.RunID)
+		}
+
+		rc, err = s.d.GetRunConfig(tx, r.RunConfigID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		if rc == nil {
+			return errors.Errorf("runconfig with id %q doesn't exist", r.RunConfigID)
+		}
+
+		return nil
+	})
+	if err != nil {
 		return errors.WithStack(err)
 	}
+
 	if executor == nil {
 		s.log.Warn().Msgf("executor with id %q doesn't exist", et.Spec.ExecutorID)
 		return nil
 	}
 
-	r, _, err := store.GetRun(ctx, s.e, et.Spec.RunID)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	rc, err := store.OSTGetRunConfig(s.dm, r.ID)
-	if err != nil {
-		return errors.Wrapf(err, "cannot get run config %q", r.ID)
-	}
-	rt, ok := r.Tasks[et.ID]
+	rt, ok := r.Tasks[et.Spec.RunTaskID]
 	if !ok {
-		return errors.Errorf("no such run task with id %s for run %s", et.ID, r.ID)
+		return errors.Errorf("no such run task with id %s for run %s", et.Spec.RunTaskID, r.ID)
 	}
 
 	// take a copy to not change the input executorTask
@@ -384,8 +457,7 @@ func (s *Runservice) compactChangeGroupsLoop(ctx context.Context) {
 		if err := s.compactChangeGroups(ctx); err != nil {
 			s.log.Err(err).Send()
 		}
-
-		sleepCh := time.NewTimer(1 * time.Second).C
+		sleepCh := time.NewTimer(changeGroupCompactorInterval).C
 		select {
 		case <-ctx.Done():
 			return
@@ -395,131 +467,144 @@ func (s *Runservice) compactChangeGroupsLoop(ctx context.Context) {
 }
 
 func (s *Runservice) compactChangeGroups(ctx context.Context) error {
-	session, err := concurrency.NewSession(s.e.Client(), concurrency.WithTTL(5), concurrency.WithContext(ctx))
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	defer session.Close()
-
-	m := etcd.NewMutex(session, common.EtcdCompactChangeGroupsLockKey)
-
-	if err := m.TryLock(ctx); err != nil {
-		if errors.Is(err, etcd.ErrLocked) {
-			return nil
+	// TODO(sgotti) do this in batches of N changegroups and/or filter by update time directly in the query
+	err := s.d.Do(ctx, func(tx *sql.Tx) error {
+		changeGroups, err := s.d.GetChangeGroups(tx)
+		if err != nil {
+			return errors.WithStack(err)
 		}
-		return errors.WithStack(err)
-	}
-	defer func() { _ = m.Unlock(ctx) }()
 
-	resp, err := s.e.Client().Get(ctx, common.EtcdChangeGroupMinRevisionKey)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	revision := resp.Kvs[0].ModRevision
-
-	// first update minrevision
-	cmp := etcdclientv3.Compare(etcdclientv3.ModRevision(common.EtcdChangeGroupMinRevisionKey), "=", revision)
-	then := etcdclientv3.OpPut(common.EtcdChangeGroupMinRevisionKey, "")
-	txn := s.e.Client().Txn(ctx).If(cmp).Then(then)
-	tresp, err := txn.Commit()
-	if err != nil {
-		return errors.WithStack(etcd.FromEtcdError(err))
-	}
-	if !tresp.Succeeded {
-		return errors.Errorf("failed to update change group min revision key due to concurrent update")
-	}
-
-	revision = tresp.Header.Revision
-
-	// then remove all the groups keys with modrevision < minrevision
-	// remove old groups
-
-	resp, err = s.e.List(ctx, common.EtcdChangeGroupsDir, "", 0)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	for _, kv := range resp.Kvs {
-		if kv.ModRevision < revision-common.EtcdChangeGroupMinRevisionRange {
-			cmp := etcdclientv3.Compare(etcdclientv3.ModRevision(string(kv.Key)), "=", kv.ModRevision)
-			then := etcdclientv3.OpDelete(string(kv.Key))
-			txn := s.e.Client().Txn(ctx).If(cmp).Then(then)
-			tresp, err := txn.Commit()
-			if err != nil {
-				return errors.WithStack(etcd.FromEtcdError(err))
+		for _, changeGroup := range changeGroups {
+			if time.Since(changeGroup.UpdateTime) < changeGroupMinDuration {
+				continue
 			}
-			if !tresp.Succeeded {
-				s.log.Error().Msgf("failed to update change group min revision key due to concurrent update")
+			if err := s.d.DeleteChangeGroup(tx, changeGroup.ID); err != nil {
+				return errors.WithStack(err)
 			}
 		}
+
+		return nil
+	})
+	if err != nil {
+		return errors.WithStack(err)
 	}
+
 	return nil
 }
 
-func (s *Runservice) scheduleRun(ctx context.Context, r *types.Run, rc *types.RunConfig) error {
+func (s *Runservice) scheduleRun(ctx context.Context, runID string) error {
+	// we use multiple transactions to split the logic in multiple steps and
+	// rely on optimistic object locking.
+	// We could probably also use a single transaction without many issues
+	// (perhaps more serializable transaction errors) since it should be quite
+	// faster.
+	var shouldSubmitRunTasks bool
+	var etsToSend []*types.ExecutorTask
+
+	var r *types.Run
+	var rc *types.RunConfig
+	var scheduledExecutorTasks []*types.ExecutorTask
+	err := s.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+
+		r, err = s.d.GetRun(tx, runID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		if r == nil {
+			return errors.Errorf("run with id %q doesn't exist", runID)
+		}
+
+		rc, err = s.d.GetRunConfig(tx, r.RunConfigID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		if rc == nil {
+			return errors.Errorf("runconfig with id %q doesn't exist", r.RunConfigID)
+		}
+
+		// the real source of active tasks is the number of executor tasks in the db
+		// we can't rely on RunTask.Status since it's only updated when receiveing
+		// updated from the executor so it could be in a NotStarted state but have an
+		// executor tasks scheduled and running
+		scheduledExecutorTasks, err = s.d.GetExecutorTasksByRun(tx, r.ID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
 	s.log.Debug().Msgf("r: %s", util.Dump(r))
 
 	prevPhase := r.Phase
 	prevResult := r.Result
 
-	// the real source of active tasks is the number of executor tasks in etcd
-	// we can't rely on RunTask.Status since it's only updated when receiveing
-	// updated from the executor so it could be in a NotStarted state but have an
-	// executor tasks scheduled and running
-	scheduledExecutorTasks, err := store.GetExecutorTasksForRun(ctx, s.e, r.ID)
+	if err := advanceRun(s.log, r, rc, scheduledExecutorTasks); err != nil {
+		return errors.WithStack(err)
+	}
+
+	err = s.d.Do(ctx, func(tx *sql.Tx) error {
+		// if the run is set to stop, stop all active tasks
+		if r.Stop {
+			for _, et := range scheduledExecutorTasks {
+				et.Spec.Stop = true
+				if err := s.d.UpdateExecutorTask(tx, et); err != nil {
+					return errors.WithStack(err)
+				}
+				etsToSend = append(etsToSend, et)
+			}
+		}
+
+		// advance tasks
+		if r.Phase == types.RunPhaseRunning {
+			r, err = advanceRunTasks(s.log, r, rc, scheduledExecutorTasks)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+
+			shouldSubmitRunTasks = true
+		}
+
+		if err := s.d.UpdateRun(tx, r); err != nil {
+			return errors.WithStack(err)
+		}
+
+		// detect changes to phase and result and set related events
+		if prevPhase != r.Phase || prevResult != r.Result {
+			runEvent, err := common.NewRunEvent(s.d, tx, r.ID, r.Phase, r.Result)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			if err := s.d.InsertRunEvent(tx, runEvent); err != nil {
+				return errors.WithStack(err)
+			}
+		}
+		return nil
+	})
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	if err := advanceRun(ctx, s.log, r, rc, scheduledExecutorTasks); err != nil {
-		return errors.WithStack(err)
-	}
-
-	var runEvent *types.RunEvent
-	// detect changes to phase and result and set related events
-	if prevPhase != r.Phase || prevResult != r.Result {
-		var err error
-		runEvent, err = common.NewRunEvent(ctx, s.e, r.ID, r.Phase, r.Result)
-		if err != nil {
+	for _, et := range etsToSend {
+		if err := s.sendExecutorTask(ctx, et); err != nil {
 			return errors.WithStack(err)
 		}
 	}
-
-	r, err = store.AtomicPutRun(ctx, s.e, r, runEvent, nil)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	// if the run is set to stop, stop all active tasks
-	if r.Stop {
-		for _, et := range scheduledExecutorTasks {
-			et.Spec.Stop = true
-			if _, err := store.AtomicPutExecutorTask(ctx, s.e, et); err != nil {
-				return errors.WithStack(err)
-			}
-			if err := s.sendExecutorTask(ctx, et); err != nil {
-				return errors.WithStack(err)
-			}
-		}
-	}
-
-	// advance tasks
-	if r.Phase == types.RunPhaseRunning {
-		r, err := advanceRunTasks(ctx, s.log, r, rc, scheduledExecutorTasks)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-		r, err = store.AtomicPutRun(ctx, s.e, r, nil, nil)
+	if shouldSubmitRunTasks {
+		tasksToRun, err := getTasksToRun(s.log, r, rc)
 		if err != nil {
 			return errors.WithStack(err)
 		}
 
-		tasksToRun, err := getTasksToRun(ctx, s.log, r, rc)
-		if err != nil {
+		if err := s.submitRunTasks(ctx, r, rc, tasksToRun); err != nil {
 			return errors.WithStack(err)
 		}
-
-		return s.submitRunTasks(ctx, r, rc, tasksToRun)
 	}
 
 	return nil
@@ -527,7 +612,7 @@ func (s *Runservice) scheduleRun(ctx context.Context, r *types.Run, rc *types.Ru
 
 // advanceRun updates the run result and phase. It must be the unique function that
 // should update them.
-func advanceRun(ctx context.Context, log zerolog.Logger, r *types.Run, rc *types.RunConfig, scheduledExecutorTasks []*types.ExecutorTask) error {
+func advanceRun(log zerolog.Logger, r *types.Run, rc *types.RunConfig, scheduledExecutorTasks []*types.ExecutorTask) error {
 	log.Debug().Msgf("run: %s", util.Dump(r))
 	hasScheduledTasks := len(scheduledExecutorTasks) > 0
 
@@ -607,33 +692,49 @@ func advanceRun(ctx context.Context, log zerolog.Logger, r *types.Run, rc *types
 	return nil
 }
 
-func (s *Runservice) handleExecutorTaskUpdate(ctx context.Context, et *types.ExecutorTask) error {
-	r, _, err := store.GetRun(ctx, s.e, et.Spec.RunID)
+func (s *Runservice) handleExecutorTaskUpdate(ctx context.Context, executorTaskID string) error {
+	var r *types.Run
+	err := s.d.Do(ctx, func(tx *sql.Tx) error {
+		et, err := s.d.GetExecutorTask(tx, executorTaskID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		if et == nil {
+			return errors.Errorf("executor task with id %q doesn't exist", executorTaskID)
+		}
+
+		r, err = s.d.GetRun(tx, et.Spec.RunID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		if r == nil {
+			return errors.Errorf("run with id %q doesn't exist", et.Spec.RunID)
+		}
+
+		if err := s.updateRunTaskStatus(et, r); err != nil {
+			return errors.WithStack(err)
+		}
+
+		if err = s.d.UpdateRun(tx, r); err != nil {
+			return errors.WithStack(err)
+		}
+		return nil
+	})
 	if err != nil {
 		return errors.WithStack(err)
-	}
-	rc, err := store.OSTGetRunConfig(s.dm, r.ID)
-	if err != nil {
-		return errors.Wrapf(err, "cannot get run config %q", r.ID)
 	}
 
-	if err := s.updateRunTaskStatus(ctx, et, r); err != nil {
-		return errors.WithStack(err)
-	}
-	r, err = store.AtomicPutRun(ctx, s.e, r, nil, nil)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	return s.scheduleRun(ctx, r, rc)
+	return s.scheduleRun(ctx, r.ID)
 }
 
-func (s *Runservice) updateRunTaskStatus(ctx context.Context, et *types.ExecutorTask, r *types.Run) error {
+func (s *Runservice) updateRunTaskStatus(et *types.ExecutorTask, r *types.Run) error {
 	s.log.Debug().Msgf("et: %s", util.Dump(et))
 
-	rt, ok := r.Tasks[et.ID]
+	rt, ok := r.Tasks[et.Spec.RunTaskID]
 	if !ok {
-		return errors.Errorf("no such run task with id %s for run %s", et.ID, r.ID)
+		return errors.Errorf("no such run task with id %s for run %s", et.Spec.RunTaskID, r.ID)
 	}
 
 	rt.StartTime = et.Status.StartTime
@@ -708,14 +809,14 @@ func (s *Runservice) updateRunTaskStatus(ctx context.Context, et *types.Executor
 	return nil
 }
 
-func (s *Runservice) executorTaskUpdateHandler(ctx context.Context, c <-chan *types.ExecutorTask) {
+func (s *Runservice) executorTaskUpdateHandler(ctx context.Context, c <-chan string) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case et := <-c:
+		case etID := <-c:
 			go func() {
-				if err := s.handleExecutorTaskUpdate(ctx, et); err != nil {
+				if err := s.handleExecutorTaskUpdate(ctx, etID); err != nil {
 					// TODO(sgotti) improve logging to not return "run modified errors" since
 					// they are normal
 					s.log.Warn().Msgf("err: %+v", err)
@@ -743,20 +844,22 @@ func (s *Runservice) executorTasksCleanerLoop(ctx context.Context) {
 }
 
 func (s *Runservice) executorTasksCleaner(ctx context.Context) error {
-	// TODO(sgotti) use paged List
-	resp, err := s.e.List(ctx, common.EtcdTasksDir, "", 0)
+	// TODO(sgotti) use paged List or get only the executor tasks id
+	var executorTasks []*types.ExecutorTask
+	err := s.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		executorTasks, err = s.d.GetExecutorTasks(tx)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		return nil
+	})
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	for _, kv := range resp.Kvs {
-		var et *types.ExecutorTask
-		if err := json.Unmarshal(kv.Value, &et); err != nil {
-			s.log.Err(err).Send()
-			continue
-		}
-		et.Revision = kv.ModRevision
-		if err := s.executorTaskCleaner(ctx, et); err != nil {
+	for _, et := range executorTasks {
+		if err := s.executorTaskCleaner(ctx, et.ID); err != nil {
 			s.log.Err(err).Send()
 		}
 	}
@@ -764,60 +867,83 @@ func (s *Runservice) executorTasksCleaner(ctx context.Context) error {
 	return nil
 }
 
-func (s *Runservice) executorTaskCleaner(ctx context.Context, et *types.ExecutorTask) error {
-	s.log.Debug().Msgf("et: %s", util.Dump(et))
-	if et.Status.Phase.IsFinished() {
-		r, _, err := store.GetRun(ctx, s.e, et.Spec.RunID)
+func (s *Runservice) executorTaskCleaner(ctx context.Context, executorTaskID string) error {
+	var shouldSend bool
+
+	var et *types.ExecutorTask
+	err := s.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		et, err = s.d.GetExecutorTask(tx, executorTaskID)
 		if err != nil {
-			if errors.Is(err, etcd.ErrKeyNotFound) {
+			return errors.WithStack(err)
+		}
+		s.log.Debug().Msgf("et: %s", util.Dump(et))
+
+		if et == nil {
+			return nil
+		}
+
+		if et.Status.Phase.IsFinished() {
+			r, err := s.d.GetRun(tx, et.Spec.RunID)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			if r == nil {
 				// run doesn't exists, remove executor task
-				if err := store.DeleteExecutorTask(ctx, s.e, et.ID); err != nil {
+				s.log.Warn().Msgf("deleting executor task %q since run %q doesn't exist", et.ID, et.Spec.RunID)
+				if err := s.d.DeleteExecutorTask(tx, et.ID); err != nil {
 					s.log.Err(err).Send()
 					return errors.WithStack(err)
 				}
 				return nil
 			}
-			s.log.Err(err).Send()
-			return errors.WithStack(err)
-		}
 
-		if r.Phase.IsFinished() {
-			// if the run is finished mark the executor tasks to stop
-			if !et.Spec.Stop {
-				et.Spec.Stop = true
-				if _, err := store.AtomicPutExecutorTask(ctx, s.e, et); err != nil {
-					return errors.WithStack(err)
-				}
-				if err := s.sendExecutorTask(ctx, et); err != nil {
-					s.log.Err(err).Send()
-					return errors.WithStack(err)
+			if r.Phase.IsFinished() {
+				// if the run is finished mark the executor tasks to stop
+				if !et.Spec.Stop {
+					et.Spec.Stop = true
+					if err := s.d.UpdateExecutorTask(tx, et); err != nil {
+						return errors.WithStack(err)
+					}
+					shouldSend = true
 				}
 			}
 		}
-	}
 
-	if !et.Status.Phase.IsFinished() {
-		// if the executor doesn't exists anymore mark the not finished executor tasks as failed
-		executor, err := store.GetExecutor(ctx, s.e, et.Spec.ExecutorID)
-		if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
-			return errors.WithStack(err)
-		}
-		if executor == nil {
-			s.log.Warn().Msgf("executor with id %q doesn't exist. marking executor task %q as failed", et.Spec.ExecutorID, et.ID)
-			et.Status.FailError = "executor deleted"
-			et.Status.Phase = types.ExecutorTaskPhaseFailed
-			et.Status.EndTime = util.TimeP(time.Now())
-			for _, s := range et.Status.Steps {
-				if s.Phase == types.ExecutorTaskPhaseRunning {
-					s.Phase = types.ExecutorTaskPhaseFailed
-					s.EndTime = util.TimeP(time.Now())
-				}
-			}
-			if _, err := store.AtomicPutExecutorTask(ctx, s.e, et); err != nil {
+		if !et.Status.Phase.IsFinished() {
+			// if the executor doesn't exists anymore mark the not finished executor tasks as failed
+			executor, err := s.d.GetExecutorByExecutorID(tx, et.Spec.ExecutorID)
+			if err != nil {
 				return errors.WithStack(err)
 			}
+			if executor == nil {
+				s.log.Warn().Msgf("executor with id %q doesn't exist. marking executor task %q as failed", et.Spec.ExecutorID, et.ID)
+				et.Status.FailError = "executor deleted"
+				et.Status.Phase = types.ExecutorTaskPhaseFailed
+				et.Status.EndTime = util.TimeP(time.Now())
+				for _, s := range et.Status.Steps {
+					if s.Phase == types.ExecutorTaskPhaseRunning {
+						s.Phase = types.ExecutorTaskPhaseFailed
+						s.EndTime = util.TimeP(time.Now())
+					}
+				}
+				if err := s.d.UpdateExecutorTask(tx, et); err != nil {
+					return errors.WithStack(err)
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	if shouldSend {
+		if err := s.sendExecutorTask(ctx, et); err != nil {
+			return errors.WithStack(err)
 		}
 	}
+
 	return nil
 }
 
@@ -841,35 +967,28 @@ func (s *Runservice) runTasksUpdaterLoop(ctx context.Context) {
 func (s *Runservice) runTasksUpdater(ctx context.Context) error {
 	s.log.Debug().Msgf("runTasksUpdater")
 
-	session, err := concurrency.NewSession(s.e.Client(), concurrency.WithTTL(5), concurrency.WithContext(ctx))
-	if err != nil {
-		return errors.WithStack(err)
+	l := s.lf.NewLock(common.TaskUpdaterLockKey)
+	if err := l.Lock(ctx); err != nil {
+		return errors.Wrap(err, "failed to acquire task updater lock")
 	}
-	defer session.Close()
+	defer func() { _ = l.Unlock() }()
 
-	m := etcd.NewMutex(session, common.EtcdTaskUpdaterLockKey)
-
-	if err := m.TryLock(ctx); err != nil {
-		if errors.Is(err, etcd.ErrLocked) {
-			return nil
-		}
-		return errors.WithStack(err)
-	}
-	defer func() { _ = m.Unlock(ctx) }()
-
-	// TODO(sgotti) use paged List
-	resp, err := s.e.List(ctx, common.EtcdTasksDir, "", 0)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	for _, kv := range resp.Kvs {
-		var et *types.ExecutorTask
-		if err := json.Unmarshal(kv.Value, &et); err != nil {
+	// TODO(sgotti) use paged List or get only the executor tasks id
+	var executorTasks []*types.ExecutorTask
+	err := s.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		executorTasks, err = s.d.GetExecutorTasks(tx)
+		if err != nil {
 			return errors.WithStack(err)
 		}
-		et.Revision = kv.ModRevision
-		if err := s.handleExecutorTaskUpdate(ctx, et); err != nil {
+		return nil
+	})
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	for _, et := range executorTasks {
+		if err := s.handleExecutorTaskUpdate(ctx, et.ID); err != nil {
 			s.log.Err(err).Send()
 		}
 	}
@@ -885,21 +1004,36 @@ func (s *Runservice) OSTFileExists(path string) (bool, error) {
 	return err == nil, nil
 }
 
-func (s *Runservice) fetchLog(ctx context.Context, rt *types.RunTask, setup bool, stepnum int) error {
-	et, err := store.GetExecutorTask(ctx, s.e, rt.ID)
-	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
+func (s *Runservice) fetchLog(ctx context.Context, runID string, rt *types.RunTask, setup bool, stepnum int) error {
+	var et *types.ExecutorTask
+	var executor *types.Executor
+	err := s.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		et, err = s.d.GetExecutorTaskByRunTask(tx, runID, rt.ID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if et == nil {
+			return nil
+		}
+		executor, err = s.d.GetExecutorByExecutorID(tx, et.Spec.ExecutorID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		return nil
+	})
+	if err != nil {
 		return errors.WithStack(err)
 	}
+
 	if et == nil {
 		if rt.Status != types.RunTaskStatusSkipped {
-			s.log.Error().Msgf("executor task with id %q doesn't exist. This shouldn't happen. Skipping fetching", rt.ID)
+			s.log.Error().Msgf("executor task for run task with id %q doesn't exist. This shouldn't happen. Skipping fetching", rt.ID)
 		}
 		return nil
 	}
-	executor, err := store.GetExecutor(ctx, s.e, et.Spec.ExecutorID)
-	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
-		return errors.WithStack(err)
-	}
+
 	if executor == nil {
 		s.log.Warn().Msgf("executor with id %q doesn't exist. Skipping fetching", et.Spec.ExecutorID)
 		return nil
@@ -921,9 +1055,9 @@ func (s *Runservice) fetchLog(ctx context.Context, rt *types.RunTask, setup bool
 
 	var u string
 	if setup {
-		u = fmt.Sprintf(executor.ListenURL+"/api/v1alpha/executor/logs?taskid=%s&setup", rt.ID)
+		u = fmt.Sprintf(executor.ListenURL+"/api/v1alpha/executor/logs?taskid=%s&setup", et.ID)
 	} else {
-		u = fmt.Sprintf(executor.ListenURL+"/api/v1alpha/executor/logs?taskid=%s&step=%d", rt.ID, stepnum)
+		u = fmt.Sprintf(executor.ListenURL+"/api/v1alpha/executor/logs?taskid=%s&step=%d", et.ID, stepnum)
 	}
 	r, err := http.Get(u)
 	if err != nil {
@@ -952,69 +1086,102 @@ func (s *Runservice) fetchLog(ctx context.Context, rt *types.RunTask, setup bool
 }
 
 func (s *Runservice) finishSetupLogPhase(ctx context.Context, runID, runTaskID string) error {
-	r, _, err := store.GetRun(ctx, s.e, runID)
+	err := s.d.Do(ctx, func(tx *sql.Tx) error {
+		r, err := s.d.GetRun(tx, runID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if r == nil {
+			return nil
+		}
+
+		rt, ok := r.Tasks[runTaskID]
+		if !ok {
+			return errors.Errorf("no such task with ID %s in run %s", runTaskID, runID)
+		}
+
+		rt.SetupStep.LogPhase = types.RunTaskFetchPhaseFinished
+		if err := s.d.UpdateRun(tx, r); err != nil {
+			return errors.WithStack(err)
+		}
+		return nil
+	})
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	rt, ok := r.Tasks[runTaskID]
-	if !ok {
-		return errors.Errorf("no such task with ID %s in run %s", runTaskID, runID)
-	}
 
-	rt.SetupStep.LogPhase = types.RunTaskFetchPhaseFinished
-	if _, err := store.AtomicPutRun(ctx, s.e, r, nil, nil); err != nil {
-		return errors.WithStack(err)
-	}
 	return nil
 }
 
 func (s *Runservice) finishStepLogPhase(ctx context.Context, runID, runTaskID string, stepnum int) error {
-	r, _, err := store.GetRun(ctx, s.e, runID)
+	err := s.d.Do(ctx, func(tx *sql.Tx) error {
+		r, err := s.d.GetRun(tx, runID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if r == nil {
+			return nil
+		}
+
+		rt, ok := r.Tasks[runTaskID]
+		if !ok {
+			return errors.Errorf("no such task with ID %s in run %s", runTaskID, runID)
+		}
+		if len(rt.Steps) <= stepnum {
+			return errors.Errorf("no such step for task %s in run %s", runTaskID, runID)
+		}
+
+		rt.Steps[stepnum].LogPhase = types.RunTaskFetchPhaseFinished
+		if err := s.d.UpdateRun(tx, r); err != nil {
+			return errors.WithStack(err)
+		}
+		return nil
+	})
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	rt, ok := r.Tasks[runTaskID]
-	if !ok {
-		return errors.Errorf("no such task with ID %s in run %s", runTaskID, runID)
-	}
-	if len(rt.Steps) <= stepnum {
-		return errors.Errorf("no such step for task %s in run %s", runTaskID, runID)
-	}
 
-	rt.Steps[stepnum].LogPhase = types.RunTaskFetchPhaseFinished
-	if _, err := store.AtomicPutRun(ctx, s.e, r, nil, nil); err != nil {
-		return errors.WithStack(err)
-	}
 	return nil
 }
 
 func (s *Runservice) finishArchivePhase(ctx context.Context, runID, runTaskID string, stepnum int) error {
-	r, _, err := store.GetRun(ctx, s.e, runID)
+	err := s.d.Do(ctx, func(tx *sql.Tx) error {
+		r, err := s.d.GetRun(tx, runID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if r == nil {
+			return nil
+		}
+
+		rt, ok := r.Tasks[runTaskID]
+		if !ok {
+			return errors.Errorf("no such task with ID %s in run %s", runTaskID, runID)
+		}
+		if len(rt.Steps) <= stepnum {
+			return errors.Errorf("no such step for task %s in run %s", runTaskID, runID)
+		}
+		found := false
+		for i, sn := range rt.WorkspaceArchives {
+			if stepnum == sn {
+				found = true
+				rt.WorkspaceArchivesPhase[i] = types.RunTaskFetchPhaseFinished
+				break
+			}
+		}
+		if !found {
+			return errors.Errorf("no workspace archive for task %s, step %d in run %s", runTaskID, stepnum, runID)
+		}
+
+		if err := s.d.UpdateRun(tx, r); err != nil {
+			return errors.WithStack(err)
+		}
+		return nil
+	})
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	rt, ok := r.Tasks[runTaskID]
-	if !ok {
-		return errors.Errorf("no such task with ID %s in run %s", runTaskID, runID)
-	}
-	if len(rt.Steps) <= stepnum {
-		return errors.Errorf("no such step for task %s in run %s", runTaskID, runID)
-	}
-	found := false
-	for i, sn := range rt.WorkspaceArchives {
-		if stepnum == sn {
-			found = true
-			rt.WorkspaceArchivesPhase[i] = types.RunTaskFetchPhaseFinished
-			break
-		}
-	}
-	if !found {
-		return errors.Errorf("no workspace archive for task %s, step %d in run %s", runTaskID, stepnum, runID)
-	}
 
-	if _, err := store.AtomicPutRun(ctx, s.e, r, nil, nil); err != nil {
-		return errors.WithStack(err)
-	}
 	return nil
 }
 
@@ -1023,7 +1190,7 @@ func (s *Runservice) fetchTaskLogs(ctx context.Context, runID string, rt *types.
 
 	// fetch setup log
 	if rt.SetupStep.LogPhase == types.RunTaskFetchPhaseNotStarted {
-		if err := s.fetchLog(ctx, rt, true, 0); err != nil {
+		if err := s.fetchLog(ctx, runID, rt, true, 0); err != nil {
 			s.log.Err(err).Send()
 		} else {
 			if err := s.finishSetupLogPhase(ctx, runID, rt.ID); err != nil {
@@ -1036,7 +1203,7 @@ func (s *Runservice) fetchTaskLogs(ctx context.Context, runID string, rt *types.
 	for i, rts := range rt.Steps {
 		lp := rts.LogPhase
 		if lp == types.RunTaskFetchPhaseNotStarted {
-			if err := s.fetchLog(ctx, rt, false, i); err != nil {
+			if err := s.fetchLog(ctx, runID, rt, false, i); err != nil {
 				s.log.Err(err).Send()
 				continue
 			}
@@ -1048,21 +1215,36 @@ func (s *Runservice) fetchTaskLogs(ctx context.Context, runID string, rt *types.
 	}
 }
 
-func (s *Runservice) fetchArchive(ctx context.Context, rt *types.RunTask, stepnum int) error {
-	et, err := store.GetExecutorTask(ctx, s.e, rt.ID)
-	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
+func (s *Runservice) fetchArchive(ctx context.Context, runID string, rt *types.RunTask, stepnum int) error {
+	var et *types.ExecutorTask
+	var executor *types.Executor
+	err := s.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		et, err = s.d.GetExecutorTaskByRunTask(tx, runID, rt.ID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if et == nil {
+			return nil
+		}
+		executor, err = s.d.GetExecutorByExecutorID(tx, et.Spec.ExecutorID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		return nil
+	})
+	if err != nil {
 		return errors.WithStack(err)
 	}
+
 	if et == nil {
 		if rt.Status != types.RunTaskStatusSkipped {
-			s.log.Error().Msgf("executor task with id %q doesn't exist. This shouldn't happen. Skipping fetching", rt.ID)
+			s.log.Error().Msgf("executor task for run task with id %q doesn't exist. This shouldn't happen. Skipping fetching", rt.ID)
 		}
 		return nil
 	}
-	executor, err := store.GetExecutor(ctx, s.e, et.Spec.ExecutorID)
-	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
-		return errors.WithStack(err)
-	}
+
 	if executor == nil {
 		s.log.Warn().Msgf("executor with id %q doesn't exist. Skipping fetching", et.Spec.ExecutorID)
 		return nil
@@ -1077,7 +1259,7 @@ func (s *Runservice) fetchArchive(ctx context.Context, rt *types.RunTask, stepnu
 		return nil
 	}
 
-	u := fmt.Sprintf(executor.ListenURL+"/api/v1alpha/executor/archives?taskid=%s&step=%d", rt.ID, stepnum)
+	u := fmt.Sprintf(executor.ListenURL+"/api/v1alpha/executor/archives?taskid=%s&step=%d", et.ID, stepnum)
 	s.log.Debug().Msgf("fetchArchive: %s", u)
 	r, err := http.Get(u)
 	if err != nil {
@@ -1111,7 +1293,7 @@ func (s *Runservice) fetchTaskArchives(ctx context.Context, runID string, rt *ty
 	for i, stepnum := range rt.WorkspaceArchives {
 		phase := rt.WorkspaceArchivesPhase[i]
 		if phase == types.RunTaskFetchPhaseNotStarted {
-			if err := s.fetchArchive(ctx, rt, stepnum); err != nil {
+			if err := s.fetchArchive(ctx, runID, rt, stepnum); err != nil {
 				s.log.Err(err).Send()
 				continue
 			}
@@ -1142,10 +1324,20 @@ func (s *Runservice) fetcherLoop(ctx context.Context) {
 
 func (s *Runservice) fetcher(ctx context.Context) error {
 	s.log.Debug().Msgf("fetcher")
-	runs, err := store.GetRuns(ctx, s.e)
+
+	var runs []*types.Run
+	err := s.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		runs, err = s.d.GetUnarchivedRuns(tx)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		return nil
+	})
 	if err != nil {
 		return errors.WithStack(err)
 	}
+
 	for _, r := range runs {
 		s.log.Debug().Msgf("r: %s", util.Dump(r))
 		for _, rt := range r.Tasks {
@@ -1163,21 +1355,12 @@ func (s *Runservice) taskFetcher(ctx context.Context, r *types.Run, rt *types.Ru
 	if !rt.Status.IsFinished() {
 		return nil
 	}
-	session, err := concurrency.NewSession(s.e.Client(), concurrency.WithTTL(5), concurrency.WithContext(ctx))
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	defer session.Close()
 
-	m := etcd.NewMutex(session, common.EtcdTaskFetcherLockKey(rt.ID))
-
-	if err := m.TryLock(ctx); err != nil {
-		if errors.Is(err, etcd.ErrLocked) {
-			return nil
-		}
-		return errors.WithStack(err)
+	l := s.lf.NewLock(common.TaskFetcherLockKey(rt.ID))
+	if err := l.Lock(ctx); err != nil {
+		return errors.Wrap(err, "failed to acquire task fetcher lock")
 	}
-	defer func() { _ = m.Unlock(ctx) }()
+	defer func() { _ = l.Unlock() }()
 
 	// write related logs runID
 	runIDPath := store.OSTRunTaskLogsRunPath(rt.ID, r.ID)
@@ -1208,7 +1391,18 @@ func (s *Runservice) taskFetcher(ctx context.Context, r *types.Run, rt *types.Ru
 	// remove it before since it contains the reference to the executor where we
 	// should fetch the data
 	if rt.LogsFetchFinished() && rt.ArchivesFetchFinished() {
-		if err := store.DeleteExecutorTask(ctx, s.e, rt.ID); err != nil {
+		err := s.d.Do(ctx, func(tx *sql.Tx) error {
+			et, err := s.d.GetExecutorTaskByRunTask(tx, r.ID, rt.ID)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			if et == nil {
+				return nil
+			}
+			s.log.Warn().Msgf("deleting executor task %q since logs/archive fetch finished", et.ID)
+			return errors.WithStack(s.d.DeleteExecutorTask(tx, et.ID))
+		})
+		if err != nil {
 			return errors.WithStack(err)
 		}
 	}
@@ -1235,10 +1429,19 @@ func (s *Runservice) runsSchedulerLoop(ctx context.Context) {
 
 func (s *Runservice) runsScheduler(ctx context.Context) error {
 	s.log.Debug().Msgf("runsScheduler")
-	runs, err := store.GetRuns(ctx, s.e)
+	var runs []*types.Run
+	err := s.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		runs, err = s.d.GetUnarchivedRuns(tx)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		return nil
+	})
 	if err != nil {
 		return errors.WithStack(err)
 	}
+
 	for _, r := range runs {
 		if err := s.runScheduler(ctx, r); err != nil {
 			s.log.Err(err).Send()
@@ -1249,13 +1452,7 @@ func (s *Runservice) runsScheduler(ctx context.Context) error {
 }
 
 func (s *Runservice) runScheduler(ctx context.Context, r *types.Run) error {
-	s.log.Debug().Msgf("runScheduler")
-	rc, err := store.OSTGetRunConfig(s.dm, r.ID)
-	if err != nil {
-		return errors.Wrapf(err, "cannot get run config %q", r.ID)
-	}
-
-	return s.scheduleRun(ctx, r, rc)
+	return s.scheduleRun(ctx, r.ID)
 }
 
 func (s *Runservice) finishedRunsArchiverLoop(ctx context.Context) {
@@ -1277,26 +1474,22 @@ func (s *Runservice) finishedRunsArchiverLoop(ctx context.Context) {
 
 func (s *Runservice) finishedRunsArchiver(ctx context.Context) error {
 	s.log.Debug().Msgf("finished run archiver")
-	runs, err := store.GetRuns(ctx, s.e)
+	var runs []*types.Run
+	err := s.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		runs, err = s.d.GetUnarchivedRuns(tx)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		return nil
+	})
 	if err != nil {
 		return errors.WithStack(err)
-	}
-	for _, r := range runs {
-		if err := s.finishedRunArchiver(ctx, r); err != nil {
-			s.log.Err(err).Send()
-		}
 	}
 
-	// We write archived runs in objectstorage in the ordered they were archived
-	runs, err = store.GetRuns(ctx, s.e)
-	if err != nil {
-		return errors.WithStack(err)
-	}
 	for _, r := range runs {
-		if r.Archived {
-			if err := s.runOSTArchiver(ctx, r); err != nil {
-				s.log.Err(err).Send()
-			}
+		if err := s.finishedRunArchiver(ctx, r.ID); err != nil {
+			s.log.Err(err).Send()
 		}
 	}
 
@@ -1305,54 +1498,47 @@ func (s *Runservice) finishedRunsArchiver(ctx context.Context) error {
 
 // finishedRunArchiver archives a run if it's finished and all the fetching
 // phases (logs and archives) are marked as finished
-func (s *Runservice) finishedRunArchiver(ctx context.Context, r *types.Run) error {
-	if !r.Phase.IsFinished() {
-		return nil
-	}
-
-	done := true
-	for _, rt := range r.Tasks {
-		// check that all logs are fetched
-		if !rt.LogsFetchFinished() {
-			done = false
-			break
+func (s *Runservice) finishedRunArchiver(ctx context.Context, runID string) error {
+	err := s.d.Do(ctx, func(tx *sql.Tx) error {
+		r, err := s.d.GetRun(tx, runID)
+		if err != nil {
+			return errors.WithStack(err)
 		}
-		// check that all archives are fetched
-		if !rt.ArchivesFetchFinished() {
-			done = false
-			break
+
+		if r == nil {
+			return errors.Errorf("run with id %q doesn't exist", runID)
 		}
-	}
-	if !done {
+
+		if !r.Phase.IsFinished() {
+			return nil
+		}
+
+		done := true
+		for _, rt := range r.Tasks {
+			// check that all logs are fetched
+			if !rt.LogsFetchFinished() {
+				done = false
+				break
+			}
+			// check that all archives are fetched
+			if !rt.ArchivesFetchFinished() {
+				done = false
+				break
+			}
+		}
+		if !done {
+			return nil
+		}
+		s.log.Info().Msgf("run %q archiving completed", r.ID)
+
+		r.Archived = true
+		if err := s.d.UpdateRun(tx, r); err != nil {
+			return errors.WithStack(err)
+		}
+
 		return nil
-	}
-	s.log.Info().Msgf("run %q archiving completed", r.ID)
-
-	r.Archived = true
-	if _, err := store.AtomicPutRun(ctx, s.e, r, nil, nil); err != nil {
-		return errors.WithStack(err)
-	}
-
-	return nil
-}
-
-func (s *Runservice) runOSTArchiver(ctx context.Context, r *types.Run) error {
-	// TODO(sgotti) avoid saving multiple times the run on objectstorage if the
-	// store.DeletedArchivedRun fails
-	s.log.Info().Msgf("saving run in objectstorage: %s", r.ID)
-	ra, err := store.OSTSaveRunAction(r)
+	})
 	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	actions := []*datamanager.Action{ra}
-
-	if _, err = s.dm.WriteWal(ctx, actions, nil); err != nil {
-		return errors.WithStack(err)
-	}
-
-	s.log.Info().Msgf("deleting run from etcd: %s", r.ID)
-	if err := store.DeleteRun(ctx, s.e, r.ID); err != nil {
 		return errors.WithStack(err)
 	}
 
@@ -1377,27 +1563,17 @@ func (s *Runservice) cacheCleanerLoop(ctx context.Context, cacheExpireInterval t
 func (s *Runservice) cacheCleaner(ctx context.Context, cacheExpireInterval time.Duration) error {
 	s.log.Debug().Msgf("cacheCleaner")
 
-	session, err := concurrency.NewSession(s.e.Client(), concurrency.WithTTL(5), concurrency.WithContext(ctx))
-	if err != nil {
-		return errors.WithStack(err)
+	l := s.lf.NewLock(common.CacheCleanerLockKey)
+	if err := l.Lock(ctx); err != nil {
+		return errors.Wrap(err, "failed to acquire cache cleaner lock")
 	}
-	defer session.Close()
-
-	m := etcd.NewMutex(session, common.EtcdCacheCleanerLockKey)
-
-	if err := m.TryLock(ctx); err != nil {
-		if errors.Is(err, etcd.ErrLocked) {
-			return nil
-		}
-		return errors.WithStack(err)
-	}
-	defer func() { _ = m.Unlock(ctx) }()
+	defer func() { _ = l.Unlock() }()
 
 	doneCh := make(chan struct{})
 	defer close(doneCh)
 	for object := range s.ost.List(store.OSTCacheDir()+"/", "", true, doneCh) {
 		if object.Err != nil {
-			return errors.WithStack(object.Err)
+			return object.Err
 		}
 		if object.LastModified.Add(cacheExpireInterval).Before(time.Now()) {
 			if err := s.ost.DeleteObject(object.Path); err != nil {
@@ -1429,27 +1605,17 @@ func (s *Runservice) workspaceCleanerLoop(ctx context.Context, workspaceExpireIn
 func (s *Runservice) workspaceCleaner(ctx context.Context, workspaceExpireInterval time.Duration) error {
 	s.log.Debug().Msgf("workspaceCleaner")
 
-	session, err := concurrency.NewSession(s.e.Client(), concurrency.WithTTL(5), concurrency.WithContext(ctx))
-	if err != nil {
-		return errors.WithStack(err)
+	l := s.lf.NewLock(common.WorkspaceCleanerLockKey)
+	if err := l.Lock(ctx); err != nil {
+		return errors.Wrap(err, "failed to acquire workspace cleaner lock")
 	}
-	defer session.Close()
-
-	m := etcd.NewMutex(session, common.EtcdWorkspaceCleanerLockKey)
-
-	if err := m.TryLock(ctx); err != nil {
-		if errors.Is(err, etcd.ErrLocked) {
-			return nil
-		}
-		return errors.WithStack(err)
-	}
-	defer func() { _ = m.Unlock(ctx) }()
+	defer func() { _ = l.Unlock() }()
 
 	doneCh := make(chan struct{})
 	defer close(doneCh)
 	for object := range s.ost.List(store.OSTArchivesBaseDir()+"/", "", true, doneCh) {
 		if object.Err != nil {
-			return errors.WithStack(object.Err)
+			return object.Err
 		}
 		if object.LastModified.Add(workspaceExpireInterval).Before(time.Now()) {
 			if err := s.ost.DeleteObject(object.Path); err != nil {

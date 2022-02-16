@@ -106,7 +106,7 @@ func (c *Client) SendExecutorStatus(ctx context.Context, executor *rstypes.Execu
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	return c.getResponse(ctx, "POST", fmt.Sprintf("/executor/%s", executor.ID), nil, -1, jsonContent, bytes.NewReader(executorj))
+	return c.getResponse(ctx, "POST", fmt.Sprintf("/executor/%s", executor.ExecutorID), nil, -1, jsonContent, bytes.NewReader(executorj))
 }
 
 func (c *Client) SendExecutorTaskStatus(ctx context.Context, executorID string, et *rstypes.ExecutorTask) (*http.Response, error) {
@@ -157,7 +157,7 @@ func (c *Client) PutCache(ctx context.Context, key string, size int64, r io.Read
 	return c.getResponse(ctx, "POST", fmt.Sprintf("/executor/caches/%s", url.PathEscape(key)), nil, size, nil, r)
 }
 
-func (c *Client) GetRuns(ctx context.Context, phaseFilter, resultFilter, groups []string, lastRun bool, changeGroups []string, start string, limit int, asc bool) (*rsapitypes.GetRunsResponse, *http.Response, error) {
+func (c *Client) GetRuns(ctx context.Context, phaseFilter, resultFilter, groups []string, lastRun bool, changeGroups []string, startRunSequence uint64, limit int, asc bool) (*rsapitypes.GetRunsResponse, *http.Response, error) {
 	q := url.Values{}
 	for _, phase := range phaseFilter {
 		q.Add("phase", phase)
@@ -174,9 +174,10 @@ func (c *Client) GetRuns(ctx context.Context, phaseFilter, resultFilter, groups 
 	for _, changeGroup := range changeGroups {
 		q.Add("changegroup", changeGroup)
 	}
-	if start != "" {
-		q.Add("start", start)
+	if startRunSequence > 0 {
+		q.Add("start", strconv.FormatUint(startRunSequence, 10))
 	}
+
 	if limit > 0 {
 		q.Add("limit", strconv.Itoa(limit))
 	}
@@ -189,28 +190,28 @@ func (c *Client) GetRuns(ctx context.Context, phaseFilter, resultFilter, groups 
 	return getRunsResponse, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetQueuedRuns(ctx context.Context, start string, limit int, changeGroups []string) (*rsapitypes.GetRunsResponse, *http.Response, error) {
-	return c.GetRuns(ctx, []string{"queued"}, nil, []string{}, false, changeGroups, start, limit, true)
+func (c *Client) GetQueuedRuns(ctx context.Context, startRunSequence uint64, limit int, changeGroups []string) (*rsapitypes.GetRunsResponse, *http.Response, error) {
+	return c.GetRuns(ctx, []string{"queued"}, nil, []string{}, false, changeGroups, startRunSequence, limit, true)
 }
 
-func (c *Client) GetRunningRuns(ctx context.Context, start string, limit int, changeGroups []string) (*rsapitypes.GetRunsResponse, *http.Response, error) {
-	return c.GetRuns(ctx, []string{"running"}, nil, []string{}, false, changeGroups, start, limit, true)
+func (c *Client) GetRunningRuns(ctx context.Context, startRunSequence uint64, limit int, changeGroups []string) (*rsapitypes.GetRunsResponse, *http.Response, error) {
+	return c.GetRuns(ctx, []string{"running"}, nil, []string{}, false, changeGroups, startRunSequence, limit, true)
 }
 
 func (c *Client) GetGroupQueuedRuns(ctx context.Context, group string, limit int, changeGroups []string) (*rsapitypes.GetRunsResponse, *http.Response, error) {
-	return c.GetRuns(ctx, []string{"queued"}, nil, []string{group}, false, changeGroups, "", limit, false)
+	return c.GetRuns(ctx, []string{"queued"}, nil, []string{group}, false, changeGroups, 0, limit, false)
 }
 
 func (c *Client) GetGroupRunningRuns(ctx context.Context, group string, limit int, changeGroups []string) (*rsapitypes.GetRunsResponse, *http.Response, error) {
-	return c.GetRuns(ctx, []string{"running"}, nil, []string{group}, false, changeGroups, "", limit, false)
+	return c.GetRuns(ctx, []string{"running"}, nil, []string{group}, false, changeGroups, 0, limit, false)
 }
 
 func (c *Client) GetGroupFirstQueuedRuns(ctx context.Context, group string, changeGroups []string) (*rsapitypes.GetRunsResponse, *http.Response, error) {
-	return c.GetRuns(ctx, []string{"queued"}, nil, []string{group}, false, changeGroups, "", 1, true)
+	return c.GetRuns(ctx, []string{"queued"}, nil, []string{group}, false, changeGroups, 0, 1, true)
 }
 
 func (c *Client) GetGroupLastRun(ctx context.Context, group string, changeGroups []string) (*rsapitypes.GetRunsResponse, *http.Response, error) {
-	return c.GetRuns(ctx, nil, nil, []string{group}, false, changeGroups, "", 1, false)
+	return c.GetRuns(ctx, nil, nil, []string{group}, false, changeGroups, 0, 1, false)
 }
 
 func (c *Client) GetGroupRuns(ctx context.Context, phaseFilter, resultFilter []string, group string, changeGroups []string, startRunCounter uint64, limit int, asc bool) (*rsapitypes.GetRunsResponse, *http.Response, error) {
