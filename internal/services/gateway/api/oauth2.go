@@ -16,6 +16,7 @@ package api
 
 import (
 	"net/http"
+	"net/url"
 
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
@@ -38,6 +39,13 @@ func (h *OAuth2CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	query := r.URL.Query()
 	code := query.Get("code")
 	state := query.Get("state")
+
+	code, err := url.QueryUnescape(code)
+	if err != nil {
+		h.log.Errorf("err: %+v", err)
+		httpError(w, util.NewErrBadRequest(err))
+		return
+	}
 
 	cresp, err := h.ah.HandleOauth2Callback(ctx, code, state)
 	if err != nil {
