@@ -15,7 +15,7 @@
 package util
 
 import (
-	uuid "github.com/satori/go.uuid"
+	"github.com/gofrs/uuid"
 )
 
 type UUIDGenerator interface {
@@ -25,7 +25,7 @@ type UUIDGenerator interface {
 type DefaultUUIDGenerator struct{}
 
 func (u DefaultUUIDGenerator) New(s string) uuid.UUID {
-	return uuid.NewV4()
+	return uuid.Must(uuid.NewV4())
 }
 
 type TestUUIDGenerator struct{}

@@ -23,7 +23,7 @@ import (
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/gofrs/uuid"
 	errors "golang.org/x/xerrors"
 )
 
@@ -133,7 +133,7 @@ func (h *ActionHandler) CreateSecret(ctx context.Context, secret *types.Secret) 
 		return nil, err
 	}
 
-	secret.ID = uuid.NewV4().String()
+	secret.ID = uuid.Must(uuid.NewV4()).String()
 
 	secretj, err := json.Marshal(secret)
 	if err != nil {

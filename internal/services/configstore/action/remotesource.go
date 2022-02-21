@@ -23,7 +23,7 @@ import (
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/gofrs/uuid"
 	errors "golang.org/x/xerrors"
 )
 
@@ -95,7 +95,7 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, remoteSource *ty
 		return nil, err
 	}
 
-	remoteSource.ID = uuid.NewV4().String()
+	remoteSource.ID = uuid.Must(uuid.NewV4()).String()
 
 	rsj, err := json.Marshal(remoteSource)
 	if err != nil {

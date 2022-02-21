@@ -25,7 +25,7 @@ import (
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/gofrs/uuid"
 	errors "golang.org/x/xerrors"
 )
 
@@ -89,9 +89,9 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 	}
 
 	user := &types.User{
-		ID:     uuid.NewV4().String(),
+		ID:     uuid.Must(uuid.NewV4()).String(),
 		Name:   req.UserName,
-		Secret: util.EncodeSha1Hex(uuid.NewV4().String()),
+		Secret: util.EncodeSha1Hex(uuid.Must(uuid.NewV4()).String()),
 	}
 	if req.CreateUserLARequest != nil {
 		if user.LinkedAccounts == nil {
@@ -99,7 +99,7 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 		}
 
 		la := &types.LinkedAccount{
-			ID:                         uuid.NewV4().String(),
+			ID:                         uuid.Must(uuid.NewV4()).String(),
 			RemoteSourceID:             rs.ID,
 			RemoteUserID:               req.CreateUserLARequest.RemoteUserID,
 			RemoteUserName:             req.CreateUserLARequest.RemoteUserName,
@@ -119,7 +119,7 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 
 	// create root user project group
 	pg := &types.ProjectGroup{
-		ID: uuid.NewV4().String(),
+		ID: uuid.Must(uuid.NewV4()).String(),
 		// use public visibility
 		Visibility: types.VisibilityPublic,
 		Parent: types.Parent{
@@ -332,7 +332,7 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 	}
 
 	la := &types.LinkedAccount{
-		ID:                         uuid.NewV4().String(),
+		ID:                         uuid.Must(uuid.NewV4()).String(),
 		RemoteSourceID:             rs.ID,
 		RemoteUserID:               req.RemoteUserID,
 		RemoteUserName:             req.RemoteUserName,
@@ -550,7 +550,7 @@ func (h *ActionHandler) CreateUserToken(ctx context.Context, userRef, tokenName 
 		user.Tokens = make(map[string]string)
 	}
 
-	token := util.EncodeSha1Hex(uuid.NewV4().String())
+	token := util.EncodeSha1Hex(uuid.Must(uuid.NewV4()).String())
 	user.Tokens[tokenName] = token
 
 	userj, err := json.Marshal(user)

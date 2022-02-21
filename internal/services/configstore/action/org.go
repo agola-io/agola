@@ -26,7 +26,7 @@ import (
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/gofrs/uuid"
 	errors "golang.org/x/xerrors"
 )
 
@@ -119,7 +119,7 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) 
 
 	actions := []*datamanager.Action{}
 
-	org.ID = uuid.NewV4().String()
+	org.ID = uuid.Must(uuid.NewV4()).String()
 	org.CreatedAt = time.Now()
 	orgj, err := json.Marshal(org)
 	if err != nil {
@@ -135,7 +135,7 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) 
 	if org.CreatorUserID != "" {
 		// add the creator as org member with role owner
 		orgmember := &types.OrganizationMember{
-			ID:             uuid.NewV4().String(),
+			ID:             uuid.Must(uuid.NewV4()).String(),
 			OrganizationID: org.ID,
 			UserID:         org.CreatorUserID,
 			MemberRole:     types.MemberRoleOwner,
@@ -154,7 +154,7 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) 
 
 	// create root org project group
 	pg := &types.ProjectGroup{
-		ID: uuid.NewV4().String(),
+		ID: uuid.Must(uuid.NewV4()).String(),
 		// use same org visibility
 		Visibility: org.Visibility,
 		Parent: types.Parent{
@@ -277,7 +277,7 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 		orgmember.MemberRole = role
 	} else {
 		orgmember = &types.OrganizationMember{
-			ID:             uuid.NewV4().String(),
+			ID:             uuid.Must(uuid.NewV4()).String(),
 			OrganizationID: org.ID,
 			UserID:         user.ID,
 			MemberRole:     role,
