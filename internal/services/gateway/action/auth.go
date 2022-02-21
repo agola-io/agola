@@ -145,72 +145,78 @@ func (h *ActionHandler) IsVariableOwner(ctx context.Context, parentType cstypes.
 	return h.IsProjectOwner(ctx, ownerType, ownerID)
 }
 
-func (h *ActionHandler) CanGetRun(ctx context.Context, runGroup string) (bool, error) {
-	groupType, groupID, err := scommon.GroupTypeIDFromRunGroup(runGroup)
-	if err != nil {
-		return false, errors.WithStack(err)
-	}
-
+func (h *ActionHandler) CanGetRun(ctx context.Context, groupType scommon.GroupType, ref string) (bool, string, error) {
 	var visibility cstypes.Visibility
 	var ownerType cstypes.ConfigType
+	var refID string
 	var ownerID string
 	switch groupType {
 	case scommon.GroupTypeProject:
-		p, _, err := h.configstoreClient.GetProject(ctx, groupID)
+		p, _, err := h.configstoreClient.GetProject(ctx, ref)
 		if err != nil {
-			return false, util.NewAPIError(util.KindFromRemoteError(err), err)
+			return false, "", util.NewAPIError(util.KindFromRemoteError(err), err)
 		}
-		ownerType = p.OwnerType
+		refID = p.ID
 		ownerID = p.OwnerID
+		ownerType = p.OwnerType
 		visibility = p.GlobalVisibility
 	case scommon.GroupTypeUser:
+		u, _, err := h.configstoreClient.GetUser(ctx, ref)
+		if err != nil {
+			return false, "", util.NewAPIError(util.KindFromRemoteError(err), err)
+		}
+
 		// user direct runs
+		refID = u.ID
 		ownerType = cstypes.ConfigTypeUser
-		ownerID = groupID
+		ownerID = u.ID
 		visibility = cstypes.VisibilityPrivate
 	}
 
 	if visibility == cstypes.VisibilityPublic {
-		return true, nil
+		return true, refID, nil
 	}
 	isProjectMember, err := h.IsProjectMember(ctx, ownerType, ownerID)
 	if err != nil {
-		return false, errors.Wrapf(err, "failed to determine ownership")
+		return false, "", errors.Wrapf(err, "failed to determine ownership")
 	}
 	if !isProjectMember {
-		return false, nil
+		return false, "", nil
 	}
-	return true, nil
+	return true, refID, nil
 }
 
-func (h *ActionHandler) CanDoRunActions(ctx context.Context, runGroup string) (bool, error) {
-	groupType, groupID, err := scommon.GroupTypeIDFromRunGroup(runGroup)
-	if err != nil {
-		return false, errors.WithStack(err)
-	}
-
+func (h *ActionHandler) CanDoRunActions(ctx context.Context, groupType scommon.GroupType, ref string) (bool, string, error) {
 	var ownerType cstypes.ConfigType
+	var refID string
 	var ownerID string
 	switch groupType {
 	case scommon.GroupTypeProject:
-		p, _, err := h.configstoreClient.GetProject(ctx, groupID)
+		p, _, err := h.configstoreClient.GetProject(ctx, ref)
 		if err != nil {
-			return false, util.NewAPIError(util.KindFromRemoteError(err), err)
+			return false, "", util.NewAPIError(util.KindFromRemoteError(err), err)
 		}
+		refID = p.ID
 		ownerType = p.OwnerType
 		ownerID = p.OwnerID
 	case scommon.GroupTypeUser:
+		u, _, err := h.configstoreClient.GetUser(ctx, ref)
+		if err != nil {
+			return false, "", util.NewAPIError(util.KindFromRemoteError(err), err)
+		}
+
 		// user direct runs
+		refID = u.ID
 		ownerType = cstypes.ConfigTypeUser
-		ownerID = groupID
+		ownerID = u.ID
 	}
 
 	isProjectOwner, err := h.IsProjectOwner(ctx, ownerType, ownerID)
 	if err != nil {
-		return false, errors.Wrapf(err, "failed to determine ownership")
+		return false, "", errors.Wrapf(err, "failed to determine ownership")
 	}
 	if !isProjectOwner {
-		return false, nil
+		return false, "", nil
 	}
-	return true, nil
+	return true, refID, nil
 }

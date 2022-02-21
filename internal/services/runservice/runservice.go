@@ -227,16 +227,18 @@ func (s *Runservice) setupDefaultRouter(etCh chan *types.ExecutorTask) http.Hand
 	logsDeleteHandler := api.NewLogsDeleteHandler(s.log, s.e, s.ost, s.dm)
 
 	runHandler := api.NewRunHandler(s.log, s.e, s.dm, s.readDB)
+	runByGroupHandler := api.NewRunByGroupHandler(s.log, s.e, s.dm, s.readDB)
 	runTaskActionsHandler := api.NewRunTaskActionsHandler(s.log, s.ah)
 	runsHandler := api.NewRunsHandler(s.log, s.readDB)
+	runsByGroupHandler := api.NewRunsByGroupHandler(s.log, s.readDB)
 	runActionsHandler := api.NewRunActionsHandler(s.log, s.ah)
 	runCreateHandler := api.NewRunCreateHandler(s.log, s.ah)
 	runEventsHandler := api.NewRunEventsHandler(s.log, s.e, s.ost, s.dm)
 
 	changeGroupsUpdateTokensHandler := api.NewChangeGroupsUpdateTokensHandler(s.log, s.readDB)
 
-	router := mux.NewRouter()
-	apirouter := router.PathPrefix("/api/v1alpha").Subrouter()
+	router := mux.NewRouter().UseEncodedPath().SkipClean(true)
+	apirouter := router.PathPrefix("/api/v1alpha").Subrouter().UseEncodedPath().SkipClean(true)
 
 	// don't return 404 on a call to an undefined handler but 400 to distinguish between a non existent resource and a wrong method
 	apirouter.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusBadRequest) })
@@ -258,6 +260,10 @@ func (s *Runservice) setupDefaultRouter(etCh chan *types.ExecutorTask) http.Hand
 	apirouter.Handle("/runs/{runid}", runHandler).Methods("GET")
 	apirouter.Handle("/runs/{runid}/actions", runActionsHandler).Methods("PUT")
 	apirouter.Handle("/runs/{runid}/tasks/{taskid}/actions", runTaskActionsHandler).Methods("PUT")
+
+	apirouter.Handle("/runs/group/{group}/{runcounter}", runByGroupHandler).Methods("GET")
+	apirouter.Handle("/runs/group/{group}", runsByGroupHandler).Methods("GET")
+
 	apirouter.Handle("/runs", runsHandler).Methods("GET")
 	apirouter.Handle("/runs", runCreateHandler).Methods("POST")
 
@@ -267,7 +273,7 @@ func (s *Runservice) setupDefaultRouter(etCh chan *types.ExecutorTask) http.Hand
 
 	apirouter.Handle("/export", exportHandler).Methods("GET")
 
-	mainrouter := mux.NewRouter()
+	mainrouter := mux.NewRouter().UseEncodedPath().SkipClean(true)
 	mainrouter.PathPrefix("/").Handler(router)
 
 	// Return a bad request when it doesn't match any route
