@@ -1321,7 +1321,7 @@ func TestRemoteSource(t *testing.T) {
 					t.Fatalf("unexpected err: %v", err)
 				}
 
-				expectedError := util.NewErrBadRequest(fmt.Errorf(`remotesource "rs01" already exists`))
+				expectedError := util.NewAPIError(util.ErrBadRequest, fmt.Errorf(`remotesource "rs01" already exists`))
 				_, err = cs.ah.CreateRemoteSource(ctx, rs)
 				if err.Error() != expectedError.Error() {
 					t.Fatalf("expected err: %v, got err: %v", expectedError.Error(), err.Error())
@@ -1410,7 +1410,7 @@ func TestRemoteSource(t *testing.T) {
 					t.Fatalf("unexpected err: %v", err)
 				}
 
-				expectedError := util.NewErrBadRequest(fmt.Errorf(`remotesource "rs02" already exists`))
+				expectedError := util.NewAPIError(util.ErrBadRequest, fmt.Errorf(`remotesource "rs02" already exists`))
 				rs01.Name = "rs02"
 				req := &action.UpdateRemoteSourceRequest{
 					RemoteSourceRef: "rs01",

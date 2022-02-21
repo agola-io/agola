@@ -1288,7 +1288,7 @@ func TestDirectRunLogs(t *testing.T) {
 		{
 			name: "test get log with unexisting step",
 			step: 99,
-			err:  errors.Errorf("log doesn't exist"),
+			err:  util.NewRemoteError(util.ErrNotExist, "", ""),
 		},
 		{
 			name:   "test delete log step 1",
@@ -1304,7 +1304,7 @@ func TestDirectRunLogs(t *testing.T) {
 			name:   "test delete log with unexisting step",
 			step:   99,
 			delete: true,
-			err:    errors.Errorf("log doesn't exist"),
+			err:    util.NewRemoteError(util.ErrNotExist, "", ""),
 		},
 	}
 

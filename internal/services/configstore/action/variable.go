@@ -30,7 +30,7 @@ import (
 func (h *ActionHandler) GetVariables(ctx context.Context, parentType types.ConfigType, parentRef string, tree bool) ([]*types.Variable, error) {
 	var variables []*types.Variable
 	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
-		parentID, err := h.readDB.ResolveConfigID(tx, parentType, parentRef)
+		parentID, err := h.ResolveConfigID(tx, parentType, parentRef)
 		if err != nil {
 			return err
 		}
@@ -50,22 +50,22 @@ func (h *ActionHandler) GetVariables(ctx context.Context, parentType types.Confi
 
 func (h *ActionHandler) ValidateVariable(ctx context.Context, variable *types.Variable) error {
 	if variable.Name == "" {
-		return util.NewErrBadRequest(errors.Errorf("variable name required"))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("variable name required"))
 	}
 	if !util.ValidateName(variable.Name) {
-		return util.NewErrBadRequest(errors.Errorf("invalid variable name %q", variable.Name))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid variable name %q", variable.Name))
 	}
 	if len(variable.Values) == 0 {
-		return util.NewErrBadRequest(errors.Errorf("variable values required"))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("variable values required"))
 	}
 	if variable.Parent.Type == "" {
-		return util.NewErrBadRequest(errors.Errorf("variable parent type required"))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("variable parent type required"))
 	}
 	if variable.Parent.ID == "" {
-		return util.NewErrBadRequest(errors.Errorf("variable parent id required"))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("variable parent id required"))
 	}
 	if variable.Parent.Type != types.ConfigTypeProject && variable.Parent.Type != types.ConfigTypeProjectGroup {
-		return util.NewErrBadRequest(errors.Errorf("invalid variable parent type %q", variable.Parent.Type))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid variable parent type %q", variable.Parent.Type))
 	}
 
 	return nil
@@ -88,7 +88,7 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, variable *types.Vari
 			return err
 		}
 
-		parentID, err := h.readDB.ResolveConfigID(tx, variable.Parent.Type, variable.Parent.ID)
+		parentID, err := h.ResolveConfigID(tx, variable.Parent.Type, variable.Parent.ID)
 		if err != nil {
 			return err
 		}
@@ -100,7 +100,7 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, variable *types.Vari
 			return err
 		}
 		if s != nil {
-			return util.NewErrBadRequest(errors.Errorf("variable with name %q for %s with id %q already exists", variable.Name, variable.Parent.Type, variable.Parent.ID))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("variable with name %q for %s with id %q already exists", variable.Name, variable.Parent.Type, variable.Parent.ID))
 		}
 
 		return nil
@@ -147,7 +147,7 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableR
 	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 
-		parentID, err := h.readDB.ResolveConfigID(tx, req.Variable.Parent.Type, req.Variable.Parent.ID)
+		parentID, err := h.ResolveConfigID(tx, req.Variable.Parent.Type, req.Variable.Parent.ID)
 		if err != nil {
 			return err
 		}
@@ -159,7 +159,7 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableR
 			return err
 		}
 		if curVariable == nil {
-			return util.NewErrBadRequest(errors.Errorf("variable with name %q for %s with id %q doesn't exists", req.VariableName, req.Variable.Parent.Type, req.Variable.Parent.ID))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("variable with name %q for %s with id %q doesn't exists", req.VariableName, req.Variable.Parent.Type, req.Variable.Parent.ID))
 		}
 
 		if curVariable.Name != req.Variable.Name {
@@ -169,7 +169,7 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableR
 				return err
 			}
 			if u != nil {
-				return util.NewErrBadRequest(errors.Errorf("variable with name %q for %s with id %q already exists", req.Variable.Name, req.Variable.Parent.Type, req.Variable.Parent.ID))
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("variable with name %q for %s with id %q already exists", req.Variable.Name, req.Variable.Parent.Type, req.Variable.Parent.ID))
 			}
 		}
 
@@ -216,7 +216,7 @@ func (h *ActionHandler) DeleteVariable(ctx context.Context, parentType types.Con
 	// must do all the checks in a single transaction to avoid concurrent changes
 	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
-		parentID, err := h.readDB.ResolveConfigID(tx, parentType, parentRef)
+		parentID, err := h.ResolveConfigID(tx, parentType, parentRef)
 		if err != nil {
 			return err
 		}
@@ -227,7 +227,7 @@ func (h *ActionHandler) DeleteVariable(ctx context.Context, parentType types.Con
 			return err
 		}
 		if variable == nil {
-			return util.NewErrBadRequest(errors.Errorf("variable with name %q doesn't exist", variableName))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("variable with name %q doesn't exist", variableName))
 		}
 
 		// changegroup is the variable id

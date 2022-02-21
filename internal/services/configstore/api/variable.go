@@ -45,13 +45,13 @@ func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, tree := query["tree"]
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
 	variables, err := h.ah.GetVariables(ctx, parentType, parentRef, tree)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -73,11 +73,11 @@ func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
+		util.HTTPError(w, err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, resVariables); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, resVariables); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -94,7 +94,7 @@ func NewCreateVariableHandler(logger *zap.Logger, ah *action.ActionHandler) *Cre
 func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -102,7 +102,7 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	var variable *types.Variable
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&variable); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
@@ -110,12 +110,12 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	variable.Parent.ID = parentRef
 
 	variable, err = h.ah.CreateVariable(ctx, variable)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusCreated, variable); err != nil {
+	if err := util.HTTPResponse(w, http.StatusCreated, variable); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -135,7 +135,7 @@ func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	variableName := vars["variablename"]
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -143,7 +143,7 @@ func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	var variable *types.Variable
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&variable); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
@@ -155,12 +155,12 @@ func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		Variable:     variable,
 	}
 	variable, err = h.ah.UpdateVariable(ctx, areq)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, variable); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, variable); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -180,16 +180,16 @@ func (h *DeleteVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	variableName := vars["variablename"]
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
 	err = h.ah.DeleteVariable(ctx, parentType, parentRef, variableName)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 	}
-	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }

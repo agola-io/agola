@@ -42,7 +42,7 @@ func (h *OAuth2CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	cresp, err := h.ah.HandleOauth2Callback(ctx, code, state)
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
@@ -86,7 +86,7 @@ func (h *OAuth2CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		RequestType: string(cresp.RequestType),
 		Response:    response,
 	}
-	if err := httpResponse(w, http.StatusOK, res); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }

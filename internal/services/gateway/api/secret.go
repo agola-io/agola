@@ -52,7 +52,7 @@ func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, removeoverridden := query["removeoverridden"]
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -64,7 +64,7 @@ func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		RemoveOverridden: removeoverridden,
 	}
 	cssecrets, err := h.ah.GetSecrets(ctx, areq)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -74,7 +74,7 @@ func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		secrets[i] = createSecretResponse(s)
 	}
 
-	if err := httpResponse(w, http.StatusOK, secrets); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, secrets); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -91,14 +91,14 @@ func NewCreateSecretHandler(logger *zap.Logger, ah *action.ActionHandler) *Creat
 func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		return
 	}
 
 	var req gwapitypes.CreateSecretRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
@@ -112,13 +112,13 @@ func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		Path:             req.Path,
 	}
 	cssecret, err := h.ah.CreateSecret(ctx, areq)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
 	res := createSecretResponse(cssecret)
-	if err := httpResponse(w, http.StatusCreated, res); err != nil {
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -138,7 +138,7 @@ func (h *UpdateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	secretName := vars["secretname"]
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -146,7 +146,7 @@ func (h *UpdateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	var req gwapitypes.UpdateSecretRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 	areq := &action.UpdateSecretRequest{
@@ -161,13 +161,13 @@ func (h *UpdateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		Path:             req.Path,
 	}
 	cssecret, err := h.ah.UpdateSecret(ctx, areq)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
 	res := createSecretResponse(cssecret)
-	if err := httpResponse(w, http.StatusOK, res); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -187,17 +187,17 @@ func (h *DeleteSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	secretName := vars["secretname"]
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		return
 	}
 
 	err = h.ah.DeleteSecret(ctx, parentType, parentRef, secretName)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }

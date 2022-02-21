@@ -53,16 +53,16 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
+		util.HTTPError(w, err)
 		return
 	}
 
 	if user == nil {
-		httpError(w, util.NewErrNotExist(errors.Errorf("user %q doesn't exist", userRef)))
+		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("user %q doesn't exist", userRef)))
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, user); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, user); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -82,7 +82,7 @@ func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var req *csapitypes.CreateUserRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
@@ -102,12 +102,12 @@ func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user, err := h.ah.CreateUser(ctx, creq)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusCreated, user); err != nil {
+	if err := util.HTTPResponse(w, http.StatusCreated, user); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -130,7 +130,7 @@ func (h *UpdateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var req *csapitypes.UpdateUserRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
@@ -140,12 +140,12 @@ func (h *UpdateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user, err := h.ah.UpdateUser(ctx, creq)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusCreated, user); err != nil {
+	if err := util.HTTPResponse(w, http.StatusCreated, user); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -166,10 +166,10 @@ func (h *DeleteUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	userRef := vars["userref"]
 
 	err := h.ah.DeleteUser(ctx, userRef)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 	}
-	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -198,12 +198,12 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		limit, err = strconv.Atoi(limitS)
 		if err != nil {
-			httpError(w, util.NewErrBadRequest(errors.Errorf("cannot parse limit: %w", err)))
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot parse limit: %w", err)))
 			return
 		}
 	}
 	if limit < 0 {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("limit must be greater or equal than 0")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0")))
 		return
 	}
 	if limit > MaxUsersLimit {
@@ -231,11 +231,11 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		})
 		if err != nil {
 			h.log.Errorf("err: %+v", err)
-			httpError(w, err)
+			util.HTTPError(w, err)
 			return
 		}
 		if user == nil {
-			httpError(w, util.NewErrNotExist(errors.Errorf("user with required token doesn't exist")))
+			util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("user with required token doesn't exist")))
 			return
 		}
 		users = []*types.User{user}
@@ -249,11 +249,11 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		})
 		if err != nil {
 			h.log.Errorf("err: %+v", err)
-			httpError(w, err)
+			util.HTTPError(w, err)
 			return
 		}
 		if user == nil {
-			httpError(w, util.NewErrNotExist(errors.Errorf("user with linked account %q token doesn't exist", linkedAccountID)))
+			util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("user with linked account %q token doesn't exist", linkedAccountID)))
 			return
 		}
 		users = []*types.User{user}
@@ -268,11 +268,11 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		})
 		if err != nil {
 			h.log.Errorf("err: %+v", err)
-			httpError(w, err)
+			util.HTTPError(w, err)
 			return
 		}
 		if user == nil {
-			httpError(w, util.NewErrNotExist(errors.Errorf("user with remote user %q for remote source %q token doesn't exist", remoteUserID, remoteSourceID)))
+			util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("user with remote user %q for remote source %q token doesn't exist", remoteUserID, remoteSourceID)))
 			return
 		}
 		users = []*types.User{user}
@@ -285,12 +285,12 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		})
 		if err != nil {
 			h.log.Errorf("err: %+v", err)
-			httpError(w, err)
+			util.HTTPError(w, err)
 			return
 		}
 	}
 
-	if err := httpResponse(w, http.StatusOK, users); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, users); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -312,7 +312,7 @@ func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	var req csapitypes.CreateUserLARequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
@@ -327,12 +327,12 @@ func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		Oauth2AccessTokenExpiresAt: req.Oauth2AccessTokenExpiresAt,
 	}
 	user, err := h.ah.CreateUserLA(ctx, creq)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusCreated, user); err != nil {
+	if err := util.HTTPResponse(w, http.StatusCreated, user); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -353,10 +353,10 @@ func (h *DeleteUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	laID := vars["laid"]
 
 	err := h.ah.DeleteUserLA(ctx, userRef, laID)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 	}
-	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -379,7 +379,7 @@ func (h *UpdateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	var req csapitypes.UpdateUserLARequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
@@ -394,12 +394,12 @@ func (h *UpdateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		Oauth2AccessTokenExpiresAt: req.Oauth2AccessTokenExpiresAt,
 	}
 	user, err := h.ah.UpdateUserLA(ctx, creq)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, user); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, user); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -421,12 +421,12 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	var req csapitypes.CreateUserTokenRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
 	token, err := h.ah.CreateUserToken(ctx, userRef, req.TokenName)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -434,7 +434,7 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	resp := &csapitypes.CreateUserTokenResponse{
 		Token: token,
 	}
-	if err := httpResponse(w, http.StatusCreated, resp); err != nil {
+	if err := util.HTTPResponse(w, http.StatusCreated, resp); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -455,11 +455,11 @@ func (h *DeleteUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	tokenName := vars["tokenname"]
 
 	err := h.ah.DeleteUserToken(ctx, userRef, tokenName)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
-	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -486,7 +486,7 @@ func (h *UserOrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	userRef := vars["userref"]
 
 	userOrgs, err := h.ah.GetUserOrgs(ctx, userRef)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -496,7 +496,7 @@ func (h *UserOrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		res[i] = userOrgsResponse(userOrg)
 	}
 
-	if err := httpResponse(w, http.StatusOK, res); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }

@@ -74,16 +74,16 @@ var (
 )
 
 func (h *ActionHandler) GetRun(ctx context.Context, runID string) (*rsapitypes.RunResponse, error) {
-	runResp, resp, err := h.runserviceClient.GetRun(ctx, runID, nil)
+	runResp, _, err := h.runserviceClient.GetRun(ctx, runID, nil)
 	if err != nil {
-		return nil, ErrFromRemote(resp, err)
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
 	canGetRun, err := h.CanGetRun(ctx, runResp.RunConfig.Group)
 	if err != nil {
 		return nil, errors.Errorf("failed to determine permissions: %w", err)
 	}
 	if !canGetRun {
-		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
 	}
 
 	return runResp, nil
@@ -106,13 +106,13 @@ func (h *ActionHandler) GetRuns(ctx context.Context, req *GetRunsRequest) (*rsap
 		return nil, errors.Errorf("failed to determine permissions: %w", err)
 	}
 	if !canGetRun {
-		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
 	}
 
 	groups := []string{req.Group}
-	runsResp, resp, err := h.runserviceClient.GetRuns(ctx, req.PhaseFilter, req.ResultFilter, groups, req.LastRun, req.ChangeGroups, req.StartRunID, req.Limit, req.Asc)
+	runsResp, _, err := h.runserviceClient.GetRuns(ctx, req.PhaseFilter, req.ResultFilter, groups, req.LastRun, req.ChangeGroups, req.StartRunID, req.Limit, req.Asc)
 	if err != nil {
-		return nil, ErrFromRemote(resp, err)
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
 
 	return runsResp, nil
@@ -127,21 +127,21 @@ type GetLogsRequest struct {
 }
 
 func (h *ActionHandler) GetLogs(ctx context.Context, req *GetLogsRequest) (*http.Response, error) {
-	runResp, resp, err := h.runserviceClient.GetRun(ctx, req.RunID, nil)
+	runResp, _, err := h.runserviceClient.GetRun(ctx, req.RunID, nil)
 	if err != nil {
-		return nil, ErrFromRemote(resp, err)
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
 	canGetRun, err := h.CanGetRun(ctx, runResp.RunConfig.Group)
 	if err != nil {
 		return nil, errors.Errorf("failed to determine permissions: %w", err)
 	}
 	if !canGetRun {
-		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
 	}
 
-	resp, err = h.runserviceClient.GetLogs(ctx, req.RunID, req.TaskID, req.Setup, req.Step, req.Follow)
+	resp, err := h.runserviceClient.GetLogs(ctx, req.RunID, req.TaskID, req.Setup, req.Step, req.Follow)
 	if err != nil {
-		return nil, ErrFromRemote(resp, err)
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
 
 	return resp, nil
@@ -155,21 +155,20 @@ type DeleteLogsRequest struct {
 }
 
 func (h *ActionHandler) DeleteLogs(ctx context.Context, req *DeleteLogsRequest) error {
-	runResp, resp, err := h.runserviceClient.GetRun(ctx, req.RunID, nil)
+	runResp, _, err := h.runserviceClient.GetRun(ctx, req.RunID, nil)
 	if err != nil {
-		return ErrFromRemote(resp, err)
+		return util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
 	canDoRunActions, err := h.CanDoRunActions(ctx, runResp.RunConfig.Group)
 	if err != nil {
 		return errors.Errorf("failed to determine permissions: %w", err)
 	}
 	if !canDoRunActions {
-		return util.NewErrForbidden(errors.Errorf("user not authorized"))
+		return util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
 	}
 
-	resp, err = h.runserviceClient.DeleteLogs(ctx, req.RunID, req.TaskID, req.Setup, req.Step)
-	if err != nil {
-		return ErrFromRemote(resp, err)
+	if _, err = h.runserviceClient.DeleteLogs(ctx, req.RunID, req.TaskID, req.Setup, req.Step); err != nil {
+		return util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
 
 	return nil
@@ -192,16 +191,16 @@ type RunActionsRequest struct {
 }
 
 func (h *ActionHandler) RunAction(ctx context.Context, req *RunActionsRequest) (*rsapitypes.RunResponse, error) {
-	runResp, resp, err := h.runserviceClient.GetRun(ctx, req.RunID, nil)
+	runResp, _, err := h.runserviceClient.GetRun(ctx, req.RunID, nil)
 	if err != nil {
-		return nil, ErrFromRemote(resp, err)
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
 	canGetRun, err := h.CanDoRunActions(ctx, runResp.RunConfig.Group)
 	if err != nil {
 		return nil, errors.Errorf("failed to determine permissions: %w", err)
 	}
 	if !canGetRun {
-		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
 	}
 
 	switch req.ActionType {
@@ -211,9 +210,9 @@ func (h *ActionHandler) RunAction(ctx context.Context, req *RunActionsRequest) (
 			FromStart: req.FromStart,
 		}
 
-		runResp, resp, err = h.runserviceClient.CreateRun(ctx, rsreq)
+		runResp, _, err = h.runserviceClient.CreateRun(ctx, rsreq)
 		if err != nil {
-			return nil, ErrFromRemote(resp, err)
+			return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 		}
 
 	case RunActionTypeCancel:
@@ -222,9 +221,8 @@ func (h *ActionHandler) RunAction(ctx context.Context, req *RunActionsRequest) (
 			Phase:      rstypes.RunPhaseCancelled,
 		}
 
-		resp, err = h.runserviceClient.RunActions(ctx, req.RunID, rsreq)
-		if err != nil {
-			return nil, ErrFromRemote(resp, err)
+		if _, err = h.runserviceClient.RunActions(ctx, req.RunID, rsreq); err != nil {
+			return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 		}
 
 	case RunActionTypeStop:
@@ -232,13 +230,12 @@ func (h *ActionHandler) RunAction(ctx context.Context, req *RunActionsRequest) (
 			ActionType: rsapitypes.RunActionTypeStop,
 		}
 
-		resp, err = h.runserviceClient.RunActions(ctx, req.RunID, rsreq)
-		if err != nil {
-			return nil, ErrFromRemote(resp, err)
+		if _, err = h.runserviceClient.RunActions(ctx, req.RunID, rsreq); err != nil {
+			return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 		}
 
 	default:
-		return nil, util.NewErrBadRequest(errors.Errorf("wrong run action type %q", req.ActionType))
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("wrong run action type %q", req.ActionType))
 	}
 
 	return runResp, nil
@@ -258,27 +255,27 @@ type RunTaskActionsRequest struct {
 }
 
 func (h *ActionHandler) RunTaskAction(ctx context.Context, req *RunTaskActionsRequest) error {
-	runResp, resp, err := h.runserviceClient.GetRun(ctx, req.RunID, nil)
+	runResp, _, err := h.runserviceClient.GetRun(ctx, req.RunID, nil)
 	if err != nil {
-		return ErrFromRemote(resp, err)
+		return util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
 	canDoRunAction, err := h.CanDoRunActions(ctx, runResp.RunConfig.Group)
 	if err != nil {
 		return errors.Errorf("failed to determine permissions: %w", err)
 	}
 	if !canDoRunAction {
-		return util.NewErrForbidden(errors.Errorf("user not authorized"))
+		return util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
 	}
 	curUserID := common.CurrentUserID(ctx)
 	if curUserID == "" {
-		return util.NewErrBadRequest(errors.Errorf("no logged in user"))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("no logged in user"))
 	}
 
 	switch req.ActionType {
 	case RunTaskActionTypeApprove:
 		rt, ok := runResp.Run.Tasks[req.TaskID]
 		if !ok {
-			return util.NewErrBadRequest(errors.Errorf("run %q doesn't have task %q", req.RunID, req.TaskID))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("run %q doesn't have task %q", req.RunID, req.TaskID))
 		}
 
 		approvers := []string{}
@@ -295,7 +292,7 @@ func (h *ActionHandler) RunTaskAction(ctx context.Context, req *RunTaskActionsRe
 
 		for _, approver := range approvers {
 			if approver == curUserID {
-				return util.NewErrBadRequest(errors.Errorf("user %q alredy approved the task", approver))
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q alredy approved the task", approver))
 			}
 		}
 		approvers = append(approvers, curUserID)
@@ -313,13 +310,12 @@ func (h *ActionHandler) RunTaskAction(ctx context.Context, req *RunTaskActionsRe
 			ChangeGroupsUpdateToken: runResp.ChangeGroupsUpdateToken,
 		}
 
-		resp, err := h.runserviceClient.RunTaskActions(ctx, req.RunID, req.TaskID, rsreq)
-		if err != nil {
-			return ErrFromRemote(resp, err)
+		if _, err := h.runserviceClient.RunTaskActions(ctx, req.RunID, req.TaskID, rsreq); err != nil {
+			return util.NewAPIError(util.KindFromRemoteError(err), err)
 		}
 
 	default:
-		return util.NewErrBadRequest(errors.Errorf("wrong run task action type %q", req.ActionType))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("wrong run task action type %q", req.ActionType))
 	}
 
 	return nil
@@ -367,10 +363,10 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 	setupErrors := []string{}
 
 	if req.CommitSHA == "" {
-		return util.NewErrBadRequest(errors.Errorf("empty commit SHA"))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("empty commit SHA"))
 	}
 	if req.Message == "" {
-		return util.NewErrBadRequest(errors.Errorf("empty message"))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("empty message"))
 	}
 
 	var baseGroupType scommon.GroupType
@@ -485,7 +481,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 
 	data, filename, err := h.fetchConfigFiles(ctx, req.GitSource, req.RepoPath, req.CommitSHA)
 	if err != nil {
-		return util.NewErrInternal(errors.Errorf("failed to fetch config file: %w", err))
+		return util.NewAPIError(util.ErrInternal, errors.Errorf("failed to fetch config file: %w", err))
 	}
 	h.log.Debug("data: %s", data)
 
@@ -529,7 +525,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 
 		if _, _, err := h.runserviceClient.CreateRun(ctx, createRunReq); err != nil {
 			h.log.Errorf("failed to create run: %+v", err)
-			return err
+			return util.NewAPIError(util.KindFromRemoteError(err), err)
 		}
 		return nil
 	}
@@ -559,7 +555,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 
 		if _, _, err := h.runserviceClient.CreateRun(ctx, createRunReq); err != nil {
 			h.log.Errorf("failed to create run: %+v", err)
-			return err
+			return util.NewAPIError(util.KindFromRemoteError(err), err)
 		}
 	}
 

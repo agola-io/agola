@@ -164,13 +164,13 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	runID := vars["runid"]
 
 	runResp, err := h.ah.GetRun(ctx, runID)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
 	res := createRunResponse(runResp.Run, runResp.RunConfig)
-	if err := httpResponse(w, http.StatusOK, res); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -191,7 +191,7 @@ func (h *RuntaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	taskID := vars["taskid"]
 
 	runResp, err := h.ah.GetRun(ctx, runID)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -201,13 +201,13 @@ func (h *RuntaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	rt, ok := run.Tasks[taskID]
 	if !ok {
-		httpError(w, util.NewErrNotExist(errors.Errorf("run %q task %q not found", runID, taskID)))
+		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("run %q task %q not found", runID, taskID)))
 		return
 	}
 	rct := rc.Tasks[rt.ID]
 
 	res := createRunTaskResponse(rt, rct)
-	if err := httpResponse(w, http.StatusOK, res); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -254,7 +254,7 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	group := q.Get("group")
 	// we require that groups are specified to not return all runs
 	if group == "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("no groups specified")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("no groups specified")))
 		return
 	}
 
@@ -269,12 +269,12 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		limit, err = strconv.Atoi(limitS)
 		if err != nil {
-			httpError(w, util.NewErrBadRequest(errors.Errorf("cannot parse limit: %w", err)))
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot parse limit: %w", err)))
 			return
 		}
 	}
 	if limit < 0 {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("limit must be greater or equal than 0")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0")))
 		return
 	}
 	if limit > MaxRunsLimit {
@@ -298,7 +298,7 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Asc:          asc,
 	}
 	runsResp, err := h.ah.GetRuns(ctx, areq)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -307,7 +307,7 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for i, r := range runsResp.Runs {
 		runs[i] = createRunsResponse(r)
 	}
-	if err := httpResponse(w, http.StatusOK, runs); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, runs); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -329,7 +329,7 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var req gwapitypes.RunActionsRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
@@ -340,13 +340,13 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	runResp, err := h.ah.RunAction(ctx, areq)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
 	res := createRunResponse(runResp.Run, runResp.RunConfig)
-	if err := httpResponse(w, http.StatusOK, res); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -369,7 +369,7 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	var req gwapitypes.RunTaskActionsRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
@@ -380,7 +380,7 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	}
 
 	err := h.ah.RunTaskAction(ctx, areq)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -402,23 +402,23 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	runID := q.Get("runID")
 	if runID == "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("empty run id")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("empty run id")))
 		return
 	}
 	taskID := q.Get("taskID")
 	if taskID == "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("empty task id")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("empty task id")))
 		return
 	}
 
 	_, setup := q["setup"]
 	stepStr := q.Get("step")
 	if !setup && stepStr == "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("no setup or step number provided")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("no setup or step number provided")))
 		return
 	}
 	if setup && stepStr != "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("both setup and step number provided")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("both setup and step number provided")))
 		return
 	}
 
@@ -427,7 +427,7 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		step, err = strconv.Atoi(stepStr)
 		if err != nil {
-			httpError(w, util.NewErrBadRequest(errors.Errorf("cannot parse step number: %w", err)))
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot parse step number: %w", err)))
 			return
 		}
 	}
@@ -446,7 +446,7 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp, err := h.ah.GetLogs(ctx, areq)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -519,23 +519,23 @@ func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	runID := q.Get("runID")
 	if runID == "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("empty run id")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("empty run id")))
 		return
 	}
 	taskID := q.Get("taskID")
 	if taskID == "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("empty task id")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("empty task id")))
 		return
 	}
 
 	_, setup := q["setup"]
 	stepStr := q.Get("step")
 	if !setup && stepStr == "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("no setup or step number provided")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("no setup or step number provided")))
 		return
 	}
 	if setup && stepStr != "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("both setup and step number provided")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("both setup and step number provided")))
 		return
 	}
 
@@ -544,7 +544,7 @@ func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		step, err = strconv.Atoi(stepStr)
 		if err != nil {
-			httpError(w, util.NewErrBadRequest(errors.Errorf("cannot parse step number: %w", err)))
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot parse step number: %w", err)))
 			return
 		}
 	}
@@ -557,7 +557,7 @@ func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err := h.ah.DeleteLogs(ctx, areq)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}

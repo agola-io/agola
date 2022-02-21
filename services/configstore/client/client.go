@@ -20,17 +20,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
+	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
-	"agola.io/agola/services/configstore/types"
 	cstypes "agola.io/agola/services/configstore/types"
-
-	errors "golang.org/x/xerrors"
 )
 
 var jsonContent = http.Header{"Content-Type": []string{"application/json"}}
@@ -78,18 +75,8 @@ func (c *Client) getResponse(ctx context.Context, method, path string, query url
 		return nil, err
 	}
 
-	if resp.StatusCode/100 != 2 {
-		defer resp.Body.Close()
-		data, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return resp, err
-		}
-
-		errMap := make(map[string]interface{})
-		if err = json.Unmarshal(data, &errMap); err != nil {
-			return resp, fmt.Errorf("unknown api error (code: %d): %s", resp.StatusCode, string(data))
-		}
-		return resp, errors.New(errMap["message"].(string))
+	if err := util.ErrFromRemote(resp); err != nil {
+		return resp, err
 	}
 
 	return resp, nil
@@ -332,7 +319,7 @@ func (c *Client) DeleteProjectVariable(ctx context.Context, projectRef, variable
 }
 
 func (c *Client) GetUser(ctx context.Context, userRef string) (*cstypes.User, *http.Response, error) {
-	user := new(types.User)
+	user := new(cstypes.User)
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/users/%s", userRef), nil, jsonContent, nil, user)
 	return user, resp, err
 }
@@ -383,7 +370,7 @@ func (c *Client) CreateUser(ctx context.Context, req *csapitypes.CreateUserReque
 		return nil, nil, err
 	}
 
-	user := new(types.User)
+	user := new(cstypes.User)
 	resp, err := c.getParsedResponse(ctx, "POST", "/users", nil, jsonContent, bytes.NewReader(reqj), user)
 	return user, resp, err
 }
@@ -394,7 +381,7 @@ func (c *Client) UpdateUser(ctx context.Context, userRef string, req *csapitypes
 		return nil, nil, err
 	}
 
-	user := new(types.User)
+	user := new(cstypes.User)
 	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/users/%s", userRef), nil, jsonContent, bytes.NewReader(reqj), user)
 	return user, resp, err
 }
@@ -426,7 +413,7 @@ func (c *Client) CreateUserLA(ctx context.Context, userRef string, req *csapityp
 		return nil, nil, err
 	}
 
-	la := new(types.LinkedAccount)
+	la := new(cstypes.LinkedAccount)
 	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/users/%s/linkedaccounts", userRef), nil, jsonContent, bytes.NewReader(reqj), la)
 	return la, resp, err
 }
@@ -441,7 +428,7 @@ func (c *Client) UpdateUserLA(ctx context.Context, userRef, laID string, req *cs
 		return nil, nil, err
 	}
 
-	la := new(types.LinkedAccount)
+	la := new(cstypes.LinkedAccount)
 	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/users/%s/linkedaccounts/%s", userRef, laID), nil, jsonContent, bytes.NewReader(reqj), la)
 	return la, resp, err
 }
@@ -468,7 +455,7 @@ func (c *Client) GetUserOrgs(ctx context.Context, userRef string) ([]*csapitypes
 }
 
 func (c *Client) GetRemoteSource(ctx context.Context, rsRef string) (*cstypes.RemoteSource, *http.Response, error) {
-	rs := new(types.RemoteSource)
+	rs := new(cstypes.RemoteSource)
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/remotesources/%s", rsRef), nil, jsonContent, nil, rs)
 	return rs, resp, err
 }
@@ -490,24 +477,24 @@ func (c *Client) GetRemoteSources(ctx context.Context, start string, limit int, 
 	return rss, resp, err
 }
 
-func (c *Client) CreateRemoteSource(ctx context.Context, rs *cstypes.RemoteSource) (*types.RemoteSource, *http.Response, error) {
+func (c *Client) CreateRemoteSource(ctx context.Context, rs *cstypes.RemoteSource) (*cstypes.RemoteSource, *http.Response, error) {
 	rsj, err := json.Marshal(rs)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	rs = new(types.RemoteSource)
+	rs = new(cstypes.RemoteSource)
 	resp, err := c.getParsedResponse(ctx, "POST", "/remotesources", nil, jsonContent, bytes.NewReader(rsj), rs)
 	return rs, resp, err
 }
 
-func (c *Client) UpdateRemoteSource(ctx context.Context, remoteSourceRef string, remoteSource *cstypes.RemoteSource) (*types.RemoteSource, *http.Response, error) {
+func (c *Client) UpdateRemoteSource(ctx context.Context, remoteSourceRef string, remoteSource *cstypes.RemoteSource) (*cstypes.RemoteSource, *http.Response, error) {
 	rsj, err := json.Marshal(remoteSource)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	resRemoteSource := new(types.RemoteSource)
+	resRemoteSource := new(cstypes.RemoteSource)
 	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/remotesources/%s", url.PathEscape(remoteSourceRef)), nil, jsonContent, bytes.NewReader(rsj), resRemoteSource)
 	return resRemoteSource, resp, err
 }
@@ -516,13 +503,13 @@ func (c *Client) DeleteRemoteSource(ctx context.Context, rsRef string) (*http.Re
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/remotesources/%s", rsRef), nil, jsonContent, nil)
 }
 
-func (c *Client) CreateOrg(ctx context.Context, org *cstypes.Organization) (*types.Organization, *http.Response, error) {
+func (c *Client) CreateOrg(ctx context.Context, org *cstypes.Organization) (*cstypes.Organization, *http.Response, error) {
 	oj, err := json.Marshal(org)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	org = new(types.Organization)
+	org = new(cstypes.Organization)
 	resp, err := c.getParsedResponse(ctx, "POST", "/orgs", nil, jsonContent, bytes.NewReader(oj), org)
 	return org, resp, err
 }
@@ -540,7 +527,7 @@ func (c *Client) AddOrgMember(ctx context.Context, orgRef, userRef string, role 
 		return nil, nil, err
 	}
 
-	orgmember := new(types.OrganizationMember)
+	orgmember := new(cstypes.OrganizationMember)
 	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/orgs/%s/members/%s", orgRef, userRef), nil, jsonContent, bytes.NewReader(omj), orgmember)
 	return orgmember, resp, err
 }
@@ -567,7 +554,7 @@ func (c *Client) GetOrgs(ctx context.Context, start string, limit int, asc bool)
 }
 
 func (c *Client) GetOrg(ctx context.Context, orgRef string) (*cstypes.Organization, *http.Response, error) {
-	org := new(types.Organization)
+	org := new(cstypes.Organization)
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s", orgRef), nil, jsonContent, nil, org)
 	return org, resp, err
 }

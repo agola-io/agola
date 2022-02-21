@@ -52,16 +52,16 @@ func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	})
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
+		util.HTTPError(w, err)
 		return
 	}
 
 	if remoteSource == nil {
-		httpError(w, util.NewErrNotExist(errors.Errorf("remote source %q doesn't exist", rsRef)))
+		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("remote source %q doesn't exist", rsRef)))
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, remoteSource); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, remoteSource); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -81,17 +81,17 @@ func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	var req types.RemoteSource
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
 	remoteSource, err := h.ah.CreateRemoteSource(ctx, &req)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusCreated, remoteSource); err != nil {
+	if err := util.HTTPResponse(w, http.StatusCreated, remoteSource); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -114,7 +114,7 @@ func (h *UpdateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	var remoteSource *types.RemoteSource
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&remoteSource); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
@@ -123,12 +123,12 @@ func (h *UpdateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		RemoteSource:    remoteSource,
 	}
 	remoteSource, err := h.ah.UpdateRemoteSource(ctx, areq)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusCreated, remoteSource); err != nil {
+	if err := util.HTTPResponse(w, http.StatusCreated, remoteSource); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -149,10 +149,10 @@ func (h *DeleteRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	rsRef := vars["remotesourceref"]
 
 	err := h.ah.DeleteRemoteSource(ctx, rsRef)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 	}
-	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -181,12 +181,12 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		var err error
 		limit, err = strconv.Atoi(limitS)
 		if err != nil {
-			httpError(w, util.NewErrBadRequest(errors.Errorf("cannot parse limit: %w", err)))
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot parse limit: %w", err)))
 			return
 		}
 	}
 	if limit < 0 {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("limit must be greater or equal than 0")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0")))
 		return
 	}
 	if limit > MaxRemoteSourcesLimit {
@@ -202,11 +202,11 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	remoteSources, err := h.readDB.GetRemoteSources(ctx, start, limit, asc)
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
+		util.HTTPError(w, err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, remoteSources); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, remoteSources); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }

@@ -50,6 +50,35 @@ var (
 	ErrConcurrency = errors.New("wal concurrency error: change groups already updated")
 )
 
+type ErrNotExist struct {
+	err error
+}
+
+func newErrNotExist(err error) error {
+	return &ErrNotExist{err: err}
+}
+
+func (e *ErrNotExist) Error() string {
+	return e.err.Error()
+}
+
+func (e *ErrNotExist) Unwrap() error {
+	return e.err
+}
+
+func IsNotExist(err error) bool {
+	var e *ErrNotExist
+	return errors.As(err, &e)
+}
+
+func fromOSTError(err error) error {
+	if objectstorage.IsNotExist(err) {
+		return newErrNotExist(err)
+	}
+
+	return err
+}
+
 var (
 	// Storage paths. Always use path (not filepath) to use the "/" separator
 	storageDataDir = "data"

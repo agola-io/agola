@@ -31,7 +31,6 @@ import (
 
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/testutil"
-	"agola.io/agola/internal/util"
 
 	"github.com/google/go-cmp/cmp"
 	"go.uber.org/zap"
@@ -559,8 +558,8 @@ func TestReadObject(t *testing.T) {
 
 	// should not exists
 	_, _, err = dm.ReadObject("datatype01", "object1", nil)
-	if !util.IsNotExist(err) {
-		t.Fatalf("expected err %v, got: %v", &util.ErrNotExist{}, err)
+	if !IsNotExist(err) {
+		t.Fatalf("expected not exist error, got: %v", err)
 	}
 	// should exist
 	_, _, err = dm.ReadObject("datatype01", "object19", nil)
@@ -583,8 +582,8 @@ func TestReadObject(t *testing.T) {
 
 	// should not exists
 	_, _, err = dm.ReadObject("datatype01", "object1", nil)
-	if !util.IsNotExist(err) {
-		t.Fatalf("expected err %v, got: %v", &util.ErrNotExist{}, err)
+	if !IsNotExist(err) {
+		t.Fatalf("expected not exist error, got: %v", err)
 	}
 	// should exist
 	_, _, err = dm.ReadObject("datatype01", "object19", nil)

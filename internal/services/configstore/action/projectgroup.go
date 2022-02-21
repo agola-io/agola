@@ -41,7 +41,7 @@ func (h *ActionHandler) GetProjectGroup(ctx context.Context, projectGroupRef str
 	}
 
 	if projectGroup == nil {
-		return nil, util.NewErrNotExist(errors.Errorf("project group %q doesn't exist", projectGroupRef))
+		return nil, util.NewAPIError(util.ErrNotExist, errors.Errorf("project group %q doesn't exist", projectGroupRef))
 	}
 
 	return projectGroup, nil
@@ -57,7 +57,7 @@ func (h *ActionHandler) GetProjectGroupSubgroups(ctx context.Context, projectGro
 		}
 
 		if projectGroup == nil {
-			return util.NewErrNotExist(errors.Errorf("project group %q doesn't exist", projectGroupRef))
+			return util.NewAPIError(util.ErrNotExist, errors.Errorf("project group %q doesn't exist", projectGroupRef))
 		}
 
 		projectGroups, err = h.readDB.GetProjectGroupSubgroups(tx, projectGroup.ID)
@@ -80,7 +80,7 @@ func (h *ActionHandler) GetProjectGroupProjects(ctx context.Context, projectGrou
 		}
 
 		if projectGroup == nil {
-			return util.NewErrNotExist(errors.Errorf("project group %q doesn't exist", projectGroupRef))
+			return util.NewAPIError(util.ErrNotExist, errors.Errorf("project group %q doesn't exist", projectGroupRef))
 		}
 
 		projects, err = h.readDB.GetProjectGroupProjects(tx, projectGroup.ID)
@@ -96,28 +96,28 @@ func (h *ActionHandler) ValidateProjectGroup(ctx context.Context, projectGroup *
 	if projectGroup.Parent.Type != types.ConfigTypeProjectGroup &&
 		projectGroup.Parent.Type != types.ConfigTypeOrg &&
 		projectGroup.Parent.Type != types.ConfigTypeUser {
-		return util.NewErrBadRequest(errors.Errorf("invalid project group parent type %q", projectGroup.Parent.Type))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid project group parent type %q", projectGroup.Parent.Type))
 	}
 	if projectGroup.Parent.ID == "" {
-		return util.NewErrBadRequest(errors.Errorf("project group parent id required"))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group parent id required"))
 	}
 
 	// if the project group is a root project group the name must be empty
 	if projectGroup.Parent.Type == types.ConfigTypeOrg ||
 		projectGroup.Parent.Type == types.ConfigTypeUser {
 		if projectGroup.Name != "" {
-			return util.NewErrBadRequest(errors.Errorf("project group name for root project group must be empty"))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group name for root project group must be empty"))
 		}
 	} else {
 		if projectGroup.Name == "" {
-			return util.NewErrBadRequest(errors.Errorf("project group name required"))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group name required"))
 		}
 		if !util.ValidateName(projectGroup.Name) {
-			return util.NewErrBadRequest(errors.Errorf("invalid project group name %q", projectGroup.Name))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid project group name %q", projectGroup.Name))
 		}
 	}
 	if !types.IsValidVisibility(projectGroup.Visibility) {
-		return util.NewErrBadRequest(errors.Errorf("invalid project group visibility"))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid project group visibility"))
 	}
 
 	return nil
@@ -129,7 +129,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, projectGroup *ty
 	}
 
 	if projectGroup.Parent.Type != types.ConfigTypeProjectGroup {
-		return nil, util.NewErrBadRequest(errors.Errorf("wrong project group parent type %q", projectGroup.Parent.Type))
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("wrong project group parent type %q", projectGroup.Parent.Type))
 	}
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
@@ -141,7 +141,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, projectGroup *ty
 			return err
 		}
 		if parentProjectGroup == nil {
-			return util.NewErrBadRequest(errors.Errorf("project group with id %q doesn't exist", projectGroup.Parent.ID))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group with id %q doesn't exist", projectGroup.Parent.ID))
 		}
 		// TODO(sgotti) now we are doing a very ugly thing setting the request
 		// projectgroup parent ID that can be both an ID or a ref. Then we are fixing
@@ -168,7 +168,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, projectGroup *ty
 			return err
 		}
 		if pg != nil {
-			return util.NewErrBadRequest(errors.Errorf("project group with name %q, path %q already exists", pg.Name, pp))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group with name %q, path %q already exists", pg.Name, pp))
 		}
 		return nil
 	})
@@ -218,15 +218,15 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, req *UpdateProje
 			return err
 		}
 		if pg == nil {
-			return util.NewErrBadRequest(errors.Errorf("project group with ref %q doesn't exist", req.ProjectGroupRef))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group with ref %q doesn't exist", req.ProjectGroupRef))
 		}
 		// check that the project group ID matches
 		if pg.ID != req.ProjectGroup.ID {
-			return util.NewErrBadRequest(errors.Errorf("project group with ref %q has a different id", req.ProjectGroupRef))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group with ref %q has a different id", req.ProjectGroupRef))
 		}
 
 		if pg.Parent.Type != req.ProjectGroup.Parent.Type {
-			return util.NewErrBadRequest(errors.Errorf("changing project group parent type isn't supported"))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("changing project group parent type isn't supported"))
 		}
 
 		switch req.ProjectGroup.Parent.Type {
@@ -235,7 +235,7 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, req *UpdateProje
 		case types.ConfigTypeUser:
 			// Cannot update root project group parent
 			if pg.Parent.Type != req.ProjectGroup.Parent.Type || pg.Parent.ID != req.ProjectGroup.Parent.ID {
-				return util.NewErrBadRequest(errors.Errorf("cannot change root project group parent type or id"))
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot change root project group parent type or id"))
 			}
 			// if the project group is a root project group force the name to be empty
 			req.ProjectGroup.Name = ""
@@ -247,7 +247,7 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, req *UpdateProje
 				return err
 			}
 			if group == nil {
-				return util.NewErrBadRequest(errors.Errorf("project group with id %q doesn't exist", req.ProjectGroup.Parent.ID))
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group with id %q doesn't exist", req.ProjectGroup.Parent.ID))
 			}
 			// TODO(sgotti) now we are doing a very ugly thing setting the request
 			// projectgroup parent ID that can be both an ID or a ref. Then we are fixing
@@ -274,11 +274,11 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, req *UpdateProje
 				return err
 			}
 			if ap != nil {
-				return util.NewErrBadRequest(errors.Errorf("project group with name %q, path %q already exists", req.ProjectGroup.Name, pgp))
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group with name %q, path %q already exists", req.ProjectGroup.Name, pgp))
 			}
 			// Cannot move inside itself or a child project group
 			if strings.HasPrefix(pgp, curPGP+"/") {
-				return util.NewErrBadRequest(errors.Errorf("cannot move project group inside itself or child project group"))
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot move project group inside itself or child project group"))
 			}
 		}
 
@@ -334,13 +334,13 @@ func (h *ActionHandler) DeleteProjectGroup(ctx context.Context, projectGroupRef 
 			return err
 		}
 		if projectGroup == nil {
-			return util.NewErrBadRequest(errors.Errorf("project group %q doesn't exist", projectGroupRef))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group %q doesn't exist", projectGroupRef))
 		}
 
 		// cannot delete root project group
 		if projectGroup.Parent.Type == types.ConfigTypeOrg ||
 			projectGroup.Parent.Type == types.ConfigTypeUser {
-			return util.NewErrBadRequest(errors.Errorf("cannot delete root project group"))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot delete root project group"))
 		}
 
 		// changegroup is the project group id.

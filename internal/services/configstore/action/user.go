@@ -37,10 +37,10 @@ type CreateUserRequest struct {
 
 func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) (*types.User, error) {
 	if req.UserName == "" {
-		return nil, util.NewErrBadRequest(errors.Errorf("user name required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user name required"))
 	}
 	if !util.ValidateName(req.UserName) {
-		return nil, util.NewErrBadRequest(errors.Errorf("invalid user name %q", req.UserName))
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid user name %q", req.UserName))
 	}
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
@@ -63,7 +63,7 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 			return err
 		}
 		if u != nil {
-			return util.NewErrBadRequest(errors.Errorf("user with name %q already exists", u.Name))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user with name %q already exists", u.Name))
 		}
 
 		if req.CreateUserLARequest != nil {
@@ -72,14 +72,14 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 				return err
 			}
 			if rs == nil {
-				return util.NewErrBadRequest(errors.Errorf("remote source %q doesn't exist", req.CreateUserLARequest.RemoteSourceName))
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remote source %q doesn't exist", req.CreateUserLARequest.RemoteSourceName))
 			}
 			user, err := h.readDB.GetUserByLinkedAccountRemoteUserIDandSource(tx, req.CreateUserLARequest.RemoteUserID, rs.ID)
 			if err != nil {
 				return errors.Errorf("failed to get user for remote user id %q and remote source %q: %w", req.CreateUserLARequest.RemoteUserID, rs.ID, err)
 			}
 			if user != nil {
-				return util.NewErrBadRequest(errors.Errorf("user for remote user id %q for remote source %q already exists", req.CreateUserLARequest.RemoteUserID, req.CreateUserLARequest.RemoteSourceName))
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user for remote user id %q for remote source %q already exists", req.CreateUserLARequest.RemoteUserID, req.CreateUserLARequest.RemoteSourceName))
 			}
 		}
 		return nil
@@ -165,7 +165,7 @@ func (h *ActionHandler) DeleteUser(ctx context.Context, userRef string) error {
 			return err
 		}
 		if user == nil {
-			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", userRef))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", userRef))
 		}
 
 		// changegroup is the userid
@@ -213,7 +213,7 @@ func (h *ActionHandler) UpdateUser(ctx context.Context, req *UpdateUserRequest) 
 			return err
 		}
 		if user == nil {
-			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", req.UserRef))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", req.UserRef))
 		}
 
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
@@ -228,7 +228,7 @@ func (h *ActionHandler) UpdateUser(ctx context.Context, req *UpdateUserRequest) 
 				return err
 			}
 			if u != nil {
-				return util.NewErrBadRequest(errors.Errorf("user with name %q already exists", u.Name))
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user with name %q already exists", u.Name))
 			}
 			// changegroup is the username (and in future the email) to ensure no
 			// concurrent user creation/modification using the same name
@@ -277,10 +277,10 @@ type CreateUserLARequest struct {
 
 func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequest) (*types.LinkedAccount, error) {
 	if req.UserRef == "" {
-		return nil, util.NewErrBadRequest(errors.Errorf("user ref required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user ref required"))
 	}
 	if req.RemoteSourceName == "" {
-		return nil, util.NewErrBadRequest(errors.Errorf("remote source name required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("remote source name required"))
 	}
 
 	var user *types.User
@@ -296,7 +296,7 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 			return err
 		}
 		if user == nil {
-			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", req.UserRef))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", req.UserRef))
 		}
 
 		// changegroup is the userid
@@ -311,7 +311,7 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 			return err
 		}
 		if rs == nil {
-			return util.NewErrBadRequest(errors.Errorf("remote source %q doesn't exist", req.RemoteSourceName))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remote source %q doesn't exist", req.RemoteSourceName))
 		}
 
 		user, err := h.readDB.GetUserByLinkedAccountRemoteUserIDandSource(tx, req.RemoteUserID, rs.ID)
@@ -319,7 +319,7 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 			return errors.Errorf("failed to get user for remote user id %q and remote source %q: %w", req.RemoteUserID, rs.ID, err)
 		}
 		if user != nil {
-			return util.NewErrBadRequest(errors.Errorf("user for remote user id %q for remote source %q already exists", req.RemoteUserID, req.RemoteSourceName))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user for remote user id %q for remote source %q already exists", req.RemoteUserID, req.RemoteSourceName))
 		}
 		return nil
 	})
@@ -363,10 +363,10 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 
 func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) error {
 	if userRef == "" {
-		return util.NewErrBadRequest(errors.Errorf("user ref  required"))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user ref  required"))
 	}
 	if laID == "" {
-		return util.NewErrBadRequest(errors.Errorf("user linked account id required"))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user linked account id required"))
 	}
 
 	var user *types.User
@@ -381,7 +381,7 @@ func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) 
 			return err
 		}
 		if user == nil {
-			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", userRef))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", userRef))
 		}
 
 		// changegroup is the userid
@@ -399,7 +399,7 @@ func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) 
 
 	_, ok := user.LinkedAccounts[laID]
 	if !ok {
-		return util.NewErrBadRequest(errors.Errorf("linked account id %q for user %q doesn't exist", laID, userRef))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("linked account id %q for user %q doesn't exist", laID, userRef))
 	}
 
 	delete(user.LinkedAccounts, laID)
@@ -435,7 +435,7 @@ type UpdateUserLARequest struct {
 
 func (h *ActionHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLARequest) (*types.LinkedAccount, error) {
 	if req.UserRef == "" {
-		return nil, util.NewErrBadRequest(errors.Errorf("user ref required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user ref required"))
 	}
 
 	var user *types.User
@@ -451,7 +451,7 @@ func (h *ActionHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLAReque
 			return err
 		}
 		if user == nil {
-			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", req.UserRef))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", req.UserRef))
 		}
 
 		// changegroup is the userid
@@ -463,7 +463,7 @@ func (h *ActionHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLAReque
 
 		la, ok := user.LinkedAccounts[req.LinkedAccountID]
 		if !ok {
-			return util.NewErrBadRequest(errors.Errorf("linked account id %q for user %q doesn't exist", req.LinkedAccountID, user.Name))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("linked account id %q for user %q doesn't exist", req.LinkedAccountID, user.Name))
 		}
 
 		rs, err = h.readDB.GetRemoteSource(tx, la.RemoteSourceID)
@@ -471,7 +471,7 @@ func (h *ActionHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLAReque
 			return err
 		}
 		if rs == nil {
-			return util.NewErrBadRequest(errors.Errorf("remote source with id %q doesn't exist", la.RemoteSourceID))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remote source with id %q doesn't exist", la.RemoteSourceID))
 		}
 		return nil
 	})
@@ -507,10 +507,10 @@ func (h *ActionHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLAReque
 
 func (h *ActionHandler) CreateUserToken(ctx context.Context, userRef, tokenName string) (string, error) {
 	if userRef == "" {
-		return "", util.NewErrBadRequest(errors.Errorf("user ref required"))
+		return "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("user ref required"))
 	}
 	if tokenName == "" {
-		return "", util.NewErrBadRequest(errors.Errorf("token name required"))
+		return "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("token name required"))
 	}
 
 	var user *types.User
@@ -525,7 +525,7 @@ func (h *ActionHandler) CreateUserToken(ctx context.Context, userRef, tokenName 
 			return err
 		}
 		if user == nil {
-			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", userRef))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", userRef))
 		}
 
 		// changegroup is the userid
@@ -542,7 +542,7 @@ func (h *ActionHandler) CreateUserToken(ctx context.Context, userRef, tokenName 
 	}
 	if user.Tokens != nil {
 		if _, ok := user.Tokens[tokenName]; ok {
-			return "", util.NewErrBadRequest(errors.Errorf("token %q for user %q already exists", tokenName, userRef))
+			return "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("token %q for user %q already exists", tokenName, userRef))
 		}
 	}
 
@@ -572,10 +572,10 @@ func (h *ActionHandler) CreateUserToken(ctx context.Context, userRef, tokenName 
 
 func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName string) error {
 	if userRef == "" {
-		return util.NewErrBadRequest(errors.Errorf("user ref required"))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user ref required"))
 	}
 	if tokenName == "" {
-		return util.NewErrBadRequest(errors.Errorf("token name required"))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("token name required"))
 	}
 
 	var user *types.User
@@ -590,7 +590,7 @@ func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName 
 			return err
 		}
 		if user == nil {
-			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exist", userRef))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", userRef))
 		}
 
 		// changegroup is the userid
@@ -608,7 +608,7 @@ func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName 
 
 	_, ok := user.Tokens[tokenName]
 	if !ok {
-		return util.NewErrBadRequest(errors.Errorf("token %q for user %q doesn't exist", tokenName, userRef))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("token %q for user %q doesn't exist", tokenName, userRef))
 	}
 
 	delete(user.Tokens, tokenName)
@@ -651,7 +651,7 @@ func (h *ActionHandler) GetUserOrgs(ctx context.Context, userRef string) ([]*Use
 			return err
 		}
 		if user == nil {
-			return util.NewErrNotExist(errors.Errorf("user %q doesn't exist", userRef))
+			return util.NewAPIError(util.ErrNotExist, errors.Errorf("user %q doesn't exist", userRef))
 		}
 
 		userOrgs, err = h.readDB.GetUserOrgs(tx, user.ID)

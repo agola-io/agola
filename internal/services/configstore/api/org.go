@@ -53,16 +53,16 @@ func (h *OrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
+		util.HTTPError(w, err)
 		return
 	}
 
 	if org == nil {
-		httpError(w, util.NewErrNotExist(errors.Errorf("org %q doesn't exist", orgRef)))
+		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("org %q doesn't exist", orgRef)))
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, org); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, org); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -82,17 +82,17 @@ func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var req types.Organization
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
 	org, err := h.ah.CreateOrg(ctx, &req)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusCreated, org); err != nil {
+	if err := util.HTTPResponse(w, http.StatusCreated, org); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -113,11 +113,11 @@ func (h *DeleteOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	orgRef := vars["orgref"]
 
 	err := h.ah.DeleteOrg(ctx, orgRef)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
-	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -146,12 +146,12 @@ func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		limit, err = strconv.Atoi(limitS)
 		if err != nil {
-			httpError(w, util.NewErrBadRequest(errors.Errorf("cannot parse limit: %w", err)))
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot parse limit: %w", err)))
 			return
 		}
 	}
 	if limit < 0 {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("limit must be greater or equal than 0")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0")))
 		return
 	}
 	if limit > MaxOrgsLimit {
@@ -172,11 +172,11 @@ func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
+		util.HTTPError(w, err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, orgs); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, orgs); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -200,17 +200,17 @@ func (h *AddOrgMemberHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	var req csapitypes.AddOrgMemberRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
 	org, err := h.ah.AddOrgMember(ctx, orgRef, userRef, req.Role)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusCreated, org); err != nil {
+	if err := util.HTTPResponse(w, http.StatusCreated, org); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -232,12 +232,12 @@ func (h *RemoveOrgMemberHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	userRef := vars["userref"]
 
 	err := h.ah.RemoveOrgMember(ctx, orgRef, userRef)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -264,7 +264,7 @@ func (h *OrgMembersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	orgRef := vars["orgref"]
 
 	orgUsers, err := h.ah.GetOrgMembers(ctx, orgRef)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -274,7 +274,7 @@ func (h *OrgMembersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		res[i] = orgMemberResponse(orgUser)
 	}
 
-	if err := httpResponse(w, http.StatusOK, res); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }

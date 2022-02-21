@@ -95,23 +95,23 @@ func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
 	projectGroup, err := h.ah.GetProjectGroup(ctx, projectGroupRef)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
 	resProjectGroup, err := projectGroupResponse(ctx, h.readDB, projectGroup)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, resProjectGroup); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, resProjectGroup); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -132,23 +132,23 @@ func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
 	projects, err := h.ah.GetProjectGroupProjects(ctx, projectGroupRef)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
 	resProjects, err := projectsResponse(ctx, h.readDB, projects)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, resProjects); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, resProjects); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -168,23 +168,23 @@ func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.
 	vars := mux.Vars(r)
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
 	projectGroups, err := h.ah.GetProjectGroupSubgroups(ctx, projectGroupRef)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
 	resProjectGroups, err := projectGroupsResponse(ctx, h.readDB, projectGroups)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, resProjectGroups); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, resProjectGroups); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -205,23 +205,23 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	var req types.ProjectGroup
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
 	projectGroup, err := h.ah.CreateProjectGroup(ctx, &req)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
 	resProjectGroup, err := projectGroupResponse(ctx, h.readDB, projectGroup)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusCreated, resProjectGroup); err != nil {
+	if err := util.HTTPResponse(w, http.StatusCreated, resProjectGroup); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -242,14 +242,14 @@ func (h *UpdateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	vars := mux.Vars(r)
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
 	var projectGroup *types.ProjectGroup
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&projectGroup); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
@@ -258,18 +258,18 @@ func (h *UpdateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		ProjectGroup:    projectGroup,
 	}
 	projectGroup, err = h.ah.UpdateProjectGroup(ctx, areq)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
 	resProjectGroup, err := projectGroupResponse(ctx, h.readDB, projectGroup)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusCreated, resProjectGroup); err != nil {
+	if err := util.HTTPResponse(w, http.StatusCreated, resProjectGroup); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -289,15 +289,15 @@ func (h *DeleteProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	vars := mux.Vars(r)
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
 	err = h.ah.DeleteProjectGroup(ctx, projectGroupRef)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 	}
-	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }

@@ -69,7 +69,7 @@ func (h *VariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, removeoverridden := query["removeoverridden"]
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -81,7 +81,7 @@ func (h *VariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		RemoveOverridden: removeoverridden,
 	}
 	csvars, cssecrets, err := h.ah.GetVariables(ctx, areq)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -91,7 +91,7 @@ func (h *VariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		variables[i] = createVariableResponse(v, cssecrets)
 	}
 
-	if err := httpResponse(w, http.StatusOK, variables); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, variables); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -108,7 +108,7 @@ func NewCreateVariableHandler(logger *zap.Logger, ah *action.ActionHandler) *Cre
 func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -116,7 +116,7 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	var req gwapitypes.CreateVariableRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 	areq := &action.CreateVariableRequest{
@@ -126,13 +126,13 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		Values:     fromApiVariableValues(req.Values),
 	}
 	csvar, cssecrets, err := h.ah.CreateVariable(ctx, areq)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
 	res := createVariableResponse(csvar, cssecrets)
-	if err := httpResponse(w, http.StatusCreated, res); err != nil {
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -152,7 +152,7 @@ func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	variableName := vars["variablename"]
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -160,7 +160,7 @@ func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	var req gwapitypes.UpdateVariableRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
@@ -173,13 +173,13 @@ func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		Values:     fromApiVariableValues(req.Values),
 	}
 	csvar, cssecrets, err := h.ah.UpdateVariable(ctx, areq)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
 	res := createVariableResponse(csvar, cssecrets)
-	if err := httpResponse(w, http.StatusOK, res); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -199,18 +199,18 @@ func (h *DeleteVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	variableName := vars["variablename"]
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
 	err = h.ah.DeleteVariable(ctx, parentType, parentRef, variableName)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }

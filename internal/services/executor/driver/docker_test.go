@@ -25,8 +25,8 @@ import (
 	"agola.io/agola/internal/testutil"
 
 	"github.com/docker/docker/api/types"
-	"github.com/google/go-cmp/cmp"
 	"github.com/gofrs/uuid"
+	"github.com/google/go-cmp/cmp"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 )

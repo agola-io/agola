@@ -51,7 +51,7 @@ func (h *ActionHandler) GetOrgMembers(ctx context.Context, orgRef string) ([]*Or
 			return err
 		}
 		if org == nil {
-			return util.NewErrNotExist(errors.Errorf("org %q doesn't exist", orgRef))
+			return util.NewAPIError(util.ErrNotExist, errors.Errorf("org %q doesn't exist", orgRef))
 		}
 
 		orgUsers, err = h.readDB.GetOrgUsers(tx, org.ID)
@@ -71,13 +71,13 @@ func (h *ActionHandler) GetOrgMembers(ctx context.Context, orgRef string) ([]*Or
 
 func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) (*types.Organization, error) {
 	if org.Name == "" {
-		return nil, util.NewErrBadRequest(errors.Errorf("organization name required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("organization name required"))
 	}
 	if !util.ValidateName(org.Name) {
-		return nil, util.NewErrBadRequest(errors.Errorf("invalid organization name %q", org.Name))
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid organization name %q", org.Name))
 	}
 	if !types.IsValidVisibility(org.Visibility) {
-		return nil, util.NewErrBadRequest(errors.Errorf("invalid organization visibility"))
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid organization visibility"))
 	}
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
@@ -98,7 +98,7 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) 
 			return err
 		}
 		if o != nil {
-			return util.NewErrBadRequest(errors.Errorf("org %q already exists", o.Name))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("org %q already exists", o.Name))
 		}
 
 		if org.CreatorUserID != "" {
@@ -107,7 +107,7 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) 
 				return err
 			}
 			if user == nil {
-				return util.NewErrBadRequest(errors.Errorf("creator user %q doesn't exist", org.CreatorUserID))
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("creator user %q doesn't exist", org.CreatorUserID))
 			}
 		}
 
@@ -190,7 +190,7 @@ func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 			return err
 		}
 		if org == nil {
-			return util.NewErrBadRequest(errors.Errorf("org %q doesn't exist", orgRef))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("org %q doesn't exist", orgRef))
 		}
 
 		// changegroup is the org id
@@ -223,7 +223,7 @@ func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 // TODO(sgotti) handle invitation when implemented
 func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string, role types.MemberRole) (*types.OrganizationMember, error) {
 	if !types.IsValidMemberRole(role) {
-		return nil, util.NewErrBadRequest(errors.Errorf("invalid role %q", role))
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid role %q", role))
 	}
 
 	var org *types.Organization
@@ -240,7 +240,7 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 			return err
 		}
 		if org == nil {
-			return util.NewErrBadRequest(errors.Errorf("org %q doesn't exists", orgRef))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("org %q doesn't exists", orgRef))
 		}
 		// check existing user
 		user, err = h.readDB.GetUser(tx, userRef)
@@ -248,7 +248,7 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 			return err
 		}
 		if user == nil {
-			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exists", userRef))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exists", userRef))
 		}
 
 		// fetch org member if it already exist
@@ -316,7 +316,7 @@ func (h *ActionHandler) RemoveOrgMember(ctx context.Context, orgRef, userRef str
 			return err
 		}
 		if org == nil {
-			return util.NewErrBadRequest(errors.Errorf("org %q doesn't exists", orgRef))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("org %q doesn't exists", orgRef))
 		}
 		// check existing user
 		user, err = h.readDB.GetUser(tx, userRef)
@@ -324,7 +324,7 @@ func (h *ActionHandler) RemoveOrgMember(ctx context.Context, orgRef, userRef str
 			return err
 		}
 		if user == nil {
-			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exists", userRef))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exists", userRef))
 		}
 
 		// check that org member exists
@@ -333,7 +333,7 @@ func (h *ActionHandler) RemoveOrgMember(ctx context.Context, orgRef, userRef str
 			return err
 		}
 		if orgmember == nil {
-			return util.NewErrBadRequest(errors.Errorf("orgmember for org %q, user %q doesn't exists", orgRef, userRef))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("orgmember for org %q, user %q doesn't exists", orgRef, userRef))
 		}
 
 		cgNames := []string{util.EncodeSha256Hex(fmt.Sprintf("orgmember-%s-%s", org.ID, user.ID))}

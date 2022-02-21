@@ -45,12 +45,12 @@ func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	secretID := vars["secretid"]
 
 	secret, err := h.ah.GetSecret(ctx, secretID)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, secret); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, secret); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -71,13 +71,13 @@ func (h *SecretsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, tree := query["tree"]
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
 	secrets, err := h.ah.GetSecrets(ctx, parentType, parentRef, tree)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -100,11 +100,11 @@ func (h *SecretsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
+		util.HTTPError(w, err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, resSecrets); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, resSecrets); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -121,7 +121,7 @@ func NewCreateSecretHandler(logger *zap.Logger, ah *action.ActionHandler) *Creat
 func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -129,7 +129,7 @@ func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	var secret *types.Secret
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&secret); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
@@ -137,12 +137,12 @@ func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	secret.Parent.ID = parentRef
 
 	secret, err = h.ah.CreateSecret(ctx, secret)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusCreated, secret); err != nil {
+	if err := util.HTTPResponse(w, http.StatusCreated, secret); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -162,7 +162,7 @@ func (h *UpdateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	secretName := vars["secretname"]
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -170,7 +170,7 @@ func (h *UpdateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	var secret *types.Secret
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&secret); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
@@ -182,12 +182,12 @@ func (h *UpdateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		Secret:     secret,
 	}
 	secret, err = h.ah.UpdateSecret(ctx, areq)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, secret); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, secret); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -207,16 +207,16 @@ func (h *DeleteSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	secretName := vars["secretname"]
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
 	err = h.ah.DeleteSecret(ctx, parentType, parentRef, secretName)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 	}
-	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }

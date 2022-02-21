@@ -163,7 +163,7 @@ func (s *Scheduler) approveRunTasks(ctx context.Context, runID string) error {
 	for _, rtID := range tasksWaitingApproval {
 		rt, ok := run.Tasks[rtID]
 		if !ok {
-			return util.NewErrBadRequest(errors.Errorf("run %q doesn't have task %q", run.ID, rtID))
+			return errors.Errorf("run %q doesn't have task %q", run.ID, rtID)
 		}
 		annotations := rt.Annotations
 		if annotations == nil {

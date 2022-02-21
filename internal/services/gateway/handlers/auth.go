@@ -21,6 +21,7 @@ import (
 
 	scommon "agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/gateway/common"
+	"agola.io/agola/internal/util"
 	csclient "agola.io/agola/services/configstore/client"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -64,12 +65,12 @@ func (h *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		} else {
-			user, resp, err := h.configstoreClient.GetUserByToken(ctx, tokenString)
-			if err != nil && resp.StatusCode == http.StatusNotFound {
-				http.Error(w, "", http.StatusUnauthorized)
-				return
-			}
+			user, _, err := h.configstoreClient.GetUserByToken(ctx, tokenString)
 			if err != nil {
+				if util.RemoteErrorIs(err, util.ErrNotExist) {
+					http.Error(w, "", http.StatusUnauthorized)
+					return
+				}
 				http.Error(w, "", http.StatusInternalServerError)
 				return
 			}
@@ -118,9 +119,9 @@ func (h *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		claims := token.Claims.(jwt.MapClaims)
 		userID := claims["sub"].(string)
 
-		user, resp, err := h.configstoreClient.GetUser(ctx, userID)
+		user, _, err := h.configstoreClient.GetUser(ctx, userID)
 		if err != nil {
-			if resp != nil && resp.StatusCode == http.StatusNotFound {
+			if util.RemoteErrorIs(err, util.ErrNotExist) {
 				http.Error(w, "", http.StatusUnauthorized)
 				return
 			}
