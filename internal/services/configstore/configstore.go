@@ -25,7 +25,6 @@ import (
 	scommon "agola.io/agola/internal/common"
 	"agola.io/agola/internal/datamanager"
 	"agola.io/agola/internal/etcd"
-	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/services/config"
 	action "agola.io/agola/internal/services/configstore/action"
@@ -36,24 +35,20 @@ import (
 	"agola.io/agola/services/configstore/types"
 
 	"github.com/gorilla/mux"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/mvcc/mvccpb"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	errors "golang.org/x/xerrors"
 )
 
-var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
-var logger = slog.New(level)
-var log = logger.Sugar()
-
 func (s *Configstore) maintenanceModeWatcherLoop(ctx context.Context, runCtxCancel context.CancelFunc, maintenanceModeEnabled bool) {
 	for {
-		log.Debugf("maintenanceModeWatcherLoop")
+		log.Debug().Msgf("maintenanceModeWatcherLoop")
 
 		// at first watch restart from previous processed revision
 		if err := s.maintenanceModeWatcher(ctx, runCtxCancel, maintenanceModeEnabled); err != nil {
-			log.Errorf("err: %+v", err)
+			log.Err(err).Send()
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
@@ -66,14 +61,14 @@ func (s *Configstore) maintenanceModeWatcherLoop(ctx context.Context, runCtxCanc
 }
 
 func (s *Configstore) maintenanceModeWatcher(ctx context.Context, runCtxCancel context.CancelFunc, maintenanceModeEnabled bool) error {
-	log.Infof("watcher: maintenance mode enabled: %t", maintenanceModeEnabled)
+	log.Info().Msgf("watcher: maintenance mode enabled: %t", maintenanceModeEnabled)
 	resp, err := s.e.Get(ctx, common.EtcdMaintenanceKey, 0)
 	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
 		return err
 	}
 
 	if len(resp.Kvs) > 0 {
-		log.Infof("maintenance mode key is present")
+		log.Info().Msgf("maintenance mode key is present")
 		if !maintenanceModeEnabled {
 			runCtxCancel()
 		}
@@ -94,13 +89,13 @@ func (s *Configstore) maintenanceModeWatcher(ctx context.Context, runCtxCancel c
 		for _, ev := range wresp.Events {
 			switch ev.Type {
 			case mvccpb.PUT:
-				log.Infof("maintenance mode key set")
+				log.Info().Msgf("maintenance mode key set")
 				if !maintenanceModeEnabled {
 					runCtxCancel()
 				}
 
 			case mvccpb.DELETE:
-				log.Infof("maintenance mode key removed")
+				log.Info().Msgf("maintenance mode key removed")
 				if maintenanceModeEnabled {
 					runCtxCancel()
 				}
@@ -112,6 +107,7 @@ func (s *Configstore) maintenanceModeWatcher(ctx context.Context, runCtxCancel c
 }
 
 type Configstore struct {
+	log             zerolog.Logger
 	c               *config.Configstore
 	e               *etcd.Store
 	dm              *datamanager.DataManager
@@ -121,25 +117,22 @@ type Configstore struct {
 	maintenanceMode bool
 }
 
-func NewConfigstore(ctx context.Context, l *zap.Logger, c *config.Configstore) (*Configstore, error) {
-	if l != nil {
-		logger = l
-	}
+func NewConfigstore(ctx context.Context, log zerolog.Logger, c *config.Configstore) (*Configstore, error) {
 	if c.Debug {
-		level.SetLevel(zapcore.DebugLevel)
+		log = log.Level(zerolog.DebugLevel)
 	}
-	log = logger.Sugar()
 
 	ost, err := scommon.NewObjectStorage(&c.ObjectStorage)
 	if err != nil {
 		return nil, err
 	}
-	e, err := scommon.NewEtcd(&c.Etcd, logger, "configstore")
+	e, err := scommon.NewEtcd(&c.Etcd, log, "configstore")
 	if err != nil {
 		return nil, err
 	}
 
 	cs := &Configstore{
+		log: log,
 		c:   c,
 		e:   e,
 		ost: ost,
@@ -160,11 +153,11 @@ func NewConfigstore(ctx context.Context, l *zap.Logger, c *config.Configstore) (
 			string(types.ConfigTypeVariable),
 		},
 	}
-	dm, err := datamanager.NewDataManager(ctx, logger, dmConf)
+	dm, err := datamanager.NewDataManager(ctx, log, dmConf)
 	if err != nil {
 		return nil, err
 	}
-	readDB, err := readdb.NewReadDB(ctx, logger, filepath.Join(c.DataDir, "readdb"), e, ost, dm)
+	readDB, err := readdb.NewReadDB(ctx, log, filepath.Join(c.DataDir, "readdb"), e, ost, dm)
 	if err != nil {
 		return nil, err
 	}
@@ -172,67 +165,67 @@ func NewConfigstore(ctx context.Context, l *zap.Logger, c *config.Configstore) (
 	cs.dm = dm
 	cs.readDB = readDB
 
-	ah := action.NewActionHandler(logger, readDB, dm, e)
+	ah := action.NewActionHandler(log, readDB, dm, e)
 	cs.ah = ah
 
 	return cs, nil
 }
 
 func (s *Configstore) setupDefaultRouter() http.Handler {
-	maintenanceModeHandler := api.NewMaintenanceModeHandler(logger, s.ah, s.e)
-	exportHandler := api.NewExportHandler(logger, s.ah)
+	maintenanceModeHandler := api.NewMaintenanceModeHandler(s.log, s.ah, s.e)
+	exportHandler := api.NewExportHandler(s.log, s.ah)
 
-	projectGroupHandler := api.NewProjectGroupHandler(logger, s.ah, s.readDB)
-	projectGroupSubgroupsHandler := api.NewProjectGroupSubgroupsHandler(logger, s.ah, s.readDB)
-	projectGroupProjectsHandler := api.NewProjectGroupProjectsHandler(logger, s.ah, s.readDB)
-	createProjectGroupHandler := api.NewCreateProjectGroupHandler(logger, s.ah, s.readDB)
-	updateProjectGroupHandler := api.NewUpdateProjectGroupHandler(logger, s.ah, s.readDB)
-	deleteProjectGroupHandler := api.NewDeleteProjectGroupHandler(logger, s.ah)
+	projectGroupHandler := api.NewProjectGroupHandler(s.log, s.ah, s.readDB)
+	projectGroupSubgroupsHandler := api.NewProjectGroupSubgroupsHandler(s.log, s.ah, s.readDB)
+	projectGroupProjectsHandler := api.NewProjectGroupProjectsHandler(s.log, s.ah, s.readDB)
+	createProjectGroupHandler := api.NewCreateProjectGroupHandler(s.log, s.ah, s.readDB)
+	updateProjectGroupHandler := api.NewUpdateProjectGroupHandler(s.log, s.ah, s.readDB)
+	deleteProjectGroupHandler := api.NewDeleteProjectGroupHandler(s.log, s.ah)
 
-	projectHandler := api.NewProjectHandler(logger, s.ah, s.readDB)
-	createProjectHandler := api.NewCreateProjectHandler(logger, s.ah, s.readDB)
-	updateProjectHandler := api.NewUpdateProjectHandler(logger, s.ah, s.readDB)
-	deleteProjectHandler := api.NewDeleteProjectHandler(logger, s.ah)
+	projectHandler := api.NewProjectHandler(s.log, s.ah, s.readDB)
+	createProjectHandler := api.NewCreateProjectHandler(s.log, s.ah, s.readDB)
+	updateProjectHandler := api.NewUpdateProjectHandler(s.log, s.ah, s.readDB)
+	deleteProjectHandler := api.NewDeleteProjectHandler(s.log, s.ah)
 
-	secretsHandler := api.NewSecretsHandler(logger, s.ah, s.readDB)
-	createSecretHandler := api.NewCreateSecretHandler(logger, s.ah)
-	updateSecretHandler := api.NewUpdateSecretHandler(logger, s.ah)
-	deleteSecretHandler := api.NewDeleteSecretHandler(logger, s.ah)
+	secretsHandler := api.NewSecretsHandler(s.log, s.ah, s.readDB)
+	createSecretHandler := api.NewCreateSecretHandler(s.log, s.ah)
+	updateSecretHandler := api.NewUpdateSecretHandler(s.log, s.ah)
+	deleteSecretHandler := api.NewDeleteSecretHandler(s.log, s.ah)
 
-	variablesHandler := api.NewVariablesHandler(logger, s.ah, s.readDB)
-	createVariableHandler := api.NewCreateVariableHandler(logger, s.ah)
-	updateVariableHandler := api.NewUpdateVariableHandler(logger, s.ah)
-	deleteVariableHandler := api.NewDeleteVariableHandler(logger, s.ah)
+	variablesHandler := api.NewVariablesHandler(s.log, s.ah, s.readDB)
+	createVariableHandler := api.NewCreateVariableHandler(s.log, s.ah)
+	updateVariableHandler := api.NewUpdateVariableHandler(s.log, s.ah)
+	deleteVariableHandler := api.NewDeleteVariableHandler(s.log, s.ah)
 
-	userHandler := api.NewUserHandler(logger, s.readDB)
-	usersHandler := api.NewUsersHandler(logger, s.readDB)
-	createUserHandler := api.NewCreateUserHandler(logger, s.ah)
-	updateUserHandler := api.NewUpdateUserHandler(logger, s.ah)
-	deleteUserHandler := api.NewDeleteUserHandler(logger, s.ah)
+	userHandler := api.NewUserHandler(s.log, s.readDB)
+	usersHandler := api.NewUsersHandler(s.log, s.readDB)
+	createUserHandler := api.NewCreateUserHandler(s.log, s.ah)
+	updateUserHandler := api.NewUpdateUserHandler(s.log, s.ah)
+	deleteUserHandler := api.NewDeleteUserHandler(s.log, s.ah)
 
-	createUserLAHandler := api.NewCreateUserLAHandler(logger, s.ah)
-	deleteUserLAHandler := api.NewDeleteUserLAHandler(logger, s.ah)
-	updateUserLAHandler := api.NewUpdateUserLAHandler(logger, s.ah)
+	createUserLAHandler := api.NewCreateUserLAHandler(s.log, s.ah)
+	deleteUserLAHandler := api.NewDeleteUserLAHandler(s.log, s.ah)
+	updateUserLAHandler := api.NewUpdateUserLAHandler(s.log, s.ah)
 
-	createUserTokenHandler := api.NewCreateUserTokenHandler(logger, s.ah)
-	deleteUserTokenHandler := api.NewDeleteUserTokenHandler(logger, s.ah)
+	createUserTokenHandler := api.NewCreateUserTokenHandler(s.log, s.ah)
+	deleteUserTokenHandler := api.NewDeleteUserTokenHandler(s.log, s.ah)
 
-	userOrgsHandler := api.NewUserOrgsHandler(logger, s.ah)
+	userOrgsHandler := api.NewUserOrgsHandler(s.log, s.ah)
 
-	orgHandler := api.NewOrgHandler(logger, s.readDB)
-	orgsHandler := api.NewOrgsHandler(logger, s.readDB)
-	createOrgHandler := api.NewCreateOrgHandler(logger, s.ah)
-	deleteOrgHandler := api.NewDeleteOrgHandler(logger, s.ah)
+	orgHandler := api.NewOrgHandler(s.log, s.readDB)
+	orgsHandler := api.NewOrgsHandler(s.log, s.readDB)
+	createOrgHandler := api.NewCreateOrgHandler(s.log, s.ah)
+	deleteOrgHandler := api.NewDeleteOrgHandler(s.log, s.ah)
 
-	orgMembersHandler := api.NewOrgMembersHandler(logger, s.ah)
-	addOrgMemberHandler := api.NewAddOrgMemberHandler(logger, s.ah)
-	removeOrgMemberHandler := api.NewRemoveOrgMemberHandler(logger, s.ah)
+	orgMembersHandler := api.NewOrgMembersHandler(s.log, s.ah)
+	addOrgMemberHandler := api.NewAddOrgMemberHandler(s.log, s.ah)
+	removeOrgMemberHandler := api.NewRemoveOrgMemberHandler(s.log, s.ah)
 
-	remoteSourceHandler := api.NewRemoteSourceHandler(logger, s.readDB)
-	remoteSourcesHandler := api.NewRemoteSourcesHandler(logger, s.readDB)
-	createRemoteSourceHandler := api.NewCreateRemoteSourceHandler(logger, s.ah)
-	updateRemoteSourceHandler := api.NewUpdateRemoteSourceHandler(logger, s.ah)
-	deleteRemoteSourceHandler := api.NewDeleteRemoteSourceHandler(logger, s.ah)
+	remoteSourceHandler := api.NewRemoteSourceHandler(s.log, s.readDB)
+	remoteSourcesHandler := api.NewRemoteSourcesHandler(s.log, s.readDB)
+	createRemoteSourceHandler := api.NewCreateRemoteSourceHandler(s.log, s.ah)
+	updateRemoteSourceHandler := api.NewUpdateRemoteSourceHandler(s.log, s.ah)
+	deleteRemoteSourceHandler := api.NewDeleteRemoteSourceHandler(s.log, s.ah)
 
 	router := mux.NewRouter()
 	apirouter := router.PathPrefix("/api/v1alpha").Subrouter().UseEncodedPath()
@@ -306,9 +299,9 @@ func (s *Configstore) setupDefaultRouter() http.Handler {
 }
 
 func (s *Configstore) setupMaintenanceRouter() http.Handler {
-	maintenanceModeHandler := api.NewMaintenanceModeHandler(logger, s.ah, s.e)
-	exportHandler := api.NewExportHandler(logger, s.ah)
-	importHandler := api.NewImportHandler(logger, s.ah)
+	maintenanceModeHandler := api.NewMaintenanceModeHandler(s.log, s.ah, s.e)
+	exportHandler := api.NewExportHandler(s.log, s.ah)
+	importHandler := api.NewImportHandler(s.log, s.ah)
 
 	router := mux.NewRouter()
 	apirouter := router.PathPrefix("/api/v1alpha").Subrouter().UseEncodedPath()
@@ -327,13 +320,13 @@ func (s *Configstore) setupMaintenanceRouter() http.Handler {
 func (s *Configstore) Run(ctx context.Context) error {
 	for {
 		if err := s.run(ctx); err != nil {
-			log.Errorf("run error: %+v", err)
+			log.Err(err).Msgf("run error")
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
 		select {
 		case <-ctx.Done():
-			log.Infof("configstore exiting")
+			s.log.Info().Msgf("configstore exiting")
 			return nil
 		case <-sleepCh:
 		}
@@ -346,7 +339,7 @@ func (s *Configstore) run(ctx context.Context) error {
 		var err error
 		tlsConfig, err = util.NewTLSConfig(s.c.Web.TLSCertFile, s.c.Web.TLSKeyFile, "", false)
 		if err != nil {
-			log.Errorf("err: %+v")
+			s.log.Err(err).Send()
 			return err
 		}
 	}
@@ -358,7 +351,7 @@ func (s *Configstore) run(ctx context.Context) error {
 
 	maintenanceMode := false
 	if len(resp.Kvs) > 0 {
-		log.Infof("maintenance mode key is present")
+		log.Info().Msgf("maintenance mode key is present")
 		maintenanceMode = true
 	}
 
@@ -408,15 +401,15 @@ func (s *Configstore) run(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		log.Infof("configstore run exiting")
+		log.Info().Msgf("configstore run exiting")
 	case err := <-lerrCh:
 		if err != nil {
-			log.Errorf("http server listen error: %+v", err)
+			log.Err(err).Msgf("http server listen error")
 			return err
 		}
 	case err := <-errCh:
 		if err != nil {
-			log.Errorf("error: %+v", err)
+			s.log.Err(err).Send()
 			return err
 		}
 	}

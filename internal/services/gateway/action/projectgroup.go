@@ -94,12 +94,12 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProje
 		Visibility: req.Visibility,
 	}
 
-	h.log.Infof("creating projectGroup")
+	h.log.Info().Msgf("creating projectGroup")
 	rp, _, err := h.configstoreClient.CreateProjectGroup(ctx, p)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to create projectGroup: %w", err))
 	}
-	h.log.Infof("projectGroup %s created, ID: %s", rp.Name, rp.ID)
+	h.log.Info().Msgf("projectGroup %s created, ID: %s", rp.Name, rp.ID)
 
 	return rp, nil
 }
@@ -135,12 +135,12 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, projectGroupRef 
 		pg.Visibility = *req.Visibility
 	}
 
-	h.log.Infof("updating project group")
+	h.log.Info().Msgf("updating project group")
 	rp, _, err := h.configstoreClient.UpdateProjectGroup(ctx, pg.ID, pg.ProjectGroup)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to update project group: %w", err))
 	}
-	h.log.Infof("project group %q updated, ID: %s", pg.Name, pg.ID)
+	h.log.Info().Msgf("project group %q updated, ID: %s", pg.Name, pg.ID)
 
 	return rp, nil
 }

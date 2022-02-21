@@ -46,7 +46,7 @@ func (r *ReadDB) insertUser(tx *db.Tx, data []byte) error {
 	if err := json.Unmarshal(data, &user); err != nil {
 		return errors.Errorf("failed to unmarshal user: %w", err)
 	}
-	r.log.Debugf("inserting user: %s", util.Dump(user))
+	r.log.Debug().Msgf("inserting user: %s", util.Dump(user))
 	// poor man insert or update...
 	if err := r.deleteUser(tx, user.ID); err != nil {
 		return err
@@ -74,7 +74,7 @@ func (r *ReadDB) insertUser(tx *db.Tx, data []byte) error {
 	}
 	// insert user_token
 	for _, tokenValue := range user.Tokens {
-		r.log.Debugf("inserting user token: %s", tokenValue)
+		r.log.Debug().Msgf("inserting user token: %s", tokenValue)
 		if err := r.deleteUserToken(tx, tokenValue); err != nil {
 			return err
 		}
@@ -157,7 +157,7 @@ func (r *ReadDB) GetUser(tx *db.Tx, userRef string) (*types.User, error) {
 
 func (r *ReadDB) GetUserByID(tx *db.Tx, userID string) (*types.User, error) {
 	q, args, err := userSelect.Where(sq.Eq{"id": userID}).ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}
@@ -177,7 +177,7 @@ func (r *ReadDB) GetUserByID(tx *db.Tx, userID string) (*types.User, error) {
 
 func (r *ReadDB) GetUserByName(tx *db.Tx, name string) (*types.User, error) {
 	q, args, err := userSelect.Where(sq.Eq{"name": name}).ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}
@@ -200,7 +200,7 @@ func (r *ReadDB) GetUserByTokenValue(tx *db.Tx, tokenValue string) (*types.User,
 	s = s.Join("user_token on user_token.userid = user.id")
 	s = s.Where(sq.Eq{"user_token.tokenvalue": tokenValue})
 	q, args, err := s.ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}
@@ -223,7 +223,7 @@ func (r *ReadDB) GetUserByLinkedAccount(tx *db.Tx, linkedAccountID string) (*typ
 	s = s.Join("linkedaccount_user as lau on lau.userid = user.id")
 	s = s.Where(sq.Eq{"lau.id": linkedAccountID})
 	q, args, err := s.ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}
@@ -246,7 +246,7 @@ func (r *ReadDB) GetUserByLinkedAccountRemoteUserIDandSource(tx *db.Tx, remoteUs
 	s = s.Join("linkedaccount_user as lau on lau.userid = user.id")
 	s = s.Where(sq.Eq{"lau.remoteuserid": remoteUserID, "lau.remotesourceid": remoteSourceID})
 	q, args, err := s.ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}
@@ -292,7 +292,7 @@ func (r *ReadDB) GetUsers(tx *db.Tx, startUserName string, limit int, asc bool) 
 
 	s := getUsersFilteredQuery(startUserName, limit, asc)
 	q, args, err := s.ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}

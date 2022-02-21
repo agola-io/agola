@@ -20,16 +20,16 @@ import (
 	"agola.io/agola/internal/services/gateway/action"
 	util "agola.io/agola/internal/util"
 
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 )
 
 type VersionHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewVersionHandler(logger *zap.Logger, ah *action.ActionHandler) *VersionHandler {
-	return &VersionHandler{log: logger.Sugar(), ah: ah}
+func NewVersionHandler(log zerolog.Logger, ah *action.ActionHandler) *VersionHandler {
+	return &VersionHandler{log: log, ah: ah}
 }
 
 func (h *VersionHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -37,11 +37,11 @@ func (h *VersionHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	version, err := h.ah.GetVersion(ctx)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	if err := util.HTTPResponse(w, http.StatusOK, version); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }

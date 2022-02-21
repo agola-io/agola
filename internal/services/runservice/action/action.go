@@ -32,12 +32,12 @@ import (
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/runservice/types"
 
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 	errors "golang.org/x/xerrors"
 )
 
 type ActionHandler struct {
-	log             *zap.SugaredLogger
+	log             zerolog.Logger
 	e               *etcd.Store
 	readDB          *readdb.ReadDB
 	ost             *objectstorage.ObjStorage
@@ -45,9 +45,9 @@ type ActionHandler struct {
 	maintenanceMode bool
 }
 
-func NewActionHandler(logger *zap.Logger, e *etcd.Store, readDB *readdb.ReadDB, ost *objectstorage.ObjStorage, dm *datamanager.DataManager) *ActionHandler {
+func NewActionHandler(log zerolog.Logger, e *etcd.Store, readDB *readdb.ReadDB, ost *objectstorage.ObjStorage, dm *datamanager.DataManager) *ActionHandler {
 	return &ActionHandler{
-		log:             logger.Sugar(),
+		log:             log,
 		e:               e,
 		readDB:          readDB,
 		ost:             ost,
@@ -196,14 +196,14 @@ func (h *ActionHandler) newRun(ctx context.Context, req *RunCreateRequest) (*typ
 	id := seq.String()
 
 	if err := runconfig.CheckRunConfigTasks(rcts); err != nil {
-		h.log.Errorf("check run config tasks failed: %+v", err)
+		h.log.Err(err).Msgf("check run config tasks failed")
 		setupErrors = append(setupErrors, err.Error())
 	}
 
 	// generate tasks levels
 	if len(setupErrors) == 0 {
 		if err := runconfig.GenTasksLevels(rcts); err != nil {
-			h.log.Errorf("gen tasks leveles failed: %+v", err)
+			h.log.Err(err).Msgf("gen tasks leveles failed")
 			setupErrors = append(setupErrors, err.Error())
 		}
 	}
@@ -221,7 +221,7 @@ func (h *ActionHandler) newRun(ctx context.Context, req *RunCreateRequest) (*typ
 	}
 
 	run := genRun(rc)
-	h.log.Debugf("created run: %s", util.Dump(run))
+	h.log.Debug().Msgf("created run: %s", util.Dump(run))
 
 	return &types.RunBundle{
 		Run: run,
@@ -238,7 +238,7 @@ func (h *ActionHandler) recreateRun(ctx context.Context, req *RunCreateRequest) 
 	id := seq.String()
 
 	// fetch the existing runconfig and run
-	h.log.Infof("creating run from existing run")
+	h.log.Info().Msgf("creating run from existing run")
 	rc, err := store.OSTGetRunConfig(h.dm, req.RunID)
 	if err != nil {
 		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("runconfig %q doesn't exist: %w", req.RunID, err))
@@ -252,8 +252,8 @@ func (h *ActionHandler) recreateRun(ctx context.Context, req *RunCreateRequest) 
 		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("run %q doesn't exist: %w", req.RunID, err))
 	}
 
-	h.log.Debugf("rc: %s", util.Dump(rc))
-	h.log.Debugf("run: %s", util.Dump(run))
+	h.log.Debug().Msgf("rc: %s", util.Dump(rc))
+	h.log.Debug().Msgf("run: %s", util.Dump(run))
 
 	if req.FromStart {
 		if canRestart, reason := run.CanRestartFromScratch(); !canRestart {
@@ -267,8 +267,8 @@ func (h *ActionHandler) recreateRun(ctx context.Context, req *RunCreateRequest) 
 
 	rb := recreateRun(util.DefaultUUIDGenerator{}, run, rc, id, req)
 
-	h.log.Debugf("created rc from existing rc: %s", util.Dump(rb.Rc))
-	h.log.Debugf("created run from existing run: %s", util.Dump(rb.Run))
+	h.log.Debug().Msgf("created rc from existing rc: %s", util.Dump(rb.Rc))
+	h.log.Debug().Msgf("created run from existing run: %s", util.Dump(rb.Run))
 
 	return rb, nil
 }
@@ -391,7 +391,7 @@ func (h *ActionHandler) saveRun(ctx context.Context, rb *types.RunBundle, runcgt
 	rc := rb.Rc
 
 	c, cgt, err := h.getRunCounter(ctx, run.Group)
-	h.log.Debugf("c: %d, cgt: %s", c, util.Dump(cgt))
+	h.log.Debug().Msgf("c: %d, cgt: %s", c, util.Dump(cgt))
 	if err != nil {
 		return err
 	}

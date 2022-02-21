@@ -31,6 +31,7 @@ import (
 	"agola.io/agola/internal/services/runservice/store"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/runservice/types"
+	"github.com/rs/zerolog"
 
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/clientv3/concurrency"
@@ -77,9 +78,9 @@ func taskMatchesParentDependCondition(ctx context.Context, rt *types.RunTask, r 
 	return len(parents) == matchedNum
 }
 
-func advanceRunTasks(ctx context.Context, curRun *types.Run, rc *types.RunConfig, scheduledExecutorTasks []*types.ExecutorTask) (*types.Run, error) {
-	log.Debugf("run: %s", util.Dump(curRun))
-	log.Debugf("rc: %s", util.Dump(rc))
+func advanceRunTasks(ctx context.Context, log zerolog.Logger, curRun *types.Run, rc *types.RunConfig, scheduledExecutorTasks []*types.ExecutorTask) (*types.Run, error) {
+	log.Debug().Msgf("run: %s", util.Dump(curRun))
+	log.Debug().Msgf("rc: %s", util.Dump(rc))
 
 	// take a deepcopy of r so we do logic only on fixed status and not affeccted by current changes (due to random map iteration)
 	newRun := curRun.DeepCopy()
@@ -182,9 +183,9 @@ func advanceRunTasks(ctx context.Context, curRun *types.Run, rc *types.RunConfig
 	return newRun, nil
 }
 
-func getTasksToRun(ctx context.Context, r *types.Run, rc *types.RunConfig) ([]*types.RunTask, error) {
-	log.Debugf("run: %s", util.Dump(r))
-	log.Debugf("rc: %s", util.Dump(rc))
+func getTasksToRun(ctx context.Context, log zerolog.Logger, r *types.Run, rc *types.RunConfig) ([]*types.RunTask, error) {
+	log.Debug().Msgf("run: %s", util.Dump(r))
+	log.Debug().Msgf("rc: %s", util.Dump(rc))
 
 	tasksToRun := []*types.RunTask{}
 	// get tasks that can be executed
@@ -226,7 +227,7 @@ func getTasksToRun(ctx context.Context, r *types.Run, rc *types.RunConfig) ([]*t
 }
 
 func (s *Runservice) submitRunTasks(ctx context.Context, r *types.Run, rc *types.RunConfig, tasks []*types.RunTask) error {
-	log.Debugf("tasksToRun: %s", util.Dump(tasks))
+	s.log.Debug().Msgf("tasksToRun: %s", util.Dump(tasks))
 
 	for _, rt := range tasks {
 		rct := rc.Tasks[rt.ID]
@@ -236,12 +237,12 @@ func (s *Runservice) submitRunTasks(ctx context.Context, r *types.Run, rc *types
 			return err
 		}
 		if executor == nil {
-			log.Warnf("cannot choose an executor")
+			s.log.Warn().Msgf("cannot choose an executor")
 			return nil
 		}
 
 		et := common.GenExecutorTask(r, rt, rc, executor)
-		log.Debugf("et: %s", util.Dump(et))
+		s.log.Debug().Msgf("et: %s", util.Dump(et))
 
 		// check that the executorTask wasn't already scheduled
 		// just a check but it's not really needed since the call to
@@ -339,7 +340,7 @@ func (s *Runservice) sendExecutorTask(ctx context.Context, et *types.ExecutorTas
 		return err
 	}
 	if executor == nil {
-		log.Warnf("executor with id %q doesn't exist", et.Spec.ExecutorID)
+		s.log.Warn().Msgf("executor with id %q doesn't exist", et.Spec.ExecutorID)
 		return nil
 	}
 
@@ -381,7 +382,7 @@ func (s *Runservice) sendExecutorTask(ctx context.Context, et *types.ExecutorTas
 func (s *Runservice) compactChangeGroupsLoop(ctx context.Context) {
 	for {
 		if err := s.compactChangeGroups(ctx); err != nil {
-			log.Errorf("err: %+v", err)
+			s.log.Err(err).Send()
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
@@ -448,7 +449,7 @@ func (s *Runservice) compactChangeGroups(ctx context.Context) error {
 				return etcd.FromEtcdError(err)
 			}
 			if !tresp.Succeeded {
-				log.Errorf("failed to update change group min revision key due to concurrent update")
+				s.log.Error().Msgf("failed to update change group min revision key due to concurrent update")
 			}
 		}
 	}
@@ -456,7 +457,7 @@ func (s *Runservice) compactChangeGroups(ctx context.Context) error {
 }
 
 func (s *Runservice) scheduleRun(ctx context.Context, r *types.Run, rc *types.RunConfig) error {
-	log.Debugf("r: %s", util.Dump(r))
+	s.log.Debug().Msgf("r: %s", util.Dump(r))
 
 	prevPhase := r.Phase
 	prevResult := r.Result
@@ -470,7 +471,7 @@ func (s *Runservice) scheduleRun(ctx context.Context, r *types.Run, rc *types.Ru
 		return err
 	}
 
-	if err := advanceRun(ctx, r, rc, scheduledExecutorTasks); err != nil {
+	if err := advanceRun(ctx, s.log, r, rc, scheduledExecutorTasks); err != nil {
 		return err
 	}
 
@@ -504,7 +505,7 @@ func (s *Runservice) scheduleRun(ctx context.Context, r *types.Run, rc *types.Ru
 
 	// advance tasks
 	if r.Phase == types.RunPhaseRunning {
-		r, err := advanceRunTasks(ctx, r, rc, scheduledExecutorTasks)
+		r, err := advanceRunTasks(ctx, s.log, r, rc, scheduledExecutorTasks)
 		if err != nil {
 			return err
 		}
@@ -513,7 +514,7 @@ func (s *Runservice) scheduleRun(ctx context.Context, r *types.Run, rc *types.Ru
 			return err
 		}
 
-		tasksToRun, err := getTasksToRun(ctx, r, rc)
+		tasksToRun, err := getTasksToRun(ctx, s.log, r, rc)
 		if err != nil {
 			return err
 		}
@@ -526,21 +527,21 @@ func (s *Runservice) scheduleRun(ctx context.Context, r *types.Run, rc *types.Ru
 
 // advanceRun updates the run result and phase. It must be the unique function that
 // should update them.
-func advanceRun(ctx context.Context, r *types.Run, rc *types.RunConfig, scheduledExecutorTasks []*types.ExecutorTask) error {
-	log.Debugf("run: %s", util.Dump(r))
+func advanceRun(ctx context.Context, log zerolog.Logger, r *types.Run, rc *types.RunConfig, scheduledExecutorTasks []*types.ExecutorTask) error {
+	log.Debug().Msgf("run: %s", util.Dump(r))
 	hasScheduledTasks := len(scheduledExecutorTasks) > 0
 
 	// fail run if a task is failed
 	if !r.Result.IsSet() && r.Phase == types.RunPhaseRunning {
 		for _, rt := range r.Tasks {
 			rct, ok := rc.Tasks[rt.ID]
-			log.Debugf("rct: %s", util.Dump(rct))
+			log.Debug().Msgf("rct: %s", util.Dump(rct))
 			if !ok {
 				return errors.Errorf("no such run config task with id %s for run config %s", rt.ID, rc.ID)
 			}
 			if rt.Status == types.RunTaskStatusFailed {
 				if !rct.IgnoreFailure {
-					log.Debugf("marking run %q as failed is task %q is failed", r.ID, rt.ID)
+					log.Debug().Msgf("marking run %q as failed is task %q is failed", r.ID, rt.ID)
 					r.Result = types.RunResultFailed
 					break
 				}
@@ -589,7 +590,7 @@ func advanceRun(ctx context.Context, r *types.Run, rc *types.RunConfig, schedule
 		// all not started runtasks' fetch phases (setup step, logs and archives) as finished
 		if r.Phase.IsFinished() {
 			for _, rt := range r.Tasks {
-				log.Debugf("rt: %s", util.Dump(rt))
+				log.Debug().Msgf("rt: %s", util.Dump(rt))
 				if rt.Status == types.RunTaskStatusNotStarted {
 					rt.SetupStep.LogPhase = types.RunTaskFetchPhaseFinished
 					for _, s := range rt.Steps {
@@ -628,7 +629,7 @@ func (s *Runservice) handleExecutorTaskUpdate(ctx context.Context, et *types.Exe
 }
 
 func (s *Runservice) updateRunTaskStatus(ctx context.Context, et *types.ExecutorTask, r *types.Run) error {
-	log.Debugf("et: %s", util.Dump(et))
+	s.log.Debug().Msgf("et: %s", util.Dump(et))
 
 	rt, ok := r.Tasks[et.ID]
 	if !ok {
@@ -674,7 +675,7 @@ func (s *Runservice) updateRunTaskStatus(ctx context.Context, et *types.Executor
 		}
 	}
 	if wrongstatus {
-		log.Warnf("ignoring wrong executor task %q status: %q, rt status: %q", et.ID, et.Status.Phase, rt.Status)
+		s.log.Warn().Msgf("ignoring wrong executor task %q status: %q, rt status: %q", et.ID, et.Status.Phase, rt.Status)
 		return nil
 	}
 
@@ -717,7 +718,7 @@ func (s *Runservice) executorTaskUpdateHandler(ctx context.Context, c <-chan *ty
 				if err := s.handleExecutorTaskUpdate(ctx, et); err != nil {
 					// TODO(sgotti) improve logging to not return "run modified errors" since
 					// they are normal
-					log.Warnf("err: %+v", err)
+					s.log.Warn().Msgf("err: %+v", err)
 				}
 			}()
 		}
@@ -726,10 +727,10 @@ func (s *Runservice) executorTaskUpdateHandler(ctx context.Context, c <-chan *ty
 
 func (s *Runservice) executorTasksCleanerLoop(ctx context.Context) {
 	for {
-		log.Debugf("executorTasksCleaner")
+		s.log.Debug().Msgf("executorTasksCleaner")
 
 		if err := s.executorTasksCleaner(ctx); err != nil {
-			log.Errorf("err: %+v", err)
+			s.log.Err(err).Send()
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
@@ -751,12 +752,12 @@ func (s *Runservice) executorTasksCleaner(ctx context.Context) error {
 	for _, kv := range resp.Kvs {
 		var et *types.ExecutorTask
 		if err := json.Unmarshal(kv.Value, &et); err != nil {
-			log.Errorf("err: %+v", err)
+			s.log.Err(err).Send()
 			continue
 		}
 		et.Revision = kv.ModRevision
 		if err := s.executorTaskCleaner(ctx, et); err != nil {
-			log.Errorf("err: %+v", err)
+			s.log.Err(err).Send()
 		}
 	}
 
@@ -764,19 +765,19 @@ func (s *Runservice) executorTasksCleaner(ctx context.Context) error {
 }
 
 func (s *Runservice) executorTaskCleaner(ctx context.Context, et *types.ExecutorTask) error {
-	log.Debugf("et: %s", util.Dump(et))
+	s.log.Debug().Msgf("et: %s", util.Dump(et))
 	if et.Status.Phase.IsFinished() {
 		r, _, err := store.GetRun(ctx, s.e, et.Spec.RunID)
 		if err != nil {
 			if errors.Is(err, etcd.ErrKeyNotFound) {
 				// run doesn't exists, remove executor task
 				if err := store.DeleteExecutorTask(ctx, s.e, et.ID); err != nil {
-					log.Errorf("err: %+v", err)
+					s.log.Err(err).Send()
 					return err
 				}
 				return nil
 			}
-			log.Errorf("err: %+v", err)
+			s.log.Err(err).Send()
 			return err
 		}
 
@@ -788,7 +789,7 @@ func (s *Runservice) executorTaskCleaner(ctx context.Context, et *types.Executor
 					return err
 				}
 				if err := s.sendExecutorTask(ctx, et); err != nil {
-					log.Errorf("err: %+v", err)
+					s.log.Err(err).Send()
 					return err
 				}
 			}
@@ -802,7 +803,7 @@ func (s *Runservice) executorTaskCleaner(ctx context.Context, et *types.Executor
 			return err
 		}
 		if executor == nil {
-			log.Warnf("executor with id %q doesn't exist. marking executor task %q as failed", et.Spec.ExecutorID, et.ID)
+			s.log.Warn().Msgf("executor with id %q doesn't exist. marking executor task %q as failed", et.Spec.ExecutorID, et.ID)
 			et.Status.FailError = "executor deleted"
 			et.Status.Phase = types.ExecutorTaskPhaseFailed
 			et.Status.EndTime = util.TimeP(time.Now())
@@ -822,10 +823,10 @@ func (s *Runservice) executorTaskCleaner(ctx context.Context, et *types.Executor
 
 func (s *Runservice) runTasksUpdaterLoop(ctx context.Context) {
 	for {
-		log.Debugf("runTasksUpdater")
+		s.log.Debug().Msgf("runTasksUpdater")
 
 		if err := s.runTasksUpdater(ctx); err != nil {
-			log.Errorf("err: %+v", err)
+			s.log.Err(err).Send()
 		}
 
 		sleepCh := time.NewTimer(10 * time.Second).C
@@ -838,7 +839,7 @@ func (s *Runservice) runTasksUpdaterLoop(ctx context.Context) {
 }
 
 func (s *Runservice) runTasksUpdater(ctx context.Context) error {
-	log.Debugf("runTasksUpdater")
+	s.log.Debug().Msgf("runTasksUpdater")
 
 	session, err := concurrency.NewSession(s.e.Client(), concurrency.WithTTL(5), concurrency.WithContext(ctx))
 	if err != nil {
@@ -869,7 +870,7 @@ func (s *Runservice) runTasksUpdater(ctx context.Context) error {
 		}
 		et.Revision = kv.ModRevision
 		if err := s.handleExecutorTaskUpdate(ctx, et); err != nil {
-			log.Errorf("err: %v", err)
+			s.log.Err(err).Send()
 		}
 	}
 
@@ -891,7 +892,7 @@ func (s *Runservice) fetchLog(ctx context.Context, rt *types.RunTask, setup bool
 	}
 	if et == nil {
 		if rt.Status != types.RunTaskStatusSkipped {
-			log.Errorf("executor task with id %q doesn't exist. This shouldn't happen. Skipping fetching", rt.ID)
+			s.log.Error().Msgf("executor task with id %q doesn't exist. This shouldn't happen. Skipping fetching", rt.ID)
 		}
 		return nil
 	}
@@ -900,7 +901,7 @@ func (s *Runservice) fetchLog(ctx context.Context, rt *types.RunTask, setup bool
 		return err
 	}
 	if executor == nil {
-		log.Warnf("executor with id %q doesn't exist. Skipping fetching", et.Spec.ExecutorID)
+		s.log.Warn().Msgf("executor with id %q doesn't exist. Skipping fetching", et.Spec.ExecutorID)
 		return nil
 	}
 
@@ -1018,15 +1019,15 @@ func (s *Runservice) finishArchivePhase(ctx context.Context, runID, runTaskID st
 }
 
 func (s *Runservice) fetchTaskLogs(ctx context.Context, runID string, rt *types.RunTask) {
-	log.Debugf("fetchTaskLogs")
+	s.log.Debug().Msgf("fetchTaskLogs")
 
 	// fetch setup log
 	if rt.SetupStep.LogPhase == types.RunTaskFetchPhaseNotStarted {
 		if err := s.fetchLog(ctx, rt, true, 0); err != nil {
-			log.Errorf("err: %+v", err)
+			s.log.Err(err).Send()
 		} else {
 			if err := s.finishSetupLogPhase(ctx, runID, rt.ID); err != nil {
-				log.Errorf("err: %+v", err)
+				s.log.Err(err).Send()
 			}
 		}
 	}
@@ -1036,11 +1037,11 @@ func (s *Runservice) fetchTaskLogs(ctx context.Context, runID string, rt *types.
 		lp := rts.LogPhase
 		if lp == types.RunTaskFetchPhaseNotStarted {
 			if err := s.fetchLog(ctx, rt, false, i); err != nil {
-				log.Errorf("err: %+v", err)
+				s.log.Err(err).Send()
 				continue
 			}
 			if err := s.finishStepLogPhase(ctx, runID, rt.ID, i); err != nil {
-				log.Errorf("err: %+v", err)
+				s.log.Err(err).Send()
 				continue
 			}
 		}
@@ -1054,7 +1055,7 @@ func (s *Runservice) fetchArchive(ctx context.Context, rt *types.RunTask, stepnu
 	}
 	if et == nil {
 		if rt.Status != types.RunTaskStatusSkipped {
-			log.Errorf("executor task with id %q doesn't exist. This shouldn't happen. Skipping fetching", rt.ID)
+			s.log.Error().Msgf("executor task with id %q doesn't exist. This shouldn't happen. Skipping fetching", rt.ID)
 		}
 		return nil
 	}
@@ -1063,7 +1064,7 @@ func (s *Runservice) fetchArchive(ctx context.Context, rt *types.RunTask, stepnu
 		return err
 	}
 	if executor == nil {
-		log.Warnf("executor with id %q doesn't exist. Skipping fetching", et.Spec.ExecutorID)
+		s.log.Warn().Msgf("executor with id %q doesn't exist. Skipping fetching", et.Spec.ExecutorID)
 		return nil
 	}
 
@@ -1077,7 +1078,7 @@ func (s *Runservice) fetchArchive(ctx context.Context, rt *types.RunTask, stepnu
 	}
 
 	u := fmt.Sprintf(executor.ListenURL+"/api/v1alpha/executor/archives?taskid=%s&step=%d", rt.ID, stepnum)
-	log.Debugf("fetchArchive: %s", u)
+	s.log.Debug().Msgf("fetchArchive: %s", u)
 	r, err := http.Get(u)
 	if err != nil {
 		return err
@@ -1105,17 +1106,17 @@ func (s *Runservice) fetchArchive(ctx context.Context, rt *types.RunTask, stepnu
 }
 
 func (s *Runservice) fetchTaskArchives(ctx context.Context, runID string, rt *types.RunTask) {
-	log.Debugf("fetchTaskArchives")
+	s.log.Debug().Msgf("fetchTaskArchives")
 
 	for i, stepnum := range rt.WorkspaceArchives {
 		phase := rt.WorkspaceArchivesPhase[i]
 		if phase == types.RunTaskFetchPhaseNotStarted {
 			if err := s.fetchArchive(ctx, rt, stepnum); err != nil {
-				log.Errorf("err: %+v", err)
+				s.log.Err(err).Send()
 				continue
 			}
 			if err := s.finishArchivePhase(ctx, runID, rt.ID, stepnum); err != nil {
-				log.Errorf("err: %+v", err)
+				s.log.Err(err).Send()
 				continue
 			}
 		}
@@ -1124,10 +1125,10 @@ func (s *Runservice) fetchTaskArchives(ctx context.Context, runID string, rt *ty
 
 func (s *Runservice) fetcherLoop(ctx context.Context) {
 	for {
-		log.Debugf("fetcher")
+		s.log.Debug().Msgf("fetcher")
 
 		if err := s.fetcher(ctx); err != nil {
-			log.Errorf("err: %+v", err)
+			s.log.Err(err).Send()
 		}
 
 		sleepCh := time.NewTimer(2 * time.Second).C
@@ -1140,15 +1141,15 @@ func (s *Runservice) fetcherLoop(ctx context.Context) {
 }
 
 func (s *Runservice) fetcher(ctx context.Context) error {
-	log.Debugf("fetcher")
+	s.log.Debug().Msgf("fetcher")
 	runs, err := store.GetRuns(ctx, s.e)
 	if err != nil {
 		return err
 	}
 	for _, r := range runs {
-		log.Debugf("r: %s", util.Dump(r))
+		s.log.Debug().Msgf("r: %s", util.Dump(r))
 		for _, rt := range r.Tasks {
-			log.Debugf("rt: %s", util.Dump(rt))
+			s.log.Debug().Msgf("rt: %s", util.Dump(rt))
 			if err := s.taskFetcher(ctx, r, rt); err != nil {
 				return err
 			}
@@ -1182,10 +1183,10 @@ func (s *Runservice) taskFetcher(ctx context.Context, r *types.Run, rt *types.Ru
 	runIDPath := store.OSTRunTaskLogsRunPath(rt.ID, r.ID)
 	exists, err := s.OSTFileExists(runIDPath)
 	if err != nil {
-		log.Errorf("err: %+v", err)
+		s.log.Err(err).Send()
 	} else if !exists {
 		if err := s.ost.WriteObject(runIDPath, bytes.NewReader([]byte{}), 0, false); err != nil {
-			log.Errorf("err: %+v", err)
+			s.log.Err(err).Send()
 		}
 	}
 
@@ -1193,10 +1194,10 @@ func (s *Runservice) taskFetcher(ctx context.Context, r *types.Run, rt *types.Ru
 	runIDPath = store.OSTRunTaskArchivesRunPath(rt.ID, r.ID)
 	exists, err = s.OSTFileExists(runIDPath)
 	if err != nil {
-		log.Errorf("err: %+v", err)
+		s.log.Err(err).Send()
 	} else if !exists {
 		if err := s.ost.WriteObject(runIDPath, bytes.NewReader([]byte{}), 0, false); err != nil {
-			log.Errorf("err: %+v", err)
+			s.log.Err(err).Send()
 		}
 	}
 
@@ -1217,10 +1218,10 @@ func (s *Runservice) taskFetcher(ctx context.Context, r *types.Run, rt *types.Ru
 
 func (s *Runservice) runsSchedulerLoop(ctx context.Context) {
 	for {
-		log.Debugf("runsSchedulerLoop")
+		s.log.Debug().Msgf("runsSchedulerLoop")
 
 		if err := s.runsScheduler(ctx); err != nil {
-			log.Errorf("err: %+v", err)
+			s.log.Err(err).Send()
 		}
 
 		sleepCh := time.NewTimer(2 * time.Second).C
@@ -1233,14 +1234,14 @@ func (s *Runservice) runsSchedulerLoop(ctx context.Context) {
 }
 
 func (s *Runservice) runsScheduler(ctx context.Context) error {
-	log.Debugf("runsScheduler")
+	s.log.Debug().Msgf("runsScheduler")
 	runs, err := store.GetRuns(ctx, s.e)
 	if err != nil {
 		return err
 	}
 	for _, r := range runs {
 		if err := s.runScheduler(ctx, r); err != nil {
-			log.Errorf("err: %+v", err)
+			s.log.Err(err).Send()
 		}
 	}
 
@@ -1248,7 +1249,7 @@ func (s *Runservice) runsScheduler(ctx context.Context) error {
 }
 
 func (s *Runservice) runScheduler(ctx context.Context, r *types.Run) error {
-	log.Debugf("runScheduler")
+	s.log.Debug().Msgf("runScheduler")
 	rc, err := store.OSTGetRunConfig(s.dm, r.ID)
 	if err != nil {
 		return errors.Errorf("cannot get run config %q: %w", r.ID, err)
@@ -1259,10 +1260,10 @@ func (s *Runservice) runScheduler(ctx context.Context, r *types.Run) error {
 
 func (s *Runservice) finishedRunsArchiverLoop(ctx context.Context) {
 	for {
-		log.Debugf("finished run archiver loop")
+		s.log.Debug().Msgf("finished run archiver loop")
 
 		if err := s.finishedRunsArchiver(ctx); err != nil {
-			log.Errorf("err: %+v", err)
+			s.log.Err(err).Send()
 		}
 
 		sleepCh := time.NewTimer(2 * time.Second).C
@@ -1275,14 +1276,14 @@ func (s *Runservice) finishedRunsArchiverLoop(ctx context.Context) {
 }
 
 func (s *Runservice) finishedRunsArchiver(ctx context.Context) error {
-	log.Debugf("finished run archiver")
+	s.log.Debug().Msgf("finished run archiver")
 	runs, err := store.GetRuns(ctx, s.e)
 	if err != nil {
 		return err
 	}
 	for _, r := range runs {
 		if err := s.finishedRunArchiver(ctx, r); err != nil {
-			log.Errorf("err: %+v", err)
+			s.log.Err(err).Send()
 		}
 	}
 
@@ -1294,7 +1295,7 @@ func (s *Runservice) finishedRunsArchiver(ctx context.Context) error {
 	for _, r := range runs {
 		if r.Archived {
 			if err := s.runOSTArchiver(ctx, r); err != nil {
-				log.Errorf("err: %+v", err)
+				s.log.Err(err).Send()
 			}
 		}
 	}
@@ -1325,7 +1326,7 @@ func (s *Runservice) finishedRunArchiver(ctx context.Context, r *types.Run) erro
 	if !done {
 		return nil
 	}
-	log.Infof("run %q archiving completed", r.ID)
+	s.log.Info().Msgf("run %q archiving completed", r.ID)
 
 	r.Archived = true
 	if _, err := store.AtomicPutRun(ctx, s.e, r, nil, nil); err != nil {
@@ -1338,7 +1339,7 @@ func (s *Runservice) finishedRunArchiver(ctx context.Context, r *types.Run) erro
 func (s *Runservice) runOSTArchiver(ctx context.Context, r *types.Run) error {
 	// TODO(sgotti) avoid saving multiple times the run on objectstorage if the
 	// store.DeletedArchivedRun fails
-	log.Infof("saving run in objectstorage: %s", r.ID)
+	s.log.Info().Msgf("saving run in objectstorage: %s", r.ID)
 	ra, err := store.OSTSaveRunAction(r)
 	if err != nil {
 		return err
@@ -1350,7 +1351,7 @@ func (s *Runservice) runOSTArchiver(ctx context.Context, r *types.Run) error {
 		return err
 	}
 
-	log.Infof("deleting run from etcd: %s", r.ID)
+	s.log.Info().Msgf("deleting run from etcd: %s", r.ID)
 	if err := store.DeleteRun(ctx, s.e, r.ID); err != nil {
 		return err
 	}
@@ -1361,7 +1362,7 @@ func (s *Runservice) runOSTArchiver(ctx context.Context, r *types.Run) error {
 func (s *Runservice) cacheCleanerLoop(ctx context.Context, cacheExpireInterval time.Duration) {
 	for {
 		if err := s.cacheCleaner(ctx, cacheExpireInterval); err != nil {
-			log.Errorf("err: %+v", err)
+			s.log.Err(err).Send()
 		}
 
 		sleepCh := time.NewTimer(cacheCleanerInterval).C
@@ -1374,7 +1375,7 @@ func (s *Runservice) cacheCleanerLoop(ctx context.Context, cacheExpireInterval t
 }
 
 func (s *Runservice) cacheCleaner(ctx context.Context, cacheExpireInterval time.Duration) error {
-	log.Debugf("cacheCleaner")
+	s.log.Debug().Msgf("cacheCleaner")
 
 	session, err := concurrency.NewSession(s.e.Client(), concurrency.WithTTL(5), concurrency.WithContext(ctx))
 	if err != nil {
@@ -1401,7 +1402,7 @@ func (s *Runservice) cacheCleaner(ctx context.Context, cacheExpireInterval time.
 		if object.LastModified.Add(cacheExpireInterval).Before(time.Now()) {
 			if err := s.ost.DeleteObject(object.Path); err != nil {
 				if !objectstorage.IsNotExist(err) {
-					log.Warnf("failed to delete cache object %q: %v", object.Path, err)
+					s.log.Warn().Msgf("failed to delete cache object %q: %v", object.Path, err)
 				}
 			}
 		}
@@ -1413,7 +1414,7 @@ func (s *Runservice) cacheCleaner(ctx context.Context, cacheExpireInterval time.
 func (s *Runservice) workspaceCleanerLoop(ctx context.Context, workspaceExpireInterval time.Duration) {
 	for {
 		if err := s.workspaceCleaner(ctx, workspaceExpireInterval); err != nil {
-			log.Errorf("err: %+v", err)
+			s.log.Err(err).Send()
 		}
 
 		sleepCh := time.NewTimer(workspaceCleanerInterval).C
@@ -1426,7 +1427,7 @@ func (s *Runservice) workspaceCleanerLoop(ctx context.Context, workspaceExpireIn
 }
 
 func (s *Runservice) workspaceCleaner(ctx context.Context, workspaceExpireInterval time.Duration) error {
-	log.Debugf("workspaceCleaner")
+	s.log.Debug().Msgf("workspaceCleaner")
 
 	session, err := concurrency.NewSession(s.e.Client(), concurrency.WithTTL(5), concurrency.WithContext(ctx))
 	if err != nil {
@@ -1453,7 +1454,7 @@ func (s *Runservice) workspaceCleaner(ctx context.Context, workspaceExpireInterv
 		if object.LastModified.Add(workspaceExpireInterval).Before(time.Now()) {
 			if err := s.ost.DeleteObject(object.Path); err != nil {
 				if !objectstorage.IsNotExist(err) {
-					log.Warnf("failed to delete workspace object %q: %v", object.Path, err)
+					s.log.Warn().Msgf("failed to delete workspace object %q: %v", object.Path, err)
 				}
 			}
 		}

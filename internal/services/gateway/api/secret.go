@@ -25,7 +25,7 @@ import (
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 
 	"github.com/gorilla/mux"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 )
 
 func createSecretResponse(s *csapitypes.Secret) *gwapitypes.SecretResponse {
@@ -37,12 +37,12 @@ func createSecretResponse(s *csapitypes.Secret) *gwapitypes.SecretResponse {
 }
 
 type SecretHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewSecretHandler(logger *zap.Logger, ah *action.ActionHandler) *SecretHandler {
-	return &SecretHandler{log: logger.Sugar(), ah: ah}
+func NewSecretHandler(log zerolog.Logger, ah *action.ActionHandler) *SecretHandler {
+	return &SecretHandler{log: log, ah: ah}
 }
 
 func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -53,7 +53,7 @@ func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -65,7 +65,7 @@ func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	cssecrets, err := h.ah.GetSecrets(ctx, areq)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -75,17 +75,17 @@ func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := util.HTTPResponse(w, http.StatusOK, secrets); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type CreateSecretHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewCreateSecretHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateSecretHandler {
-	return &CreateSecretHandler{log: logger.Sugar(), ah: ah}
+func NewCreateSecretHandler(log zerolog.Logger, ah *action.ActionHandler) *CreateSecretHandler {
+	return &CreateSecretHandler{log: log, ah: ah}
 }
 
 func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -113,23 +113,23 @@ func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 	cssecret, err := h.ah.CreateSecret(ctx, areq)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	res := createSecretResponse(cssecret)
 	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type UpdateSecretHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewUpdateSecretHandler(logger *zap.Logger, ah *action.ActionHandler) *UpdateSecretHandler {
-	return &UpdateSecretHandler{log: logger.Sugar(), ah: ah}
+func NewUpdateSecretHandler(log zerolog.Logger, ah *action.ActionHandler) *UpdateSecretHandler {
+	return &UpdateSecretHandler{log: log, ah: ah}
 }
 
 func (h *UpdateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -139,7 +139,7 @@ func (h *UpdateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -162,23 +162,23 @@ func (h *UpdateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 	cssecret, err := h.ah.UpdateSecret(ctx, areq)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	res := createSecretResponse(cssecret)
 	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type DeleteSecretHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewDeleteSecretHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteSecretHandler {
-	return &DeleteSecretHandler{log: logger.Sugar(), ah: ah}
+func NewDeleteSecretHandler(log zerolog.Logger, ah *action.ActionHandler) *DeleteSecretHandler {
+	return &DeleteSecretHandler{log: log, ah: ah}
 }
 
 func (h *DeleteSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -193,11 +193,11 @@ func (h *DeleteSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	err = h.ah.DeleteSecret(ctx, parentType, parentRef, secretName)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }

@@ -33,17 +33,17 @@ import (
 	errors "golang.org/x/xerrors"
 
 	"github.com/gorilla/mux"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 )
 
 type ExecutorStatusHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	e   *etcd.Store
 	ah  *action.ActionHandler
 }
 
-func NewExecutorStatusHandler(logger *zap.Logger, e *etcd.Store, ah *action.ActionHandler) *ExecutorStatusHandler {
-	return &ExecutorStatusHandler{log: logger.Sugar(), e: e, ah: ah}
+func NewExecutorStatusHandler(log zerolog.Logger, e *etcd.Store, ah *action.ActionHandler) *ExecutorStatusHandler {
+	return &ExecutorStatusHandler{log: log, e: e, ah: ah}
 }
 
 func (h *ExecutorStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -99,7 +99,7 @@ func (h *ExecutorStatusHandler) deleteStaleExecutors(ctx context.Context, curExe
 		}
 		if !active {
 			if err := h.ah.DeleteExecutor(ctx, executor.ID); err != nil {
-				h.log.Errorf("failed to delete executor %q: %v", executor.ID, err)
+				h.log.Err(err).Msgf("failed to delete executor %q: %v", executor.ID, err)
 			}
 		}
 	}
@@ -138,12 +138,12 @@ func (h *ExecutorTaskStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 }
 
 type ExecutorTaskHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewExecutorTaskHandler(logger *zap.Logger, ah *action.ActionHandler) *ExecutorTaskHandler {
-	return &ExecutorTaskHandler{log: logger.Sugar(), ah: ah}
+func NewExecutorTaskHandler(log zerolog.Logger, ah *action.ActionHandler) *ExecutorTaskHandler {
+	return &ExecutorTaskHandler{log: log, ah: ah}
 }
 
 func (h *ExecutorTaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -159,22 +159,22 @@ func (h *ExecutorTaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	et, err := h.ah.GetExecutorTask(ctx, etID)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	if err := util.HTTPResponse(w, http.StatusOK, et); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type ExecutorTasksHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewExecutorTasksHandler(logger *zap.Logger, ah *action.ActionHandler) *ExecutorTasksHandler {
-	return &ExecutorTasksHandler{log: logger.Sugar(), ah: ah}
+func NewExecutorTasksHandler(log zerolog.Logger, ah *action.ActionHandler) *ExecutorTasksHandler {
+	return &ExecutorTasksHandler{log: log, ah: ah}
 }
 
 func (h *ExecutorTasksHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -201,13 +201,13 @@ func (h *ExecutorTasksHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 }
 
 type ArchivesHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ost *objectstorage.ObjStorage
 }
 
-func NewArchivesHandler(logger *zap.Logger, ost *objectstorage.ObjStorage) *ArchivesHandler {
+func NewArchivesHandler(log zerolog.Logger, ost *objectstorage.ObjStorage) *ArchivesHandler {
 	return &ArchivesHandler{
-		log: logger.Sugar(),
+		log: log,
 		ost: ost,
 	}
 }
@@ -262,13 +262,13 @@ func (h *ArchivesHandler) readArchive(rtID string, step int, w io.Writer) error 
 }
 
 type CacheHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ost *objectstorage.ObjStorage
 }
 
-func NewCacheHandler(logger *zap.Logger, ost *objectstorage.ObjStorage) *CacheHandler {
+func NewCacheHandler(log zerolog.Logger, ost *objectstorage.ObjStorage) *CacheHandler {
 	return &CacheHandler{
-		log: logger.Sugar(),
+		log: log,
 		ost: ost,
 	}
 }
@@ -371,13 +371,13 @@ func (h *CacheHandler) readCache(key string, w io.Writer) error {
 }
 
 type CacheCreateHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ost *objectstorage.ObjStorage
 }
 
-func NewCacheCreateHandler(logger *zap.Logger, ost *objectstorage.ObjStorage) *CacheCreateHandler {
+func NewCacheCreateHandler(log zerolog.Logger, ost *objectstorage.ObjStorage) *CacheCreateHandler {
 	return &CacheCreateHandler{
-		log: logger.Sugar(),
+		log: log,
 		ost: ost,
 	}
 }
@@ -427,13 +427,13 @@ func (h *CacheCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type ExecutorDeleteHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewExecutorDeleteHandler(logger *zap.Logger, ah *action.ActionHandler) *ExecutorDeleteHandler {
+func NewExecutorDeleteHandler(log zerolog.Logger, ah *action.ActionHandler) *ExecutorDeleteHandler {
 	return &ExecutorDeleteHandler{
-		log: logger.Sugar(),
+		log: log,
 		ah:  ah,
 	}
 }

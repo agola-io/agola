@@ -16,19 +16,19 @@ func (s *Gitserver) repoCleanerLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Info("repoCleaner exiting")
+			s.log.Info().Msgf("repoCleaner exiting")
 
 			return
 		case <-time.After(s.c.RepositoryCleanupInterval):
 			if err := s.scanRepos(ctx); err != nil {
-				log.Errorf("scanRepos error: %v", err)
+				s.log.Err(err).Msgf("scanRepos error")
 			}
 		}
 	}
 }
 
 func (s *Gitserver) scanRepos(ctx context.Context) error {
-	log.Info("repoCleaner scanRepos start")
+	s.log.Info().Msgf("repoCleaner scanRepos start")
 
 	usersDir, err := ioutil.ReadDir(s.c.DataDir)
 	if err != nil {
@@ -47,12 +47,12 @@ func (s *Gitserver) scanRepos(ctx context.Context) error {
 			}
 
 			if err := s.scanRepo(ctx, filepath.Join(s.c.DataDir, u.Name(), r.Name())); err != nil {
-				log.Errorf("scanRepo error: %v", err)
+				s.log.Err(err).Msgf("scanRepo error")
 			}
 		}
 	}
 
-	log.Info("repoCleaner scanRepos end")
+	s.log.Info().Msgf("repoCleaner scanRepos end")
 
 	return nil
 }
@@ -103,7 +103,7 @@ func (s *Gitserver) scanRepo(ctx context.Context, repoDir string) error {
 	}
 
 	if len(b) == 0 && len(t) == 0 {
-		log.Info("deleting repo:", repoDir)
+		s.log.Info().Msgf("deleting repo: %q", repoDir)
 		if err := s.deleteRepo(ctx, repoDir); err != nil {
 			return fmt.Errorf("failed to delete repository: %w", err)
 		}

@@ -61,7 +61,7 @@ func (r *ReadDB) deleteVariable(tx *db.Tx, id string) error {
 
 func (r *ReadDB) GetVariableByID(tx *db.Tx, variableID string) (*types.Variable, error) {
 	q, args, err := variableSelect.Where(sq.Eq{"id": variableID}).ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}
@@ -81,7 +81,7 @@ func (r *ReadDB) GetVariableByID(tx *db.Tx, variableID string) (*types.Variable,
 
 func (r *ReadDB) GetVariableByName(tx *db.Tx, parentID, name string) (*types.Variable, error) {
 	q, args, err := variableSelect.Where(sq.Eq{"parentid": parentID, "name": name}).ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}
@@ -101,7 +101,7 @@ func (r *ReadDB) GetVariableByName(tx *db.Tx, parentID, name string) (*types.Var
 
 func (r *ReadDB) GetVariables(tx *db.Tx, parentID string) ([]*types.Variable, error) {
 	q, args, err := variableSelect.Where(sq.Eq{"parentid": parentID}).ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}

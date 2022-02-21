@@ -19,6 +19,7 @@ import (
 
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
 )
@@ -28,7 +29,7 @@ var cmdOrgMemberRemove = &cobra.Command{
 	Short: "removes an organization member",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := orgMemberRemove(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -47,10 +48,10 @@ func init() {
 	flags.StringVar(&orgMemberRemoveOpts.username, "username", "", "user name")
 
 	if err := cmdOrgMemberRemove.MarkFlagRequired("orgname"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdOrgMemberRemove.MarkFlagRequired("username"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdOrgMember.AddCommand(cmdOrgMemberRemove)
@@ -59,7 +60,7 @@ func init() {
 func orgMemberRemove(cmd *cobra.Command, args []string) error {
 	gwclient := gwclient.NewClient(gatewayURL, token)
 
-	log.Infof("removing member %q from organization %q", orgMemberRemoveOpts.username, orgMemberRemoveOpts.orgname)
+	log.Info().Msgf("removing member %q from organization %q", orgMemberRemoveOpts.username, orgMemberRemoveOpts.orgname)
 	_, err := gwclient.RemoveOrgMember(context.TODO(), orgMemberRemoveOpts.orgname, orgMemberRemoveOpts.username)
 	if err != nil {
 		return errors.Errorf("failed to remove organization member: %w", err)

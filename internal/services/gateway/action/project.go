@@ -130,7 +130,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 		return nil, errors.Errorf("failed to get repository info from gitsource: %w", err)
 	}
 
-	h.log.Infof("generating ssh key pairs")
+	h.log.Info().Msgf("generating ssh key pairs")
 	privateKey, _, err := util.GenSSHKeyPair(4096)
 	if err != nil {
 		return nil, errors.Errorf("failed to generate ssh key pair: %w", err)
@@ -153,25 +153,25 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 		PassVarsToForkedPR:         req.PassVarsToForkedPR,
 	}
 
-	h.log.Infof("creating project")
+	h.log.Info().Msgf("creating project")
 	rp, _, err := h.configstoreClient.CreateProject(ctx, p)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to create project: %w", err))
 	}
-	h.log.Infof("project %s created, ID: %s", rp.Name, rp.ID)
+	h.log.Info().Msgf("project %s created, ID: %s", rp.Name, rp.ID)
 
 	if serr := h.setupGitSourceRepo(ctx, rs, user, la, rp); serr != nil {
 		var err error
-		h.log.Errorf("failed to setup git source repo, trying to cleanup: %+v", err)
+		h.log.Err(err).Msgf("failed to setup git source repo, trying to cleanup")
 		// try to cleanup gitsource configs and remove project
 		// we'll log but ignore errors
-		h.log.Infof("deleting project with ID: %q", rp.ID)
+		h.log.Info().Msgf("deleting project with ID: %q", rp.ID)
 		if _, err := h.configstoreClient.DeleteProject(ctx, rp.ID); err != nil {
-			h.log.Errorf("failed to delete project: %+v", err)
+			h.log.Err(err).Msgf("failed to delete project ")
 		}
-		h.log.Infof("cleanup git source repo")
+		h.log.Info().Msgf("cleanup git source repo")
 		if err := h.cleanupGitSourceRepo(ctx, rs, user, la, rp); err != nil {
-			h.log.Errorf("failed to cleanup git source repo: %+v", err)
+			h.log.Err(err).Msgf("failed to cleanup git source repo")
 		}
 		return nil, errors.Errorf("failed to setup git source repo: %w", serr)
 	}
@@ -214,12 +214,12 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, projectRef string, re
 		p.PassVarsToForkedPR = *req.PassVarsToForkedPR
 	}
 
-	h.log.Infof("updating project")
+	h.log.Info().Msgf("updating project")
 	rp, _, err := h.configstoreClient.UpdateProject(ctx, p.ID, p.Project)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to update project: %w", err))
 	}
-	h.log.Infof("project %s updated, ID: %s", p.Name, p.ID)
+	h.log.Info().Msgf("project %s updated, ID: %s", p.Name, p.ID)
 
 	return rp, nil
 }
@@ -273,12 +273,12 @@ func (h *ActionHandler) ProjectUpdateRepoLinkedAccount(ctx context.Context, proj
 
 	p.LinkedAccountID = la.ID
 
-	h.log.Infof("updating project")
+	h.log.Info().Msgf("updating project")
 	rp, _, err := h.configstoreClient.UpdateProject(ctx, p.ID, p.Project)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to update project: %w", err))
 	}
-	h.log.Infof("project %s updated, ID: %s", p.Name, p.ID)
+	h.log.Info().Msgf("project %s updated, ID: %s", p.Name, p.ID)
 
 	return rp, nil
 }
@@ -303,15 +303,15 @@ func (h *ActionHandler) setupGitSourceRepo(ctx context.Context, rs *cstypes.Remo
 	// can have multiple projects referencing the same remote repository and this
 	// will trigger multiple different runs
 	deployKeyName := fmt.Sprintf("agola deploy key - %s", project.ID)
-	h.log.Infof("creating/updating deploy key: %s", deployKeyName)
+	h.log.Info().Msgf("creating/updating deploy key: %s", deployKeyName)
 	if err := gitsource.UpdateDeployKey(project.RepositoryPath, deployKeyName, string(pubKey), true); err != nil {
 		return errors.Errorf("failed to create deploy key: %w", err)
 	}
-	h.log.Infof("deleting existing webhooks")
+	h.log.Info().Msgf("deleting existing webhooks")
 	if err := gitsource.DeleteRepoWebhook(project.RepositoryPath, webhookURL); err != nil {
 		return errors.Errorf("failed to delete repository webhook: %w", err)
 	}
-	h.log.Infof("creating webhook to url: %s", webhookURL)
+	h.log.Info().Msgf("creating webhook to url: %s", webhookURL)
 	if err := gitsource.CreateRepoWebhook(project.RepositoryPath, webhookURL, project.WebhookSecret); err != nil {
 		return errors.Errorf("failed to create repository webhook: %w", err)
 	}
@@ -334,11 +334,11 @@ func (h *ActionHandler) cleanupGitSourceRepo(ctx context.Context, rs *cstypes.Re
 	// can have multiple projects referencing the same remote repository and this
 	// will trigger multiple different runs
 	deployKeyName := fmt.Sprintf("agola deploy key - %s", project.ID)
-	h.log.Infof("deleting deploy key: %s", deployKeyName)
+	h.log.Info().Msgf("deleting deploy key: %s", deployKeyName)
 	if err := gitsource.DeleteDeployKey(project.RepositoryPath, deployKeyName); err != nil {
 		return errors.Errorf("failed to create deploy key: %w", err)
 	}
-	h.log.Infof("deleting existing webhooks")
+	h.log.Info().Msgf("deleting existing webhooks")
 	if err := gitsource.DeleteRepoWebhook(project.RepositoryPath, webhookURL); err != nil {
 		return errors.Errorf("failed to delete repository webhook: %w", err)
 	}
@@ -404,10 +404,10 @@ func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) er
 	user, rs, la, err := h.getRemoteRepoAccessData(ctx, p.LinkedAccountID)
 	if err != nil {
 		canDoRepCleanup = false
-		h.log.Errorf("failed to get remote repo access data: %+v", err)
+		h.log.Err(err).Msgf("failed to get remote repo access data: %+v", err)
 	}
 
-	h.log.Infof("deleting project with ID: %q", p.ID)
+	h.log.Info().Msgf("deleting project with ID: %q", p.ID)
 	if _, err = h.configstoreClient.DeleteProject(ctx, projectRef); err != nil {
 		return util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
@@ -415,9 +415,9 @@ func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) er
 	// try to cleanup gitsource configs
 	// we'll log but ignore errors
 	if canDoRepCleanup {
-		h.log.Infof("cleanup git source repo")
+		h.log.Info().Msgf("cleanup git source repo")
 		if err := h.cleanupGitSourceRepo(ctx, rs, user, la, p); err != nil {
-			h.log.Errorf("failed to cleanup git source repo: %+v", err)
+			h.log.Err(err).Msgf("failed to cleanup git source repo: %+v", err)
 		}
 	}
 

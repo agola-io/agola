@@ -27,8 +27,6 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zaptest"
 )
 
 func TestDockerPod(t *testing.T) {
@@ -40,11 +38,11 @@ func TestDockerPod(t *testing.T) {
 		t.Fatalf("env var AGOLA_TOOLBOX_PATH is undefined")
 	}
 
-	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+	log := testutil.NewLogger(t)
 
 	initImage := "busybox:stable"
 
-	d, err := NewDockerDriver(logger, "executorid01", toolboxPath, initImage, nil)
+	d, err := NewDockerDriver(log, "executorid01", toolboxPath, initImage, nil)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}

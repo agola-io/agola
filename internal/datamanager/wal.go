@@ -118,7 +118,7 @@ func (d *DataManager) ReadObject(dataType, id string, cgNames []string) (io.Read
 		for _, action := range actions {
 			if action.ActionType == ActionTypePut {
 				if action.DataType == dataType && action.ID == id {
-					d.log.Debugf("reading datatype %q, id %q from wal: %q", dataType, id)
+					d.log.Debug().Msgf("reading datatype %q, id %q from wal: %q", dataType, id, walseq)
 					return ioutil.NopCloser(bytes.NewReader(action.Data)), cgt, nil
 				}
 			}
@@ -455,7 +455,7 @@ func (d *DataManager) WriteWalAdditionalOps(ctx context.Context, actions []*Acti
 	if err := d.ost.WriteObject(walDataFilePath, bytes.NewReader(buf.Bytes()), int64(buf.Len()), true); err != nil {
 		return nil, fromOSTError(err)
 	}
-	d.log.Debugf("wrote wal file: %s", walDataFilePath)
+	d.log.Debug().Msgf("wrote wal file: %s", walDataFilePath)
 
 	walData := &WalData{
 		WalSequence:         walSequence.String(),
@@ -534,7 +534,7 @@ func (d *DataManager) WriteWalAdditionalOps(ctx context.Context, actions []*Acti
 
 	// try to commit storage right now
 	if err := d.sync(ctx); err != nil {
-		d.log.Errorf("wal sync error: %+v", err)
+		d.log.Err(err).Msgf("wal sync error")
 	}
 
 	return ncgt, nil
@@ -542,9 +542,9 @@ func (d *DataManager) WriteWalAdditionalOps(ctx context.Context, actions []*Acti
 
 func (d *DataManager) syncLoop(ctx context.Context) {
 	for {
-		d.log.Debugf("syncer")
+		d.log.Debug().Msgf("syncer")
 		if err := d.sync(ctx); err != nil {
-			d.log.Errorf("syncer error: %+v", err)
+			d.log.Err(err).Msgf("syncer error")
 		}
 
 		sleepCh := time.NewTimer(DefaultSyncInterval).C
@@ -587,7 +587,7 @@ func (d *DataManager) sync(ctx context.Context) error {
 		switch walData.WalStatus {
 		case WalStatusCommitted:
 			walFilePath := d.storageWalStatusFile(walData.WalSequence)
-			d.log.Debugf("syncing committed wal %q to storage", walData.WalSequence)
+			d.log.Debug().Msgf("syncing committed wal %q to storage", walData.WalSequence)
 			header := &WalHeader{
 				WalDataFileID:       walData.WalDataFileID,
 				PreviousWalSequence: walData.PreviousWalSequence,
@@ -602,7 +602,7 @@ func (d *DataManager) sync(ctx context.Context) error {
 				return fromOSTError(err)
 			}
 
-			d.log.Debugf("updating wal to state %q", WalStatusCommittedStorage)
+			d.log.Debug().Msgf("updating wal to state %q", WalStatusCommittedStorage)
 			walData.WalStatus = WalStatusCommittedStorage
 			walDataj, err := json.Marshal(walData)
 			if err != nil {
@@ -631,9 +631,9 @@ func (d *DataManager) sync(ctx context.Context) error {
 
 func (d *DataManager) checkpointLoop(ctx context.Context) {
 	for {
-		d.log.Debugf("checkpointer")
+		d.log.Debug().Msgf("checkpointer")
 		if err := d.checkpoint(ctx, false); err != nil {
-			d.log.Errorf("checkpoint error: %v", err)
+			d.log.Err(err).Msgf("checkpoint error")
 		}
 
 		sleepCh := time.NewTimer(d.checkpointInterval).C
@@ -675,7 +675,7 @@ func (d *DataManager) checkpoint(ctx context.Context, force bool) error {
 		walData.Revision = kv.ModRevision
 
 		if walData.WalStatus == WalStatusCommitted {
-			d.log.Warnf("wal %s not yet committed storage", walData.WalSequence)
+			d.log.Warn().Msgf("wal %s not yet committed storage", walData.WalSequence)
 			break
 		}
 		if walData.WalStatus == WalStatusCheckpointed {
@@ -696,7 +696,7 @@ func (d *DataManager) checkpoint(ctx context.Context, force bool) error {
 	}
 
 	for _, walData := range walsData {
-		d.log.Debugf("updating wal to state %q", WalStatusCheckpointed)
+		d.log.Debug().Msgf("updating wal to state %q", WalStatusCheckpointed)
 		walData.WalStatus = WalStatusCheckpointed
 		walDataj, err := json.Marshal(walData)
 		if err != nil {
@@ -713,9 +713,9 @@ func (d *DataManager) checkpoint(ctx context.Context, force bool) error {
 
 func (d *DataManager) checkpointCleanLoop(ctx context.Context) {
 	for {
-		d.log.Debugf("checkpointCleanLoop")
+		d.log.Debug().Msgf("checkpointCleanLoop")
 		if err := d.checkpointClean(ctx); err != nil {
-			d.log.Errorf("checkpointClean error: %v", err)
+			d.log.Err(err).Msgf("checkpointClean error")
 		}
 
 		sleepCh := time.NewTimer(d.checkpointCleanInterval).C
@@ -753,9 +753,9 @@ func (d *DataManager) checkpointClean(ctx context.Context) error {
 
 func (d *DataManager) etcdWalCleanerLoop(ctx context.Context) {
 	for {
-		d.log.Debugf("etcdwalcleaner")
+		d.log.Debug().Msgf("etcdwalcleaner")
 		if err := d.etcdWalCleaner(ctx); err != nil {
-			d.log.Errorf("etcdwalcleaner error: %v", err)
+			d.log.Err(err).Msgf("etcdwalcleaner error")
 		}
 
 		sleepCh := time.NewTimer(DefaultEtcdWalCleanInterval).C
@@ -812,7 +812,7 @@ func (d *DataManager) etcdWalCleaner(ctx context.Context) error {
 		// sure that no objects with old data will be returned? Is it enough to read
 		// it back or the result could just be luckily correct but another client may
 		// arrive to a differnt S3 server that is not yet in sync?
-		d.log.Infof("removing wal %q from etcd", walData.WalSequence)
+		d.log.Info().Msgf("removing wal %q from etcd", walData.WalSequence)
 		if _, err := d.e.AtomicDelete(ctx, string(kv.Key), kv.ModRevision); err != nil {
 			return err
 		}
@@ -828,9 +828,9 @@ func (d *DataManager) etcdWalCleaner(ctx context.Context) error {
 
 func (d *DataManager) storageWalCleanerLoop(ctx context.Context) {
 	for {
-		d.log.Debugf("storagewalcleaner")
+		d.log.Debug().Msgf("storagewalcleaner")
 		if err := d.storageWalCleaner(ctx); err != nil {
-			d.log.Errorf("storagewalcleaner error: %v", err)
+			d.log.Err(err).Msgf("storagewalcleaner error")
 		}
 
 		sleepCh := time.NewTimer(DefaultStorageWalCleanInterval).C
@@ -907,7 +907,7 @@ func (d *DataManager) storageWalCleaner(ctx context.Context) error {
 
 			// first remove wal data file
 			walStatusFilePath := d.storageWalDataFile(header.WalDataFileID)
-			d.log.Infof("removing %q", walStatusFilePath)
+			d.log.Info().Msgf("removing %q", walStatusFilePath)
 			if err := d.ost.DeleteObject(walStatusFilePath); err != nil {
 				if !objectstorage.IsNotExist(err) {
 					return fromOSTError(err)
@@ -915,7 +915,7 @@ func (d *DataManager) storageWalCleaner(ctx context.Context) error {
 			}
 
 			// then remove wal status files
-			d.log.Infof("removing %q", object.Path)
+			d.log.Info().Msgf("removing %q", object.Path)
 			if err := d.ost.DeleteObject(object.Path); err != nil {
 				if !objectstorage.IsNotExist(err) {
 					return fromOSTError(err)
@@ -926,7 +926,7 @@ func (d *DataManager) storageWalCleaner(ctx context.Context) error {
 		// handle old checkpointed status file
 		// TODO(sgotti) remove this in future versions since .checkpointed files are not created anymore
 		if ext == ".checkpointed" {
-			d.log.Infof("removing %q", object.Path)
+			d.log.Info().Msgf("removing %q", object.Path)
 			if err := d.ost.DeleteObject(object.Path); err != nil {
 				if !objectstorage.IsNotExist(err) {
 					return fromOSTError(err)
@@ -941,7 +941,7 @@ func (d *DataManager) storageWalCleaner(ctx context.Context) error {
 func (d *DataManager) compactChangeGroupsLoop(ctx context.Context) {
 	for {
 		if err := d.compactChangeGroups(ctx); err != nil {
-			d.log.Errorf("err: %+v", err)
+			d.log.Err(err).Send()
 		}
 
 		sleepCh := time.NewTimer(DefaultCompactChangeGroupsInterval).C
@@ -1009,7 +1009,7 @@ func (d *DataManager) compactChangeGroups(ctx context.Context) error {
 				return etcd.FromEtcdError(err)
 			}
 			if !tresp.Succeeded {
-				d.log.Errorf("failed to update change group min revision key due to concurrent update")
+				d.log.Err(err).Msgf("failed to update change group min revision key due to concurrent update")
 			}
 		}
 	}
@@ -1026,7 +1026,7 @@ func (d *DataManager) compactChangeGroups(ctx context.Context) error {
 func (d *DataManager) etcdPingerLoop(ctx context.Context) {
 	for {
 		if err := d.etcdPinger(ctx); err != nil {
-			d.log.Errorf("err: %+v", err)
+			d.log.Err(err).Send()
 		}
 
 		sleepCh := time.NewTimer(DefaultEtcdPingerInterval).C
@@ -1119,7 +1119,7 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 	}
 
 	if mustInit {
-		d.log.Infof("no data found in etcd, initializing")
+		d.log.Info().Msgf("no data found in etcd, initializing")
 
 		// delete all wals from etcd
 		if err := d.deleteEtcd(ctx); err != nil {
@@ -1170,7 +1170,7 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 		if dataStatus == nil {
 			return errors.Errorf("no datastatus in etcd but some wals are present, this shouldn't happen")
 		}
-		d.log.Debugf("wal: %s", wal)
+		d.log.Debug().Msgf("wal: %s", wal)
 		if wal.Err != nil {
 			return wal.Err
 		}
@@ -1202,10 +1202,10 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 	if err := d.ost.WriteObject(walDataFilePath, bytes.NewReader([]byte{}), 0, true); err != nil {
 		return fromOSTError(err)
 	}
-	d.log.Debugf("wrote wal file: %s", walDataFilePath)
+	d.log.Debug().Msgf("wrote wal file: %s", walDataFilePath)
 
 	walFilePath := d.storageWalStatusFile(walSequence.String())
-	d.log.Infof("syncing committed wal %q to storage", walSequence.String())
+	d.log.Info().Msgf("syncing committed wal %q to storage", walSequence.String())
 	header := &WalHeader{
 		WalDataFileID:       walDataFileID,
 		PreviousWalSequence: lastCommittedStorageWalSequence,

@@ -22,6 +22,7 @@ import (
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
 )
@@ -31,7 +32,7 @@ var cmdProjectSecretList = &cobra.Command{
 	Short: "list project secrets",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := secretList(cmd, "project", args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -48,7 +49,7 @@ func init() {
 	flags.StringVar(&secretListOpts.parentRef, "project", "", "project id or full path")
 
 	if err := cmdProjectSecretList.MarkFlagRequired("project"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdProjectSecret.AddCommand(cmdProjectSecretList)

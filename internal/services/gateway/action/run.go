@@ -483,7 +483,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 	if err != nil {
 		return util.NewAPIError(util.ErrInternal, errors.Errorf("failed to fetch config file: %w", err))
 	}
-	h.log.Debug("data: %s", data)
+	h.log.Debug().Msgf("data: %s", data)
 
 	var configFormat config.ConfigFormat
 	switch path.Ext(filename) {
@@ -509,7 +509,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 
 	config, err := config.ParseConfig([]byte(data), configFormat, configContext)
 	if err != nil {
-		h.log.Errorf("failed to parse config: %+v", err)
+		h.log.Err(err).Msgf("failed to parse config")
 
 		// create a run (per config file) with a generic error since we cannot parse
 		// it and know how many runs are defined
@@ -524,7 +524,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 		}
 
 		if _, _, err := h.runserviceClient.CreateRun(ctx, createRunReq); err != nil {
-			h.log.Errorf("failed to create run: %+v", err)
+			h.log.Err(err).Msgf("failed to create run")
 			return util.NewAPIError(util.KindFromRemoteError(err), err)
 		}
 		return nil
@@ -532,12 +532,12 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 
 	for _, run := range config.Runs {
 		if SkipRunMessage.MatchString(req.Message) {
-			h.log.Debugf("skipping run since special commit message")
+			h.log.Debug().Msgf("skipping run since special commit message")
 			continue
 		}
 
 		if match := types.MatchWhen(run.When.ToWhen(), req.RefType, req.Branch, req.Tag, req.Ref); !match {
-			h.log.Debugf("skipping run since when condition doesn't match")
+			h.log.Debug().Msgf("skipping run since when condition doesn't match")
 			continue
 		}
 
@@ -554,7 +554,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 		}
 
 		if _, _, err := h.runserviceClient.CreateRun(ctx, createRunReq); err != nil {
-			h.log.Errorf("failed to create run: %+v", err)
+			h.log.Err(err).Msgf("failed to create run")
 			return util.NewAPIError(util.KindFromRemoteError(err), err)
 		}
 	}
@@ -572,7 +572,7 @@ func (h *ActionHandler) fetchConfigFiles(ctx context.Context, gitSource gitsourc
 			if err == nil {
 				return true, nil
 			}
-			h.log.Errorf("get file err: %v", err)
+			h.log.Err(err).Msgf("get file err")
 		}
 		return false, nil
 	})

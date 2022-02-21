@@ -33,13 +33,12 @@ import (
 	"agola.io/agola/internal/testutil"
 
 	"github.com/google/go-cmp/cmp"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zaptest"
+	"github.com/rs/zerolog"
 	errors "golang.org/x/xerrors"
 )
 
-func setupEtcd(t *testing.T, logger *zap.Logger, dir string) *testutil.TestEmbeddedEtcd {
-	tetcd, err := testutil.NewTestEmbeddedEtcd(t, logger, dir)
+func setupEtcd(t *testing.T, log zerolog.Logger, dir string) *testutil.TestEmbeddedEtcd {
+	tetcd, err := testutil.NewTestEmbeddedEtcd(t, log, dir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -65,13 +64,13 @@ func TestEtcdReset(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
-	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+	log := testutil.NewLogger(t)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	tetcd := setupEtcd(t, logger, etcdDir)
+	tetcd := setupEtcd(t, log, etcdDir)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -92,7 +91,7 @@ func TestEtcdReset(t *testing.T) {
 		EtcdWalsKeepNum: 10,
 		DataTypes:       []string{"datatype01"},
 	}
-	dm, err := NewDataManager(ctx, logger, dmConfig)
+	dm, err := NewDataManager(ctx, log, dmConfig)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -131,7 +130,7 @@ func TestEtcdReset(t *testing.T) {
 	t.Logf("resetting etcd")
 	os.RemoveAll(etcdDir)
 	t.Logf("starting etcd")
-	tetcd = setupEtcd(t, logger, etcdDir)
+	tetcd = setupEtcd(t, log, etcdDir)
 	if err := tetcd.Start(); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -146,7 +145,7 @@ func TestEtcdReset(t *testing.T) {
 		EtcdWalsKeepNum: 10,
 		DataTypes:       []string{"datatype01"},
 	}
-	dm, err = NewDataManager(ctx, logger, dmConfig)
+	dm, err = NewDataManager(ctx, log, dmConfig)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -174,13 +173,13 @@ func TestEtcdResetWalsGap(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
-	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+	log := testutil.NewLogger(t)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	tetcd := setupEtcd(t, logger, etcdDir)
+	tetcd := setupEtcd(t, log, etcdDir)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -201,7 +200,7 @@ func TestEtcdResetWalsGap(t *testing.T) {
 		EtcdWalsKeepNum: 10,
 		DataTypes:       []string{"datatype01"},
 	}
-	dm, err := NewDataManager(ctx, logger, dmConfig)
+	dm, err := NewDataManager(ctx, log, dmConfig)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -240,7 +239,7 @@ func TestEtcdResetWalsGap(t *testing.T) {
 	t.Logf("resetting etcd")
 	os.RemoveAll(etcdDir)
 	t.Logf("starting etcd")
-	tetcd = setupEtcd(t, logger, etcdDir)
+	tetcd = setupEtcd(t, log, etcdDir)
 	if err := tetcd.Start(); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -279,7 +278,7 @@ func TestEtcdResetWalsGap(t *testing.T) {
 		EtcdWalsKeepNum: 10,
 		DataTypes:       []string{"datatype01"},
 	}
-	dm, err = NewDataManager(ctx, logger, dmConfig)
+	dm, err = NewDataManager(ctx, log, dmConfig)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -302,13 +301,13 @@ func TestConcurrentUpdate(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
-	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+	log := testutil.NewLogger(t)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	tetcd := setupEtcd(t, logger, etcdDir)
+	tetcd := setupEtcd(t, log, etcdDir)
 	defer shutdownEtcd(tetcd)
 
 	ctx := context.Background()
@@ -329,7 +328,7 @@ func TestConcurrentUpdate(t *testing.T) {
 		EtcdWalsKeepNum: 10,
 		DataTypes:       []string{"datatype01"},
 	}
-	dm, err := NewDataManager(ctx, logger, dmConfig)
+	dm, err := NewDataManager(ctx, log, dmConfig)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -395,13 +394,13 @@ func TestEtcdWalCleaner(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
-	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+	log := testutil.NewLogger(t)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	tetcd := setupEtcd(t, logger, etcdDir)
+	tetcd := setupEtcd(t, log, etcdDir)
 	defer shutdownEtcd(tetcd)
 
 	ctx := context.Background()
@@ -424,7 +423,7 @@ func TestEtcdWalCleaner(t *testing.T) {
 		DataTypes:            []string{"datatype01"},
 		MinCheckpointWalsNum: 1,
 	}
-	dm, err := NewDataManager(ctx, logger, dmConfig)
+	dm, err := NewDataManager(ctx, log, dmConfig)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -471,13 +470,13 @@ func TestReadObject(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
-	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+	log := testutil.NewLogger(t)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	tetcd := setupEtcd(t, logger, etcdDir)
+	tetcd := setupEtcd(t, log, etcdDir)
 	defer shutdownEtcd(tetcd)
 
 	ctx := context.Background()
@@ -498,7 +497,7 @@ func TestReadObject(t *testing.T) {
 		EtcdWalsKeepNum: 1,
 		DataTypes:       []string{"datatype01"},
 	}
-	dm, err := NewDataManager(ctx, logger, dmConfig)
+	dm, err := NewDataManager(ctx, log, dmConfig)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -766,13 +765,13 @@ func testCheckpoint(t *testing.T, basePath string) {
 	}
 	defer os.RemoveAll(dir)
 
-	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+	log := testutil.NewLogger(t)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	tetcd := setupEtcd(t, logger, etcdDir)
+	tetcd := setupEtcd(t, log, etcdDir)
 	defer shutdownEtcd(tetcd)
 
 	ctx := context.Background()
@@ -798,7 +797,7 @@ func testCheckpoint(t *testing.T, basePath string) {
 		// use a small maxDataFileSize
 		MaxDataFileSize: 10 * 1024,
 	}
-	dm, err := NewDataManager(ctx, logger, dmConfig)
+	dm, err := NewDataManager(ctx, log, dmConfig)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -984,13 +983,13 @@ func TestRead(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
-	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+	log := testutil.NewLogger(t)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	tetcd := setupEtcd(t, logger, etcdDir)
+	tetcd := setupEtcd(t, log, etcdDir)
 	defer shutdownEtcd(tetcd)
 
 	ctx := context.Background()
@@ -1016,7 +1015,7 @@ func TestRead(t *testing.T) {
 		// use a small maxDataFileSize
 		MaxDataFileSize: 10 * 1024,
 	}
-	dm, err := NewDataManager(ctx, logger, dmConfig)
+	dm, err := NewDataManager(ctx, log, dmConfig)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -1100,13 +1099,13 @@ func testClean(t *testing.T, basePath string) {
 	}
 	defer os.RemoveAll(dir)
 
-	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+	log := testutil.NewLogger(t)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	tetcd := setupEtcd(t, logger, etcdDir)
+	tetcd := setupEtcd(t, log, etcdDir)
 	defer shutdownEtcd(tetcd)
 
 	ctx := context.Background()
@@ -1132,7 +1131,7 @@ func testClean(t *testing.T, basePath string) {
 		// use a small maxDataFileSize
 		MaxDataFileSize: 10 * 1024,
 	}
-	dm, err := NewDataManager(ctx, logger, dmConfig)
+	dm, err := NewDataManager(ctx, log, dmConfig)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -1220,13 +1219,13 @@ func testCleanConcurrentCheckpoint(t *testing.T, basePath string) {
 	}
 	defer os.RemoveAll(dir)
 
-	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+	log := testutil.NewLogger(t)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	tetcd := setupEtcd(t, logger, etcdDir)
+	tetcd := setupEtcd(t, log, etcdDir)
 	defer shutdownEtcd(tetcd)
 
 	ctx := context.Background()
@@ -1252,7 +1251,7 @@ func testCleanConcurrentCheckpoint(t *testing.T, basePath string) {
 		// use a small maxDataFileSize
 		MaxDataFileSize: 10 * 1024,
 	}
-	dm, err := NewDataManager(ctx, logger, dmConfig)
+	dm, err := NewDataManager(ctx, log, dmConfig)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -1351,13 +1350,13 @@ func testStorageWalCleaner(t *testing.T, basePath string) {
 	}
 	defer os.RemoveAll(dir)
 
-	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+	log := testutil.NewLogger(t)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	tetcd := setupEtcd(t, logger, etcdDir)
+	tetcd := setupEtcd(t, log, etcdDir)
 	defer shutdownEtcd(tetcd)
 
 	ctx := context.Background()
@@ -1383,7 +1382,7 @@ func testStorageWalCleaner(t *testing.T, basePath string) {
 		// use a small maxDataFileSize
 		MaxDataFileSize: 10 * 1024,
 	}
-	dm, err := NewDataManager(ctx, logger, dmConfig)
+	dm, err := NewDataManager(ctx, log, dmConfig)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -1493,13 +1492,13 @@ func TestExportImport(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
-	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+	log := testutil.NewLogger(t)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	tetcd := setupEtcd(t, logger, etcdDir)
+	tetcd := setupEtcd(t, log, etcdDir)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -1524,7 +1523,7 @@ func TestExportImport(t *testing.T) {
 		// use a small maxDataFileSize
 		MaxDataFileSize: 10 * 1024,
 	}
-	dm, err := NewDataManager(ctx, logger, dmConfig)
+	dm, err := NewDataManager(ctx, log, dmConfig)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -1603,7 +1602,7 @@ func TestExportImport(t *testing.T) {
 	t.Logf("resetting etcd")
 	os.RemoveAll(etcdDir)
 	t.Logf("starting etcd")
-	tetcd = setupEtcd(t, logger, etcdDir)
+	tetcd = setupEtcd(t, log, etcdDir)
 	if err := tetcd.Start(); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -1634,7 +1633,7 @@ func TestExportImport(t *testing.T) {
 		MaxDataFileSize: 10 * 1024,
 		MaintenanceMode: true,
 	}
-	dm, err = NewDataManager(ctx, logger, dmConfig)
+	dm, err = NewDataManager(ctx, log, dmConfig)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -1671,7 +1670,7 @@ func TestExportImport(t *testing.T) {
 		// use a small maxDataFileSize
 		MaxDataFileSize: 10 * 1024,
 	}
-	dm, err = NewDataManager(ctx, logger, dmConfig)
+	dm, err = NewDataManager(ctx, log, dmConfig)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}

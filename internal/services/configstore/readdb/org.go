@@ -40,7 +40,7 @@ func (r *ReadDB) insertOrg(tx *db.Tx, data []byte) error {
 	if err := json.Unmarshal(data, &org); err != nil {
 		return errors.Errorf("failed to unmarshal org: %w", err)
 	}
-	r.log.Debugf("inserting org: %s", util.Dump(org))
+	r.log.Debug().Msgf("inserting org: %s", util.Dump(org))
 	// poor man insert or update...
 	if err := r.deleteOrg(tx, org.ID); err != nil {
 		return err
@@ -81,7 +81,7 @@ func (r *ReadDB) GetOrg(tx *db.Tx, orgRef string) (*types.Organization, error) {
 
 func (r *ReadDB) GetOrgByID(tx *db.Tx, orgID string) (*types.Organization, error) {
 	q, args, err := orgSelect.Where(sq.Eq{"id": orgID}).ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}
@@ -101,7 +101,7 @@ func (r *ReadDB) GetOrgByID(tx *db.Tx, orgID string) (*types.Organization, error
 
 func (r *ReadDB) GetOrgByName(tx *db.Tx, name string) (*types.Organization, error) {
 	q, args, err := orgSelect.Where(sq.Eq{"name": name}).ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}
@@ -147,7 +147,7 @@ func (r *ReadDB) GetOrgs(tx *db.Tx, startOrgName string, limit int, asc bool) ([
 
 	s := getOrgsFilteredQuery(startOrgName, limit, asc)
 	q, args, err := s.ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}
@@ -209,7 +209,7 @@ func (r *ReadDB) insertOrgMember(tx *db.Tx, data []byte) error {
 	if err := json.Unmarshal(data, &orgmember); err != nil {
 		return errors.Errorf("failed to unmarshal orgmember: %w", err)
 	}
-	r.log.Debugf("inserting orgmember: %s", util.Dump(orgmember))
+	r.log.Debug().Msgf("inserting orgmember: %s", util.Dump(orgmember))
 	// poor man insert or update...
 	if err := r.deleteOrgMember(tx, orgmember.ID); err != nil {
 		return err
@@ -234,7 +234,7 @@ func (r *ReadDB) deleteOrgMember(tx *db.Tx, orgmemberID string) error {
 
 func (r *ReadDB) GetOrgMemberByOrgUserID(tx *db.Tx, orgID, userID string) (*types.OrganizationMember, error) {
 	q, args, err := orgmemberSelect.Where(sq.Eq{"orgmember.orgid": orgID, "orgmember.userid": userID}).ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}
@@ -307,7 +307,7 @@ func (r *ReadDB) GetOrgUsers(tx *db.Tx, orgID string) ([]*OrgUser, error) {
 	s = s.Join("user on user.id = orgmember.userid")
 	s = s.OrderBy("user.name")
 	q, args, err := s.ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}
@@ -358,7 +358,7 @@ func (r *ReadDB) GetUserOrgs(tx *db.Tx, userID string) ([]*UserOrg, error) {
 	s = s.Join("org on org.id = orgmember.orgid")
 	s = s.OrderBy("org.name")
 	q, args, err := s.ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}

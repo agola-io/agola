@@ -61,7 +61,7 @@ func (r *ReadDB) deleteSecret(tx *db.Tx, id string) error {
 
 func (r *ReadDB) GetSecretByID(tx *db.Tx, secretID string) (*types.Secret, error) {
 	q, args, err := secretSelect.Where(sq.Eq{"id": secretID}).ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}
@@ -81,7 +81,7 @@ func (r *ReadDB) GetSecretByID(tx *db.Tx, secretID string) (*types.Secret, error
 
 func (r *ReadDB) GetSecretByName(tx *db.Tx, parentID, name string) (*types.Secret, error) {
 	q, args, err := secretSelect.Where(sq.Eq{"parentid": parentID, "name": name}).ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}
@@ -101,7 +101,7 @@ func (r *ReadDB) GetSecretByName(tx *db.Tx, parentID, name string) (*types.Secre
 
 func (r *ReadDB) GetSecrets(tx *db.Tx, parentID string) ([]*types.Secret, error) {
 	q, args, err := secretSelect.Where(sq.Eq{"parentid": parentID}).ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}

@@ -19,11 +19,11 @@ import (
 	csclient "agola.io/agola/services/configstore/client"
 	rsclient "agola.io/agola/services/runservice/client"
 
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 )
 
 type ActionHandler struct {
-	log               *zap.SugaredLogger
+	log               zerolog.Logger
 	sd                *common.TokenSigningData
 	configstoreClient *csclient.Client
 	runserviceClient  *rsclient.Client
@@ -32,9 +32,9 @@ type ActionHandler struct {
 	webExposedURL     string
 }
 
-func NewActionHandler(logger *zap.Logger, sd *common.TokenSigningData, configstoreClient *csclient.Client, runserviceClient *rsclient.Client, agolaID, apiExposedURL, webExposedURL string) *ActionHandler {
+func NewActionHandler(log zerolog.Logger, sd *common.TokenSigningData, configstoreClient *csclient.Client, runserviceClient *rsclient.Client, agolaID, apiExposedURL, webExposedURL string) *ActionHandler {
 	return &ActionHandler{
-		log:               logger.Sugar(),
+		log:               log,
 		sd:                sd,
 		configstoreClient: configstoreClient,
 		runserviceClient:  runserviceClient,

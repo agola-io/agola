@@ -26,7 +26,7 @@ import (
 
 	"agola.io/agola/internal/util"
 
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 	errors "golang.org/x/xerrors"
 )
 
@@ -138,16 +138,16 @@ type RepoAbsPathFunc func(reposDir, path string) (absPath string, exists bool, e
 type RepoPostCreateFunc func(repoPath, repoAbsPath string) error
 
 type GitSmartHandler struct {
-	log                *zap.SugaredLogger
+	log                zerolog.Logger
 	reposDir           string
 	createRepo         bool
 	repoAbsPathFunc    RepoAbsPathFunc
 	repoPostCreateFunc RepoPostCreateFunc
 }
 
-func NewGitSmartHandler(logger *zap.Logger, reposDir string, createRepo bool, repoAbsPathFunc RepoAbsPathFunc, repoPostCreateFunc RepoPostCreateFunc) *GitSmartHandler {
+func NewGitSmartHandler(log zerolog.Logger, reposDir string, createRepo bool, repoAbsPathFunc RepoAbsPathFunc, repoPostCreateFunc RepoPostCreateFunc) *GitSmartHandler {
 	return &GitSmartHandler{
-		log:                logger.Sugar(),
+		log:                log,
 		reposDir:           reposDir,
 		createRepo:         createRepo,
 		repoAbsPathFunc:    repoAbsPathFunc,
@@ -188,7 +188,7 @@ func (h *GitSmartHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case RequestTypeInfoRefs:
 		if h.createRepo && !exists {
 			if output, err := git.Output(ctx, nil, "init", "--bare", repoAbsPath); err != nil {
-				h.log.Errorf("git error %v, output: %s", err, output)
+				h.log.Err(err).Msgf("git error, output: %s", output)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -208,7 +208,7 @@ func (h *GitSmartHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		res, err := InfoRefsResponse(ctx, repoAbsPath, serviceName)
 		if err != nil {
 			// we cannot return any http error since the http header has already been written
-			h.log.Errorf("git command error: %v", err)
+			h.log.Err(err).Msgf("git command error")
 			return
 		}
 
@@ -220,27 +220,27 @@ func (h *GitSmartHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		if err := gitService(ctx, w, body, repoAbsPath, "upload-pack"); err != nil {
 			// we cannot return any http error since the http header has already been written
-			h.log.Errorf("git command error: %v", err)
+			h.log.Err(err).Msgf("git command error")
 		}
 	case RequestTypeReceivePack:
 		w.Header().Set("Content-Type", "application/x-git-receive-pack-result")
 
 		if err := gitService(ctx, w, body, repoAbsPath, "receive-pack"); err != nil {
 			// we cannot return any http error since the http header has already been written
-			h.log.Errorf("git command error: %v", err)
+			h.log.Err(err).Msgf("git command error")
 		}
 	}
 }
 
 type FetchFileHandler struct {
-	log             *zap.SugaredLogger
+	log             zerolog.Logger
 	reposDir        string
 	repoAbsPathFunc RepoAbsPathFunc
 }
 
-func NewFetchFileHandler(logger *zap.Logger, reposDir string, repoAbsPathFunc RepoAbsPathFunc) *FetchFileHandler {
+func NewFetchFileHandler(log zerolog.Logger, reposDir string, repoAbsPathFunc RepoAbsPathFunc) *FetchFileHandler {
 	return &FetchFileHandler{
-		log:             logger.Sugar(),
+		log:             log,
 		reposDir:        reposDir,
 		repoAbsPathFunc: repoAbsPathFunc,
 	}
@@ -266,7 +266,7 @@ func (h *FetchFileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := gitFetchFile(ctx, w, r.Body, repoAbsPath, fetchData.Ref, fetchData.Path); err != nil {
-		h.log.Errorf("git command error: %v", err)
+		h.log.Err(err).Msgf("git command error")
 
 		// since we already answered with a 200 we cannot return another error code
 		// So abort the connection and the client will detect the missing ending chunk

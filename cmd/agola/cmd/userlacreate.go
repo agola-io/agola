@@ -20,6 +20,7 @@ import (
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
 )
@@ -29,7 +30,7 @@ var cmdUserLACreate = &cobra.Command{
 	Short: "create a user linkedaccount",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := userLACreate(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -52,10 +53,10 @@ func init() {
 	flags.StringVar(&userLACreateOpts.remoteSourceLoginPassword, "remote-password", "", "remote source password")
 
 	if err := cmdUserLACreate.MarkFlagRequired("username"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdUserLACreate.MarkFlagRequired("remote-source"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdUserLA.AddCommand(cmdUserLACreate)
@@ -70,15 +71,15 @@ func userLACreate(cmd *cobra.Command, args []string) error {
 		RemoteSourceLoginPassword: userLACreateOpts.remoteSourceLoginPassword,
 	}
 
-	log.Infof("creating linked account for user %q", userLACreateOpts.username)
+	log.Info().Msgf("creating linked account for user %q", userLACreateOpts.username)
 	resp, _, err := gwclient.CreateUserLA(context.TODO(), userLACreateOpts.username, req)
 	if err != nil {
 		return errors.Errorf("failed to create linked account: %w", err)
 	}
 	if resp.Oauth2Redirect != "" {
-		log.Infof("visit %s to continue", resp.Oauth2Redirect)
+		log.Info().Msgf("visit %s to continue", resp.Oauth2Redirect)
 	} else {
-		log.Infof("linked account for user %q created, ID: %s", userLACreateOpts.username, resp.LinkedAccount.ID)
+		log.Info().Msgf("linked account for user %q created, ID: %s", userLACreateOpts.username, resp.LinkedAccount.ID)
 	}
 
 	return nil

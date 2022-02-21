@@ -39,10 +39,10 @@ import (
 	"agola.io/agola/services/runservice/types"
 
 	sq "github.com/Masterminds/squirrel"
+	"github.com/rs/zerolog"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
 	etcdclientv3rpc "go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
 	"go.etcd.io/etcd/mvcc/mvccpb"
-	"go.uber.org/zap"
 	errors "golang.org/x/xerrors"
 )
 
@@ -89,7 +89,7 @@ var (
 )
 
 type ReadDB struct {
-	log     *zap.SugaredLogger
+	log     zerolog.Logger
 	dataDir string
 	e       *etcd.Store
 	rdb     *db.DB
@@ -108,13 +108,13 @@ type ReadDB struct {
 	dbWriteLock sync.Mutex
 }
 
-func NewReadDB(ctx context.Context, logger *zap.Logger, dataDir string, e *etcd.Store, ost *objectstorage.ObjStorage, dm *datamanager.DataManager) (*ReadDB, error) {
+func NewReadDB(ctx context.Context, log zerolog.Logger, dataDir string, e *etcd.Store, ost *objectstorage.ObjStorage, dm *datamanager.DataManager) (*ReadDB, error) {
 	if err := os.MkdirAll(dataDir, 0770); err != nil {
 		return nil, err
 	}
 
 	readDB := &ReadDB{
-		log:     logger.Sugar(),
+		log:     log,
 		e:       e,
 		dataDir: dataDir,
 		ost:     ost,
@@ -273,7 +273,7 @@ func (r *ReadDB) Run(ctx context.Context) error {
 			if err == nil {
 				break
 			}
-			r.log.Errorf("initialize err: %+v", err)
+			r.log.Err(err).Msgf("initialize err")
 
 			sleepCh := time.NewTimer(1 * time.Second).C
 			select {
@@ -296,7 +296,7 @@ func (r *ReadDB) Run(ctx context.Context) error {
 				r.SetInitialized(true)
 				break
 			}
-			r.log.Errorf("initialize err: %+v", err)
+			r.log.Err(err).Msgf("initialize err")
 
 			sleepCh := time.NewTimer(1 * time.Second).C
 			select {
@@ -313,18 +313,18 @@ func (r *ReadDB) Run(ctx context.Context) error {
 		wg.Add(2)
 
 		go func() {
-			r.log.Infof("starting handleEvents")
+			r.log.Info().Msgf("starting handleEvents")
 			if err := r.handleEvents(hctx); err != nil {
-				r.log.Errorf("handleEvents err: %+v", err)
+				r.log.Err(err).Msgf("handleEvents err")
 			}
 			wg.Done()
 			doneCh <- struct{}{}
 		}()
 
 		go func() {
-			r.log.Infof("starting handleEventsOST")
+			r.log.Info().Msgf("starting handleEventsOST")
 			if err := r.handleEventsOST(hctx); err != nil {
-				r.log.Errorf("handleEventsOST err: %+v", err)
+				r.log.Err(err).Msgf("handleEventsOST err")
 			}
 			wg.Done()
 			doneCh <- struct{}{}
@@ -332,7 +332,7 @@ func (r *ReadDB) Run(ctx context.Context) error {
 
 		select {
 		case <-ctx.Done():
-			r.log.Infof("readdb exiting")
+			r.log.Info().Msgf("readdb exiting")
 			cancel()
 			return nil
 		case <-doneCh:
@@ -401,7 +401,7 @@ func (r *ReadDB) handleEvents(ctx context.Context) error {
 		if wresp.Canceled {
 			err = wresp.Err()
 			if errors.Is(err, etcdclientv3rpc.ErrCompacted) {
-				r.log.Errorf("required events already compacted, reinitializing readdb")
+				r.log.Err(err).Msgf("required events already compacted, reinitializing readdb")
 				r.SetInitialized(false)
 			}
 			return errors.Errorf("watch error: %w", err)
@@ -432,7 +432,7 @@ func (r *ReadDB) handleEvents(ctx context.Context) error {
 }
 
 func (r *ReadDB) handleEvent(tx *db.Tx, ev *etcdclientv3.Event, wresp *etcdclientv3.WatchResponse) error {
-	r.log.Debugf("event: %s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
+	r.log.Debug().Msgf("event: %s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
 	key := string(ev.Kv.Key)
 	switch {
 	case strings.HasPrefix(key, common.EtcdRunsDir+"/"):
@@ -543,14 +543,14 @@ func (r *ReadDB) SyncObjectStorage(ctx context.Context) error {
 	doFullSync := false
 	if curWalSeq == "" {
 		doFullSync = true
-		r.log.Warn("no startWalSeq in db, doing a full sync")
+		r.log.Warn().Msgf("no startWalSeq in db, doing a full sync")
 	} else {
 		ok, err := r.dm.HasOSTWal(curWalSeq)
 		if err != nil {
 			return err
 		}
 		if !ok {
-			r.log.Warnf("no wal with seq %q in objectstorage, doing a full sync", curWalSeq)
+			r.log.Warn().Msgf("no wal with seq %q in objectstorage, doing a full sync", curWalSeq)
 			doFullSync = true
 		}
 
@@ -570,13 +570,13 @@ func (r *ReadDB) SyncObjectStorage(ctx context.Context) error {
 			return err
 		}
 		if curWalEpoch != lastCommittedStorageWalSequence.Epoch {
-			r.log.Warnf("current rdb wal sequence epoch %d different than new wal sequence epoch %d, doing a full sync", curWalEpoch, lastCommittedStorageWalSequence.Epoch)
+			r.log.Warn().Msgf("current rdb wal sequence epoch %d different than new wal sequence epoch %d, doing a full sync", curWalEpoch, lastCommittedStorageWalSequence.Epoch)
 			doFullSync = true
 		}
 	}
 
 	if doFullSync {
-		r.log.Infof("doing a full sync from dump")
+		r.log.Info().Msgf("doing a full sync from dump")
 		if err := r.ResetDB(ctx); err != nil {
 			return err
 		}
@@ -588,7 +588,7 @@ func (r *ReadDB) SyncObjectStorage(ctx context.Context) error {
 		}
 	}
 
-	r.log.Debugf("startWalSeq: %s", curWalSeq)
+	r.log.Debug().Msgf("startWalSeq: %s", curWalSeq)
 
 	// Sync from wals
 	// sync from objectstorage until the current known lastCommittedStorageWal in etcd
@@ -608,8 +608,8 @@ func (r *ReadDB) SyncObjectStorage(ctx context.Context) error {
 	if err != nil {
 		return errors.Errorf("failed to get first available wal data: %w", err)
 	}
-	r.log.Debugf("firstAvailableWalData: %s", util.Dump(firstAvailableWalData))
-	r.log.Debugf("revision: %d", revision)
+	r.log.Debug().Msgf("firstAvailableWalData: %s", util.Dump(firstAvailableWalData))
+	r.log.Debug().Msgf("revision: %d", revision)
 	if firstAvailableWalData == nil {
 		return errors.Errorf("no wal data in etcd")
 	}
@@ -617,7 +617,7 @@ func (r *ReadDB) SyncObjectStorage(ctx context.Context) error {
 		return errors.Errorf("current applied wal seq %q is smaller than the first available wal in etcd %q", curWalSeq, firstAvailableWalData.WalSequence)
 	}
 
-	r.log.Infof("syncing from wals")
+	r.log.Info().Msgf("syncing from wals")
 	err = r.rdb.Do(ctx, func(tx *db.Tx) error {
 		if err := insertRevisionOST(tx, revision); err != nil {
 			return err
@@ -641,7 +641,7 @@ func (r *ReadDB) SyncObjectStorage(ctx context.Context) error {
 				return err
 			}
 
-			r.log.Debugf("applying wal to db")
+			r.log.Debug().Msgf("applying wal to db")
 			if err := r.applyWal(tx, walElement.WalData.WalDataFileID); err != nil {
 				return err
 			}
@@ -798,14 +798,14 @@ func (r *ReadDB) handleEventsOST(ctx context.Context) error {
 
 	wctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	r.log.Debugf("revision: %d", revision)
+	r.log.Debug().Msgf("revision: %d", revision)
 	wch := r.dm.Watch(wctx, revision+1)
 	for we := range wch {
-		r.log.Debugf("we: %s", util.Dump(we))
+		r.log.Debug().Msgf("we: %s", util.Dump(we))
 		if we.Err != nil {
 			err := we.Err
 			if errors.Is(err, datamanager.ErrCompacted) {
-				r.log.Warnf("required events already compacted, reinitializing readdb")
+				r.log.Warn().Msgf("required events already compacted, reinitializing readdb")
 				r.Initialized = false
 				return nil
 			}
@@ -826,7 +826,7 @@ func (r *ReadDB) handleEventsOST(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			r.log.Debugf("curWalSeq: %q", curWalSeq)
+			r.log.Debug().Msgf("curWalSeq: %q", curWalSeq)
 			if curWalSeq != "" && we.WalData != nil {
 				curWalSequence, err := sequence.Parse(curWalSeq)
 				if err != nil {
@@ -838,7 +838,7 @@ func (r *ReadDB) handleEventsOST(ctx context.Context) error {
 				if err != nil {
 					return err
 				}
-				r.log.Debugf("we.WalData.WalSequence: %q", we.WalData.WalSequence)
+				r.log.Debug().Msgf("we.WalData.WalSequence: %q", we.WalData.WalSequence)
 				weWalEpoch := weWalSequence.Epoch
 				if curWalEpoch != weWalEpoch {
 					r.Initialized = false
@@ -893,7 +893,7 @@ func (r *ReadDB) applyWal(tx *db.Tx, walDataFileID string) error {
 }
 
 func (r *ReadDB) applyAction(tx *db.Tx, action *datamanager.Action) error {
-	r.log.Debugf("action: dataType: %s, ID: %s", action.DataType, action.ID)
+	r.log.Debug().Msgf("action: dataType: %s, ID: %s", action.DataType, action.ID)
 	switch action.ActionType {
 	case datamanager.ActionTypePut:
 		switch action.DataType {
@@ -910,7 +910,7 @@ func (r *ReadDB) applyAction(tx *db.Tx, action *datamanager.Action) error {
 			if err := json.Unmarshal(action.Data, &runCounter); err != nil {
 				return err
 			}
-			r.log.Debugf("inserting run counter %q, c: %d", action.ID, runCounter)
+			r.log.Debug().Msgf("inserting run counter %q, c: %d", action.ID, runCounter)
 			if err := r.insertRunCounterOST(tx, action.ID, runCounter); err != nil {
 				return err
 			}
@@ -927,7 +927,7 @@ func (r *ReadDB) applyAction(tx *db.Tx, action *datamanager.Action) error {
 }
 
 func (r *ReadDB) handleEventOST(tx *db.Tx, we *datamanager.WatchElement) error {
-	//r.log.Debugf("event: %s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
+	//r.log.Debug().Msgf("event: %s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
 	//key := string(ev.Kv.Key)
 
 	if err := r.handleWalEvent(tx, we); err != nil {
@@ -953,7 +953,7 @@ func (r *ReadDB) handleWalEvent(tx *db.Tx, we *datamanager.WatchElement) error {
 			return err
 		}
 
-		r.log.Debugf("applying wal to db")
+		r.log.Debug().Msgf("applying wal to db")
 		return r.applyWal(tx, we.WalData.WalDataFileID)
 	}
 	return nil
@@ -1098,7 +1098,7 @@ func (r *ReadDB) getRevision(tx *db.Tx) (int64, error) {
 	var revision int64
 
 	q, args, err := revisionSelect.ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return 0, errors.Errorf("failed to build query: %w", err)
 	}
@@ -1113,7 +1113,7 @@ func (r *ReadDB) getRevision(tx *db.Tx) (int64, error) {
 func (r *ReadDB) GetChangeGroupsUpdateTokens(tx *db.Tx, groups []string) (*types.ChangeGroupsUpdateToken, error) {
 	s := changegrouprevisionSelect.Where(sq.Eq{"id": groups})
 	q, args, err := s.ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}
@@ -1243,7 +1243,7 @@ func (r *ReadDB) getRunsFilteredQuery(phaseFilter []types.RunPhase, resultFilter
 		rundatat = "rundata_ost"
 	}
 
-	r.log.Debugf("runt: %s", runt)
+	r.log.Debug().Msgf("runt: %s", runt)
 	s := sb.Select(fields...).From(runt + " as run")
 	switch sortOrder {
 	case types.SortOrderAsc:
@@ -1302,7 +1302,7 @@ func (r *ReadDB) getRunsFilteredActive(tx *db.Tx, groups []string, lastRun bool,
 	s := r.getRunsFilteredQuery(phaseFilter, resultFilter, groups, lastRun, startRunID, limit, sortOrder, false)
 
 	q, args, err := s.ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}
@@ -1314,7 +1314,7 @@ func (r *ReadDB) GetRunsFilteredOST(tx *db.Tx, groups []string, lastRun bool, ph
 	s := r.getRunsFilteredQuery(phaseFilter, resultFilter, groups, lastRun, startRunID, limit, sortOrder, true)
 
 	q, args, err := s.ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}
@@ -1339,7 +1339,7 @@ func (r *ReadDB) getRun(tx *db.Tx, runID string, ost bool) (*types.Run, error) {
 	s := r.getRunQuery(runID, ost)
 
 	q, args, err := s.ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}
@@ -1460,7 +1460,7 @@ func scanChangeGroupsRevision(rows *sql.Rows) (types.ChangeGroupsRevisions, erro
 }
 
 func (r *ReadDB) insertCommittedWalSequenceOST(tx *db.Tx, seq string) error {
-	r.log.Debugf("insert seq: %s", seq)
+	r.log.Debug().Msgf("insert seq: %s", seq)
 	// poor man insert or update that works because transaction isolation level is serializable
 	if _, err := tx.Exec("delete from committedwalsequence_ost"); err != nil {
 		return errors.Errorf("failed to delete committedwalsequence: %w", err)
@@ -1479,7 +1479,7 @@ func (r *ReadDB) GetCommittedWalSequenceOST(tx *db.Tx) (string, error) {
 	var seq string
 
 	q, args, err := committedwalsequenceOSTSelect.OrderBy("seq").Limit(1).ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return "", errors.Errorf("failed to build query: %w", err)
 	}
@@ -1492,7 +1492,7 @@ func (r *ReadDB) GetCommittedWalSequenceOST(tx *db.Tx) (string, error) {
 }
 
 func (r *ReadDB) insertChangeGroupRevisionOST(tx *db.Tx, changegroup string, revision int64) error {
-	r.log.Debugf("insertChangeGroupRevision: %s %d", changegroup, revision)
+	r.log.Debug().Msgf("insertChangeGroupRevision: %s %d", changegroup, revision)
 
 	// poor man insert or update that works because transaction isolation level is serializable
 	if _, err := tx.Exec("delete from changegrouprevision_ost where id = $1", changegroup); err != nil {
@@ -1514,7 +1514,7 @@ func (r *ReadDB) insertChangeGroupRevisionOST(tx *db.Tx, changegroup string, rev
 func (r *ReadDB) GetChangeGroupsUpdateTokensOST(tx *db.Tx, groups []string) (*datamanager.ChangeGroupsUpdateToken, error) {
 	s := changegrouprevisionOSTSelect.Where(sq.Eq{"id": groups})
 	q, args, err := s.ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}
@@ -1587,7 +1587,7 @@ func (r *ReadDB) GetRunCounterOST(tx *db.Tx, group string) (uint64, error) {
 	var counter uint64
 
 	q, args, err := runcounterOSTSelect.Where(sq.Eq{"groupid": group}).ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return 0, errors.Errorf("failed to build query: %w", err)
 	}
@@ -1607,7 +1607,7 @@ func (r *ReadDB) GetRunCountersOST(tx *db.Tx, start string, limit int) ([]*types
 	s = s.OrderBy("groupid asc")
 
 	q, args, err := s.ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}

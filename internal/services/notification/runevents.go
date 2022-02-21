@@ -38,7 +38,7 @@ var (
 func (n *NotificationService) runEventsHandlerLoop(ctx context.Context) {
 	for {
 		if err := n.runEventsHandler(ctx); err != nil {
-			log.Errorf("err: %+v", err)
+			n.log.Err(err).Send()
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
@@ -111,7 +111,7 @@ func (n *NotificationService) runEventsHandler(ctx context.Context) error {
 			// their status to etcd so we can also do more logic like retrying and handle
 			// multiple kind of notifications (email etc...)
 			if err := n.updateCommitStatus(ctx, ev); err != nil {
-				log.Infof("failed to update commit status: %v", err)
+				n.log.Info().Msgf("failed to update commit status: %v", err)
 			}
 
 		default:

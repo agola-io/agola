@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"agola.io/agola/internal/services/config"
+	"agola.io/agola/internal/testutil"
 	"agola.io/agola/internal/util"
 )
 
@@ -85,6 +86,8 @@ func TestRepoCleaner(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			log := testutil.NewLogger(t)
+
 			dir, err := ioutil.TempDir("", "agola")
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
@@ -102,7 +105,7 @@ func TestRepoCleaner(t *testing.T) {
 				RepositoryRefsExpireInterval: 24 * time.Hour,
 			}
 
-			gs, err := NewGitserver(ctx, logger, config)
+			gs, err := NewGitserver(ctx, log, config)
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}

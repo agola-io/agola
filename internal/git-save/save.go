@@ -23,7 +23,7 @@ import (
 	"agola.io/agola/internal/util"
 
 	"github.com/gofrs/uuid"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 	errors "golang.org/x/xerrors"
 )
 
@@ -150,18 +150,18 @@ type GitSaveConfig struct {
 }
 
 type GitSave struct {
-	log        *zap.SugaredLogger
+	log        zerolog.Logger
 	conf       *GitSaveConfig
 	refsPrefix string
 }
 
-func NewGitSave(logger *zap.Logger, conf *GitSaveConfig) *GitSave {
+func NewGitSave(log zerolog.Logger, conf *GitSaveConfig) *GitSave {
 	refsPrefix := conf.RefsPrefix
 	if refsPrefix == "" {
 		refsPrefix = defaultRefsPrefix
 	}
 	return &GitSave{
-		log:        logger.Sugar(),
+		log:        log,
 		conf:       conf,
 		refsPrefix: refsPrefix,
 	}
@@ -201,7 +201,7 @@ func (s *GitSave) Save(message, branchName string) (string, error) {
 		if err := copyFile(indexPath, tmpIndexPath); err != nil {
 			return "", err
 		}
-		s.log.Infof("created temporary index: %s", tmpIndexPath)
+		s.log.Info().Msgf("created temporary index: %s", tmpIndexPath)
 		// read the current branch tree information into the index
 		git := &util.Git{Env: []string{"GIT_INDEX_FILE=" + tmpIndexPath}}
 		_, err = git.Output(context.Background(), nil, "read-tree", curBranch)
@@ -209,43 +209,43 @@ func (s *GitSave) Save(message, branchName string) (string, error) {
 			return "", err
 		}
 	} else {
-		s.log.Infof("index %s does not exist", indexPath)
+		s.log.Info().Msgf("index %s does not exist", indexPath)
 	}
 
-	s.log.Infof("updating files already in the index")
+	s.log.Info().Msgf("updating files already in the index")
 	if err := gitUpdateFiles(tmpIndexPath); err != nil {
 		return "", err
 	}
 
 	if s.conf.AddUntracked {
-		s.log.Infof("adding untracked files")
+		s.log.Info().Msgf("adding untracked files")
 		if err := gitAddUntrackedFiles(tmpIndexPath); err != nil {
 			return "", err
 		}
 	}
 
 	if s.conf.AddIgnored {
-		s.log.Infof("adding ignored files")
+		s.log.Info().Msgf("adding ignored files")
 		if err := gitAddIgnoredFiles(tmpIndexPath); err != nil {
 			return "", err
 		}
 	}
 
-	s.log.Infof("writing tree file")
+	s.log.Info().Msgf("writing tree file")
 	treeSHA, err := gitWriteTree(tmpIndexPath)
 	if err != nil {
 		return "", err
 	}
-	s.log.Infof("tree: %s", treeSHA)
+	s.log.Info().Msgf("tree: %s", treeSHA)
 
-	s.log.Infof("committing tree")
+	s.log.Info().Msgf("committing tree")
 	commitSHA, err := gitCommitTree(message, treeSHA)
 	if err != nil {
 		return "", err
 	}
-	s.log.Infof("commit: %s", commitSHA)
+	s.log.Info().Msgf("commit: %s", commitSHA)
 
-	s.log.Infof("updating ref")
+	s.log.Info().Msgf("updating ref")
 	if err = gitUpdateRef("git-save", filepath.Join(s.refsPrefix, branchName), commitSHA); err != nil {
 		return "", err
 	}

@@ -32,7 +32,7 @@ import (
 
 	"github.com/docker/docker/pkg/archive"
 	"github.com/gofrs/uuid"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 	errors "golang.org/x/xerrors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -71,7 +71,7 @@ const (
 )
 
 type K8sDriver struct {
-	log              *zap.SugaredLogger
+	log              zerolog.Logger
 	restconfig       *restclient.Config
 	client           *kubernetes.Clientset
 	toolboxPath      string
@@ -98,7 +98,7 @@ type K8sPod struct {
 	initVolumeDir string
 }
 
-func NewK8sDriver(logger *zap.Logger, executorID, toolboxPath, initImage string, initDockerConfig *registry.DockerConfig) (*K8sDriver, error) {
+func NewK8sDriver(log zerolog.Logger, executorID, toolboxPath, initImage string, initDockerConfig *registry.DockerConfig) (*K8sDriver, error) {
 	kubeClientConfig := NewKubeClientConfig("", "", "")
 	kubecfg, err := kubeClientConfig.ClientConfig()
 	if err != nil {
@@ -115,7 +115,7 @@ func NewK8sDriver(logger *zap.Logger, executorID, toolboxPath, initImage string,
 	}
 
 	d := &K8sDriver{
-		log:              logger.Sugar(),
+		log:              log,
 		restconfig:       kubecfg,
 		client:           kubecli,
 		toolboxPath:      toolboxPath,
@@ -133,7 +133,7 @@ func NewK8sDriver(logger *zap.Logger, executorID, toolboxPath, initImage string,
 	sv, err := parseGitVersion(serverVersion.GitVersion)
 	// if server version parsing fails just warn but ignore it
 	if err != nil {
-		d.log.Warnf("failed to parse k8s server version: %w", err)
+		d.log.Warn().Err(err).Msgf("failed to parse k8s server version")
 	}
 	if sv != nil {
 		// for k8s version < v1.14.x use old arch label
@@ -194,7 +194,7 @@ func NewK8sDriver(logger *zap.Logger, executorID, toolboxPath, initImage string,
 	go func() {
 		for {
 			if err := d.updateLease(ctx); err != nil {
-				d.log.Errorf("failed to update executor lease: %+v", err)
+				d.log.Err(err).Msgf("failed to update executor lease")
 			}
 
 			select {
@@ -210,7 +210,7 @@ func NewK8sDriver(logger *zap.Logger, executorID, toolboxPath, initImage string,
 	go func() {
 		for {
 			if err := d.cleanStaleExecutorsLease(ctx); err != nil {
-				d.log.Errorf("failed to clean stale executors lease: %+v", err)
+				d.log.Err(err).Msgf("failed to clean stale executors lease")
 			}
 
 			select {

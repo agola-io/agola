@@ -26,16 +26,16 @@ require (
 	github.com/mitchellh/copystructure v1.0.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/opencontainers/runc v0.1.1 // indirect
+	github.com/rs/zerolog v1.26.1
 	github.com/sanity-io/litter v1.2.0
 	github.com/sgotti/gexpect v0.0.0-20210315095146-1ec64e69809b
 	github.com/spf13/cobra v0.0.5
 	github.com/xanzy/go-gitlab v0.26.0
 	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738
 	go.starlark.net v0.0.0-20200203144150-6677ee5c7211
-	go.uber.org/zap v1.13.0
-	golang.org/x/crypto v0.0.0-20200214034016-1d94cc7ab1c6
+	golang.org/x/crypto v0.0.0-20211215165025-cf75a172585e
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
-	golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 	gopkg.in/src-d/go-billy.v4 v4.3.2
 	gopkg.in/src-d/go-git.v4 v4.13.1
 	gopkg.in/yaml.v2 v2.2.8

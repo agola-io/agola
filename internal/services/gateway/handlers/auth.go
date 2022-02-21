@@ -26,12 +26,12 @@ import (
 
 	"github.com/golang-jwt/jwt/v4"
 	jwtrequest "github.com/golang-jwt/jwt/v4/request"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 	errors "golang.org/x/xerrors"
 )
 
 type AuthHandler struct {
-	log  *zap.SugaredLogger
+	log  zerolog.Logger
 	next http.Handler
 
 	configstoreClient *csclient.Client
@@ -42,10 +42,10 @@ type AuthHandler struct {
 	required bool
 }
 
-func NewAuthHandler(logger *zap.Logger, configstoreClient *csclient.Client, adminToken string, sd *scommon.TokenSigningData, required bool) func(http.Handler) http.Handler {
+func NewAuthHandler(log zerolog.Logger, configstoreClient *csclient.Client, adminToken string, sd *scommon.TokenSigningData, required bool) func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		return &AuthHandler{
-			log:               logger.Sugar(),
+			log:               log,
 			next:              h,
 			configstoreClient: configstoreClient,
 			adminToken:        adminToken,
@@ -107,7 +107,7 @@ func (h *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return key, nil
 		})
 		if err != nil {
-			h.log.Errorf("err: %+v", err)
+			h.log.Err(err).Send()
 			http.Error(w, "", http.StatusUnauthorized)
 			return
 		}

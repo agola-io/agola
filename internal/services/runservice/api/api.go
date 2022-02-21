@@ -35,10 +35,10 @@ import (
 	"agola.io/agola/services/runservice/types"
 
 	"github.com/gorilla/mux"
+	"github.com/rs/zerolog"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
 	etcdclientv3rpc "go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
 	"go.etcd.io/etcd/mvcc/mvccpb"
-	"go.uber.org/zap"
 	errors "golang.org/x/xerrors"
 )
 
@@ -47,15 +47,15 @@ type ErrorResponse struct {
 }
 
 type LogsHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	e   *etcd.Store
 	ost *objectstorage.ObjStorage
 	dm  *datamanager.DataManager
 }
 
-func NewLogsHandler(logger *zap.Logger, e *etcd.Store, ost *objectstorage.ObjStorage, dm *datamanager.DataManager) *LogsHandler {
+func NewLogsHandler(log zerolog.Logger, e *etcd.Store, ost *objectstorage.ObjStorage, dm *datamanager.DataManager) *LogsHandler {
 	return &LogsHandler{
-		log: logger.Sugar(),
+		log: log,
 		e:   e,
 		ost: ost,
 		dm:  dm,
@@ -105,7 +105,7 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err, sendError := h.readTaskLogs(ctx, runID, taskID, setup, step, w, follow); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		if sendError {
 			switch {
 			case util.APIErrorIs(err, util.ErrNotExist):
@@ -238,15 +238,15 @@ func sendLogs(w http.ResponseWriter, r io.Reader) error {
 }
 
 type LogsDeleteHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	e   *etcd.Store
 	ost *objectstorage.ObjStorage
 	dm  *datamanager.DataManager
 }
 
-func NewLogsDeleteHandler(logger *zap.Logger, e *etcd.Store, ost *objectstorage.ObjStorage, dm *datamanager.DataManager) *LogsDeleteHandler {
+func NewLogsDeleteHandler(log zerolog.Logger, e *etcd.Store, ost *objectstorage.ObjStorage, dm *datamanager.DataManager) *LogsDeleteHandler {
 	return &LogsDeleteHandler{
-		log: logger.Sugar(),
+		log: log,
 		e:   e,
 		ost: ost,
 		dm:  dm,
@@ -291,7 +291,7 @@ func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.deleteTaskLogs(ctx, runID, taskID, setup, step, w); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		switch {
 		case util.APIErrorIs(err, util.ErrNotExist):
 			util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("log doesn't exist: %w", err)))
@@ -338,13 +338,13 @@ func (h *LogsDeleteHandler) deleteTaskLogs(ctx context.Context, runID, taskID st
 }
 
 type ChangeGroupsUpdateTokensHandler struct {
-	log    *zap.SugaredLogger
+	log    zerolog.Logger
 	readDB *readdb.ReadDB
 }
 
-func NewChangeGroupsUpdateTokensHandler(logger *zap.Logger, readDB *readdb.ReadDB) *ChangeGroupsUpdateTokensHandler {
+func NewChangeGroupsUpdateTokensHandler(log zerolog.Logger, readDB *readdb.ReadDB) *ChangeGroupsUpdateTokensHandler {
 	return &ChangeGroupsUpdateTokensHandler{
-		log:    logger.Sugar(),
+		log:    log,
 		readDB: readDB,
 	}
 }
@@ -373,20 +373,20 @@ func (h *ChangeGroupsUpdateTokensHandler) ServeHTTP(w http.ResponseWriter, r *ht
 	}
 
 	if err := util.HTTPResponse(w, http.StatusOK, cgts); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type RunHandler struct {
-	log    *zap.SugaredLogger
+	log    zerolog.Logger
 	e      *etcd.Store
 	dm     *datamanager.DataManager
 	readDB *readdb.ReadDB
 }
 
-func NewRunHandler(logger *zap.Logger, e *etcd.Store, dm *datamanager.DataManager, readDB *readdb.ReadDB) *RunHandler {
+func NewRunHandler(log zerolog.Logger, e *etcd.Store, dm *datamanager.DataManager, readDB *readdb.ReadDB) *RunHandler {
 	return &RunHandler{
-		log:    logger.Sugar(),
+		log:    log,
 		e:      e,
 		dm:     dm,
 		readDB: readDB,
@@ -408,7 +408,7 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		run, err = h.readDB.GetRun(tx, runID)
 		if err != nil {
-			h.log.Errorf("err: %+v", err)
+			h.log.Err(err).Send()
 			return err
 		}
 
@@ -443,7 +443,7 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
@@ -453,13 +453,13 @@ const (
 )
 
 type RunsHandler struct {
-	log    *zap.SugaredLogger
+	log    zerolog.Logger
 	readDB *readdb.ReadDB
 }
 
-func NewRunsHandler(logger *zap.Logger, readDB *readdb.ReadDB) *RunsHandler {
+func NewRunsHandler(log zerolog.Logger, readDB *readdb.ReadDB) *RunsHandler {
 	return &RunsHandler{
-		log:    logger.Sugar(),
+		log:    log,
 		readDB: readDB,
 	}
 }
@@ -505,7 +505,7 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		runs, err = h.readDB.GetRuns(tx, groups, lastRun, phaseFilter, resultFilter, start, limit, sortOrder)
 		if err != nil {
-			h.log.Errorf("err: %+v", err)
+			h.log.Err(err).Send()
 			return err
 		}
 
@@ -528,18 +528,18 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ChangeGroupsUpdateToken: cgts,
 	}
 	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type RunCreateHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewRunCreateHandler(logger *zap.Logger, ah *action.ActionHandler) *RunCreateHandler {
+func NewRunCreateHandler(log zerolog.Logger, ah *action.ActionHandler) *RunCreateHandler {
 	return &RunCreateHandler{
-		log: logger.Sugar(),
+		log: log,
 		ah:  ah,
 	}
 }
@@ -572,7 +572,7 @@ func (h *RunCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	rb, err := h.ah.CreateRun(ctx, creq)
 	if err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		util.HTTPError(w, err)
 		return
 	}
@@ -583,18 +583,18 @@ func (h *RunCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type RunActionsHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewRunActionsHandler(logger *zap.Logger, ah *action.ActionHandler) *RunActionsHandler {
+func NewRunActionsHandler(log zerolog.Logger, ah *action.ActionHandler) *RunActionsHandler {
 	return &RunActionsHandler{
-		log: logger.Sugar(),
+		log: log,
 		ah:  ah,
 	}
 }
@@ -619,7 +619,7 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			ChangeGroupsUpdateToken: req.ChangeGroupsUpdateToken,
 		}
 		if err := h.ah.ChangeRunPhase(ctx, creq); err != nil {
-			h.log.Errorf("err: %+v", err)
+			h.log.Err(err).Send()
 			util.HTTPError(w, err)
 			return
 		}
@@ -629,7 +629,7 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			ChangeGroupsUpdateToken: req.ChangeGroupsUpdateToken,
 		}
 		if err := h.ah.StopRun(ctx, creq); err != nil {
-			h.log.Errorf("err: %+v", err)
+			h.log.Err(err).Send()
 			util.HTTPError(w, err)
 			return
 		}
@@ -640,13 +640,13 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type RunTaskActionsHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewRunTaskActionsHandler(logger *zap.Logger, ah *action.ActionHandler) *RunTaskActionsHandler {
+func NewRunTaskActionsHandler(log zerolog.Logger, ah *action.ActionHandler) *RunTaskActionsHandler {
 	return &RunTaskActionsHandler{
-		log: logger.Sugar(),
+		log: log,
 		ah:  ah,
 	}
 }
@@ -673,7 +673,7 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 			ChangeGroupsUpdateToken: req.ChangeGroupsUpdateToken,
 		}
 		if err := h.ah.RunTaskSetAnnotations(ctx, creq); err != nil {
-			h.log.Errorf("err: %+v", err)
+			h.log.Err(err).Send()
 			util.HTTPError(w, err)
 			return
 		}
@@ -685,7 +685,7 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 			ChangeGroupsUpdateToken: req.ChangeGroupsUpdateToken,
 		}
 		if err := h.ah.ApproveRunTask(ctx, creq); err != nil {
-			h.log.Errorf("err: %+v", err)
+			h.log.Err(err).Send()
 			util.HTTPError(w, err)
 			return
 		}
@@ -697,15 +697,15 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 }
 
 type RunEventsHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	e   *etcd.Store
 	ost *objectstorage.ObjStorage
 	dm  *datamanager.DataManager
 }
 
-func NewRunEventsHandler(logger *zap.Logger, e *etcd.Store, ost *objectstorage.ObjStorage, dm *datamanager.DataManager) *RunEventsHandler {
+func NewRunEventsHandler(log zerolog.Logger, e *etcd.Store, ost *objectstorage.ObjStorage, dm *datamanager.DataManager) *RunEventsHandler {
 	return &RunEventsHandler{
-		log: logger.Sugar(),
+		log: log,
 		e:   e,
 		ost: ost,
 		dm:  dm,
@@ -722,7 +722,7 @@ func (h *RunEventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	startRunEventID := q.Get("startruneventid")
 
 	if err := h.sendRunEvents(ctx, startRunEventID, w); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
@@ -747,7 +747,7 @@ func (h *RunEventsHandler) sendRunEvents(ctx context.Context, startRunEventID st
 		if wresp.Canceled {
 			err := wresp.Err()
 			if errors.Is(err, etcdclientv3rpc.ErrCompacted) {
-				h.log.Errorf("required events already compacted")
+				h.log.Err(err).Msgf("required events already compacted")
 			}
 			return errors.Errorf("watch error: %w", err)
 		}

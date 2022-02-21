@@ -40,11 +40,11 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/stdcopy"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 )
 
 type DockerDriver struct {
-	log              *zap.SugaredLogger
+	log              zerolog.Logger
 	client           *client.Client
 	toolboxPath      string
 	initImage        string
@@ -53,14 +53,14 @@ type DockerDriver struct {
 	arch             types.Arch
 }
 
-func NewDockerDriver(logger *zap.Logger, executorID, toolboxPath, initImage string, initDockerConfig *registry.DockerConfig) (*DockerDriver, error) {
+func NewDockerDriver(log zerolog.Logger, executorID, toolboxPath, initImage string, initDockerConfig *registry.DockerConfig) (*DockerDriver, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.26"))
 	if err != nil {
 		return nil, err
 	}
 
 	return &DockerDriver{
-		log:              logger.Sugar(),
+		log:              log,
 		client:           cli,
 		toolboxPath:      toolboxPath,
 		initImage:        initImage,

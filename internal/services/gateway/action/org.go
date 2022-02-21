@@ -107,12 +107,12 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*
 		org.CreatorUserID = req.CreatorUserID
 	}
 
-	h.log.Infof("creating organization")
+	h.log.Info().Msgf("creating organization")
 	org, _, err := h.configstoreClient.CreateOrg(ctx, org)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to create organization: %w", err))
 	}
-	h.log.Infof("organization %s created, ID: %s", org.Name, org.ID)
+	h.log.Info().Msgf("organization %s created, ID: %s", org.Name, org.ID)
 
 	return org, nil
 }

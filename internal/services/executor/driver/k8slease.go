@@ -181,7 +181,7 @@ func (d *K8sDriver) cleanStaleExecutorsLease(ctx context.Context) error {
 		}
 		for _, lease := range leases {
 			if lease.Spec.HolderIdentity == nil {
-				d.log.Warnf("missing holder identity for lease %q", lease.Name)
+				d.log.Warn().Msgf("missing holder identity for lease %q", lease.Name)
 				continue
 			}
 			// skip our lease
@@ -189,13 +189,13 @@ func (d *K8sDriver) cleanStaleExecutorsLease(ctx context.Context) error {
 				continue
 			}
 			if lease.Spec.RenewTime == nil {
-				d.log.Warnf("missing renew time for lease %q", lease.Name)
+				d.log.Warn().Msgf("missing renew time for lease %q", lease.Name)
 				continue
 			}
 			if lease.Spec.RenewTime.Add(staleExecutorLeaseInterval).Before(time.Now()) {
-				d.log.Infof("deleting stale lease %q", lease.Name)
+				d.log.Info().Msgf("deleting stale lease %q", lease.Name)
 				if err := leaseClient.Delete(lease.Name, nil); err != nil {
-					d.log.Errorf("failed to delete stale lease %q, err: %v", lease.Name, err)
+					d.log.Err(err).Msgf("failed to delete stale lease %q", lease.Name)
 				}
 			}
 		}
@@ -210,7 +210,7 @@ func (d *K8sDriver) cleanStaleExecutorsLease(ctx context.Context) error {
 			var ld *LeaseData
 			if cm.Annotations == nil {
 				// this shouldn't happen
-				d.log.Warnf("missing configmap lease annotations for configmap %q", cm.Name)
+				d.log.Warn().Msgf("missing configmap lease annotations for configmap %q", cm.Name)
 				continue
 			}
 			if recordBytes, found := cm.Annotations[cmLeaseKey]; found {
@@ -223,9 +223,9 @@ func (d *K8sDriver) cleanStaleExecutorsLease(ctx context.Context) error {
 				continue
 			}
 			if ld.RenewTime.Add(staleExecutorLeaseInterval).Before(time.Now()) {
-				d.log.Infof("deleting stale configmap lease %q", cm.Name)
+				d.log.Info().Msgf("deleting stale configmap lease %q", cm.Name)
 				if err := cmClient.Delete(cm.Name, nil); err != nil {
-					d.log.Errorf("failed to delete stale configmap lease %q, err: %v", cm.Name, err)
+					d.log.Err(err).Msgf("failed to delete stale configmap lease %q", cm.Name)
 				}
 			}
 		}

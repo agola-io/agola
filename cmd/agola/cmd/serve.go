@@ -30,6 +30,7 @@ import (
 	"agola.io/agola/internal/services/scheduler"
 	"agola.io/agola/internal/util"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"go.etcd.io/etcd/embed"
 	errors "golang.org/x/xerrors"
@@ -57,7 +58,7 @@ var cmdServe = &cobra.Command{
 	Version: cmd.Version,
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := serve(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -80,7 +81,7 @@ func init() {
 	flags.StringVar(&serveOpts.embeddedEtcdDataDir, "embedded-etcd-data-dir", "/tmp/agola/etcd", "embedded etcd data dir, only for testing purpose")
 
 	if err := cmdServe.MarkFlagRequired("components"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdAgola.AddCommand(cmdServe)
@@ -92,7 +93,7 @@ func embeddedEtcd(ctx context.Context) error {
 	cfg.Logger = "zap"
 	cfg.LogOutputs = []string{"stderr"}
 
-	log.Infof("starting embedded etcd server")
+	log.Info().Msgf("starting embedded etcd server")
 	e, err := embed.StartEtcd(cfg)
 	if err != nil {
 		return err
@@ -100,10 +101,10 @@ func embeddedEtcd(ctx context.Context) error {
 
 	go func() {
 		<-e.Server.ReadyNotify()
-		log.Infof("embedded etcd server is ready")
+		log.Info().Msgf("embedded etcd server is ready")
 
 		<-ctx.Done()
-		log.Infof("stopping embedded etcd server")
+		log.Info().Msgf("stopping embedded etcd server")
 		e.Close()
 	}()
 
@@ -142,7 +143,7 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	var rs *rsscheduler.Runservice
 	if isComponentEnabled("runservice") {
-		rs, err = rsscheduler.NewRunservice(ctx, nil, &c.Runservice)
+		rs, err = rsscheduler.NewRunservice(ctx, log.Logger, &c.Runservice)
 		if err != nil {
 			return errors.Errorf("failed to start run service scheduler: %w", err)
 		}
@@ -150,7 +151,7 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	var ex *rsexecutor.Executor
 	if isComponentEnabled("executor") {
-		ex, err = executor.NewExecutor(ctx, nil, &c.Executor)
+		ex, err = executor.NewExecutor(ctx, log.Logger, &c.Executor)
 		if err != nil {
 			return errors.Errorf("failed to start run service executor: %w", err)
 		}
@@ -158,7 +159,7 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	var cs *configstore.Configstore
 	if isComponentEnabled("configstore") {
-		cs, err = configstore.NewConfigstore(ctx, nil, &c.Configstore)
+		cs, err = configstore.NewConfigstore(ctx, log.Logger, &c.Configstore)
 		if err != nil {
 			return errors.Errorf("failed to start config store: %w", err)
 		}
@@ -166,7 +167,7 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	var sched *scheduler.Scheduler
 	if isComponentEnabled("scheduler") {
-		sched, err = scheduler.NewScheduler(ctx, nil, &c.Scheduler)
+		sched, err = scheduler.NewScheduler(ctx, log.Logger, &c.Scheduler)
 		if err != nil {
 			return errors.Errorf("failed to start scheduler: %w", err)
 		}
@@ -174,7 +175,7 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	var ns *notification.NotificationService
 	if isComponentEnabled("notification") {
-		ns, err = notification.NewNotificationService(ctx, nil, c)
+		ns, err = notification.NewNotificationService(ctx, log.Logger, c)
 		if err != nil {
 			return errors.Errorf("failed to start notification service: %w", err)
 		}
@@ -182,7 +183,7 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	var gw *gateway.Gateway
 	if isComponentEnabled("gateway") {
-		gw, err = gateway.NewGateway(ctx, nil, c)
+		gw, err = gateway.NewGateway(ctx, log.Logger, c)
 		if err != nil {
 			return errors.Errorf("failed to start gateway: %w", err)
 		}
@@ -190,7 +191,7 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	var gs *gitserver.Gitserver
 	if isComponentEnabled("gitserver") {
-		gs, err = gitserver.NewGitserver(ctx, nil, &c.Gitserver)
+		gs, err = gitserver.NewGitserver(ctx, log.Logger, &c.Gitserver)
 		if err != nil {
 			return errors.Errorf("failed to start git server: %w", err)
 		}
