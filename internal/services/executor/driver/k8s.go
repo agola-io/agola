@@ -31,7 +31,7 @@ import (
 	"agola.io/agola/services/types"
 
 	"github.com/docker/docker/pkg/archive"
-	uuid "github.com/satori/go.uuid"
+	"github.com/gofrs/uuid"
 	"go.uber.org/zap"
 	errors "golang.org/x/xerrors"
 	corev1 "k8s.io/api/core/v1"
@@ -297,7 +297,7 @@ func (d *K8sDriver) getOrCreateExecutorsGroupID(ctx context.Context) (string, er
 		return cm.Data[executorsGroupIDConfigMapKey], nil
 	}
 
-	executorsGroupID := uuid.NewV4().String()
+	executorsGroupID := uuid.Must(uuid.NewV4()).String()
 
 	cm = &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{

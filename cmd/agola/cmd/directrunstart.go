@@ -29,7 +29,7 @@ import (
 	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/ghodss/yaml"
-	uuid "github.com/satori/go.uuid"
+	"github.com/gofrs/uuid"
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
 )
@@ -163,7 +163,7 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 	git := &util.Git{}
 	repoUUID, _ := git.ConfigGet(context.Background(), "agola.repouuid")
 	if repoUUID == "" {
-		repoUUID = uuid.NewV4().String()
+		repoUUID = uuid.Must(uuid.NewV4()).String()
 		if _, err := git.ConfigSet(context.Background(), "agola.repouuid", repoUUID); err != nil {
 			return fmt.Errorf("failed to set agola repo uid in git config: %v", err)
 		}
@@ -174,7 +174,7 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 		AddIgnored:   directRunStartOpts.ignored,
 	})
 
-	localBranch := "gitsavebranch-" + uuid.NewV4().String()
+	localBranch := "gitsavebranch-" + uuid.Must(uuid.NewV4()).String()
 	message := "agola direct run"
 
 	commitSHA, err := gs.Save(message, localBranch)

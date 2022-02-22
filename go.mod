@@ -12,6 +12,7 @@ require (
 	github.com/elazarl/go-bindata-assetfs v1.0.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-bindata/go-bindata v1.0.0
+	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/golang-jwt/jwt/v4 v4.0.0
 	github.com/google/go-cmp v0.4.0
 	github.com/google/go-containerregistry v0.0.0-20200212224832-c629a66d7231
@@ -26,7 +27,6 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/opencontainers/runc v0.1.1 // indirect
 	github.com/sanity-io/litter v1.2.0
-	github.com/satori/go.uuid v1.2.0
 	github.com/sgotti/gexpect v0.0.0-20210315095146-1ec64e69809b
 	github.com/spf13/cobra v0.0.5
 	github.com/xanzy/go-gitlab v0.26.0

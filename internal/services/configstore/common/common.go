@@ -18,7 +18,7 @@ import (
 	"net/url"
 	"strings"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/gofrs/uuid"
 )
 
 const (

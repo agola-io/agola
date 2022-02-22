@@ -24,7 +24,7 @@ import (
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/gofrs/uuid"
 	errors "golang.org/x/xerrors"
 )
 
@@ -148,11 +148,11 @@ func (h *ActionHandler) CreateProject(ctx context.Context, project *types.Projec
 		return nil, err
 	}
 
-	project.ID = uuid.NewV4().String()
+	project.ID = uuid.Must(uuid.NewV4()).String()
 	project.Parent.Type = types.ConfigTypeProjectGroup
 	// generate the Secret and the WebhookSecret
-	project.Secret = util.EncodeSha1Hex(uuid.NewV4().String())
-	project.WebhookSecret = util.EncodeSha1Hex(uuid.NewV4().String())
+	project.Secret = util.EncodeSha1Hex(uuid.Must(uuid.NewV4()).String())
+	project.WebhookSecret = util.EncodeSha1Hex(uuid.Must(uuid.NewV4()).String())
 
 	pcj, err := json.Marshal(project)
 	if err != nil {

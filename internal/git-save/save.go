@@ -21,8 +21,8 @@ import (
 	"path/filepath"
 
 	"agola.io/agola/internal/util"
-	uuid "github.com/satori/go.uuid"
 
+	"github.com/gofrs/uuid"
 	"go.uber.org/zap"
 	errors "golang.org/x/xerrors"
 )
@@ -181,7 +181,7 @@ func (s *GitSave) Save(message, branchName string) (string, error) {
 		return "", err
 	}
 
-	tmpIndexPath := filepath.Join(gitdir, "gitsave-index-"+uuid.NewV4().String())
+	tmpIndexPath := filepath.Join(gitdir, "gitsave-index-"+uuid.Must(uuid.NewV4()).String())
 	defer os.Remove(tmpIndexPath)
 
 	indexPath := filepath.Join(gitdir, gitIndexFile)

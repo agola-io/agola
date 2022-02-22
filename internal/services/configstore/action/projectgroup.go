@@ -25,7 +25,7 @@ import (
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/gofrs/uuid"
 	errors "golang.org/x/xerrors"
 )
 
@@ -176,7 +176,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, projectGroup *ty
 		return nil, err
 	}
 
-	projectGroup.ID = uuid.NewV4().String()
+	projectGroup.ID = uuid.Must(uuid.NewV4()).String()
 	projectGroup.Parent.Type = types.ConfigTypeProjectGroup
 
 	pgj, err := json.Marshal(projectGroup)

@@ -30,7 +30,7 @@ import (
 	"agola.io/agola/internal/sequence"
 	"agola.io/agola/internal/util"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/gofrs/uuid"
 	errors "golang.org/x/xerrors"
 )
 
@@ -469,7 +469,7 @@ func (d *DataManager) writeDataType(ctx context.Context, wi walIndex, dataType s
 			}
 			dataFileIndexes = append(dataFileIndexes, dataFileIndex)
 			for i, sp := range splitPoints {
-				curDataFileID := d.dataFileID(dataSequence, uuid.NewV4().String())
+				curDataFileID := d.dataFileID(dataSequence, uuid.Must(uuid.NewV4()).String())
 				if err := d.writeDataFile(ctx, &buf, sp.pos-curPos, dataFileIndexes[i], curDataFileID, dataType); err != nil {
 					return nil, err
 				}
@@ -744,7 +744,7 @@ func (d *DataManager) Import(ctx context.Context, r io.Reader) error {
 
 		err := dec.Decode(&de)
 		if err == io.EOF {
-			dataFileID := d.dataFileID(dataSequence, uuid.NewV4().String())
+			dataFileID := d.dataFileID(dataSequence, uuid.Must(uuid.NewV4()).String())
 			if err := d.writeDataFile(ctx, &buf, int64(buf.Len()), dataFileIndex, dataFileID, curDataType); err != nil {
 				return err
 			}
@@ -778,7 +778,7 @@ func (d *DataManager) Import(ctx context.Context, r io.Reader) error {
 		}
 
 		if mustWrite {
-			dataFileID := d.dataFileID(dataSequence, uuid.NewV4().String())
+			dataFileID := d.dataFileID(dataSequence, uuid.Must(uuid.NewV4()).String())
 			if err := d.writeDataFile(ctx, &buf, int64(buf.Len()), dataFileIndex, dataFileID, curDataType); err != nil {
 				return err
 			}

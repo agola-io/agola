@@ -38,8 +38,8 @@ import (
 	"agola.io/agola/internal/util"
 	rsclient "agola.io/agola/services/runservice/client"
 	"agola.io/agola/services/runservice/types"
-	uuid "github.com/satori/go.uuid"
 
+	"github.com/gofrs/uuid"
 	"github.com/gorilla/mux"
 	sockaddr "github.com/hashicorp/go-sockaddr"
 	"go.uber.org/zap"
@@ -846,7 +846,7 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 	podConfig := &driver.PodConfig{
 		// generate a random pod id (don't use task id for future ability to restart
 		// tasks failed to start and don't clash with existing pods)
-		ID:            uuid.NewV4().String(),
+		ID:            uuid.Must(uuid.NewV4()).String(),
 		TaskID:        et.ID,
 		Arch:          et.Spec.Arch,
 		InitVolumeDir: toolboxContainerDir,
@@ -1393,7 +1393,7 @@ func NewExecutor(ctx context.Context, l *zap.Logger, c *config.Executor) (*Execu
 		return nil, err
 	}
 	if id == "" {
-		id = uuid.NewV4().String()
+		id = uuid.Must(uuid.NewV4()).String()
 		if err := e.saveExecutorID(id); err != nil {
 			return nil, err
 		}

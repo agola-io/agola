@@ -30,7 +30,7 @@ import (
 	"agola.io/agola/internal/sequence"
 	"agola.io/agola/internal/util"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/gofrs/uuid"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/clientv3/concurrency"
 	etcdclientv3rpc "go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
@@ -439,7 +439,7 @@ func (d *DataManager) WriteWalAdditionalOps(ctx context.Context, actions []*Acti
 	}
 	walsData.Revision = resp.Kvs[0].ModRevision
 
-	walDataFileID := uuid.NewV4().String()
+	walDataFileID := uuid.Must(uuid.NewV4()).String()
 	walDataFilePath := d.storageWalDataFile(walDataFileID)
 	walKey := etcdWalKey(walSequence.String())
 
@@ -1196,7 +1196,7 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 		return err
 	}
 
-	walDataFileID := uuid.NewV4().String()
+	walDataFileID := uuid.Must(uuid.NewV4()).String()
 	walDataFilePath := d.storageWalDataFile(walDataFileID)
 	walKey := etcdWalKey(walSequence.String())
 

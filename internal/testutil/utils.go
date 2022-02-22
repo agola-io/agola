@@ -36,7 +36,7 @@ import (
 	"go.etcd.io/etcd/embed"
 	"go.uber.org/zap"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/gofrs/uuid"
 	"github.com/sgotti/gexpect"
 )
 
@@ -149,7 +149,7 @@ type TestEmbeddedEtcd struct {
 }
 
 func NewTestEmbeddedEtcd(t *testing.T, logger *zap.Logger, dir string, a ...string) (*TestEmbeddedEtcd, error) {
-	u := uuid.NewV4()
+	u := uuid.Must(uuid.NewV4())
 	uid := fmt.Sprintf("%x", u[:4])
 
 	dataDir := filepath.Join(dir, fmt.Sprintf("etcd%s", uid))
@@ -235,7 +235,7 @@ type TestExternalEtcd struct {
 }
 
 func NewTestExternalEtcd(t *testing.T, logger *zap.Logger, dir string, a ...string) (*TestExternalEtcd, error) {
-	u := uuid.NewV4()
+	u := uuid.Must(uuid.NewV4())
 	uid := fmt.Sprintf("%x", u[:4])
 
 	dataDir := filepath.Join(dir, fmt.Sprintf("etcd%s", uid))
@@ -448,7 +448,7 @@ type TestGitea struct {
 }
 
 func NewTestGitea(t *testing.T, dir, dockerBridgeAddress string, a ...string) (*TestGitea, error) {
-	u := uuid.NewV4()
+	u := uuid.Must(uuid.NewV4())
 	uid := fmt.Sprintf("%x", u[:4])
 
 	giteaPath := os.Getenv("GITEA_PATH")
