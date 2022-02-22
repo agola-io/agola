@@ -17,21 +17,21 @@ package config
 import (
 	"encoding/json"
 
+	"agola.io/agola/internal/errors"
 	"github.com/google/go-jsonnet"
-	errors "golang.org/x/xerrors"
 )
 
 func execJsonnet(configData []byte, configContext *ConfigContext) ([]byte, error) {
 	vm := jsonnet.MakeVM()
 	cj, err := json.Marshal(configContext)
 	if err != nil {
-		return nil, errors.Errorf("failed to marshal config context: %w", err)
+		return nil, errors.Wrapf(err, "failed to marshal config context")
 	}
 
 	vm.TLACode("ctx", string(cj))
 	out, err := vm.EvaluateSnippet("", string(configData))
 	if err != nil {
-		return nil, errors.Errorf("failed to evaluate jsonnet config: %w", err)
+		return nil, errors.Wrapf(err, "failed to evaluate jsonnet config")
 	}
 
 	return []byte(out), nil

@@ -16,13 +16,13 @@ package gitserver
 
 import (
 	"context"
-	"errors"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/testutil"
 	"agola.io/agola/internal/util"

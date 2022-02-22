@@ -20,11 +20,12 @@ import (
 
 	"agola.io/agola/internal/datamanager"
 	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/errors"
+
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
 
 	"github.com/gofrs/uuid"
-	errors "golang.org/x/xerrors"
 )
 
 func (h *ActionHandler) GetSecret(ctx context.Context, secretID string) (*types.Secret, error) {
@@ -32,10 +33,10 @@ func (h *ActionHandler) GetSecret(ctx context.Context, secretID string) (*types.
 	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		secret, err = h.readDB.GetSecretByID(tx, secretID)
-		return err
+		return errors.WithStack(err)
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	if secret == nil {
@@ -50,17 +51,17 @@ func (h *ActionHandler) GetSecrets(ctx context.Context, parentType types.ConfigT
 	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		parentID, err := h.ResolveConfigID(tx, parentType, parentRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if tree {
 			secrets, err = h.readDB.GetSecretsTree(tx, parentType, parentID)
 		} else {
 			secrets, err = h.readDB.GetSecrets(tx, parentID)
 		}
-		return err
+		return errors.WithStack(err)
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return secrets, nil
@@ -97,7 +98,7 @@ func (h *ActionHandler) ValidateSecret(ctx context.Context, secret *types.Secret
 
 func (h *ActionHandler) CreateSecret(ctx context.Context, secret *types.Secret) (*types.Secret, error) {
 	if err := h.ValidateSecret(ctx, secret); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
@@ -109,19 +110,19 @@ func (h *ActionHandler) CreateSecret(ctx context.Context, secret *types.Secret) 
 		var err error
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		parentID, err := h.ResolveConfigID(tx, secret.Parent.Type, secret.Parent.ID)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		secret.Parent.ID = parentID
 
 		// check duplicate secret name
 		s, err := h.readDB.GetSecretByName(tx, secret.Parent.ID, secret.Name)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if s != nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("secret with name %q for %s with id %q already exists", secret.Name, secret.Parent.Type, secret.Parent.ID))
@@ -130,14 +131,14 @@ func (h *ActionHandler) CreateSecret(ctx context.Context, secret *types.Secret) 
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	secret.ID = uuid.Must(uuid.NewV4()).String()
 
 	secretj, err := json.Marshal(secret)
 	if err != nil {
-		return nil, errors.Errorf("failed to marshal secret: %w", err)
+		return nil, errors.Wrapf(err, "failed to marshal secret")
 	}
 	actions := []*datamanager.Action{
 		{
@@ -149,7 +150,7 @@ func (h *ActionHandler) CreateSecret(ctx context.Context, secret *types.Secret) 
 	}
 
 	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return secret, err
+	return secret, errors.WithStack(err)
 }
 
 type UpdateSecretRequest struct {
@@ -160,7 +161,7 @@ type UpdateSecretRequest struct {
 
 func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretRequest) (*types.Secret, error) {
 	if err := h.ValidateSecret(ctx, req.Secret); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	var curSecret *types.Secret
@@ -173,14 +174,14 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretReque
 
 		parentID, err := h.ResolveConfigID(tx, req.Secret.Parent.Type, req.Secret.Parent.ID)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		req.Secret.Parent.ID = parentID
 
 		// check secret exists
 		curSecret, err = h.readDB.GetSecretByName(tx, req.Secret.Parent.ID, req.SecretName)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if curSecret == nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("secret with name %q for %s with id %q doesn't exists", req.SecretName, req.Secret.Parent.Type, req.Secret.Parent.ID))
@@ -190,7 +191,7 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretReque
 			// check duplicate secret name
 			u, err := h.readDB.GetSecretByName(tx, req.Secret.Parent.ID, req.Secret.Name)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			if u != nil {
 				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("secret with name %q for %s with id %q already exists", req.Secret.Name, req.Secret.Parent.Type, req.Secret.Parent.ID))
@@ -206,18 +207,18 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretReque
 		}
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	secretj, err := json.Marshal(req.Secret)
 	if err != nil {
-		return nil, errors.Errorf("failed to marshal secret: %w", err)
+		return nil, errors.Wrapf(err, "failed to marshal secret")
 	}
 	actions := []*datamanager.Action{
 		{
@@ -229,7 +230,7 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretReque
 	}
 
 	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return req.Secret, err
+	return req.Secret, errors.WithStack(err)
 }
 
 func (h *ActionHandler) DeleteSecret(ctx context.Context, parentType types.ConfigType, parentRef, secretName string) error {
@@ -242,13 +243,13 @@ func (h *ActionHandler) DeleteSecret(ctx context.Context, parentType types.Confi
 		var err error
 		parentID, err := h.ResolveConfigID(tx, parentType, parentRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		// check secret existance
 		secret, err = h.readDB.GetSecretByName(tx, parentID, secretName)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if secret == nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("secret with name %q doesn't exist", secretName))
@@ -258,13 +259,13 @@ func (h *ActionHandler) DeleteSecret(ctx context.Context, parentType types.Confi
 		cgNames := []string{util.EncodeSha256Hex("secretid-" + secret.ID)}
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		return nil
 	})
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	actions := []*datamanager.Action{
@@ -276,5 +277,5 @@ func (h *ActionHandler) DeleteSecret(ctx context.Context, parentType types.Confi
 	}
 
 	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return err
+	return errors.WithStack(err)
 }

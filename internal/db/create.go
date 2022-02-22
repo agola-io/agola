@@ -18,8 +18,8 @@ import (
 	"context"
 	"database/sql"
 
+	"agola.io/agola/internal/errors"
 	sq "github.com/Masterminds/squirrel"
-	errors "golang.org/x/xerrors"
 )
 
 const dbVersionTableDDLTmpl = `
@@ -33,22 +33,22 @@ func (db *DB) Create(ctx context.Context, stmts []string) error {
 
 	err := db.Do(ctx, func(tx *Tx) error {
 		if _, err := tx.Exec(dbVersionTableDDLTmpl); err != nil {
-			return errors.Errorf("failed to create dbversion table: %w", err)
+			return errors.Wrapf(err, "failed to create dbversion table")
 		}
 		return nil
 	})
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	err = db.Do(ctx, func(tx *Tx) error {
 		var version sql.NullInt64
 		q, args, err := sb.Select("max(version)").From("dbversion").ToSql()
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if err := tx.QueryRow(q, args...).Scan(&version); err != nil {
-			return errors.Errorf("cannot get current db version: %w", err)
+			return errors.Wrapf(err, "cannot get current db version")
 		}
 		if version.Valid {
 			return nil
@@ -56,18 +56,18 @@ func (db *DB) Create(ctx context.Context, stmts []string) error {
 
 		for _, stmt := range stmts {
 			if _, err := tx.Exec(stmt); err != nil {
-				return errors.Errorf("creation failed: %w", err)
+				return errors.Wrapf(err, "creation failed")
 			}
 		}
 
 		q, args, err = sb.Insert("dbversion").Columns("version", "time").Values(dbVersion, "now()").ToSql()
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if _, err := tx.Exec(q, args...); err != nil {
-			return errors.Errorf("failed to update dbversion table: %w", err)
+			return errors.Wrapf(err, "failed to update dbversion table")
 		}
 		return nil
 	})
-	return err
+	return errors.WithStack(err)
 }

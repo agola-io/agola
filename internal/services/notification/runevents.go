@@ -24,11 +24,11 @@ import (
 	"path"
 	"time"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/etcd"
 	rstypes "agola.io/agola/services/runservice/types"
 
 	"go.etcd.io/etcd/clientv3/concurrency"
-	errors "golang.org/x/xerrors"
 )
 
 var (
@@ -53,7 +53,7 @@ func (n *NotificationService) runEventsHandlerLoop(ctx context.Context) {
 func (n *NotificationService) runEventsHandler(ctx context.Context) error {
 	session, err := concurrency.NewSession(n.e.Client(), concurrency.WithTTL(5), concurrency.WithContext(ctx))
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	defer session.Close()
 
@@ -63,13 +63,13 @@ func (n *NotificationService) runEventsHandler(ctx context.Context) error {
 		if errors.Is(err, etcd.ErrLocked) {
 			return nil
 		}
-		return err
+		return errors.WithStack(err)
 	}
 	defer func() { _ = m.Unlock(ctx) }()
 
 	resp, err := n.runserviceClient.GetRunEvents(ctx, "")
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	if resp.StatusCode != http.StatusOK {
 		return errors.Errorf("http status code: %d", resp.StatusCode)
@@ -87,7 +87,7 @@ func (n *NotificationService) runEventsHandler(ctx context.Context) error {
 		line, err := br.ReadBytes('\n')
 		if err != nil {
 			if err != io.EOF {
-				return err
+				return errors.WithStack(err)
 			}
 			if len(line) == 0 {
 				return nil
@@ -103,7 +103,7 @@ func (n *NotificationService) runEventsHandler(ctx context.Context) error {
 
 			var ev *rstypes.RunEvent
 			if err := json.Unmarshal(data, &ev); err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 
 			// TODO(sgotti)

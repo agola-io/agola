@@ -15,8 +15,9 @@
 package util
 
 import (
-	"errors"
 	"regexp"
+
+	"agola.io/agola/internal/errors"
 
 	"github.com/gofrs/uuid"
 )

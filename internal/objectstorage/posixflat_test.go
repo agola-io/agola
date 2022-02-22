@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	errors "golang.org/x/xerrors"
+	"agola.io/agola/internal/errors"
 )
 
 func TestEscapeUnescape(t *testing.T) {

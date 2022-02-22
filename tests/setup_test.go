@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/configstore"
 	"agola.io/agola/internal/services/executor"
@@ -44,7 +45,6 @@ import (
 	"code.gitea.io/sdk/gitea"
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/zerolog"
-	errors "golang.org/x/xerrors"
 	"gopkg.in/src-d/go-billy.v4/memfs"
 	"gopkg.in/src-d/go-billy.v4/osfs"
 	"gopkg.in/src-d/go-git.v4"
@@ -140,37 +140,37 @@ func shutdownGitea(tgitea *testutil.TestGitea) {
 func startAgola(ctx context.Context, t *testing.T, log zerolog.Logger, dir string, c *config.Config) (<-chan error, error) {
 	rs, err := rsscheduler.NewRunservice(ctx, log, &c.Runservice)
 	if err != nil {
-		return nil, errors.Errorf("failed to start run service scheduler: %w", err)
+		return nil, errors.Wrapf(err, "failed to start run service scheduler")
 	}
 
 	ex, err := executor.NewExecutor(ctx, log, &c.Executor)
 	if err != nil {
-		return nil, errors.Errorf("failed to start run service executor: %w", err)
+		return nil, errors.Wrapf(err, "failed to start run service executor")
 	}
 
 	cs, err := configstore.NewConfigstore(ctx, log, &c.Configstore)
 	if err != nil {
-		return nil, errors.Errorf("failed to start config store: %w", err)
+		return nil, errors.Wrapf(err, "failed to start config store")
 	}
 
 	sched, err := scheduler.NewScheduler(ctx, log, &c.Scheduler)
 	if err != nil {
-		return nil, errors.Errorf("failed to start scheduler: %w", err)
+		return nil, errors.Wrapf(err, "failed to start scheduler")
 	}
 
 	ns, err := notification.NewNotificationService(ctx, log, c)
 	if err != nil {
-		return nil, errors.Errorf("failed to start notification service: %w", err)
+		return nil, errors.Wrapf(err, "failed to start notification service")
 	}
 
 	gw, err := gateway.NewGateway(ctx, log, c)
 	if err != nil {
-		return nil, errors.Errorf("failed to start gateway: %w", err)
+		return nil, errors.Wrapf(err, "failed to start gateway")
 	}
 
 	gs, err := gitserver.NewGitserver(ctx, log, &c.Gitserver)
 	if err != nil {
-		return nil, errors.Errorf("failed to start git server: %w", err)
+		return nil, errors.Wrapf(err, "failed to start git server")
 	}
 
 	errCh := make(chan error)
@@ -358,7 +358,7 @@ func setup(ctx context.Context, t *testing.T, dir string) (*testutil.TestEmbedde
 	go func() {
 		err := <-errCh
 		if err != nil {
-			panic(fmt.Errorf("agola component returned error: %w", err))
+			panic(errors.Wrap(err, "agola component returned error: %w"))
 		}
 	}()
 

@@ -24,6 +24,7 @@ import (
 
 	"agola.io/agola/internal/datamanager"
 	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/services/runservice/action"
@@ -39,7 +40,6 @@ import (
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
 	etcdclientv3rpc "go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
 	"go.etcd.io/etcd/mvcc/mvccpb"
-	errors "golang.org/x/xerrors"
 )
 
 type ErrorResponse struct {
@@ -104,12 +104,12 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		follow = true
 	}
 
-	if err, sendError := h.readTaskLogs(ctx, runID, taskID, setup, step, w, follow); err != nil {
+	if sendError, err := h.readTaskLogs(ctx, runID, taskID, setup, step, w, follow); err != nil {
 		h.log.Err(err).Send()
 		if sendError {
 			switch {
 			case util.APIErrorIs(err, util.ErrNotExist):
-				util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("log doesn't exist: %w", err)))
+				util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Wrapf(err, "log doesn't exist")))
 			default:
 				util.HTTPError(w, err)
 			}
@@ -117,21 +117,21 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, setup bool, step int, w http.ResponseWriter, follow bool) (error, bool) {
+func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, setup bool, step int, w http.ResponseWriter, follow bool) (bool, error) {
 	r, err := store.GetRunEtcdOrOST(ctx, h.e, h.dm, runID)
 	if err != nil {
-		return err, true
+		return true, errors.WithStack(err)
 	}
 	if r == nil {
-		return util.NewAPIError(util.ErrNotExist, errors.Errorf("no such run with id: %s", runID)), true
+		return true, util.NewAPIError(util.ErrNotExist, errors.Errorf("no such run with id: %s", runID))
 	}
 
 	task, ok := r.Tasks[taskID]
 	if !ok {
-		return util.NewAPIError(util.ErrNotExist, errors.Errorf("no such task with ID %s in run %s", taskID, runID)), true
+		return true, util.NewAPIError(util.ErrNotExist, errors.Errorf("no such task with ID %s in run %s", taskID, runID))
 	}
 	if len(task.Steps) <= step {
-		return util.NewAPIError(util.ErrNotExist, errors.Errorf("no such step for task %s in run %s", taskID, runID)), true
+		return true, util.NewAPIError(util.ErrNotExist, errors.Errorf("no such step for task %s in run %s", taskID, runID))
 	}
 
 	// if the log has been already fetched use it, otherwise fetch it from the executor
@@ -145,27 +145,27 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 		f, err := h.ost.ReadObject(logPath)
 		if err != nil {
 			if objectstorage.IsNotExist(err) {
-				return util.NewAPIError(util.ErrNotExist, err), true
+				return true, util.NewAPIError(util.ErrNotExist, err)
 			}
-			return err, true
+			return true, errors.WithStack(err)
 		}
 		defer f.Close()
-		return sendLogs(w, f), false
+		return false, sendLogs(w, f)
 	}
 
 	et, err := store.GetExecutorTask(ctx, h.e, task.ID)
 	if err != nil {
 		if errors.Is(err, etcd.ErrKeyNotFound) {
-			return util.NewAPIError(util.ErrNotExist, errors.Errorf("executor task with id %q doesn't exist", task.ID)), true
+			return true, util.NewAPIError(util.ErrNotExist, errors.Errorf("executor task with id %q doesn't exist", task.ID))
 		}
-		return err, true
+		return true, errors.WithStack(err)
 	}
 	executor, err := store.GetExecutor(ctx, h.e, et.Spec.ExecutorID)
 	if err != nil {
 		if errors.Is(err, etcd.ErrKeyNotFound) {
-			return util.NewAPIError(util.ErrNotExist, errors.Errorf("executor with id %q doesn't exist", et.Spec.ExecutorID)), true
+			return true, util.NewAPIError(util.ErrNotExist, errors.Errorf("executor with id %q doesn't exist", et.Spec.ExecutorID))
 		}
-		return err, true
+		return true, errors.WithStack(err)
 	}
 
 	var url string
@@ -179,14 +179,14 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 	}
 	req, err := http.Get(url)
 	if err != nil {
-		return err, true
+		return true, errors.WithStack(err)
 	}
 	defer req.Body.Close()
 	if req.StatusCode != http.StatusOK {
 		if req.StatusCode == http.StatusNotFound {
-			return util.NewAPIError(util.ErrNotExist, errors.New("no log on executor")), true
+			return true, util.NewAPIError(util.ErrNotExist, errors.New("no log on executor"))
 		}
-		return errors.Errorf("received http status: %d", req.StatusCode), true
+		return true, errors.Errorf("received http status: %d", req.StatusCode)
 	}
 
 	// write and flush the headers so the client will receive the response
@@ -202,7 +202,7 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 		flusher.Flush()
 	}
 
-	return sendLogs(w, req.Body), false
+	return false, sendLogs(w, req.Body)
 }
 
 func sendLogs(w http.ResponseWriter, r io.Reader) error {
@@ -221,7 +221,7 @@ func sendLogs(w http.ResponseWriter, r io.Reader) error {
 		//data, err := br.ReadBytes('\n')
 		if err != nil {
 			if err != io.EOF {
-				return err
+				return errors.WithStack(err)
 			}
 			if n == 0 {
 				return nil
@@ -229,7 +229,7 @@ func sendLogs(w http.ResponseWriter, r io.Reader) error {
 			stop = true
 		}
 		if _, err := w.Write(buf[:n]); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if flusher != nil {
 			flusher.Flush()
@@ -294,7 +294,7 @@ func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.log.Err(err).Send()
 		switch {
 		case util.APIErrorIs(err, util.ErrNotExist):
-			util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("log doesn't exist: %w", err)))
+			util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Wrapf(err, "log doesn't exist")))
 		default:
 			util.HTTPError(w, err)
 		}
@@ -304,7 +304,7 @@ func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *LogsDeleteHandler) deleteTaskLogs(ctx context.Context, runID, taskID string, setup bool, step int, w http.ResponseWriter) error {
 	r, err := store.GetRunEtcdOrOST(ctx, h.e, h.dm, runID)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	if r == nil {
 		return util.NewAPIError(util.ErrNotExist, errors.Errorf("no such run with id: %s", runID))
@@ -330,7 +330,7 @@ func (h *LogsDeleteHandler) deleteTaskLogs(ctx context.Context, runID, taskID st
 			if objectstorage.IsNotExist(err) {
 				return util.NewAPIError(util.ErrNotExist, err)
 			}
-			return err
+			return errors.WithStack(err)
 		}
 		return nil
 	}
@@ -359,7 +359,7 @@ func (h *ChangeGroupsUpdateTokensHandler) ServeHTTP(w http.ResponseWriter, r *ht
 	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, groups)
-		return err
+		return errors.WithStack(err)
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -409,11 +409,11 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		run, err = h.readDB.GetRun(tx, runID)
 		if err != nil {
 			h.log.Err(err).Send()
-			return err
+			return errors.WithStack(err)
 		}
 
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, changeGroups)
-		return err
+		return errors.WithStack(err)
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -506,11 +506,11 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		runs, err = h.readDB.GetRuns(tx, groups, lastRun, phaseFilter, resultFilter, start, limit, sortOrder)
 		if err != nil {
 			h.log.Err(err).Send()
-			return err
+			return errors.WithStack(err)
 		}
 
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, changeGroups)
-		return err
+		return errors.WithStack(err)
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -749,7 +749,7 @@ func (h *RunEventsHandler) sendRunEvents(ctx context.Context, startRunEventID st
 			if errors.Is(err, etcdclientv3rpc.ErrCompacted) {
 				h.log.Err(err).Msgf("required events already compacted")
 			}
-			return errors.Errorf("watch error: %w", err)
+			return errors.Wrapf(err, "watch error")
 		}
 
 		for _, ev := range wresp.Events {
@@ -757,10 +757,10 @@ func (h *RunEventsHandler) sendRunEvents(ctx context.Context, startRunEventID st
 			case mvccpb.PUT:
 				var runEvent *types.RunEvent
 				if err := json.Unmarshal(ev.Kv.Value, &runEvent); err != nil {
-					return errors.Errorf("failed to unmarshal run: %w", err)
+					return errors.Wrapf(err, "failed to unmarshal run")
 				}
 				if _, err := w.Write([]byte(fmt.Sprintf("data: %s\n\n", ev.Kv.Value))); err != nil {
-					return err
+					return errors.WithStack(err)
 				}
 			}
 		}

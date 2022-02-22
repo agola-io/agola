@@ -18,18 +18,18 @@ import (
 	"net/http"
 	"net/url"
 
+	"agola.io/agola/internal/errors"
 	util "agola.io/agola/internal/util"
 	cstypes "agola.io/agola/services/configstore/types"
 
 	"github.com/gorilla/mux"
-	errors "golang.org/x/xerrors"
 )
 
 func GetConfigTypeRef(r *http.Request) (cstypes.ConfigType, string, error) {
 	vars := mux.Vars(r)
 	projectRef, err := url.PathUnescape(vars["projectref"])
 	if err != nil {
-		return "", "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("wrong projectref %q: %w", vars["projectref"], err))
+		return "", "", util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "wrong projectref %q", vars["projectref"]))
 	}
 	if projectRef != "" {
 		return cstypes.ConfigTypeProject, projectRef, nil
@@ -37,7 +37,7 @@ func GetConfigTypeRef(r *http.Request) (cstypes.ConfigType, string, error) {
 
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
-		return "", "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("wrong projectgroupref %q: %w", vars["projectgroupref"], err))
+		return "", "", util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "wrong projectgroupref %q", vars["projectgroupref"]))
 	}
 	if projectGroupRef != "" {
 		return cstypes.ConfigTypeProjectGroup, projectGroupRef, nil

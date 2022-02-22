@@ -26,11 +26,11 @@ import (
 	"sort"
 	"strings"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/sequence"
 
 	"github.com/gofrs/uuid"
-	errors "golang.org/x/xerrors"
 )
 
 // ErrNoDataStatus represent when there's no data status files in the ost
@@ -96,12 +96,12 @@ func (d *DataManager) walIndex(ctx context.Context, wals []*WalData) (walIndex, 
 	for _, walData := range wals {
 		header, err := d.ReadWal(walData.WalSequence)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 
 		walFile, err := d.ReadWalData(header.WalDataFileID)
 		if err != nil {
-			return nil, errors.Errorf("cannot read wal data file %q: %w", header.WalDataFileID, err)
+			return nil, errors.Wrapf(err, "cannot read wal data file %q", header.WalDataFileID)
 		}
 		defer walFile.Close()
 
@@ -115,7 +115,7 @@ func (d *DataManager) walIndex(ctx context.Context, wals []*WalData) (walIndex, 
 				break
 			}
 			if err != nil {
-				return nil, errors.Errorf("failed to decode wal file: %w", err)
+				return nil, errors.Wrapf(err, "failed to decode wal file")
 			}
 
 			if _, ok := wimap[action.DataType]; !ok {
@@ -148,7 +148,7 @@ func (d *DataManager) walIndex(ctx context.Context, wals []*WalData) (walIndex, 
 func (d *DataManager) writeDataSnapshot(ctx context.Context, wals []*WalData) error {
 	dataSequence, err := sequence.IncSequence(ctx, d.e, etcdCheckpointSeqKey)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	var lastWalSequence string
@@ -164,7 +164,7 @@ func (d *DataManager) writeDataSnapshot(ctx context.Context, wals []*WalData) er
 
 	curDataStatus, err := d.GetLastDataStatus()
 	if err != nil && !errors.Is(err, ErrNoDataStatus) {
-		return err
+		return errors.WithStack(err)
 	}
 
 	startWalIndex := 0
@@ -184,7 +184,7 @@ func (d *DataManager) writeDataSnapshot(ctx context.Context, wals []*WalData) er
 
 	wi, err := d.walIndex(ctx, wals)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	for _, dataType := range d.dataTypes {
@@ -194,14 +194,14 @@ func (d *DataManager) writeDataSnapshot(ctx context.Context, wals []*WalData) er
 		}
 		dataStatusFiles, err := d.writeDataType(ctx, wi, dataType, dataSequence, curDataStatusFiles)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		dataStatus.Files[dataType] = dataStatusFiles
 	}
 
 	dataStatusj, err := json.Marshal(dataStatus)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	if err := d.ost.WriteObject(d.dataStatusPath(dataSequence), bytes.NewReader(dataStatusj), int64(len(dataStatusj)), true); err != nil {
 		return fromOSTError(err)
@@ -212,7 +212,7 @@ func (d *DataManager) writeDataSnapshot(ctx context.Context, wals []*WalData) er
 
 func (d *DataManager) writeDataFile(ctx context.Context, buf *bytes.Buffer, size int64, dataFileIndex *DataFileIndex, dataFileID, dataType string) error {
 	if buf.Len() == 0 {
-		return fmt.Errorf("empty data entries")
+		return errors.Errorf("empty data entries")
 	}
 
 	if err := d.ost.WriteObject(d.DataFilePath(dataType, dataFileID), buf, size, true); err != nil {
@@ -221,7 +221,7 @@ func (d *DataManager) writeDataFile(ctx context.Context, buf *bytes.Buffer, size
 
 	dataFileIndexj, err := json.Marshal(dataFileIndex)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	if err := d.ost.WriteObject(d.DataFileIndexPath(dataType, dataFileID), bytes.NewReader(dataFileIndexj), int64(len(dataFileIndexj)), true); err != nil {
 		return fromOSTError(err)
@@ -354,7 +354,7 @@ func (d *DataManager) writeDataType(ctx context.Context, wi walIndex, dataType s
 					}
 					if err != nil {
 						oldDataf.Close()
-						return nil, err
+						return nil, errors.WithStack(err)
 					}
 
 					dataEntries = append(dataEntries, de)
@@ -434,10 +434,10 @@ func (d *DataManager) writeDataType(ctx context.Context, wi walIndex, dataType s
 				lastEntryID = de.ID
 				dataEntryj, err := json.Marshal(de)
 				if err != nil {
-					return nil, err
+					return nil, errors.WithStack(err)
 				}
 				if _, err := buf.Write(dataEntryj); err != nil {
-					return nil, err
+					return nil, errors.WithStack(err)
 				}
 				dataFileIndex.Index[de.ID] = pos - lastSplitPos
 				prevPos := pos
@@ -470,7 +470,7 @@ func (d *DataManager) writeDataType(ctx context.Context, wi walIndex, dataType s
 			for i, sp := range splitPoints {
 				curDataFileID := d.dataFileID(dataSequence, uuid.Must(uuid.NewV4()).String())
 				if err := d.writeDataFile(ctx, &buf, sp.pos-curPos, dataFileIndexes[i], curDataFileID, dataType); err != nil {
-					return nil, err
+					return nil, errors.WithStack(err)
 				}
 				// insert new dataStatusFile
 				dataStatusFiles = append(dataStatusFiles, &DataStatusFile{
@@ -492,7 +492,7 @@ func (d *DataManager) writeDataType(ctx context.Context, wi walIndex, dataType s
 func (d *DataManager) Read(dataType, id string) (io.Reader, error) {
 	curDataStatus, err := d.GetLastDataStatus()
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	curFiles := curDataStatus.Files
 
@@ -519,7 +519,7 @@ func (d *DataManager) Read(dataType, id string) (io.Reader, error) {
 	err = dec.Decode(&dataFileIndex)
 	if err != nil {
 		dataFileIndexf.Close()
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	dataFileIndexf.Close()
 
@@ -534,13 +534,13 @@ func (d *DataManager) Read(dataType, id string) (io.Reader, error) {
 	}
 	if _, err := dataf.Seek(int64(pos), io.SeekStart); err != nil {
 		dataf.Close()
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	var de *DataEntry
 	dec = json.NewDecoder(dataf)
 	if err := dec.Decode(&de); err != nil {
 		dataf.Close()
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	dataf.Close()
 
@@ -640,7 +640,7 @@ func (d *DataManager) GetDataStatus(dataSequence *sequence.Sequence) (*DataStatu
 func (d *DataManager) GetFirstDataStatusSequence() (*sequence.Sequence, error) {
 	dataStatusSequences, err := d.GetFirstDataStatusSequences(1)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return dataStatusSequences[0], nil
@@ -649,7 +649,7 @@ func (d *DataManager) GetFirstDataStatusSequence() (*sequence.Sequence, error) {
 func (d *DataManager) GetLastDataStatusSequence() (*sequence.Sequence, error) {
 	dataStatusSequences, err := d.GetLastDataStatusSequences(1)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return dataStatusSequences[0], nil
@@ -658,7 +658,7 @@ func (d *DataManager) GetLastDataStatusSequence() (*sequence.Sequence, error) {
 func (d *DataManager) GetFirstDataStatus() (*DataStatus, error) {
 	dataStatusSequence, err := d.GetFirstDataStatusSequence()
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return d.GetDataStatus(dataStatusSequence)
@@ -667,7 +667,7 @@ func (d *DataManager) GetFirstDataStatus() (*DataStatus, error) {
 func (d *DataManager) GetLastDataStatus() (*DataStatus, error) {
 	dataStatusSequence, err := d.GetLastDataStatusSequence()
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return d.GetDataStatus(dataStatusSequence)
@@ -675,12 +675,12 @@ func (d *DataManager) GetLastDataStatus() (*DataStatus, error) {
 
 func (d *DataManager) Export(ctx context.Context, w io.Writer) error {
 	if err := d.checkpoint(ctx, true); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	curDataStatus, err := d.GetLastDataStatus()
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	for _, dataType := range d.dataTypes {
@@ -695,7 +695,7 @@ func (d *DataManager) Export(ctx context.Context, w io.Writer) error {
 			}
 			if _, err := io.Copy(w, dataf); err != nil {
 				dataf.Close()
-				return err
+				return errors.WithStack(err)
 			}
 
 			dataf.Close()
@@ -708,7 +708,7 @@ func (d *DataManager) Export(ctx context.Context, w io.Writer) error {
 func (d *DataManager) Import(ctx context.Context, r io.Reader) error {
 	// delete contents in etcd
 	if err := d.deleteEtcd(ctx); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	// we require all entries of the same datatypes grouped together
@@ -717,7 +717,7 @@ func (d *DataManager) Import(ctx context.Context, r io.Reader) error {
 	// create a new sequence, we assume that it'll be greater than previous data sequences
 	dataSequence, err := sequence.IncSequence(ctx, d.e, etcdCheckpointSeqKey)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	dataStatus := &DataStatus{
@@ -745,7 +745,7 @@ func (d *DataManager) Import(ctx context.Context, r io.Reader) error {
 		if errors.Is(err, io.EOF) {
 			dataFileID := d.dataFileID(dataSequence, uuid.Must(uuid.NewV4()).String())
 			if err := d.writeDataFile(ctx, &buf, int64(buf.Len()), dataFileIndex, dataFileID, curDataType); err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 
 			dataStatusFiles = append(dataStatusFiles, &DataStatusFile{
@@ -779,7 +779,7 @@ func (d *DataManager) Import(ctx context.Context, r io.Reader) error {
 		if mustWrite {
 			dataFileID := d.dataFileID(dataSequence, uuid.Must(uuid.NewV4()).String())
 			if err := d.writeDataFile(ctx, &buf, int64(buf.Len()), dataFileIndex, dataFileID, curDataType); err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 
 			dataStatusFiles = append(dataStatusFiles, &DataStatusFile{
@@ -810,10 +810,10 @@ func (d *DataManager) Import(ctx context.Context, r io.Reader) error {
 
 		dataEntryj, err := json.Marshal(de)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if _, err := buf.Write(dataEntryj); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		dataFileIndex.Index[de.ID] = pos
 		pos += int64(len(dataEntryj))
@@ -821,7 +821,7 @@ func (d *DataManager) Import(ctx context.Context, r io.Reader) error {
 
 	dataStatusj, err := json.Marshal(dataStatus)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	if err := d.ost.WriteObject(d.dataStatusPath(dataSequence), bytes.NewReader(dataStatusj), int64(len(dataStatusj)), true); err != nil {
 		return fromOSTError(err)
@@ -829,7 +829,7 @@ func (d *DataManager) Import(ctx context.Context, r io.Reader) error {
 
 	// initialize etcd providing the specific datastatus
 	if err := d.InitEtcd(ctx, dataStatus); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	return nil
@@ -838,7 +838,7 @@ func (d *DataManager) Import(ctx context.Context, r io.Reader) error {
 func (d *DataManager) CleanOldCheckpoints(ctx context.Context) error {
 	dataStatusSequences, err := d.GetLastDataStatusSequences(dataStatusToKeep)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	return d.cleanOldCheckpoints(ctx, dataStatusSequences)
@@ -894,7 +894,7 @@ func (d *DataManager) cleanOldCheckpoints(ctx context.Context, dataStatusSequenc
 	for _, dataStatusSequence := range dataStatusSequences {
 		dataStatus, err := d.GetDataStatus(dataStatusSequence)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		for dataType := range dataStatus.Files {

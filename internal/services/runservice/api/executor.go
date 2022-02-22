@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"time"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/services/runservice/action"
@@ -30,7 +31,6 @@ import (
 	"agola.io/agola/internal/services/runservice/store"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/runservice/types"
-	errors "golang.org/x/xerrors"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
@@ -76,7 +76,7 @@ func (h *ExecutorStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 func (h *ExecutorStatusHandler) deleteStaleExecutors(ctx context.Context, curExecutor *types.Executor) error {
 	executors, err := store.GetExecutors(ctx, h.e)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	for _, executor := range executors {
@@ -251,14 +251,14 @@ func (h *ArchivesHandler) readArchive(rtID string, step int, w io.Writer) error 
 		if objectstorage.IsNotExist(err) {
 			return util.NewAPIError(util.ErrNotExist, err)
 		}
-		return err
+		return errors.WithStack(err)
 	}
 	defer f.Close()
 
 	br := bufio.NewReader(f)
 
 	_, err = io.Copy(w, br)
-	return err
+	return errors.WithStack(err)
 }
 
 type CacheHandler struct {
@@ -328,7 +328,7 @@ func matchCache(ost *objectstorage.ObjStorage, key string, prefix bool) (string,
 		var lastObject *objectstorage.ObjectInfo
 		for object := range ost.List(store.OSTCacheDir()+"/"+key, "", false, doneCh) {
 			if object.Err != nil {
-				return "", object.Err
+				return "", errors.WithStack(object.Err)
 			}
 
 			if (lastObject == nil) || (lastObject.LastModified.Before(object.LastModified)) {
@@ -348,7 +348,7 @@ func matchCache(ost *objectstorage.ObjStorage, key string, prefix bool) (string,
 		return "", nil
 	}
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	return key, nil
 }
@@ -360,14 +360,14 @@ func (h *CacheHandler) readCache(key string, w io.Writer) error {
 		if objectstorage.IsNotExist(err) {
 			return util.NewAPIError(util.ErrNotExist, err)
 		}
-		return err
+		return errors.WithStack(err)
 	}
 	defer f.Close()
 
 	br := bufio.NewReader(f)
 
 	_, err = io.Copy(w, br)
-	return err
+	return errors.WithStack(err)
 }
 
 type CacheCreateHandler struct {

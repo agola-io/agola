@@ -19,13 +19,13 @@ import (
 	"io/ioutil"
 	"os"
 
+	"agola.io/agola/internal/errors"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/ghodss/yaml"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	errors "golang.org/x/xerrors"
 )
 
 var cmdProjectVariableUpdate = &cobra.Command{
@@ -77,12 +77,12 @@ func variableUpdate(cmd *cobra.Command, ownertype string, args []string) error {
 	if variableUpdateOpts.file == "-" {
 		data, err = ioutil.ReadAll(os.Stdin)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	} else {
 		data, err = ioutil.ReadFile(variableUpdateOpts.file)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	}
 
@@ -113,14 +113,14 @@ func variableUpdate(cmd *cobra.Command, ownertype string, args []string) error {
 		log.Info().Msgf("updating project variable")
 		variable, _, err := gwclient.UpdateProjectVariable(context.TODO(), variableUpdateOpts.parentRef, variableUpdateOpts.name, req)
 		if err != nil {
-			return errors.Errorf("failed to update project variable: %w", err)
+			return errors.Wrapf(err, "failed to update project variable")
 		}
 		log.Info().Msgf("project variable %q updated, ID: %q", variable.Name, variable.ID)
 	case "projectgroup":
 		log.Info().Msgf("updating project group variable")
 		variable, _, err := gwclient.UpdateProjectGroupVariable(context.TODO(), variableUpdateOpts.parentRef, variableUpdateOpts.name, req)
 		if err != nil {
-			return errors.Errorf("failed to update project group variable: %w", err)
+			return errors.Wrapf(err, "failed to update project group variable")
 		}
 		log.Info().Msgf("project group variable %q updated, ID: %q", variable.Name, variable.ID)
 	}

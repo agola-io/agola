@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	errors "golang.org/x/xerrors"
+	"agola.io/agola/internal/errors"
 )
 
 func HTTPResponse(w http.ResponseWriter, code int, res interface{}) error {
@@ -16,11 +16,11 @@ func HTTPResponse(w http.ResponseWriter, code int, res interface{}) error {
 		resj, err := json.Marshal(res)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			return err
+			return errors.WithStack(err)
 		}
 		w.WriteHeader(code)
 		_, err = w.Write(resj)
-		return err
+		return errors.WithStack(err)
 	}
 
 	w.WriteHeader(code)
@@ -96,7 +96,7 @@ func ErrFromRemote(resp *http.Response) error {
 
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	// Re-populate error response body so it can be parsed by the caller if needed

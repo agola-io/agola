@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"strings"
 
+	"agola.io/agola/internal/errors"
 	scommon "agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
@@ -27,7 +28,6 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	jwtrequest "github.com/golang-jwt/jwt/v4/request"
 	"github.com/rs/zerolog"
-	errors "golang.org/x/xerrors"
 )
 
 type AuthHandler struct {

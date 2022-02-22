@@ -28,6 +28,8 @@ import (
 	"time"
 
 	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/errors"
+
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/configstore/action"
 	"agola.io/agola/internal/testutil"
@@ -106,9 +108,9 @@ func getProjects(ctx context.Context, cs *Configstore) ([]*types.Project, error)
 	err := cs.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		projects, err = cs.readDB.GetAllProjects(tx)
-		return err
+		return errors.WithStack(err)
 	})
-	return projects, err
+	return projects, errors.WithStack(err)
 }
 
 func getUsers(ctx context.Context, cs *Configstore) ([]*types.User, error) {
@@ -116,9 +118,9 @@ func getUsers(ctx context.Context, cs *Configstore) ([]*types.User, error) {
 	err := cs.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		users, err = cs.readDB.GetUsers(tx, "", 0, true)
-		return err
+		return errors.WithStack(err)
 	})
-	return users, err
+	return users, errors.WithStack(err)
 }
 
 func TestResync(t *testing.T) {
@@ -1320,7 +1322,7 @@ func TestRemoteSource(t *testing.T) {
 					t.Fatalf("unexpected err: %v", err)
 				}
 
-				expectedError := util.NewAPIError(util.ErrBadRequest, fmt.Errorf(`remotesource "rs01" already exists`))
+				expectedError := util.NewAPIError(util.ErrBadRequest, errors.Errorf(`remotesource "rs01" already exists`))
 				_, err = cs.ah.CreateRemoteSource(ctx, rs)
 				if err.Error() != expectedError.Error() {
 					t.Fatalf("expected err: %v, got err: %v", expectedError.Error(), err.Error())
@@ -1409,7 +1411,7 @@ func TestRemoteSource(t *testing.T) {
 					t.Fatalf("unexpected err: %v", err)
 				}
 
-				expectedError := util.NewAPIError(util.ErrBadRequest, fmt.Errorf(`remotesource "rs02" already exists`))
+				expectedError := util.NewAPIError(util.ErrBadRequest, errors.Errorf(`remotesource "rs02" already exists`))
 				rs01.Name = "rs02"
 				req := &action.UpdateRemoteSourceRequest{
 					RemoteSourceRef: "rs01",

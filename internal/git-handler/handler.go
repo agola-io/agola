@@ -24,10 +24,10 @@ import (
 	"regexp"
 	"strings"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/util"
 
 	"github.com/rs/zerolog"
-	errors "golang.org/x/xerrors"
 )
 
 var (
@@ -109,21 +109,21 @@ func InfoRefsResponse(ctx context.Context, repoPath, serviceName string) ([]byte
 	git := &util.Git{}
 	out, err := git.Output(ctx, nil, serviceName, "--stateless-rpc", "--advertise-refs", repoPath)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	buf.Write(out)
 
-	return buf.Bytes(), err
+	return buf.Bytes(), errors.WithStack(err)
 }
 
 func gitService(ctx context.Context, w io.Writer, r io.Reader, repoPath, serviceName string) error {
 	git := &util.Git{GitDir: repoPath}
-	return git.Pipe(ctx, w, r, serviceName, "--stateless-rpc", repoPath)
+	return errors.WithStack(git.Pipe(ctx, w, r, serviceName, "--stateless-rpc", repoPath))
 }
 
 func gitFetchFile(ctx context.Context, w io.Writer, r io.Reader, repoPath, ref, path string) error {
 	git := &util.Git{GitDir: repoPath}
-	return git.Pipe(ctx, w, r, "show", fmt.Sprintf("%s:%s", ref, path))
+	return errors.WithStack(git.Pipe(ctx, w, r, "show", fmt.Sprintf("%s:%s", ref, path)))
 }
 
 var ErrWrongRepoPath = errors.New("wrong repository path")

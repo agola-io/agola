@@ -18,11 +18,10 @@ import (
 	"context"
 	"path"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"
-
-	errors "golang.org/x/xerrors"
 )
 
 func (h *ActionHandler) GetProjectGroup(ctx context.Context, projectGroupRef string) (*csapitypes.ProjectGroup, error) {
@@ -63,12 +62,12 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProje
 
 	pg, _, err := h.configstoreClient.GetProjectGroup(ctx, req.ParentRef)
 	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to get project group %q: %w", req.ParentRef, err))
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get project group %q", req.ParentRef))
 	}
 
 	isProjectOwner, err := h.IsProjectOwner(ctx, pg.OwnerType, pg.OwnerID)
 	if err != nil {
-		return nil, errors.Errorf("failed to determine ownership: %w", err)
+		return nil, errors.Wrapf(err, "failed to determine ownership")
 	}
 	if !isProjectOwner {
 		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
@@ -76,7 +75,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProje
 
 	user, _, err := h.configstoreClient.GetUser(ctx, req.CurrentUserID)
 	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to get user %q: %w", req.CurrentUserID, err))
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q", req.CurrentUserID))
 	}
 
 	parentRef := req.ParentRef
@@ -97,7 +96,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProje
 	h.log.Info().Msgf("creating projectGroup")
 	rp, _, err := h.configstoreClient.CreateProjectGroup(ctx, p)
 	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to create projectGroup: %w", err))
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to create projectGroup"))
 	}
 	h.log.Info().Msgf("projectGroup %s created, ID: %s", rp.Name, rp.ID)
 
@@ -114,12 +113,12 @@ type UpdateProjectGroupRequest struct {
 func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, projectGroupRef string, req *UpdateProjectGroupRequest) (*csapitypes.ProjectGroup, error) {
 	pg, _, err := h.configstoreClient.GetProjectGroup(ctx, projectGroupRef)
 	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to get project group %q: %w", projectGroupRef, err))
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get project group %q", projectGroupRef))
 	}
 
 	isProjectOwner, err := h.IsProjectOwner(ctx, pg.OwnerType, pg.OwnerID)
 	if err != nil {
-		return nil, errors.Errorf("failed to determine ownership: %w", err)
+		return nil, errors.Wrapf(err, "failed to determine ownership")
 	}
 	if !isProjectOwner {
 		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
@@ -138,7 +137,7 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, projectGroupRef 
 	h.log.Info().Msgf("updating project group")
 	rp, _, err := h.configstoreClient.UpdateProjectGroup(ctx, pg.ID, pg.ProjectGroup)
 	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to update project group: %w", err))
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to update project group"))
 	}
 	h.log.Info().Msgf("project group %q updated, ID: %s", pg.Name, pg.ID)
 
@@ -148,12 +147,12 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, projectGroupRef 
 func (h *ActionHandler) DeleteProjectGroup(ctx context.Context, projectRef string) error {
 	p, _, err := h.configstoreClient.GetProjectGroup(ctx, projectRef)
 	if err != nil {
-		return util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to get project %q: %w", projectRef, err))
+		return util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get project %q", projectRef))
 	}
 
 	isProjectOwner, err := h.IsProjectOwner(ctx, p.OwnerType, p.OwnerID)
 	if err != nil {
-		return errors.Errorf("failed to determine ownership: %w", err)
+		return errors.Wrapf(err, "failed to determine ownership")
 	}
 	if !isProjectOwner {
 		return util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))

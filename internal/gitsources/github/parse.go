@@ -21,10 +21,10 @@ import (
 	"strconv"
 	"strings"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/types"
 
 	"github.com/google/go-github/v29/github"
-	errors "golang.org/x/xerrors"
 )
 
 const (
@@ -37,12 +37,12 @@ const (
 func (c *Client) ParseWebhook(r *http.Request, secret string) (*types.WebhookData, error) {
 	payload, err := github.ValidatePayload(r, []byte(secret))
 	if err != nil {
-		return nil, errors.Errorf("wrong webhook signature: %w", err)
+		return nil, errors.Wrapf(err, "wrong webhook signature")
 	}
 	webHookType := github.WebHookType(r)
 	event, err := github.ParseWebHook(webHookType, payload)
 	if err != nil {
-		return nil, errors.Errorf("failed to parse webhook: %w", err)
+		return nil, errors.Wrapf(err, "failed to parse webhook")
 	}
 	switch event := event.(type) {
 	case *github.PushEvent:
@@ -96,7 +96,7 @@ func webhookDataFromPush(hook *github.PushEvent) (*types.WebhookData, error) {
 
 	default:
 		// ignore received webhook since it doesn't have a ref we're interested in
-		return nil, fmt.Errorf("unsupported webhook ref %q", *hook.Ref)
+		return nil, errors.Errorf("unsupported webhook ref %q", *hook.Ref)
 	}
 
 	return whd, nil

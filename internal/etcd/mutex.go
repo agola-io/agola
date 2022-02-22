@@ -16,6 +16,7 @@
 // have the TryLock function not yet available on stable v3.4 client
 // Remove this when updating the client to a version providing TryLock
 
+//nolint:wrapcheck
 package etcd
 
 import (

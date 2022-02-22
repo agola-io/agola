@@ -22,11 +22,12 @@ import (
 
 	"agola.io/agola/internal/datamanager"
 	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/errors"
+
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
 
 	"github.com/gofrs/uuid"
-	errors "golang.org/x/xerrors"
 )
 
 func (h *ActionHandler) GetProjectGroup(ctx context.Context, projectGroupRef string) (*types.ProjectGroup, error) {
@@ -34,10 +35,10 @@ func (h *ActionHandler) GetProjectGroup(ctx context.Context, projectGroupRef str
 	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		projectGroup, err = h.readDB.GetProjectGroup(tx, projectGroupRef)
-		return err
+		return errors.WithStack(err)
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	if projectGroup == nil {
@@ -53,7 +54,7 @@ func (h *ActionHandler) GetProjectGroupSubgroups(ctx context.Context, projectGro
 		var err error
 		projectGroup, err := h.readDB.GetProjectGroup(tx, projectGroupRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		if projectGroup == nil {
@@ -61,10 +62,10 @@ func (h *ActionHandler) GetProjectGroupSubgroups(ctx context.Context, projectGro
 		}
 
 		projectGroups, err = h.readDB.GetProjectGroupSubgroups(tx, projectGroup.ID)
-		return err
+		return errors.WithStack(err)
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return projectGroups, nil
@@ -76,7 +77,7 @@ func (h *ActionHandler) GetProjectGroupProjects(ctx context.Context, projectGrou
 		var err error
 		projectGroup, err := h.readDB.GetProjectGroup(tx, projectGroupRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		if projectGroup == nil {
@@ -84,10 +85,10 @@ func (h *ActionHandler) GetProjectGroupProjects(ctx context.Context, projectGrou
 		}
 
 		projects, err = h.readDB.GetProjectGroupProjects(tx, projectGroup.ID)
-		return err
+		return errors.WithStack(err)
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	return projects, nil
 }
@@ -125,7 +126,7 @@ func (h *ActionHandler) ValidateProjectGroup(ctx context.Context, projectGroup *
 
 func (h *ActionHandler) CreateProjectGroup(ctx context.Context, projectGroup *types.ProjectGroup) (*types.ProjectGroup, error) {
 	if err := h.ValidateProjectGroup(ctx, projectGroup); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	if projectGroup.Parent.Type != types.ConfigTypeProjectGroup {
@@ -138,7 +139,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, projectGroup *ty
 	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		parentProjectGroup, err := h.readDB.GetProjectGroup(tx, projectGroup.Parent.ID)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if parentProjectGroup == nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group with id %q doesn't exist", projectGroup.Parent.ID))
@@ -150,7 +151,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, projectGroup *ty
 
 		groupPath, err := h.readDB.GetProjectGroupPath(tx, parentProjectGroup)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		pp := path.Join(groupPath, projectGroup.Name)
 
@@ -159,13 +160,13 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, projectGroup *ty
 		cgNames := []string{util.EncodeSha256Hex("projectpath-" + pp)}
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		// check duplicate project group name
 		pg, err := h.readDB.GetProjectGroupByName(tx, projectGroup.Parent.ID, projectGroup.Name)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if pg != nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group with name %q, path %q already exists", pg.Name, pp))
@@ -173,7 +174,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, projectGroup *ty
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	projectGroup.ID = uuid.Must(uuid.NewV4()).String()
@@ -181,7 +182,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, projectGroup *ty
 
 	pgj, err := json.Marshal(projectGroup)
 	if err != nil {
-		return nil, errors.Errorf("failed to marshal projectGroup: %w", err)
+		return nil, errors.Wrapf(err, "failed to marshal projectGroup")
 	}
 	actions := []*datamanager.Action{
 		{
@@ -193,7 +194,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, projectGroup *ty
 	}
 
 	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return projectGroup, err
+	return projectGroup, errors.WithStack(err)
 }
 
 type UpdateProjectGroupRequest struct {
@@ -204,7 +205,7 @@ type UpdateProjectGroupRequest struct {
 
 func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, req *UpdateProjectGroupRequest) (*types.ProjectGroup, error) {
 	if err := h.ValidateProjectGroup(ctx, req.ProjectGroup); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
@@ -215,7 +216,7 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, req *UpdateProje
 		// check project exists
 		pg, err := h.readDB.GetProjectGroup(tx, req.ProjectGroupRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if pg == nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group with ref %q doesn't exist", req.ProjectGroupRef))
@@ -244,7 +245,7 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, req *UpdateProje
 			// check parent exists
 			group, err := h.readDB.GetProjectGroup(tx, req.ProjectGroup.Parent.ID)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			if group == nil {
 				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group with id %q doesn't exist", req.ProjectGroup.Parent.ID))
@@ -257,13 +258,13 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, req *UpdateProje
 
 		curPGParentPath, err := h.readDB.GetPath(tx, pg.Parent.Type, pg.Parent.ID)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		curPGP := path.Join(curPGParentPath, pg.Name)
 
 		pgParentPath, err := h.readDB.GetPath(tx, req.ProjectGroup.Parent.Type, req.ProjectGroup.Parent.ID)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		pgp := path.Join(pgParentPath, req.ProjectGroup.Name)
 
@@ -271,7 +272,7 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, req *UpdateProje
 			// check duplicate project group name
 			ap, err := h.readDB.GetProjectGroupByName(tx, req.ProjectGroup.Parent.ID, req.ProjectGroup.Name)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			if ap != nil {
 				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group with name %q, path %q already exists", req.ProjectGroup.Name, pgp))
@@ -293,18 +294,18 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, req *UpdateProje
 
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	pgj, err := json.Marshal(req.ProjectGroup)
 	if err != nil {
-		return nil, errors.Errorf("failed to marshal project: %w", err)
+		return nil, errors.Wrapf(err, "failed to marshal project")
 	}
 	actions := []*datamanager.Action{
 		{
@@ -316,7 +317,7 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, req *UpdateProje
 	}
 
 	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return req.ProjectGroup, err
+	return req.ProjectGroup, errors.WithStack(err)
 }
 
 func (h *ActionHandler) DeleteProjectGroup(ctx context.Context, projectGroupRef string) error {
@@ -331,7 +332,7 @@ func (h *ActionHandler) DeleteProjectGroup(ctx context.Context, projectGroupRef 
 		// check project group existance
 		projectGroup, err = h.readDB.GetProjectGroup(tx, projectGroupRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if projectGroup == nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group %q doesn't exist", projectGroupRef))
@@ -347,13 +348,13 @@ func (h *ActionHandler) DeleteProjectGroup(ctx context.Context, projectGroupRef 
 		cgNames := []string{util.EncodeSha256Hex(projectGroup.ID)}
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		return nil
 	})
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	// TODO(sgotti) implement childs garbage collection
@@ -366,5 +367,5 @@ func (h *ActionHandler) DeleteProjectGroup(ctx context.Context, projectGroupRef 
 	}
 
 	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return err
+	return errors.WithStack(err)
 }

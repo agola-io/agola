@@ -20,11 +20,11 @@ import (
 	"os"
 	"path/filepath"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/util"
 
 	"github.com/gofrs/uuid"
 	"github.com/rs/zerolog"
-	errors "golang.org/x/xerrors"
 )
 
 const (
@@ -35,24 +35,24 @@ const (
 func copyFile(src, dest string) error {
 	srcf, err := os.Open(src)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	defer srcf.Close()
 
 	destf, err := os.Create(dest)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	defer destf.Close()
 
 	_, err = io.Copy(destf, srcf)
-	return err
+	return errors.WithStack(err)
 }
 
 func fileExists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err != nil && !os.IsNotExist(err) {
-		return false, err
+		return false, errors.WithStack(err)
 	}
 	return !os.IsNotExist(err), nil
 }
@@ -62,24 +62,24 @@ func GitDir() (string, error) {
 	git := &util.Git{}
 	lines, err := git.OutputLines(context.Background(), nil, "rev-parse", "--git-dir")
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	if len(lines) != 1 {
 		return "", errors.Errorf("received %d lines, expected one line", len(lines))
 	}
-	return lines[0], err
+	return lines[0], errors.WithStack(err)
 }
 
 func currentGitBranch() (string, error) {
 	git := &util.Git{}
 	lines, err := git.OutputLines(context.Background(), nil, "symbolic-ref", "--short", "HEAD")
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	if len(lines) != 1 {
 		return "", errors.Errorf("received %d lines, expected one line", len(lines))
 	}
-	return lines[0], err
+	return lines[0], errors.WithStack(err)
 }
 
 // gitDir returns the git dir relative to the working dir
@@ -87,60 +87,60 @@ func gitWriteTree(indexPath string) (string, error) {
 	git := &util.Git{Env: []string{"GIT_INDEX_FILE=" + indexPath}}
 	lines, err := git.OutputLines(context.Background(), nil, "write-tree")
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	if len(lines) != 1 {
 		return "", errors.Errorf("received %d lines, expected  one line", len(lines))
 	}
-	return lines[0], err
+	return lines[0], errors.WithStack(err)
 }
 
 func gitCommitTree(message, treeSHA string) (string, error) {
 	git := &util.Git{}
 	lines, err := git.OutputLines(context.Background(), nil, "commit-tree", "-m", message, treeSHA)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	if len(lines) != 1 {
 		return "", errors.Errorf("received %d lines, expected one line", len(lines))
 	}
-	return lines[0], err
+	return lines[0], errors.WithStack(err)
 }
 
 func gitUpdateRef(message, ref, commitSHA string) error {
 	git := &util.Git{}
 	_, err := git.Output(context.Background(), nil, "update-ref", "-m", message, ref, commitSHA)
-	return err
+	return errors.WithStack(err)
 }
 
 func gitUpdateFiles(indexPath string) error {
 	git := &util.Git{Env: []string{"GIT_INDEX_FILE=" + indexPath}}
 	_, err := git.Output(context.Background(), nil, "add", "-u")
-	return err
+	return errors.WithStack(err)
 }
 
 func gitAddUntrackedFiles(indexPath string) error {
 	git := &util.Git{Env: []string{"GIT_INDEX_FILE=" + indexPath}}
 	_, err := git.Output(context.Background(), nil, "add", ".")
-	return err
+	return errors.WithStack(err)
 }
 
 func gitAddIgnoredFiles(indexPath string) error {
 	git := &util.Git{Env: []string{"GIT_INDEX_FILE=" + indexPath}}
 	_, err := git.Output(context.Background(), nil, "add", "-f", "-A", ".")
-	return err
+	return errors.WithStack(err)
 }
 
 func GitAddRemote(configPath, name, url string) error {
 	git := &util.Git{}
 	_, err := git.Output(context.Background(), nil, "remote", "add", name, url)
-	return err
+	return errors.WithStack(err)
 }
 
 func GitPush(configPath, remote, branch string) error {
 	git := &util.Git{}
 	_, err := git.Output(context.Background(), nil, "push", remote, branch, "-f")
-	return err
+	return errors.WithStack(err)
 }
 
 type GitSaveConfig struct {
@@ -178,7 +178,7 @@ func (s *GitSave) RefsPrefix() string {
 func (s *GitSave) Save(message, branchName string) (string, error) {
 	gitdir, err := GitDir()
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	tmpIndexPath := filepath.Join(gitdir, "gitsave-index-"+uuid.Must(uuid.NewV4()).String())
@@ -188,25 +188,25 @@ func (s *GitSave) Save(message, branchName string) (string, error) {
 
 	curBranch, err := currentGitBranch()
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	indexExists, err := fileExists(indexPath)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	if indexExists {
 		// copy current git index to a temporary index
 		if err := copyFile(indexPath, tmpIndexPath); err != nil {
-			return "", err
+			return "", errors.WithStack(err)
 		}
 		s.log.Info().Msgf("created temporary index: %s", tmpIndexPath)
 		// read the current branch tree information into the index
 		git := &util.Git{Env: []string{"GIT_INDEX_FILE=" + tmpIndexPath}}
 		_, err = git.Output(context.Background(), nil, "read-tree", curBranch)
 		if err != nil {
-			return "", err
+			return "", errors.WithStack(err)
 		}
 	} else {
 		s.log.Info().Msgf("index %s does not exist", indexPath)
@@ -214,40 +214,40 @@ func (s *GitSave) Save(message, branchName string) (string, error) {
 
 	s.log.Info().Msgf("updating files already in the index")
 	if err := gitUpdateFiles(tmpIndexPath); err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	if s.conf.AddUntracked {
 		s.log.Info().Msgf("adding untracked files")
 		if err := gitAddUntrackedFiles(tmpIndexPath); err != nil {
-			return "", err
+			return "", errors.WithStack(err)
 		}
 	}
 
 	if s.conf.AddIgnored {
 		s.log.Info().Msgf("adding ignored files")
 		if err := gitAddIgnoredFiles(tmpIndexPath); err != nil {
-			return "", err
+			return "", errors.WithStack(err)
 		}
 	}
 
 	s.log.Info().Msgf("writing tree file")
 	treeSHA, err := gitWriteTree(tmpIndexPath)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	s.log.Info().Msgf("tree: %s", treeSHA)
 
 	s.log.Info().Msgf("committing tree")
 	commitSHA, err := gitCommitTree(message, treeSHA)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	s.log.Info().Msgf("commit: %s", commitSHA)
 
 	s.log.Info().Msgf("updating ref")
 	if err = gitUpdateRef("git-save", filepath.Join(s.refsPrefix, branchName), commitSHA); err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	return commitSHA, nil

@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/util"
 
 	"github.com/rs/zerolog"
@@ -29,7 +30,6 @@ import (
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/clientv3/namespace"
 	"go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
-	errors "golang.org/x/xerrors"
 )
 
 var (
@@ -65,7 +65,7 @@ func FromEtcdError(err error) error {
 	if errors.Is(err, rpctypes.ErrKeyNotFound) {
 		return ErrKeyNotFound
 	}
-	return err
+	return errors.WithStack(err)
 }
 
 type Store struct {
@@ -90,7 +90,7 @@ func New(cfg Config) (*Store, error) {
 	for _, e := range endpoints {
 		u, err := url.Parse(e)
 		if err != nil {
-			return nil, errors.Errorf("cannot parse endpoint %q: %w", e, err)
+			return nil, errors.Wrapf(err, "cannot parse endpoint %q", e)
 		}
 		if scheme == "" {
 			scheme = u.Scheme
@@ -108,7 +108,7 @@ func New(cfg Config) (*Store, error) {
 		var err error
 		tlsConfig, err = util.NewTLSConfig(cfg.CertFile, cfg.KeyFile, cfg.CAFile, cfg.SkipTLSVerify)
 		if err != nil {
-			return nil, errors.Errorf("cannot create tls config: %w", err)
+			return nil, errors.Wrapf(err, "cannot create tls config")
 		}
 	}
 
@@ -119,7 +119,7 @@ func New(cfg Config) (*Store, error) {
 
 	c, err := etcdclientv3.New(config)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	c.KV = namespace.NewKV(c.KV, prefix)
@@ -150,7 +150,7 @@ func (s *Store) Put(ctx context.Context, key string, value []byte, options *Writ
 		if options.TTL > 0 {
 			lease, err := s.c.Grant(ctx, int64(options.TTL.Seconds()))
 			if err != nil {
-				return nil, err
+				return nil, errors.WithStack(err)
 			}
 			etcdv3Options = append(etcdv3Options, etcdclientv3.WithLease(lease.ID))
 		}
@@ -252,7 +252,7 @@ func (s *Store) AtomicPut(ctx context.Context, key string, value []byte, prevRev
 		if options.TTL > 0 {
 			lease, err := s.c.Grant(ctx, int64(options.TTL))
 			if err != nil {
-				return nil, err
+				return nil, errors.WithStack(err)
 			}
 			etcdv3Options = append(etcdv3Options, etcdclientv3.WithLease(lease.ID))
 		}
@@ -282,7 +282,7 @@ func (s *Store) AtomicPut(ctx context.Context, key string, value []byte, prevRev
 func (s *Store) Delete(ctx context.Context, key string) error {
 	_, err := s.c.Delete(ctx, key)
 
-	return err
+	return errors.WithStack(err)
 }
 
 func (s *Store) DeletePrefix(ctx context.Context, prefix string) error {
@@ -298,7 +298,7 @@ func (s *Store) DeletePrefix(ctx context.Context, prefix string) error {
 
 	_, err := s.c.Delete(ctx, key, etcdv3Options...)
 
-	return err
+	return errors.WithStack(err)
 }
 
 func (s *Store) AtomicDelete(ctx context.Context, key string, revision int64) (*etcdclientv3.TxnResponse, error) {
@@ -333,7 +333,7 @@ func (s *Store) Watch(ctx context.Context, prefix string, revision int64) etcdcl
 }
 
 func (s *Store) Close() error {
-	return s.c.Close()
+	return errors.WithStack(s.c.Close())
 }
 
 func (s *Store) compactor(ctx context.Context, interval time.Duration) {
@@ -364,7 +364,7 @@ func (s *Store) compact(ctx context.Context, version, rev int64) (int64, int64, 
 	).Commit()
 
 	if err != nil {
-		return version, rev, err
+		return version, rev, errors.WithStack(err)
 	}
 
 	curRev := resp.Header.Revision
@@ -380,7 +380,7 @@ func (s *Store) compact(ctx context.Context, version, rev int64) (int64, int64, 
 	}
 	if _, err = s.c.Compact(ctx, rev); err != nil {
 		s.log.Warn().Msgf("compact error: %v", err)
-		return curVersion, curRev, err
+		return curVersion, curRev, errors.WithStack(err)
 	}
 	s.log.Info().Msgf("compacted revision: %d", rev)
 	return curVersion, curRev, nil

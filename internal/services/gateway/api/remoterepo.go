@@ -17,6 +17,7 @@ package api
 import (
 	"net/http"
 
+	"agola.io/agola/internal/errors"
 	gitsource "agola.io/agola/internal/gitsources"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/services/gateway/common"
@@ -27,7 +28,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
-	errors "golang.org/x/xerrors"
 )
 
 func createRemoteRepoResponse(r *gitsource.RepoInfo) *gwapitypes.RemoteRepoResponse {
@@ -95,7 +95,7 @@ func (h *UserRemoteReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 
 	remoteRepos, err := gitsource.ListUserRepos()
 	if err != nil {
-		err := util.NewAPIError(util.ErrBadRequest, errors.Errorf("failed to get user repositories from git source: %w", err))
+		err := util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "failed to get user repositories from git source"))
 		util.HTTPError(w, err)
 		h.log.Err(err).Send()
 		return

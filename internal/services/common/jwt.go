@@ -19,8 +19,8 @@ import (
 	"encoding/json"
 	"time"
 
+	"agola.io/agola/internal/errors"
 	"github.com/golang-jwt/jwt/v4"
-	errors "golang.org/x/xerrors"
 )
 
 type TokenSigningData struct {
@@ -44,13 +44,14 @@ func GenerateGenericJWTToken(sd *TokenSigningData, claims jwt.Claims) (string, e
 		return "", errors.Errorf("unsupported signing method %q", sd.Method.Alg())
 	}
 	// Sign and get the complete encoded token as a string
-	return token.SignedString(key)
+	ts, err := token.SignedString(key)
+	return ts, errors.WithStack(err)
 }
 
 func GenerateOauth2JWTToken(sd *TokenSigningData, remoteSourceName, requestType string, request interface{}) (string, error) {
 	requestj, err := json.Marshal(request)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	return GenerateGenericJWTToken(sd, jwt.MapClaims{

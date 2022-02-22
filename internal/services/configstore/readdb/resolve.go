@@ -18,10 +18,38 @@ import (
 	"path"
 
 	"agola.io/agola/internal/db"
-	"agola.io/agola/services/configstore/types"
+	"agola.io/agola/internal/errors"
 
-	errors "golang.org/x/xerrors"
+	"agola.io/agola/internal/util"
+	"agola.io/agola/services/configstore/types"
 )
+
+func (r *ReadDB) ResolveConfigID(tx *db.Tx, configType types.ConfigType, ref string) (string, error) {
+	switch configType {
+	case types.ConfigTypeProjectGroup:
+		group, err := r.GetProjectGroup(tx, ref)
+		if err != nil {
+			return "", errors.WithStack(err)
+		}
+		if group == nil {
+			return "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("group with ref %q doesn't exists", ref))
+		}
+		return group.ID, nil
+
+	case types.ConfigTypeProject:
+		project, err := r.GetProject(tx, ref)
+		if err != nil {
+			return "", errors.WithStack(err)
+		}
+		if project == nil {
+			return "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("project with ref %q doesn't exists", ref))
+		}
+		return project.ID, nil
+
+	default:
+		return "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("unknown config type %q", configType))
+	}
+}
 
 func (r *ReadDB) GetPath(tx *db.Tx, configType types.ConfigType, id string) (string, error) {
 	var p string
@@ -29,31 +57,31 @@ func (r *ReadDB) GetPath(tx *db.Tx, configType types.ConfigType, id string) (str
 	case types.ConfigTypeProjectGroup:
 		projectGroup, err := r.GetProjectGroup(tx, id)
 		if err != nil {
-			return "", err
+			return "", errors.WithStack(err)
 		}
 		if projectGroup == nil {
 			return "", errors.Errorf("projectgroup with id %q doesn't exist", id)
 		}
 		p, err = r.GetProjectGroupPath(tx, projectGroup)
 		if err != nil {
-			return "", err
+			return "", errors.WithStack(err)
 		}
 	case types.ConfigTypeProject:
 		project, err := r.GetProject(tx, id)
 		if err != nil {
-			return "", err
+			return "", errors.WithStack(err)
 		}
 		if project == nil {
 			return "", errors.Errorf("project with id %q doesn't exist", id)
 		}
 		p, err = r.GetProjectPath(tx, project)
 		if err != nil {
-			return "", err
+			return "", errors.WithStack(err)
 		}
 	case types.ConfigTypeOrg:
 		org, err := r.GetOrg(tx, id)
 		if err != nil {
-			return "", errors.Errorf("failed to get org %q: %w", id, err)
+			return "", errors.Wrapf(err, "failed to get org %q", id)
 		}
 		if org == nil {
 			return "", errors.Errorf("cannot find org with id %q", id)
@@ -62,7 +90,7 @@ func (r *ReadDB) GetPath(tx *db.Tx, configType types.ConfigType, id string) (str
 	case types.ConfigTypeUser:
 		user, err := r.GetUser(tx, id)
 		if err != nil {
-			return "", errors.Errorf("failed to get user %q: %w", id, err)
+			return "", errors.Wrapf(err, "failed to get user %q", id)
 		}
 		if user == nil {
 			return "", errors.Errorf("cannot find user with id %q", id)

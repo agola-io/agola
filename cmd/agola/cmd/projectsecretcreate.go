@@ -19,13 +19,13 @@ import (
 	"io/ioutil"
 	"os"
 
+	"agola.io/agola/internal/errors"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/ghodss/yaml"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	errors "golang.org/x/xerrors"
 )
 
 var cmdProjectSecretCreate = &cobra.Command{
@@ -82,12 +82,12 @@ func secretCreate(cmd *cobra.Command, ownertype string, args []string) error {
 	if secretCreateOpts.file == "-" {
 		data, err = ioutil.ReadAll(os.Stdin)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	} else {
 		data, err = ioutil.ReadFile(secretCreateOpts.file)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	}
 
@@ -106,14 +106,14 @@ func secretCreate(cmd *cobra.Command, ownertype string, args []string) error {
 		log.Info().Msgf("creating project secret")
 		secret, _, err := gwclient.CreateProjectSecret(context.TODO(), secretCreateOpts.parentRef, req)
 		if err != nil {
-			return errors.Errorf("failed to create project secret: %w", err)
+			return errors.Wrapf(err, "failed to create project secret")
 		}
 		log.Info().Msgf("project secret %q created, ID: %q", secret.Name, secret.ID)
 	case "projectgroup":
 		log.Info().Msgf("creating project group secret")
 		secret, _, err := gwclient.CreateProjectGroupSecret(context.TODO(), secretCreateOpts.parentRef, req)
 		if err != nil {
-			return errors.Errorf("failed to create project group secret: %w", err)
+			return errors.Wrapf(err, "failed to create project group secret")
 		}
 		log.Info().Msgf("project group secret %q created, ID: %q", secret.Name, secret.ID)
 	}

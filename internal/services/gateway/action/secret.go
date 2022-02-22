@@ -17,12 +17,11 @@ package action
 import (
 	"context"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"
-
-	errors "golang.org/x/xerrors"
 )
 
 type GetSecretsRequest struct {
@@ -73,7 +72,7 @@ type CreateSecretRequest struct {
 func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretRequest) (*csapitypes.Secret, error) {
 	isVariableOwner, err := h.IsVariableOwner(ctx, req.ParentType, req.ParentRef)
 	if err != nil {
-		return nil, errors.Errorf("failed to determine ownership: %w", err)
+		return nil, errors.Wrapf(err, "failed to determine ownership")
 	}
 	if !isVariableOwner {
 		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
@@ -99,7 +98,7 @@ func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretReque
 		rs, _, err = h.configstoreClient.CreateProjectSecret(ctx, req.ParentRef, s)
 	}
 	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to create secret: %w", err))
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to create secret"))
 	}
 	h.log.Info().Msgf("secret %s created, ID: %s", rs.Name, rs.ID)
 
@@ -127,7 +126,7 @@ type UpdateSecretRequest struct {
 func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretRequest) (*csapitypes.Secret, error) {
 	isVariableOwner, err := h.IsVariableOwner(ctx, req.ParentType, req.ParentRef)
 	if err != nil {
-		return nil, errors.Errorf("failed to determine ownership: %w", err)
+		return nil, errors.Wrapf(err, "failed to determine ownership")
 	}
 	if !isVariableOwner {
 		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
@@ -153,7 +152,7 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretReque
 		rs, _, err = h.configstoreClient.UpdateProjectSecret(ctx, req.ParentRef, req.SecretName, s)
 	}
 	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to update secret: %w", err))
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to update secret"))
 	}
 	h.log.Info().Msgf("secret %s updated, ID: %s", rs.Name, rs.ID)
 
@@ -163,7 +162,7 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretReque
 func (h *ActionHandler) DeleteSecret(ctx context.Context, parentType cstypes.ConfigType, parentRef, name string) error {
 	isVariableOwner, err := h.IsVariableOwner(ctx, parentType, parentRef)
 	if err != nil {
-		return errors.Errorf("failed to determine ownership: %w", err)
+		return errors.Wrapf(err, "failed to determine ownership")
 	}
 	if !isVariableOwner {
 		return util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
@@ -178,7 +177,7 @@ func (h *ActionHandler) DeleteSecret(ctx context.Context, parentType cstypes.Con
 		_, err = h.configstoreClient.DeleteProjectSecret(ctx, parentRef, name)
 	}
 	if err != nil {
-		return util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to delete secret: %w", err))
+		return util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to delete secret"))
 	}
 	return nil
 }

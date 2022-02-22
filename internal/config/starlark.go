@@ -19,29 +19,29 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"agola.io/agola/internal/errors"
 	"go.starlark.net/starlark"
-	errors "golang.org/x/xerrors"
 )
 
 func starlarkArgs(cc *ConfigContext) (starlark.Tuple, error) {
 	d := &starlark.Dict{}
 	if err := d.SetKey(starlark.String("ref_type"), starlark.String(cc.RefType)); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if err := d.SetKey(starlark.String("ref"), starlark.String(cc.Ref)); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if err := d.SetKey(starlark.String("branch"), starlark.String(cc.Branch)); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if err := d.SetKey(starlark.String("tag"), starlark.String(cc.Tag)); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if err := d.SetKey(starlark.String("pull_request_id"), starlark.String(cc.PullRequestID)); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if err := d.SetKey(starlark.String("commit_sha"), starlark.String(cc.CommitSHA)); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return []starlark.Value{d}, nil
@@ -59,13 +59,13 @@ func starlarkJSON(out *bytes.Buffer, v starlark.Value) error {
 	case starlark.Int:
 		data, err := json.Marshal(v.BigInt())
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		out.Write(data)
 	case starlark.Float:
 		data, err := json.Marshal(float64(v))
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		out.Write(data)
 	case starlark.String:
@@ -76,7 +76,7 @@ func starlarkJSON(out *bytes.Buffer, v starlark.Value) error {
 		e := json.NewEncoder(data)
 		e.SetEscapeHTML(false)
 		if err := e.Encode(string(v)); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		// remove final \n introduced by the encoder
 		out.Write(bytes.TrimSuffix(data.Bytes(), []byte("\n")))
@@ -87,7 +87,7 @@ func starlarkJSON(out *bytes.Buffer, v starlark.Value) error {
 				out.WriteString(", ")
 			}
 			if err := starlarkJSON(out, v.Index(i)); err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 		}
 		out.WriteByte(']')
@@ -98,20 +98,20 @@ func starlarkJSON(out *bytes.Buffer, v starlark.Value) error {
 				out.WriteString(", ")
 			}
 			if _, ok := item[0].(starlark.String); !ok {
-				return fmt.Errorf("cannot convert non-string dict key to JSON")
+				return errors.Errorf("cannot convert non-string dict key to JSON")
 			}
 			if err := starlarkJSON(out, item[0]); err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			out.WriteString(": ")
 			if err := starlarkJSON(out, item[1]); err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 		}
 		out.WriteByte('}')
 
 	default:
-		return fmt.Errorf("cannot convert starlark type %q to JSON", v.Type())
+		return errors.Errorf("cannot convert starlark type %q to JSON", v.Type())
 	}
 	return nil
 }
@@ -124,7 +124,7 @@ func execStarlark(configData []byte, configContext *ConfigContext) ([]byte, erro
 	}
 	globals, err := starlark.ExecFile(thread, "config.star", configData, nil)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	// we require a main function that will be called wiht one
@@ -139,18 +139,18 @@ func execStarlark(configData []byte, configContext *ConfigContext) ([]byte, erro
 	}
 	args, err := starlarkArgs(configContext)
 	if err != nil {
-		return nil, errors.Errorf("cannot create startlark arguments: %w", err)
+		return nil, errors.Wrapf(err, "cannot create startlark arguments")
 	}
 	mainVal, err = starlark.Call(thread, main, args, nil)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	buf := new(bytes.Buffer)
 	switch v := mainVal.(type) {
 	case *starlark.Dict:
 		if err := starlarkJSON(buf, v); err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 	default:
 		return nil, errors.Errorf("wrong starlark output, must be a dict")

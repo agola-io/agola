@@ -17,6 +17,7 @@ package cmd
 import (
 	"context"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/gitsources/github"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
@@ -24,7 +25,6 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	errors "golang.org/x/xerrors"
 )
 
 var cmdRemoteSourceCreate = &cobra.Command{
@@ -117,7 +117,7 @@ func remoteSourceCreate(cmd *cobra.Command, args []string) error {
 	log.Info().Msgf("creating remotesource")
 	remoteSource, _, err := gwclient.CreateRemoteSource(context.TODO(), req)
 	if err != nil {
-		return errors.Errorf("failed to create remotesource: %w", err)
+		return errors.Wrapf(err, "failed to create remotesource")
 	}
 	log.Info().Msgf("remotesource %s created, ID: %s", remoteSource.Name, remoteSource.ID)
 

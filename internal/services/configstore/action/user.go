@@ -21,12 +21,13 @@ import (
 
 	"agola.io/agola/internal/datamanager"
 	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/errors"
+
 	"agola.io/agola/internal/services/configstore/readdb"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
 
 	"github.com/gofrs/uuid"
-	errors "golang.org/x/xerrors"
 )
 
 type CreateUserRequest struct {
@@ -54,13 +55,13 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 		var err error
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		// check duplicate user name
 		u, err := h.readDB.GetUserByName(tx, req.UserName)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if u != nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user with name %q already exists", u.Name))
@@ -69,14 +70,14 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 		if req.CreateUserLARequest != nil {
 			rs, err = h.readDB.GetRemoteSourceByName(tx, req.CreateUserLARequest.RemoteSourceName)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			if rs == nil {
 				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remote source %q doesn't exist", req.CreateUserLARequest.RemoteSourceName))
 			}
 			user, err := h.readDB.GetUserByLinkedAccountRemoteUserIDandSource(tx, req.CreateUserLARequest.RemoteUserID, rs.ID)
 			if err != nil {
-				return errors.Errorf("failed to get user for remote user id %q and remote source %q: %w", req.CreateUserLARequest.RemoteUserID, rs.ID, err)
+				return errors.Wrapf(err, "failed to get user for remote user id %q and remote source %q", req.CreateUserLARequest.RemoteUserID, rs.ID)
 			}
 			if user != nil {
 				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user for remote user id %q for remote source %q already exists", req.CreateUserLARequest.RemoteUserID, req.CreateUserLARequest.RemoteSourceName))
@@ -85,7 +86,7 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	user := &types.User{
@@ -114,7 +115,7 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 
 	userj, err := json.Marshal(user)
 	if err != nil {
-		return nil, errors.Errorf("failed to marshal user: %w", err)
+		return nil, errors.Wrapf(err, "failed to marshal user")
 	}
 
 	// create root user project group
@@ -129,7 +130,7 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 	}
 	pgj, err := json.Marshal(pg)
 	if err != nil {
-		return nil, errors.Errorf("failed to marshal project group: %w", err)
+		return nil, errors.Wrapf(err, "failed to marshal project group")
 	}
 
 	actions := []*datamanager.Action{
@@ -148,7 +149,7 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 	}
 
 	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return user, err
+	return user, errors.WithStack(err)
 }
 
 func (h *ActionHandler) DeleteUser(ctx context.Context, userRef string) error {
@@ -162,7 +163,7 @@ func (h *ActionHandler) DeleteUser(ctx context.Context, userRef string) error {
 		// check user existance
 		user, err = h.readDB.GetUser(tx, userRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if user == nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", userRef))
@@ -172,13 +173,13 @@ func (h *ActionHandler) DeleteUser(ctx context.Context, userRef string) error {
 		cgNames := []string{util.EncodeSha256Hex("userid-" + user.ID)}
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		return nil
 	})
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	actions := []*datamanager.Action{
@@ -190,7 +191,7 @@ func (h *ActionHandler) DeleteUser(ctx context.Context, userRef string) error {
 	}
 
 	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return err
+	return errors.WithStack(err)
 }
 
 type UpdateUserRequest struct {
@@ -210,7 +211,7 @@ func (h *ActionHandler) UpdateUser(ctx context.Context, req *UpdateUserRequest) 
 		var err error
 		user, err = h.readDB.GetUser(tx, req.UserRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if user == nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", req.UserRef))
@@ -218,14 +219,14 @@ func (h *ActionHandler) UpdateUser(ctx context.Context, req *UpdateUserRequest) 
 
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		if req.UserName != "" {
 			// check duplicate user name
 			u, err := h.readDB.GetUserByName(tx, req.UserName)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			if u != nil {
 				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user with name %q already exists", u.Name))
@@ -238,7 +239,7 @@ func (h *ActionHandler) UpdateUser(ctx context.Context, req *UpdateUserRequest) 
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	if req.UserName != "" {
@@ -247,7 +248,7 @@ func (h *ActionHandler) UpdateUser(ctx context.Context, req *UpdateUserRequest) 
 
 	userj, err := json.Marshal(user)
 	if err != nil {
-		return nil, errors.Errorf("failed to marshal user: %w", err)
+		return nil, errors.Wrapf(err, "failed to marshal user")
 	}
 
 	actions := []*datamanager.Action{
@@ -260,7 +261,7 @@ func (h *ActionHandler) UpdateUser(ctx context.Context, req *UpdateUserRequest) 
 	}
 
 	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return user, err
+	return user, errors.WithStack(err)
 }
 
 type CreateUserLARequest struct {
@@ -293,7 +294,7 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 		var err error
 		user, err = h.readDB.GetUser(tx, req.UserRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if user == nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", req.UserRef))
@@ -303,12 +304,12 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 		cgNames := []string{util.EncodeSha256Hex("userid-" + user.ID)}
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		rs, err = h.readDB.GetRemoteSourceByName(tx, req.RemoteSourceName)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if rs == nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remote source %q doesn't exist", req.RemoteSourceName))
@@ -316,7 +317,7 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 
 		user, err := h.readDB.GetUserByLinkedAccountRemoteUserIDandSource(tx, req.RemoteUserID, rs.ID)
 		if err != nil {
-			return errors.Errorf("failed to get user for remote user id %q and remote source %q: %w", req.RemoteUserID, rs.ID, err)
+			return errors.Wrapf(err, "failed to get user for remote user id %q and remote source %q", req.RemoteUserID, rs.ID)
 		}
 		if user != nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user for remote user id %q for remote source %q already exists", req.RemoteUserID, req.RemoteSourceName))
@@ -324,7 +325,7 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	if user.LinkedAccounts == nil {
@@ -346,7 +347,7 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 
 	userj, err := json.Marshal(user)
 	if err != nil {
-		return nil, errors.Errorf("failed to marshal user: %w", err)
+		return nil, errors.Wrapf(err, "failed to marshal user")
 	}
 	actions := []*datamanager.Action{
 		{
@@ -358,7 +359,7 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 	}
 
 	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return la, err
+	return la, errors.WithStack(err)
 }
 
 func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) error {
@@ -378,7 +379,7 @@ func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) 
 		var err error
 		user, err = h.readDB.GetUser(tx, userRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if user == nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", userRef))
@@ -388,13 +389,13 @@ func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) 
 		cgNames := []string{util.EncodeSha256Hex("userid-" + user.ID)}
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		return nil
 	})
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	_, ok := user.LinkedAccounts[laID]
@@ -406,7 +407,7 @@ func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) 
 
 	userj, err := json.Marshal(user)
 	if err != nil {
-		return errors.Errorf("failed to marshal user: %w", err)
+		return errors.Wrapf(err, "failed to marshal user")
 	}
 	actions := []*datamanager.Action{
 		{
@@ -418,7 +419,7 @@ func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) 
 	}
 
 	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return err
+	return errors.WithStack(err)
 }
 
 type UpdateUserLARequest struct {
@@ -448,7 +449,7 @@ func (h *ActionHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLAReque
 		var err error
 		user, err = h.readDB.GetUser(tx, req.UserRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if user == nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", req.UserRef))
@@ -458,7 +459,7 @@ func (h *ActionHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLAReque
 		cgNames := []string{util.EncodeSha256Hex("userid-" + user.ID)}
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		la, ok := user.LinkedAccounts[req.LinkedAccountID]
@@ -468,7 +469,7 @@ func (h *ActionHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLAReque
 
 		rs, err = h.readDB.GetRemoteSource(tx, la.RemoteSourceID)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if rs == nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remote source with id %q doesn't exist", la.RemoteSourceID))
@@ -476,7 +477,7 @@ func (h *ActionHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLAReque
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	la := user.LinkedAccounts[req.LinkedAccountID]
@@ -490,7 +491,7 @@ func (h *ActionHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLAReque
 
 	userj, err := json.Marshal(user)
 	if err != nil {
-		return nil, errors.Errorf("failed to marshal user: %w", err)
+		return nil, errors.Wrapf(err, "failed to marshal user")
 	}
 	actions := []*datamanager.Action{
 		{
@@ -502,7 +503,7 @@ func (h *ActionHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLAReque
 	}
 
 	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return la, err
+	return la, errors.WithStack(err)
 }
 
 func (h *ActionHandler) CreateUserToken(ctx context.Context, userRef, tokenName string) (string, error) {
@@ -522,7 +523,7 @@ func (h *ActionHandler) CreateUserToken(ctx context.Context, userRef, tokenName 
 		var err error
 		user, err = h.readDB.GetUser(tx, userRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if user == nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", userRef))
@@ -532,13 +533,13 @@ func (h *ActionHandler) CreateUserToken(ctx context.Context, userRef, tokenName 
 		cgNames := []string{util.EncodeSha256Hex("userid-" + user.ID)}
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		return nil
 	})
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	if user.Tokens != nil {
 		if _, ok := user.Tokens[tokenName]; ok {
@@ -555,7 +556,7 @@ func (h *ActionHandler) CreateUserToken(ctx context.Context, userRef, tokenName 
 
 	userj, err := json.Marshal(user)
 	if err != nil {
-		return "", errors.Errorf("failed to marshal user: %w", err)
+		return "", errors.Wrapf(err, "failed to marshal user")
 	}
 	actions := []*datamanager.Action{
 		{
@@ -567,7 +568,7 @@ func (h *ActionHandler) CreateUserToken(ctx context.Context, userRef, tokenName 
 	}
 
 	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return token, err
+	return token, errors.WithStack(err)
 }
 
 func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName string) error {
@@ -587,7 +588,7 @@ func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName 
 		var err error
 		user, err = h.readDB.GetUser(tx, userRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if user == nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", userRef))
@@ -597,13 +598,13 @@ func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName 
 		cgNames := []string{util.EncodeSha256Hex("userid-" + user.ID)}
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		return nil
 	})
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	_, ok := user.Tokens[tokenName]
@@ -615,7 +616,7 @@ func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName 
 
 	userj, err := json.Marshal(user)
 	if err != nil {
-		return errors.Errorf("failed to marshal user: %w", err)
+		return errors.Wrapf(err, "failed to marshal user")
 	}
 	actions := []*datamanager.Action{
 		{
@@ -627,7 +628,7 @@ func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName 
 	}
 
 	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return err
+	return errors.WithStack(err)
 }
 
 type UserOrgsResponse struct {
@@ -648,17 +649,17 @@ func (h *ActionHandler) GetUserOrgs(ctx context.Context, userRef string) ([]*Use
 		var err error
 		user, err := h.readDB.GetUser(tx, userRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if user == nil {
 			return util.NewAPIError(util.ErrNotExist, errors.Errorf("user %q doesn't exist", userRef))
 		}
 
 		userOrgs, err = h.readDB.GetUserOrgs(tx, user.ID)
-		return err
+		return errors.WithStack(err)
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	res := make([]*UserOrgsResponse, len(userOrgs))

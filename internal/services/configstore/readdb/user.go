@@ -19,12 +19,12 @@ import (
 	"encoding/json"
 
 	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/configstore/common"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
 
 	sq "github.com/Masterminds/squirrel"
-	errors "golang.org/x/xerrors"
 )
 
 var (
@@ -44,46 +44,46 @@ var (
 func (r *ReadDB) insertUser(tx *db.Tx, data []byte) error {
 	user := types.User{}
 	if err := json.Unmarshal(data, &user); err != nil {
-		return errors.Errorf("failed to unmarshal user: %w", err)
+		return errors.Wrapf(err, "failed to unmarshal user")
 	}
 	r.log.Debug().Msgf("inserting user: %s", util.Dump(user))
 	// poor man insert or update...
 	if err := r.deleteUser(tx, user.ID); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	q, args, err := userInsert.Values(user.ID, user.Name, data).ToSql()
 	if err != nil {
-		return errors.Errorf("failed to build query: %w", err)
+		return errors.Wrapf(err, "failed to build query")
 	}
 	if _, err := tx.Exec(q, args...); err != nil {
-		return errors.Errorf("failed to insert user: %w", err)
+		return errors.Wrapf(err, "failed to insert user")
 	}
 
 	// insert linkedaccounts_user
 	for _, la := range user.LinkedAccounts {
 		if err := r.deleteUserLinkedAccount(tx, la.ID); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		q, args, err = linkedaccountuserInsert.Values(la.ID, la.RemoteSourceID, user.ID, la.RemoteUserID).ToSql()
 		if err != nil {
-			return errors.Errorf("failed to build query: %w", err)
+			return errors.Wrapf(err, "failed to build query")
 		}
 		if _, err := tx.Exec(q, args...); err != nil {
-			return errors.Errorf("failed to insert user: %w", err)
+			return errors.Wrapf(err, "failed to insert user")
 		}
 	}
 	// insert user_token
 	for _, tokenValue := range user.Tokens {
 		r.log.Debug().Msgf("inserting user token: %s", tokenValue)
 		if err := r.deleteUserToken(tx, tokenValue); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		q, args, err = usertokenInsert.Values(tokenValue, user.ID).ToSql()
 		if err != nil {
-			return errors.Errorf("failed to build query: %w", err)
+			return errors.Wrapf(err, "failed to build query")
 		}
 		if _, err := tx.Exec(q, args...); err != nil {
-			return errors.Errorf("failed to insert user: %w", err)
+			return errors.Wrapf(err, "failed to insert user")
 		}
 	}
 
@@ -93,17 +93,17 @@ func (r *ReadDB) insertUser(tx *db.Tx, data []byte) error {
 func (r *ReadDB) deleteUser(tx *db.Tx, userID string) error {
 	// delete user linked accounts
 	if err := r.deleteUserLinkedAccounts(tx, userID); err != nil {
-		return errors.Errorf("failed to delete user linked accounts: %w", err)
+		return errors.Wrapf(err, "failed to delete user linked accounts")
 	}
 
 	// delete user tokens
 	if _, err := tx.Exec("delete from user_token where userid = $1", userID); err != nil {
-		return errors.Errorf("failed to delete usertokens: %w", err)
+		return errors.Wrapf(err, "failed to delete usertokens")
 	}
 
 	// poor man insert or update...
 	if _, err := tx.Exec("delete from user where id = $1", userID); err != nil {
-		return errors.Errorf("failed to delete user: %w", err)
+		return errors.Wrapf(err, "failed to delete user")
 	}
 
 	return nil
@@ -112,10 +112,10 @@ func (r *ReadDB) deleteUser(tx *db.Tx, userID string) error {
 func (r *ReadDB) deleteUserLinkedAccounts(tx *db.Tx, userID string) error {
 	// poor man insert or update...
 	if _, err := tx.Exec("delete from linkedaccount_user where userid = $1", userID); err != nil {
-		return errors.Errorf("failed to delete linked account: %w", err)
+		return errors.Wrapf(err, "failed to delete linked account")
 	}
 	if _, err := tx.Exec("delete from linkedaccount_project where id = $1", userID); err != nil {
-		return errors.Errorf("failed to delete linked account: %w", err)
+		return errors.Wrapf(err, "failed to delete linked account")
 	}
 	return nil
 }
@@ -123,10 +123,10 @@ func (r *ReadDB) deleteUserLinkedAccounts(tx *db.Tx, userID string) error {
 func (r *ReadDB) deleteUserLinkedAccount(tx *db.Tx, id string) error {
 	// poor man insert or update...
 	if _, err := tx.Exec("delete from linkedaccount_user where id = $1", id); err != nil {
-		return errors.Errorf("failed to delete linked account: %w", err)
+		return errors.Wrapf(err, "failed to delete linked account")
 	}
 	if _, err := tx.Exec("delete from linkedaccount_project where id = $1", id); err != nil {
-		return errors.Errorf("failed to delete linked account: %w", err)
+		return errors.Wrapf(err, "failed to delete linked account")
 	}
 	return nil
 }
@@ -134,7 +134,7 @@ func (r *ReadDB) deleteUserLinkedAccount(tx *db.Tx, id string) error {
 func (r *ReadDB) deleteUserToken(tx *db.Tx, tokenValue string) error {
 	// poor man insert or update...
 	if _, err := tx.Exec("delete from user_token where tokenvalue = $1", tokenValue); err != nil {
-		return errors.Errorf("failed to delete user_token: %w", err)
+		return errors.Wrapf(err, "failed to delete user_token")
 	}
 	return nil
 }
@@ -142,7 +142,7 @@ func (r *ReadDB) deleteUserToken(tx *db.Tx, tokenValue string) error {
 func (r *ReadDB) GetUser(tx *db.Tx, userRef string) (*types.User, error) {
 	refType, err := common.ParseNameRef(userRef)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	var user *types.User
@@ -152,19 +152,19 @@ func (r *ReadDB) GetUser(tx *db.Tx, userRef string) (*types.User, error) {
 	case common.RefTypeName:
 		user, err = r.GetUserByName(tx, userRef)
 	}
-	return user, err
+	return user, errors.WithStack(err)
 }
 
 func (r *ReadDB) GetUserByID(tx *db.Tx, userID string) (*types.User, error) {
 	q, args, err := userSelect.Where(sq.Eq{"id": userID}).ToSql()
 	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Errorf("failed to build query: %w", err)
+		return nil, errors.Wrapf(err, "failed to build query")
 	}
 
 	users, _, err := fetchUsers(tx, q, args...)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if len(users) > 1 {
 		return nil, errors.Errorf("too many rows returned")
@@ -179,12 +179,12 @@ func (r *ReadDB) GetUserByName(tx *db.Tx, name string) (*types.User, error) {
 	q, args, err := userSelect.Where(sq.Eq{"name": name}).ToSql()
 	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Errorf("failed to build query: %w", err)
+		return nil, errors.Wrapf(err, "failed to build query")
 	}
 
 	users, _, err := fetchUsers(tx, q, args...)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if len(users) > 1 {
 		return nil, errors.Errorf("too many rows returned")
@@ -202,12 +202,12 @@ func (r *ReadDB) GetUserByTokenValue(tx *db.Tx, tokenValue string) (*types.User,
 	q, args, err := s.ToSql()
 	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Errorf("failed to build query: %w", err)
+		return nil, errors.Wrapf(err, "failed to build query")
 	}
 
 	users, _, err := fetchUsers(tx, q, args...)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if len(users) > 1 {
 		return nil, errors.Errorf("too many rows returned")
@@ -225,12 +225,12 @@ func (r *ReadDB) GetUserByLinkedAccount(tx *db.Tx, linkedAccountID string) (*typ
 	q, args, err := s.ToSql()
 	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Errorf("failed to build query: %w", err)
+		return nil, errors.Wrapf(err, "failed to build query")
 	}
 
 	users, _, err := fetchUsers(tx, q, args...)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if len(users) > 1 {
 		return nil, errors.Errorf("too many rows returned")
@@ -248,12 +248,12 @@ func (r *ReadDB) GetUserByLinkedAccountRemoteUserIDandSource(tx *db.Tx, remoteUs
 	q, args, err := s.ToSql()
 	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Errorf("failed to build query: %w", err)
+		return nil, errors.Wrapf(err, "failed to build query")
 	}
 
 	users, _, err := fetchUsers(tx, q, args...)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if len(users) > 1 {
 		return nil, errors.Errorf("too many rows returned")
@@ -294,22 +294,22 @@ func (r *ReadDB) GetUsers(tx *db.Tx, startUserName string, limit int, asc bool) 
 	q, args, err := s.ToSql()
 	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Errorf("failed to build query: %w", err)
+		return nil, errors.Wrapf(err, "failed to build query")
 	}
 
 	rows, err := tx.Query(q, args...)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	users, _, err = scanUsers(rows)
-	return users, err
+	return users, errors.WithStack(err)
 }
 
 func fetchUsers(tx *db.Tx, q string, args ...interface{}) ([]*types.User, []string, error) {
 	rows, err := tx.Query(q, args...)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.WithStack(err)
 	}
 	defer rows.Close()
 	return scanUsers(rows)
@@ -319,12 +319,12 @@ func scanUser(rows *sql.Rows, additionalFields ...interface{}) (*types.User, str
 	var id string
 	var data []byte
 	if err := rows.Scan(&id, &data); err != nil {
-		return nil, "", errors.Errorf("failed to scan rows: %w", err)
+		return nil, "", errors.Wrapf(err, "failed to scan rows")
 	}
 	user := types.User{}
 	if len(data) > 0 {
 		if err := json.Unmarshal(data, &user); err != nil {
-			return nil, "", errors.Errorf("failed to unmarshal user: %w", err)
+			return nil, "", errors.Wrapf(err, "failed to unmarshal user")
 		}
 	}
 
@@ -338,13 +338,13 @@ func scanUsers(rows *sql.Rows) ([]*types.User, []string, error) {
 		p, id, err := scanUser(rows)
 		if err != nil {
 			rows.Close()
-			return nil, nil, err
+			return nil, nil, errors.WithStack(err)
 		}
 		users = append(users, p)
 		ids = append(ids, id)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, nil, err
+		return nil, nil, errors.WithStack(err)
 	}
 	return users, ids, nil
 }

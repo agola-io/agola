@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 
+	"agola.io/agola/internal/errors"
 	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/rs/zerolog/log"
@@ -43,7 +44,7 @@ func printVersions(cmd *cobra.Command, args []string) error {
 
 	gwversion, _, err := gwclient.GetVersion(context.TODO())
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	fmt.Printf("Gateway version:\t%s\n", gwversion.Version)

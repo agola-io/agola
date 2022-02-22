@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 
+	"agola.io/agola/internal/errors"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
@@ -62,7 +63,7 @@ func remoteSourceList(cmd *cobra.Command, args []string) error {
 
 	remouteSources, _, err := gwclient.GetRemoteSources(context.TODO(), remoteSourceListOpts.start, remoteSourceListOpts.limit, false)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	printRemoteSources(remouteSources)

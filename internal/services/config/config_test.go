@@ -20,7 +20,7 @@ import (
 	"path"
 	"testing"
 
-	errors "golang.org/x/xerrors"
+	"agola.io/agola/internal/errors"
 )
 
 func TestParseConfig(t *testing.T) {

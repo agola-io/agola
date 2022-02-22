@@ -22,12 +22,13 @@ import (
 
 	"agola.io/agola/internal/datamanager"
 	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/errors"
+
 	"agola.io/agola/internal/services/configstore/readdb"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
 
 	"github.com/gofrs/uuid"
-	errors "golang.org/x/xerrors"
 )
 
 type OrgMemberResponse struct {
@@ -48,17 +49,17 @@ func (h *ActionHandler) GetOrgMembers(ctx context.Context, orgRef string) ([]*Or
 		var err error
 		org, err := h.readDB.GetOrg(tx, orgRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if org == nil {
 			return util.NewAPIError(util.ErrNotExist, errors.Errorf("org %q doesn't exist", orgRef))
 		}
 
 		orgUsers, err = h.readDB.GetOrgUsers(tx, org.ID)
-		return err
+		return errors.WithStack(err)
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	res := make([]*OrgMemberResponse, len(orgUsers))
@@ -89,13 +90,13 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) 
 		var err error
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		// check duplicate org name
 		o, err := h.readDB.GetOrgByName(tx, org.Name)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if o != nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("org %q already exists", o.Name))
@@ -104,7 +105,7 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) 
 		if org.CreatorUserID != "" {
 			user, err := h.readDB.GetUser(tx, org.CreatorUserID)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			if user == nil {
 				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("creator user %q doesn't exist", org.CreatorUserID))
@@ -114,7 +115,7 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) 
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	actions := []*datamanager.Action{}
@@ -123,7 +124,7 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) 
 	org.CreatedAt = time.Now()
 	orgj, err := json.Marshal(org)
 	if err != nil {
-		return nil, errors.Errorf("failed to marshal org: %w", err)
+		return nil, errors.Wrapf(err, "failed to marshal org")
 	}
 	actions = append(actions, &datamanager.Action{
 		ActionType: datamanager.ActionTypePut,
@@ -142,7 +143,7 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) 
 		}
 		orgmemberj, err := json.Marshal(orgmember)
 		if err != nil {
-			return nil, errors.Errorf("failed to marshal project group: %w", err)
+			return nil, errors.Wrapf(err, "failed to marshal project group")
 		}
 		actions = append(actions, &datamanager.Action{
 			ActionType: datamanager.ActionTypePut,
@@ -164,7 +165,7 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) 
 	}
 	pgj, err := json.Marshal(pg)
 	if err != nil {
-		return nil, errors.Errorf("failed to marshal project group: %w", err)
+		return nil, errors.Wrapf(err, "failed to marshal project group")
 	}
 	actions = append(actions, &datamanager.Action{
 		ActionType: datamanager.ActionTypePut,
@@ -174,7 +175,7 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) 
 	})
 
 	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return org, err
+	return org, errors.WithStack(err)
 }
 
 func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
@@ -187,7 +188,7 @@ func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 		// check org existance
 		org, err = h.readDB.GetOrgByName(tx, orgRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if org == nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("org %q doesn't exist", orgRef))
@@ -197,13 +198,13 @@ func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 		cgNames := []string{util.EncodeSha256Hex("orgid-" + org.ID)}
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		return nil
 	})
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	// TODO(sgotti) delete all project groups, projects etc...
@@ -216,7 +217,7 @@ func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 	}
 
 	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return err
+	return errors.WithStack(err)
 }
 
 // AddOrgMember add/updates an org member.
@@ -237,7 +238,7 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 		// check existing org
 		org, err = h.readDB.GetOrg(tx, orgRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if org == nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("org %q doesn't exists", orgRef))
@@ -245,7 +246,7 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 		// check existing user
 		user, err = h.readDB.GetUser(tx, userRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if user == nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exists", userRef))
@@ -254,19 +255,19 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 		// fetch org member if it already exist
 		orgmember, err = h.readDB.GetOrgMemberByOrgUserID(tx, org.ID, user.ID)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		cgNames := []string{util.EncodeSha256Hex(fmt.Sprintf("orgmember-%s-%s", org.ID, user.ID))}
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	// update if role changed
@@ -287,7 +288,7 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 	actions := []*datamanager.Action{}
 	orgmemberj, err := json.Marshal(orgmember)
 	if err != nil {
-		return nil, errors.Errorf("failed to marshal project group: %w", err)
+		return nil, errors.Wrapf(err, "failed to marshal project group")
 	}
 	actions = append(actions, &datamanager.Action{
 		ActionType: datamanager.ActionTypePut,
@@ -297,7 +298,7 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 	})
 
 	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return orgmember, err
+	return orgmember, errors.WithStack(err)
 }
 
 // RemoveOrgMember removes an org member.
@@ -313,7 +314,7 @@ func (h *ActionHandler) RemoveOrgMember(ctx context.Context, orgRef, userRef str
 		// check existing org
 		org, err = h.readDB.GetOrg(tx, orgRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if org == nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("org %q doesn't exists", orgRef))
@@ -321,7 +322,7 @@ func (h *ActionHandler) RemoveOrgMember(ctx context.Context, orgRef, userRef str
 		// check existing user
 		user, err = h.readDB.GetUser(tx, userRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if user == nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exists", userRef))
@@ -330,7 +331,7 @@ func (h *ActionHandler) RemoveOrgMember(ctx context.Context, orgRef, userRef str
 		// check that org member exists
 		orgmember, err = h.readDB.GetOrgMemberByOrgUserID(tx, org.ID, user.ID)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if orgmember == nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("orgmember for org %q, user %q doesn't exists", orgRef, userRef))
@@ -339,13 +340,13 @@ func (h *ActionHandler) RemoveOrgMember(ctx context.Context, orgRef, userRef str
 		cgNames := []string{util.EncodeSha256Hex(fmt.Sprintf("orgmember-%s-%s", org.ID, user.ID))}
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		return nil
 	})
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	actions := []*datamanager.Action{}
@@ -356,5 +357,5 @@ func (h *ActionHandler) RemoveOrgMember(ctx context.Context, orgRef, userRef str
 	})
 
 	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return err
+	return errors.WithStack(err)
 }

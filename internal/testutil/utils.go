@@ -32,13 +32,13 @@ import (
 	"text/template"
 	"time"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/etcd"
 	"github.com/rs/zerolog"
 	"go.etcd.io/etcd/embed"
 
 	"github.com/gofrs/uuid"
 	"github.com/sgotti/gexpect"
-	errors "golang.org/x/xerrors"
 )
 
 const (
@@ -63,16 +63,16 @@ type Process struct {
 
 func (p *Process) start() error {
 	if p.Cmd != nil {
-		panic(fmt.Errorf("%s: cmd not cleanly stopped", p.uid))
+		panic(errors.Errorf("%s: cmd not cleanly stopped", p.uid))
 	}
 	cmd := exec.Command(p.bin, p.args...)
 	pr, pw, err := os.Pipe()
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	p.Cmd = &gexpect.ExpectSubprocess{Cmd: cmd, Output: pw}
 	if err := p.Cmd.Start(); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	go func() {
 		scanner := bufio.NewScanner(pr)
@@ -86,7 +86,7 @@ func (p *Process) start() error {
 
 func (p *Process) Start() error {
 	if err := p.start(); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	p.Cmd.Continue()
 	return nil
@@ -99,15 +99,15 @@ func (p *Process) StartExpect() error {
 func (p *Process) Signal(sig os.Signal) error {
 	p.t.Logf("signalling %s %s with %s", p.name, p.uid, sig)
 	if p.Cmd == nil {
-		panic(fmt.Errorf("p: %s, cmd is empty", p.uid))
+		panic(errors.Errorf("p: %s, cmd is empty", p.uid))
 	}
-	return p.Cmd.Cmd.Process.Signal(sig)
+	return errors.WithStack(p.Cmd.Cmd.Process.Signal(sig))
 }
 
 func (p *Process) Kill() {
 	p.t.Logf("killing %s %s", p.name, p.uid)
 	if p.Cmd == nil {
-		panic(fmt.Errorf("p: %s, cmd is empty", p.uid))
+		panic(errors.Errorf("p: %s, cmd is empty", p.uid))
 	}
 	_ = p.Cmd.Cmd.Process.Signal(os.Kill)
 	_ = p.Cmd.Wait()
@@ -117,7 +117,7 @@ func (p *Process) Kill() {
 func (p *Process) Stop() {
 	p.t.Logf("stopping %s %s", p.name, p.uid)
 	if p.Cmd == nil {
-		panic(fmt.Errorf("p: %s, cmd is empty", p.uid))
+		panic(errors.Errorf("p: %s, cmd is empty", p.uid))
 	}
 	p.Cmd.Continue()
 	_ = p.Cmd.Cmd.Process.Signal(os.Interrupt)
@@ -134,7 +134,7 @@ func (p *Process) Wait(timeout time.Duration) error {
 	}()
 	select {
 	case <-timeoutCh:
-		return fmt.Errorf("timeout waiting on process")
+		return errors.Errorf("timeout waiting on process")
 	case <-endCh:
 		return nil
 	}
@@ -157,11 +157,11 @@ func NewTestEmbeddedEtcd(t *testing.T, log zerolog.Logger, dir string, a ...stri
 
 	listenAddress, port, err := GetFreePort(true, false)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	listenAddress2, port2, err := GetFreePort(true, false)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	cfg := embed.NewConfig()
@@ -183,7 +183,7 @@ func NewTestEmbeddedEtcd(t *testing.T, log zerolog.Logger, dir string, a ...stri
 	t.Logf("starting embedded etcd server")
 	embeddedEtcd, err := embed.StartEtcd(cfg)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	storeEndpoint := fmt.Sprintf("http://%s:%s", listenAddress, port)
@@ -194,7 +194,7 @@ func NewTestEmbeddedEtcd(t *testing.T, log zerolog.Logger, dir string, a ...stri
 	}
 	e, err := etcd.New(storeConfig)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create store: %w", err)
+		return nil, errors.Wrapf(err, "cannot create store")
 	}
 
 	tectd := &TestEmbeddedEtcd{
@@ -243,11 +243,11 @@ func NewTestExternalEtcd(t *testing.T, log zerolog.Logger, dir string, a ...stri
 
 	listenAddress, port, err := GetFreePort(true, false)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	listenAddress2, port2, err := GetFreePort(true, false)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	args := []string{}
@@ -268,12 +268,12 @@ func NewTestExternalEtcd(t *testing.T, log zerolog.Logger, dir string, a ...stri
 	}
 	e, err := etcd.New(storeConfig)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create store: %w", err)
+		return nil, errors.Wrapf(err, "cannot create store")
 	}
 
 	bin := os.Getenv("ETCD_BIN")
 	if bin == "" {
-		return nil, fmt.Errorf("missing ETCD_BIN env")
+		return nil, errors.Errorf("missing ETCD_BIN env")
 	}
 	tectd := &TestExternalEtcd{
 		t: t,
@@ -305,11 +305,11 @@ func (te *TestEtcd) Compact() error {
 	defer cancel()
 	resp, err := te.Get(ctx, "anykey", 0)
 	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
-		return err
+		return errors.WithStack(err)
 	}
 
 	_, err = te.Client().Compact(ctx, resp.Header.Revision)
-	return err
+	return errors.WithStack(err)
 }
 
 func (te *TestEtcd) WaitUp(timeout time.Duration) error {
@@ -327,7 +327,7 @@ func (te *TestEtcd) WaitUp(timeout time.Duration) error {
 		time.Sleep(sleepInterval)
 	}
 
-	return fmt.Errorf("timeout")
+	return errors.Errorf("timeout")
 }
 
 func (te *TestEtcd) WaitDown(timeout time.Duration) error {
@@ -342,7 +342,7 @@ func (te *TestEtcd) WaitDown(timeout time.Duration) error {
 		time.Sleep(sleepInterval)
 	}
 
-	return fmt.Errorf("timeout")
+	return errors.Errorf("timeout")
 }
 
 const (
@@ -483,22 +483,22 @@ func NewTestGitea(t *testing.T, dir, dockerBridgeAddress string, a ...string) (*
 	}
 	tmpl, err := template.New("gitea").Parse(giteaAppIniTmpl)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	conf := &bytes.Buffer{}
 	if err := tmpl.Execute(conf, giteaConfig); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	if err := os.MkdirAll(filepath.Join(dir, "gitea", "conf"), 0775); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if err := os.MkdirAll(filepath.Join(dir, "gitea", "log"), 0775); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	configPath := filepath.Join(dir, "gitea", "conf", "app.ini")
 	if err := ioutil.WriteFile(configPath, conf.Bytes(), 0664); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	args := []string{}
@@ -530,20 +530,20 @@ func Wait(timeout time.Duration, f CheckFunc) error {
 	for time.Now().Add(-timeout).Before(start) {
 		ok, err := f()
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if ok {
 			return nil
 		}
 		time.Sleep(sleepInterval)
 	}
-	return fmt.Errorf("timeout")
+	return errors.Errorf("timeout")
 }
 
 func testFreeTCPPort(port int) error {
 	ln, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	ln.Close()
 	return nil
@@ -552,7 +552,7 @@ func testFreeTCPPort(port int) error {
 func testFreeUDPPort(port int) error {
 	ln, err := net.ListenPacket("udp", fmt.Sprintf("localhost:%d", port))
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	ln.Close()
 	return nil
@@ -564,16 +564,16 @@ func GetFreePort(tcp bool, udp bool) (string, string, error) {
 	defer portMutex.Unlock()
 
 	if !tcp && !udp {
-		return "", "", fmt.Errorf("at least one of tcp or udp port shuld be required")
+		return "", "", errors.Errorf("at least one of tcp or udp port shuld be required")
 	}
 	localhostIP, err := net.ResolveIPAddr("ip", "localhost")
 	if err != nil {
-		return "", "", fmt.Errorf("failed to resolve ip addr: %w", err)
+		return "", "", errors.Wrapf(err, "failed to resolve ip addr")
 	}
 	for {
 		curPort++
 		if curPort > MaxPort {
-			return "", "", fmt.Errorf("all available ports to test have been exausted")
+			return "", "", errors.Errorf("all available ports to test have been exausted")
 		}
 		if tcp {
 			if err := testFreeTCPPort(curPort); err != nil {

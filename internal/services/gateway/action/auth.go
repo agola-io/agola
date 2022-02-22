@@ -17,12 +17,11 @@ package action
 import (
 	"context"
 
+	"agola.io/agola/internal/errors"
 	scommon "agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
 	cstypes "agola.io/agola/services/configstore/types"
-
-	errors "golang.org/x/xerrors"
 )
 
 func (h *ActionHandler) IsOrgOwner(ctx context.Context, orgID string) (bool, error) {
@@ -38,7 +37,7 @@ func (h *ActionHandler) IsOrgOwner(ctx context.Context, orgID string) (bool, err
 
 	userOrgs, _, err := h.configstoreClient.GetUserOrgs(ctx, userID)
 	if err != nil {
-		return false, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to get user orgs: %w", err))
+		return false, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user orgs"))
 	}
 
 	for _, userOrg := range userOrgs {
@@ -73,7 +72,7 @@ func (h *ActionHandler) IsProjectOwner(ctx context.Context, ownerType cstypes.Co
 	if ownerType == cstypes.ConfigTypeOrg {
 		userOrgs, _, err := h.configstoreClient.GetUserOrgs(ctx, userID)
 		if err != nil {
-			return false, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to get user orgs: %w", err))
+			return false, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user orgs"))
 		}
 
 		for _, userOrg := range userOrgs {
@@ -109,7 +108,7 @@ func (h *ActionHandler) IsProjectMember(ctx context.Context, ownerType cstypes.C
 	if ownerType == cstypes.ConfigTypeOrg {
 		userOrgs, _, err := h.configstoreClient.GetUserOrgs(ctx, userID)
 		if err != nil {
-			return false, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to get user orgs: %w", err))
+			return false, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user orgs"))
 		}
 
 		for _, userOrg := range userOrgs {
@@ -130,14 +129,14 @@ func (h *ActionHandler) IsVariableOwner(ctx context.Context, parentType cstypes.
 	case cstypes.ConfigTypeProjectGroup:
 		pg, _, err := h.configstoreClient.GetProjectGroup(ctx, parentRef)
 		if err != nil {
-			return false, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to get project group %q: %w", parentRef, err))
+			return false, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get project group %q", parentRef))
 		}
 		ownerType = pg.OwnerType
 		ownerID = pg.OwnerID
 	case cstypes.ConfigTypeProject:
 		p, _, err := h.configstoreClient.GetProject(ctx, parentRef)
 		if err != nil {
-			return false, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to get project  %q: %w", parentRef, err))
+			return false, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get project  %q", parentRef))
 		}
 		ownerType = p.OwnerType
 		ownerID = p.OwnerID
@@ -149,7 +148,7 @@ func (h *ActionHandler) IsVariableOwner(ctx context.Context, parentType cstypes.
 func (h *ActionHandler) CanGetRun(ctx context.Context, runGroup string) (bool, error) {
 	groupType, groupID, err := scommon.GroupTypeIDFromRunGroup(runGroup)
 	if err != nil {
-		return false, err
+		return false, errors.WithStack(err)
 	}
 
 	var visibility cstypes.Visibility
@@ -176,7 +175,7 @@ func (h *ActionHandler) CanGetRun(ctx context.Context, runGroup string) (bool, e
 	}
 	isProjectMember, err := h.IsProjectMember(ctx, ownerType, ownerID)
 	if err != nil {
-		return false, errors.Errorf("failed to determine ownership: %w", err)
+		return false, errors.Wrapf(err, "failed to determine ownership")
 	}
 	if !isProjectMember {
 		return false, nil
@@ -187,7 +186,7 @@ func (h *ActionHandler) CanGetRun(ctx context.Context, runGroup string) (bool, e
 func (h *ActionHandler) CanDoRunActions(ctx context.Context, runGroup string) (bool, error) {
 	groupType, groupID, err := scommon.GroupTypeIDFromRunGroup(runGroup)
 	if err != nil {
-		return false, err
+		return false, errors.WithStack(err)
 	}
 
 	var ownerType cstypes.ConfigType
@@ -208,7 +207,7 @@ func (h *ActionHandler) CanDoRunActions(ctx context.Context, runGroup string) (b
 
 	isProjectOwner, err := h.IsProjectOwner(ctx, ownerType, ownerID)
 	if err != nil {
-		return false, errors.Errorf("failed to determine ownership: %w", err)
+		return false, errors.Wrapf(err, "failed to determine ownership")
 	}
 	if !isProjectOwner {
 		return false, nil

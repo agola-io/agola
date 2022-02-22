@@ -19,6 +19,8 @@ import (
 	"net/http"
 
 	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/errors"
+
 	"agola.io/agola/internal/services/configstore/action"
 	"agola.io/agola/internal/services/configstore/readdb"
 	"agola.io/agola/internal/util"
@@ -65,11 +67,11 @@ func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		for _, v := range resVariables {
 			pp, err := h.readDB.GetPath(tx, v.Parent.Type, v.Parent.ID)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			v.ParentPath = pp
 		}
-		return err
+		return errors.WithStack(err)
 	})
 	if err != nil {
 		h.log.Err(err).Send()

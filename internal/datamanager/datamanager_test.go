@@ -29,12 +29,12 @@ import (
 	"testing"
 	"time"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/testutil"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/zerolog"
-	errors "golang.org/x/xerrors"
 )
 
 func setupEtcd(t *testing.T, log zerolog.Logger, dir string) *testutil.TestEmbeddedEtcd {
@@ -612,7 +612,7 @@ func doAndCheckCheckpoint(t *testing.T, ctx context.Context, dm *DataManager, ac
 		// populate with a wal
 		_, err := dm.WriteWal(ctx, actionGroup, nil)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 	}
 
@@ -621,11 +621,11 @@ func doAndCheckCheckpoint(t *testing.T, ctx context.Context, dm *DataManager, ac
 
 	// do a checkpoint
 	if err := dm.checkpoint(ctx, true); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	if err := checkDataFiles(ctx, t, dm, expectedEntries); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return expectedEntries, nil
@@ -635,7 +635,7 @@ func checkDataFiles(ctx context.Context, t *testing.T, dm *DataManager, expected
 	// read the data file
 	curDataStatus, err := dm.GetLastDataStatus()
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	allEntriesMap := map[string]*DataEntry{}
@@ -645,14 +645,14 @@ func checkDataFiles(ctx context.Context, t *testing.T, dm *DataManager, expected
 		for i, file := range curDataStatus.Files[dataType] {
 			dataFileIndexf, err := dm.ost.ReadObject(dm.DataFileIndexPath(dataType, file.ID))
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			var dataFileIndex *DataFileIndex
 			dec := json.NewDecoder(dataFileIndexf)
 			err = dec.Decode(&dataFileIndex)
 			if err != nil {
 				dataFileIndexf.Close()
-				return err
+				return errors.WithStack(err)
 			}
 
 			dataFileIndexf.Close()
@@ -660,7 +660,7 @@ func checkDataFiles(ctx context.Context, t *testing.T, dm *DataManager, expected
 			dataEntries := []*DataEntry{}
 			dataf, err := dm.ost.ReadObject(dm.DataFilePath(dataType, file.ID))
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			dec = json.NewDecoder(dataf)
 			var prevEntryID string
@@ -674,15 +674,15 @@ func checkDataFiles(ctx context.Context, t *testing.T, dm *DataManager, expected
 				}
 				if err != nil {
 					dataf.Close()
-					return err
+					return errors.WithStack(err)
 				}
 				// check that there are no duplicate entries
 				if _, ok := allEntriesMap[de.ID]; ok {
-					return fmt.Errorf("duplicate entry id: %s", de.ID)
+					return errors.Errorf("duplicate entry id: %s", de.ID)
 				}
 				// check that the entries are in order
 				if de.ID < prevEntryID {
-					return fmt.Errorf("previous entry id: %s greater than entry id: %s", prevEntryID, de.ID)
+					return errors.Errorf("previous entry id: %s greater than entry id: %s", prevEntryID, de.ID)
 				}
 
 				dataEntriesMap[de.ID] = de
@@ -693,7 +693,7 @@ func checkDataFiles(ctx context.Context, t *testing.T, dm *DataManager, expected
 
 			// check that the index matches the entries
 			if len(dataFileIndex.Index) != len(dataEntriesMap) {
-				return fmt.Errorf("index entries: %d different than data entries: %d", len(dataFileIndex.Index), len(dataEntriesMap))
+				return errors.Errorf("index entries: %d different than data entries: %d", len(dataFileIndex.Index), len(dataEntriesMap))
 			}
 			indexIDs := make([]string, len(dataFileIndex.Index))
 			entriesIDs := make([]string, len(dataEntriesMap))
@@ -706,19 +706,19 @@ func checkDataFiles(ctx context.Context, t *testing.T, dm *DataManager, expected
 			sort.Strings(indexIDs)
 			sort.Strings(entriesIDs)
 			if !reflect.DeepEqual(indexIDs, entriesIDs) {
-				return fmt.Errorf("index entries ids don't match data entries ids: index: %v, data: %v", indexIDs, entriesIDs)
+				return errors.Errorf("index entries ids don't match data entries ids: index: %v, data: %v", indexIDs, entriesIDs)
 			}
 
 			if file.LastEntryID != dataEntries[len(dataEntries)-1].ID {
-				return fmt.Errorf("lastEntryID for datafile %d: %s is different than real last entry id: %s", i, file.LastEntryID, dataEntries[len(dataEntries)-1].ID)
+				return errors.Errorf("lastEntryID for datafile %d: %s is different than real last entry id: %s", i, file.LastEntryID, dataEntries[len(dataEntries)-1].ID)
 			}
 
 			// check that all the files are in order
 			if file.LastEntryID == prevLastEntryID {
-				return fmt.Errorf("lastEntryID for datafile %d is equal than previous file lastEntryID: %s == %s", i, file.LastEntryID, prevLastEntryID)
+				return errors.Errorf("lastEntryID for datafile %d is equal than previous file lastEntryID: %s == %s", i, file.LastEntryID, prevLastEntryID)
 			}
 			if file.LastEntryID < prevLastEntryID {
-				return fmt.Errorf("lastEntryID for datafile %d is less than previous file lastEntryID: %s < %s", i, file.LastEntryID, prevLastEntryID)
+				return errors.Errorf("lastEntryID for datafile %d is less than previous file lastEntryID: %s < %s", i, file.LastEntryID, prevLastEntryID)
 			}
 			prevLastEntryID = file.LastEntryID
 		}
@@ -726,10 +726,10 @@ func checkDataFiles(ctx context.Context, t *testing.T, dm *DataManager, expected
 
 	// check that the number of entries is right
 	if len(allEntriesMap) != len(expectedEntriesMap) {
-		return fmt.Errorf("expected %d total entries, got %d", len(expectedEntriesMap), len(allEntriesMap))
+		return errors.Errorf("expected %d total entries, got %d", len(expectedEntriesMap), len(allEntriesMap))
 	}
 	if !reflect.DeepEqual(expectedEntriesMap, allEntriesMap) {
-		return fmt.Errorf("expected entries don't match current entries")
+		return errors.Errorf("expected entries don't match current entries")
 	}
 
 	return nil

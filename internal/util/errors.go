@@ -15,9 +15,10 @@
 package util
 
 import (
-	"errors"
 	"fmt"
 	"strings"
+
+	"agola.io/agola/internal/errors"
 )
 
 // Errors is an error that contains multiple errors
@@ -92,10 +93,12 @@ type APIError struct {
 	Kind    ErrorKind
 	Code    ErrorCode
 	Message string
+
+	*errors.Stack
 }
 
 func NewAPIError(kind ErrorKind, err error, options ...APIErrorOption) error {
-	derr := &APIError{err: err, Kind: kind}
+	derr := &APIError{err: err, Kind: kind, Stack: errors.Callers(0)}
 
 	for _, opt := range options {
 		opt(derr)

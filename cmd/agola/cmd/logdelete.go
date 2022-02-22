@@ -17,12 +17,12 @@ package cmd
 import (
 	"context"
 
+	"agola.io/agola/internal/errors"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	errors "golang.org/x/xerrors"
 )
 
 var cmdLogDelete = &cobra.Command{
@@ -93,7 +93,7 @@ func logDelete(cmd *cobra.Command, args []string) error {
 
 		run, _, err := gwclient.GetRun(context.TODO(), logDeleteOpts.runid)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		for _, t := range run.Tasks {
 			if t.Name == logDeleteOpts.taskname {

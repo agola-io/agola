@@ -15,10 +15,10 @@
 package common
 
 import (
-	"fmt"
 	"path"
 	"sort"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/runconfig"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/runservice/types"
@@ -84,7 +84,7 @@ const (
 func OSTSubGroupsAndGroupTypes(group string) []string {
 	h := util.PathHierarchy(group)
 	if len(h)%2 != 1 {
-		panic(fmt.Errorf("wrong group path %q", group))
+		panic(errors.Errorf("wrong group path %q", group))
 	}
 
 	return h
@@ -93,7 +93,7 @@ func OSTSubGroupsAndGroupTypes(group string) []string {
 func OSTRootGroup(group string) string {
 	pl := util.PathList(group)
 	if len(pl) < 2 {
-		panic(fmt.Errorf("cannot determine root group name, wrong group path %q", group))
+		panic(errors.Errorf("cannot determine root group name, wrong group path %q", group))
 	}
 
 	return pl[1]
@@ -102,7 +102,7 @@ func OSTRootGroup(group string) string {
 func OSTSubGroups(group string) []string {
 	h := util.PathHierarchy(group)
 	if len(h)%2 != 1 {
-		panic(fmt.Errorf("wrong group path %q", group))
+		panic(errors.Errorf("wrong group path %q", group))
 	}
 
 	// remove group types
@@ -119,7 +119,7 @@ func OSTSubGroups(group string) []string {
 func OSTSubGroupTypes(group string) []string {
 	h := util.PathHierarchy(group)
 	if len(h)%2 != 1 {
-		panic(fmt.Errorf("wrong group path %q", group))
+		panic(errors.Errorf("wrong group path %q", group))
 	}
 
 	// remove group names

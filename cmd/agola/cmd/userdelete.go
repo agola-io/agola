@@ -17,11 +17,11 @@ package cmd
 import (
 	"context"
 
+	"agola.io/agola/internal/errors"
 	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	errors "golang.org/x/xerrors"
 )
 
 var cmdUserDelete = &cobra.Command{
@@ -57,7 +57,7 @@ func userDelete(cmd *cobra.Command, args []string) error {
 
 	log.Info().Msgf("deleting user %q", userDeleteOpts.username)
 	if _, err := gwclient.DeleteUser(context.TODO(), userDeleteOpts.username); err != nil {
-		return errors.Errorf("failed to delete user: %w", err)
+		return errors.Wrapf(err, "failed to delete user")
 	}
 
 	return nil

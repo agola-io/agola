@@ -21,6 +21,7 @@ import (
 	"net/http"
 
 	scommon "agola.io/agola/internal/common"
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/config"
@@ -36,7 +37,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	errors "golang.org/x/xerrors"
 )
 
 const (
@@ -93,19 +93,19 @@ func NewGateway(ctx context.Context, log zerolog.Logger, gc *config.Config) (*Ga
 		sd.Method = jwt.SigningMethodRS256
 		privateKeyData, err := ioutil.ReadFile(c.TokenSigning.PrivateKeyPath)
 		if err != nil {
-			return nil, errors.Errorf("error reading token signing private key: %w", err)
+			return nil, errors.Wrapf(err, "error reading token signing private key")
 		}
 		sd.PrivateKey, err = jwt.ParseRSAPrivateKeyFromPEM(privateKeyData)
 		if err != nil {
-			return nil, errors.Errorf("error parsing token signing private key: %w", err)
+			return nil, errors.Wrapf(err, "error parsing token signing private key")
 		}
 		publicKeyData, err := ioutil.ReadFile(c.TokenSigning.PublicKeyPath)
 		if err != nil {
-			return nil, errors.Errorf("error reading token signing public key: %w", err)
+			return nil, errors.Wrapf(err, "error reading token signing public key")
 		}
 		sd.PublicKey, err = jwt.ParseRSAPublicKeyFromPEM(publicKeyData)
 		if err != nil {
-			return nil, errors.Errorf("error parsing token signing public key: %w", err)
+			return nil, errors.Wrapf(err, "error parsing token signing public key")
 		}
 	case "":
 		return nil, errors.Errorf("missing token signing method")
@@ -115,7 +115,7 @@ func NewGateway(ctx context.Context, log zerolog.Logger, gc *config.Config) (*Ga
 
 	ost, err := scommon.NewObjectStorage(&c.ObjectStorage)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	configstoreClient := csclient.NewClient(c.ConfigstoreURL)
@@ -333,7 +333,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 		tlsConfig, err = util.NewTLSConfig(g.c.Web.TLSCertFile, g.c.Web.TLSKeyFile, "", false)
 		if err != nil {
 			g.log.Err(err).Send()
-			return err
+			return errors.WithStack(err)
 		}
 	}
 
@@ -359,7 +359,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	case err := <-lerrCh:
 		if err != nil {
 			log.Err(err).Msgf("http server listen error")
-			return err
+			return errors.WithStack(err)
 		}
 	}
 

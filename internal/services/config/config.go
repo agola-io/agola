@@ -18,9 +18,9 @@ import (
 	"io/ioutil"
 	"time"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/util"
 
-	errors "golang.org/x/xerrors"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -273,12 +273,12 @@ var defaultConfig = Config{
 func Parse(configFile string, componentsNames []string) (*Config, error) {
 	configData, err := ioutil.ReadFile(configFile)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	c := &defaultConfig
 	if err := yaml.Unmarshal(configData, &c); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return c, Validate(c, componentsNames)
@@ -333,7 +333,7 @@ func Validate(c *Config, componentsNames []string) error {
 			return errors.Errorf("gateway runserviceURL is empty")
 		}
 		if err := validateWeb(&c.Gateway.Web); err != nil {
-			return errors.Errorf("gateway web configuration error: %w", err)
+			return errors.Wrapf(err, "gateway web configuration error")
 		}
 	}
 
@@ -343,7 +343,7 @@ func Validate(c *Config, componentsNames []string) error {
 			return errors.Errorf("configstore dataDir is empty")
 		}
 		if err := validateWeb(&c.Configstore.Web); err != nil {
-			return errors.Errorf("configstore web configuration error: %w", err)
+			return errors.Wrapf(err, "configstore web configuration error")
 		}
 	}
 
@@ -353,7 +353,7 @@ func Validate(c *Config, componentsNames []string) error {
 			return errors.Errorf("runservice dataDir is empty")
 		}
 		if err := validateWeb(&c.Runservice.Web); err != nil {
-			return errors.Errorf("runservice web configuration error: %w", err)
+			return errors.Wrapf(err, "runservice web configuration error")
 		}
 	}
 
@@ -379,7 +379,7 @@ func Validate(c *Config, componentsNames []string) error {
 		}
 
 		if err := validateInitImage(&c.Executor.InitImage); err != nil {
-			return errors.Errorf("executor initImage configuration error: %w", err)
+			return errors.Wrapf(err, "executor initImage configuration error")
 		}
 	}
 

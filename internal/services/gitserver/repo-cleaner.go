@@ -2,13 +2,12 @@ package gitserver
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/util"
 )
 
@@ -32,7 +31,7 @@ func (s *Gitserver) scanRepos(ctx context.Context) error {
 
 	usersDir, err := ioutil.ReadDir(s.c.DataDir)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	for _, u := range usersDir {
@@ -64,12 +63,12 @@ func (s *Gitserver) scanRepo(ctx context.Context, repoDir string) error {
 	for _, b := range branches {
 		committerTime, err := s.getLastCommiterTime(ctx, git, "refs/heads/"+b)
 		if err != nil {
-			return fmt.Errorf("return failed to get last commit time: %w", err)
+			return errors.Wrapf(err, "return failed to get last commit time")
 		}
 
 		if time.Since(committerTime) >= s.c.RepositoryRefsExpireInterval {
 			if err := s.deleteBranch(ctx, git, b); err != nil {
-				return fmt.Errorf("failed to delete git branch: %w", err)
+				return errors.Wrapf(err, "failed to delete git branch")
 			}
 		}
 	}
@@ -78,34 +77,34 @@ func (s *Gitserver) scanRepo(ctx context.Context, repoDir string) error {
 	for _, tag := range tags {
 		committerTime, err := s.getLastCommiterTime(ctx, git, "refs/tags/"+tag)
 		if err != nil {
-			return fmt.Errorf("failed to get last commit time: %w", err)
+			return errors.Wrapf(err, "failed to get last commit time")
 		}
 
 		if time.Since(committerTime) >= s.c.RepositoryRefsExpireInterval {
 			if err := s.deleteTag(ctx, git, tag); err != nil {
-				return fmt.Errorf("failed to delete git tag: %w", err)
+				return errors.Wrapf(err, "failed to delete git tag")
 			}
 		}
 	}
 
 	if _, err := git.Output(ctx, nil, "prune"); err != nil {
-		return fmt.Errorf("git prune failed: %w", err)
+		return errors.Wrapf(err, "git prune failed")
 	}
 
 	b, err := s.getBranches(git, ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get git branches: %w", err)
+		return errors.Wrapf(err, "failed to get git branches")
 	}
 
 	t, err := s.getTags(git, ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get git tags: %w", err)
+		return errors.Wrapf(err, "failed to get git tags")
 	}
 
 	if len(b) == 0 && len(t) == 0 {
 		s.log.Info().Msgf("deleting repo: %q", repoDir)
 		if err := s.deleteRepo(ctx, repoDir); err != nil {
-			return fmt.Errorf("failed to delete repository: %w", err)
+			return errors.Wrapf(err, "failed to delete repository")
 		}
 	}
 
@@ -115,7 +114,7 @@ func (s *Gitserver) scanRepo(ctx context.Context, repoDir string) error {
 func (s *Gitserver) getBranches(git *util.Git, ctx context.Context) ([]string, error) {
 	branches, err := git.OutputLines(ctx, nil, "for-each-ref", "--format=%(refname:short)", "refs/heads/")
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return branches, nil
@@ -124,7 +123,7 @@ func (s *Gitserver) getBranches(git *util.Git, ctx context.Context) ([]string, e
 func (s *Gitserver) getTags(git *util.Git, ctx context.Context) ([]string, error) {
 	tags, err := git.OutputLines(ctx, nil, "for-each-ref", "--format=%(refname:short)", "refs/tags/")
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return tags, nil
@@ -133,7 +132,7 @@ func (s *Gitserver) getTags(git *util.Git, ctx context.Context) ([]string, error
 func (s *Gitserver) getLastCommiterTime(ctx context.Context, git *util.Git, ref string) (time.Time, error) {
 	output, err := git.OutputLines(ctx, nil, "log", "-1", "--format=%cI", ref)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, errors.WithStack(err)
 	}
 
 	if len(output) != 1 {
@@ -142,7 +141,7 @@ func (s *Gitserver) getLastCommiterTime(ctx context.Context, git *util.Git, ref 
 
 	committerTime, err := time.Parse(time.RFC3339, output[0])
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, errors.WithStack(err)
 	}
 
 	return committerTime, nil
@@ -150,14 +149,14 @@ func (s *Gitserver) getLastCommiterTime(ctx context.Context, git *util.Git, ref 
 
 func (s *Gitserver) deleteBranch(ctx context.Context, git *util.Git, branch string) error {
 	_, err := git.Output(ctx, nil, "branch", "-D", branch)
-	return err
+	return errors.WithStack(err)
 }
 
 func (s *Gitserver) deleteTag(ctx context.Context, git *util.Git, tag string) error {
 	_, err := git.Output(ctx, nil, "tag", "-d", tag)
-	return err
+	return errors.WithStack(err)
 }
 
 func (s *Gitserver) deleteRepo(ctx context.Context, repoDir string) error {
-	return os.RemoveAll(repoDir)
+	return errors.WithStack(os.RemoveAll(repoDir))
 }

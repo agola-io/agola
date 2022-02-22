@@ -19,11 +19,11 @@ import (
 	"encoding/json"
 	"os"
 
+	"agola.io/agola/internal/errors"
 	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	errors "golang.org/x/xerrors"
 )
 
 var cmdOrgMemberList = &cobra.Command{
@@ -59,12 +59,12 @@ func orgMemberList(cmd *cobra.Command, args []string) error {
 
 	orgMembers, _, err := gwclient.GetOrgMembers(context.TODO(), orgMemberListOpts.orgname)
 	if err != nil {
-		return errors.Errorf("failed to get organization member: %w", err)
+		return errors.Wrapf(err, "failed to get organization member")
 	}
 
 	out, err := json.MarshalIndent(orgMembers, "", "\t")
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	os.Stdout.Write(out)
 

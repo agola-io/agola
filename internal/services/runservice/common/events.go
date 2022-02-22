@@ -17,6 +17,7 @@ package common
 import (
 	"context"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/sequence"
 	"agola.io/agola/services/runservice/types"
@@ -25,7 +26,7 @@ import (
 func NewRunEvent(ctx context.Context, e *etcd.Store, runID string, phase types.RunPhase, result types.RunResult) (*types.RunEvent, error) {
 	seq, err := sequence.IncSequence(ctx, e, EtcdRunEventSequenceKey)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	return &types.RunEvent{Sequence: seq.String(), RunID: runID, Phase: phase, Result: result}, nil
 }

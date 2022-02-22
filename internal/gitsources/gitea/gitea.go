@@ -28,11 +28,11 @@ import (
 	"strings"
 	"time"
 
+	"agola.io/agola/internal/errors"
 	gitsource "agola.io/agola/internal/gitsources"
 
 	"code.gitea.io/sdk/gitea"
 	"golang.org/x/oauth2"
-	errors "golang.org/x/xerrors"
 )
 
 const (
@@ -146,7 +146,7 @@ func (c *Client) RequestOauth2Token(callbackURL, code string) (*oauth2.Token, er
 	var config = c.oauth2Config(callbackURL)
 	token, err := config.Exchange(ctx, code)
 	if err != nil {
-		return nil, errors.Errorf("cannot get oauth2 token: %w", err)
+		return nil, errors.Wrapf(err, "cannot get oauth2 token")
 	}
 	return token, nil
 }
@@ -158,7 +158,9 @@ func (c *Client) RefreshOauth2Token(refreshToken string) (*oauth2.Token, error) 
 	var config = c.oauth2Config("")
 	token := &oauth2.Token{RefreshToken: refreshToken}
 	ts := config.TokenSource(ctx, token)
-	return ts.Token()
+	ntoken, err := ts.Token()
+
+	return ntoken, errors.WithStack(err)
 }
 
 func (c *Client) LoginPassword(username, password, tokenName string) (string, error) {
@@ -172,16 +174,16 @@ func (c *Client) LoginPassword(username, password, tokenName string) (string, er
 	tokens := make([]*gitea.AccessToken, 0, 10)
 	req, err := http.NewRequest("GET", c.APIURL+"/api/v1"+fmt.Sprintf("/users/%s/tokens", username), nil)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(username+":"+password)))
 
 	resp, err := c.oauth2HTTPClient.Do(req)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	if resp.StatusCode == http.StatusUnauthorized {
-		return "", gitsource.ErrUnauthorized
+		return "", errors.WithStack(gitsource.ErrUnauthorized)
 	}
 	if resp.StatusCode/100 != 2 {
 		return "", errors.Errorf("gitea api status code %d", resp.StatusCode)
@@ -190,7 +192,7 @@ func (c *Client) LoginPassword(username, password, tokenName string) (string, er
 
 	dec := json.NewDecoder(resp.Body)
 	if err := dec.Decode(&tokens); err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	for _, token := range tokens {
 		if token.Name == tokenName {
@@ -206,7 +208,7 @@ func (c *Client) LoginPassword(username, password, tokenName string) (string, er
 			gitea.CreateAccessTokenOption{Name: tokenName},
 		)
 		if terr != nil {
-			return "", terr
+			return "", errors.WithStack(terr)
 		}
 		accessToken = token.Token
 	}
@@ -217,7 +219,7 @@ func (c *Client) LoginPassword(username, password, tokenName string) (string, er
 func (c *Client) GetUserInfo() (*gitsource.UserInfo, error) {
 	user, err := c.client.GetMyUserInfo()
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	return &gitsource.UserInfo{
 		ID:        strconv.FormatInt(user.ID, 10),
@@ -229,11 +231,11 @@ func (c *Client) GetUserInfo() (*gitsource.UserInfo, error) {
 func (c *Client) GetRepoInfo(repopath string) (*gitsource.RepoInfo, error) {
 	owner, reponame, err := parseRepoPath(repopath)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	rr, err := c.client.GetRepo(owner, reponame)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	return fromGiteaRepo(rr), nil
 }
@@ -241,23 +243,23 @@ func (c *Client) GetRepoInfo(repopath string) (*gitsource.RepoInfo, error) {
 func (c *Client) GetFile(repopath, commit, file string) ([]byte, error) {
 	owner, reponame, err := parseRepoPath(repopath)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	data, err := c.client.GetFile(owner, reponame, commit, file)
-	return data, err
+	return data, errors.WithStack(err)
 }
 
 func (c *Client) CreateDeployKey(repopath, title, pubKey string, readonly bool) error {
 	owner, reponame, err := parseRepoPath(repopath)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	if _, err = c.client.CreateDeployKey(owner, reponame, gitea.CreateKeyOption{
 		Title:    title,
 		Key:      pubKey,
 		ReadOnly: readonly,
 	}); err != nil {
-		return errors.Errorf("error creating deploy key: %w", err)
+		return errors.Wrapf(err, "error creating deploy key")
 	}
 
 	return nil
@@ -266,7 +268,7 @@ func (c *Client) CreateDeployKey(repopath, title, pubKey string, readonly bool) 
 func (c *Client) UpdateDeployKey(repopath, title, pubKey string, readonly bool) error {
 	owner, reponame, err := parseRepoPath(repopath)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	// NOTE(sgotti) gitea has a bug where if we delete and remove the same key with
 	// the same value it is correctly readded and the admin must force a
@@ -274,7 +276,7 @@ func (c *Client) UpdateDeployKey(repopath, title, pubKey string, readonly bool) 
 	// when the public key value has changed
 	keys, err := c.client.ListDeployKeys(owner, reponame, gitea.ListDeployKeysOptions{})
 	if err != nil {
-		return errors.Errorf("error retrieving existing deploy keys: %w", err)
+		return errors.Wrapf(err, "error retrieving existing deploy keys")
 	}
 
 	for _, key := range keys {
@@ -283,7 +285,7 @@ func (c *Client) UpdateDeployKey(repopath, title, pubKey string, readonly bool) 
 				return nil
 			}
 			if err := c.client.DeleteDeployKey(owner, reponame, key.ID); err != nil {
-				return errors.Errorf("error removing existing deploy key: %w", err)
+				return errors.Wrapf(err, "error removing existing deploy key")
 			}
 		}
 	}
@@ -293,7 +295,7 @@ func (c *Client) UpdateDeployKey(repopath, title, pubKey string, readonly bool) 
 		Key:      pubKey,
 		ReadOnly: readonly,
 	}); err != nil {
-		return errors.Errorf("error creating deploy key: %w", err)
+		return errors.Wrapf(err, "error creating deploy key")
 	}
 
 	return nil
@@ -302,17 +304,17 @@ func (c *Client) UpdateDeployKey(repopath, title, pubKey string, readonly bool) 
 func (c *Client) DeleteDeployKey(repopath, title string) error {
 	owner, reponame, err := parseRepoPath(repopath)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	keys, err := c.client.ListDeployKeys(owner, reponame, gitea.ListDeployKeysOptions{})
 	if err != nil {
-		return errors.Errorf("error retrieving existing deploy keys: %w", err)
+		return errors.Wrapf(err, "error retrieving existing deploy keys")
 	}
 
 	for _, key := range keys {
 		if key.Title == title {
 			if err := c.client.DeleteDeployKey(owner, reponame, key.ID); err != nil {
-				return errors.Errorf("error removing existing deploy key: %w", err)
+				return errors.Wrapf(err, "error removing existing deploy key")
 			}
 		}
 	}
@@ -323,7 +325,7 @@ func (c *Client) DeleteDeployKey(repopath, title string) error {
 func (c *Client) CreateRepoWebhook(repopath, url, secret string) error {
 	owner, reponame, err := parseRepoPath(repopath)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	opts := gitea.CreateHookOption{
@@ -338,7 +340,7 @@ func (c *Client) CreateRepoWebhook(repopath, url, secret string) error {
 	}
 
 	if _, err = c.client.CreateRepoHook(owner, reponame, opts); err != nil {
-		return errors.Errorf("error creating repository webhook: %w", err)
+		return errors.Wrapf(err, "error creating repository webhook")
 	}
 
 	return nil
@@ -347,11 +349,11 @@ func (c *Client) CreateRepoWebhook(repopath, url, secret string) error {
 func (c *Client) DeleteRepoWebhook(repopath, u string) error {
 	owner, reponame, err := parseRepoPath(repopath)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	hooks, err := c.client.ListRepoHooks(owner, reponame, gitea.ListHooksOptions{})
 	if err != nil {
-		return errors.Errorf("error retrieving repository webhooks: %w", err)
+		return errors.Wrapf(err, "error retrieving repository webhooks")
 	}
 
 	// match the full url so we can have multiple webhooks for different agola
@@ -359,7 +361,7 @@ func (c *Client) DeleteRepoWebhook(repopath, u string) error {
 	for _, hook := range hooks {
 		if hook.Config["url"] == u {
 			if err := c.client.DeleteRepoHook(owner, reponame, hook.ID); err != nil {
-				return errors.Errorf("error deleting existing repository webhook: %w", err)
+				return errors.Wrapf(err, "error deleting existing repository webhook")
 			}
 		}
 	}
@@ -370,7 +372,7 @@ func (c *Client) DeleteRepoWebhook(repopath, u string) error {
 func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource.CommitStatus, targetURL, description, context string) error {
 	owner, reponame, err := parseRepoPath(repopath)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	_, err = c.client.CreateStatus(owner, reponame, commitSHA, gitea.CreateStatusOption{
 		State:       fromCommitStatus(status),
@@ -378,7 +380,7 @@ func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource
 		Description: description,
 		Context:     context,
 	})
-	return err
+	return errors.WithStack(err)
 }
 
 func (c *Client) ListUserRepos() ([]*gitsource.RepoInfo, error) {
@@ -396,7 +398,7 @@ func (c *Client) ListUserRepos() ([]*gitsource.RepoInfo, error) {
 		)
 
 		if err != nil {
-			return []*gitsource.RepoInfo{}, err
+			return []*gitsource.RepoInfo{}, errors.WithStack(err)
 		}
 
 		for _, repo := range remoteRepos {
@@ -429,12 +431,12 @@ func fromGiteaRepo(rr *gitea.Repository) *gitsource.RepoInfo {
 func (c *Client) GetRef(repopath, ref string) (*gitsource.Ref, error) {
 	owner, reponame, err := parseRepoPath(repopath)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	remoteRefs, err := c.client.GetRepoRefs(owner, reponame, ref)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if len(remoteRefs) == 0 {
 		return nil, errors.Errorf("no ref %q for repository %q", ref, repopath)
@@ -480,12 +482,12 @@ func (c *Client) RefType(ref string) (gitsource.RefType, string, error) {
 func (c *Client) GetCommit(repopath, commitSHA string) (*gitsource.Commit, error) {
 	owner, reponame, err := parseRepoPath(repopath)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	commit, err := c.client.GetSingleCommit(owner, reponame, commitSHA)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return &gitsource.Commit{

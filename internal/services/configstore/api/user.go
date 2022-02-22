@@ -20,6 +20,7 @@ import (
 	"strconv"
 
 	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/errors"
 	action "agola.io/agola/internal/services/configstore/action"
 	"agola.io/agola/internal/services/configstore/readdb"
 	"agola.io/agola/internal/util"
@@ -28,7 +29,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
-	errors "golang.org/x/xerrors"
 )
 
 type UserHandler struct {
@@ -49,7 +49,7 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		user, err = h.readDB.GetUser(tx, userRef)
-		return err
+		return errors.WithStack(err)
 	})
 	if err != nil {
 		h.log.Err(err).Send()
@@ -198,7 +198,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		limit, err = strconv.Atoi(limitS)
 		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot parse limit: %w", err)))
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit")))
 			return
 		}
 	}
@@ -227,7 +227,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 			var err error
 			user, err = h.readDB.GetUserByTokenValue(tx, token)
-			return err
+			return errors.WithStack(err)
 		})
 		if err != nil {
 			h.log.Err(err).Send()
@@ -245,7 +245,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 			var err error
 			user, err = h.readDB.GetUserByLinkedAccount(tx, linkedAccountID)
-			return err
+			return errors.WithStack(err)
 		})
 		if err != nil {
 			h.log.Err(err).Send()
@@ -264,7 +264,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 			var err error
 			user, err = h.readDB.GetUserByLinkedAccountRemoteUserIDandSource(tx, remoteUserID, remoteSourceID)
-			return err
+			return errors.WithStack(err)
 		})
 		if err != nil {
 			h.log.Err(err).Send()
@@ -281,7 +281,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 			var err error
 			users, err = h.readDB.GetUsers(tx, start, limit, asc)
-			return err
+			return errors.WithStack(err)
 		})
 		if err != nil {
 			h.log.Err(err).Send()

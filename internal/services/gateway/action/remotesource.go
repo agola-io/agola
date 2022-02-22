@@ -17,17 +17,16 @@ package action
 import (
 	"context"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
 	cstypes "agola.io/agola/services/configstore/types"
-
-	errors "golang.org/x/xerrors"
 )
 
 func (h *ActionHandler) GetRemoteSource(ctx context.Context, rsRef string) (*cstypes.RemoteSource, error) {
 	rs, _, err := h.configstoreClient.GetRemoteSource(ctx, rsRef)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	return rs, nil
 }
@@ -41,7 +40,7 @@ type GetRemoteSourcesRequest struct {
 func (h *ActionHandler) GetRemoteSources(ctx context.Context, req *GetRemoteSourcesRequest) ([]*cstypes.RemoteSource, error) {
 	remoteSources, _, err := h.configstoreClient.GetRemoteSources(ctx, req.Start, req.Limit, req.Asc)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	return remoteSources, nil
 }
@@ -113,7 +112,7 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemot
 	h.log.Info().Msgf("creating remotesource")
 	rs, _, err := h.configstoreClient.CreateRemoteSource(ctx, rs)
 	if err != nil {
-		return nil, errors.Errorf("failed to create remotesource: %w", err)
+		return nil, errors.Wrapf(err, "failed to create remotesource")
 	}
 	h.log.Info().Msgf("remotesource %s created, ID: %s", rs.Name, rs.ID)
 
@@ -141,7 +140,7 @@ func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, req *UpdateRemot
 
 	rs, _, err := h.configstoreClient.GetRemoteSource(ctx, req.RemoteSourceRef)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	if req.Name != nil {
@@ -175,7 +174,7 @@ func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, req *UpdateRemot
 	h.log.Info().Msgf("updating remotesource")
 	rs, _, err = h.configstoreClient.UpdateRemoteSource(ctx, req.RemoteSourceRef, rs)
 	if err != nil {
-		return nil, errors.Errorf("failed to update remotesource: %w", err)
+		return nil, errors.Wrapf(err, "failed to update remotesource")
 	}
 	h.log.Info().Msgf("remotesource %s updated", rs.Name)
 
@@ -188,7 +187,7 @@ func (h *ActionHandler) DeleteRemoteSource(ctx context.Context, rsRef string) er
 	}
 
 	if _, err := h.configstoreClient.DeleteRemoteSource(ctx, rsRef); err != nil {
-		return errors.Errorf("failed to delete remote source: %w", err)
+		return errors.Wrapf(err, "failed to delete remote source")
 	}
 	return nil
 }
