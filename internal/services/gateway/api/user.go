@@ -23,6 +23,7 @@ import (
 
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
+	csapitypes "agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 
@@ -589,4 +590,48 @@ func (h *UserCreateRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	if err := httpResponse(w, http.StatusCreated, nil); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
+}
+
+type UserOrgsHandler struct {
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
+}
+
+func NewUserOrgsHandler(logger *zap.Logger, ah *action.ActionHandler) *UserOrgsHandler {
+	return &UserOrgsHandler{log: logger.Sugar(), ah: ah}
+}
+
+func (h *UserOrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	userIDVal := ctx.Value("userid")
+	if userIDVal == nil {
+		httpError(w, util.NewErrBadRequest(errors.Errorf("user not authenticated")))
+		return
+	}
+	userRef := userIDVal.(string)
+
+	userOrgs, err := h.ah.GetUserOrgs(ctx, userRef)
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	res := make([]*gwapitypes.UserOrgsResponse, len(userOrgs))
+	for i, userOrg := range userOrgs {
+		res[i] = createUserOrgsResponse(userOrg)
+	}
+
+	if err := httpResponse(w, http.StatusOK, res); err != nil {
+		h.log.Errorf("err: %+v", err)
+	}
+}
+
+func createUserOrgsResponse(o *csapitypes.UserOrgsResponse) *gwapitypes.UserOrgsResponse {
+	userOrgs := &gwapitypes.UserOrgsResponse{
+		Organization: createOrgResponse(o.Organization),
+		Role:         gwapitypes.MemberRole(o.Role),
+	}
+
+	return userOrgs
 }

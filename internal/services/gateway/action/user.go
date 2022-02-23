@@ -57,6 +57,18 @@ func (h *ActionHandler) GetUser(ctx context.Context, userRef string) (*cstypes.U
 	return user, nil
 }
 
+func (h *ActionHandler) GetUserOrgs(ctx context.Context, userRef string) ([]*csapitypes.UserOrgsResponse, error) {
+	if !h.IsUserLogged(ctx) {
+		return nil, errors.Errorf("user not logged in")
+	}
+
+	orgs, resp, err := h.configstoreClient.GetUserOrgs(ctx, userRef)
+	if err != nil {
+		return nil, ErrFromRemote(resp, err)
+	}
+	return orgs, nil
+}
+
 type GetUsersRequest struct {
 	Start string
 	Limit int

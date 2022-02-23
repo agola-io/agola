@@ -106,3 +106,8 @@ type UserCreateRunRequest struct {
 	PullRequestRefRegexes []string          `json:"pull_request_ref_regexes,omitempty"`
 	Variables             map[string]string `json:"variables,omitempty"`
 }
+
+type UserOrgsResponse struct {
+	Organization *OrgResponse
+	Role         MemberRole
+}

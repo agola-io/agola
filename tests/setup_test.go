@@ -42,6 +42,7 @@ import (
 	rstypes "agola.io/agola/services/runservice/types"
 
 	"code.gitea.io/sdk/gitea"
+	"github.com/google/go-cmp/cmp"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 	errors "golang.org/x/xerrors"
@@ -1933,5 +1934,69 @@ def main(ctx):
 				}
 			})
 		}
+	}
+}
+
+func TestUserOrgs(t *testing.T) {
+	dir, err := ioutil.TempDir("", "agola")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	tetcd, tgitea, c := setup(ctx, t, dir)
+	defer shutdownGitea(tgitea)
+	defer shutdownEtcd(tetcd)
+
+	gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
+
+	org01, _, err := gwClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: "org01", Visibility: gwapitypes.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	org02, _, err := gwClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: "org02", Visibility: gwapitypes.VisibilityPrivate})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	_, _, err = gwClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: "org03", Visibility: gwapitypes.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	_, token := createLinkedAccount(ctx, t, tgitea, c)
+
+	_, _, err = gwClient.AddOrgMember(ctx, "org01", giteaUser01, gwapitypes.MemberRoleMember)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	_, _, err = gwClient.AddOrgMember(ctx, "org02", giteaUser01, gwapitypes.MemberRoleOwner)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	gwClientNew := gwclient.NewClient(c.Gateway.APIExposedURL, token)
+
+	orgs, _, err := gwClientNew.GetUserOrgs(ctx)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	expectedOrgs := []*gwapitypes.UserOrgsResponse{
+		{
+			Organization: &gwapitypes.OrgResponse{ID: org01.ID, Name: "org01", Visibility: gwapitypes.VisibilityPublic},
+			Role:         gwapitypes.MemberRoleMember,
+		},
+
+		{
+			Organization: &gwapitypes.OrgResponse{ID: org02.ID, Name: "org02", Visibility: gwapitypes.VisibilityPrivate},
+			Role:         gwapitypes.MemberRoleOwner,
+		},
+	}
+
+	if diff := cmp.Diff(expectedOrgs, orgs); diff != "" {
+		t.Fatalf("user orgs mismatch (-want +got):\n%s", diff)
 	}
 }

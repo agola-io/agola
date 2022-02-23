@@ -60,7 +60,6 @@ func (c *Client) doRequest(ctx context.Context, method, path string, query url.V
 		return nil, err
 	}
 	u.RawQuery = query.Encode()
-
 	req, err := http.NewRequest(method, u.String(), ibody)
 	req = req.WithContext(ctx)
 	if err != nil {
@@ -610,4 +609,10 @@ func (c *Client) GetVersion(ctx context.Context) (*gwapitypes.VersionResponse, *
 	res := &gwapitypes.VersionResponse{}
 	resp, err := c.getParsedResponse(ctx, "GET", "/version", nil, jsonContent, nil, &res)
 	return res, resp, err
+}
+
+func (c *Client) GetUserOrgs(ctx context.Context) ([]*gwapitypes.UserOrgsResponse, *http.Response, error) {
+	userOrgs := []*gwapitypes.UserOrgsResponse{}
+	resp, err := c.getParsedResponse(ctx, "GET", "/user/orgs", nil, jsonContent, nil, &userOrgs)
+	return userOrgs, resp, err
 }
