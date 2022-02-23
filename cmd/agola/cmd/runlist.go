@@ -83,7 +83,7 @@ func printRuns(runs []*runDetails) {
 				fmt.Printf("\t\tfailed to retrieve task information: %v\n", task.retrieveError)
 			} else {
 				for n, step := range task.runTaskResponse.Steps {
-					if step.Phase.IsFinished() && step.Type == "run" {
+					if step.Phase.IsFinished() && step.Type == "run" && step.ExitStatus != nil {
 						fmt.Printf("\t\tStep: %d, Name: %s, Type: %s, Phase: %s, ExitStatus: %d\n", n, step.Name, step.Type, step.Phase, *step.ExitStatus)
 					} else {
 						fmt.Printf("\t\tStep: %d, Name: %s, Type: %s, Phase: %s\n", n, step.Name, step.Type, step.Phase)
