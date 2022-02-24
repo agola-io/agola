@@ -162,7 +162,7 @@ func (r *Run) TasksWaitingApproval() []string {
 // CanRestartFromScratch reports if the run can be restarted from scratch
 func (r *Run) CanRestartFromScratch() (bool, string) {
 	if r.Phase == RunPhaseSetupError {
-		return false, fmt.Sprintf("run has setup errors")
+		return false, "run has setup errors"
 	}
 	// can restart only if the run phase is finished or cancelled
 	if !r.Phase.IsFinished() {
@@ -174,7 +174,7 @@ func (r *Run) CanRestartFromScratch() (bool, string) {
 // CanRestartFromFailedTasks reports if the run can be restarted from failed tasks
 func (r *Run) CanRestartFromFailedTasks() (bool, string) {
 	if r.Phase == RunPhaseSetupError {
-		return false, fmt.Sprintf("run has setup errors")
+		return false, "run has setup errors"
 	}
 	// can restart only if the run phase is finished or cancelled
 	if !r.Phase.IsFinished() {

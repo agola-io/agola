@@ -129,12 +129,8 @@ func (s *S3Storage) List(prefix, startWith, delimiter string, doneCh <-chan stru
 	}
 
 	// remove leading slash
-	if strings.HasPrefix(prefix, "/") {
-		prefix = strings.TrimPrefix(prefix, "/")
-	}
-	if strings.HasPrefix(startWith, "/") {
-		startWith = strings.TrimPrefix(startWith, "/")
-	}
+	prefix = strings.TrimPrefix(prefix, "/")
+	startWith = strings.TrimPrefix(startWith, "/")
 
 	// Initiate list objects goroutine here.
 	go func(objectCh chan<- ObjectInfo) {

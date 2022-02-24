@@ -338,9 +338,7 @@ func (s *PosixFlatStorage) List(prefix, startWith, delimiter string, doneCh <-ch
 	recursive := delimiter == ""
 
 	// remove leading slash from prefix
-	if strings.HasPrefix(prefix, "/") {
-		prefix = strings.TrimPrefix(prefix, "/")
-	}
+	prefix = strings.TrimPrefix(prefix, "/")
 
 	fprefix := filepath.Join(s.dataDir, escape(prefix))
 	root := filepath.Dir(fprefix)
@@ -349,9 +347,7 @@ func (s *PosixFlatStorage) List(prefix, startWith, delimiter string, doneCh <-ch
 	}
 
 	// remove leading slash
-	if strings.HasPrefix(startWith, "/") {
-		startWith = strings.TrimPrefix(startWith, "/")
-	}
+	startWith = strings.TrimPrefix(startWith, "/")
 
 	go func(objectCh chan<- ObjectInfo) {
 		var prevp string
