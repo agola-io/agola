@@ -133,7 +133,7 @@ func (s *PosixStorage) DeleteObject(p string) error {
 		}
 
 		_, err = f.Readdirnames(1)
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			f.Close()
 			if err := os.Remove(pdir); err != nil {
 				return nil
@@ -221,7 +221,7 @@ func (s *PosixStorage) List(prefix, startWith, delimiter string, doneCh <-chan s
 
 			return nil
 		})
-		if err != nil && err != io.EOF {
+		if err != nil && !errors.Is(err, io.EOF) {
 			objectCh <- ObjectInfo{
 				Err: err,
 			}

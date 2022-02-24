@@ -371,7 +371,7 @@ func TestConcurrentUpdate(t *testing.T) {
 
 	// this must fail since we are using the old cgt
 	_, err = dm.WriteWal(ctx, actions, oldcgt)
-	if err != ErrConcurrency {
+	if !errors.Is(err, ErrConcurrency) {
 		t.Fatalf("expected err: %v, got %v", ErrConcurrency, err)
 	}
 
@@ -384,7 +384,7 @@ func TestConcurrentUpdate(t *testing.T) {
 
 	// this must fail since we are using the old cgt
 	_, err = dm.WriteWal(ctx, actions, oldcgt)
-	if err != ErrConcurrency {
+	if !errors.Is(err, ErrConcurrency) {
 		t.Fatalf("expected err: %v, got %v", ErrConcurrency, err)
 	}
 }
@@ -670,7 +670,7 @@ func checkDataFiles(ctx context.Context, t *testing.T, dm *DataManager, expected
 				var de *DataEntry
 
 				err := dec.Decode(&de)
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					// all done
 					break
 				}

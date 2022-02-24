@@ -143,7 +143,7 @@ func (d *DataManager) applyWalChanges(ctx context.Context, walData *WalData, rev
 		var action *Action
 
 		err := dec.Decode(&action)
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			// all done
 			break
 		}
@@ -261,7 +261,7 @@ func (d *DataManager) watcher(ctx context.Context) error {
 	for wresp := range wch {
 		if wresp.Canceled {
 			err := wresp.Err()
-			if err == etcdclientv3rpc.ErrCompacted {
+			if errors.Is(err, etcdclientv3rpc.ErrCompacted) {
 				d.log.Errorf("required events already compacted, reinitializing watcher changes")
 				d.changes.Lock()
 				d.changes.initialized = false

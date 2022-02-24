@@ -144,7 +144,7 @@ func (r *ReadDB) SyncFromDump(ctx context.Context) (string, error) {
 				var de *datamanager.DataEntry
 
 				err := dec.Decode(&de)
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					// all done
 					break
 				}
@@ -488,7 +488,7 @@ func (r *ReadDB) handleEvents(ctx context.Context) error {
 	err := r.rdb.Do(ctx, func(tx *db.Tx) error {
 		err := tx.QueryRow("select revision from revision order by revision desc limit 1").Scan(&revision)
 		if err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				revision = 0
 			} else {
 				return err
@@ -508,7 +508,7 @@ func (r *ReadDB) handleEvents(ctx context.Context) error {
 		r.log.Debugf("we: %s", util.Dump(we))
 		if we.Err != nil {
 			err := we.Err
-			if err == datamanager.ErrCompacted {
+			if errors.Is(err, datamanager.ErrCompacted) {
 				r.log.Warnf("required events already compacted, reinitializing readdb")
 				r.Initialized = false
 				return nil
@@ -612,7 +612,7 @@ func (r *ReadDB) applyWal(tx *db.Tx, walDataFileID string) error {
 		var action *datamanager.Action
 
 		err := dec.Decode(&action)
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			// all done
 			break
 		}
@@ -755,7 +755,7 @@ func (r *ReadDB) getRevision(tx *db.Tx) (int64, error) {
 	}
 
 	err = tx.QueryRow(q, args...).Scan(&revision)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, nil
 	}
 	return revision, err
@@ -787,7 +787,7 @@ func (r *ReadDB) GetCommittedWalSequence(tx *db.Tx) (string, error) {
 	}
 
 	err = tx.QueryRow(q, args...).Scan(&seq)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
 	return seq, err

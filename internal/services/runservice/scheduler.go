@@ -247,7 +247,7 @@ func (s *Runservice) submitRunTasks(ctx context.Context, r *types.Run, rc *types
 		// just a check but it's not really needed since the call to
 		// atomicPutExecutorTask will fail if it already exists
 		tet, err := store.GetExecutorTask(ctx, s.e, et.ID)
-		if err != nil && err != etcd.ErrKeyNotFound {
+		if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
 			return err
 		}
 		if tet != nil {
@@ -335,7 +335,7 @@ func chooseExecutor(executors []*types.Executor, executorTasksCount map[string]i
 // will periodically fetch the executortask anyway
 func (s *Runservice) sendExecutorTask(ctx context.Context, et *types.ExecutorTask) error {
 	executor, err := store.GetExecutor(ctx, s.e, et.Spec.ExecutorID)
-	if err != nil && err != etcd.ErrKeyNotFound {
+	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
 		return err
 	}
 	if executor == nil {
@@ -768,7 +768,7 @@ func (s *Runservice) executorTaskCleaner(ctx context.Context, et *types.Executor
 	if et.Status.Phase.IsFinished() {
 		r, _, err := store.GetRun(ctx, s.e, et.Spec.RunID)
 		if err != nil {
-			if err == etcd.ErrKeyNotFound {
+			if errors.Is(err, etcd.ErrKeyNotFound) {
 				// run doesn't exists, remove executor task
 				if err := store.DeleteExecutorTask(ctx, s.e, et.ID); err != nil {
 					log.Errorf("err: %+v", err)
@@ -798,7 +798,7 @@ func (s *Runservice) executorTaskCleaner(ctx context.Context, et *types.Executor
 	if !et.Status.Phase.IsFinished() {
 		// if the executor doesn't exists anymore mark the not finished executor tasks as failed
 		executor, err := store.GetExecutor(ctx, s.e, et.Spec.ExecutorID)
-		if err != nil && err != etcd.ErrKeyNotFound {
+		if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
 			return err
 		}
 		if executor == nil {
@@ -886,7 +886,7 @@ func (s *Runservice) OSTFileExists(path string) (bool, error) {
 
 func (s *Runservice) fetchLog(ctx context.Context, rt *types.RunTask, setup bool, stepnum int) error {
 	et, err := store.GetExecutorTask(ctx, s.e, rt.ID)
-	if err != nil && err != etcd.ErrKeyNotFound {
+	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
 		return err
 	}
 	if et == nil {
@@ -896,7 +896,7 @@ func (s *Runservice) fetchLog(ctx context.Context, rt *types.RunTask, setup bool
 		return nil
 	}
 	executor, err := store.GetExecutor(ctx, s.e, et.Spec.ExecutorID)
-	if err != nil && err != etcd.ErrKeyNotFound {
+	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
 		return err
 	}
 	if executor == nil {
@@ -1049,7 +1049,7 @@ func (s *Runservice) fetchTaskLogs(ctx context.Context, runID string, rt *types.
 
 func (s *Runservice) fetchArchive(ctx context.Context, rt *types.RunTask, stepnum int) error {
 	et, err := store.GetExecutorTask(ctx, s.e, rt.ID)
-	if err != nil && err != etcd.ErrKeyNotFound {
+	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
 		return err
 	}
 	if et == nil {
@@ -1059,7 +1059,7 @@ func (s *Runservice) fetchArchive(ctx context.Context, rt *types.RunTask, stepnu
 		return nil
 	}
 	executor, err := store.GetExecutor(ctx, s.e, et.Spec.ExecutorID)
-	if err != nil && err != etcd.ErrKeyNotFound {
+	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
 		return err
 	}
 	if executor == nil {

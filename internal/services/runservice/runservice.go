@@ -40,6 +40,7 @@ import (
 	"go.etcd.io/etcd/mvcc/mvccpb"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	errors "golang.org/x/xerrors"
 )
 
 var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
@@ -94,7 +95,7 @@ func (s *Runservice) maintenanceModeWatcherLoop(ctx context.Context, runCtxCance
 func (s *Runservice) maintenanceModeWatcher(ctx context.Context, runCtxCancel context.CancelFunc, maintenanceModeEnabled bool) error {
 	log.Infof("watcher: maintenance mode enabled: %t", maintenanceModeEnabled)
 	resp, err := s.e.Get(ctx, common.EtcdMaintenanceKey, 0)
-	if err != nil && err != etcd.ErrKeyNotFound {
+	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
 		return err
 	}
 
@@ -330,7 +331,7 @@ func (s *Runservice) run(ctx context.Context) error {
 	}
 
 	resp, err := s.e.Get(ctx, common.EtcdMaintenanceKey, 0)
-	if err != nil && err != etcd.ErrKeyNotFound {
+	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
 		return err
 	}
 

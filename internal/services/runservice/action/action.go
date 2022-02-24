@@ -591,7 +591,7 @@ func (h *ActionHandler) getRunCounter(ctx context.Context, group string) (uint64
 
 func (h *ActionHandler) GetExecutorTask(ctx context.Context, etID string) (*types.ExecutorTask, error) {
 	et, err := store.GetExecutorTask(ctx, h.e, etID)
-	if err != nil && err != etcd.ErrKeyNotFound {
+	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
 		return nil, err
 	}
 	if et == nil {
@@ -619,7 +619,7 @@ func (h *ActionHandler) GetExecutorTask(ctx context.Context, etID string) (*type
 
 func (h *ActionHandler) GetExecutorTasks(ctx context.Context, executorID string) ([]*types.ExecutorTask, error) {
 	ets, err := store.GetExecutorTasksForExecutor(ctx, h.e, executorID)
-	if err != nil && err != etcd.ErrKeyNotFound {
+	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
 		return nil, err
 	}
 

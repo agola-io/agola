@@ -97,7 +97,7 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 
 	for _, res := range directRunStartOpts.prRefRegexes {
 		if _, err := regexp.Compile(res); err != nil {
-			return fmt.Errorf("wrong regular expression %q: %v", res, err)
+			return fmt.Errorf("wrong regular expression %q: %w", res, err)
 		}
 	}
 
@@ -145,7 +145,7 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 		}
 
 		if err := yaml.Unmarshal(data, &variables); err != nil {
-			return errors.Errorf("failed to unmarshal values: %v", err)
+			return errors.Errorf("failed to unmarshal values: %w", err)
 		}
 
 		// TODO(sgotti) validate variable name
@@ -165,7 +165,7 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 	if repoUUID == "" {
 		repoUUID = uuid.Must(uuid.NewV4()).String()
 		if _, err := git.ConfigSet(context.Background(), "agola.repouuid", repoUUID); err != nil {
-			return fmt.Errorf("failed to set agola repo uid in git config: %v", err)
+			return fmt.Errorf("failed to set agola repo uid in git config: %w", err)
 		}
 	}
 

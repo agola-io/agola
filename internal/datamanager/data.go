@@ -111,7 +111,7 @@ func (d *DataManager) walIndex(ctx context.Context, wals []*WalData) (walIndex, 
 			var action *Action
 
 			err := dec.Decode(&action)
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				// all done
 				break
 			}
@@ -349,7 +349,7 @@ func (d *DataManager) writeDataType(ctx context.Context, wi walIndex, dataType s
 					var de *DataEntry
 
 					err := dec.Decode(&de)
-					if err == io.EOF {
+					if errors.Is(err, io.EOF) {
 						// all done
 						break
 					}
@@ -743,7 +743,7 @@ func (d *DataManager) Import(ctx context.Context, r io.Reader) error {
 		var de *DataEntry
 
 		err := dec.Decode(&de)
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			dataFileID := d.dataFileID(dataSequence, uuid.Must(uuid.NewV4()).String())
 			if err := d.writeDataFile(ctx, &buf, int64(buf.Len()), dataFileIndex, dataFileID, curDataType); err != nil {
 				return err

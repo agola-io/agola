@@ -359,7 +359,7 @@ func setup(ctx context.Context, t *testing.T, dir string) (*testutil.TestEmbedde
 	go func() {
 		err := <-errCh
 		if err != nil {
-			panic(fmt.Errorf("agola component returned error: %+v", err))
+			panic(fmt.Errorf("agola component returned error: %w", err))
 		}
 	}()
 

@@ -36,7 +36,7 @@ func New(level zap.AtomicLevel) *zap.Logger {
 
 	logger, err := config.Build()
 	if err != nil {
-		panic(fmt.Errorf("failed to initialize logger: %v", err))
+		panic(fmt.Errorf("failed to initialize logger: %w", err))
 	}
 
 	return logger

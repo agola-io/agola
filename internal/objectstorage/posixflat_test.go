@@ -20,6 +20,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	errors "golang.org/x/xerrors"
 )
 
 func TestEscapeUnescape(t *testing.T) {
@@ -64,7 +66,7 @@ func TestEscapeUnescape(t *testing.T) {
 		if err != nil {
 			if tt.err == nil {
 				t.Errorf("%d: unescape: expected no error got %v", i, err)
-			} else if tt.err != err {
+			} else if !errors.Is(tt.err, err) {
 				t.Errorf("%d: unescape: expected error %v got %v", i, tt.err, err)
 			}
 		} else {

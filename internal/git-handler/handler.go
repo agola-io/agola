@@ -166,7 +166,7 @@ func (h *GitSmartHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	repoAbsPath, exists, err := h.repoAbsPathFunc(h.reposDir, repoPath)
 	if err != nil {
-		if err == ErrWrongRepoPath {
+		if errors.Is(err, ErrWrongRepoPath) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -257,7 +257,7 @@ func (h *FetchFileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	repoAbsPath, _, err := h.repoAbsPathFunc(h.reposDir, fetchData.RepoPath)
 	if err != nil {
-		if err == ErrWrongRepoPath {
+		if errors.Is(err, ErrWrongRepoPath) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
