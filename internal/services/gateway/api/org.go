@@ -189,10 +189,10 @@ func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func createOrgMemberResponse(user *cstypes.User, role cstypes.MemberRole) *gwapitypes.OrgMemberResponse {
+func createOrgMemberResponse(user *cstypes.User, role cstypes.OrgMemberRole) *gwapitypes.OrgMemberResponse {
 	return &gwapitypes.OrgMemberResponse{
 		User: createUserResponse(user),
-		Role: gwapitypes.MemberRole(role),
+		Role: gwapitypes.OrgMemberRole(role),
 	}
 }
 
@@ -229,12 +229,12 @@ func (h *OrgMembersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func createAddOrgMemberResponse(org *cstypes.Organization, user *cstypes.User, role cstypes.MemberRole) *gwapitypes.AddOrgMemberResponse {
+func createAddOrgMemberResponse(org *cstypes.Organization, user *cstypes.User, role cstypes.OrgMemberRole) *gwapitypes.AddOrgMemberResponse {
 	return &gwapitypes.AddOrgMemberResponse{
 		Organization: createOrgResponse(org),
 		OrgMemberResponse: gwapitypes.OrgMemberResponse{
 			User: createUserResponse(user),
-			Role: gwapitypes.MemberRole(role),
+			Role: gwapitypes.OrgMemberRole(role),
 		},
 	}
 }
@@ -262,7 +262,7 @@ func (h *AddOrgMemberHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	ares, err := h.ah.AddOrgMember(ctx, orgRef, userRef, cstypes.MemberRole(req.Role))
+	ares, err := h.ah.AddOrgMember(ctx, orgRef, userRef, cstypes.OrgMemberRole(req.Role))
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return

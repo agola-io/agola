@@ -46,8 +46,12 @@ func isAccessTokenExpired(expiresAt time.Time) bool {
 }
 
 func (h *ActionHandler) GetUser(ctx context.Context, userRef string) (*cstypes.User, error) {
-	if !h.IsUserLoggedOrAdmin(ctx) {
-		return nil, errors.Errorf("user not logged in")
+	authorized, err := h.CanDoUserAction(ctx, cstypes.ActionTypeGetUser, userRef)
+	if err != nil {
+		return nil, errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
 	user, resp, err := h.configstoreClient.GetUser(ctx, userRef)
@@ -76,8 +80,12 @@ type GetUsersRequest struct {
 }
 
 func (h *ActionHandler) GetUsers(ctx context.Context, req *GetUsersRequest) ([]*cstypes.User, error) {
-	if !h.IsUserAdmin(ctx) {
-		return nil, errors.Errorf("user not logged in")
+	authorized, err := h.CanDoUserAction(ctx, cstypes.ActionTypeGetUser, "")
+	if err != nil {
+		return nil, errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
 	users, resp, err := h.configstoreClient.GetUsers(ctx, req.Start, req.Limit, req.Asc)
@@ -92,8 +100,12 @@ type CreateUserRequest struct {
 }
 
 func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) (*cstypes.User, error) {
-	if !h.IsUserAdmin(ctx) {
-		return nil, errors.Errorf("user not admin")
+	authorized, err := h.CanDoUserAction(ctx, cstypes.ActionTypeCreateUser, "")
+	if err != nil {
+		return nil, errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
 	if req.UserName == "" {
@@ -123,16 +135,12 @@ type CreateUserTokenRequest struct {
 }
 
 func (h *ActionHandler) CreateUserToken(ctx context.Context, req *CreateUserTokenRequest) (string, error) {
-	var userID string
-	userIDVal := ctx.Value("userid")
-	if userIDVal != nil {
-		userID = userIDVal.(string)
+	authorized, err := h.CanDoUserAction(ctx, cstypes.ActionTypeUpdateUser, "")
+	if err != nil {
+		return "", errors.Errorf("failed to determine authorization: %w", err)
 	}
-
-	isAdmin := false
-	isAdminVal := ctx.Value("admin")
-	if isAdminVal != nil {
-		isAdmin = isAdminVal.(bool)
+	if !authorized {
+		return "", util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
 	userRef := req.UserRef
@@ -141,10 +149,6 @@ func (h *ActionHandler) CreateUserToken(ctx context.Context, req *CreateUserToke
 		return "", errors.Errorf("failed to get user: %w", ErrFromRemote(resp, err))
 	}
 
-	// only admin or the same logged user can create a token
-	if !isAdmin && user.ID != userID {
-		return "", util.NewErrBadRequest(errors.Errorf("logged in user cannot create token for another user"))
-	}
 	if _, ok := user.Tokens[req.TokenName]; ok {
 		return "", util.NewErrBadRequest(errors.Errorf("user %q already have a token with name %q", userRef, req.TokenName))
 	}
@@ -173,6 +177,14 @@ type CreateUserLARequest struct {
 }
 
 func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequest) (*cstypes.LinkedAccount, error) {
+	authorized, err := h.CanDoUserAction(ctx, cstypes.ActionTypeUpdateUser, req.UserRef)
+	if err != nil {
+		return nil, errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	userRef := req.UserRef
 	user, resp, err := h.configstoreClient.GetUser(ctx, userRef)
 	if err != nil {
@@ -231,6 +243,14 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 }
 
 func (h *ActionHandler) UpdateUserLA(ctx context.Context, userRef string, la *cstypes.LinkedAccount) error {
+	authorized, err := h.CanDoUserAction(ctx, cstypes.ActionTypeUpdateUser, userRef)
+	if err != nil {
+		return errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	user, resp, err := h.configstoreClient.GetUser(ctx, userRef)
 	if err != nil {
 		return errors.Errorf("failed to get user %q: %w", userRef, ErrFromRemote(resp, err))
@@ -265,8 +285,8 @@ func (h *ActionHandler) UpdateUserLA(ctx context.Context, userRef string, la *cs
 	return nil
 }
 
-// RefreshLinkedAccount refreshed the linked account oauth2 access token and update linked account in the configstore
-func (h *ActionHandler) RefreshLinkedAccount(ctx context.Context, rs *cstypes.RemoteSource, userName string, la *cstypes.LinkedAccount) (*cstypes.LinkedAccount, error) {
+// refreshLinkedAccount refreshed the linked account oauth2 access token and update linked account in the configstore
+func (h *ActionHandler) refreshLinkedAccount(ctx context.Context, rs *cstypes.RemoteSource, userName string, la *cstypes.LinkedAccount) (*cstypes.LinkedAccount, error) {
 	switch rs.AuthType {
 	case cstypes.RemoteSourceAuthTypeOauth2:
 		// refresh access token if expired
@@ -297,7 +317,7 @@ func (h *ActionHandler) RefreshLinkedAccount(ctx context.Context, rs *cstypes.Re
 // GetGitSource is a wrapper around common.GetGitSource that will also refresh
 // the oauth2 access token and update the linked account when needed
 func (h *ActionHandler) GetGitSource(ctx context.Context, rs *cstypes.RemoteSource, userName string, la *cstypes.LinkedAccount) (gitsource.GitSource, error) {
-	la, err := h.RefreshLinkedAccount(ctx, rs, userName, la)
+	la, err := h.refreshLinkedAccount(ctx, rs, userName, la)
 	if err != nil {
 		return nil, err
 	}
@@ -765,8 +785,12 @@ func (h *ActionHandler) HandleOauth2Callback(ctx context.Context, code, state st
 }
 
 func (h *ActionHandler) DeleteUser(ctx context.Context, userRef string) error {
-	if !h.IsUserAdmin(ctx) {
-		return errors.Errorf("user not logged in")
+	authorized, err := h.CanDoUserAction(ctx, cstypes.ActionTypeDeleteUser, userRef)
+	if err != nil {
+		return errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
 	resp, err := h.configstoreClient.DeleteUser(ctx, userRef)
@@ -777,24 +801,15 @@ func (h *ActionHandler) DeleteUser(ctx context.Context, userRef string) error {
 }
 
 func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) error {
-	if !h.IsUserLoggedOrAdmin(ctx) {
-		return errors.Errorf("user not logged in")
-	}
-
-	isAdmin := !h.IsUserAdmin(ctx)
-	curUserID := h.CurrentUserID(ctx)
-
-	user, resp, err := h.configstoreClient.GetUser(ctx, userRef)
+	authorized, err := h.CanDoUserAction(ctx, cstypes.ActionTypeUpdateUser, userRef)
 	if err != nil {
-		return errors.Errorf("failed to get user %q: %w", userRef, ErrFromRemote(resp, err))
+		return errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
-	// only admin or the same logged user can create a token
-	if !isAdmin && user.ID != curUserID {
-		return util.NewErrBadRequest(errors.Errorf("logged in user cannot create token for another user"))
-	}
-
-	resp, err = h.configstoreClient.DeleteUserLA(ctx, userRef, laID)
+	resp, err := h.configstoreClient.DeleteUserLA(ctx, userRef, laID)
 	if err != nil {
 		return errors.Errorf("failed to delete user linked account: %w", ErrFromRemote(resp, err))
 	}
@@ -802,24 +817,15 @@ func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) 
 }
 
 func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName string) error {
-	if !h.IsUserLoggedOrAdmin(ctx) {
-		return errors.Errorf("user not logged in")
-	}
-
-	isAdmin := !h.IsUserAdmin(ctx)
-	curUserID := h.CurrentUserID(ctx)
-
-	user, resp, err := h.configstoreClient.GetUser(ctx, userRef)
+	authorized, err := h.CanDoUserAction(ctx, cstypes.ActionTypeUpdateUser, userRef)
 	if err != nil {
-		return errors.Errorf("failed to get user %q: %w", userRef, ErrFromRemote(resp, err))
+		return errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
-	// only admin or the same logged user can create a token
-	if !isAdmin && user.ID != curUserID {
-		return util.NewErrBadRequest(errors.Errorf("logged in user cannot delete token for another user"))
-	}
-
-	resp, err = h.configstoreClient.DeleteUserToken(ctx, userRef, tokenName)
+	resp, err := h.configstoreClient.DeleteUserToken(ctx, userRef, tokenName)
 	if err != nil {
 		return errors.Errorf("failed to delete user token: %w", ErrFromRemote(resp, err))
 	}
@@ -840,6 +846,16 @@ type UserCreateRunRequest struct {
 }
 
 func (h *ActionHandler) UserCreateRun(ctx context.Context, req *UserCreateRunRequest) error {
+	curUserID := h.CurrentUserID(ctx)
+
+	authorized, err := h.CanDoUserAction(ctx, cstypes.ActionTypeCreateRun, curUserID)
+	if err != nil {
+		return errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	prRefRegexes := []*regexp.Regexp{}
 	for _, res := range req.PullRequestRefRegexes {
 		re, err := regexp.Compile(res)
@@ -848,8 +864,6 @@ func (h *ActionHandler) UserCreateRun(ctx context.Context, req *UserCreateRunReq
 		}
 		prRefRegexes = append(prRefRegexes, re)
 	}
-
-	curUserID := h.CurrentUserID(ctx)
 
 	user, resp, err := h.configstoreClient.GetUser(ctx, curUserID)
 	if err != nil {
@@ -865,7 +879,7 @@ func (h *ActionHandler) UserCreateRun(ctx context.Context, req *UserCreateRunReq
 		return util.NewErrBadRequest(errors.Errorf("wrong repo path: %q", req.RepoPath))
 	}
 	if repoParts[0] != user.ID {
-		return util.NewErrUnauthorized(errors.Errorf("repo %q not owned", req.RepoPath))
+		return util.NewErrForbidden(errors.Errorf("repo %q not owned", req.RepoPath))
 	}
 
 	branch := req.Branch

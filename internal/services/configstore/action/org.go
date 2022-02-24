@@ -32,7 +32,7 @@ import (
 
 type OrgMemberResponse struct {
 	User *types.User
-	Role types.MemberRole
+	Role types.OrgMemberRole
 }
 
 func orgMemberResponse(orgUser *readdb.OrgUser) *OrgMemberResponse {
@@ -138,7 +138,7 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) 
 			ID:             uuid.Must(uuid.NewV4()).String(),
 			OrganizationID: org.ID,
 			UserID:         org.CreatorUserID,
-			MemberRole:     types.MemberRoleOwner,
+			MemberRole:     types.OrgMemberRoleOwner,
 		}
 		orgmemberj, err := json.Marshal(orgmember)
 		if err != nil {
@@ -221,8 +221,8 @@ func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 
 // AddOrgMember add/updates an org member.
 // TODO(sgotti) handle invitation when implemented
-func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string, role types.MemberRole) (*types.OrganizationMember, error) {
-	if !types.IsValidMemberRole(role) {
+func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string, role types.OrgMemberRole) (*types.OrganizationMember, error) {
+	if !types.IsValidOrgMemberRole(role) {
 		return nil, util.NewErrBadRequest(errors.Errorf("invalid role %q", role))
 	}
 

@@ -26,6 +26,14 @@ import (
 )
 
 func (h *ActionHandler) GetProjectGroup(ctx context.Context, projectGroupRef string) (*csapitypes.ProjectGroup, error) {
+	authorized, err := h.CanDoProjectGroupAction(ctx, cstypes.ActionTypeGetProjectGroup, projectGroupRef)
+	if err != nil {
+		return nil, errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	projectGroup, resp, err := h.configstoreClient.GetProjectGroup(ctx, projectGroupRef)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
@@ -34,6 +42,14 @@ func (h *ActionHandler) GetProjectGroup(ctx context.Context, projectGroupRef str
 }
 
 func (h *ActionHandler) GetProjectGroupSubgroups(ctx context.Context, projectGroupRef string) ([]*csapitypes.ProjectGroup, error) {
+	authorized, err := h.CanDoProjectGroupAction(ctx, cstypes.ActionTypeGetProjectGroup, projectGroupRef)
+	if err != nil {
+		return nil, errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	projectGroups, resp, err := h.configstoreClient.GetProjectGroupSubgroups(ctx, projectGroupRef)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
@@ -42,6 +58,14 @@ func (h *ActionHandler) GetProjectGroupSubgroups(ctx context.Context, projectGro
 }
 
 func (h *ActionHandler) GetProjectGroupProjects(ctx context.Context, projectGroupRef string) ([]*csapitypes.Project, error) {
+	authorized, err := h.CanDoProjectGroupAction(ctx, cstypes.ActionTypeGetProjectGroup, projectGroupRef)
+	if err != nil {
+		return nil, errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	projects, resp, err := h.configstoreClient.GetProjectGroupProjects(ctx, projectGroupRef)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
@@ -57,21 +81,16 @@ type CreateProjectGroupRequest struct {
 }
 
 func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProjectGroupRequest) (*csapitypes.ProjectGroup, error) {
+	authorized, err := h.CanDoProjectGroupAction(ctx, cstypes.ActionTypeCreateProjectGroup, req.ParentRef)
+	if err != nil {
+		return nil, errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	if !util.ValidateName(req.Name) {
 		return nil, util.NewErrBadRequest(errors.Errorf("invalid projectGroup name %q", req.Name))
-	}
-
-	pg, resp, err := h.configstoreClient.GetProjectGroup(ctx, req.ParentRef)
-	if err != nil {
-		return nil, errors.Errorf("failed to get project group %q: %w", req.ParentRef, ErrFromRemote(resp, err))
-	}
-
-	isProjectOwner, err := h.IsProjectOwner(ctx, pg.OwnerType, pg.OwnerID)
-	if err != nil {
-		return nil, errors.Errorf("failed to determine ownership: %w", err)
-	}
-	if !isProjectOwner {
-		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
 	user, resp, err := h.configstoreClient.GetUser(ctx, req.CurrentUserID)
@@ -112,17 +131,17 @@ type UpdateProjectGroupRequest struct {
 }
 
 func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, projectGroupRef string, req *UpdateProjectGroupRequest) (*csapitypes.ProjectGroup, error) {
+	authorized, err := h.CanDoProjectGroupAction(ctx, cstypes.ActionTypeUpdateProjectGroup, projectGroupRef)
+	if err != nil {
+		return nil, errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	pg, resp, err := h.configstoreClient.GetProjectGroup(ctx, projectGroupRef)
 	if err != nil {
 		return nil, errors.Errorf("failed to get project group %q: %w", projectGroupRef, ErrFromRemote(resp, err))
-	}
-
-	isProjectOwner, err := h.IsProjectOwner(ctx, pg.OwnerType, pg.OwnerID)
-	if err != nil {
-		return nil, errors.Errorf("failed to determine ownership: %w", err)
-	}
-	if !isProjectOwner {
-		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
 	if req.Name != nil {
@@ -145,21 +164,16 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, projectGroupRef 
 	return rp, nil
 }
 
-func (h *ActionHandler) DeleteProjectGroup(ctx context.Context, projectRef string) error {
-	p, resp, err := h.configstoreClient.GetProjectGroup(ctx, projectRef)
+func (h *ActionHandler) DeleteProjectGroup(ctx context.Context, projectGroupRef string) error {
+	authorized, err := h.CanDoProjectGroupAction(ctx, cstypes.ActionTypeDeleteProjectGroup, projectGroupRef)
 	if err != nil {
-		return errors.Errorf("failed to get project %q: %w", projectRef, ErrFromRemote(resp, err))
+		return errors.Errorf("failed to determine authorization: %w", err)
 	}
-
-	isProjectOwner, err := h.IsProjectOwner(ctx, p.OwnerType, p.OwnerID)
-	if err != nil {
-		return errors.Errorf("failed to determine ownership: %w", err)
-	}
-	if !isProjectOwner {
+	if !authorized {
 		return util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
-	resp, err = h.configstoreClient.DeleteProjectGroup(ctx, projectRef)
+	resp, err := h.configstoreClient.DeleteProjectGroup(ctx, projectGroupRef)
 	if err != nil {
 		return ErrFromRemote(resp, err)
 	}

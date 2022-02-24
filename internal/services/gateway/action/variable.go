@@ -34,6 +34,14 @@ type GetVariablesRequest struct {
 }
 
 func (h *ActionHandler) GetVariables(ctx context.Context, req *GetVariablesRequest) ([]*csapitypes.Variable, []*csapitypes.Secret, error) {
+	authorized, err := h.CanDoVariableAction(ctx, cstypes.ActionTypeGetVariable, req.ParentType, req.ParentRef)
+	if err != nil {
+		return nil, nil, errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return nil, nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	var csvars []*csapitypes.Variable
 	var cssecrets []*csapitypes.Secret
 
@@ -80,11 +88,11 @@ type CreateVariableRequest struct {
 }
 
 func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateVariableRequest) (*csapitypes.Variable, []*csapitypes.Secret, error) {
-	isVariableOwner, err := h.IsVariableOwner(ctx, req.ParentType, req.ParentRef)
+	authorized, err := h.CanDoVariableAction(ctx, cstypes.ActionTypeCreateVariable, req.ParentType, req.ParentRef)
 	if err != nil {
-		return nil, nil, errors.Errorf("failed to determine ownership: %w", err)
+		return nil, nil, errors.Errorf("failed to determine authorization: %w", err)
 	}
-	if !isVariableOwner {
+	if !authorized {
 		return nil, nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
@@ -153,11 +161,11 @@ type UpdateVariableRequest struct {
 }
 
 func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableRequest) (*csapitypes.Variable, []*csapitypes.Secret, error) {
-	isVariableOwner, err := h.IsVariableOwner(ctx, req.ParentType, req.ParentRef)
+	authorized, err := h.CanDoVariableAction(ctx, cstypes.ActionTypeUpdateVariable, req.ParentType, req.ParentRef)
 	if err != nil {
-		return nil, nil, errors.Errorf("failed to determine ownership: %w", err)
+		return nil, nil, errors.Errorf("failed to determine authorization: %w", err)
 	}
-	if !isVariableOwner {
+	if !authorized {
 		return nil, nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
@@ -215,11 +223,11 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableR
 }
 
 func (h *ActionHandler) DeleteVariable(ctx context.Context, parentType cstypes.ConfigType, parentRef, name string) error {
-	isVariableOwner, err := h.IsVariableOwner(ctx, parentType, parentRef)
+	authorized, err := h.CanDoVariableAction(ctx, cstypes.ActionTypeDeleteVariable, parentType, parentRef)
 	if err != nil {
-		return errors.Errorf("failed to determine ownership: %w", err)
+		return errors.Errorf("failed to determine authorization: %w", err)
 	}
-	if !isVariableOwner {
+	if !authorized {
 		return util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 

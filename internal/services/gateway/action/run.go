@@ -77,11 +77,11 @@ func (h *ActionHandler) GetRun(ctx context.Context, runID string) (*rsapitypes.R
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
 	}
-	canGetRun, err := h.CanGetRun(ctx, runResp.RunConfig.Group)
+	authorized, err := h.CanDoRunAction(ctx, cstypes.ActionTypeGetRun, runResp.RunConfig.Group)
 	if err != nil {
-		return nil, errors.Errorf("failed to determine permissions: %w", err)
+		return nil, errors.Errorf("failed to determine authorization: %w", err)
 	}
-	if !canGetRun {
+	if !authorized {
 		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
@@ -100,11 +100,11 @@ type GetRunsRequest struct {
 }
 
 func (h *ActionHandler) GetRuns(ctx context.Context, req *GetRunsRequest) (*rsapitypes.GetRunsResponse, error) {
-	canGetRun, err := h.CanGetRun(ctx, req.Group)
+	authorized, err := h.CanDoRunAction(ctx, cstypes.ActionTypeGetRun, req.Group)
 	if err != nil {
-		return nil, errors.Errorf("failed to determine permissions: %w", err)
+		return nil, errors.Errorf("failed to determine authorization: %w", err)
 	}
-	if !canGetRun {
+	if !authorized {
 		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
@@ -130,11 +130,12 @@ func (h *ActionHandler) GetLogs(ctx context.Context, req *GetLogsRequest) (*http
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
 	}
-	canGetRun, err := h.CanGetRun(ctx, runResp.RunConfig.Group)
+
+	authorized, err := h.CanDoRunAction(ctx, cstypes.ActionTypeGetLog, runResp.RunConfig.Group)
 	if err != nil {
-		return nil, errors.Errorf("failed to determine permissions: %w", err)
+		return nil, errors.Errorf("failed to determine authorization: %w", err)
 	}
-	if !canGetRun {
+	if !authorized {
 		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
@@ -158,11 +159,12 @@ func (h *ActionHandler) DeleteLogs(ctx context.Context, req *DeleteLogsRequest) 
 	if err != nil {
 		return ErrFromRemote(resp, err)
 	}
-	canDoRunActions, err := h.CanDoRunActions(ctx, runResp.RunConfig.Group)
+
+	authorized, err := h.CanDoRunAction(ctx, cstypes.ActionTypeDeleteLog, runResp.RunConfig.Group)
 	if err != nil {
-		return errors.Errorf("failed to determine permissions: %w", err)
+		return errors.Errorf("failed to determine authorization: %w", err)
 	}
-	if !canDoRunActions {
+	if !authorized {
 		return util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
@@ -195,11 +197,24 @@ func (h *ActionHandler) RunAction(ctx context.Context, req *RunActionsRequest) (
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
 	}
-	canGetRun, err := h.CanDoRunActions(ctx, runResp.RunConfig.Group)
-	if err != nil {
-		return nil, errors.Errorf("failed to determine permissions: %w", err)
+
+	var action cstypes.ActionType
+	switch req.ActionType {
+	case RunActionTypeRestart:
+		action = cstypes.ActionTypeRestartRun
+	case RunActionTypeCancel:
+		action = cstypes.ActionTypeCancelRun
+	case RunActionTypeStop:
+		action = cstypes.ActionTypeStopRun
+	default:
+		return nil, util.NewErrBadRequest(errors.Errorf("wrong run action type %q", req.ActionType))
 	}
-	if !canGetRun {
+
+	authorized, err := h.CanDoRunAction(ctx, action, runResp.RunConfig.Group)
+	if err != nil {
+		return nil, errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
 		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
@@ -261,13 +276,23 @@ func (h *ActionHandler) RunTaskAction(ctx context.Context, req *RunTaskActionsRe
 	if err != nil {
 		return ErrFromRemote(resp, err)
 	}
-	canDoRunAction, err := h.CanDoRunActions(ctx, runResp.RunConfig.Group)
-	if err != nil {
-		return errors.Errorf("failed to determine permissions: %w", err)
+
+	var action cstypes.ActionType
+	switch req.ActionType {
+	case RunTaskActionTypeApprove:
+		action = cstypes.ActionTypeApproveTask
+	default:
+		return util.NewErrBadRequest(errors.Errorf("wrong run task action type %q", req.ActionType))
 	}
-	if !canDoRunAction {
+
+	authorized, err := h.CanDoRunAction(ctx, action, runResp.RunConfig.Group)
+	if err != nil {
+		return errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
 		return util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
+
 	curUserID := h.CurrentUserID(ctx)
 	if curUserID == "" {
 		return util.NewErrBadRequest(errors.Errorf("no logged in user"))

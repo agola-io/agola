@@ -297,7 +297,7 @@ func scanOrgMembers(rows *sql.Rows) ([]*types.OrganizationMember, []string, erro
 
 type OrgUser struct {
 	User *types.User
-	Role types.MemberRole
+	Role types.OrgMemberRole
 }
 
 // TODO(sgotti) implement cursor fetching
@@ -348,7 +348,7 @@ func (r *ReadDB) GetOrgUsers(tx *db.Tx, orgID string) ([]*OrgUser, error) {
 
 type UserOrg struct {
 	Organization *types.Organization
-	Role         types.MemberRole
+	Role         types.OrgMemberRole
 }
 
 // TODO(sgotti) implement cursor fetching

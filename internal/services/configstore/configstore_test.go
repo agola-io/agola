@@ -1219,7 +1219,7 @@ func TestOrgMembers(t *testing.T) {
 		expectedResponse := []*action.UserOrgsResponse{
 			{
 				Organization: org,
-				Role:         types.MemberRoleOwner,
+				Role:         types.OrgMemberRoleOwner,
 			},
 		}
 		res, err := cs.ah.GetUserOrgs(ctx, user.ID)
@@ -1252,13 +1252,13 @@ func TestOrgMembers(t *testing.T) {
 		expectedResponse := []*action.UserOrgsResponse{
 			{
 				Organization: org,
-				Role:         types.MemberRoleOwner,
+				Role:         types.OrgMemberRoleOwner,
 			},
 		}
 		for i := 5; i < 10; i++ {
 			expectedResponse = append(expectedResponse, &action.UserOrgsResponse{
 				Organization: orgs[i],
-				Role:         types.MemberRoleOwner,
+				Role:         types.OrgMemberRoleOwner,
 			})
 		}
 		res, err := cs.ah.GetUserOrgs(ctx, user.ID)

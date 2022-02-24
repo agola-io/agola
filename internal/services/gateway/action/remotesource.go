@@ -61,7 +61,7 @@ type CreateRemoteSourceRequest struct {
 
 func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemoteSourceRequest) (*cstypes.RemoteSource, error) {
 	if !h.IsUserAdmin(ctx) {
-		return nil, errors.Errorf("user not admin")
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
 	if !util.ValidateName(req.Name) {
@@ -135,7 +135,7 @@ type UpdateRemoteSourceRequest struct {
 
 func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, req *UpdateRemoteSourceRequest) (*cstypes.RemoteSource, error) {
 	if !h.IsUserAdmin(ctx) {
-		return nil, errors.Errorf("user not admin")
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
 	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, req.RemoteSourceRef)
@@ -183,7 +183,7 @@ func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, req *UpdateRemot
 
 func (h *ActionHandler) DeleteRemoteSource(ctx context.Context, rsRef string) error {
 	if !h.IsUserAdmin(ctx) {
-		return errors.Errorf("user not admin")
+		return util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
 	resp, err := h.configstoreClient.DeleteRemoteSource(ctx, rsRef)

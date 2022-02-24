@@ -31,20 +31,17 @@ import (
 )
 
 func (h *ActionHandler) GetProject(ctx context.Context, projectRef string) (*csapitypes.Project, error) {
+	authorized, err := h.CanDoProjectAction(ctx, cstypes.ActionTypeGetProject, projectRef)
+	if err != nil {
+		return nil, errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	project, resp, err := h.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
-	}
-
-	isProjectMember, err := h.IsProjectMember(ctx, project.OwnerType, project.OwnerID)
-	if err != nil {
-		return nil, errors.Errorf("failed to determine ownership: %w", err)
-	}
-	if project.GlobalVisibility == cstypes.VisibilityPublic {
-		return project, nil
-	}
-	if !isProjectMember {
-		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
 	return project, nil
@@ -73,16 +70,11 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 		parentRef = path.Join("user", user.Name)
 	}
 
-	pg, resp, err := h.configstoreClient.GetProjectGroup(ctx, parentRef)
+	authorized, err := h.CanDoProjectGroupAction(ctx, cstypes.ActionTypeCreateProject, parentRef)
 	if err != nil {
-		return nil, errors.Errorf("failed to get project group %q: %w", parentRef, ErrFromRemote(resp, err))
+		return nil, errors.Errorf("failed to determine authorization: %w", err)
 	}
-
-	isProjectOwner, err := h.IsProjectOwner(ctx, pg.OwnerType, pg.OwnerID)
-	if err != nil {
-		return nil, errors.Errorf("failed to determine ownership: %w", err)
-	}
-	if !isProjectOwner {
+	if !authorized {
 		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
@@ -94,6 +86,11 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 	}
 	if req.RepoPath == "" {
 		return nil, util.NewErrBadRequest(errors.Errorf("empty remote repo path"))
+	}
+
+	pg, resp, err := h.configstoreClient.GetProjectGroup(ctx, parentRef)
+	if err != nil {
+		return nil, errors.Errorf("failed to get project group %q: %w", parentRef, ErrFromRemote(resp, err))
 	}
 
 	projectPath := path.Join(pg.Path, req.Name)
@@ -190,17 +187,17 @@ type UpdateProjectRequest struct {
 }
 
 func (h *ActionHandler) UpdateProject(ctx context.Context, projectRef string, req *UpdateProjectRequest) (*csapitypes.Project, error) {
+	authorized, err := h.CanDoProjectAction(ctx, cstypes.ActionTypeUpdateProject, projectRef)
+	if err != nil {
+		return nil, errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	p, resp, err := h.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
 		return nil, errors.Errorf("failed to get project %q: %w", projectRef, ErrFromRemote(resp, err))
-	}
-
-	isProjectOwner, err := h.IsProjectOwner(ctx, p.OwnerType, p.OwnerID)
-	if err != nil {
-		return nil, errors.Errorf("failed to determine ownership: %w", err)
-	}
-	if !isProjectOwner {
-		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
 	if req.Name != nil {
@@ -234,17 +231,17 @@ func (h *ActionHandler) ProjectUpdateRepoLinkedAccount(ctx context.Context, proj
 		return nil, errors.Errorf("failed to get user %q: %w", curUserID, ErrFromRemote(resp, err))
 	}
 
+	authorized, err := h.CanDoProjectAction(ctx, cstypes.ActionTypeUpdateProject, projectRef)
+	if err != nil {
+		return nil, errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	p, resp, err := h.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
 		return nil, errors.Errorf("failed to get project %q: %w", projectRef, ErrFromRemote(resp, err))
-	}
-
-	isProjectOwner, err := h.IsProjectOwner(ctx, p.OwnerType, p.OwnerID)
-	if err != nil {
-		return nil, errors.Errorf("failed to determine ownership: %w", err)
-	}
-	if !isProjectOwner {
-		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
 	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, p.RemoteSourceID)
@@ -363,17 +360,17 @@ func (h *ActionHandler) genWebhookURL(project *csapitypes.Project) (string, erro
 }
 
 func (h *ActionHandler) ReconfigProject(ctx context.Context, projectRef string) error {
+	authorized, err := h.CanDoProjectAction(ctx, cstypes.ActionTypeUpdateProject, projectRef)
+	if err != nil {
+		return errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	p, resp, err := h.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
 		return errors.Errorf("failed to get project %q: %w", projectRef, ErrFromRemote(resp, err))
-	}
-
-	isProjectOwner, err := h.IsProjectOwner(ctx, p.OwnerType, p.OwnerID)
-	if err != nil {
-		return errors.Errorf("failed to determine ownership: %w", err)
-	}
-	if !isProjectOwner {
-		return util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
 	user, rs, la, err := h.getRemoteRepoAccessData(ctx, p.LinkedAccountID)
@@ -387,17 +384,17 @@ func (h *ActionHandler) ReconfigProject(ctx context.Context, projectRef string) 
 }
 
 func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) error {
+	authorized, err := h.CanDoProjectAction(ctx, cstypes.ActionTypeDeleteProject, projectRef)
+	if err != nil {
+		return errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	p, resp, err := h.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
 		return errors.Errorf("failed to get project %q: %w", projectRef, ErrFromRemote(resp, err))
-	}
-
-	isProjectOwner, err := h.IsProjectOwner(ctx, p.OwnerType, p.OwnerID)
-	if err != nil {
-		return errors.Errorf("failed to determine ownership: %w", err)
-	}
-	if !isProjectOwner {
-		return util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
 	// get data needed for repo cleanup
@@ -428,6 +425,14 @@ func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) er
 }
 
 func (h *ActionHandler) ProjectCreateRun(ctx context.Context, projectRef, branch, tag, refName, commitSHA string) error {
+	authorized, err := h.CanDoProjectAction(ctx, cstypes.ActionTypeCreateRun, projectRef)
+	if err != nil {
+		return errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	curUserID := h.CurrentUserID(ctx)
 
 	user, resp, err := h.configstoreClient.GetUser(ctx, curUserID)
@@ -438,14 +443,6 @@ func (h *ActionHandler) ProjectCreateRun(ctx context.Context, projectRef, branch
 	p, resp, err := h.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
 		return errors.Errorf("failed to get project %q: %w", projectRef, ErrFromRemote(resp, err))
-	}
-
-	isProjectOwner, err := h.IsProjectOwner(ctx, p.OwnerType, p.OwnerID)
-	if err != nil {
-		return errors.Errorf("failed to determine ownership: %w", err)
-	}
-	if !isProjectOwner {
-		return util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
 	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, p.RemoteSourceID)

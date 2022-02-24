@@ -24,6 +24,14 @@ import (
 )
 
 func (h *ActionHandler) GetOrg(ctx context.Context, orgRef string) (*cstypes.Organization, error) {
+	authorized, err := h.CanDoOrgAction(ctx, cstypes.ActionTypeGetOrg, "")
+	if err != nil {
+		return nil, errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	org, resp, err := h.configstoreClient.GetOrg(ctx, orgRef)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
@@ -38,45 +46,19 @@ type GetOrgsRequest struct {
 }
 
 func (h *ActionHandler) GetOrgs(ctx context.Context, req *GetOrgsRequest) ([]*cstypes.Organization, error) {
+	authorized, err := h.CanDoOrgAction(ctx, cstypes.ActionTypeGetOrg, "")
+	if err != nil {
+		return nil, errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	orgs, resp, err := h.configstoreClient.GetOrgs(ctx, req.Start, req.Limit, req.Asc)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
 	}
 	return orgs, nil
-}
-
-type OrgMembersResponse struct {
-	Organization *cstypes.Organization
-	Members      []*OrgMemberResponse
-}
-
-type OrgMemberResponse struct {
-	User *cstypes.User
-	Role cstypes.MemberRole
-}
-
-func (h *ActionHandler) GetOrgMembers(ctx context.Context, orgRef string) (*OrgMembersResponse, error) {
-	org, resp, err := h.configstoreClient.GetOrg(ctx, orgRef)
-	if err != nil {
-		return nil, ErrFromRemote(resp, err)
-	}
-
-	orgMembers, resp, err := h.configstoreClient.GetOrgMembers(ctx, orgRef)
-	if err != nil {
-		return nil, ErrFromRemote(resp, err)
-	}
-
-	res := &OrgMembersResponse{
-		Organization: org,
-		Members:      make([]*OrgMemberResponse, len(orgMembers)),
-	}
-	for i, orgMember := range orgMembers {
-		res.Members[i] = &OrgMemberResponse{
-			User: orgMember.User,
-			Role: orgMember.Role,
-		}
-	}
-	return res, nil
 }
 
 type CreateOrgRequest struct {
@@ -87,8 +69,12 @@ type CreateOrgRequest struct {
 }
 
 func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*cstypes.Organization, error) {
-	if !h.IsUserLoggedOrAdmin(ctx) {
-		return nil, errors.Errorf("user not logged in")
+	authorized, err := h.CanDoOrgAction(ctx, cstypes.ActionTypeCreateOrg, "")
+	if err != nil {
+		return nil, errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
 	if req.Name == "" {
@@ -117,24 +103,61 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*
 }
 
 func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
-	org, resp, err := h.configstoreClient.GetOrg(ctx, orgRef)
+	authorized, err := h.CanDoOrgAction(ctx, cstypes.ActionTypeDeleteOrg, orgRef)
 	if err != nil {
-		return ErrFromRemote(resp, err)
+		return errors.Errorf("failed to determine authorization: %w", err)
 	}
-
-	isOrgOwner, err := h.IsOrgOwner(ctx, org.ID)
-	if err != nil {
-		return errors.Errorf("failed to determine ownership: %w", err)
-	}
-	if !isOrgOwner {
+	if !authorized {
 		return util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
-	resp, err = h.configstoreClient.DeleteOrg(ctx, orgRef)
+	resp, err := h.configstoreClient.DeleteOrg(ctx, orgRef)
 	if err != nil {
 		return errors.Errorf("failed to delete org: %w", ErrFromRemote(resp, err))
 	}
 	return nil
+}
+
+type OrgMembersResponse struct {
+	Organization *cstypes.Organization
+	Members      []*OrgMemberResponse
+}
+
+type OrgMemberResponse struct {
+	User *cstypes.User
+	Role cstypes.OrgMemberRole
+}
+
+func (h *ActionHandler) GetOrgMembers(ctx context.Context, orgRef string) (*OrgMembersResponse, error) {
+	authorized, err := h.CanDoOrgAction(ctx, cstypes.ActionTypeGetOrgMembers, orgRef)
+	if err != nil {
+		return nil, errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
+	org, resp, err := h.configstoreClient.GetOrg(ctx, orgRef)
+	if err != nil {
+		return nil, ErrFromRemote(resp, err)
+	}
+
+	orgMembers, resp, err := h.configstoreClient.GetOrgMembers(ctx, orgRef)
+	if err != nil {
+		return nil, ErrFromRemote(resp, err)
+	}
+
+	res := &OrgMembersResponse{
+		Organization: org,
+		Members:      make([]*OrgMemberResponse, len(orgMembers)),
+	}
+	for i, orgMember := range orgMembers {
+		res.Members[i] = &OrgMemberResponse{
+			User: orgMember.User,
+			Role: orgMember.Role,
+		}
+	}
+	return res, nil
 }
 
 type AddOrgMemberResponse struct {
@@ -143,7 +166,15 @@ type AddOrgMemberResponse struct {
 	User               *cstypes.User
 }
 
-func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string, role cstypes.MemberRole) (*AddOrgMemberResponse, error) {
+func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string, role cstypes.OrgMemberRole) (*AddOrgMemberResponse, error) {
+	authorized, err := h.CanDoOrgAction(ctx, cstypes.ActionTypeAddOrgMembers, orgRef)
+	if err != nil {
+		return nil, errors.Errorf("failed to determine authorization: %w", err)
+	}
+	if !authorized {
+		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+	}
+
 	org, resp, err := h.configstoreClient.GetOrg(ctx, orgRef)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
@@ -151,14 +182,6 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 	user, resp, err := h.configstoreClient.GetUser(ctx, userRef)
 	if err != nil {
 		return nil, ErrFromRemote(resp, err)
-	}
-
-	isOrgOwner, err := h.IsOrgOwner(ctx, org.ID)
-	if err != nil {
-		return nil, errors.Errorf("failed to determine ownership: %w", err)
-	}
-	if !isOrgOwner {
-		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
 	orgmember, resp, err := h.configstoreClient.AddOrgMember(ctx, orgRef, userRef, role)
@@ -174,20 +197,15 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 }
 
 func (h *ActionHandler) RemoveOrgMember(ctx context.Context, orgRef, userRef string) error {
-	org, resp, err := h.configstoreClient.GetOrg(ctx, orgRef)
+	authorized, err := h.CanDoOrgAction(ctx, cstypes.ActionTypeRemoveOrgMembers, orgRef)
 	if err != nil {
-		return ErrFromRemote(resp, err)
+		return errors.Errorf("failed to determine authorization: %w", err)
 	}
-
-	isOrgOwner, err := h.IsOrgOwner(ctx, org.ID)
-	if err != nil {
-		return errors.Errorf("failed to determine ownership: %w", err)
-	}
-	if !isOrgOwner {
+	if !authorized {
 		return util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
 
-	resp, err = h.configstoreClient.RemoveOrgMember(ctx, orgRef, userRef)
+	resp, err := h.configstoreClient.RemoveOrgMember(ctx, orgRef, userRef)
 	if err != nil {
 		return errors.Errorf("failed to remove organization member: %w", ErrFromRemote(resp, err))
 	}

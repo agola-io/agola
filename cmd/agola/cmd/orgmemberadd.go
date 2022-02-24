@@ -63,7 +63,7 @@ func orgMemberAdd(cmd *cobra.Command, args []string) error {
 	gwclient := gwclient.NewClient(gatewayURL, token)
 
 	log.Infof("adding/updating member %q to organization %q with role %q", orgMemberAddOpts.username, orgMemberAddOpts.orgname, orgMemberAddOpts.role)
-	_, _, err := gwclient.AddOrgMember(context.TODO(), orgMemberAddOpts.orgname, orgMemberAddOpts.username, gwapitypes.MemberRole(orgMemberAddOpts.role))
+	_, _, err := gwclient.AddOrgMember(context.TODO(), orgMemberAddOpts.orgname, orgMemberAddOpts.username, gwapitypes.OrgMemberRole(orgMemberAddOpts.role))
 	if err != nil {
 		return errors.Errorf("failed to add/update organization member: %w", err)
 	}

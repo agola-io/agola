@@ -59,5 +59,5 @@ type CreateUserTokenResponse struct {
 
 type UserOrgsResponse struct {
 	Organization *cstypes.Organization
-	Role         cstypes.MemberRole
+	Role         cstypes.OrgMemberRole
 }

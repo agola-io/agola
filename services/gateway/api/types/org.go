@@ -14,11 +14,11 @@
 
 package types
 
-type MemberRole string
+type OrgMemberRole string
 
 const (
-	MemberRoleOwner  MemberRole = "owner"
-	MemberRoleMember MemberRole = "member"
+	OrgMemberRoleOwner  OrgMemberRole = "owner"
+	OrgMemberRoleMember OrgMemberRole = "member"
 )
 
 type CreateOrgRequest struct {
@@ -39,7 +39,7 @@ type OrgMembersResponse struct {
 
 type OrgMemberResponse struct {
 	User *UserResponse `json:"user"`
-	Role MemberRole    `json:"role"`
+	Role OrgMemberRole `json:"role"`
 }
 
 type AddOrgMemberResponse struct {
@@ -48,5 +48,5 @@ type AddOrgMemberResponse struct {
 }
 
 type AddOrgMemberRequest struct {
-	Role MemberRole `json:"role"`
+	Role OrgMemberRole `json:"role"`
 }
