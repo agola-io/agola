@@ -22,6 +22,7 @@ import (
 	"path"
 
 	gitsource "agola.io/agola/internal/gitsources"
+	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
@@ -61,7 +62,7 @@ type CreateProjectRequest struct {
 }
 
 func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectRequest) (*csapitypes.Project, error) {
-	curUserID := h.CurrentUserID(ctx)
+	curUserID := common.CurrentUserID(ctx)
 
 	user, resp, err := h.configstoreClient.GetUser(ctx, curUserID)
 	if err != nil {
@@ -227,7 +228,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, projectRef string, re
 }
 
 func (h *ActionHandler) ProjectUpdateRepoLinkedAccount(ctx context.Context, projectRef string) (*csapitypes.Project, error) {
-	curUserID := h.CurrentUserID(ctx)
+	curUserID := common.CurrentUserID(ctx)
 
 	user, resp, err := h.configstoreClient.GetUser(ctx, curUserID)
 	if err != nil {
@@ -428,7 +429,7 @@ func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) er
 }
 
 func (h *ActionHandler) ProjectCreateRun(ctx context.Context, projectRef, branch, tag, refName, commitSHA string) error {
-	curUserID := h.CurrentUserID(ctx)
+	curUserID := common.CurrentUserID(ctx)
 
 	user, resp, err := h.configstoreClient.GetUser(ctx, curUserID)
 	if err != nil {

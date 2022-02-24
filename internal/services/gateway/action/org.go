@@ -17,6 +17,7 @@ package action
 import (
 	"context"
 
+	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
 	cstypes "agola.io/agola/services/configstore/types"
 
@@ -87,7 +88,7 @@ type CreateOrgRequest struct {
 }
 
 func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*cstypes.Organization, error) {
-	if !h.IsUserLoggedOrAdmin(ctx) {
+	if !common.IsUserLoggedOrAdmin(ctx) {
 		return nil, errors.Errorf("user not logged in")
 	}
 

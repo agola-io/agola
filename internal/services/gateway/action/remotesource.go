@@ -17,6 +17,7 @@ package action
 import (
 	"context"
 
+	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
 	cstypes "agola.io/agola/services/configstore/types"
 
@@ -60,7 +61,7 @@ type CreateRemoteSourceRequest struct {
 }
 
 func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemoteSourceRequest) (*cstypes.RemoteSource, error) {
-	if !h.IsUserAdmin(ctx) {
+	if !common.IsUserAdmin(ctx) {
 		return nil, errors.Errorf("user not admin")
 	}
 
@@ -134,7 +135,7 @@ type UpdateRemoteSourceRequest struct {
 }
 
 func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, req *UpdateRemoteSourceRequest) (*cstypes.RemoteSource, error) {
-	if !h.IsUserAdmin(ctx) {
+	if !common.IsUserAdmin(ctx) {
 		return nil, errors.Errorf("user not admin")
 	}
 
@@ -182,7 +183,7 @@ func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, req *UpdateRemot
 }
 
 func (h *ActionHandler) DeleteRemoteSource(ctx context.Context, rsRef string) error {
-	if !h.IsUserAdmin(ctx) {
+	if !common.IsUserAdmin(ctx) {
 		return errors.Errorf("user not admin")
 	}
 

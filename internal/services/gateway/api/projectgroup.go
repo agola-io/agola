@@ -20,6 +20,7 @@ import (
 	"net/url"
 
 	"agola.io/agola/internal/services/gateway/action"
+	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"
@@ -49,12 +50,11 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	userIDVal := ctx.Value("userid")
-	if userIDVal == nil {
+	userID := common.CurrentUserID(ctx)
+	if userID == "" {
 		httpError(w, util.NewErrBadRequest(errors.Errorf("user not authenticated")))
 		return
 	}
-	userID := userIDVal.(string)
 
 	creq := &action.CreateProjectGroupRequest{
 		Name:          req.Name,

@@ -24,7 +24,8 @@ import (
 
 	gitsource "agola.io/agola/internal/gitsources"
 	"agola.io/agola/internal/gitsources/agolagit"
-	"agola.io/agola/internal/services/common"
+	scommon "agola.io/agola/internal/services/common"
+	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
@@ -46,7 +47,7 @@ func isAccessTokenExpired(expiresAt time.Time) bool {
 }
 
 func (h *ActionHandler) GetUser(ctx context.Context, userRef string) (*cstypes.User, error) {
-	if !h.IsUserLoggedOrAdmin(ctx) {
+	if !common.IsUserLoggedOrAdmin(ctx) {
 		return nil, errors.Errorf("user not logged in")
 	}
 
@@ -58,7 +59,7 @@ func (h *ActionHandler) GetUser(ctx context.Context, userRef string) (*cstypes.U
 }
 
 func (h *ActionHandler) GetUserOrgs(ctx context.Context, userRef string) ([]*csapitypes.UserOrgsResponse, error) {
-	if !h.IsUserLogged(ctx) {
+	if !common.IsUserLogged(ctx) {
 		return nil, errors.Errorf("user not logged in")
 	}
 
@@ -76,7 +77,7 @@ type GetUsersRequest struct {
 }
 
 func (h *ActionHandler) GetUsers(ctx context.Context, req *GetUsersRequest) ([]*cstypes.User, error) {
-	if !h.IsUserAdmin(ctx) {
+	if !common.IsUserAdmin(ctx) {
 		return nil, errors.Errorf("user not logged in")
 	}
 
@@ -92,7 +93,7 @@ type CreateUserRequest struct {
 }
 
 func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) (*cstypes.User, error) {
-	if !h.IsUserAdmin(ctx) {
+	if !common.IsUserAdmin(ctx) {
 		return nil, errors.Errorf("user not admin")
 	}
 
@@ -123,17 +124,8 @@ type CreateUserTokenRequest struct {
 }
 
 func (h *ActionHandler) CreateUserToken(ctx context.Context, req *CreateUserTokenRequest) (string, error) {
-	var userID string
-	userIDVal := ctx.Value("userid")
-	if userIDVal != nil {
-		userID = userIDVal.(string)
-	}
-
-	isAdmin := false
-	isAdminVal := ctx.Value("admin")
-	if isAdminVal != nil {
-		isAdmin = isAdminVal.(bool)
-	}
+	isAdmin := common.IsUserAdmin(ctx)
+	userID := common.CurrentUserID(ctx)
 
 	userRef := req.UserRef
 	user, resp, err := h.configstoreClient.GetUser(ctx, userRef)
@@ -193,11 +185,11 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 		return nil, util.NewErrBadRequest(errors.Errorf("user %q already have a linked account for remote source %q", userRef, rs.Name))
 	}
 
-	accessToken, err := common.GetAccessToken(rs, req.UserAccessToken, req.Oauth2AccessToken)
+	accessToken, err := scommon.GetAccessToken(rs, req.UserAccessToken, req.Oauth2AccessToken)
 	if err != nil {
 		return nil, err
 	}
-	userSource, err := common.GetUserSource(rs, accessToken)
+	userSource, err := scommon.GetUserSource(rs, accessToken)
 	if err != nil {
 		return nil, err
 	}
@@ -271,7 +263,7 @@ func (h *ActionHandler) RefreshLinkedAccount(ctx context.Context, rs *cstypes.Re
 	case cstypes.RemoteSourceAuthTypeOauth2:
 		// refresh access token if expired
 		if isAccessTokenExpired(la.Oauth2AccessTokenExpiresAt) {
-			userSource, err := common.GetOauth2Source(rs, "")
+			userSource, err := scommon.GetOauth2Source(rs, "")
 			if err != nil {
 				return nil, err
 			}
@@ -301,7 +293,7 @@ func (h *ActionHandler) GetGitSource(ctx context.Context, rs *cstypes.RemoteSour
 	if err != nil {
 		return nil, err
 	}
-	return common.GetGitSource(rs, la)
+	return scommon.GetGitSource(rs, la)
 }
 
 type RegisterUserRequest struct {
@@ -329,11 +321,11 @@ func (h *ActionHandler) RegisterUser(ctx context.Context, req *RegisterUserReque
 		return nil, util.NewErrBadRequest(errors.Errorf("remote source user registration is disabled"))
 	}
 
-	accessToken, err := common.GetAccessToken(rs, req.UserAccessToken, req.Oauth2AccessToken)
+	accessToken, err := scommon.GetAccessToken(rs, req.UserAccessToken, req.Oauth2AccessToken)
 	if err != nil {
 		return nil, err
 	}
-	userSource, err := common.GetUserSource(rs, accessToken)
+	userSource, err := scommon.GetUserSource(rs, accessToken)
 	if err != nil {
 		return nil, err
 	}
@@ -391,11 +383,11 @@ func (h *ActionHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (*
 		return nil, util.NewErrBadRequest(errors.Errorf("remote source user login is disabled"))
 	}
 
-	accessToken, err := common.GetAccessToken(rs, req.UserAccessToken, req.Oauth2AccessToken)
+	accessToken, err := scommon.GetAccessToken(rs, req.UserAccessToken, req.Oauth2AccessToken)
 	if err != nil {
 		return nil, err
 	}
-	userSource, err := common.GetUserSource(rs, accessToken)
+	userSource, err := scommon.GetUserSource(rs, accessToken)
 	if err != nil {
 		return nil, err
 	}
@@ -451,7 +443,7 @@ func (h *ActionHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (*
 	}
 
 	// generate jwt token
-	token, err := common.GenerateLoginJWTToken(h.sd, user.ID)
+	token, err := scommon.GenerateLoginJWTToken(h.sd, user.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -480,11 +472,11 @@ func (h *ActionHandler) Authorize(ctx context.Context, req *AuthorizeRequest) (*
 		return nil, errors.Errorf("failed to get remote source %q: %w", req.RemoteSourceName, ErrFromRemote(resp, err))
 	}
 
-	accessToken, err := common.GetAccessToken(rs, req.UserAccessToken, req.Oauth2AccessToken)
+	accessToken, err := scommon.GetAccessToken(rs, req.UserAccessToken, req.Oauth2AccessToken)
 	if err != nil {
 		return nil, err
 	}
-	userSource, err := common.GetUserSource(rs, accessToken)
+	userSource, err := scommon.GetUserSource(rs, accessToken)
 	if err != nil {
 		return nil, err
 	}
@@ -523,7 +515,7 @@ func (h *ActionHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSource
 			return nil, errors.Errorf("failed to get user %q: %w", req.UserRef, ErrFromRemote(resp, err))
 		}
 
-		curUserID := h.CurrentUserID(ctx)
+		curUserID := common.CurrentUserID(ctx)
 
 		// user must be already logged in the create a linked account and can create a
 		// linked account only on itself.
@@ -554,11 +546,11 @@ func (h *ActionHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSource
 
 	switch rs.AuthType {
 	case cstypes.RemoteSourceAuthTypeOauth2:
-		oauth2Source, err := common.GetOauth2Source(rs, "")
+		oauth2Source, err := scommon.GetOauth2Source(rs, "")
 		if err != nil {
 			return nil, errors.Errorf("failed to create git source: %w", err)
 		}
-		token, err := common.GenerateOauth2JWTToken(h.sd, rs.Name, string(requestType), req)
+		token, err := scommon.GenerateOauth2JWTToken(h.sd, rs.Name, string(requestType), req)
 		if err != nil {
 			return nil, err
 		}
@@ -572,7 +564,7 @@ func (h *ActionHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSource
 		}, nil
 
 	case cstypes.RemoteSourceAuthTypePassword:
-		passwordSource, err := common.GetPasswordSource(rs, "")
+		passwordSource, err := scommon.GetPasswordSource(rs, "")
 		if err != nil {
 			return nil, errors.Errorf("failed to create git source: %w", err)
 		}
@@ -751,7 +743,7 @@ func (h *ActionHandler) HandleOauth2Callback(ctx context.Context, code, state st
 		return nil, errors.Errorf("failed to get remote source %q: %w", remoteSourceName, ErrFromRemote(resp, err))
 	}
 
-	oauth2Source, err := common.GetOauth2Source(rs, "")
+	oauth2Source, err := scommon.GetOauth2Source(rs, "")
 	if err != nil {
 		return nil, errors.Errorf("failed to create oauth2 source: %w", err)
 	}
@@ -765,7 +757,7 @@ func (h *ActionHandler) HandleOauth2Callback(ctx context.Context, code, state st
 }
 
 func (h *ActionHandler) DeleteUser(ctx context.Context, userRef string) error {
-	if !h.IsUserAdmin(ctx) {
+	if !common.IsUserAdmin(ctx) {
 		return errors.Errorf("user not logged in")
 	}
 
@@ -777,12 +769,12 @@ func (h *ActionHandler) DeleteUser(ctx context.Context, userRef string) error {
 }
 
 func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) error {
-	if !h.IsUserLoggedOrAdmin(ctx) {
+	if !common.IsUserLoggedOrAdmin(ctx) {
 		return errors.Errorf("user not logged in")
 	}
 
-	isAdmin := !h.IsUserAdmin(ctx)
-	curUserID := h.CurrentUserID(ctx)
+	isAdmin := common.IsUserAdmin(ctx)
+	curUserID := common.CurrentUserID(ctx)
 
 	user, resp, err := h.configstoreClient.GetUser(ctx, userRef)
 	if err != nil {
@@ -802,12 +794,12 @@ func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) 
 }
 
 func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName string) error {
-	if !h.IsUserLoggedOrAdmin(ctx) {
+	if !common.IsUserLoggedOrAdmin(ctx) {
 		return errors.Errorf("user not logged in")
 	}
 
-	isAdmin := !h.IsUserAdmin(ctx)
-	curUserID := h.CurrentUserID(ctx)
+	isAdmin := common.IsUserAdmin(ctx)
+	curUserID := common.CurrentUserID(ctx)
 
 	user, resp, err := h.configstoreClient.GetUser(ctx, userRef)
 	if err != nil {
@@ -849,7 +841,7 @@ func (h *ActionHandler) UserCreateRun(ctx context.Context, req *UserCreateRunReq
 		prRefRegexes = append(prRefRegexes, re)
 	}
 
-	curUserID := h.CurrentUserID(ctx)
+	curUserID := common.CurrentUserID(ctx)
 
 	user, resp, err := h.configstoreClient.GetUser(ctx, curUserID)
 	if err != nil {
