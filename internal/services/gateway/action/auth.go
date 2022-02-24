@@ -17,44 +17,20 @@ package action
 import (
 	"context"
 
-	"agola.io/agola/internal/services/common"
+	scommon "agola.io/agola/internal/services/common"
+	"agola.io/agola/internal/services/gateway/common"
 	cstypes "agola.io/agola/services/configstore/types"
 
 	errors "golang.org/x/xerrors"
 )
 
-func (h *ActionHandler) CurrentUserID(ctx context.Context) string {
-	userIDVal := ctx.Value("userid")
-	if userIDVal == nil {
-		return ""
-	}
-	return userIDVal.(string)
-}
-
-func (h *ActionHandler) IsUserLogged(ctx context.Context) bool {
-	return ctx.Value("userid") != nil
-}
-
-func (h *ActionHandler) IsUserAdmin(ctx context.Context) bool {
-	isAdmin := false
-	isAdminVal := ctx.Value("admin")
-	if isAdminVal != nil {
-		isAdmin = isAdminVal.(bool)
-	}
-	return isAdmin
-}
-
-func (h *ActionHandler) IsUserLoggedOrAdmin(ctx context.Context) bool {
-	return h.IsUserLogged(ctx) || h.IsUserAdmin(ctx)
-}
-
 func (h *ActionHandler) IsOrgOwner(ctx context.Context, orgID string) (bool, error) {
-	isAdmin := h.IsUserAdmin(ctx)
+	isAdmin := common.IsUserAdmin(ctx)
 	if isAdmin {
 		return true, nil
 	}
 
-	userID := h.CurrentUserID(ctx)
+	userID := common.CurrentUserID(ctx)
 	if userID == "" {
 		return false, nil
 	}
@@ -77,12 +53,12 @@ func (h *ActionHandler) IsOrgOwner(ctx context.Context, orgID string) (bool, err
 }
 
 func (h *ActionHandler) IsProjectOwner(ctx context.Context, ownerType cstypes.ConfigType, ownerID string) (bool, error) {
-	isAdmin := h.IsUserAdmin(ctx)
+	isAdmin := common.IsUserAdmin(ctx)
 	if isAdmin {
 		return true, nil
 	}
 
-	userID := h.CurrentUserID(ctx)
+	userID := common.CurrentUserID(ctx)
 	if userID == "" {
 		return false, nil
 	}
@@ -113,12 +89,12 @@ func (h *ActionHandler) IsProjectOwner(ctx context.Context, ownerType cstypes.Co
 }
 
 func (h *ActionHandler) IsProjectMember(ctx context.Context, ownerType cstypes.ConfigType, ownerID string) (bool, error) {
-	isAdmin := h.IsUserAdmin(ctx)
+	isAdmin := common.IsUserAdmin(ctx)
 	if isAdmin {
 		return true, nil
 	}
 
-	userID := h.CurrentUserID(ctx)
+	userID := common.CurrentUserID(ctx)
 	if userID == "" {
 		return false, nil
 	}
@@ -170,7 +146,7 @@ func (h *ActionHandler) IsVariableOwner(ctx context.Context, parentType cstypes.
 }
 
 func (h *ActionHandler) CanGetRun(ctx context.Context, runGroup string) (bool, error) {
-	groupType, groupID, err := common.GroupTypeIDFromRunGroup(runGroup)
+	groupType, groupID, err := scommon.GroupTypeIDFromRunGroup(runGroup)
 	if err != nil {
 		return false, err
 	}
@@ -179,7 +155,7 @@ func (h *ActionHandler) CanGetRun(ctx context.Context, runGroup string) (bool, e
 	var ownerType cstypes.ConfigType
 	var ownerID string
 	switch groupType {
-	case common.GroupTypeProject:
+	case scommon.GroupTypeProject:
 		p, resp, err := h.configstoreClient.GetProject(ctx, groupID)
 		if err != nil {
 			return false, ErrFromRemote(resp, err)
@@ -187,7 +163,7 @@ func (h *ActionHandler) CanGetRun(ctx context.Context, runGroup string) (bool, e
 		ownerType = p.OwnerType
 		ownerID = p.OwnerID
 		visibility = p.GlobalVisibility
-	case common.GroupTypeUser:
+	case scommon.GroupTypeUser:
 		// user direct runs
 		ownerType = cstypes.ConfigTypeUser
 		ownerID = groupID
@@ -208,7 +184,7 @@ func (h *ActionHandler) CanGetRun(ctx context.Context, runGroup string) (bool, e
 }
 
 func (h *ActionHandler) CanDoRunActions(ctx context.Context, runGroup string) (bool, error) {
-	groupType, groupID, err := common.GroupTypeIDFromRunGroup(runGroup)
+	groupType, groupID, err := scommon.GroupTypeIDFromRunGroup(runGroup)
 	if err != nil {
 		return false, err
 	}
@@ -216,14 +192,14 @@ func (h *ActionHandler) CanDoRunActions(ctx context.Context, runGroup string) (b
 	var ownerType cstypes.ConfigType
 	var ownerID string
 	switch groupType {
-	case common.GroupTypeProject:
+	case scommon.GroupTypeProject:
 		p, resp, err := h.configstoreClient.GetProject(ctx, groupID)
 		if err != nil {
 			return false, ErrFromRemote(resp, err)
 		}
 		ownerType = p.OwnerType
 		ownerID = p.OwnerID
-	case common.GroupTypeUser:
+	case scommon.GroupTypeUser:
 		// user direct runs
 		ownerType = cstypes.ConfigTypeUser
 		ownerID = groupID

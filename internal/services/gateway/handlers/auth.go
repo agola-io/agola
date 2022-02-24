@@ -19,7 +19,8 @@ import (
 	"net/http"
 	"strings"
 
-	"agola.io/agola/internal/services/common"
+	scommon "agola.io/agola/internal/services/common"
+	"agola.io/agola/internal/services/gateway/common"
 	csclient "agola.io/agola/services/configstore/client"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -35,12 +36,12 @@ type AuthHandler struct {
 	configstoreClient *csclient.Client
 	adminToken        string
 
-	sd *common.TokenSigningData
+	sd *scommon.TokenSigningData
 
 	required bool
 }
 
-func NewAuthHandler(logger *zap.Logger, configstoreClient *csclient.Client, adminToken string, sd *common.TokenSigningData, required bool) func(http.Handler) http.Handler {
+func NewAuthHandler(logger *zap.Logger, configstoreClient *csclient.Client, adminToken string, sd *scommon.TokenSigningData, required bool) func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		return &AuthHandler{
 			log:               logger.Sugar(),
@@ -59,7 +60,7 @@ func (h *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	tokenString, _ := TokenExtractor.ExtractToken(r)
 	if h.adminToken != "" && tokenString != "" {
 		if tokenString == h.adminToken {
-			ctx = context.WithValue(ctx, "admin", true)
+			ctx = context.WithValue(ctx, common.ContextKeyUserAdmin, true)
 			h.next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		} else {
@@ -74,11 +75,11 @@ func (h *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// pass userid to handlers via context
-			ctx = context.WithValue(ctx, "userid", user.ID)
-			ctx = context.WithValue(ctx, "username", user.Name)
+			ctx = context.WithValue(ctx, common.ContextKeyUserID, user.ID)
+			ctx = context.WithValue(ctx, common.ContextKeyUsername, user.Name)
 
 			if user.Admin {
-				ctx = context.WithValue(ctx, "admin", true)
+				ctx = context.WithValue(ctx, common.ContextKeyUserAdmin, true)
 			}
 
 			h.next.ServeHTTP(w, r.WithContext(ctx))
@@ -128,11 +129,11 @@ func (h *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// pass userid and username to handlers via context
-		ctx = context.WithValue(ctx, "userid", user.ID)
-		ctx = context.WithValue(ctx, "username", user.Name)
+		ctx = context.WithValue(ctx, common.ContextKeyUserID, user.ID)
+		ctx = context.WithValue(ctx, common.ContextKeyUsername, user.Name)
 
 		if user.Admin {
-			ctx = context.WithValue(ctx, "admin", true)
+			ctx = context.WithValue(ctx, common.ContextKeyUserAdmin, true)
 		}
 
 		h.next.ServeHTTP(w, r.WithContext(ctx))

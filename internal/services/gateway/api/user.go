@@ -22,6 +22,7 @@ import (
 	"strconv"
 
 	"agola.io/agola/internal/services/gateway/action"
+	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"
@@ -104,12 +105,11 @@ func NewCurrentUserHandler(logger *zap.Logger, ah *action.ActionHandler) *Curren
 func (h *CurrentUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	userIDVal := ctx.Value("userid")
-	if userIDVal == nil {
+	userID := common.CurrentUserID(ctx)
+	if userID == "" {
 		httpError(w, util.NewErrBadRequest(errors.Errorf("user not authenticated")))
 		return
 	}
-	userID := userIDVal.(string)
 
 	user, err := h.ah.GetUser(ctx, userID)
 	if httpError(w, err) {
@@ -604,14 +604,13 @@ func NewUserOrgsHandler(logger *zap.Logger, ah *action.ActionHandler) *UserOrgsH
 func (h *UserOrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	userIDVal := ctx.Value("userid")
-	if userIDVal == nil {
+	userID := common.CurrentUserID(ctx)
+	if userID == "" {
 		httpError(w, util.NewErrBadRequest(errors.Errorf("user not authenticated")))
 		return
 	}
-	userRef := userIDVal.(string)
 
-	userOrgs, err := h.ah.GetUserOrgs(ctx, userRef)
+	userOrgs, err := h.ah.GetUserOrgs(ctx, userID)
 	if httpError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return

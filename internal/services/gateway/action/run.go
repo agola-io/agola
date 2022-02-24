@@ -24,7 +24,8 @@ import (
 	"agola.io/agola/internal/config"
 	gitsource "agola.io/agola/internal/gitsources"
 	"agola.io/agola/internal/runconfig"
-	"agola.io/agola/internal/services/common"
+	scommon "agola.io/agola/internal/services/common"
+	"agola.io/agola/internal/services/gateway/common"
 	itypes "agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 	cstypes "agola.io/agola/services/configstore/types"
@@ -268,7 +269,7 @@ func (h *ActionHandler) RunTaskAction(ctx context.Context, req *RunTaskActionsRe
 	if !canDoRunAction {
 		return util.NewErrForbidden(errors.Errorf("user not authorized"))
 	}
-	curUserID := h.CurrentUserID(ctx)
+	curUserID := common.CurrentUserID(ctx)
 	if curUserID == "" {
 		return util.NewErrBadRequest(errors.Errorf("no logged in user"))
 	}
@@ -285,7 +286,7 @@ func (h *ActionHandler) RunTaskAction(ctx context.Context, req *RunTaskActionsRe
 		if rt.Annotations != nil {
 			annotations = rt.Annotations
 		}
-		approversAnnotation, ok := annotations[common.ApproversAnnotation]
+		approversAnnotation, ok := annotations[scommon.ApproversAnnotation]
 		if ok {
 			if err := json.Unmarshal([]byte(approversAnnotation), &approvers); err != nil {
 				return errors.Errorf("failed to unmarshal run task approvers annotation: %w", err)
@@ -304,7 +305,7 @@ func (h *ActionHandler) RunTaskAction(ctx context.Context, req *RunTaskActionsRe
 			return errors.Errorf("failed to marshal run task approvers annotation: %w", err)
 		}
 
-		annotations[common.ApproversAnnotation] = string(approversj)
+		annotations[scommon.ApproversAnnotation] = string(approversj)
 
 		rsreq := &rsapitypes.RunTaskActionsRequest{
 			ActionType:              rsapitypes.RunTaskActionTypeSetAnnotations,
@@ -372,32 +373,32 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 		return util.NewErrBadRequest(errors.Errorf("empty message"))
 	}
 
-	var baseGroupType common.GroupType
+	var baseGroupType scommon.GroupType
 	var baseGroupID string
-	var groupType common.GroupType
+	var groupType scommon.GroupType
 	var group string
 
 	if req.RunType == itypes.RunTypeProject {
-		baseGroupType = common.GroupTypeProject
+		baseGroupType = scommon.GroupTypeProject
 		baseGroupID = req.Project.ID
 	} else {
-		baseGroupType = common.GroupTypeUser
+		baseGroupType = scommon.GroupTypeUser
 		baseGroupID = req.User.ID
 	}
 
 	switch req.RefType {
 	case itypes.RunRefTypeBranch:
-		groupType = common.GroupTypeBranch
+		groupType = scommon.GroupTypeBranch
 		group = req.Branch
 	case itypes.RunRefTypeTag:
-		groupType = common.GroupTypeTag
+		groupType = scommon.GroupTypeTag
 		group = req.Tag
 	case itypes.RunRefTypePullRequest:
-		groupType = common.GroupTypePullRequest
+		groupType = scommon.GroupTypePullRequest
 		group = req.PullRequestID
 	}
 
-	runGroup := common.GenRunGroup(baseGroupType, baseGroupID, groupType, group)
+	runGroup := scommon.GenRunGroup(baseGroupType, baseGroupID, groupType, group)
 
 	gitURL, err := util.ParseGitURL(req.CloneURL)
 	if err != nil {
@@ -595,7 +596,7 @@ func (h *ActionHandler) genRunVariables(ctx context.Context, req *CreateRunReque
 	}
 
 	// remove overriden variables
-	pvars = common.FilterOverriddenVariables(pvars)
+	pvars = scommon.FilterOverriddenVariables(pvars)
 
 	// get project secrets
 	secrets, _, err := h.configstoreClient.GetProjectSecrets(ctx, req.Project.ID, true)
@@ -611,7 +612,7 @@ func (h *ActionHandler) genRunVariables(ctx context.Context, req *CreateRunReque
 				continue
 			}
 			// get the secret value referenced by the variable, it must be a secret at the same level or a lower level
-			secret := common.GetVarValueMatchingSecret(varval, pvar.ParentPath, secrets)
+			secret := scommon.GetVarValueMatchingSecret(varval, pvar.ParentPath, secrets)
 			if secret != nil {
 				varValue, ok := secret.Data[varval.SecretVar]
 				if ok {

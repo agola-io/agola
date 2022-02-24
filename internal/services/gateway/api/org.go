@@ -20,6 +20,7 @@ import (
 	"strconv"
 
 	"agola.io/agola/internal/services/gateway/action"
+	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
 	cstypes "agola.io/agola/services/configstore/types"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
@@ -41,11 +42,7 @@ func NewCreateOrgHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateOr
 func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var userID string
-	userIDVal := ctx.Value("userid")
-	if userIDVal != nil {
-		userID = userIDVal.(string)
-	}
+	userID := common.CurrentUserID(ctx)
 
 	var req gwapitypes.CreateOrgRequest
 	d := json.NewDecoder(r.Body)
