@@ -47,7 +47,8 @@ func (e *Errors) Equal(e2 error) bool {
 	for _, err := range e.Errs {
 		errs1 = append(errs1, err.Error())
 	}
-	if es2, ok := e2.(*Errors); ok {
+	var es2 *Errors
+	if errors.As(e2, &es2) {
 		for _, err := range es2.Errs {
 			errs2 = append(errs2, err.Error())
 		}
@@ -72,13 +73,13 @@ func NewErrBadRequest(err error) *ErrBadRequest {
 	return &ErrBadRequest{Err: err}
 }
 
-func (*ErrBadRequest) Is(err error) bool {
-	_, ok := err.(*ErrBadRequest)
-	return ok
+func (e *ErrBadRequest) Unwrap() error {
+	return e.Err
 }
 
 func IsBadRequest(err error) bool {
-	return errors.Is(err, &ErrBadRequest{})
+	var e *ErrBadRequest
+	return errors.As(err, &e)
 }
 
 // ErrNotExist represent a not exist error
@@ -95,13 +96,13 @@ func NewErrNotExist(err error) *ErrNotExist {
 	return &ErrNotExist{Err: err}
 }
 
-func (*ErrNotExist) Is(err error) bool {
-	_, ok := err.(*ErrNotExist)
-	return ok
+func (e *ErrNotExist) Unwrap() error {
+	return e.Err
 }
 
 func IsNotExist(err error) bool {
-	return errors.Is(err, &ErrNotExist{})
+	var e *ErrNotExist
+	return errors.As(err, &e)
 }
 
 // ErrForbidden represent an error caused by an forbidden operation
@@ -118,13 +119,13 @@ func NewErrForbidden(err error) *ErrForbidden {
 	return &ErrForbidden{Err: err}
 }
 
-func (*ErrForbidden) Is(err error) bool {
-	_, ok := err.(*ErrForbidden)
-	return ok
+func (e *ErrForbidden) Unwrap() error {
+	return e.Err
 }
 
 func IsForbidden(err error) bool {
-	return errors.Is(err, &ErrForbidden{})
+	var e *ErrForbidden
+	return errors.As(err, &e)
 }
 
 // ErrUnauthorized represent an error caused by an unauthorized request
@@ -141,13 +142,13 @@ func NewErrUnauthorized(err error) *ErrUnauthorized {
 	return &ErrUnauthorized{Err: err}
 }
 
-func (*ErrUnauthorized) Is(err error) bool {
-	_, ok := err.(*ErrUnauthorized)
-	return ok
+func (e *ErrUnauthorized) Unwrap() error {
+	return e.Err
 }
 
 func IsUnauthorized(err error) bool {
-	return errors.Is(err, &ErrUnauthorized{})
+	var e *ErrUnauthorized
+	return errors.As(err, &e)
 }
 
 type ErrInternal struct {
@@ -163,11 +164,11 @@ func NewErrInternal(err error) *ErrInternal {
 	return &ErrInternal{Err: err}
 }
 
-func (*ErrInternal) Is(err error) bool {
-	_, ok := err.(*ErrInternal)
-	return ok
+func (e *ErrInternal) Unwrap() error {
+	return e.Err
 }
 
 func IsInternal(err error) bool {
-	return errors.Is(err, &ErrInternal{})
+	var e *ErrInternal
+	return errors.As(err, &e)
 }

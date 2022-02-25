@@ -27,7 +27,7 @@ import (
 
 func (h *ActionHandler) MaintenanceMode(ctx context.Context, enable bool) error {
 	resp, err := h.e.Get(ctx, common.EtcdMaintenanceKey, 0)
-	if err != nil && err != etcd.ErrKeyNotFound {
+	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
 		return err
 	}
 

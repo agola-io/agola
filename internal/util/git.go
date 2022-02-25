@@ -154,7 +154,8 @@ func (g *Git) ConfigGet(ctx context.Context, args ...string) (string, error) {
 	out, err := g.Output(ctx, nil, args...)
 
 	if err != nil {
-		if exitError, ok := err.(*exec.ExitError); ok {
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) {
 			if waitStatus, ok := exitError.Sys().(syscall.WaitStatus); ok {
 				if waitStatus.ExitStatus() == 1 {
 					return "", &ErrGitKeyNotFound{Key: args[len(args)-1]}
@@ -172,7 +173,8 @@ func (g *Git) ConfigSet(ctx context.Context, args ...string) (string, error) {
 	out, err := g.Output(ctx, nil, args...)
 
 	if err != nil {
-		if exitError, ok := err.(*exec.ExitError); ok {
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) {
 			if waitStatus, ok := exitError.Sys().(syscall.WaitStatus); ok {
 				if waitStatus.ExitStatus() == 1 {
 					return "", &ErrGitKeyNotFound{Key: args[len(args)-1]}

@@ -38,6 +38,7 @@ import (
 
 	"github.com/gofrs/uuid"
 	"github.com/sgotti/gexpect"
+	errors "golang.org/x/xerrors"
 )
 
 const (
@@ -193,7 +194,7 @@ func NewTestEmbeddedEtcd(t *testing.T, logger *zap.Logger, dir string, a ...stri
 	}
 	e, err := etcd.New(storeConfig)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create store: %v", err)
+		return nil, fmt.Errorf("cannot create store: %w", err)
 	}
 
 	tectd := &TestEmbeddedEtcd{
@@ -267,7 +268,7 @@ func NewTestExternalEtcd(t *testing.T, logger *zap.Logger, dir string, a ...stri
 	}
 	e, err := etcd.New(storeConfig)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create store: %v", err)
+		return nil, fmt.Errorf("cannot create store: %w", err)
 	}
 
 	bin := os.Getenv("ETCD_BIN")
@@ -303,7 +304,7 @@ func (te *TestEtcd) Compact() error {
 	ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 	defer cancel()
 	resp, err := te.Get(ctx, "anykey", 0)
-	if err != nil && err != etcd.ErrKeyNotFound {
+	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
 		return err
 	}
 
@@ -317,7 +318,7 @@ func (te *TestEtcd) WaitUp(timeout time.Duration) error {
 		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 		defer cancel()
 		_, err := te.Get(ctx, "anykey", 0)
-		if err != nil && err == etcd.ErrKeyNotFound {
+		if err != nil && errors.Is(err, etcd.ErrKeyNotFound) {
 			return nil
 		}
 		if err == nil {
@@ -335,7 +336,7 @@ func (te *TestEtcd) WaitDown(timeout time.Duration) error {
 		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 		defer cancel()
 		_, err := te.Get(ctx, "anykey", 0)
-		if err != nil && err != etcd.ErrKeyNotFound {
+		if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
 			return nil
 		}
 		time.Sleep(sleepInterval)
@@ -567,7 +568,7 @@ func GetFreePort(tcp bool, udp bool) (string, string, error) {
 	}
 	localhostIP, err := net.ResolveIPAddr("ip", "localhost")
 	if err != nil {
-		return "", "", fmt.Errorf("failed to resolve ip addr: %v", err)
+		return "", "", fmt.Errorf("failed to resolve ip addr: %w", err)
 	}
 	for {
 		curPort++

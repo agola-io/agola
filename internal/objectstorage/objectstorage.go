@@ -46,13 +46,13 @@ func (e *ErrNotExist) Error() string {
 	return e.err.Error()
 }
 
-func (*ErrNotExist) Is(err error) bool {
-	_, ok := err.(*ErrNotExist)
-	return ok
+func (e *ErrNotExist) Unwrap() error {
+	return e.err
 }
 
 func IsNotExist(err error) bool {
-	return errors.Is(err, &ErrNotExist{})
+	var e *ErrNotExist
+	return errors.As(err, &e)
 }
 
 type ReadSeekCloser interface {

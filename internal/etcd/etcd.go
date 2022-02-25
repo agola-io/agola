@@ -62,8 +62,7 @@ type Config struct {
 }
 
 func FromEtcdError(err error) error {
-	switch err {
-	case rpctypes.ErrKeyNotFound:
+	if errors.Is(err, rpctypes.ErrKeyNotFound) {
 		return ErrKeyNotFound
 	}
 	return err

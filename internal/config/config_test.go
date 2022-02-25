@@ -207,7 +207,8 @@ func TestParseConfig(t *testing.T) {
 				if tt.err == nil {
 					t.Fatalf("got error: %v, expected no error", err)
 				}
-				if errs, ok := err.(*util.Errors); ok {
+				var errs *util.Errors
+				if errors.As(err, &errs) {
 					if !errs.Equal(tt.err) {
 						t.Fatalf("got error: %v, want error: %v", err, tt.err)
 					}

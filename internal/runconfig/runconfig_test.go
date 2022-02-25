@@ -663,7 +663,8 @@ func TestCheckRunConfig(t *testing.T) {
 			}
 
 			if err := CheckRunConfigTasks(inRcts); err != nil {
-				if errs, ok := err.(*util.Errors); ok {
+				var errs *util.Errors
+				if errors.As(err, &errs) {
 					if !errs.Equal(tt.err) {
 						t.Fatalf("got error: %v, want error: %v", err, tt.err)
 					}

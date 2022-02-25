@@ -73,15 +73,15 @@ func (s *Sequence) EqualEpoch(s2 *Sequence) bool {
 
 func CurSequence(ctx context.Context, e *etcd.Store, key string) (*Sequence, bool, error) {
 	resp, err := e.Get(ctx, key, 0)
-	if err != nil && err != etcd.ErrKeyNotFound {
+	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
 		return nil, false, err
 	}
-	if err == etcd.ErrKeyNotFound {
+	if errors.Is(err, etcd.ErrKeyNotFound) {
 		return nil, false, nil
 	}
 
 	seq := &Sequence{}
-	if err != etcd.ErrKeyNotFound {
+	if !errors.Is(err, etcd.ErrKeyNotFound) {
 		kv := resp.Kvs[0]
 		if err := json.Unmarshal(kv.Value, &seq); err != nil {
 			return nil, false, err
@@ -92,13 +92,13 @@ func CurSequence(ctx context.Context, e *etcd.Store, key string) (*Sequence, boo
 
 func IncSequence(ctx context.Context, e *etcd.Store, key string) (*Sequence, error) {
 	resp, err := e.Get(ctx, key, 0)
-	if err != nil && err != etcd.ErrKeyNotFound {
+	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
 		return nil, err
 	}
 
 	var revision int64
 	seq := &Sequence{}
-	if err != etcd.ErrKeyNotFound {
+	if !errors.Is(err, etcd.ErrKeyNotFound) {
 		kv := resp.Kvs[0]
 		if err := json.Unmarshal(kv.Value, &seq); err != nil {
 			return nil, err

@@ -420,10 +420,10 @@ func AtomicPutRun(ctx context.Context, e *etcd.Store, r *types.Run, runEvent *ty
 
 	// insert only if the run as changed
 	curRun, _, err := GetRun(ctx, e, r.ID)
-	if err != nil && err != etcd.ErrKeyNotFound {
+	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
 		return nil, err
 	}
-	if err != etcd.ErrKeyNotFound {
+	if !errors.Is(err, etcd.ErrKeyNotFound) {
 		if curRun.Revision != r.Revision {
 			// fast fail path if the run was already updated
 			return nil, errors.Errorf("run modified")
@@ -522,7 +522,7 @@ func GetRuns(ctx context.Context, e *etcd.Store) ([]*types.Run, error) {
 
 func GetRunEtcdOrOST(ctx context.Context, e *etcd.Store, dm *datamanager.DataManager, runID string) (*types.Run, error) {
 	r, _, err := GetRun(ctx, e, runID)
-	if err != nil && err != etcd.ErrKeyNotFound {
+	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
 		return nil, err
 	}
 	if r == nil {

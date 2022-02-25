@@ -106,7 +106,7 @@ func NewK8sDriver(logger *zap.Logger, executorID, toolboxPath, initImage string,
 	}
 	kubecli, err := kubernetes.NewForConfig(kubecfg)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create kubernetes client: %v", err)
+		return nil, fmt.Errorf("cannot create kubernetes client: %w", err)
 	}
 
 	namespace, _, err := kubeClientConfig.Namespace()
@@ -133,7 +133,7 @@ func NewK8sDriver(logger *zap.Logger, executorID, toolboxPath, initImage string,
 	sv, err := parseGitVersion(serverVersion.GitVersion)
 	// if server version parsing fails just warn but ignore it
 	if err != nil {
-		d.log.Warnf("failed to parse k8s server version: %v", err)
+		d.log.Warnf("failed to parse k8s server version: %w", err)
 	}
 	if sv != nil {
 		// for k8s version < v1.14.x use old arch label
@@ -800,10 +800,10 @@ func (e *K8sContainerExec) Wait(ctx context.Context) (int, error) {
 
 	var exitCode int
 	if err != nil {
-		switch err := err.(type) {
-		case utilexec.ExitError:
-			exitCode = err.ExitStatus()
-		default:
+		var verr utilexec.ExitError
+		if errors.As(err, &verr) {
+			exitCode = verr.ExitStatus()
+		} else {
 			return -1, err
 		}
 	}

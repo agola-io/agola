@@ -241,14 +241,14 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 
 	et, err := store.GetExecutorTask(ctx, h.e, task.ID)
 	if err != nil {
-		if err == etcd.ErrKeyNotFound {
+		if errors.Is(err, etcd.ErrKeyNotFound) {
 			return util.NewErrNotExist(errors.Errorf("executor task with id %q doesn't exist", task.ID)), true
 		}
 		return err, true
 	}
 	executor, err := store.GetExecutor(ctx, h.e, et.Spec.ExecutorID)
 	if err != nil {
-		if err == etcd.ErrKeyNotFound {
+		if errors.Is(err, etcd.ErrKeyNotFound) {
 			return util.NewErrNotExist(errors.Errorf("executor with id %q doesn't exist", et.Spec.ExecutorID)), true
 		}
 		return err, true
@@ -832,7 +832,7 @@ func (h *RunEventsHandler) sendRunEvents(ctx context.Context, startRunEventID st
 	for wresp := range wch {
 		if wresp.Canceled {
 			err := wresp.Err()
-			if err == etcdclientv3rpc.ErrCompacted {
+			if errors.Is(err, etcdclientv3rpc.ErrCompacted) {
 				h.log.Errorf("required events already compacted")
 			}
 			return errors.Errorf("watch error: %w", err)

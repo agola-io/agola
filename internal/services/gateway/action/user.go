@@ -571,7 +571,7 @@ func (h *ActionHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSource
 		tokenName := "agola-" + h.agolaID
 		accessToken, err := passwordSource.LoginPassword(loginName, loginPassword, tokenName)
 		if err != nil {
-			if err == gitsource.ErrUnauthorized {
+			if errors.Is(err, gitsource.ErrUnauthorized) {
 				return nil, util.NewErrUnauthorized(errors.Errorf("failed to login to remotesource %q: %w", remoteSourceName, err))
 			}
 			return nil, errors.Errorf("failed to login to remote source %q with login name %q: %w", rs.Name, loginName, err)
@@ -836,7 +836,7 @@ func (h *ActionHandler) UserCreateRun(ctx context.Context, req *UserCreateRunReq
 	for _, res := range req.PullRequestRefRegexes {
 		re, err := regexp.Compile(res)
 		if err != nil {
-			return fmt.Errorf("wrong regular expression %q: %v", res, err)
+			return fmt.Errorf("wrong regular expression %q: %w", res, err)
 		}
 		prRefRegexes = append(prRefRegexes, re)
 	}

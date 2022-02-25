@@ -296,10 +296,10 @@ func (d *DataManager) FirstAvailableWalData(ctx context.Context) (*WalData, int6
 
 func (d *DataManager) LastCommittedStorageWal(ctx context.Context) (string, int64, error) {
 	resp, err := d.e.Get(ctx, etcdLastCommittedStorageWalSeqKey, 0)
-	if err != nil && err != etcd.ErrKeyNotFound {
+	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
 		return "", 0, err
 	}
-	if err == etcd.ErrKeyNotFound {
+	if errors.Is(err, etcd.ErrKeyNotFound) {
 		return "", 0, errors.Errorf("no last committedstorage wal on etcd")
 	}
 	lastCommittedStorageWal := string(resp.Kvs[0].Value)
@@ -334,10 +334,9 @@ func (d *DataManager) Watch(ctx context.Context, revision int64) <-chan *WatchEl
 
 			if wresp.Canceled {
 				err := wresp.Err()
-				switch err {
-				case etcdclientv3rpc.ErrCompacted:
+				if errors.Is(err, etcdclientv3rpc.ErrCompacted) {
 					we.Err = ErrCompacted
-				default:
+				} else {
 					we.Err = err
 				}
 
@@ -1054,7 +1053,7 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 		}
 		dec := json.NewDecoder(walFile)
 		var header *WalHeader
-		if err = dec.Decode(&header); err != nil && err != io.EOF {
+		if err = dec.Decode(&header); err != nil && !errors.Is(err, io.EOF) {
 			walFile.Close()
 			return err
 		}
@@ -1113,7 +1112,7 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 
 	_, err = d.e.Get(ctx, etcdWalsDataKey, 0)
 	if err != nil {
-		if err != etcd.ErrKeyNotFound {
+		if !errors.Is(err, etcd.ErrKeyNotFound) {
 			return err
 		}
 		mustInit = true

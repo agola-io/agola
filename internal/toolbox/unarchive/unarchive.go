@@ -16,6 +16,7 @@ package unarchive
 
 import (
 	"archive/tar"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -32,12 +33,12 @@ func Unarchive(source io.Reader, destDir string, overwrite, removeDestDir bool) 
 	var err error
 	destDir, err = filepath.Abs(destDir)
 	if err != nil {
-		return fmt.Errorf("failed to calculate destination dir absolute path: %v", err)
+		return fmt.Errorf("failed to calculate destination dir absolute path: %w", err)
 	}
 	// don't follow destdir if it's a symlink
 	fi, err := os.Lstat(destDir)
 	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to lstat destination dir: %v", err)
+		return fmt.Errorf("failed to lstat destination dir: %w", err)
 	}
 	if fi != nil && !fi.IsDir() {
 		return fmt.Errorf("destination path %q already exists and it's not a directory (mode: %q)", destDir, fi.Mode().String())
@@ -52,11 +53,11 @@ func Unarchive(source io.Reader, destDir string, overwrite, removeDestDir bool) 
 
 	for {
 		err := untarNext(tr, destDir, overwrite)
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("error reading file in tar archive: %v", err)
+			return fmt.Errorf("error reading file in tar archive: %w", err)
 		}
 	}
 
@@ -132,7 +133,7 @@ func fileExists(name string) bool {
 func mkdir(dirPath string, mode os.FileMode) error {
 	err := os.MkdirAll(dirPath, mode)
 	if err != nil {
-		return fmt.Errorf("%s: making directory: %v", dirPath, err)
+		return fmt.Errorf("%s: making directory: %w", dirPath, err)
 	}
 	return nil
 }
@@ -140,23 +141,23 @@ func mkdir(dirPath string, mode os.FileMode) error {
 func writeNewFile(fpath string, in io.Reader, mode os.FileMode) error {
 	err := os.MkdirAll(filepath.Dir(fpath), defaultDirPerm)
 	if err != nil {
-		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
+		return fmt.Errorf("%s: making directory for file: %w", fpath, err)
 	}
 
 	out, err := os.Create(fpath)
 	if err != nil {
-		return fmt.Errorf("%s: creating new file: %v", fpath, err)
+		return fmt.Errorf("%s: creating new file: %w", fpath, err)
 	}
 	defer out.Close()
 
 	err = out.Chmod(mode)
 	if err != nil && runtime.GOOS != "windows" {
-		return fmt.Errorf("%s: changing file mode: %v", fpath, err)
+		return fmt.Errorf("%s: changing file mode: %w", fpath, err)
 	}
 
 	_, err = io.Copy(out, in)
 	if err != nil {
-		return fmt.Errorf("%s: writing file: %v", fpath, err)
+		return fmt.Errorf("%s: writing file: %w", fpath, err)
 	}
 	return nil
 }
@@ -164,11 +165,11 @@ func writeNewFile(fpath string, in io.Reader, mode os.FileMode) error {
 func writeNewSymbolicLink(fpath string, target string) error {
 	err := os.MkdirAll(filepath.Dir(fpath), defaultDirPerm)
 	if err != nil {
-		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
+		return fmt.Errorf("%s: making directory for file: %w", fpath, err)
 	}
 	err = os.Symlink(target, fpath)
 	if err != nil {
-		return fmt.Errorf("%s: making symbolic link for: %v", fpath, err)
+		return fmt.Errorf("%s: making symbolic link for: %w", fpath, err)
 	}
 	return nil
 }
@@ -176,11 +177,11 @@ func writeNewSymbolicLink(fpath string, target string) error {
 func writeNewHardLink(fpath string, target string) error {
 	err := os.MkdirAll(filepath.Dir(fpath), defaultDirPerm)
 	if err != nil {
-		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
+		return fmt.Errorf("%s: making directory for file: %w", fpath, err)
 	}
 	err = os.Link(target, fpath)
 	if err != nil {
-		return fmt.Errorf("%s: making hard link for: %v", fpath, err)
+		return fmt.Errorf("%s: making hard link for: %w", fpath, err)
 	}
 	return nil
 }

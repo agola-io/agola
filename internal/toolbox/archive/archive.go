@@ -50,7 +50,7 @@ func CreateTar(archiveInfos []*ArchiveInfo, w io.Writer) error {
 
 		sourceDirInfo, err := os.Stat(sourceDir)
 		if err != nil {
-			return fmt.Errorf("%s: stat: %v", sourceDir, err)
+			return fmt.Errorf("%s: stat: %w", sourceDir, err)
 		}
 		if !sourceDirInfo.IsDir() {
 			return fmt.Errorf("sourceDir %q is not a directory", sourceDir)
@@ -62,7 +62,7 @@ func CreateTar(archiveInfos []*ArchiveInfo, w io.Writer) error {
 			}
 
 			if err != nil {
-				return fmt.Errorf("error accessing path %q: %v. Skipping.", path, err)
+				return fmt.Errorf("error accessing path %q: %w. Skipping.", path, err)
 			}
 			match := false
 			for _, pattern := range ai.Paths {
@@ -104,19 +104,19 @@ func CreateTar(archiveInfos []*ArchiveInfo, w io.Writer) error {
 				var err error
 				linkTarget, err = os.Readlink(path)
 				if err != nil {
-					return fmt.Errorf("%s: readlink: %v", path, err)
+					return fmt.Errorf("%s: readlink: %w", path, err)
 				}
 			}
 
 			hdr, err := tar.FileInfoHeader(fi, filepath.ToSlash(linkTarget))
 			if err != nil {
-				return fmt.Errorf("%s: making header: %v", path, err)
+				return fmt.Errorf("%s: making header: %w", path, err)
 			}
 			hdr.Name = destPath
 
 			err = tw.WriteHeader(hdr)
 			if err != nil {
-				return fmt.Errorf("%s: writing header: %v", hdr.Name, err)
+				return fmt.Errorf("%s: writing header: %w", hdr.Name, err)
 			}
 
 			if fi.IsDir() {
@@ -130,14 +130,14 @@ func CreateTar(archiveInfos []*ArchiveInfo, w io.Writer) error {
 				}
 				defer f.Close()
 				if _, err := io.Copy(tw, f); err != nil {
-					return fmt.Errorf("%s: copying contents: %v", f.Name(), err)
+					return fmt.Errorf("%s: copying contents: %w", f.Name(), err)
 				}
 			}
 
 			return nil
 		})
 		if err != nil {
-			return fmt.Errorf("error walking the path %q: %v\n", sourceDir, err)
+			return fmt.Errorf("error walking the path %q: %w", sourceDir, err)
 		}
 	}
 
