@@ -46,92 +46,6 @@ type ErrorResponse struct {
 	Message string `json:"message"`
 }
 
-func ErrorResponseFromError(err error) *ErrorResponse {
-	var aerr error
-	// use inner errors if of these types
-	switch {
-	case util.IsBadRequest(err):
-		var cerr *util.ErrBadRequest
-		errors.As(err, &cerr)
-		aerr = cerr
-	case util.IsNotExist(err):
-		var cerr *util.ErrNotExist
-		errors.As(err, &cerr)
-		aerr = cerr
-	case util.IsForbidden(err):
-		var cerr *util.ErrForbidden
-		errors.As(err, &cerr)
-		aerr = cerr
-	case util.IsUnauthorized(err):
-		var cerr *util.ErrUnauthorized
-		errors.As(err, &cerr)
-		aerr = cerr
-	case util.IsInternal(err):
-		var cerr *util.ErrInternal
-		errors.As(err, &cerr)
-		aerr = cerr
-	}
-
-	if aerr != nil {
-		return &ErrorResponse{Message: aerr.Error()}
-	}
-
-	// on generic error return an generic message to not leak the real error
-	return &ErrorResponse{Message: "internal server error"}
-}
-
-func httpError(w http.ResponseWriter, err error) bool {
-	if err == nil {
-		return false
-	}
-
-	response := ErrorResponseFromError(err)
-	resj, merr := json.Marshal(response)
-	if merr != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return true
-	}
-	switch {
-	case util.IsBadRequest(err):
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write(resj)
-	case util.IsNotExist(err):
-		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write(resj)
-	case util.IsForbidden(err):
-		w.WriteHeader(http.StatusForbidden)
-		_, _ = w.Write(resj)
-	case util.IsUnauthorized(err):
-		w.WriteHeader(http.StatusUnauthorized)
-		_, _ = w.Write(resj)
-	case util.IsInternal(err):
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(resj)
-	default:
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(resj)
-	}
-	return true
-}
-
-func httpResponse(w http.ResponseWriter, code int, res interface{}) error {
-	w.Header().Set("Content-Type", "application/json")
-
-	if res != nil {
-		resj, err := json.Marshal(res)
-		if err != nil {
-			httpError(w, err)
-			return err
-		}
-		w.WriteHeader(code)
-		_, err = w.Write(resj)
-		return err
-	}
-
-	w.WriteHeader(code)
-	return nil
-}
-
 type LogsHandler struct {
 	log *zap.SugaredLogger
 	e   *etcd.Store
@@ -194,10 +108,10 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.log.Errorf("err: %+v", err)
 		if sendError {
 			switch {
-			case util.IsNotExist(err):
-				httpError(w, util.NewErrNotExist(errors.Errorf("log doesn't exist: %w", err)))
+			case util.APIErrorIs(err, util.ErrNotExist):
+				util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("log doesn't exist: %w", err)))
 			default:
-				httpError(w, err)
+				util.HTTPError(w, err)
 			}
 		}
 	}
@@ -209,15 +123,15 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 		return err, true
 	}
 	if r == nil {
-		return util.NewErrNotExist(errors.Errorf("no such run with id: %s", runID)), true
+		return util.NewAPIError(util.ErrNotExist, errors.Errorf("no such run with id: %s", runID)), true
 	}
 
 	task, ok := r.Tasks[taskID]
 	if !ok {
-		return util.NewErrNotExist(errors.Errorf("no such task with ID %s in run %s", taskID, runID)), true
+		return util.NewAPIError(util.ErrNotExist, errors.Errorf("no such task with ID %s in run %s", taskID, runID)), true
 	}
 	if len(task.Steps) <= step {
-		return util.NewErrNotExist(errors.Errorf("no such step for task %s in run %s", taskID, runID)), true
+		return util.NewAPIError(util.ErrNotExist, errors.Errorf("no such step for task %s in run %s", taskID, runID)), true
 	}
 
 	// if the log has been already fetched use it, otherwise fetch it from the executor
@@ -231,7 +145,7 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 		f, err := h.ost.ReadObject(logPath)
 		if err != nil {
 			if objectstorage.IsNotExist(err) {
-				return util.NewErrNotExist(err), true
+				return util.NewAPIError(util.ErrNotExist, err), true
 			}
 			return err, true
 		}
@@ -242,14 +156,14 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 	et, err := store.GetExecutorTask(ctx, h.e, task.ID)
 	if err != nil {
 		if errors.Is(err, etcd.ErrKeyNotFound) {
-			return util.NewErrNotExist(errors.Errorf("executor task with id %q doesn't exist", task.ID)), true
+			return util.NewAPIError(util.ErrNotExist, errors.Errorf("executor task with id %q doesn't exist", task.ID)), true
 		}
 		return err, true
 	}
 	executor, err := store.GetExecutor(ctx, h.e, et.Spec.ExecutorID)
 	if err != nil {
 		if errors.Is(err, etcd.ErrKeyNotFound) {
-			return util.NewErrNotExist(errors.Errorf("executor with id %q doesn't exist", et.Spec.ExecutorID)), true
+			return util.NewAPIError(util.ErrNotExist, errors.Errorf("executor with id %q doesn't exist", et.Spec.ExecutorID)), true
 		}
 		return err, true
 	}
@@ -270,7 +184,7 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 	defer req.Body.Close()
 	if req.StatusCode != http.StatusOK {
 		if req.StatusCode == http.StatusNotFound {
-			return util.NewErrNotExist(errors.New("no log on executor")), true
+			return util.NewAPIError(util.ErrNotExist, errors.New("no log on executor")), true
 		}
 		return errors.Errorf("received http status: %d", req.StatusCode), true
 	}
@@ -346,23 +260,23 @@ func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	runID := q.Get("runid")
 	if runID == "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("runid is empty")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("runid is empty")))
 		return
 	}
 	taskID := q.Get("taskid")
 	if taskID == "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("taskid is empty")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("taskid is empty")))
 		return
 	}
 
 	_, setup := q["setup"]
 	stepStr := q.Get("step")
 	if !setup && stepStr == "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("setup is false and step is empty")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("setup is false and step is empty")))
 		return
 	}
 	if setup && stepStr != "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("setup is true and step is %s", stepStr)))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("setup is true and step is %s", stepStr)))
 		return
 	}
 
@@ -371,7 +285,7 @@ func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		step, err = strconv.Atoi(stepStr)
 		if err != nil {
-			httpError(w, util.NewErrBadRequest(errors.Errorf("step %s is not a valid number", stepStr)))
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("step %s is not a valid number", stepStr)))
 			return
 		}
 	}
@@ -379,10 +293,10 @@ func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := h.deleteTaskLogs(ctx, runID, taskID, setup, step, w); err != nil {
 		h.log.Errorf("err: %+v", err)
 		switch {
-		case util.IsNotExist(err):
-			httpError(w, util.NewErrNotExist(errors.Errorf("log doesn't exist: %w", err)))
+		case util.APIErrorIs(err, util.ErrNotExist):
+			util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("log doesn't exist: %w", err)))
 		default:
-			httpError(w, err)
+			util.HTTPError(w, err)
 		}
 	}
 }
@@ -393,15 +307,15 @@ func (h *LogsDeleteHandler) deleteTaskLogs(ctx context.Context, runID, taskID st
 		return err
 	}
 	if r == nil {
-		return util.NewErrNotExist(errors.Errorf("no such run with id: %s", runID))
+		return util.NewAPIError(util.ErrNotExist, errors.Errorf("no such run with id: %s", runID))
 	}
 
 	task, ok := r.Tasks[taskID]
 	if !ok {
-		return util.NewErrNotExist(errors.Errorf("no such task with ID %s in run %s", taskID, runID))
+		return util.NewAPIError(util.ErrNotExist, errors.Errorf("no such task with ID %s in run %s", taskID, runID))
 	}
 	if len(task.Steps) <= step {
-		return util.NewErrNotExist(errors.Errorf("no such step for task %s in run %s", taskID, runID))
+		return util.NewAPIError(util.ErrNotExist, errors.Errorf("no such step for task %s in run %s", taskID, runID))
 	}
 
 	if task.Steps[step].LogPhase == types.RunTaskFetchPhaseFinished {
@@ -414,13 +328,13 @@ func (h *LogsDeleteHandler) deleteTaskLogs(ctx context.Context, runID, taskID st
 		err := h.ost.DeleteObject(logPath)
 		if err != nil {
 			if objectstorage.IsNotExist(err) {
-				return util.NewErrNotExist(err)
+				return util.NewAPIError(util.ErrNotExist, err)
 			}
 			return err
 		}
 		return nil
 	}
-	return util.NewErrBadRequest(errors.Errorf("Log for task %s in run %s is not yet archived", taskID, runID))
+	return util.NewAPIError(util.ErrBadRequest, errors.Errorf("Log for task %s in run %s is not yet archived", taskID, runID))
 }
 
 type ChangeGroupsUpdateTokensHandler struct {
@@ -458,7 +372,7 @@ func (h *ChangeGroupsUpdateTokensHandler) ServeHTTP(w http.ResponseWriter, r *ht
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, cgts); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, cgts); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -506,7 +420,7 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if run == nil {
-		httpError(w, util.NewErrNotExist(errors.Errorf("run %q doesn't exist", runID)))
+		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("run %q doesn't exist", runID)))
 		return
 	}
 
@@ -528,7 +442,7 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ChangeGroupsUpdateToken: cgts,
 	}
 
-	if err := httpResponse(w, http.StatusOK, res); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -613,7 +527,7 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Runs:                    runs,
 		ChangeGroupsUpdateToken: cgts,
 	}
-	if err := httpResponse(w, http.StatusOK, res); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -659,7 +573,7 @@ func (h *RunCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	rb, err := h.ah.CreateRun(ctx, creq)
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
+		util.HTTPError(w, err)
 		return
 	}
 
@@ -668,7 +582,7 @@ func (h *RunCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		RunConfig: rb.Rc,
 	}
 
-	if err := httpResponse(w, http.StatusCreated, res); err != nil {
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -706,7 +620,7 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := h.ah.ChangeRunPhase(ctx, creq); err != nil {
 			h.log.Errorf("err: %+v", err)
-			httpError(w, err)
+			util.HTTPError(w, err)
 			return
 		}
 	case rsapitypes.RunActionTypeStop:
@@ -716,7 +630,7 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := h.ah.StopRun(ctx, creq); err != nil {
 			h.log.Errorf("err: %+v", err)
-			httpError(w, err)
+			util.HTTPError(w, err)
 			return
 		}
 	default:
@@ -760,7 +674,7 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		}
 		if err := h.ah.RunTaskSetAnnotations(ctx, creq); err != nil {
 			h.log.Errorf("err: %+v", err)
-			httpError(w, err)
+			util.HTTPError(w, err)
 			return
 		}
 
@@ -772,7 +686,7 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		}
 		if err := h.ah.ApproveRunTask(ctx, creq); err != nil {
 			h.log.Errorf("err: %+v", err)
-			httpError(w, err)
+			util.HTTPError(w, err)
 			return
 		}
 

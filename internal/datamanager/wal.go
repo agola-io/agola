@@ -28,7 +28,6 @@ import (
 	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/sequence"
-	"agola.io/agola/internal/util"
 
 	"github.com/gofrs/uuid"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
@@ -124,7 +123,7 @@ func (d *DataManager) ReadObject(dataType, id string, cgNames []string) (io.Read
 				}
 			}
 		}
-		return nil, nil, util.NewErrNotExist(errors.Errorf("no datatype %q, id %q in wal %s", dataType, id, walseq))
+		return nil, nil, newErrNotExist(errors.Errorf("no datatype %q, id %q in wal %s", dataType, id, walseq))
 	}
 
 	f, err := d.Read(dataType, id)
@@ -137,7 +136,7 @@ func (d *DataManager) HasOSTWal(walseq string) (bool, error) {
 		return false, nil
 	}
 	if err != nil {
-		return false, err
+		return false, fromOSTError(err)
 	}
 	return true, nil
 }
@@ -145,7 +144,7 @@ func (d *DataManager) HasOSTWal(walseq string) (bool, error) {
 func (d *DataManager) ReadWal(walseq string) (*WalHeader, error) {
 	walFilef, err := d.ost.ReadObject(d.storageWalStatusFile(walseq) + ".committed")
 	if err != nil {
-		return nil, err
+		return nil, fromOSTError(err)
 	}
 	defer walFilef.Close()
 	dec := json.NewDecoder(walFilef)
@@ -158,7 +157,8 @@ func (d *DataManager) ReadWal(walseq string) (*WalHeader, error) {
 }
 
 func (d *DataManager) ReadWalData(walFileID string) (io.ReadCloser, error) {
-	return d.ost.ReadObject(d.storageWalDataFile(walFileID))
+	r, err := d.ost.ReadObject(d.storageWalDataFile(walFileID))
+	return r, fromOSTError(err)
 }
 
 type WalFile struct {
@@ -183,7 +183,7 @@ func (d *DataManager) ListOSTWals(start string) <-chan *WalFile {
 		for object := range d.ost.List(d.storageWalStatusDir()+"/", startPath, true, doneCh) {
 			if object.Err != nil {
 				walCh <- &WalFile{
-					Err: object.Err,
+					Err: fromOSTError(object.Err),
 				}
 				return
 			}
@@ -453,7 +453,7 @@ func (d *DataManager) WriteWalAdditionalOps(ctx context.Context, actions []*Acti
 		}
 	}
 	if err := d.ost.WriteObject(walDataFilePath, bytes.NewReader(buf.Bytes()), int64(buf.Len()), true); err != nil {
-		return nil, err
+		return nil, fromOSTError(err)
 	}
 	d.log.Debugf("wrote wal file: %s", walDataFilePath)
 
@@ -599,7 +599,7 @@ func (d *DataManager) sync(ctx context.Context) error {
 
 			walFileCommittedPath := walFilePath + ".committed"
 			if err := d.ost.WriteObject(walFileCommittedPath, bytes.NewReader(headerj), int64(len(headerj)), true); err != nil {
-				return err
+				return fromOSTError(err)
 			}
 
 			d.log.Debugf("updating wal to state %q", WalStatusCommittedStorage)
@@ -888,7 +888,7 @@ func (d *DataManager) storageWalCleaner(ctx context.Context) error {
 
 	for object := range d.ost.List(d.storageWalStatusDir()+"/", "", true, doneCh) {
 		if object.Err != nil {
-			return err
+			return fromOSTError(err)
 		}
 		name := path.Base(object.Path)
 		ext := path.Ext(name)
@@ -910,7 +910,7 @@ func (d *DataManager) storageWalCleaner(ctx context.Context) error {
 			d.log.Infof("removing %q", walStatusFilePath)
 			if err := d.ost.DeleteObject(walStatusFilePath); err != nil {
 				if !objectstorage.IsNotExist(err) {
-					return err
+					return fromOSTError(err)
 				}
 			}
 
@@ -918,7 +918,7 @@ func (d *DataManager) storageWalCleaner(ctx context.Context) error {
 			d.log.Infof("removing %q", object.Path)
 			if err := d.ost.DeleteObject(object.Path); err != nil {
 				if !objectstorage.IsNotExist(err) {
-					return err
+					return fromOSTError(err)
 				}
 			}
 		}
@@ -929,7 +929,7 @@ func (d *DataManager) storageWalCleaner(ctx context.Context) error {
 			d.log.Infof("removing %q", object.Path)
 			if err := d.ost.DeleteObject(object.Path); err != nil {
 				if !objectstorage.IsNotExist(err) {
-					return err
+					return fromOSTError(err)
 				}
 			}
 		}
@@ -1049,7 +1049,7 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 	writeWal := func(wal *WalFile, prevWalSequence string) error {
 		walFile, err := d.ost.ReadObject(d.storageWalStatusFile(wal.WalSequence) + ".committed")
 		if err != nil {
-			return err
+			return fromOSTError(err)
 		}
 		dec := json.NewDecoder(walFile)
 		var header *WalHeader
@@ -1200,7 +1200,7 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 	walKey := etcdWalKey(walSequence.String())
 
 	if err := d.ost.WriteObject(walDataFilePath, bytes.NewReader([]byte{}), 0, true); err != nil {
-		return err
+		return fromOSTError(err)
 	}
 	d.log.Debugf("wrote wal file: %s", walDataFilePath)
 
@@ -1216,7 +1216,7 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 	}
 	walFileCommittedPath := walFilePath + ".committed"
 	if err := d.ost.WriteObject(walFileCommittedPath, bytes.NewReader(headerj), int64(len(headerj)), true); err != nil {
-		return err
+		return fromOSTError(err)
 	}
 
 	walData := &WalData{

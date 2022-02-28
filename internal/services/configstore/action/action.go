@@ -16,10 +16,14 @@ package action
 
 import (
 	"agola.io/agola/internal/datamanager"
+	"agola.io/agola/internal/db"
 	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/services/configstore/readdb"
+	"agola.io/agola/internal/util"
+	"agola.io/agola/services/configstore/types"
 
 	"go.uber.org/zap"
+	errors "golang.org/x/xerrors"
 )
 
 type ActionHandler struct {
@@ -42,4 +46,31 @@ func NewActionHandler(logger *zap.Logger, readDB *readdb.ReadDB, dm *datamanager
 
 func (h *ActionHandler) SetMaintenanceMode(maintenanceMode bool) {
 	h.maintenanceMode = maintenanceMode
+}
+
+func (h *ActionHandler) ResolveConfigID(tx *db.Tx, configType types.ConfigType, ref string) (string, error) {
+	switch configType {
+	case types.ConfigTypeProjectGroup:
+		group, err := h.readDB.GetProjectGroup(tx, ref)
+		if err != nil {
+			return "", err
+		}
+		if group == nil {
+			return "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("group with ref %q doesn't exists", ref))
+		}
+		return group.ID, nil
+
+	case types.ConfigTypeProject:
+		project, err := h.readDB.GetProject(tx, ref)
+		if err != nil {
+			return "", err
+		}
+		if project == nil {
+			return "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("project with ref %q doesn't exists", ref))
+		}
+		return project.ID, nil
+
+	default:
+		return "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("unknown config type %q", configType))
+	}
 }

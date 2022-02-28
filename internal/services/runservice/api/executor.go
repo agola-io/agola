@@ -153,17 +153,17 @@ func (h *ExecutorTaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	// TODO(sgotti) Check authorized call from executors
 	etID := vars["taskid"]
 	if etID == "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("taskid is empty")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("taskid is empty")))
 		return
 	}
 
 	et, err := h.ah.GetExecutorTask(ctx, etID)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, et); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, et); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }
@@ -235,7 +235,7 @@ func (h *ArchivesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.readArchive(taskID, step, w); err != nil {
 		switch {
-		case util.IsNotExist(err):
+		case util.APIErrorIs(err, util.ErrNotExist):
 			http.Error(w, err.Error(), http.StatusNotFound)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -249,7 +249,7 @@ func (h *ArchivesHandler) readArchive(rtID string, step int, w io.Writer) error 
 	f, err := h.ost.ReadObject(archivePath)
 	if err != nil {
 		if objectstorage.IsNotExist(err) {
-			return util.NewErrNotExist(err)
+			return util.NewAPIError(util.ErrNotExist, err)
 		}
 		return err
 	}
@@ -308,7 +308,7 @@ func (h *CacheHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.readCache(matchedKey, w); err != nil {
 		switch {
-		case util.IsNotExist(err):
+		case util.APIErrorIs(err, util.ErrNotExist):
 			http.Error(w, err.Error(), http.StatusNotFound)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -358,7 +358,7 @@ func (h *CacheHandler) readCache(key string, w io.Writer) error {
 	f, err := h.ost.ReadObject(cachePath)
 	if err != nil {
 		if objectstorage.IsNotExist(err) {
-			return util.NewErrNotExist(err)
+			return util.NewAPIError(util.ErrNotExist, err)
 		}
 		return err
 	}

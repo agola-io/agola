@@ -19,6 +19,7 @@ import (
 
 	scommon "agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/gateway/common"
+	"agola.io/agola/internal/util"
 	cstypes "agola.io/agola/services/configstore/types"
 
 	errors "golang.org/x/xerrors"
@@ -35,9 +36,9 @@ func (h *ActionHandler) IsOrgOwner(ctx context.Context, orgID string) (bool, err
 		return false, nil
 	}
 
-	userOrgs, resp, err := h.configstoreClient.GetUserOrgs(ctx, userID)
+	userOrgs, _, err := h.configstoreClient.GetUserOrgs(ctx, userID)
 	if err != nil {
-		return false, errors.Errorf("failed to get user orgs: %w", ErrFromRemote(resp, err))
+		return false, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to get user orgs: %w", err))
 	}
 
 	for _, userOrg := range userOrgs {
@@ -70,9 +71,9 @@ func (h *ActionHandler) IsProjectOwner(ctx context.Context, ownerType cstypes.Co
 	}
 
 	if ownerType == cstypes.ConfigTypeOrg {
-		userOrgs, resp, err := h.configstoreClient.GetUserOrgs(ctx, userID)
+		userOrgs, _, err := h.configstoreClient.GetUserOrgs(ctx, userID)
 		if err != nil {
-			return false, errors.Errorf("failed to get user orgs: %w", ErrFromRemote(resp, err))
+			return false, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to get user orgs: %w", err))
 		}
 
 		for _, userOrg := range userOrgs {
@@ -106,9 +107,9 @@ func (h *ActionHandler) IsProjectMember(ctx context.Context, ownerType cstypes.C
 	}
 
 	if ownerType == cstypes.ConfigTypeOrg {
-		userOrgs, resp, err := h.configstoreClient.GetUserOrgs(ctx, userID)
+		userOrgs, _, err := h.configstoreClient.GetUserOrgs(ctx, userID)
 		if err != nil {
-			return false, errors.Errorf("failed to get user orgs: %w", ErrFromRemote(resp, err))
+			return false, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to get user orgs: %w", err))
 		}
 
 		for _, userOrg := range userOrgs {
@@ -127,16 +128,16 @@ func (h *ActionHandler) IsVariableOwner(ctx context.Context, parentType cstypes.
 	var ownerID string
 	switch parentType {
 	case cstypes.ConfigTypeProjectGroup:
-		pg, resp, err := h.configstoreClient.GetProjectGroup(ctx, parentRef)
+		pg, _, err := h.configstoreClient.GetProjectGroup(ctx, parentRef)
 		if err != nil {
-			return false, errors.Errorf("failed to get project group %q: %w", parentRef, ErrFromRemote(resp, err))
+			return false, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to get project group %q: %w", parentRef, err))
 		}
 		ownerType = pg.OwnerType
 		ownerID = pg.OwnerID
 	case cstypes.ConfigTypeProject:
-		p, resp, err := h.configstoreClient.GetProject(ctx, parentRef)
+		p, _, err := h.configstoreClient.GetProject(ctx, parentRef)
 		if err != nil {
-			return false, errors.Errorf("failed to get project  %q: %w", parentRef, ErrFromRemote(resp, err))
+			return false, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to get project  %q: %w", parentRef, err))
 		}
 		ownerType = p.OwnerType
 		ownerID = p.OwnerID
@@ -156,9 +157,9 @@ func (h *ActionHandler) CanGetRun(ctx context.Context, runGroup string) (bool, e
 	var ownerID string
 	switch groupType {
 	case scommon.GroupTypeProject:
-		p, resp, err := h.configstoreClient.GetProject(ctx, groupID)
+		p, _, err := h.configstoreClient.GetProject(ctx, groupID)
 		if err != nil {
-			return false, ErrFromRemote(resp, err)
+			return false, util.NewAPIError(util.KindFromRemoteError(err), err)
 		}
 		ownerType = p.OwnerType
 		ownerID = p.OwnerID
@@ -193,9 +194,9 @@ func (h *ActionHandler) CanDoRunActions(ctx context.Context, runGroup string) (b
 	var ownerID string
 	switch groupType {
 	case scommon.GroupTypeProject:
-		p, resp, err := h.configstoreClient.GetProject(ctx, groupID)
+		p, _, err := h.configstoreClient.GetProject(ctx, groupID)
 		if err != nil {
-			return false, ErrFromRemote(resp, err)
+			return false, util.NewAPIError(util.KindFromRemoteError(err), err)
 		}
 		ownerType = p.OwnerType
 		ownerID = p.OwnerID

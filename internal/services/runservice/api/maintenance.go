@@ -19,6 +19,7 @@ import (
 
 	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/services/runservice/action"
+	"agola.io/agola/internal/util"
 
 	"go.uber.org/zap"
 )
@@ -47,11 +48,11 @@ func (h *MaintenanceModeHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	err := h.ah.MaintenanceMode(ctx, enable)
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
+		util.HTTPError(w, err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, nil); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, nil); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 
@@ -96,11 +97,11 @@ func (h *ImportHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err := h.ah.Import(ctx, r.Body)
 	if err != nil {
 		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
+		util.HTTPError(w, err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, nil); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, nil); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 

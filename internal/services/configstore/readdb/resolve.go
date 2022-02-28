@@ -18,37 +18,10 @@ import (
 	"path"
 
 	"agola.io/agola/internal/db"
-	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
+
 	errors "golang.org/x/xerrors"
 )
-
-func (r *ReadDB) ResolveConfigID(tx *db.Tx, configType types.ConfigType, ref string) (string, error) {
-	switch configType {
-	case types.ConfigTypeProjectGroup:
-		group, err := r.GetProjectGroup(tx, ref)
-		if err != nil {
-			return "", err
-		}
-		if group == nil {
-			return "", util.NewErrBadRequest(errors.Errorf("group with ref %q doesn't exists", ref))
-		}
-		return group.ID, nil
-
-	case types.ConfigTypeProject:
-		project, err := r.GetProject(tx, ref)
-		if err != nil {
-			return "", err
-		}
-		if project == nil {
-			return "", util.NewErrBadRequest(errors.Errorf("project with ref %q doesn't exists", ref))
-		}
-		return project.ID, nil
-
-	default:
-		return "", util.NewErrBadRequest(errors.Errorf("unknown config type %q", configType))
-	}
-}
 
 func (r *ReadDB) GetPath(tx *db.Tx, configType types.ConfigType, id string) (string, error) {
 	var p string

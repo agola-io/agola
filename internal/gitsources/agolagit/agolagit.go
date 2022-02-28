@@ -28,7 +28,7 @@ import (
 
 	gitsource "agola.io/agola/internal/gitsources"
 	"agola.io/agola/internal/services/types"
-	errors "golang.org/x/xerrors"
+	"agola.io/agola/internal/util"
 )
 
 var (
@@ -96,20 +96,8 @@ func (c *Client) getResponse(method, path string, query url.Values, header http.
 		return nil, err
 	}
 
-	if resp.StatusCode/100 != 2 {
-		defer resp.Body.Close()
-		data, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(data) <= 1 {
-			return resp, errors.New(resp.Status)
-		}
-
-		// TODO(sgotti) use a json error response
-
-		return resp, errors.New(string(data))
+	if err := util.ErrFromRemote(resp); err != nil {
+		return resp, err
 	}
 
 	return resp, nil

@@ -28,7 +28,6 @@ import (
 
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/sequence"
-	"agola.io/agola/internal/util"
 
 	"github.com/gofrs/uuid"
 	errors "golang.org/x/xerrors"
@@ -205,7 +204,7 @@ func (d *DataManager) writeDataSnapshot(ctx context.Context, wals []*WalData) er
 		return err
 	}
 	if err := d.ost.WriteObject(d.dataStatusPath(dataSequence), bytes.NewReader(dataStatusj), int64(len(dataStatusj)), true); err != nil {
-		return err
+		return fromOSTError(err)
 	}
 
 	return nil
@@ -217,7 +216,7 @@ func (d *DataManager) writeDataFile(ctx context.Context, buf *bytes.Buffer, size
 	}
 
 	if err := d.ost.WriteObject(d.DataFilePath(dataType, dataFileID), buf, size, true); err != nil {
-		return err
+		return fromOSTError(err)
 	}
 
 	dataFileIndexj, err := json.Marshal(dataFileIndex)
@@ -225,7 +224,7 @@ func (d *DataManager) writeDataFile(ctx context.Context, buf *bytes.Buffer, size
 		return err
 	}
 	if err := d.ost.WriteObject(d.DataFileIndexPath(dataType, dataFileID), bytes.NewReader(dataFileIndexj), int64(len(dataFileIndexj)), true); err != nil {
-		return err
+		return fromOSTError(err)
 	}
 
 	return nil
@@ -341,7 +340,7 @@ func (d *DataManager) writeDataType(ctx context.Context, wi walIndex, dataType s
 			// TODO(sgotti) instead of reading all entries in memory decode it's contents one by one when needed
 			oldDataf, err := d.ost.ReadObject(d.DataFilePath(dataType, actionGroup.DataStatusFile.ID))
 			if err != nil && !objectstorage.IsNotExist(err) {
-				return nil, err
+				return nil, fromOSTError(err)
 			}
 			if !objectstorage.IsNotExist(err) {
 				dec := json.NewDecoder(oldDataf)
@@ -500,7 +499,7 @@ func (d *DataManager) Read(dataType, id string) (io.Reader, error) {
 	var matchingDataFileID string
 	// get the matching data file for the action entry ID
 	if len(curFiles[dataType]) == 0 {
-		return nil, util.NewErrNotExist(errors.Errorf("datatype %q doesn't exists", dataType))
+		return nil, newErrNotExist(errors.Errorf("datatype %q doesn't exists", dataType))
 	}
 
 	matchingDataFileID = curFiles[dataType][0].ID
@@ -513,7 +512,7 @@ func (d *DataManager) Read(dataType, id string) (io.Reader, error) {
 
 	dataFileIndexf, err := d.ost.ReadObject(d.DataFileIndexPath(dataType, matchingDataFileID))
 	if err != nil {
-		return nil, err
+		return nil, fromOSTError(err)
 	}
 	var dataFileIndex *DataFileIndex
 	dec := json.NewDecoder(dataFileIndexf)
@@ -526,12 +525,12 @@ func (d *DataManager) Read(dataType, id string) (io.Reader, error) {
 
 	pos, ok := dataFileIndex.Index[id]
 	if !ok {
-		return nil, util.NewErrNotExist(errors.Errorf("datatype %q, id %q doesn't exists", dataType, id))
+		return nil, newErrNotExist(errors.Errorf("datatype %q, id %q doesn't exists", dataType, id))
 	}
 
 	dataf, err := d.ost.ReadObject(d.DataFilePath(dataType, matchingDataFileID))
 	if err != nil {
-		return nil, err
+		return nil, fromOSTError(err)
 	}
 	if _, err := dataf.Seek(int64(pos), io.SeekStart); err != nil {
 		dataf.Close()
@@ -560,7 +559,7 @@ func (d *DataManager) GetFirstDataStatusSequences(n int) ([]*sequence.Sequence, 
 	defer close(doneCh)
 	for object := range d.ost.List(d.storageDataDir()+"/", "", false, doneCh) {
 		if object.Err != nil {
-			return nil, object.Err
+			return nil, fromOSTError(object.Err)
 		}
 		if m := DataStatusFileRegexp.FindStringSubmatch(path.Base(object.Path)); m != nil {
 			seq, err := sequence.Parse(m[1])
@@ -597,7 +596,7 @@ func (d *DataManager) GetLastDataStatusSequences(n int) ([]*sequence.Sequence, e
 
 	for object := range d.ost.List(d.storageDataDir()+"/", "", false, doneCh) {
 		if object.Err != nil {
-			return nil, object.Err
+			return nil, fromOSTError(object.Err)
 		}
 		if m := DataStatusFileRegexp.FindStringSubmatch(path.Base(object.Path)); m != nil {
 			seq, err := sequence.Parse(m[1])
@@ -629,7 +628,7 @@ func (d *DataManager) GetLastDataStatusSequences(n int) ([]*sequence.Sequence, e
 func (d *DataManager) GetDataStatus(dataSequence *sequence.Sequence) (*DataStatus, error) {
 	dataStatusf, err := d.ost.ReadObject(d.dataStatusPath(dataSequence))
 	if err != nil {
-		return nil, err
+		return nil, fromOSTError(err)
 	}
 	defer dataStatusf.Close()
 	var dataStatus *DataStatus
@@ -692,7 +691,7 @@ func (d *DataManager) Export(ctx context.Context, w io.Writer) error {
 		for _, dsf := range curDataStatusFiles {
 			dataf, err := d.ost.ReadObject(d.DataFilePath(dataType, dsf.ID))
 			if err != nil {
-				return err
+				return fromOSTError(err)
 			}
 			if _, err := io.Copy(w, dataf); err != nil {
 				dataf.Close()
@@ -825,7 +824,7 @@ func (d *DataManager) Import(ctx context.Context, r io.Reader) error {
 		return err
 	}
 	if err := d.ost.WriteObject(d.dataStatusPath(dataSequence), bytes.NewReader(dataStatusj), int64(len(dataStatusj)), true); err != nil {
-		return err
+		return fromOSTError(err)
 	}
 
 	// initialize etcd providing the specific datastatus
@@ -863,7 +862,7 @@ func (d *DataManager) cleanOldCheckpoints(ctx context.Context, dataStatusSequenc
 		defer close(doneCh)
 		for object := range d.ost.List(d.storageDataDir()+"/", "", false, doneCh) {
 			if object.Err != nil {
-				return object.Err
+				return fromOSTError(object.Err)
 			}
 
 			skip := false
@@ -882,7 +881,7 @@ func (d *DataManager) cleanOldCheckpoints(ctx context.Context, dataStatusSequenc
 				d.log.Infof("removing %q", object.Path)
 				if err := d.ost.DeleteObject(object.Path); err != nil {
 					if !objectstorage.IsNotExist(err) {
-						return err
+						return fromOSTError(err)
 					}
 				}
 			}
@@ -910,7 +909,7 @@ func (d *DataManager) cleanOldCheckpoints(ctx context.Context, dataStatusSequenc
 
 	for object := range d.ost.List(d.storageDataDir()+"/", "", true, doneCh) {
 		if object.Err != nil {
-			return object.Err
+			return fromOSTError(object.Err)
 		}
 
 		p := object.Path
@@ -950,7 +949,7 @@ func (d *DataManager) cleanOldCheckpoints(ctx context.Context, dataStatusSequenc
 			d.log.Infof("removing %q", object.Path)
 			if err := d.ost.DeleteObject(object.Path); err != nil {
 				if !objectstorage.IsNotExist(err) {
-					return err
+					return fromOSTError(err)
 				}
 			}
 		}

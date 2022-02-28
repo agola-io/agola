@@ -56,18 +56,18 @@ func (h *UserRemoteReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 
 	userID := common.CurrentUserID(ctx)
 	if userID == "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("user not authenticated")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user not authenticated")))
 		return
 	}
 
-	user, resp, err := h.configstoreClient.GetUser(ctx, userID)
-	if httpErrorFromRemote(w, resp, err) {
+	user, _, err := h.configstoreClient.GetUser(ctx, userID)
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
-	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, remoteSourceRef)
-	if httpErrorFromRemote(w, resp, err) {
+	rs, _, err := h.configstoreClient.GetRemoteSource(ctx, remoteSourceRef)
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -80,23 +80,23 @@ func (h *UserRemoteReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		}
 	}
 	if la == nil {
-		err := util.NewErrBadRequest(errors.Errorf("user doesn't have a linked account for remote source %q", rs.Name))
-		httpError(w, err)
+		err := util.NewAPIError(util.ErrBadRequest, errors.Errorf("user doesn't have a linked account for remote source %q", rs.Name))
+		util.HTTPError(w, err)
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
 	gitsource, err := h.ah.GetGitSource(ctx, rs, user.Name, la)
 	if err != nil {
-		httpError(w, err)
+		util.HTTPError(w, err)
 		h.log.Errorf("err: %+v", err)
 		return
 	}
 
 	remoteRepos, err := gitsource.ListUserRepos()
 	if err != nil {
-		err := util.NewErrBadRequest(errors.Errorf("failed to get user repositories from git source: %w", err))
-		httpError(w, err)
+		err := util.NewAPIError(util.ErrBadRequest, errors.Errorf("failed to get user repositories from git source: %w", err))
+		util.HTTPError(w, err)
 		h.log.Errorf("err: %+v", err)
 		return
 	}
@@ -105,7 +105,7 @@ func (h *UserRemoteReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	for i, r := range remoteRepos {
 		repos[i] = createRemoteRepoResponse(r)
 	}
-	if err := httpResponse(w, http.StatusOK, repos); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, repos); err != nil {
 		h.log.Errorf("err: %+v", err)
 	}
 }

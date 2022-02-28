@@ -20,6 +20,7 @@ import (
 
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
+
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 )
@@ -40,13 +41,13 @@ func (h *BadgeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	projectRef, err := url.PathUnescape(vars["projectref"])
 	if err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 	branch := query.Get("branch")
 
 	badge, err := h.ah.GetBadge(ctx, projectRef, branch)
-	if httpError(w, err) {
+	if util.HTTPError(w, err) {
 		h.log.Errorf("err: %+v", err)
 		return
 	}

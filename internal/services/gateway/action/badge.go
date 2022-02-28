@@ -20,22 +20,23 @@ import (
 	"path"
 
 	"agola.io/agola/internal/services/common"
+	"agola.io/agola/internal/util"
 	rstypes "agola.io/agola/services/runservice/types"
 )
 
 // GetBadge return a badge for a project branch
 // TODO(sgotti) also handle tags and PRs
 func (h *ActionHandler) GetBadge(ctx context.Context, projectRef, branch string) (string, error) {
-	project, resp, err := h.configstoreClient.GetProject(ctx, projectRef)
+	project, _, err := h.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
-		return "", ErrFromRemote(resp, err)
+		return "", util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
 
 	// if branch is empty we get the latest run for every branch.
 	group := path.Join("/", string(common.GroupTypeProject), project.ID, string(common.GroupTypeBranch), url.PathEscape(branch))
-	runResp, resp, err := h.runserviceClient.GetGroupLastRun(ctx, group, nil)
+	runResp, _, err := h.runserviceClient.GetGroupLastRun(ctx, group, nil)
 	if err != nil {
-		return "", ErrFromRemote(resp, err)
+		return "", util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
 	if len(runResp.Runs) == 0 {
 		return badgeUnknown, nil

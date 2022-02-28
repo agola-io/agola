@@ -29,35 +29,35 @@ import (
 
 func (h *ActionHandler) ValidateRemoteSource(ctx context.Context, remoteSource *types.RemoteSource) error {
 	if remoteSource.Name == "" {
-		return util.NewErrBadRequest(errors.Errorf("remotesource name required"))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource name required"))
 	}
 	if !util.ValidateName(remoteSource.Name) {
-		return util.NewErrBadRequest(errors.Errorf("invalid remotesource name %q", remoteSource.Name))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid remotesource name %q", remoteSource.Name))
 	}
 
 	if remoteSource.Name == "" {
-		return util.NewErrBadRequest(errors.Errorf("remotesource name required"))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource name required"))
 	}
 	if remoteSource.APIURL == "" {
-		return util.NewErrBadRequest(errors.Errorf("remotesource api url required"))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource api url required"))
 	}
 	if remoteSource.Type == "" {
-		return util.NewErrBadRequest(errors.Errorf("remotesource type required"))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource type required"))
 	}
 	if remoteSource.AuthType == "" {
-		return util.NewErrBadRequest(errors.Errorf("remotesource auth type required"))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource auth type required"))
 	}
 
 	// validate if the remotesource type supports the required auth type
 	if !types.SourceSupportsAuthType(types.RemoteSourceType(remoteSource.Type), types.RemoteSourceAuthType(remoteSource.AuthType)) {
-		return util.NewErrBadRequest(errors.Errorf("remotesource type %q doesn't support auth type %q", remoteSource.Type, remoteSource.AuthType))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource type %q doesn't support auth type %q", remoteSource.Type, remoteSource.AuthType))
 	}
 	if remoteSource.AuthType == types.RemoteSourceAuthTypeOauth2 {
 		if remoteSource.Oauth2ClientID == "" {
-			return util.NewErrBadRequest(errors.Errorf("remotesource oauth2clientid required for auth type %q", types.RemoteSourceAuthTypeOauth2))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource oauth2clientid required for auth type %q", types.RemoteSourceAuthTypeOauth2))
 		}
 		if remoteSource.Oauth2ClientSecret == "" {
-			return util.NewErrBadRequest(errors.Errorf("remotesource oauth2clientsecret required for auth type %q", types.RemoteSourceAuthTypeOauth2))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource oauth2clientsecret required for auth type %q", types.RemoteSourceAuthTypeOauth2))
 		}
 	}
 
@@ -87,7 +87,7 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, remoteSource *ty
 			return err
 		}
 		if u != nil {
-			return util.NewErrBadRequest(errors.Errorf("remotesource %q already exists", u.Name))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource %q already exists", u.Name))
 		}
 		return nil
 	})
@@ -138,7 +138,7 @@ func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, req *UpdateRemot
 			return err
 		}
 		if curRemoteSource == nil {
-			return util.NewErrBadRequest(errors.Errorf("remotesource with ref %q doesn't exist", req.RemoteSourceRef))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource with ref %q doesn't exist", req.RemoteSourceRef))
 		}
 
 		if curRemoteSource.Name != req.RemoteSource.Name {
@@ -148,7 +148,7 @@ func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, req *UpdateRemot
 				return err
 			}
 			if u != nil {
-				return util.NewErrBadRequest(errors.Errorf("remotesource %q already exists", u.Name))
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource %q already exists", u.Name))
 			}
 		}
 
@@ -199,7 +199,7 @@ func (h *ActionHandler) DeleteRemoteSource(ctx context.Context, remoteSourceName
 			return err
 		}
 		if remoteSource == nil {
-			return util.NewErrBadRequest(errors.Errorf("remotesource %q doesn't exist", remoteSourceName))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource %q doesn't exist", remoteSourceName))
 		}
 
 		// changegroup is the remotesource id

@@ -39,7 +39,7 @@ func (h *ActionHandler) GetSecret(ctx context.Context, secretID string) (*types.
 	}
 
 	if secret == nil {
-		return nil, util.NewErrNotExist(errors.Errorf("secret %q doesn't exist", secretID))
+		return nil, util.NewAPIError(util.ErrNotExist, errors.Errorf("secret %q doesn't exist", secretID))
 	}
 
 	return secret, nil
@@ -48,7 +48,7 @@ func (h *ActionHandler) GetSecret(ctx context.Context, secretID string) (*types.
 func (h *ActionHandler) GetSecrets(ctx context.Context, parentType types.ConfigType, parentRef string, tree bool) ([]*types.Secret, error) {
 	var secrets []*types.Secret
 	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
-		parentID, err := h.readDB.ResolveConfigID(tx, parentType, parentRef)
+		parentID, err := h.ResolveConfigID(tx, parentType, parentRef)
 		if err != nil {
 			return err
 		}
@@ -68,28 +68,28 @@ func (h *ActionHandler) GetSecrets(ctx context.Context, parentType types.ConfigT
 
 func (h *ActionHandler) ValidateSecret(ctx context.Context, secret *types.Secret) error {
 	if secret.Name == "" {
-		return util.NewErrBadRequest(errors.Errorf("secret name required"))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("secret name required"))
 	}
 	if !util.ValidateName(secret.Name) {
-		return util.NewErrBadRequest(errors.Errorf("invalid secret name %q", secret.Name))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid secret name %q", secret.Name))
 	}
 	if secret.Type != types.SecretTypeInternal {
-		return util.NewErrBadRequest(errors.Errorf("invalid secret type %q", secret.Type))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid secret type %q", secret.Type))
 	}
 	switch secret.Type {
 	case types.SecretTypeInternal:
 		if len(secret.Data) == 0 {
-			return util.NewErrBadRequest(errors.Errorf("empty secret data"))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("empty secret data"))
 		}
 	}
 	if secret.Parent.Type == "" {
-		return util.NewErrBadRequest(errors.Errorf("secret parent type required"))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("secret parent type required"))
 	}
 	if secret.Parent.ID == "" {
-		return util.NewErrBadRequest(errors.Errorf("secret parentid required"))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("secret parentid required"))
 	}
 	if secret.Parent.Type != types.ConfigTypeProject && secret.Parent.Type != types.ConfigTypeProjectGroup {
-		return util.NewErrBadRequest(errors.Errorf("invalid secret parent type %q", secret.Parent.Type))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid secret parent type %q", secret.Parent.Type))
 	}
 
 	return nil
@@ -112,7 +112,7 @@ func (h *ActionHandler) CreateSecret(ctx context.Context, secret *types.Secret) 
 			return err
 		}
 
-		parentID, err := h.readDB.ResolveConfigID(tx, secret.Parent.Type, secret.Parent.ID)
+		parentID, err := h.ResolveConfigID(tx, secret.Parent.Type, secret.Parent.ID)
 		if err != nil {
 			return err
 		}
@@ -124,7 +124,7 @@ func (h *ActionHandler) CreateSecret(ctx context.Context, secret *types.Secret) 
 			return err
 		}
 		if s != nil {
-			return util.NewErrBadRequest(errors.Errorf("secret with name %q for %s with id %q already exists", secret.Name, secret.Parent.Type, secret.Parent.ID))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("secret with name %q for %s with id %q already exists", secret.Name, secret.Parent.Type, secret.Parent.ID))
 		}
 
 		return nil
@@ -171,7 +171,7 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretReque
 	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 
-		parentID, err := h.readDB.ResolveConfigID(tx, req.Secret.Parent.Type, req.Secret.Parent.ID)
+		parentID, err := h.ResolveConfigID(tx, req.Secret.Parent.Type, req.Secret.Parent.ID)
 		if err != nil {
 			return err
 		}
@@ -183,7 +183,7 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretReque
 			return err
 		}
 		if curSecret == nil {
-			return util.NewErrBadRequest(errors.Errorf("secret with name %q for %s with id %q doesn't exists", req.SecretName, req.Secret.Parent.Type, req.Secret.Parent.ID))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("secret with name %q for %s with id %q doesn't exists", req.SecretName, req.Secret.Parent.Type, req.Secret.Parent.ID))
 		}
 
 		if curSecret.Name != req.Secret.Name {
@@ -193,7 +193,7 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretReque
 				return err
 			}
 			if u != nil {
-				return util.NewErrBadRequest(errors.Errorf("secret with name %q for %s with id %q already exists", req.Secret.Name, req.Secret.Parent.Type, req.Secret.Parent.ID))
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("secret with name %q for %s with id %q already exists", req.Secret.Name, req.Secret.Parent.Type, req.Secret.Parent.ID))
 			}
 		}
 
@@ -240,7 +240,7 @@ func (h *ActionHandler) DeleteSecret(ctx context.Context, parentType types.Confi
 	// must do all the checks in a single transaction to avoid concurrent changes
 	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
-		parentID, err := h.readDB.ResolveConfigID(tx, parentType, parentRef)
+		parentID, err := h.ResolveConfigID(tx, parentType, parentRef)
 		if err != nil {
 			return err
 		}
@@ -251,7 +251,7 @@ func (h *ActionHandler) DeleteSecret(ctx context.Context, parentType types.Confi
 			return err
 		}
 		if secret == nil {
-			return util.NewErrBadRequest(errors.Errorf("secret with name %q doesn't exist", secretName))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("secret with name %q doesn't exist", secretName))
 		}
 
 		// changegroup is the secret id

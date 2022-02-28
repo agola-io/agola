@@ -32,10 +32,10 @@ func (h *ActionHandler) MaintenanceMode(ctx context.Context, enable bool) error 
 	}
 
 	if enable && len(resp.Kvs) > 0 {
-		return util.NewErrBadRequest(errors.Errorf("maintenance mode already enabled"))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("maintenance mode already enabled"))
 	}
 	if !enable && len(resp.Kvs) == 0 {
-		return util.NewErrBadRequest(errors.Errorf("maintenance mode already disabled"))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("maintenance mode already disabled"))
 	}
 
 	if enable {
@@ -67,7 +67,7 @@ func (h *ActionHandler) Export(ctx context.Context, w io.Writer) error {
 
 func (h *ActionHandler) Import(ctx context.Context, r io.Reader) error {
 	if !h.maintenanceMode {
-		return util.NewErrBadRequest(errors.Errorf("not in maintenance mode"))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("not in maintenance mode"))
 	}
 	return h.dm.Import(ctx, r)
 }

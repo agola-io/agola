@@ -15,10 +15,7 @@
 package action
 
 import (
-	"net/http"
-
 	"agola.io/agola/internal/services/common"
-	"agola.io/agola/internal/util"
 	csclient "agola.io/agola/services/configstore/client"
 	rsclient "agola.io/agola/services/runservice/client"
 
@@ -45,21 +42,4 @@ func NewActionHandler(logger *zap.Logger, sd *common.TokenSigningData, configsto
 		apiExposedURL:     apiExposedURL,
 		webExposedURL:     webExposedURL,
 	}
-}
-
-func ErrFromRemote(resp *http.Response, err error) error {
-	if err == nil {
-		return nil
-	}
-
-	if resp != nil {
-		switch resp.StatusCode {
-		case http.StatusBadRequest:
-			return util.NewErrBadRequest(err)
-		case http.StatusNotFound:
-			return util.NewErrNotExist(err)
-		}
-	}
-
-	return err
 }

@@ -20,16 +20,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
 	"strconv"
 	"strings"
 
+	"agola.io/agola/internal/util"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
-
-	errors "golang.org/x/xerrors"
 )
 
 var jsonContent = http.Header{"Content-Type": []string{"application/json"}}
@@ -80,18 +78,8 @@ func (c *Client) getResponse(ctx context.Context, method, path string, query url
 		return nil, err
 	}
 
-	if resp.StatusCode/100 != 2 {
-		defer resp.Body.Close()
-		data, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return resp, err
-		}
-
-		errMap := make(map[string]interface{})
-		if err = json.Unmarshal(data, &errMap); err != nil {
-			return resp, fmt.Errorf("unknown api error (code: %d): %s", resp.StatusCode, string(data))
-		}
-		return resp, errors.New(errMap["message"].(string))
+	if err := util.ErrFromRemote(resp); err != nil {
+		return resp, err
 	}
 
 	return resp, nil
