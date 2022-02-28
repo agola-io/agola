@@ -19,6 +19,7 @@ import (
 
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
 )
@@ -28,7 +29,7 @@ var cmdProjectVariableDelete = &cobra.Command{
 	Short: "delete a variable",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := variableDelete(cmd, "project", args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -47,10 +48,10 @@ func init() {
 	flags.StringVarP(&variableDeleteOpts.name, "name", "n", "", "variable name")
 
 	if err := cmdProjectVariableDelete.MarkFlagRequired("project"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdProjectVariableDelete.MarkFlagRequired("name"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdProjectVariable.AddCommand(cmdProjectVariableDelete)
@@ -61,19 +62,19 @@ func variableDelete(cmd *cobra.Command, ownertype string, args []string) error {
 
 	switch ownertype {
 	case "project":
-		log.Infof("deleting project variable")
+		log.Info().Msgf("deleting project variable")
 		_, err := gwclient.DeleteProjectVariable(context.TODO(), variableDeleteOpts.parentRef, variableDeleteOpts.name)
 		if err != nil {
 			return errors.Errorf("failed to delete project variable: %w", err)
 		}
-		log.Infof("project variable deleted")
+		log.Info().Msgf("project variable deleted")
 	case "projectgroup":
-		log.Infof("deleting project group variable")
+		log.Info().Msgf("deleting project group variable")
 		_, err := gwclient.DeleteProjectGroupVariable(context.TODO(), variableDeleteOpts.parentRef, variableDeleteOpts.name)
 		if err != nil {
 			return errors.Errorf("failed to delete project group variable: %w", err)
 		}
-		log.Infof("project group variable deleted")
+		log.Info().Msgf("project group variable deleted")
 	}
 
 	return nil

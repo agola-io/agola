@@ -564,13 +564,13 @@ func (d *DataManager) GetFirstDataStatusSequences(n int) ([]*sequence.Sequence, 
 		if m := DataStatusFileRegexp.FindStringSubmatch(path.Base(object.Path)); m != nil {
 			seq, err := sequence.Parse(m[1])
 			if err != nil {
-				d.log.Warnf("cannot parse sequence for data status file %q", object.Path)
+				d.log.Warn().Msgf("cannot parse sequence for data status file %q", object.Path)
 				continue
 			}
 			dataStatusSequences = append(dataStatusSequences, seq)
 			c++
 		} else {
-			d.log.Warnf("bad file %q found in storage data dir", object.Path)
+			d.log.Warn().Msgf("bad file %q found in storage data dir", object.Path)
 		}
 		if c >= n {
 			break
@@ -601,13 +601,13 @@ func (d *DataManager) GetLastDataStatusSequences(n int) ([]*sequence.Sequence, e
 		if m := DataStatusFileRegexp.FindStringSubmatch(path.Base(object.Path)); m != nil {
 			seq, err := sequence.Parse(m[1])
 			if err != nil {
-				d.log.Warnf("cannot parse sequence for data status file %q", object.Path)
+				d.log.Warn().Msgf("cannot parse sequence for data status file %q", object.Path)
 				continue
 			}
 			re.Value = seq
 			re = re.Next()
 		} else {
-			d.log.Warnf("bad file %q found in storage data dir", object.Path)
+			d.log.Warn().Msgf("bad file %q found in storage data dir", object.Path)
 		}
 	}
 
@@ -869,7 +869,7 @@ func (d *DataManager) cleanOldCheckpoints(ctx context.Context, dataStatusSequenc
 			if m := DataStatusFileRegexp.FindStringSubmatch(path.Base(object.Path)); m != nil {
 				seq, err := sequence.Parse(m[1])
 				if err == nil && seq.String() > lastDataStatusSequence.String() {
-					d.log.Infof("skipping file %q since its sequence is greater than %q", object.Path, lastDataStatusSequence)
+					d.log.Info().Msgf("skipping file %q since its sequence is greater than %q", object.Path, lastDataStatusSequence)
 					skip = true
 				}
 			}
@@ -878,7 +878,7 @@ func (d *DataManager) cleanOldCheckpoints(ctx context.Context, dataStatusSequenc
 			}
 
 			if _, ok := dataStatusPathsMap[object.Path]; !ok {
-				d.log.Infof("removing %q", object.Path)
+				d.log.Info().Msgf("removing %q", object.Path)
 				if err := d.ost.DeleteObject(object.Path); err != nil {
 					if !objectstorage.IsNotExist(err) {
 						return fromOSTError(err)
@@ -937,7 +937,7 @@ func (d *DataManager) cleanOldCheckpoints(ctx context.Context, dataStatusSequenc
 		if m := DataFileRegexp.FindStringSubmatch(pb); m != nil {
 			seq, err := sequence.Parse(m[1])
 			if err == nil && seq.String() > lastDataStatusSequence.String() {
-				d.log.Infof("skipping file %q since its sequence is greater than %q", p, lastDataStatusSequence)
+				d.log.Info().Msgf("skipping file %q since its sequence is greater than %q", p, lastDataStatusSequence)
 				skip = true
 			}
 		}
@@ -946,7 +946,7 @@ func (d *DataManager) cleanOldCheckpoints(ctx context.Context, dataStatusSequenc
 		}
 
 		if _, ok := files[pne]; !ok {
-			d.log.Infof("removing %q", object.Path)
+			d.log.Info().Msgf("removing %q", object.Path)
 			if err := d.ost.DeleteObject(object.Path); err != nil {
 				if !objectstorage.IsNotExist(err) {
 					return fromOSTError(err)

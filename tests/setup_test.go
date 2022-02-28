@@ -43,8 +43,7 @@ import (
 
 	"code.gitea.io/sdk/gitea"
 	"github.com/google/go-cmp/cmp"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zaptest"
+	"github.com/rs/zerolog"
 	errors "golang.org/x/xerrors"
 	"gopkg.in/src-d/go-billy.v4/memfs"
 	"gopkg.in/src-d/go-billy.v4/osfs"
@@ -74,8 +73,8 @@ const (
 	ConfigFormatStarlark ConfigFormat = "starlark"
 )
 
-func setupEtcd(t *testing.T, logger *zap.Logger, dir string) *testutil.TestEmbeddedEtcd {
-	tetcd, err := testutil.NewTestEmbeddedEtcd(t, logger, dir)
+func setupEtcd(t *testing.T, log zerolog.Logger, dir string) *testutil.TestEmbeddedEtcd {
+	tetcd, err := testutil.NewTestEmbeddedEtcd(t, log, dir)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -138,38 +137,38 @@ func shutdownGitea(tgitea *testutil.TestGitea) {
 	tgitea.Kill()
 }
 
-func startAgola(ctx context.Context, t *testing.T, logger *zap.Logger, dir string, c *config.Config) (<-chan error, error) {
-	rs, err := rsscheduler.NewRunservice(ctx, logger, &c.Runservice)
+func startAgola(ctx context.Context, t *testing.T, log zerolog.Logger, dir string, c *config.Config) (<-chan error, error) {
+	rs, err := rsscheduler.NewRunservice(ctx, log, &c.Runservice)
 	if err != nil {
 		return nil, errors.Errorf("failed to start run service scheduler: %w", err)
 	}
 
-	ex, err := executor.NewExecutor(ctx, logger, &c.Executor)
+	ex, err := executor.NewExecutor(ctx, log, &c.Executor)
 	if err != nil {
 		return nil, errors.Errorf("failed to start run service executor: %w", err)
 	}
 
-	cs, err := configstore.NewConfigstore(ctx, logger, &c.Configstore)
+	cs, err := configstore.NewConfigstore(ctx, log, &c.Configstore)
 	if err != nil {
 		return nil, errors.Errorf("failed to start config store: %w", err)
 	}
 
-	sched, err := scheduler.NewScheduler(ctx, logger, &c.Scheduler)
+	sched, err := scheduler.NewScheduler(ctx, log, &c.Scheduler)
 	if err != nil {
 		return nil, errors.Errorf("failed to start scheduler: %w", err)
 	}
 
-	ns, err := notification.NewNotificationService(ctx, logger, c)
+	ns, err := notification.NewNotificationService(ctx, log, c)
 	if err != nil {
 		return nil, errors.Errorf("failed to start notification service: %w", err)
 	}
 
-	gw, err := gateway.NewGateway(ctx, logger, c)
+	gw, err := gateway.NewGateway(ctx, log, c)
 	if err != nil {
 		return nil, errors.Errorf("failed to start gateway: %w", err)
 	}
 
-	gs, err := gitserver.NewGitserver(ctx, logger, &c.Gitserver)
+	gs, err := gitserver.NewGitserver(ctx, log, &c.Gitserver)
 	if err != nil {
 		return nil, errors.Errorf("failed to start git server: %w", err)
 	}
@@ -191,7 +190,7 @@ func startAgola(ctx context.Context, t *testing.T, logger *zap.Logger, dir strin
 }
 
 func setup(ctx context.Context, t *testing.T, dir string) (*testutil.TestEmbeddedEtcd, *testutil.TestGitea, *config.Config) {
-	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+	log := testutil.NewLogger(t)
 
 	dockerBridgeAddress := os.Getenv("DOCKER_BRIDGE_ADDRESS")
 	if dockerBridgeAddress == "" {
@@ -301,7 +300,7 @@ func setup(ctx context.Context, t *testing.T, dir string) (*testutil.TestEmbedde
 	tgitea := setupGitea(t, dir, dockerBridgeAddress)
 
 	etcdDir := filepath.Join(dir, "etcd")
-	tetcd := setupEtcd(t, logger, etcdDir)
+	tetcd := setupEtcd(t, log, etcdDir)
 
 	c.Runservice.Etcd.Endpoints = tetcd.Endpoint
 	c.Configstore.Etcd.Endpoints = tetcd.Endpoint
@@ -352,7 +351,7 @@ func setup(ctx context.Context, t *testing.T, dir string) (*testutil.TestEmbedde
 
 	c.Executor.RunserviceURL = rsURL
 
-	errCh, err := startAgola(ctx, t, logger, dir, c)
+	errCh, err := startAgola(ctx, t, log, dir, c)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}

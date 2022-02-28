@@ -29,7 +29,7 @@ import (
 	"agola.io/agola/services/configstore/types"
 
 	"github.com/gorilla/mux"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 )
 
 func projectGroupResponse(ctx context.Context, readDB *readdb.ReadDB, projectGroup *types.ProjectGroup) (*csapitypes.ProjectGroup, error) {
@@ -80,13 +80,13 @@ func projectGroupsResponse(ctx context.Context, readDB *readdb.ReadDB, projectGr
 }
 
 type ProjectGroupHandler struct {
-	log    *zap.SugaredLogger
+	log    zerolog.Logger
 	ah     *action.ActionHandler
 	readDB *readdb.ReadDB
 }
 
-func NewProjectGroupHandler(logger *zap.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *ProjectGroupHandler {
-	return &ProjectGroupHandler{log: logger.Sugar(), ah: ah, readDB: readDB}
+func NewProjectGroupHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *ProjectGroupHandler {
+	return &ProjectGroupHandler{log: log, ah: ah, readDB: readDB}
 }
 
 func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -101,29 +101,29 @@ func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	projectGroup, err := h.ah.GetProjectGroup(ctx, projectGroupRef)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	resProjectGroup, err := projectGroupResponse(ctx, h.readDB, projectGroup)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	if err := util.HTTPResponse(w, http.StatusOK, resProjectGroup); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type ProjectGroupProjectsHandler struct {
-	log    *zap.SugaredLogger
+	log    zerolog.Logger
 	ah     *action.ActionHandler
 	readDB *readdb.ReadDB
 }
 
-func NewProjectGroupProjectsHandler(logger *zap.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *ProjectGroupProjectsHandler {
-	return &ProjectGroupProjectsHandler{log: logger.Sugar(), ah: ah, readDB: readDB}
+func NewProjectGroupProjectsHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *ProjectGroupProjectsHandler {
+	return &ProjectGroupProjectsHandler{log: log, ah: ah, readDB: readDB}
 }
 
 func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -138,29 +138,29 @@ func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 
 	projects, err := h.ah.GetProjectGroupProjects(ctx, projectGroupRef)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	resProjects, err := projectsResponse(ctx, h.readDB, projects)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	if err := util.HTTPResponse(w, http.StatusOK, resProjects); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type ProjectGroupSubgroupsHandler struct {
-	log    *zap.SugaredLogger
+	log    zerolog.Logger
 	ah     *action.ActionHandler
 	readDB *readdb.ReadDB
 }
 
-func NewProjectGroupSubgroupsHandler(logger *zap.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *ProjectGroupSubgroupsHandler {
-	return &ProjectGroupSubgroupsHandler{log: logger.Sugar(), ah: ah, readDB: readDB}
+func NewProjectGroupSubgroupsHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *ProjectGroupSubgroupsHandler {
+	return &ProjectGroupSubgroupsHandler{log: log, ah: ah, readDB: readDB}
 }
 
 func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -174,29 +174,29 @@ func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.
 
 	projectGroups, err := h.ah.GetProjectGroupSubgroups(ctx, projectGroupRef)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	resProjectGroups, err := projectGroupsResponse(ctx, h.readDB, projectGroups)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	if err := util.HTTPResponse(w, http.StatusOK, resProjectGroups); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type CreateProjectGroupHandler struct {
-	log    *zap.SugaredLogger
+	log    zerolog.Logger
 	ah     *action.ActionHandler
 	readDB *readdb.ReadDB
 }
 
-func NewCreateProjectGroupHandler(logger *zap.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *CreateProjectGroupHandler {
-	return &CreateProjectGroupHandler{log: logger.Sugar(), ah: ah, readDB: readDB}
+func NewCreateProjectGroupHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *CreateProjectGroupHandler {
+	return &CreateProjectGroupHandler{log: log, ah: ah, readDB: readDB}
 }
 
 func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -211,29 +211,29 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 
 	projectGroup, err := h.ah.CreateProjectGroup(ctx, &req)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	resProjectGroup, err := projectGroupResponse(ctx, h.readDB, projectGroup)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	if err := util.HTTPResponse(w, http.StatusCreated, resProjectGroup); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type UpdateProjectGroupHandler struct {
-	log    *zap.SugaredLogger
+	log    zerolog.Logger
 	ah     *action.ActionHandler
 	readDB *readdb.ReadDB
 }
 
-func NewUpdateProjectGroupHandler(logger *zap.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *UpdateProjectGroupHandler {
-	return &UpdateProjectGroupHandler{log: logger.Sugar(), ah: ah, readDB: readDB}
+func NewUpdateProjectGroupHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *UpdateProjectGroupHandler {
+	return &UpdateProjectGroupHandler{log: log, ah: ah, readDB: readDB}
 }
 
 func (h *UpdateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -259,28 +259,28 @@ func (h *UpdateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	}
 	projectGroup, err = h.ah.UpdateProjectGroup(ctx, areq)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	resProjectGroup, err := projectGroupResponse(ctx, h.readDB, projectGroup)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	if err := util.HTTPResponse(w, http.StatusCreated, resProjectGroup); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type DeleteProjectGroupHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewDeleteProjectGroupHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteProjectGroupHandler {
-	return &DeleteProjectGroupHandler{log: logger.Sugar(), ah: ah}
+func NewDeleteProjectGroupHandler(log zerolog.Logger, ah *action.ActionHandler) *DeleteProjectGroupHandler {
+	return &DeleteProjectGroupHandler{log: log, ah: ah}
 }
 
 func (h *DeleteProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -295,9 +295,9 @@ func (h *DeleteProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 
 	err = h.ah.DeleteProjectGroup(ctx, projectGroupRef)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }

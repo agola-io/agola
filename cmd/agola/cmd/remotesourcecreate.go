@@ -22,6 +22,7 @@ import (
 	gwclient "agola.io/agola/services/gateway/client"
 	"agola.io/agola/util"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
 )
@@ -31,7 +32,7 @@ var cmdRemoteSourceCreate = &cobra.Command{
 	Short: "create a remotesource",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := remoteSourceCreate(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -68,13 +69,13 @@ func init() {
 	flags.BoolVar(&remoteSourceCreateOpts.loginEnabled, "login-enabled", true, "enabled/disable user login with this remote source")
 
 	if err := cmdRemoteSourceCreate.MarkFlagRequired("name"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdRemoteSourceCreate.MarkFlagRequired("type"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdRemoteSourceCreate.MarkFlagRequired("auth-type"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdRemoteSource.AddCommand(cmdRemoteSourceCreate)
@@ -113,12 +114,12 @@ func remoteSourceCreate(cmd *cobra.Command, args []string) error {
 		LoginEnabled:        util.BoolP(remoteSourceCreateOpts.loginEnabled),
 	}
 
-	log.Infof("creating remotesource")
+	log.Info().Msgf("creating remotesource")
 	remoteSource, _, err := gwclient.CreateRemoteSource(context.TODO(), req)
 	if err != nil {
 		return errors.Errorf("failed to create remotesource: %w", err)
 	}
-	log.Infof("remotesource %s created, ID: %s", remoteSource.Name, remoteSource.ID)
+	log.Info().Msgf("remotesource %s created, ID: %s", remoteSource.Name, remoteSource.ID)
 
 	return nil
 }

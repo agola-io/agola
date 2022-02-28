@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
@@ -23,7 +24,7 @@ var cmdProjectGroupVariableUpdate = &cobra.Command{
 	Short: "update a project group variable",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := variableUpdate(cmd, "projectgroup", args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -37,13 +38,13 @@ func init() {
 	flags.StringVarP(&variableUpdateOpts.file, "file", "f", "", `yaml file containing the variable definition (use "-" to read from stdin)`)
 
 	if err := cmdProjectGroupVariableUpdate.MarkFlagRequired("projectgroup"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdProjectGroupVariableUpdate.MarkFlagRequired("name"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdProjectGroupVariableUpdate.MarkFlagRequired("file"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdProjectGroupVariable.AddCommand(cmdProjectGroupVariableUpdate)

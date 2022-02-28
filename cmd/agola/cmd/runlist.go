@@ -24,6 +24,7 @@ import (
 	gwclient "agola.io/agola/services/gateway/client"
 	errors "golang.org/x/xerrors"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
@@ -31,7 +32,7 @@ var cmdRunList = &cobra.Command{
 	Use: "list",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := runList(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 	Short: "list",
@@ -67,7 +68,7 @@ func init() {
 	flags.StringVar(&runListOpts.start, "start", "", "starting run id (excluded) to fetch")
 
 	if err := cmdRunList.MarkFlagRequired("project"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdRun.AddCommand(cmdRunList)

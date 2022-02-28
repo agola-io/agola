@@ -24,7 +24,8 @@ import (
 	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/services/config"
-	"go.uber.org/zap"
+
+	"github.com/rs/zerolog"
 	errors "golang.org/x/xerrors"
 )
 
@@ -109,9 +110,9 @@ func NewObjectStorage(c *config.ObjectStorage) (*objectstorage.ObjStorage, error
 	return objectstorage.NewObjStorage(ost, "/"), nil
 }
 
-func NewEtcd(c *config.Etcd, logger *zap.Logger, prefix string) (*etcd.Store, error) {
+func NewEtcd(c *config.Etcd, log zerolog.Logger, prefix string) (*etcd.Store, error) {
 	e, err := etcd.New(etcd.Config{
-		Logger:        logger,
+		Log:           log,
 		Endpoints:     c.Endpoints,
 		Prefix:        prefix,
 		CertFile:      c.TLSCertFile,

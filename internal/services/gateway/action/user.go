@@ -108,12 +108,12 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 		UserName: req.UserName,
 	}
 
-	h.log.Infof("creating user")
+	h.log.Info().Msgf("creating user")
 	u, _, err := h.configstoreClient.CreateUser(ctx, creq)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to create user: %w", err))
 	}
-	h.log.Infof("user %s created, ID: %s", u.Name, u.ID)
+	h.log.Info().Msgf("user %s created, ID: %s", u.Name, u.ID)
 
 	return u, nil
 }
@@ -141,7 +141,7 @@ func (h *ActionHandler) CreateUserToken(ctx context.Context, req *CreateUserToke
 		return "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q already have a token with name %q", userRef, req.TokenName))
 	}
 
-	h.log.Infof("creating user token")
+	h.log.Info().Msgf("creating user token")
 	creq := &csapitypes.CreateUserTokenRequest{
 		TokenName: req.TokenName,
 	}
@@ -149,7 +149,7 @@ func (h *ActionHandler) CreateUserToken(ctx context.Context, req *CreateUserToke
 	if err != nil {
 		return "", util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to create user token: %w", err))
 	}
-	h.log.Infof("token %q for user %q created", req.TokenName, userRef)
+	h.log.Info().Msgf("token %q for user %q created", req.TokenName, userRef)
 
 	return res.Token, nil
 }
@@ -212,12 +212,12 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 		Oauth2AccessTokenExpiresAt: req.Oauth2AccessTokenExpiresAt,
 	}
 
-	h.log.Infof("creating linked account")
+	h.log.Info().Msgf("creating linked account")
 	la, _, err = h.configstoreClient.CreateUserLA(ctx, userRef, creq)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to create linked account: %w", err))
 	}
-	h.log.Infof("linked account %q for user %q created", la.ID, userRef)
+	h.log.Info().Msgf("linked account %q for user %q created", la.ID, userRef)
 
 	return la, nil
 }
@@ -247,12 +247,12 @@ func (h *ActionHandler) UpdateUserLA(ctx context.Context, userRef string, la *cs
 		Oauth2AccessTokenExpiresAt: la.Oauth2AccessTokenExpiresAt,
 	}
 
-	h.log.Infof("updating user %q linked account", userRef)
+	h.log.Info().Msgf("updating user %q linked account", userRef)
 	la, _, err = h.configstoreClient.UpdateUserLA(ctx, userRef, la.ID, creq)
 	if err != nil {
 		return util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to update user: %w", err))
 	}
-	h.log.Infof("linked account %q for user %q updated", la.ID, userRef)
+	h.log.Info().Msgf("linked account %q for user %q updated", la.ID, userRef)
 
 	return nil
 }
@@ -351,12 +351,12 @@ func (h *ActionHandler) RegisterUser(ctx context.Context, req *RegisterUserReque
 		},
 	}
 
-	h.log.Infof("creating user account")
+	h.log.Info().Msgf("creating user account")
 	u, _, err := h.configstoreClient.CreateUser(ctx, creq)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to create linked account: %w", err))
 	}
-	h.log.Infof("user %q created", req.UserName)
+	h.log.Info().Msgf("user %q created", req.UserName)
 
 	return u, nil
 }
@@ -434,12 +434,12 @@ func (h *ActionHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (*
 			Oauth2AccessTokenExpiresAt: la.Oauth2AccessTokenExpiresAt,
 		}
 
-		h.log.Infof("updating user %q linked account", user.Name)
+		h.log.Info().Msgf("updating user %q linked account", user.Name)
 		la, _, err = h.configstoreClient.UpdateUserLA(ctx, user.Name, la.ID, creq)
 		if err != nil {
 			return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to update user: %w", err))
 		}
-		h.log.Infof("linked account %q for user %q updated", la.ID, user.Name)
+		h.log.Info().Msgf("linked account %q for user %q updated", la.ID, user.Name)
 	}
 
 	// generate jwt token

@@ -19,6 +19,7 @@ import (
 
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
 )
@@ -28,7 +29,7 @@ var cmdUserDelete = &cobra.Command{
 	Short: "delete a user",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := userDelete(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -45,7 +46,7 @@ func init() {
 	flags.StringVarP(&userDeleteOpts.username, "username", "n", "", "user name")
 
 	if err := cmdUserDelete.MarkFlagRequired("username"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdUser.AddCommand(cmdUserDelete)
@@ -54,7 +55,7 @@ func init() {
 func userDelete(cmd *cobra.Command, args []string) error {
 	gwclient := gwclient.NewClient(gatewayURL, token)
 
-	log.Infof("deleting user %q", userDeleteOpts.username)
+	log.Info().Msgf("deleting user %q", userDeleteOpts.username)
 	if _, err := gwclient.DeleteUser(context.TODO(), userDeleteOpts.username); err != nil {
 		return errors.Errorf("failed to delete user: %w", err)
 	}

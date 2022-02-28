@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
@@ -23,7 +24,7 @@ var cmdProjectGroupSecretDelete = &cobra.Command{
 	Short: "delete a secret",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := secretDelete(cmd, "projectgroup", args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -35,10 +36,10 @@ func init() {
 	flags.StringVarP(&secretDeleteOpts.name, "name", "n", "", "secret name")
 
 	if err := cmdProjectGroupSecretDelete.MarkFlagRequired("projectgroup"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdProjectGroupSecretDelete.MarkFlagRequired("name"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdProjectGroupSecret.AddCommand(cmdProjectGroupSecretDelete)

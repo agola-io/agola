@@ -21,6 +21,7 @@ import (
 
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
 )
@@ -30,7 +31,7 @@ var cmdOrgMemberList = &cobra.Command{
 	Short: "lists organization members",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := orgMemberList(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -47,7 +48,7 @@ func init() {
 	flags.StringVarP(&orgMemberListOpts.orgname, "orgname", "n", "", "organization name")
 
 	if err := cmdOrgMemberList.MarkFlagRequired("orgname"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdOrgMember.AddCommand(cmdOrgMemberList)

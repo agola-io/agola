@@ -20,6 +20,7 @@ import (
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
 )
@@ -29,7 +30,7 @@ var cmdProjectGroupCreate = &cobra.Command{
 	Short: "create a project group",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := projectGroupCreate(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -50,10 +51,10 @@ func init() {
 	flags.StringVar(&projectGroupCreateOpts.visibility, "visibility", "public", `project group visibility (public or private)`)
 
 	if err := cmdProjectGroupCreate.MarkFlagRequired("name"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdProjectGroupCreate.MarkFlagRequired("parent"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdProjectGroup.AddCommand(cmdProjectGroupCreate)
@@ -73,13 +74,13 @@ func projectGroupCreate(cmd *cobra.Command, args []string) error {
 		Visibility: gwapitypes.Visibility(projectGroupCreateOpts.visibility),
 	}
 
-	log.Infof("creating project group")
+	log.Info().Msgf("creating project group")
 
 	projectGroup, _, err := gwclient.CreateProjectGroup(context.TODO(), req)
 	if err != nil {
 		return errors.Errorf("failed to create project group: %w", err)
 	}
-	log.Infof("project group %s created, ID: %s", projectGroup.Name, projectGroup.ID)
+	log.Info().Msgf("project group %s created, ID: %s", projectGroup.Name, projectGroup.ID)
 
 	return nil
 }

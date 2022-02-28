@@ -33,8 +33,8 @@ import (
 	"time"
 
 	"agola.io/agola/internal/etcd"
+	"github.com/rs/zerolog"
 	"go.etcd.io/etcd/embed"
-	"go.uber.org/zap"
 
 	"github.com/gofrs/uuid"
 	"github.com/sgotti/gexpect"
@@ -149,7 +149,7 @@ type TestEmbeddedEtcd struct {
 	Port          string
 }
 
-func NewTestEmbeddedEtcd(t *testing.T, logger *zap.Logger, dir string, a ...string) (*TestEmbeddedEtcd, error) {
+func NewTestEmbeddedEtcd(t *testing.T, log zerolog.Logger, dir string, a ...string) (*TestEmbeddedEtcd, error) {
 	u := uuid.Must(uuid.NewV4())
 	uid := fmt.Sprintf("%x", u[:4])
 
@@ -189,7 +189,7 @@ func NewTestEmbeddedEtcd(t *testing.T, logger *zap.Logger, dir string, a ...stri
 	storeEndpoint := fmt.Sprintf("http://%s:%s", listenAddress, port)
 
 	storeConfig := etcd.Config{
-		Logger:    logger,
+		Log:       log,
 		Endpoints: storeEndpoint,
 	}
 	e, err := etcd.New(storeConfig)
@@ -235,7 +235,7 @@ type TestExternalEtcd struct {
 	Port          string
 }
 
-func NewTestExternalEtcd(t *testing.T, logger *zap.Logger, dir string, a ...string) (*TestExternalEtcd, error) {
+func NewTestExternalEtcd(t *testing.T, log zerolog.Logger, dir string, a ...string) (*TestExternalEtcd, error) {
 	u := uuid.Must(uuid.NewV4())
 	uid := fmt.Sprintf("%x", u[:4])
 
@@ -263,7 +263,7 @@ func NewTestExternalEtcd(t *testing.T, logger *zap.Logger, dir string, a ...stri
 	storeEndpoint := fmt.Sprintf("http://%s:%s", listenAddress, port)
 
 	storeConfig := etcd.Config{
-		Logger:    logger,
+		Log:       log,
 		Endpoints: storeEndpoint,
 	}
 	e, err := etcd.New(storeConfig)

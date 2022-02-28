@@ -113,7 +113,7 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateVariableR
 			return nil, nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to get project group %q secrets: %w", req.ParentRef, err))
 		}
 
-		h.log.Infof("creating project group variable")
+		h.log.Info().Msgf("creating project group variable")
 		rv, _, err = h.configstoreClient.CreateProjectGroupVariable(ctx, req.ParentRef, v)
 		if err != nil {
 			return nil, nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to create variable: %w", err))
@@ -125,13 +125,13 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateVariableR
 			return nil, nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to get project %q secrets: %w", req.ParentRef, err))
 		}
 
-		h.log.Infof("creating project variable")
+		h.log.Info().Msgf("creating project variable")
 		rv, _, err = h.configstoreClient.CreateProjectVariable(ctx, req.ParentRef, v)
 		if err != nil {
 			return nil, nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to create variable: %w", err))
 		}
 	}
-	h.log.Infof("variable %s created, ID: %s", rv.Name, rv.ID)
+	h.log.Info().Msgf("variable %s created, ID: %s", rv.Name, rv.ID)
 
 	return rv, cssecrets, nil
 }
@@ -184,7 +184,7 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableR
 			return nil, nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to get project group %q secrets: %w", req.ParentRef, err))
 		}
 
-		h.log.Infof("creating project group variable")
+		h.log.Info().Msgf("creating project group variable")
 		rv, _, err = h.configstoreClient.UpdateProjectGroupVariable(ctx, req.ParentRef, req.VariableName, v)
 		if err != nil {
 			return nil, nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to create variable: %w", err))
@@ -196,13 +196,13 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableR
 			return nil, nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to get project %q secrets: %w", req.ParentRef, err))
 		}
 
-		h.log.Infof("creating project variable")
+		h.log.Info().Msgf("creating project variable")
 		rv, _, err = h.configstoreClient.UpdateProjectVariable(ctx, req.ParentRef, req.VariableName, v)
 		if err != nil {
 			return nil, nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to create variable: %w", err))
 		}
 	}
-	h.log.Infof("variable %s created, ID: %s", rv.Name, rv.ID)
+	h.log.Info().Msgf("variable %s created, ID: %s", rv.Name, rv.ID)
 
 	return rv, cssecrets, nil
 }
@@ -218,10 +218,10 @@ func (h *ActionHandler) DeleteVariable(ctx context.Context, parentType cstypes.C
 
 	switch parentType {
 	case cstypes.ConfigTypeProjectGroup:
-		h.log.Infof("deleting project group variable")
+		h.log.Info().Msgf("deleting project group variable")
 		_, err = h.configstoreClient.DeleteProjectGroupVariable(ctx, parentRef, name)
 	case cstypes.ConfigTypeProject:
-		h.log.Infof("deleting project variable")
+		h.log.Info().Msgf("deleting project variable")
 		_, err = h.configstoreClient.DeleteProjectVariable(ctx, parentRef, name)
 	}
 	if err != nil {

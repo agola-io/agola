@@ -26,16 +26,16 @@ import (
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 
 	"github.com/gorilla/mux"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 )
 
 type CreateProjectHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewCreateProjectHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateProjectHandler {
-	return &CreateProjectHandler{log: logger.Sugar(), ah: ah}
+func NewCreateProjectHandler(log zerolog.Logger, ah *action.ActionHandler) *CreateProjectHandler {
+	return &CreateProjectHandler{log: log, ah: ah}
 }
 
 func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -60,23 +60,23 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 
 	project, err := h.ah.CreateProject(ctx, areq)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	res := createProjectResponse(project)
 	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type UpdateProjectHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewUpdateProjectHandler(logger *zap.Logger, ah *action.ActionHandler) *UpdateProjectHandler {
-	return &UpdateProjectHandler{log: logger.Sugar(), ah: ah}
+func NewUpdateProjectHandler(log zerolog.Logger, ah *action.ActionHandler) *UpdateProjectHandler {
+	return &UpdateProjectHandler{log: log, ah: ah}
 }
 
 func (h *UpdateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -109,23 +109,23 @@ func (h *UpdateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	}
 	project, err := h.ah.UpdateProject(ctx, projectRef, areq)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	res := createProjectResponse(project)
 	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type ProjectReconfigHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewProjectReconfigHandler(logger *zap.Logger, ah *action.ActionHandler) *ProjectReconfigHandler {
-	return &ProjectReconfigHandler{log: logger.Sugar(), ah: ah}
+func NewProjectReconfigHandler(log zerolog.Logger, ah *action.ActionHandler) *ProjectReconfigHandler {
+	return &ProjectReconfigHandler{log: log, ah: ah}
 }
 
 func (h *ProjectReconfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -142,17 +142,17 @@ func (h *ProjectReconfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type ProjectUpdateRepoLinkedAccountHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewProjectUpdateRepoLinkedAccountHandler(logger *zap.Logger, ah *action.ActionHandler) *ProjectUpdateRepoLinkedAccountHandler {
-	return &ProjectUpdateRepoLinkedAccountHandler{log: logger.Sugar(), ah: ah}
+func NewProjectUpdateRepoLinkedAccountHandler(log zerolog.Logger, ah *action.ActionHandler) *ProjectUpdateRepoLinkedAccountHandler {
+	return &ProjectUpdateRepoLinkedAccountHandler{log: log, ah: ah}
 }
 
 func (h *ProjectUpdateRepoLinkedAccountHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -166,23 +166,23 @@ func (h *ProjectUpdateRepoLinkedAccountHandler) ServeHTTP(w http.ResponseWriter,
 
 	project, err := h.ah.ProjectUpdateRepoLinkedAccount(ctx, projectRef)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	res := createProjectResponse(project)
 	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type DeleteProjectHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewDeleteProjectHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteProjectHandler {
-	return &DeleteProjectHandler{log: logger.Sugar(), ah: ah}
+func NewDeleteProjectHandler(log zerolog.Logger, ah *action.ActionHandler) *DeleteProjectHandler {
+	return &DeleteProjectHandler{log: log, ah: ah}
 }
 
 func (h *DeleteProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -196,22 +196,22 @@ func (h *DeleteProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 
 	err = h.ah.DeleteProject(ctx, projectRef)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type ProjectHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewProjectHandler(logger *zap.Logger, ah *action.ActionHandler) *ProjectHandler {
-	return &ProjectHandler{log: logger.Sugar(), ah: ah}
+func NewProjectHandler(log zerolog.Logger, ah *action.ActionHandler) *ProjectHandler {
+	return &ProjectHandler{log: log, ah: ah}
 }
 
 func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -225,13 +225,13 @@ func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	project, err := h.ah.GetProject(ctx, projectRef)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	res := createProjectResponse(project)
 	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
@@ -250,12 +250,12 @@ func createProjectResponse(r *csapitypes.Project) *gwapitypes.ProjectResponse {
 }
 
 type ProjectCreateRunHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewProjectCreateRunHandler(logger *zap.Logger, ah *action.ActionHandler) *ProjectCreateRunHandler {
-	return &ProjectCreateRunHandler{log: logger.Sugar(), ah: ah}
+func NewProjectCreateRunHandler(log zerolog.Logger, ah *action.ActionHandler) *ProjectCreateRunHandler {
+	return &ProjectCreateRunHandler{log: log, ah: ah}
 }
 
 func (h *ProjectCreateRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -276,11 +276,11 @@ func (h *ProjectCreateRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
 
 	err = h.ah.ProjectCreateRun(ctx, projectRef, req.Branch, req.Tag, req.Ref, req.CommitSHA)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	if err := util.HTTPResponse(w, http.StatusCreated, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }

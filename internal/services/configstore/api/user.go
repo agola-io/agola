@@ -27,17 +27,17 @@ import (
 	"agola.io/agola/services/configstore/types"
 
 	"github.com/gorilla/mux"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 	errors "golang.org/x/xerrors"
 )
 
 type UserHandler struct {
-	log    *zap.SugaredLogger
+	log    zerolog.Logger
 	readDB *readdb.ReadDB
 }
 
-func NewUserHandler(logger *zap.Logger, readDB *readdb.ReadDB) *UserHandler {
-	return &UserHandler{log: logger.Sugar(), readDB: readDB}
+func NewUserHandler(log zerolog.Logger, readDB *readdb.ReadDB) *UserHandler {
+	return &UserHandler{log: log, readDB: readDB}
 }
 
 func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -52,7 +52,7 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return err
 	})
 	if err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		util.HTTPError(w, err)
 		return
 	}
@@ -63,17 +63,17 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := util.HTTPResponse(w, http.StatusOK, user); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type CreateUserHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewCreateUserHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateUserHandler {
-	return &CreateUserHandler{log: logger.Sugar(), ah: ah}
+func NewCreateUserHandler(log zerolog.Logger, ah *action.ActionHandler) *CreateUserHandler {
+	return &CreateUserHandler{log: log, ah: ah}
 }
 
 func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -103,22 +103,22 @@ func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.ah.CreateUser(ctx, creq)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	if err := util.HTTPResponse(w, http.StatusCreated, user); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type UpdateUserHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewUpdateUserHandler(logger *zap.Logger, ah *action.ActionHandler) *UpdateUserHandler {
-	return &UpdateUserHandler{log: logger.Sugar(), ah: ah}
+func NewUpdateUserHandler(log zerolog.Logger, ah *action.ActionHandler) *UpdateUserHandler {
+	return &UpdateUserHandler{log: log, ah: ah}
 }
 
 func (h *UpdateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -141,22 +141,22 @@ func (h *UpdateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.ah.UpdateUser(ctx, creq)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	if err := util.HTTPResponse(w, http.StatusCreated, user); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type DeleteUserHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewDeleteUserHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteUserHandler {
-	return &DeleteUserHandler{log: logger.Sugar(), ah: ah}
+func NewDeleteUserHandler(log zerolog.Logger, ah *action.ActionHandler) *DeleteUserHandler {
+	return &DeleteUserHandler{log: log, ah: ah}
 }
 
 func (h *DeleteUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -167,10 +167,10 @@ func (h *DeleteUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	err := h.ah.DeleteUser(ctx, userRef)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
@@ -180,12 +180,12 @@ const (
 )
 
 type UsersHandler struct {
-	log    *zap.SugaredLogger
+	log    zerolog.Logger
 	readDB *readdb.ReadDB
 }
 
-func NewUsersHandler(logger *zap.Logger, readDB *readdb.ReadDB) *UsersHandler {
-	return &UsersHandler{log: logger.Sugar(), readDB: readDB}
+func NewUsersHandler(log zerolog.Logger, readDB *readdb.ReadDB) *UsersHandler {
+	return &UsersHandler{log: log, readDB: readDB}
 }
 
 func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -230,7 +230,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return err
 		})
 		if err != nil {
-			h.log.Errorf("err: %+v", err)
+			h.log.Err(err).Send()
 			util.HTTPError(w, err)
 			return
 		}
@@ -248,7 +248,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return err
 		})
 		if err != nil {
-			h.log.Errorf("err: %+v", err)
+			h.log.Err(err).Send()
 			util.HTTPError(w, err)
 			return
 		}
@@ -267,7 +267,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return err
 		})
 		if err != nil {
-			h.log.Errorf("err: %+v", err)
+			h.log.Err(err).Send()
 			util.HTTPError(w, err)
 			return
 		}
@@ -284,24 +284,24 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return err
 		})
 		if err != nil {
-			h.log.Errorf("err: %+v", err)
+			h.log.Err(err).Send()
 			util.HTTPError(w, err)
 			return
 		}
 	}
 
 	if err := util.HTTPResponse(w, http.StatusOK, users); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type CreateUserLAHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewCreateUserLAHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateUserLAHandler {
-	return &CreateUserLAHandler{log: logger.Sugar(), ah: ah}
+func NewCreateUserLAHandler(log zerolog.Logger, ah *action.ActionHandler) *CreateUserLAHandler {
+	return &CreateUserLAHandler{log: log, ah: ah}
 }
 
 func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -328,22 +328,22 @@ func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 	user, err := h.ah.CreateUserLA(ctx, creq)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	if err := util.HTTPResponse(w, http.StatusCreated, user); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type DeleteUserLAHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewDeleteUserLAHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteUserLAHandler {
-	return &DeleteUserLAHandler{log: logger.Sugar(), ah: ah}
+func NewDeleteUserLAHandler(log zerolog.Logger, ah *action.ActionHandler) *DeleteUserLAHandler {
+	return &DeleteUserLAHandler{log: log, ah: ah}
 }
 
 func (h *DeleteUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -354,20 +354,20 @@ func (h *DeleteUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	err := h.ah.DeleteUserLA(ctx, userRef, laID)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type UpdateUserLAHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewUpdateUserLAHandler(logger *zap.Logger, ah *action.ActionHandler) *UpdateUserLAHandler {
-	return &UpdateUserLAHandler{log: logger.Sugar(), ah: ah}
+func NewUpdateUserLAHandler(log zerolog.Logger, ah *action.ActionHandler) *UpdateUserLAHandler {
+	return &UpdateUserLAHandler{log: log, ah: ah}
 }
 
 func (h *UpdateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -395,22 +395,22 @@ func (h *UpdateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 	user, err := h.ah.UpdateUserLA(ctx, creq)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	if err := util.HTTPResponse(w, http.StatusOK, user); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type CreateUserTokenHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewCreateUserTokenHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateUserTokenHandler {
-	return &CreateUserTokenHandler{log: logger.Sugar(), ah: ah}
+func NewCreateUserTokenHandler(log zerolog.Logger, ah *action.ActionHandler) *CreateUserTokenHandler {
+	return &CreateUserTokenHandler{log: log, ah: ah}
 }
 
 func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -427,7 +427,7 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 
 	token, err := h.ah.CreateUserToken(ctx, userRef, req.TokenName)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -435,17 +435,17 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		Token: token,
 	}
 	if err := util.HTTPResponse(w, http.StatusCreated, resp); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type DeleteUserTokenHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewDeleteUserTokenHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteUserTokenHandler {
-	return &DeleteUserTokenHandler{log: logger.Sugar(), ah: ah}
+func NewDeleteUserTokenHandler(log zerolog.Logger, ah *action.ActionHandler) *DeleteUserTokenHandler {
+	return &DeleteUserTokenHandler{log: log, ah: ah}
 }
 
 func (h *DeleteUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -456,11 +456,11 @@ func (h *DeleteUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 
 	err := h.ah.DeleteUserToken(ctx, userRef, tokenName)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
@@ -472,12 +472,12 @@ func userOrgsResponse(userOrg *action.UserOrgsResponse) *csapitypes.UserOrgsResp
 }
 
 type UserOrgsHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewUserOrgsHandler(logger *zap.Logger, ah *action.ActionHandler) *UserOrgsHandler {
-	return &UserOrgsHandler{log: logger.Sugar(), ah: ah}
+func NewUserOrgsHandler(log zerolog.Logger, ah *action.ActionHandler) *UserOrgsHandler {
+	return &UserOrgsHandler{log: log, ah: ah}
 }
 
 func (h *UserOrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -487,7 +487,7 @@ func (h *UserOrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	userOrgs, err := h.ah.GetUserOrgs(ctx, userRef)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -497,6 +497,6 @@ func (h *UserOrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }

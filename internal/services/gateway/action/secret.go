@@ -92,16 +92,16 @@ func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretReque
 	var rs *csapitypes.Secret
 	switch req.ParentType {
 	case cstypes.ConfigTypeProjectGroup:
-		h.log.Infof("creating project group secret")
+		h.log.Info().Msgf("creating project group secret")
 		rs, _, err = h.configstoreClient.CreateProjectGroupSecret(ctx, req.ParentRef, s)
 	case cstypes.ConfigTypeProject:
-		h.log.Infof("creating project secret")
+		h.log.Info().Msgf("creating project secret")
 		rs, _, err = h.configstoreClient.CreateProjectSecret(ctx, req.ParentRef, s)
 	}
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to create secret: %w", err))
 	}
-	h.log.Infof("secret %s created, ID: %s", rs.Name, rs.ID)
+	h.log.Info().Msgf("secret %s created, ID: %s", rs.Name, rs.ID)
 
 	return rs, nil
 }
@@ -146,16 +146,16 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretReque
 	var rs *csapitypes.Secret
 	switch req.ParentType {
 	case cstypes.ConfigTypeProjectGroup:
-		h.log.Infof("updating project group secret")
+		h.log.Info().Msgf("updating project group secret")
 		rs, _, err = h.configstoreClient.UpdateProjectGroupSecret(ctx, req.ParentRef, req.SecretName, s)
 	case cstypes.ConfigTypeProject:
-		h.log.Infof("updating project secret")
+		h.log.Info().Msgf("updating project secret")
 		rs, _, err = h.configstoreClient.UpdateProjectSecret(ctx, req.ParentRef, req.SecretName, s)
 	}
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to update secret: %w", err))
 	}
-	h.log.Infof("secret %s updated, ID: %s", rs.Name, rs.ID)
+	h.log.Info().Msgf("secret %s updated, ID: %s", rs.Name, rs.ID)
 
 	return rs, nil
 }
@@ -171,10 +171,10 @@ func (h *ActionHandler) DeleteSecret(ctx context.Context, parentType cstypes.Con
 
 	switch parentType {
 	case cstypes.ConfigTypeProjectGroup:
-		h.log.Infof("deleting project group secret")
+		h.log.Info().Msgf("deleting project group secret")
 		_, err = h.configstoreClient.DeleteProjectGroupSecret(ctx, parentRef, name)
 	case cstypes.ConfigTypeProject:
-		h.log.Infof("deleting project secret")
+		h.log.Info().Msgf("deleting project secret")
 		_, err = h.configstoreClient.DeleteProjectSecret(ctx, parentRef, name)
 	}
 	if err != nil {

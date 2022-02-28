@@ -25,7 +25,7 @@ import (
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/sequence"
 
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 	errors "golang.org/x/xerrors"
 )
 
@@ -130,7 +130,7 @@ type DataManagerConfig struct {
 
 type DataManager struct {
 	basePath                string
-	log                     *zap.SugaredLogger
+	log                     zerolog.Logger
 	e                       *etcd.Store
 	ost                     *objectstorage.ObjStorage
 	changes                 *WalChanges
@@ -143,7 +143,7 @@ type DataManager struct {
 	maintenanceMode         bool
 }
 
-func NewDataManager(ctx context.Context, logger *zap.Logger, conf *DataManagerConfig) (*DataManager, error) {
+func NewDataManager(ctx context.Context, log zerolog.Logger, conf *DataManagerConfig) (*DataManager, error) {
 	if conf.EtcdWalsKeepNum == 0 {
 		conf.EtcdWalsKeepNum = DefaultEtcdWalsKeepNum
 	}
@@ -168,7 +168,7 @@ func NewDataManager(ctx context.Context, logger *zap.Logger, conf *DataManagerCo
 
 	d := &DataManager{
 		basePath:                conf.BasePath,
-		log:                     logger.Sugar(),
+		log:                     log,
 		e:                       conf.E,
 		ost:                     conf.OST,
 		changes:                 NewWalChanges(conf.DataTypes),
@@ -266,7 +266,7 @@ func (d *DataManager) Run(ctx context.Context, readyCh chan struct{}) error {
 			if err == nil {
 				break
 			}
-			d.log.Errorf("failed to initialize etcd: %+v", err)
+			d.log.Err(err).Msgf("failed to initialize etcd")
 
 			sleepCh := time.NewTimer(1 * time.Second).C
 			select {
@@ -288,12 +288,12 @@ func (d *DataManager) Run(ctx context.Context, readyCh chan struct{}) error {
 		go d.etcdPingerLoop(ctx)
 
 	} else {
-		d.log.Infof("datamanager starting in maintenance mode")
+		d.log.Info().Msgf("datamanager starting in maintenance mode")
 		readyCh <- struct{}{}
 	}
 
 	<-ctx.Done()
-	d.log.Infof("datamanager exiting")
+	d.log.Info().Msgf("datamanager exiting")
 
 	return nil
 }

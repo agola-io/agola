@@ -21,6 +21,7 @@ import (
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
 )
@@ -30,7 +31,7 @@ var cmdUserTokenCreate = &cobra.Command{
 	Short: "create a user token",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := userTokenCreate(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -49,10 +50,10 @@ func init() {
 	flags.StringVarP(&userTokenCreateOpts.tokenName, "tokenname", "t", "", "token name")
 
 	if err := cmdUserTokenCreate.MarkFlagRequired("username"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdUserTokenCreate.MarkFlagRequired("tokenname"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdUserToken.AddCommand(cmdUserTokenCreate)
@@ -65,12 +66,12 @@ func userTokenCreate(cmd *cobra.Command, args []string) error {
 		TokenName: userTokenCreateOpts.tokenName,
 	}
 
-	log.Infof("creating token for user %q", userTokenCreateOpts.username)
+	log.Info().Msgf("creating token for user %q", userTokenCreateOpts.username)
 	resp, _, err := gwclient.CreateUserToken(context.TODO(), userTokenCreateOpts.username, req)
 	if err != nil {
 		return errors.Errorf("failed to create token: %w", err)
 	}
-	log.Infof("token for user %q created: %s", userTokenCreateOpts.username, resp.Token)
+	log.Info().Msgf("token for user %q created: %s", userTokenCreateOpts.username, resp.Token)
 	fmt.Println(resp.Token)
 
 	return nil

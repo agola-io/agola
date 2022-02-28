@@ -19,6 +19,7 @@ import (
 
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
 )
@@ -28,7 +29,7 @@ var cmdProjectSecretDelete = &cobra.Command{
 	Short: "delete a secret",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := secretDelete(cmd, "project", args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -47,10 +48,10 @@ func init() {
 	flags.StringVarP(&secretDeleteOpts.name, "name", "n", "", "secret name")
 
 	if err := cmdProjectSecretDelete.MarkFlagRequired("project"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdProjectSecretDelete.MarkFlagRequired("name"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdProjectSecret.AddCommand(cmdProjectSecretDelete)
@@ -61,19 +62,19 @@ func secretDelete(cmd *cobra.Command, ownertype string, args []string) error {
 
 	switch ownertype {
 	case "project":
-		log.Infof("deleting project secret")
+		log.Info().Msgf("deleting project secret")
 		_, err := gwclient.DeleteProjectSecret(context.TODO(), secretDeleteOpts.parentRef, secretDeleteOpts.name)
 		if err != nil {
 			return errors.Errorf("failed to delete project secret: %w", err)
 		}
-		log.Infof("project secret deleted")
+		log.Info().Msgf("project secret deleted")
 	case "projectgroup":
-		log.Infof("deleting project group secret")
+		log.Info().Msgf("deleting project group secret")
 		_, err := gwclient.DeleteProjectGroupSecret(context.TODO(), secretDeleteOpts.parentRef, secretDeleteOpts.name)
 		if err != nil {
 			return errors.Errorf("failed to delete project group secret: %w", err)
 		}
-		log.Infof("project group secret deleted")
+		log.Info().Msgf("project group secret deleted")
 	}
 
 	return nil

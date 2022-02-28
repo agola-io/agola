@@ -26,17 +26,17 @@ import (
 	"agola.io/agola/services/configstore/types"
 
 	"github.com/gorilla/mux"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 )
 
 type VariablesHandler struct {
-	log    *zap.SugaredLogger
+	log    zerolog.Logger
 	ah     *action.ActionHandler
 	readDB *readdb.ReadDB
 }
 
-func NewVariablesHandler(logger *zap.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *VariablesHandler {
-	return &VariablesHandler{log: logger.Sugar(), ah: ah, readDB: readDB}
+func NewVariablesHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *VariablesHandler {
+	return &VariablesHandler{log: log, ah: ah, readDB: readDB}
 }
 
 func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -46,13 +46,13 @@ func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	variables, err := h.ah.GetVariables(ctx, parentType, parentRef, tree)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -72,30 +72,30 @@ func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return err
 	})
 	if err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		util.HTTPError(w, err)
 		return
 	}
 
 	if err := util.HTTPResponse(w, http.StatusOK, resVariables); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type CreateVariableHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewCreateVariableHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateVariableHandler {
-	return &CreateVariableHandler{log: logger.Sugar(), ah: ah}
+func NewCreateVariableHandler(log zerolog.Logger, ah *action.ActionHandler) *CreateVariableHandler {
+	return &CreateVariableHandler{log: log, ah: ah}
 }
 
 func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	parentType, parentRef, err := GetConfigTypeRef(r)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -111,22 +111,22 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 	variable, err = h.ah.CreateVariable(ctx, variable)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	if err := util.HTTPResponse(w, http.StatusCreated, variable); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type UpdateVariableHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewUpdateVariableHandler(logger *zap.Logger, ah *action.ActionHandler) *UpdateVariableHandler {
-	return &UpdateVariableHandler{log: logger.Sugar(), ah: ah}
+func NewUpdateVariableHandler(log zerolog.Logger, ah *action.ActionHandler) *UpdateVariableHandler {
+	return &UpdateVariableHandler{log: log, ah: ah}
 }
 
 func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -136,7 +136,7 @@ func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -156,22 +156,22 @@ func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	}
 	variable, err = h.ah.UpdateVariable(ctx, areq)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	if err := util.HTTPResponse(w, http.StatusOK, variable); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type DeleteVariableHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewDeleteVariableHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteVariableHandler {
-	return &DeleteVariableHandler{log: logger.Sugar(), ah: ah}
+func NewDeleteVariableHandler(log zerolog.Logger, ah *action.ActionHandler) *DeleteVariableHandler {
+	return &DeleteVariableHandler{log: log, ah: ah}
 }
 
 func (h *DeleteVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -181,15 +181,15 @@ func (h *DeleteVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	err = h.ah.DeleteVariable(ctx, parentType, parentRef, variableName)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }

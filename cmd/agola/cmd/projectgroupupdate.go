@@ -20,6 +20,7 @@ import (
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
 )
@@ -29,7 +30,7 @@ var cmdProjectGroupUpdate = &cobra.Command{
 	Short: "update a project group",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := projectGroupUpdate(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -53,7 +54,7 @@ func init() {
 	flags.StringVar(&projectGroupUpdateOpts.visibility, "visibility", "public", `project group visibility (public or private)`)
 
 	if err := cmdProjectGroupUpdate.MarkFlagRequired("ref"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdProjectGroup.AddCommand(cmdProjectGroupUpdate)
@@ -78,12 +79,12 @@ func projectGroupUpdate(cmd *cobra.Command, args []string) error {
 		req.Name = &projectGroupUpdateOpts.visibility
 	}
 
-	log.Infof("updating project group")
+	log.Info().Msgf("updating project group")
 	projectGroup, _, err := gwclient.UpdateProjectGroup(context.TODO(), projectGroupUpdateOpts.ref, req)
 	if err != nil {
 		return errors.Errorf("failed to update project group: %w", err)
 	}
-	log.Infof("project group %s update, ID: %s", projectGroup.Name, projectGroup.ID)
+	log.Info().Msgf("project group %s update, ID: %s", projectGroup.Name, projectGroup.ID)
 
 	return nil
 }

@@ -24,11 +24,11 @@ import (
 
 	"agola.io/agola/internal/util"
 
+	"github.com/rs/zerolog"
 	"go.etcd.io/etcd/clientv3"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/clientv3/namespace"
 	"go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
-	"go.uber.org/zap"
 	errors "golang.org/x/xerrors"
 )
 
@@ -50,7 +50,7 @@ type WriteOptions struct {
 }
 
 type Config struct {
-	Logger        *zap.Logger
+	Log           zerolog.Logger
 	Endpoints     string
 	Prefix        string
 	CertFile      string
@@ -69,7 +69,7 @@ func FromEtcdError(err error) error {
 }
 
 type Store struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	c   *etcdclientv3.Client
 }
 
@@ -127,7 +127,7 @@ func New(cfg Config) (*Store, error) {
 	c.Lease = namespace.NewLease(c.Lease, prefix)
 
 	s := &Store{
-		log: cfg.Logger.Sugar(),
+		log: cfg.Log,
 		c:   c,
 	}
 
@@ -379,9 +379,9 @@ func (s *Store) compact(ctx context.Context, version, rev int64) (int64, int64, 
 		return curVersion, curRev, nil
 	}
 	if _, err = s.c.Compact(ctx, rev); err != nil {
-		s.log.Warnf("compact error: %v", err)
+		s.log.Warn().Msgf("compact error: %v", err)
 		return curVersion, curRev, err
 	}
-	s.log.Infof("compacted revision: %d", rev)
+	s.log.Info().Msgf("compacted revision: %d", rev)
 	return curVersion, curRev, nil
 }

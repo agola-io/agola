@@ -23,19 +23,19 @@ import (
 	"agola.io/agola/internal/util"
 	cstypes "agola.io/agola/services/configstore/types"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 
 	"github.com/gorilla/mux"
 	errors "golang.org/x/xerrors"
 )
 
 type CreateRemoteSourceHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewCreateRemoteSourceHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateRemoteSourceHandler {
-	return &CreateRemoteSourceHandler{log: logger.Sugar(), ah: ah}
+func NewCreateRemoteSourceHandler(log zerolog.Logger, ah *action.ActionHandler) *CreateRemoteSourceHandler {
+	return &CreateRemoteSourceHandler{log: log, ah: ah}
 }
 
 func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -63,23 +63,23 @@ func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	}
 	rs, err := h.ah.CreateRemoteSource(ctx, creq)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	res := createRemoteSourceResponse(rs)
 	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type UpdateRemoteSourceHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewUpdateRemoteSourceHandler(logger *zap.Logger, ah *action.ActionHandler) *UpdateRemoteSourceHandler {
-	return &UpdateRemoteSourceHandler{log: logger.Sugar(), ah: ah}
+func NewUpdateRemoteSourceHandler(log zerolog.Logger, ah *action.ActionHandler) *UpdateRemoteSourceHandler {
+	return &UpdateRemoteSourceHandler{log: log, ah: ah}
 }
 
 func (h *UpdateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -109,13 +109,13 @@ func (h *UpdateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	}
 	rs, err := h.ah.UpdateRemoteSource(ctx, creq)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	res := createRemoteSourceResponse(rs)
 	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
@@ -131,12 +131,12 @@ func createRemoteSourceResponse(r *cstypes.RemoteSource) *gwapitypes.RemoteSourc
 }
 
 type RemoteSourceHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewRemoteSourceHandler(logger *zap.Logger, ah *action.ActionHandler) *RemoteSourceHandler {
-	return &RemoteSourceHandler{log: logger.Sugar(), ah: ah}
+func NewRemoteSourceHandler(log zerolog.Logger, ah *action.ActionHandler) *RemoteSourceHandler {
+	return &RemoteSourceHandler{log: log, ah: ah}
 }
 
 func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -146,23 +146,23 @@ func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	rs, err := h.ah.GetRemoteSource(ctx, rsRef)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	res := createRemoteSourceResponse(rs)
 	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type RemoteSourcesHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewRemoteSourcesHandler(logger *zap.Logger, ah *action.ActionHandler) *RemoteSourcesHandler {
-	return &RemoteSourcesHandler{log: logger.Sugar(), ah: ah}
+func NewRemoteSourcesHandler(log zerolog.Logger, ah *action.ActionHandler) *RemoteSourcesHandler {
+	return &RemoteSourcesHandler{log: log, ah: ah}
 }
 
 func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -200,7 +200,7 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	}
 	csRemoteSources, err := h.ah.GetRemoteSources(ctx, areq)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -210,17 +210,17 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	}
 
 	if err := util.HTTPResponse(w, http.StatusOK, remoteSources); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type DeleteRemoteSourceHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewDeleteRemoteSourceHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteRemoteSourceHandler {
-	return &DeleteRemoteSourceHandler{log: logger.Sugar(), ah: ah}
+func NewDeleteRemoteSourceHandler(log zerolog.Logger, ah *action.ActionHandler) *DeleteRemoteSourceHandler {
+	return &DeleteRemoteSourceHandler{log: log, ah: ah}
 }
 
 func (h *DeleteRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -230,11 +230,11 @@ func (h *DeleteRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 
 	err := h.ah.DeleteRemoteSource(ctx, rsRef)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }

@@ -23,6 +23,7 @@ import (
 	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/ghodss/yaml"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
 )
@@ -32,7 +33,7 @@ var cmdProjectVariableUpdate = &cobra.Command{
 	Short: "update a project variable",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := variableUpdate(cmd, "project", args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -55,13 +56,13 @@ func init() {
 	flags.StringVarP(&variableUpdateOpts.file, "file", "f", "", `yaml file containing the variable definition (use "-" to read from stdin)`)
 
 	if err := cmdProjectVariableUpdate.MarkFlagRequired("project"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdProjectVariableUpdate.MarkFlagRequired("name"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdProjectVariableUpdate.MarkFlagRequired("file"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdProjectVariable.AddCommand(cmdProjectVariableUpdate)
@@ -87,7 +88,7 @@ func variableUpdate(cmd *cobra.Command, ownertype string, args []string) error {
 
 	var values []VariableValue
 	if err := yaml.Unmarshal(data, &values); err != nil {
-		log.Fatalf("failed to unmarshall values: %v", err)
+		log.Fatal().Msgf("failed to unmarshall values: %v", err)
 	}
 	rvalues := []gwapitypes.VariableValueRequest{}
 	for _, value := range values {
@@ -109,19 +110,19 @@ func variableUpdate(cmd *cobra.Command, ownertype string, args []string) error {
 
 	switch ownertype {
 	case "project":
-		log.Infof("updating project variable")
+		log.Info().Msgf("updating project variable")
 		variable, _, err := gwclient.UpdateProjectVariable(context.TODO(), variableUpdateOpts.parentRef, variableUpdateOpts.name, req)
 		if err != nil {
 			return errors.Errorf("failed to update project variable: %w", err)
 		}
-		log.Infof("project variable %q updated, ID: %q", variable.Name, variable.ID)
+		log.Info().Msgf("project variable %q updated, ID: %q", variable.Name, variable.ID)
 	case "projectgroup":
-		log.Infof("updating project group variable")
+		log.Info().Msgf("updating project group variable")
 		variable, _, err := gwclient.UpdateProjectGroupVariable(context.TODO(), variableUpdateOpts.parentRef, variableUpdateOpts.name, req)
 		if err != nil {
 			return errors.Errorf("failed to update project group variable: %w", err)
 		}
-		log.Infof("project group variable %q updated, ID: %q", variable.Name, variable.ID)
+		log.Info().Msgf("project group variable %q updated, ID: %q", variable.Name, variable.ID)
 	}
 
 	return nil

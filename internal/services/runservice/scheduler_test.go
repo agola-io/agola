@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"agola.io/agola/internal/testutil"
 	"agola.io/agola/services/runservice/types"
 	ctypes "agola.io/agola/services/types"
 	"github.com/google/go-cmp/cmp"
@@ -390,7 +391,9 @@ func TestAdvanceRunTasks(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			r, err := advanceRunTasks(ctx, tt.r, tt.rc, tt.scheduledExecutorTasks)
+			log := testutil.NewLogger(t)
+
+			r, err := advanceRunTasks(ctx, log, tt.r, tt.rc, tt.scheduledExecutorTasks)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -551,7 +554,9 @@ func TestGetTasksToRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			tasks, err := getTasksToRun(ctx, tt.r, tt.rc)
+			log := testutil.NewLogger(t)
+
+			tasks, err := getTasksToRun(ctx, log, tt.r, tt.rc)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

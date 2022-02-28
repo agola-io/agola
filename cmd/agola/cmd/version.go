@@ -20,6 +20,7 @@ import (
 
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +29,7 @@ var cmdVersion = &cobra.Command{
 	Short: "version",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := printVersions(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }

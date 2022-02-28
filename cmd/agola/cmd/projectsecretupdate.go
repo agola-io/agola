@@ -23,6 +23,7 @@ import (
 	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/ghodss/yaml"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
 )
@@ -39,7 +40,7 @@ data02: secretvalue02
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := secretUpdate(cmd, "project", args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -62,13 +63,13 @@ func init() {
 	flags.StringVarP(&secretUpdateOpts.file, "file", "f", "", `yaml file containing the secret data (use "-" to read from stdin)`)
 
 	if err := cmdProjectSecretUpdate.MarkFlagRequired("project"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdProjectSecretUpdate.MarkFlagRequired("name"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdProjectSecretUpdate.MarkFlagRequired("file"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdProjectSecret.AddCommand(cmdProjectSecretUpdate)
@@ -94,7 +95,7 @@ func secretUpdate(cmd *cobra.Command, ownertype string, args []string) error {
 
 	var secretData map[string]string
 	if err := yaml.Unmarshal(data, &secretData); err != nil {
-		log.Fatalf("failed to unmarshal secret: %v", err)
+		log.Fatal().Msgf("failed to unmarshal secret: %v", err)
 	}
 	req := &gwapitypes.UpdateSecretRequest{
 		Name: secretUpdateOpts.name,
@@ -109,19 +110,19 @@ func secretUpdate(cmd *cobra.Command, ownertype string, args []string) error {
 
 	switch ownertype {
 	case "project":
-		log.Infof("creating project secret")
+		log.Info().Msgf("creating project secret")
 		secret, _, err := gwclient.UpdateProjectSecret(context.TODO(), secretUpdateOpts.parentRef, secretUpdateOpts.name, req)
 		if err != nil {
 			return errors.Errorf("failed to update project secret: %w", err)
 		}
-		log.Infof("project secret %q updated, ID: %q", secret.Name, secret.ID)
+		log.Info().Msgf("project secret %q updated, ID: %q", secret.Name, secret.ID)
 	case "projectgroup":
-		log.Infof("creating project group secret")
+		log.Info().Msgf("creating project group secret")
 		secret, _, err := gwclient.UpdateProjectGroupSecret(context.TODO(), secretUpdateOpts.parentRef, secretUpdateOpts.name, req)
 		if err != nil {
 			return errors.Errorf("failed to update project group secret: %w", err)
 		}
-		log.Infof("project group secret %q updated, ID: %q", secret.Name, secret.ID)
+		log.Info().Msgf("project group secret %q updated, ID: %q", secret.Name, secret.ID)
 	}
 
 	return nil

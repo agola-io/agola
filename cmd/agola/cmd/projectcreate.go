@@ -20,6 +20,7 @@ import (
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
 )
@@ -29,7 +30,7 @@ var cmdProjectCreate = &cobra.Command{
 	Short: "create a project",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := projectCreate(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -58,16 +59,16 @@ func init() {
 	flags.BoolVar(&projectCreateOpts.passVarsToForkedPR, "pass-vars-to-forked-pr", false, `pass variables to run even if triggered by PR from forked repo`)
 
 	if err := cmdProjectCreate.MarkFlagRequired("name"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdProjectCreate.MarkFlagRequired("parent"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdProjectCreate.MarkFlagRequired("repo-path"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdProjectCreate.MarkFlagRequired("remote-source"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdProject.AddCommand(cmdProjectCreate)
@@ -101,13 +102,13 @@ func projectCreate(cmd *cobra.Command, args []string) error {
 		PassVarsToForkedPR:  projectCreateOpts.passVarsToForkedPR,
 	}
 
-	log.Infof("creating project")
+	log.Info().Msgf("creating project")
 
 	project, _, err := gwclient.CreateProject(context.TODO(), req)
 	if err != nil {
 		return errors.Errorf("failed to create project: %w", err)
 	}
-	log.Infof("project %s created, ID: %s", project.Name, project.ID)
+	log.Info().Msgf("project %s created, ID: %s", project.Name, project.ID)
 
 	return nil
 }

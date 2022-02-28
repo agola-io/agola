@@ -24,19 +24,14 @@ import (
 	"strings"
 
 	handlers "agola.io/agola/internal/git-handler"
-	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/util"
 
 	"github.com/gorilla/mux"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	errors "golang.org/x/xerrors"
 )
-
-var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
-var logger = slog.New(level)
-var log = logger.Sugar()
 
 const (
 	gitSuffix = ".git"
@@ -127,26 +122,24 @@ func Matcher(matchRegexp *regexp.Regexp) mux.MatcherFunc {
 }
 
 type Gitserver struct {
-	c *config.Gitserver
+	log zerolog.Logger
+	c   *config.Gitserver
 }
 
-func NewGitserver(ctx context.Context, l *zap.Logger, c *config.Gitserver) (*Gitserver, error) {
-	if l != nil {
-		logger = l
-	}
+func NewGitserver(ctx context.Context, log zerolog.Logger, c *config.Gitserver) (*Gitserver, error) {
 	if c.Debug {
-		level.SetLevel(zapcore.DebugLevel)
+		log = log.Level(zerolog.DebugLevel)
 	}
-	log = logger.Sugar()
 
 	return &Gitserver{
-		c: c,
+		log: log,
+		c:   c,
 	}, nil
 }
 
 func (s *Gitserver) Run(ctx context.Context) error {
-	gitSmartHandler := handlers.NewGitSmartHandler(logger, s.c.DataDir, true, repoAbsPath, nil)
-	fetchFileHandler := handlers.NewFetchFileHandler(logger, s.c.DataDir, repoAbsPath)
+	gitSmartHandler := handlers.NewGitSmartHandler(s.log, s.c.DataDir, true, repoAbsPath, nil)
+	fetchFileHandler := handlers.NewFetchFileHandler(s.log, s.c.DataDir, repoAbsPath)
 
 	router := mux.NewRouter()
 	router.MatcherFunc(Matcher(handlers.InfoRefsRegExp)).Handler(gitSmartHandler)
@@ -159,7 +152,7 @@ func (s *Gitserver) Run(ctx context.Context) error {
 		var err error
 		tlsConfig, err = util.NewTLSConfig(s.c.Web.TLSCertFile, s.c.Web.TLSKeyFile, "", false)
 		if err != nil {
-			log.Errorf("err: %+v")
+			s.log.Err(err).Send()
 			return err
 		}
 	}
@@ -184,11 +177,11 @@ func (s *Gitserver) Run(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		log.Infof("gitserver exiting")
+		log.Info().Msgf("gitserver exiting")
 		httpServer.Close()
 	case err := <-lerrCh:
 		if err != nil {
-			log.Errorf("http server listen error: %v", err)
+			s.log.Err(err).Msgf("http server listen error")
 			return err
 		}
 	}

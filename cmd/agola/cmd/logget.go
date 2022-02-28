@@ -22,6 +22,7 @@ import (
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
 )
@@ -31,7 +32,7 @@ var cmdLogGet = &cobra.Command{
 	Short: "get a setup/step log",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := logGet(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -60,7 +61,7 @@ func init() {
 	flags.StringVar(&logGetOpts.output, "output", "", "Write output to file")
 
 	if err := cmdLogGet.MarkFlagRequired("runid"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdLog.AddCommand(cmdLogGet)
@@ -116,7 +117,7 @@ func logGet(cmd *cobra.Command, args []string) error {
 		taskid = task.ID
 	}
 
-	log.Infof("getting log")
+	log.Info().Msgf("getting log")
 	resp, err := gwclient.GetLogs(context.TODO(), logGetOpts.runid, taskid, logGetOpts.setup, logGetOpts.step, logGetOpts.follow)
 	if err != nil {
 		return errors.Errorf("failed to get log: %v", err)

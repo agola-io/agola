@@ -21,7 +21,6 @@ import (
 	"net/http"
 
 	scommon "agola.io/agola/internal/common"
-	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/config"
@@ -35,21 +34,18 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	ghandlers "github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	errors "golang.org/x/xerrors"
 )
-
-var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
-var logger = slog.New(level)
-var log = logger.Sugar()
 
 const (
 	maxRequestSize = 1024 * 1024
 )
 
 type Gateway struct {
-	c *config.Gateway
+	log zerolog.Logger
+	c   *config.Gateway
 
 	ost               *objectstorage.ObjStorage
 	runserviceClient  *rsclient.Client
@@ -58,16 +54,12 @@ type Gateway struct {
 	sd                *common.TokenSigningData
 }
 
-func NewGateway(ctx context.Context, l *zap.Logger, gc *config.Config) (*Gateway, error) {
+func NewGateway(ctx context.Context, log zerolog.Logger, gc *config.Config) (*Gateway, error) {
 	c := &gc.Gateway
 
-	if l != nil {
-		logger = l
-	}
 	if c.Debug {
-		level.SetLevel(zapcore.DebugLevel)
+		log = log.Level(zerolog.DebugLevel)
 	}
-	log = logger.Sugar()
 
 	if c.Web.ListenAddress == "" {
 		return nil, errors.Errorf("listen address undefined")
@@ -129,9 +121,10 @@ func NewGateway(ctx context.Context, l *zap.Logger, gc *config.Config) (*Gateway
 	configstoreClient := csclient.NewClient(c.ConfigstoreURL)
 	runserviceClient := rsclient.NewClient(c.RunserviceURL)
 
-	ah := action.NewActionHandler(logger, sd, configstoreClient, runserviceClient, gc.ID, c.APIExposedURL, c.WebExposedURL)
+	ah := action.NewActionHandler(log, sd, configstoreClient, runserviceClient, gc.ID, c.APIExposedURL, c.WebExposedURL)
 
 	return &Gateway{
+		log:               log,
 		c:                 c,
 		ost:               ost,
 		runserviceClient:  runserviceClient,
@@ -154,90 +147,90 @@ func (g *Gateway) Run(ctx context.Context) error {
 		corsHandler = ghandlers.CORS(corsAllowedMethodsOptions, corsAllowedHeadersOptions, corsAllowedOriginsOptions)
 	}
 
-	webhooksHandler := api.NewWebhooksHandler(logger, g.ah, g.configstoreClient, g.runserviceClient, g.c.APIExposedURL)
+	webhooksHandler := api.NewWebhooksHandler(g.log, g.ah, g.configstoreClient, g.runserviceClient, g.c.APIExposedURL)
 
-	projectGroupHandler := api.NewProjectGroupHandler(logger, g.ah)
-	projectGroupSubgroupsHandler := api.NewProjectGroupSubgroupsHandler(logger, g.ah)
-	projectGroupProjectsHandler := api.NewProjectGroupProjectsHandler(logger, g.ah)
-	createProjectGroupHandler := api.NewCreateProjectGroupHandler(logger, g.ah)
-	updateProjectGroupHandler := api.NewUpdateProjectGroupHandler(logger, g.ah)
-	deleteProjectGroupHandler := api.NewDeleteProjectGroupHandler(logger, g.ah)
+	projectGroupHandler := api.NewProjectGroupHandler(g.log, g.ah)
+	projectGroupSubgroupsHandler := api.NewProjectGroupSubgroupsHandler(g.log, g.ah)
+	projectGroupProjectsHandler := api.NewProjectGroupProjectsHandler(g.log, g.ah)
+	createProjectGroupHandler := api.NewCreateProjectGroupHandler(g.log, g.ah)
+	updateProjectGroupHandler := api.NewUpdateProjectGroupHandler(g.log, g.ah)
+	deleteProjectGroupHandler := api.NewDeleteProjectGroupHandler(g.log, g.ah)
 
-	projectHandler := api.NewProjectHandler(logger, g.ah)
-	createProjectHandler := api.NewCreateProjectHandler(logger, g.ah)
-	updateProjectHandler := api.NewUpdateProjectHandler(logger, g.ah)
-	deleteProjectHandler := api.NewDeleteProjectHandler(logger, g.ah)
-	projectReconfigHandler := api.NewProjectReconfigHandler(logger, g.ah)
-	projectUpdateRepoLinkedAccountHandler := api.NewProjectUpdateRepoLinkedAccountHandler(logger, g.ah)
-	projectCreateRunHandler := api.NewProjectCreateRunHandler(logger, g.ah)
+	projectHandler := api.NewProjectHandler(g.log, g.ah)
+	createProjectHandler := api.NewCreateProjectHandler(g.log, g.ah)
+	updateProjectHandler := api.NewUpdateProjectHandler(g.log, g.ah)
+	deleteProjectHandler := api.NewDeleteProjectHandler(g.log, g.ah)
+	projectReconfigHandler := api.NewProjectReconfigHandler(g.log, g.ah)
+	projectUpdateRepoLinkedAccountHandler := api.NewProjectUpdateRepoLinkedAccountHandler(g.log, g.ah)
+	projectCreateRunHandler := api.NewProjectCreateRunHandler(g.log, g.ah)
 
-	secretHandler := api.NewSecretHandler(logger, g.ah)
-	createSecretHandler := api.NewCreateSecretHandler(logger, g.ah)
-	updateSecretHandler := api.NewUpdateSecretHandler(logger, g.ah)
-	deleteSecretHandler := api.NewDeleteSecretHandler(logger, g.ah)
+	secretHandler := api.NewSecretHandler(g.log, g.ah)
+	createSecretHandler := api.NewCreateSecretHandler(g.log, g.ah)
+	updateSecretHandler := api.NewUpdateSecretHandler(g.log, g.ah)
+	deleteSecretHandler := api.NewDeleteSecretHandler(g.log, g.ah)
 
-	variableHandler := api.NewVariableHandler(logger, g.ah)
-	createVariableHandler := api.NewCreateVariableHandler(logger, g.ah)
-	updateVariableHandler := api.NewUpdateVariableHandler(logger, g.ah)
-	deleteVariableHandler := api.NewDeleteVariableHandler(logger, g.ah)
+	variableHandler := api.NewVariableHandler(g.log, g.ah)
+	createVariableHandler := api.NewCreateVariableHandler(g.log, g.ah)
+	updateVariableHandler := api.NewUpdateVariableHandler(g.log, g.ah)
+	deleteVariableHandler := api.NewDeleteVariableHandler(g.log, g.ah)
 
-	currentUserHandler := api.NewCurrentUserHandler(logger, g.ah)
-	userHandler := api.NewUserHandler(logger, g.ah)
-	usersHandler := api.NewUsersHandler(logger, g.ah)
-	createUserHandler := api.NewCreateUserHandler(logger, g.ah)
-	deleteUserHandler := api.NewDeleteUserHandler(logger, g.ah)
-	userCreateRunHandler := api.NewUserCreateRunHandler(logger, g.ah)
-	userOrgsHandler := api.NewUserOrgsHandler(logger, g.ah)
+	currentUserHandler := api.NewCurrentUserHandler(g.log, g.ah)
+	userHandler := api.NewUserHandler(g.log, g.ah)
+	usersHandler := api.NewUsersHandler(g.log, g.ah)
+	createUserHandler := api.NewCreateUserHandler(g.log, g.ah)
+	deleteUserHandler := api.NewDeleteUserHandler(g.log, g.ah)
+	userCreateRunHandler := api.NewUserCreateRunHandler(g.log, g.ah)
+	userOrgsHandler := api.NewUserOrgsHandler(g.log, g.ah)
 
-	createUserLAHandler := api.NewCreateUserLAHandler(logger, g.ah)
-	deleteUserLAHandler := api.NewDeleteUserLAHandler(logger, g.ah)
-	createUserTokenHandler := api.NewCreateUserTokenHandler(logger, g.ah)
-	deleteUserTokenHandler := api.NewDeleteUserTokenHandler(logger, g.ah)
+	createUserLAHandler := api.NewCreateUserLAHandler(g.log, g.ah)
+	deleteUserLAHandler := api.NewDeleteUserLAHandler(g.log, g.ah)
+	createUserTokenHandler := api.NewCreateUserTokenHandler(g.log, g.ah)
+	deleteUserTokenHandler := api.NewDeleteUserTokenHandler(g.log, g.ah)
 
-	remoteSourceHandler := api.NewRemoteSourceHandler(logger, g.ah)
-	createRemoteSourceHandler := api.NewCreateRemoteSourceHandler(logger, g.ah)
-	updateRemoteSourceHandler := api.NewUpdateRemoteSourceHandler(logger, g.ah)
-	remoteSourcesHandler := api.NewRemoteSourcesHandler(logger, g.ah)
-	deleteRemoteSourceHandler := api.NewDeleteRemoteSourceHandler(logger, g.ah)
+	remoteSourceHandler := api.NewRemoteSourceHandler(g.log, g.ah)
+	createRemoteSourceHandler := api.NewCreateRemoteSourceHandler(g.log, g.ah)
+	updateRemoteSourceHandler := api.NewUpdateRemoteSourceHandler(g.log, g.ah)
+	remoteSourcesHandler := api.NewRemoteSourcesHandler(g.log, g.ah)
+	deleteRemoteSourceHandler := api.NewDeleteRemoteSourceHandler(g.log, g.ah)
 
-	orgHandler := api.NewOrgHandler(logger, g.ah)
-	orgsHandler := api.NewOrgsHandler(logger, g.ah)
-	createOrgHandler := api.NewCreateOrgHandler(logger, g.ah)
-	deleteOrgHandler := api.NewDeleteOrgHandler(logger, g.ah)
+	orgHandler := api.NewOrgHandler(g.log, g.ah)
+	orgsHandler := api.NewOrgsHandler(g.log, g.ah)
+	createOrgHandler := api.NewCreateOrgHandler(g.log, g.ah)
+	deleteOrgHandler := api.NewDeleteOrgHandler(g.log, g.ah)
 
-	orgMembersHandler := api.NewOrgMembersHandler(logger, g.ah)
-	addOrgMemberHandler := api.NewAddOrgMemberHandler(logger, g.ah)
-	removeOrgMemberHandler := api.NewRemoveOrgMemberHandler(logger, g.ah)
+	orgMembersHandler := api.NewOrgMembersHandler(g.log, g.ah)
+	addOrgMemberHandler := api.NewAddOrgMemberHandler(g.log, g.ah)
+	removeOrgMemberHandler := api.NewRemoveOrgMemberHandler(g.log, g.ah)
 
-	runHandler := api.NewRunHandler(logger, g.ah)
-	runsHandler := api.NewRunsHandler(logger, g.ah)
-	runtaskHandler := api.NewRuntaskHandler(logger, g.ah)
-	runActionsHandler := api.NewRunActionsHandler(logger, g.ah)
-	runTaskActionsHandler := api.NewRunTaskActionsHandler(logger, g.ah)
+	runHandler := api.NewRunHandler(g.log, g.ah)
+	runsHandler := api.NewRunsHandler(g.log, g.ah)
+	runtaskHandler := api.NewRuntaskHandler(g.log, g.ah)
+	runActionsHandler := api.NewRunActionsHandler(g.log, g.ah)
+	runTaskActionsHandler := api.NewRunTaskActionsHandler(g.log, g.ah)
 
-	logsHandler := api.NewLogsHandler(logger, g.ah)
-	logsDeleteHandler := api.NewLogsDeleteHandler(logger, g.ah)
+	logsHandler := api.NewLogsHandler(g.log, g.ah)
+	logsDeleteHandler := api.NewLogsDeleteHandler(g.log, g.ah)
 
-	userRemoteReposHandler := api.NewUserRemoteReposHandler(logger, g.ah, g.configstoreClient)
+	userRemoteReposHandler := api.NewUserRemoteReposHandler(g.log, g.ah, g.configstoreClient)
 
-	badgeHandler := api.NewBadgeHandler(logger, g.ah)
+	badgeHandler := api.NewBadgeHandler(g.log, g.ah)
 
-	versionHandler := api.NewVersionHandler(logger, g.ah)
+	versionHandler := api.NewVersionHandler(g.log, g.ah)
 
-	reposHandler := api.NewReposHandler(logger, g.c.GitserverURL)
+	reposHandler := api.NewReposHandler(g.log, g.c.GitserverURL)
 
-	loginUserHandler := api.NewLoginUserHandler(logger, g.ah)
-	authorizeHandler := api.NewAuthorizeHandler(logger, g.ah)
-	registerHandler := api.NewRegisterUserHandler(logger, g.ah)
-	oauth2callbackHandler := api.NewOAuth2CallbackHandler(logger, g.ah)
+	loginUserHandler := api.NewLoginUserHandler(g.log, g.ah)
+	authorizeHandler := api.NewAuthorizeHandler(g.log, g.ah)
+	registerHandler := api.NewRegisterUserHandler(g.log, g.ah)
+	oauth2callbackHandler := api.NewOAuth2CallbackHandler(g.log, g.ah)
 
 	router := mux.NewRouter()
 	reposRouter := mux.NewRouter()
 
 	apirouter := mux.NewRouter().PathPrefix("/api/v1alpha").Subrouter().UseEncodedPath()
 
-	authForcedHandler := handlers.NewAuthHandler(logger, g.configstoreClient, g.c.AdminToken, g.sd, true)
-	authOptionalHandler := handlers.NewAuthHandler(logger, g.configstoreClient, g.c.AdminToken, g.sd, false)
+	authForcedHandler := handlers.NewAuthHandler(g.log, g.configstoreClient, g.c.AdminToken, g.sd, true)
+	authOptionalHandler := handlers.NewAuthHandler(g.log, g.configstoreClient, g.c.AdminToken, g.sd, false)
 
 	router.PathPrefix("/api/v1alpha").Handler(apirouter)
 
@@ -339,7 +332,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 		var err error
 		tlsConfig, err = util.NewTLSConfig(g.c.Web.TLSCertFile, g.c.Web.TLSKeyFile, "", false)
 		if err != nil {
-			log.Errorf("err: %+v")
+			g.log.Err(err).Send()
 			return err
 		}
 	}
@@ -361,11 +354,11 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		log.Infof("configstore exiting")
+		log.Info().Msgf("configstore exiting")
 		httpServer.Close()
 	case err := <-lerrCh:
 		if err != nil {
-			log.Errorf("http server listen error: %v", err)
+			log.Err(err).Msgf("http server listen error")
 			return err
 		}
 	}

@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
@@ -22,7 +23,7 @@ var cmdCompletionBash = &cobra.Command{
 	Use: "bash",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := completionShell(cmd, args, "bash"); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 	Short: "generates bash completion scripts",

@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
@@ -23,7 +24,7 @@ var cmdProjectGroupVariableList = &cobra.Command{
 	Short: "list project group variables",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := variableList(cmd, "projectgroup", args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -34,7 +35,7 @@ func init() {
 	flags.StringVar(&variableListOpts.parentRef, "projectgroup", "", "project group id or full path")
 
 	if err := cmdProjectGroupVariableList.MarkFlagRequired("projectgroup"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdProjectGroupVariable.AddCommand(cmdProjectGroupVariableList)

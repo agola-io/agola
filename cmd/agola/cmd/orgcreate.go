@@ -20,6 +20,7 @@ import (
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
 )
@@ -29,7 +30,7 @@ var cmdOrgCreate = &cobra.Command{
 	Short: "create an organization",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := orgCreate(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -48,7 +49,7 @@ func init() {
 	flags.StringVar(&orgCreateOpts.visibility, "visibility", "public", `organization visibility (public or private)`)
 
 	if err := cmdOrgCreate.MarkFlagRequired("name"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdOrg.AddCommand(cmdOrgCreate)
@@ -67,12 +68,12 @@ func orgCreate(cmd *cobra.Command, args []string) error {
 		Visibility: gwapitypes.Visibility(orgCreateOpts.visibility),
 	}
 
-	log.Infof("creating org")
+	log.Info().Msgf("creating org")
 	org, _, err := gwclient.CreateOrg(context.TODO(), req)
 	if err != nil {
 		return errors.Errorf("failed to create org: %w", err)
 	}
-	log.Infof("org %q created, ID: %q", org.Name, org.ID)
+	log.Info().Msgf("org %q created, ID: %q", org.Name, org.ID)
 
 	return nil
 }

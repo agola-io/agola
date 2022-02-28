@@ -29,7 +29,7 @@ import (
 	"agola.io/agola/services/configstore/types"
 
 	"github.com/gorilla/mux"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 )
 
 func projectResponse(ctx context.Context, readDB *readdb.ReadDB, project *types.Project) (*csapitypes.Project, error) {
@@ -112,13 +112,13 @@ func getGlobalVisibility(readDB *readdb.ReadDB, tx *db.Tx, curVisibility types.V
 }
 
 type ProjectHandler struct {
-	log    *zap.SugaredLogger
+	log    zerolog.Logger
 	ah     *action.ActionHandler
 	readDB *readdb.ReadDB
 }
 
-func NewProjectHandler(logger *zap.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *ProjectHandler {
-	return &ProjectHandler{log: logger.Sugar(), ah: ah, readDB: readDB}
+func NewProjectHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *ProjectHandler {
+	return &ProjectHandler{log: log, ah: ah, readDB: readDB}
 }
 
 func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -132,29 +132,29 @@ func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	project, err := h.ah.GetProject(ctx, projectRef)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	resProject, err := projectResponse(ctx, h.readDB, project)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	if err := util.HTTPResponse(w, http.StatusOK, resProject); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type CreateProjectHandler struct {
-	log    *zap.SugaredLogger
+	log    zerolog.Logger
 	ah     *action.ActionHandler
 	readDB *readdb.ReadDB
 }
 
-func NewCreateProjectHandler(logger *zap.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *CreateProjectHandler {
-	return &CreateProjectHandler{log: logger.Sugar(), ah: ah, readDB: readDB}
+func NewCreateProjectHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *CreateProjectHandler {
+	return &CreateProjectHandler{log: log, ah: ah, readDB: readDB}
 }
 
 func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -169,29 +169,29 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 
 	project, err := h.ah.CreateProject(ctx, &req)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	resProject, err := projectResponse(ctx, h.readDB, project)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	if err := util.HTTPResponse(w, http.StatusCreated, resProject); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type UpdateProjectHandler struct {
-	log    *zap.SugaredLogger
+	log    zerolog.Logger
 	ah     *action.ActionHandler
 	readDB *readdb.ReadDB
 }
 
-func NewUpdateProjectHandler(logger *zap.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *UpdateProjectHandler {
-	return &UpdateProjectHandler{log: logger.Sugar(), ah: ah, readDB: readDB}
+func NewUpdateProjectHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *UpdateProjectHandler {
+	return &UpdateProjectHandler{log: log, ah: ah, readDB: readDB}
 }
 
 func (h *UpdateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -217,28 +217,28 @@ func (h *UpdateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	}
 	project, err = h.ah.UpdateProject(ctx, areq)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	resProject, err := projectResponse(ctx, h.readDB, project)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	if err := util.HTTPResponse(w, http.StatusCreated, resProject); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type DeleteProjectHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewDeleteProjectHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteProjectHandler {
-	return &DeleteProjectHandler{log: logger.Sugar(), ah: ah}
+func NewDeleteProjectHandler(log zerolog.Logger, ah *action.ActionHandler) *DeleteProjectHandler {
+	return &DeleteProjectHandler{log: log, ah: ah}
 }
 
 func (h *DeleteProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -253,10 +253,10 @@ func (h *DeleteProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 
 	err = h.ah.DeleteProject(ctx, projectRef)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 

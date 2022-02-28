@@ -20,6 +20,7 @@ import (
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
 )
@@ -29,7 +30,7 @@ var cmdRemoteSourceUpdate = &cobra.Command{
 	Short: "update a remotesource",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := remoteSourceUpdate(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -65,7 +66,7 @@ func init() {
 	flags.BoolVar(&remoteSourceUpdateOpts.loginEnabled, "login-enabled", false, "enabled/disable user login with this remote source")
 
 	if err := cmdRemoteSourceUpdate.MarkFlagRequired("ref"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdRemoteSource.AddCommand(cmdRemoteSourceUpdate)
@@ -105,12 +106,12 @@ func remoteSourceUpdate(cmd *cobra.Command, args []string) error {
 		req.LoginEnabled = &remoteSourceUpdateOpts.loginEnabled
 	}
 
-	log.Infof("updating remotesource")
+	log.Info().Msgf("updating remotesource")
 	remoteSource, _, err := gwclient.UpdateRemoteSource(context.TODO(), remoteSourceUpdateOpts.ref, req)
 	if err != nil {
 		return errors.Errorf("failed to update remotesource: %w", err)
 	}
-	log.Infof("remotesource %s updated, ID: %s", remoteSource.Name, remoteSource.ID)
+	log.Info().Msgf("remotesource %s updated, ID: %s", remoteSource.Name, remoteSource.ID)
 
 	return nil
 }

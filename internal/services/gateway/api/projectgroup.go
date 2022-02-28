@@ -28,16 +28,16 @@ import (
 	errors "golang.org/x/xerrors"
 
 	"github.com/gorilla/mux"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 )
 
 type CreateProjectGroupHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewCreateProjectGroupHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateProjectGroupHandler {
-	return &CreateProjectGroupHandler{log: logger.Sugar(), ah: ah}
+func NewCreateProjectGroupHandler(log zerolog.Logger, ah *action.ActionHandler) *CreateProjectGroupHandler {
+	return &CreateProjectGroupHandler{log: log, ah: ah}
 }
 
 func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -65,23 +65,23 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 
 	projectGroup, err := h.ah.CreateProjectGroup(ctx, creq)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	res := createProjectGroupResponse(projectGroup)
 	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type UpdateProjectGroupHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewUpdateProjectGroupHandler(logger *zap.Logger, ah *action.ActionHandler) *UpdateProjectGroupHandler {
-	return &UpdateProjectGroupHandler{log: logger.Sugar(), ah: ah}
+func NewUpdateProjectGroupHandler(log zerolog.Logger, ah *action.ActionHandler) *UpdateProjectGroupHandler {
+	return &UpdateProjectGroupHandler{log: log, ah: ah}
 }
 
 func (h *UpdateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -113,23 +113,23 @@ func (h *UpdateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	}
 	projectGroup, err := h.ah.UpdateProjectGroup(ctx, projectGroupRef, areq)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	res := createProjectGroupResponse(projectGroup)
 	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type DeleteProjectGroupHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewDeleteProjectGroupHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteProjectGroupHandler {
-	return &DeleteProjectGroupHandler{log: logger.Sugar(), ah: ah}
+func NewDeleteProjectGroupHandler(log zerolog.Logger, ah *action.ActionHandler) *DeleteProjectGroupHandler {
+	return &DeleteProjectGroupHandler{log: log, ah: ah}
 }
 
 func (h *DeleteProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -143,22 +143,22 @@ func (h *DeleteProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 
 	err = h.ah.DeleteProjectGroup(ctx, projectGroupRef)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type ProjectGroupHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewProjectGroupHandler(logger *zap.Logger, ah *action.ActionHandler) *ProjectGroupHandler {
-	return &ProjectGroupHandler{log: logger.Sugar(), ah: ah}
+func NewProjectGroupHandler(log zerolog.Logger, ah *action.ActionHandler) *ProjectGroupHandler {
+	return &ProjectGroupHandler{log: log, ah: ah}
 }
 
 func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -172,23 +172,23 @@ func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	projectGroup, err := h.ah.GetProjectGroup(ctx, projectGroupRef)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	res := createProjectGroupResponse(projectGroup)
 	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type ProjectGroupProjectsHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewProjectGroupProjectsHandler(logger *zap.Logger, ah *action.ActionHandler) *ProjectGroupProjectsHandler {
-	return &ProjectGroupProjectsHandler{log: logger.Sugar(), ah: ah}
+func NewProjectGroupProjectsHandler(log zerolog.Logger, ah *action.ActionHandler) *ProjectGroupProjectsHandler {
+	return &ProjectGroupProjectsHandler{log: log, ah: ah}
 }
 
 func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -202,7 +202,7 @@ func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 
 	csprojects, err := h.ah.GetProjectGroupProjects(ctx, projectGroupRef)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -212,17 +212,17 @@ func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 	}
 
 	if err := util.HTTPResponse(w, http.StatusOK, projects); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type ProjectGroupSubgroupsHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewProjectGroupSubgroupsHandler(logger *zap.Logger, ah *action.ActionHandler) *ProjectGroupSubgroupsHandler {
-	return &ProjectGroupSubgroupsHandler{log: logger.Sugar(), ah: ah}
+func NewProjectGroupSubgroupsHandler(log zerolog.Logger, ah *action.ActionHandler) *ProjectGroupSubgroupsHandler {
+	return &ProjectGroupSubgroupsHandler{log: log, ah: ah}
 }
 
 func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -236,7 +236,7 @@ func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.
 
 	cssubgroups, err := h.ah.GetProjectGroupSubgroups(ctx, projectGroupRef)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -246,7 +246,7 @@ func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.
 	}
 
 	if err := util.HTTPResponse(w, http.StatusOK, subgroups); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 

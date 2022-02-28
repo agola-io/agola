@@ -20,6 +20,7 @@ import (
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
 )
@@ -29,7 +30,7 @@ var cmdUserCreate = &cobra.Command{
 	Short: "create a user",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := userCreate(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -46,7 +47,7 @@ func init() {
 	flags.StringVarP(&userCreateOpts.username, "username", "n", "", "user name")
 
 	if err := cmdUserCreate.MarkFlagRequired("username"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdUser.AddCommand(cmdUserCreate)
@@ -59,12 +60,12 @@ func userCreate(cmd *cobra.Command, args []string) error {
 		UserName: userCreateOpts.username,
 	}
 
-	log.Infof("creating user")
+	log.Info().Msgf("creating user")
 	user, _, err := gwclient.CreateUser(context.TODO(), req)
 	if err != nil {
 		return errors.Errorf("failed to create user: %w", err)
 	}
-	log.Infof("user %q created, ID: %q", user.UserName, user.ID)
+	log.Info().Msgf("user %q created, ID: %q", user.UserName, user.ID)
 
 	return nil
 }

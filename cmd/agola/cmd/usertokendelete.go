@@ -19,6 +19,7 @@ import (
 
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
 )
@@ -28,7 +29,7 @@ var cmdUserTokenDelete = &cobra.Command{
 	Short: "delete a user token",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := userTokenDelete(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -47,10 +48,10 @@ func init() {
 	flags.StringVarP(&userTokenDeleteOpts.tokenName, "tokenname", "t", "", "token name")
 
 	if err := cmdUserTokenDelete.MarkFlagRequired("username"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdUserTokenDelete.MarkFlagRequired("tokenname"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdUserToken.AddCommand(cmdUserTokenDelete)
@@ -62,13 +63,13 @@ func userTokenDelete(cmd *cobra.Command, args []string) error {
 	userName := userTokenDeleteOpts.userName
 	tokenName := userTokenDeleteOpts.tokenName
 
-	log.Infof("deleting token %q for user %q", tokenName, userName)
+	log.Info().Msgf("deleting token %q for user %q", tokenName, userName)
 	_, err := gwclient.DeleteUserToken(context.TODO(), userName, tokenName)
 	if err != nil {
 		return errors.Errorf("failed to delete user token: %w", err)
 	}
 
-	log.Infof("token %q for user %q deleted", tokenName, userName)
+	log.Info().Msgf("token %q for user %q deleted", tokenName, userName)
 
 	return nil
 }

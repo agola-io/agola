@@ -24,21 +24,21 @@ import (
 	csclient "agola.io/agola/services/configstore/client"
 	rsclient "agola.io/agola/services/runservice/client"
 
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 	errors "golang.org/x/xerrors"
 )
 
 type webhooksHandler struct {
-	log               *zap.SugaredLogger
+	log               zerolog.Logger
 	ah                *action.ActionHandler
 	configstoreClient *csclient.Client
 	runserviceClient  *rsclient.Client
 	apiExposedURL     string
 }
 
-func NewWebhooksHandler(logger *zap.Logger, ah *action.ActionHandler, configstoreClient *csclient.Client, runserviceClient *rsclient.Client, apiExposedURL string) *webhooksHandler {
+func NewWebhooksHandler(log zerolog.Logger, ah *action.ActionHandler, configstoreClient *csclient.Client, runserviceClient *rsclient.Client, apiExposedURL string) *webhooksHandler {
 	return &webhooksHandler{
-		log:               logger.Sugar(),
+		log:               log,
 		ah:                ah,
 		configstoreClient: configstoreClient,
 		runserviceClient:  runserviceClient,
@@ -49,12 +49,12 @@ func NewWebhooksHandler(logger *zap.Logger, ah *action.ActionHandler, configstor
 func (h *webhooksHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err := h.handleWebhook(r)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	if err := util.HTTPResponse(w, http.StatusOK, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
@@ -107,7 +107,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) error {
 	// skip nil webhook data
 	// TODO(sgotti) report the reason of the skip
 	if webhookData == nil {
-		h.log.Infof("skipping webhook")
+		h.log.Info().Msgf("skipping webhook")
 		return nil
 	}
 

@@ -20,6 +20,7 @@ import (
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
 )
@@ -29,7 +30,7 @@ var cmdOrgMemberAdd = &cobra.Command{
 	Short: "adds or updates an organization member",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := orgMemberAdd(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -50,10 +51,10 @@ func init() {
 	flags.StringVarP(&orgMemberAddOpts.role, "role", "r", "member", "member role (owner or member)")
 
 	if err := cmdOrgMemberAdd.MarkFlagRequired("orgname"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdOrgMemberAdd.MarkFlagRequired("username"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdOrgMember.AddCommand(cmdOrgMemberAdd)
@@ -62,7 +63,7 @@ func init() {
 func orgMemberAdd(cmd *cobra.Command, args []string) error {
 	gwclient := gwclient.NewClient(gatewayURL, token)
 
-	log.Infof("adding/updating member %q to organization %q with role %q", orgMemberAddOpts.username, orgMemberAddOpts.orgname, orgMemberAddOpts.role)
+	log.Info().Msgf("adding/updating member %q to organization %q with role %q", orgMemberAddOpts.username, orgMemberAddOpts.orgname, orgMemberAddOpts.role)
 	_, _, err := gwclient.AddOrgMember(context.TODO(), orgMemberAddOpts.orgname, orgMemberAddOpts.username, gwapitypes.MemberRole(orgMemberAddOpts.role))
 	if err != nil {
 		return errors.Errorf("failed to add/update organization member: %w", err)

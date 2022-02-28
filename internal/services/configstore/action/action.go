@@ -22,21 +22,21 @@ import (
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
 
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 	errors "golang.org/x/xerrors"
 )
 
 type ActionHandler struct {
-	log             *zap.SugaredLogger
+	log             zerolog.Logger
 	readDB          *readdb.ReadDB
 	dm              *datamanager.DataManager
 	e               *etcd.Store
 	maintenanceMode bool
 }
 
-func NewActionHandler(logger *zap.Logger, readDB *readdb.ReadDB, dm *datamanager.DataManager, e *etcd.Store) *ActionHandler {
+func NewActionHandler(log zerolog.Logger, readDB *readdb.ReadDB, dm *datamanager.DataManager, e *etcd.Store) *ActionHandler {
 	return &ActionHandler{
-		log:             logger.Sugar(),
+		log:             log,
 		readDB:          readDB,
 		dm:              dm,
 		e:               e,

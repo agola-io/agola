@@ -79,7 +79,7 @@ func (r *ReadDB) GetRemoteSource(tx *db.Tx, rsRef string) (*types.RemoteSource, 
 
 func (r *ReadDB) GetRemoteSourceByID(tx *db.Tx, remoteSourceID string) (*types.RemoteSource, error) {
 	q, args, err := remotesourceSelect.Where(sq.Eq{"id": remoteSourceID}).ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}
@@ -99,7 +99,7 @@ func (r *ReadDB) GetRemoteSourceByID(tx *db.Tx, remoteSourceID string) (*types.R
 
 func (r *ReadDB) GetRemoteSourceByName(tx *db.Tx, name string) (*types.RemoteSource, error) {
 	q, args, err := remotesourceSelect.Where(sq.Eq{"name": name}).ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}
@@ -145,7 +145,7 @@ func (r *ReadDB) GetRemoteSources(ctx context.Context, startRemoteSourceName str
 
 	s := getRemoteSourcesFilteredQuery(startRemoteSourceName, limit, asc)
 	q, args, err := s.ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}

@@ -22,16 +22,16 @@ import (
 	"agola.io/agola/internal/util"
 
 	"github.com/gorilla/mux"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 )
 
 type BadgeHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewBadgeHandler(logger *zap.Logger, ah *action.ActionHandler) *BadgeHandler {
-	return &BadgeHandler{log: logger.Sugar(), ah: ah}
+func NewBadgeHandler(log zerolog.Logger, ah *action.ActionHandler) *BadgeHandler {
+	return &BadgeHandler{log: log, ah: ah}
 }
 
 func (h *BadgeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -48,7 +48,7 @@ func (h *BadgeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	badge, err := h.ah.GetBadge(ctx, projectRef, branch)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -57,6 +57,6 @@ func (h *BadgeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 
 	if _, err := w.Write([]byte(badge)); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }

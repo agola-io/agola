@@ -176,18 +176,18 @@ func (d *DataManager) watcherLoop(ctx context.Context) {
 		initialized := d.changes.initialized
 		if !initialized {
 			if err := d.initializeChanges(ctx); err != nil {
-				d.log.Errorf("watcher err: %+v", err)
+				d.log.Err(err).Msgf("watcher err")
 			}
 		} else {
 			if err := d.watcher(ctx); err != nil {
-				d.log.Errorf("watcher err: %+v", err)
+				d.log.Err(err).Msgf("watcher err")
 			}
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
 		select {
 		case <-ctx.Done():
-			d.log.Infof("watcher exiting")
+			d.log.Info().Msgf("watcher exiting")
 			return
 		case <-sleepCh:
 		}
@@ -262,7 +262,7 @@ func (d *DataManager) watcher(ctx context.Context) error {
 		if wresp.Canceled {
 			err := wresp.Err()
 			if errors.Is(err, etcdclientv3rpc.ErrCompacted) {
-				d.log.Errorf("required events already compacted, reinitializing watcher changes")
+				d.log.Err(err).Msgf("required events already compacted, reinitializing watcher changes")
 				d.changes.Lock()
 				d.changes.initialized = false
 				d.changes.Unlock()

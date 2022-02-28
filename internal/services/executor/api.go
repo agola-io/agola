@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"agola.io/agola/services/runservice/types"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 	errors "golang.org/x/xerrors"
 )
 
@@ -49,13 +49,13 @@ func (h *taskSubmissionHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 }
 
 type logsHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	e   *Executor
 }
 
-func NewLogsHandler(logger *zap.Logger, e *Executor) *logsHandler {
+func NewLogsHandler(log zerolog.Logger, e *Executor) *logsHandler {
 	return &logsHandler{
-		log: logger.Sugar(),
+		log: log,
 		e:   e,
 	}
 }
@@ -97,7 +97,7 @@ func (h *logsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.readTaskLogs(taskID, setup, step, w, follow); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 

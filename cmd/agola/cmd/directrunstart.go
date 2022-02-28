@@ -30,6 +30,7 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/gofrs/uuid"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
 )
@@ -38,7 +39,7 @@ var cmdDirectRunStart = &cobra.Command{
 	Use: "start",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := directRunStart(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 	Short: "executes a run from a local git repository",
@@ -169,7 +170,7 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	gs := gitsave.NewGitSave(logger, &gitsave.GitSaveConfig{
+	gs := gitsave.NewGitSave(log.Logger, &gitsave.GitSaveConfig{
 		AddUntracked: directRunStartOpts.untracked,
 		AddIgnored:   directRunStartOpts.ignored,
 	})
@@ -182,7 +183,7 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	log.Infof("pushing branch")
+	log.Info().Msgf("pushing branch")
 	repoPath := fmt.Sprintf("%s/%s", user.ID, repoUUID)
 	repoURL := fmt.Sprintf("%s/repos/%s/%s.git", gatewayURL, user.ID, repoUUID)
 
@@ -201,7 +202,7 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	log.Infof("starting direct run")
+	log.Info().Msgf("starting direct run")
 	req := &gwapitypes.UserCreateRunRequest{
 		RepoUUID:              repoUUID,
 		RepoPath:              repoPath,

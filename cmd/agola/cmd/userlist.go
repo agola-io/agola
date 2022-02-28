@@ -21,6 +21,7 @@ import (
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +29,7 @@ var cmdUserList = &cobra.Command{
 	Use: "list",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := userList(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 	Short: "list",

@@ -109,7 +109,7 @@ func (r *ReadDB) GetProject(tx *db.Tx, projectRef string) (*types.Project, error
 
 func (r *ReadDB) GetProjectByID(tx *db.Tx, projectID string) (*types.Project, error) {
 	q, args, err := projectSelect.Where(sq.Eq{"id": projectID}).ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}
@@ -129,7 +129,7 @@ func (r *ReadDB) GetProjectByID(tx *db.Tx, projectID string) (*types.Project, er
 
 func (r *ReadDB) GetProjectByName(tx *db.Tx, parentID, name string) (*types.Project, error) {
 	q, args, err := projectSelect.Where(sq.Eq{"parentid": parentID, "name": name}).ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}
@@ -173,7 +173,7 @@ func (r *ReadDB) GetProjectGroupProjects(tx *db.Tx, parentID string) ([]*types.P
 	var projects []*types.Project
 
 	q, args, err := projectSelect.Where(sq.Eq{"parentid": parentID}).ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}
@@ -231,7 +231,7 @@ func (r *ReadDB) GetAllProjects(tx *db.Tx) ([]*types.Project, error) {
 	var projects []*types.Project
 
 	q, args, err := projectSelect.ToSql()
-	r.log.Debugf("q: %s, args: %s", q, util.Dump(args))
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
 		return nil, errors.Errorf("failed to build query: %w", err)
 	}

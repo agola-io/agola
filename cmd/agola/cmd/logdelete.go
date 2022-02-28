@@ -20,6 +20,7 @@ import (
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	errors "golang.org/x/xerrors"
 )
@@ -29,7 +30,7 @@ var cmdLogDelete = &cobra.Command{
 	Short: "delete a setup/step log",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := logDelete(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -54,7 +55,7 @@ func init() {
 	flags.BoolVar(&logDeleteOpts.setup, "setup", false, "Setup step")
 
 	if err := cmdLogDelete.MarkFlagRequired("runid"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdLog.AddCommand(cmdLogDelete)
@@ -106,7 +107,7 @@ func logDelete(cmd *cobra.Command, args []string) error {
 		}
 		taskid = task.ID
 	}
-	log.Infof("deleting log")
+	log.Info().Msgf("deleting log")
 	if _, err := gwclient.DeleteLogs(context.TODO(), logDeleteOpts.runid, taskid, logDeleteOpts.setup, logDeleteOpts.step); err != nil {
 		return errors.Errorf("failed to delete log: %v", err)
 	}

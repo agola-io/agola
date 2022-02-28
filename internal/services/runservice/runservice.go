@@ -25,7 +25,6 @@ import (
 	scommon "agola.io/agola/internal/common"
 	"agola.io/agola/internal/datamanager"
 	"agola.io/agola/internal/etcd"
-	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/runservice/action"
@@ -36,16 +35,11 @@ import (
 	"agola.io/agola/services/runservice/types"
 
 	"github.com/gorilla/mux"
+	"github.com/rs/zerolog"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/mvcc/mvccpb"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	errors "golang.org/x/xerrors"
 )
-
-var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
-var logger = slog.New(level)
-var log = logger.Sugar()
 
 // etcdPingerLoop periodically updates a key.
 // This is used by watchers to inform the client of the current revision
@@ -55,7 +49,7 @@ var log = logger.Sugar()
 func (s *Runservice) etcdPingerLoop(ctx context.Context) {
 	for {
 		if err := s.etcdPinger(ctx); err != nil {
-			log.Errorf("err: %+v", err)
+			s.log.Err(err).Send()
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
@@ -76,11 +70,11 @@ func (s *Runservice) etcdPinger(ctx context.Context) error {
 
 func (s *Runservice) maintenanceModeWatcherLoop(ctx context.Context, runCtxCancel context.CancelFunc, maintenanceModeEnabled bool) {
 	for {
-		log.Debugf("maintenanceModeWatcherLoop")
+		s.log.Debug().Msgf("maintenanceModeWatcherLoop")
 
 		// at first watch restart from previous processed revision
 		if err := s.maintenanceModeWatcher(ctx, runCtxCancel, maintenanceModeEnabled); err != nil {
-			log.Errorf("err: %+v", err)
+			s.log.Err(err).Send()
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
@@ -93,14 +87,14 @@ func (s *Runservice) maintenanceModeWatcherLoop(ctx context.Context, runCtxCance
 }
 
 func (s *Runservice) maintenanceModeWatcher(ctx context.Context, runCtxCancel context.CancelFunc, maintenanceModeEnabled bool) error {
-	log.Infof("watcher: maintenance mode enabled: %t", maintenanceModeEnabled)
+	s.log.Info().Msgf("watcher: maintenance mode enabled: %t", maintenanceModeEnabled)
 	resp, err := s.e.Get(ctx, common.EtcdMaintenanceKey, 0)
 	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
 		return err
 	}
 
 	if len(resp.Kvs) > 0 {
-		log.Infof("maintenance mode key is present")
+		s.log.Info().Msgf("maintenance mode key is present")
 		if !maintenanceModeEnabled {
 			runCtxCancel()
 		}
@@ -121,13 +115,13 @@ func (s *Runservice) maintenanceModeWatcher(ctx context.Context, runCtxCancel co
 		for _, ev := range wresp.Events {
 			switch ev.Type {
 			case mvccpb.PUT:
-				log.Infof("maintenance mode key set")
+				s.log.Info().Msgf("maintenance mode key set")
 				if !maintenanceModeEnabled {
 					runCtxCancel()
 				}
 
 			case mvccpb.DELETE:
-				log.Infof("maintenance mode key removed")
+				s.log.Info().Msgf("maintenance mode key removed")
 				if maintenanceModeEnabled {
 					runCtxCancel()
 				}
@@ -139,6 +133,7 @@ func (s *Runservice) maintenanceModeWatcher(ctx context.Context, runCtxCancel co
 }
 
 type Runservice struct {
+	log             zerolog.Logger
 	c               *config.Runservice
 	e               *etcd.Store
 	ost             *objectstorage.ObjStorage
@@ -148,25 +143,22 @@ type Runservice struct {
 	maintenanceMode bool
 }
 
-func NewRunservice(ctx context.Context, l *zap.Logger, c *config.Runservice) (*Runservice, error) {
-	if l != nil {
-		logger = l
-	}
+func NewRunservice(ctx context.Context, log zerolog.Logger, c *config.Runservice) (*Runservice, error) {
 	if c.Debug {
-		level.SetLevel(zapcore.DebugLevel)
+		log = log.Level(zerolog.DebugLevel)
 	}
-	log = logger.Sugar()
 
 	ost, err := scommon.NewObjectStorage(&c.ObjectStorage)
 	if err != nil {
 		return nil, err
 	}
-	e, err := scommon.NewEtcd(&c.Etcd, logger, "runservice")
+	e, err := scommon.NewEtcd(&c.Etcd, log, "runservice")
 	if err != nil {
 		return nil, err
 	}
 
 	s := &Runservice{
+		log: log,
 		c:   c,
 		e:   e,
 		ost: ost,
@@ -182,19 +174,19 @@ func NewRunservice(ctx context.Context, l *zap.Logger, c *config.Runservice) (*R
 			string(common.DataTypeRunCounter),
 		},
 	}
-	dm, err := datamanager.NewDataManager(ctx, logger, dmConf)
+	dm, err := datamanager.NewDataManager(ctx, log, dmConf)
 	if err != nil {
 		return nil, err
 	}
 	s.dm = dm
 
-	readDB, err := readdb.NewReadDB(ctx, logger, filepath.Join(c.DataDir, "readdb"), e, ost, dm)
+	readDB, err := readdb.NewReadDB(ctx, log, filepath.Join(c.DataDir, "readdb"), e, ost, dm)
 	if err != nil {
 		return nil, err
 	}
 	s.readDB = readDB
 
-	ah := action.NewActionHandler(logger, e, readDB, ost, dm)
+	ah := action.NewActionHandler(log, e, readDB, ost, dm)
 	s.ah = ah
 
 	return s, nil
@@ -216,32 +208,32 @@ func (s *Runservice) InitEtcd(ctx context.Context) error {
 }
 
 func (s *Runservice) setupDefaultRouter(etCh chan *types.ExecutorTask) http.Handler {
-	maintenanceModeHandler := api.NewMaintenanceModeHandler(logger, s.ah, s.e)
-	exportHandler := api.NewExportHandler(logger, s.ah)
+	maintenanceModeHandler := api.NewMaintenanceModeHandler(s.log, s.ah, s.e)
+	exportHandler := api.NewExportHandler(s.log, s.ah)
 
 	// executor dedicated api, only calls from executor should happen on these handlers
-	executorStatusHandler := api.NewExecutorStatusHandler(logger, s.e, s.ah)
+	executorStatusHandler := api.NewExecutorStatusHandler(s.log, s.e, s.ah)
 	executorTaskStatusHandler := api.NewExecutorTaskStatusHandler(s.e, etCh)
-	executorTaskHandler := api.NewExecutorTaskHandler(logger, s.ah)
-	executorTasksHandler := api.NewExecutorTasksHandler(logger, s.ah)
-	archivesHandler := api.NewArchivesHandler(logger, s.ost)
-	cacheHandler := api.NewCacheHandler(logger, s.ost)
-	cacheCreateHandler := api.NewCacheCreateHandler(logger, s.ost)
+	executorTaskHandler := api.NewExecutorTaskHandler(s.log, s.ah)
+	executorTasksHandler := api.NewExecutorTasksHandler(s.log, s.ah)
+	archivesHandler := api.NewArchivesHandler(s.log, s.ost)
+	cacheHandler := api.NewCacheHandler(s.log, s.ost)
+	cacheCreateHandler := api.NewCacheCreateHandler(s.log, s.ost)
 
 	// api from clients
-	executorDeleteHandler := api.NewExecutorDeleteHandler(logger, s.ah)
+	executorDeleteHandler := api.NewExecutorDeleteHandler(s.log, s.ah)
 
-	logsHandler := api.NewLogsHandler(logger, s.e, s.ost, s.dm)
-	logsDeleteHandler := api.NewLogsDeleteHandler(logger, s.e, s.ost, s.dm)
+	logsHandler := api.NewLogsHandler(s.log, s.e, s.ost, s.dm)
+	logsDeleteHandler := api.NewLogsDeleteHandler(s.log, s.e, s.ost, s.dm)
 
-	runHandler := api.NewRunHandler(logger, s.e, s.dm, s.readDB)
-	runTaskActionsHandler := api.NewRunTaskActionsHandler(logger, s.ah)
-	runsHandler := api.NewRunsHandler(logger, s.readDB)
-	runActionsHandler := api.NewRunActionsHandler(logger, s.ah)
-	runCreateHandler := api.NewRunCreateHandler(logger, s.ah)
-	runEventsHandler := api.NewRunEventsHandler(logger, s.e, s.ost, s.dm)
+	runHandler := api.NewRunHandler(s.log, s.e, s.dm, s.readDB)
+	runTaskActionsHandler := api.NewRunTaskActionsHandler(s.log, s.ah)
+	runsHandler := api.NewRunsHandler(s.log, s.readDB)
+	runActionsHandler := api.NewRunActionsHandler(s.log, s.ah)
+	runCreateHandler := api.NewRunCreateHandler(s.log, s.ah)
+	runEventsHandler := api.NewRunEventsHandler(s.log, s.e, s.ost, s.dm)
 
-	changeGroupsUpdateTokensHandler := api.NewChangeGroupsUpdateTokensHandler(logger, s.readDB)
+	changeGroupsUpdateTokensHandler := api.NewChangeGroupsUpdateTokensHandler(s.log, s.readDB)
 
 	router := mux.NewRouter()
 	apirouter := router.PathPrefix("/api/v1alpha").Subrouter()
@@ -285,9 +277,9 @@ func (s *Runservice) setupDefaultRouter(etCh chan *types.ExecutorTask) http.Hand
 }
 
 func (s *Runservice) setupMaintenanceRouter() http.Handler {
-	maintenanceModeHandler := api.NewMaintenanceModeHandler(logger, s.ah, s.e)
-	exportHandler := api.NewExportHandler(logger, s.ah)
-	importHandler := api.NewImportHandler(logger, s.ah)
+	maintenanceModeHandler := api.NewMaintenanceModeHandler(s.log, s.ah, s.e)
+	exportHandler := api.NewExportHandler(s.log, s.ah)
+	importHandler := api.NewImportHandler(s.log, s.ah)
 
 	router := mux.NewRouter()
 	apirouter := router.PathPrefix("/api/v1alpha").Subrouter().UseEncodedPath()
@@ -306,13 +298,13 @@ func (s *Runservice) setupMaintenanceRouter() http.Handler {
 func (s *Runservice) Run(ctx context.Context) error {
 	for {
 		if err := s.run(ctx); err != nil {
-			log.Errorf("run error: %+v", err)
+			s.log.Err(err).Msgf("run error")
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
 		select {
 		case <-ctx.Done():
-			log.Infof("runservice exiting")
+			s.log.Info().Msgf("runservice exiting")
 			return nil
 		case <-sleepCh:
 		}
@@ -325,7 +317,7 @@ func (s *Runservice) run(ctx context.Context) error {
 		var err error
 		tlsConfig, err = util.NewTLSConfig(s.c.Web.TLSCertFile, s.c.Web.TLSKeyFile, "", false)
 		if err != nil {
-			log.Errorf("err: %+v")
+			s.log.Err(err).Send()
 			return err
 		}
 	}
@@ -337,7 +329,7 @@ func (s *Runservice) run(ctx context.Context) error {
 
 	maintenanceMode := false
 	if len(resp.Kvs) > 0 {
-		log.Infof("maintenance mode key is present")
+		s.log.Info().Msgf("maintenance mode key is present")
 		maintenanceMode = true
 	}
 
@@ -372,7 +364,7 @@ func (s *Runservice) run(ctx context.Context) error {
 			if err == nil {
 				break
 			}
-			log.Errorf("failed to initialize etcd: %+v", err)
+			s.log.Err(err).Msgf("failed to initialize etcd")
 
 			sleepCh := time.NewTimer(1 * time.Second).C
 			select {
@@ -413,14 +405,14 @@ func (s *Runservice) run(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		log.Infof("runservice run exiting")
+		s.log.Info().Msgf("runservice run exiting")
 	case err = <-lerrCh:
 		if err != nil {
-			log.Errorf("http server listen error: %v", err)
+			s.log.Err(err).Msgf("http server listen error")
 		}
 	case err := <-errCh:
 		if err != nil {
-			log.Errorf("error: %+v", err)
+			s.log.Err(err).Send()
 		}
 	}
 

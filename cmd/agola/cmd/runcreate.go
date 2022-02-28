@@ -21,6 +21,7 @@ import (
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +29,7 @@ var cmdRunCreate = &cobra.Command{
 	Use: "create",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := runCreate(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 	Short: "create",
@@ -54,7 +55,7 @@ func init() {
 	flags.StringVar(&runCreateOpts.commitSHA, "commit-sha", "", "git commit sha")
 
 	if err := cmdRunCreate.MarkFlagRequired("project"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdRun.AddCommand(cmdRunCreate)

@@ -26,7 +26,7 @@ import (
 	rstypes "agola.io/agola/services/runservice/types"
 
 	"github.com/gorilla/mux"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 	errors "golang.org/x/xerrors"
 )
 
@@ -150,12 +150,12 @@ func createRunTaskResponse(rt *rstypes.RunTask, rct *rstypes.RunConfigTask) *gwa
 }
 
 type RunHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewRunHandler(logger *zap.Logger, ah *action.ActionHandler) *RunHandler {
-	return &RunHandler{log: logger.Sugar(), ah: ah}
+func NewRunHandler(log zerolog.Logger, ah *action.ActionHandler) *RunHandler {
+	return &RunHandler{log: log, ah: ah}
 }
 
 func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -165,23 +165,23 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	runResp, err := h.ah.GetRun(ctx, runID)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	res := createRunResponse(runResp.Run, runResp.RunConfig)
 	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type RuntaskHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewRuntaskHandler(logger *zap.Logger, ah *action.ActionHandler) *RuntaskHandler {
-	return &RuntaskHandler{log: logger.Sugar(), ah: ah}
+func NewRuntaskHandler(log zerolog.Logger, ah *action.ActionHandler) *RuntaskHandler {
+	return &RuntaskHandler{log: log, ah: ah}
 }
 
 func (h *RuntaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -192,7 +192,7 @@ func (h *RuntaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	runResp, err := h.ah.GetRun(ctx, runID)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -208,7 +208,7 @@ func (h *RuntaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	res := createRunTaskResponse(rt, rct)
 	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
@@ -237,12 +237,12 @@ func createRunsResponse(r *rstypes.Run) *gwapitypes.RunsResponse {
 }
 
 type RunsHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewRunsHandler(logger *zap.Logger, ah *action.ActionHandler) *RunsHandler {
-	return &RunsHandler{log: logger.Sugar(), ah: ah}
+func NewRunsHandler(log zerolog.Logger, ah *action.ActionHandler) *RunsHandler {
+	return &RunsHandler{log: log, ah: ah}
 }
 
 func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -299,7 +299,7 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	runsResp, err := h.ah.GetRuns(ctx, areq)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -308,17 +308,17 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		runs[i] = createRunsResponse(r)
 	}
 	if err := util.HTTPResponse(w, http.StatusOK, runs); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type RunActionsHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewRunActionsHandler(logger *zap.Logger, ah *action.ActionHandler) *RunActionsHandler {
-	return &RunActionsHandler{log: logger.Sugar(), ah: ah}
+func NewRunActionsHandler(log zerolog.Logger, ah *action.ActionHandler) *RunActionsHandler {
+	return &RunActionsHandler{log: log, ah: ah}
 }
 
 func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -341,23 +341,23 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	runResp, err := h.ah.RunAction(ctx, areq)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	res := createRunResponse(runResp.Run, runResp.RunConfig)
 	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 	}
 }
 
 type RunTaskActionsHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewRunTaskActionsHandler(logger *zap.Logger, ah *action.ActionHandler) *RunTaskActionsHandler {
-	return &RunTaskActionsHandler{log: logger.Sugar(), ah: ah}
+func NewRunTaskActionsHandler(log zerolog.Logger, ah *action.ActionHandler) *RunTaskActionsHandler {
+	return &RunTaskActionsHandler{log: log, ah: ah}
 }
 
 func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -381,18 +381,18 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 	err := h.ah.RunTaskAction(ctx, areq)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 }
 
 type LogsHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewLogsHandler(logger *zap.Logger, ah *action.ActionHandler) *LogsHandler {
-	return &LogsHandler{log: logger.Sugar(), ah: ah}
+func NewLogsHandler(log zerolog.Logger, ah *action.ActionHandler) *LogsHandler {
+	return &LogsHandler{log: log, ah: ah}
 }
 
 func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -447,7 +447,7 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := h.ah.GetLogs(ctx, areq)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -466,7 +466,7 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	defer resp.Body.Close()
 	if err := sendLogs(w, resp.Body); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 }
@@ -504,12 +504,12 @@ func sendLogs(w io.Writer, r io.Reader) error {
 }
 
 type LogsDeleteHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewLogsDeleteHandler(logger *zap.Logger, ah *action.ActionHandler) *LogsDeleteHandler {
-	return &LogsDeleteHandler{log: logger.Sugar(), ah: ah}
+func NewLogsDeleteHandler(log zerolog.Logger, ah *action.ActionHandler) *LogsDeleteHandler {
+	return &LogsDeleteHandler{log: log, ah: ah}
 }
 
 func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -558,7 +558,7 @@ func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	err := h.ah.DeleteLogs(ctx, areq)
 	if util.HTTPError(w, err) {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 }
