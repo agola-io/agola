@@ -951,3 +951,94 @@ func (h *ActionHandler) UserCreateRun(ctx context.Context, req *UserCreateRunReq
 
 	return h.CreateRuns(ctx, creq)
 }
+
+type GetUserProjectgroups struct {
+	UserType  bool
+	OrgType   bool
+	OnlyOwner bool
+}
+
+func (h *ActionHandler) GetUserProjectgroups(ctx context.Context, req *GetUserProjectgroups) ([]*csapitypes.ProjectGroup, error) {
+	curUserID := common.CurrentUserID(ctx)
+	if curUserID == "" {
+		return nil, util.NewErrBadRequest(errors.Errorf("no logged in user"))
+	}
+
+	user, err := h.GetUser(ctx, curUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	projectgroups := make([]*csapitypes.ProjectGroup, 0)
+
+	if req.UserType {
+		projectgroup, err := h.GetProjectGroup(ctx, "user/"+user.Name)
+		if err != nil {
+			return nil, err
+		}
+		projectgroups = append(projectgroups, projectgroup)
+
+		userProjectgroups, err := h.getUserProjectgroupsSubgroups(ctx, projectgroup.Path)
+		if err != nil {
+			return nil, err
+		}
+
+		projectgroups = append(projectgroups, userProjectgroups...)
+	}
+
+	if req.OrgType {
+		orgs, err := h.GetUserOrgs(ctx, curUserID)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, org := range orgs {
+			if req.OnlyOwner {
+				isOwner, err := h.IsOrgOwner(ctx, org.Organization.ID)
+				if err != nil {
+					return nil, err
+				}
+				if !isOwner {
+					continue
+				}
+			}
+
+			projectgroup, err := h.GetProjectGroup(ctx, "org/"+org.Organization.Name)
+			if err != nil {
+				return nil, err
+			}
+			projectgroups = append(projectgroups, projectgroup)
+
+			orgProjectgroups, err := h.getUserProjectgroupsSubgroups(ctx, projectgroup.Path)
+			if err != nil {
+				return nil, err
+			}
+
+			projectgroups = append(projectgroups, orgProjectgroups...)
+		}
+	}
+
+	return projectgroups, nil
+}
+
+func (h *ActionHandler) getUserProjectgroupsSubgroups(ctx context.Context, projectgroupRef string) ([]*csapitypes.ProjectGroup, error) {
+	projectgroups := make([]*csapitypes.ProjectGroup, 0)
+
+	subgroups, err := h.GetProjectGroupSubgroups(ctx, projectgroupRef)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, subgroup := range subgroups {
+		projectgroups = append(projectgroups, subgroup)
+
+		p, err := h.getUserProjectgroupsSubgroups(ctx, subgroup.Path)
+		if err != nil {
+			return nil, err
+		}
+
+		projectgroups = append(projectgroups, p...)
+	}
+
+	return projectgroups, nil
+}

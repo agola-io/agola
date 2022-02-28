@@ -616,3 +616,21 @@ func (c *Client) GetUserOrgs(ctx context.Context) ([]*gwapitypes.UserOrgsRespons
 	resp, err := c.getParsedResponse(ctx, "GET", "/user/orgs", nil, jsonContent, nil, &userOrgs)
 	return userOrgs, resp, err
 }
+
+func (c *Client) GetUserProjectGroups(ctx context.Context, userType, orgType, onlyOwner bool) ([]*gwapitypes.ProjectGroupResponse, *http.Response, error) {
+	q := url.Values{}
+
+	if userType {
+		q.Add("usertype", "true")
+	}
+	if orgType {
+		q.Add("orgtype", "true")
+	}
+	if onlyOwner {
+		q.Add("onlyowner", "true")
+	}
+
+	projectGroups := []*gwapitypes.ProjectGroupResponse{}
+	resp, err := c.getParsedResponse(ctx, "GET", "/user/projectgroups", q, jsonContent, nil, &projectGroups)
+	return projectGroups, resp, err
+}

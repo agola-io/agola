@@ -634,3 +634,40 @@ func createUserOrgsResponse(o *csapitypes.UserOrgsResponse) *gwapitypes.UserOrgs
 
 	return userOrgs
 }
+
+type UserProjectgroupsHandler struct {
+	log *zap.SugaredLogger
+	ah  *action.ActionHandler
+}
+
+func NewUserProjectgroupsHandler(logger *zap.Logger, ah *action.ActionHandler) *UserProjectgroupsHandler {
+	return &UserProjectgroupsHandler{log: logger.Sugar(), ah: ah}
+}
+
+func (h *UserProjectgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	q := r.URL.Query()
+
+	_, userType := q["usertype"]
+	_, orgType := q["orgtype"]
+	_, onlyOwner := q["onlyowner"]
+
+	projectgroups, err := h.ah.GetUserProjectgroups(ctx, &action.GetUserProjectgroups{
+		UserType:  userType,
+		OrgType:   orgType,
+		OnlyOwner: onlyOwner,
+	})
+	if httpError(w, err) {
+		h.log.Errorf("err: %+v", err)
+		return
+	}
+
+	res := make([]*gwapitypes.ProjectGroupResponse, len(projectgroups))
+	for i, pg := range projectgroups {
+		res[i] = createProjectGroupResponse(pg)
+	}
+
+	if err := httpResponse(w, http.StatusOK, res); err != nil {
+		h.log.Errorf("err: %+v", err)
+	}
+}

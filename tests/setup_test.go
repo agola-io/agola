@@ -2000,3 +2000,129 @@ func TestUserOrgs(t *testing.T) {
 		t.Fatalf("user orgs mismatch (-want +got):\n%s", diff)
 	}
 }
+
+func TestUserGroups(t *testing.T) {
+	dir, err := ioutil.TempDir("", "agola")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	tetcd, tgitea, c := setup(ctx, t, dir)
+	defer shutdownGitea(tgitea)
+	defer shutdownEtcd(tetcd)
+
+	_, token := createLinkedAccount(ctx, t, tgitea, c)
+	gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, token)
+
+	expectedGroups := []*gwapitypes.ProjectGroupResponse{}
+
+	//get projectgroup user/user01
+	userGroup, _, err := gwClient.GetProjectGroup(ctx, "user/user01")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedGroups = append(expectedGroups, userGroup)
+
+	//create projectgroup user/user01/usergroup1
+	res, _, err := gwClient.CreateProjectGroup(ctx, &gwapitypes.CreateProjectGroupRequest{
+		Name:       "usergroup01",
+		ParentRef:  "user/user01",
+		Visibility: gwapitypes.VisibilityPublic,
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedGroups = append(expectedGroups, createProjectGroupResponse(res))
+
+	//create projectgroup user/user01/usergroup1/usersubgroup01
+	res, _, err = gwClient.CreateProjectGroup(ctx, &gwapitypes.CreateProjectGroupRequest{
+		Name:       "usersubgroup01",
+		ParentRef:  "user/user01/usergroup01",
+		Visibility: gwapitypes.VisibilityPublic,
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedGroups = append(expectedGroups, createProjectGroupResponse(res))
+
+	//create projectgroup user/user01/usergroup2
+	res, _, err = gwClient.CreateProjectGroup(ctx, &gwapitypes.CreateProjectGroupRequest{
+		Name:       "usergroup2",
+		ParentRef:  "user/user01",
+		Visibility: gwapitypes.VisibilityPublic,
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedGroups = append(expectedGroups, createProjectGroupResponse(res))
+
+	//create org01
+	_, _, err = gwClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: "org01", Visibility: gwapitypes.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	orgGroup, _, err := gwClient.GetProjectGroup(ctx, "org/org01")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedGroups = append(expectedGroups, orgGroup)
+
+	////create projectgroup org/org01/orggroup01
+	res, _, err = gwClient.CreateProjectGroup(ctx, &gwapitypes.CreateProjectGroupRequest{
+		Name:       "orggroup01",
+		ParentRef:  "org/org01",
+		Visibility: gwapitypes.VisibilityPublic,
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedGroups = append(expectedGroups, createProjectGroupResponse(res))
+
+	////create projectgroup org/org01/orggroup01/orgsubgroup01
+	res, _, err = gwClient.CreateProjectGroup(ctx, &gwapitypes.CreateProjectGroupRequest{
+		Name:       "orgsubgroup01",
+		ParentRef:  "org/org01/orggroup01",
+		Visibility: gwapitypes.VisibilityPublic,
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedGroups = append(expectedGroups, createProjectGroupResponse(res))
+
+	////create projectgroup org/org01/orggroup02
+	res, _, err = gwClient.CreateProjectGroup(ctx, &gwapitypes.CreateProjectGroupRequest{
+		Name:       "orggroup02",
+		ParentRef:  "org/org01",
+		Visibility: gwapitypes.VisibilityPublic,
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedGroups = append(expectedGroups, createProjectGroupResponse(res))
+
+	//get user projectgroups
+	groups, _, err := gwClient.GetUserProjectGroups(ctx, true, true, true)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	if diff := cmp.Diff(expectedGroups, groups); diff != "" {
+		t.Fatalf("user groups mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func createProjectGroupResponse(r *gwapitypes.ProjectResponse) *gwapitypes.ProjectGroupResponse {
+	return &gwapitypes.ProjectGroupResponse{
+		ID:               r.ID,
+		Name:             r.Name,
+		Path:             r.Path,
+		ParentPath:       r.ParentPath,
+		Visibility:       r.Visibility,
+		GlobalVisibility: r.GlobalVisibility,
+	}
+}
