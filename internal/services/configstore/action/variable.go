@@ -20,11 +20,12 @@ import (
 
 	"agola.io/agola/internal/datamanager"
 	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/errors"
+
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
 
 	"github.com/gofrs/uuid"
-	errors "golang.org/x/xerrors"
 )
 
 func (h *ActionHandler) GetVariables(ctx context.Context, parentType types.ConfigType, parentRef string, tree bool) ([]*types.Variable, error) {
@@ -32,17 +33,17 @@ func (h *ActionHandler) GetVariables(ctx context.Context, parentType types.Confi
 	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		parentID, err := h.ResolveConfigID(tx, parentType, parentRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if tree {
 			variables, err = h.readDB.GetVariablesTree(tx, parentType, parentID)
 		} else {
 			variables, err = h.readDB.GetVariables(tx, parentID)
 		}
-		return err
+		return errors.WithStack(err)
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return variables, nil
@@ -73,7 +74,7 @@ func (h *ActionHandler) ValidateVariable(ctx context.Context, variable *types.Va
 
 func (h *ActionHandler) CreateVariable(ctx context.Context, variable *types.Variable) (*types.Variable, error) {
 	if err := h.ValidateVariable(ctx, variable); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
@@ -85,19 +86,19 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, variable *types.Vari
 		var err error
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		parentID, err := h.ResolveConfigID(tx, variable.Parent.Type, variable.Parent.ID)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		variable.Parent.ID = parentID
 
 		// check duplicate variable name
 		s, err := h.readDB.GetVariableByName(tx, variable.Parent.ID, variable.Name)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if s != nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("variable with name %q for %s with id %q already exists", variable.Name, variable.Parent.Type, variable.Parent.ID))
@@ -106,14 +107,14 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, variable *types.Vari
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	variable.ID = uuid.Must(uuid.NewV4()).String()
 
 	variablej, err := json.Marshal(variable)
 	if err != nil {
-		return nil, errors.Errorf("failed to marshal variable: %w", err)
+		return nil, errors.Wrapf(err, "failed to marshal variable")
 	}
 	actions := []*datamanager.Action{
 		{
@@ -125,7 +126,7 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, variable *types.Vari
 	}
 
 	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return variable, err
+	return variable, errors.WithStack(err)
 }
 
 type UpdateVariableRequest struct {
@@ -136,7 +137,7 @@ type UpdateVariableRequest struct {
 
 func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableRequest) (*types.Variable, error) {
 	if err := h.ValidateVariable(ctx, req.Variable); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	var curVariable *types.Variable
@@ -149,14 +150,14 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableR
 
 		parentID, err := h.ResolveConfigID(tx, req.Variable.Parent.Type, req.Variable.Parent.ID)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		req.Variable.Parent.ID = parentID
 
 		// check variable exists
 		curVariable, err = h.readDB.GetVariableByName(tx, req.Variable.Parent.ID, req.VariableName)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if curVariable == nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("variable with name %q for %s with id %q doesn't exists", req.VariableName, req.Variable.Parent.Type, req.Variable.Parent.ID))
@@ -166,7 +167,7 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableR
 			// check duplicate variable name
 			u, err := h.readDB.GetVariableByName(tx, req.Variable.Parent.ID, req.Variable.Name)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			if u != nil {
 				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("variable with name %q for %s with id %q already exists", req.Variable.Name, req.Variable.Parent.Type, req.Variable.Parent.ID))
@@ -182,18 +183,18 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableR
 		}
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	variablej, err := json.Marshal(req.Variable)
 	if err != nil {
-		return nil, errors.Errorf("failed to marshal variable: %w", err)
+		return nil, errors.Wrapf(err, "failed to marshal variable")
 	}
 	actions := []*datamanager.Action{
 		{
@@ -205,7 +206,7 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableR
 	}
 
 	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return req.Variable, err
+	return req.Variable, errors.WithStack(err)
 }
 
 func (h *ActionHandler) DeleteVariable(ctx context.Context, parentType types.ConfigType, parentRef, variableName string) error {
@@ -218,13 +219,13 @@ func (h *ActionHandler) DeleteVariable(ctx context.Context, parentType types.Con
 		var err error
 		parentID, err := h.ResolveConfigID(tx, parentType, parentRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		// check variable existance
 		variable, err = h.readDB.GetVariableByName(tx, parentID, variableName)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if variable == nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("variable with name %q doesn't exist", variableName))
@@ -234,12 +235,12 @@ func (h *ActionHandler) DeleteVariable(ctx context.Context, parentType types.Con
 		cgNames := []string{util.EncodeSha256Hex("variableid-" + variable.ID)}
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		return nil
 	})
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	actions := []*datamanager.Action{
@@ -251,5 +252,5 @@ func (h *ActionHandler) DeleteVariable(ctx context.Context, parentType types.Con
 	}
 
 	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return err
+	return errors.WithStack(err)
 }

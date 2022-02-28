@@ -20,8 +20,8 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
-	"errors"
 
+	"agola.io/agola/internal/errors"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -30,12 +30,12 @@ import (
 func GenSSHKeyPair(bits int) ([]byte, []byte, error) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, bits)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.WithStack(err)
 	}
 
 	err = privateKey.Validate()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.WithStack(err)
 	}
 	privateKeyPEM := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(privateKey)}
 

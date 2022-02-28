@@ -21,12 +21,12 @@ import (
 	"strings"
 	"time"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/sequence"
 
 	"github.com/rs/zerolog"
-	errors "golang.org/x/xerrors"
 )
 
 // TODO(sgotti) handle etcd unwanted changes:
@@ -252,7 +252,7 @@ func (d *DataManager) deleteEtcd(ctx context.Context) error {
 	}
 	for _, prefix := range prefixes {
 		if err := d.e.DeletePrefix(ctx, prefix); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	}
 

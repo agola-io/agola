@@ -17,11 +17,11 @@ package cmd
 import (
 	"context"
 
+	"agola.io/agola/internal/errors"
 	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	errors "golang.org/x/xerrors"
 )
 
 var cmdProjectGroupDelete = &cobra.Command{
@@ -58,7 +58,7 @@ func projectGroupDelete(cmd *cobra.Command, args []string) error {
 	log.Info().Msgf("deleting project group")
 
 	if _, err := gwclient.DeleteProjectGroup(context.TODO(), projectGroupDeleteOpts.ref); err != nil {
-		return errors.Errorf("failed to delete project group: %w", err)
+		return errors.Wrapf(err, "failed to delete project group")
 	}
 
 	return nil

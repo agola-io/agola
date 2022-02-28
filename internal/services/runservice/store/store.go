@@ -23,13 +23,14 @@ import (
 	"strings"
 
 	"agola.io/agola/internal/datamanager"
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/etcd"
+	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/services/runservice/common"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/runservice/types"
 
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
-	errors "golang.org/x/xerrors"
 )
 
 const (
@@ -45,7 +46,7 @@ func OSTUpdateRunCounterAction(ctx context.Context, c uint64, group string) (*da
 
 	cj, err := json.Marshal(c)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	action := &datamanager.Action{
@@ -134,13 +135,13 @@ func OSTCacheKey(p string) string {
 func OSTGetRunConfig(dm *datamanager.DataManager, runConfigID string) (*types.RunConfig, error) {
 	rcf, _, err := dm.ReadObject(string(common.DataTypeRunConfig), runConfigID, nil)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	defer rcf.Close()
 	d := json.NewDecoder(rcf)
 	var rc *types.RunConfig
 	if err := d.Decode(&rc); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return rc, nil
@@ -149,7 +150,7 @@ func OSTGetRunConfig(dm *datamanager.DataManager, runConfigID string) (*types.Ru
 func OSTSaveRunConfigAction(rc *types.RunConfig) (*datamanager.Action, error) {
 	rcj, err := json.Marshal(rc)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	action := &datamanager.Action{
@@ -165,13 +166,13 @@ func OSTSaveRunConfigAction(rc *types.RunConfig) (*datamanager.Action, error) {
 func OSTGetRun(dm *datamanager.DataManager, runID string) (*types.Run, error) {
 	rf, _, err := dm.ReadObject(string(common.DataTypeRun), runID, nil)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	defer rf.Close()
 	d := json.NewDecoder(rf)
 	var r *types.Run
 	if err := d.Decode(&r); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return r, nil
@@ -180,7 +181,7 @@ func OSTGetRun(dm *datamanager.DataManager, runID string) (*types.Run, error) {
 func OSTSaveRunAction(r *types.Run) (*datamanager.Action, error) {
 	rj, err := json.Marshal(r)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	action := &datamanager.Action{
@@ -196,13 +197,13 @@ func OSTSaveRunAction(r *types.Run) (*datamanager.Action, error) {
 func GetExecutor(ctx context.Context, e *etcd.Store, executorID string) (*types.Executor, error) {
 	resp, err := e.Get(ctx, common.EtcdExecutorKey(executorID), 0)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	var executor *types.Executor
 	kv := resp.Kvs[0]
 	if err := json.Unmarshal(kv.Value, &executor); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	executor.Revision = kv.ModRevision
 
@@ -213,7 +214,7 @@ func GetExecutors(ctx context.Context, e *etcd.Store) ([]*types.Executor, error)
 	// TODO(sgotti) use paged List
 	resp, err := e.List(ctx, common.EtcdExecutorsDir, "", 0)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	executors := []*types.Executor{}
@@ -221,7 +222,7 @@ func GetExecutors(ctx context.Context, e *etcd.Store) ([]*types.Executor, error)
 	for _, kv := range resp.Kvs {
 		var executor *types.Executor
 		if err := json.Unmarshal(kv.Value, &executor); err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 		executor.Revision = kv.ModRevision
 		executors = append(executors, executor)
@@ -233,12 +234,12 @@ func GetExecutors(ctx context.Context, e *etcd.Store) ([]*types.Executor, error)
 func PutExecutor(ctx context.Context, e *etcd.Store, executor *types.Executor) (*types.Executor, error) {
 	executorj, err := json.Marshal(executor)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	resp, err := e.Put(ctx, common.EtcdExecutorKey(executor.ID), executorj, nil)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	executor.Revision = resp.Header.Revision
 
@@ -246,19 +247,19 @@ func PutExecutor(ctx context.Context, e *etcd.Store, executor *types.Executor) (
 }
 
 func DeleteExecutor(ctx context.Context, e *etcd.Store, executorID string) error {
-	return e.Delete(ctx, common.EtcdExecutorKey(executorID))
+	return errors.WithStack(e.Delete(ctx, common.EtcdExecutorKey(executorID)))
 }
 
 func GetExecutorTask(ctx context.Context, e *etcd.Store, etID string) (*types.ExecutorTask, error) {
 	resp, err := e.Get(ctx, common.EtcdTaskKey(etID), 0)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	var et *types.ExecutorTask
 	kv := resp.Kvs[0]
 	if err := json.Unmarshal(kv.Value, &et); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	et.Revision = kv.ModRevision
 
@@ -268,12 +269,12 @@ func GetExecutorTask(ctx context.Context, e *etcd.Store, etID string) (*types.Ex
 func AtomicPutExecutorTask(ctx context.Context, e *etcd.Store, et *types.ExecutorTask) (*types.ExecutorTask, error) {
 	etj, err := json.Marshal(et)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	resp, err := e.AtomicPut(ctx, common.EtcdTaskKey(et.ID), etj, et.Revision, nil)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	et.Revision = resp.Header.Revision
 
@@ -283,7 +284,7 @@ func AtomicPutExecutorTask(ctx context.Context, e *etcd.Store, et *types.Executo
 func UpdateExecutorTaskStatus(ctx context.Context, e *etcd.Store, et *types.ExecutorTask) (*types.ExecutorTask, error) {
 	curEt, err := GetExecutorTask(ctx, e, et.ID)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	//if curET.Revision >= et.Revision {
@@ -295,14 +296,14 @@ func UpdateExecutorTaskStatus(ctx context.Context, e *etcd.Store, et *types.Exec
 }
 
 func DeleteExecutorTask(ctx context.Context, e *etcd.Store, etID string) error {
-	return e.Delete(ctx, common.EtcdTaskKey(etID))
+	return errors.WithStack(e.Delete(ctx, common.EtcdTaskKey(etID)))
 }
 
 func GetExecutorTasksCountByExecutor(ctx context.Context, e *etcd.Store) (map[string]int, error) {
 	// TODO(sgotti) use paged List
 	resp, err := e.List(ctx, common.EtcdTasksDir, "", 0)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	count := map[string]int{}
@@ -310,7 +311,7 @@ func GetExecutorTasksCountByExecutor(ctx context.Context, e *etcd.Store) (map[st
 	for _, kv := range resp.Kvs {
 		var et *types.ExecutorTask
 		if err := json.Unmarshal(kv.Value, &et); err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 		count[et.Spec.ExecutorID] = count[et.Spec.ExecutorID] + 1
 	}
@@ -322,7 +323,7 @@ func GetExecutorTasksForExecutor(ctx context.Context, e *etcd.Store, executorID 
 	// TODO(sgotti) use paged List
 	resp, err := e.List(ctx, common.EtcdTasksDir, "", 0)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	ets := []*types.ExecutorTask{}
@@ -330,7 +331,7 @@ func GetExecutorTasksForExecutor(ctx context.Context, e *etcd.Store, executorID 
 	for _, kv := range resp.Kvs {
 		var et *types.ExecutorTask
 		if err := json.Unmarshal(kv.Value, &et); err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 		et.Revision = kv.ModRevision
 		if et.Spec.ExecutorID == executorID {
@@ -344,7 +345,7 @@ func GetExecutorTasksForExecutor(ctx context.Context, e *etcd.Store, executorID 
 func GetExecutorTasksForRun(ctx context.Context, e *etcd.Store, runID string) ([]*types.ExecutorTask, error) {
 	r, curRevision, err := GetRun(ctx, e, runID)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	rtIDs := make([]string, len(r.Tasks))
@@ -369,7 +370,7 @@ func GetExecutorTasksForRun(ctx context.Context, e *etcd.Store, runID string) ([
 		txn := e.Client().Txn(ctx).Then(then...)
 		tresp, err := txn.Commit()
 		if err != nil {
-			return nil, etcd.FromEtcdError(err)
+			return nil, errors.WithStack(etcd.FromEtcdError(err))
 		}
 		for _, resp := range tresp.Responses {
 			if len(resp.GetResponseRange().Kvs) == 0 {
@@ -378,7 +379,7 @@ func GetExecutorTasksForRun(ctx context.Context, e *etcd.Store, runID string) ([
 			kv := resp.GetResponseRange().Kvs[0]
 			var et *types.ExecutorTask
 			if err := json.Unmarshal(kv.Value, &et); err != nil {
-				return nil, err
+				return nil, errors.WithStack(err)
 			}
 			et.Revision = kv.ModRevision
 			ets = append(ets, et)
@@ -391,13 +392,13 @@ func GetExecutorTasksForRun(ctx context.Context, e *etcd.Store, runID string) ([
 func GetRun(ctx context.Context, e *etcd.Store, runID string) (*types.Run, int64, error) {
 	resp, err := e.Get(ctx, common.EtcdRunKey(runID), 0)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, errors.WithStack(err)
 	}
 
 	var r *types.Run
 	kv := resp.Kvs[0]
 	if err := json.Unmarshal(kv.Value, &r); err != nil {
-		return nil, 0, err
+		return nil, 0, errors.WithStack(err)
 	}
 	r.Revision = kv.ModRevision
 
@@ -409,10 +410,10 @@ func AtomicPutRun(ctx context.Context, e *etcd.Store, r *types.Run, runEvent *ty
 	if cgt != nil {
 		for cgName := range cgt.ChangeGroupsRevisions {
 			if strings.Contains(cgName, "/") {
-				return nil, fmt.Errorf(`changegroup name %q must not contain "/"`, cgName)
+				return nil, errors.Errorf(`changegroup name %q must not contain "/"`, cgName)
 			}
 			if len(cgName) > MaxChangegroupNameLength {
-				return nil, fmt.Errorf("changegroup name %q too long", cgName)
+				return nil, errors.Errorf("changegroup name %q too long", cgName)
 			}
 		}
 	}
@@ -420,7 +421,7 @@ func AtomicPutRun(ctx context.Context, e *etcd.Store, r *types.Run, runEvent *ty
 	// insert only if the run as changed
 	curRun, _, err := GetRun(ctx, e, r.ID)
 	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if !errors.Is(err, etcd.ErrKeyNotFound) {
 		if curRun.Revision != r.Revision {
@@ -434,7 +435,7 @@ func AtomicPutRun(ctx context.Context, e *etcd.Store, r *types.Run, runEvent *ty
 
 	rj, err := json.Marshal(r)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	hasOptimisticLocking := false
@@ -472,7 +473,7 @@ func AtomicPutRun(ctx context.Context, e *etcd.Store, r *types.Run, runEvent *ty
 	if runEvent != nil {
 		eventj, err := json.Marshal(runEvent)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 		then = append(then, etcdclientv3.OpPut(common.EtcdRunEventKey, string(eventj)))
 	}
@@ -480,7 +481,7 @@ func AtomicPutRun(ctx context.Context, e *etcd.Store, r *types.Run, runEvent *ty
 	txn := e.Client().Txn(ctx).If(cmp...).Then(then...)
 	tresp, err := txn.Commit()
 	if err != nil {
-		return nil, etcd.FromEtcdError(err)
+		return nil, errors.WithStack(etcd.FromEtcdError(err))
 	}
 	if !tresp.Succeeded {
 		if hasOptimisticLocking {
@@ -495,14 +496,14 @@ func AtomicPutRun(ctx context.Context, e *etcd.Store, r *types.Run, runEvent *ty
 }
 
 func DeleteRun(ctx context.Context, e *etcd.Store, runID string) error {
-	return e.Delete(ctx, common.EtcdRunKey(runID))
+	return errors.WithStack(e.Delete(ctx, common.EtcdRunKey(runID)))
 }
 
 func GetRuns(ctx context.Context, e *etcd.Store) ([]*types.Run, error) {
 	// TODO(sgotti) use paged List
 	resp, err := e.List(ctx, common.EtcdRunsDir, "", 0)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	runs := []*types.Run{}
@@ -510,7 +511,7 @@ func GetRuns(ctx context.Context, e *etcd.Store) ([]*types.Run, error) {
 	for _, kv := range resp.Kvs {
 		var r *types.Run
 		if err := json.Unmarshal(kv.Value, &r); err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 		r.Revision = kv.ModRevision
 		runs = append(runs, r)
@@ -522,12 +523,12 @@ func GetRuns(ctx context.Context, e *etcd.Store) ([]*types.Run, error) {
 func GetRunEtcdOrOST(ctx context.Context, e *etcd.Store, dm *datamanager.DataManager, runID string) (*types.Run, error) {
 	r, _, err := GetRun(ctx, e, runID)
 	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if r == nil {
 		r, err = OSTGetRun(dm, runID)
-		if err != nil && !datamanager.IsNotExist(err) {
-			return nil, err
+		if err != nil && !objectstorage.IsNotExist(err) {
+			return nil, errors.WithStack(err)
 		}
 	}
 

@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 
+	"agola.io/agola/internal/errors"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
@@ -64,7 +65,7 @@ func projectList(cmd *cobra.Command, args []string) error {
 
 	projects, _, err := gwclient.GetProjectGroupProjects(context.TODO(), projectListOpts.parentPath)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	printProjects(projects)

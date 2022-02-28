@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"strings"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/services/runservice/types"
-	errors "golang.org/x/xerrors"
 
 	"github.com/google/go-containerregistry/pkg/name"
 )
@@ -79,7 +79,7 @@ var (
 func GetImageTagOrDigest(image string) (string, error) {
 	ref, err := name.ParseReference(image, name.WeakValidation)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	return ref.Identifier(), nil
 }
@@ -87,7 +87,7 @@ func GetImageTagOrDigest(image string) (string, error) {
 func GetRegistry(image string) (string, error) {
 	ref, err := name.ParseReference(image, name.WeakValidation)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	regName := ref.Context().RegistryStr()
 	return regName, nil
@@ -102,17 +102,17 @@ func ResolveAuth(auths map[string]types.DockerRegistryAuth, regname string) (str
 				case types.DockerRegistryAuthTypeEncodedAuth:
 					decoded, err := base64.StdEncoding.DecodeString(auth.Auth)
 					if err != nil {
-						return "", "", errors.Errorf("failed to decode docker auth: %w", err)
+						return "", "", errors.Wrapf(err, "failed to decode docker auth")
 					}
 					parts := strings.Split(string(decoded), ":")
 					if len(parts) != 2 {
-						return "", "", errors.Errorf("wrong docker auth: %w", err)
+						return "", "", errors.Wrapf(err, "wrong docker auth")
 					}
 					return parts[0], parts[1], nil
 				case types.DockerRegistryAuthTypeBasic:
 					return auth.Username, auth.Password, nil
 				default:
-					return "", "", fmt.Errorf("unsupported auth type %q", auth.Type)
+					return "", "", errors.Errorf("unsupported auth type %q", auth.Type)
 				}
 			}
 		}
@@ -126,7 +126,7 @@ func GenDockerConfig(auths map[string]types.DockerRegistryAuth, images []string)
 	for _, image := range images {
 		ref, err := name.ParseReference(image, name.WeakValidation)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 		regName := ref.Context().RegistryStr()
 
@@ -136,7 +136,7 @@ func GenDockerConfig(auths map[string]types.DockerRegistryAuth, images []string)
 
 		username, password, err := ResolveAuth(auths, regName)
 		if err != nil {
-			return nil, errors.Errorf("failed to resolve auth: %w", err)
+			return nil, errors.Wrapf(err, "failed to resolve auth")
 		}
 		delimited := fmt.Sprintf("%s:%s", username, password)
 		auth := base64.StdEncoding.EncodeToString([]byte(delimited))

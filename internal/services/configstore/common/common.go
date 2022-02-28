@@ -18,6 +18,7 @@ import (
 	"net/url"
 	"strings"
 
+	"agola.io/agola/internal/errors"
 	"github.com/gofrs/uuid"
 )
 
@@ -38,7 +39,7 @@ const (
 func ParsePathRef(ref string) (RefType, error) {
 	ref, err := url.PathUnescape(ref)
 	if err != nil {
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 	if strings.Contains(ref, "/") {
 		return RefTypePath, nil

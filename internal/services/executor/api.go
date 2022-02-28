@@ -23,9 +23,9 @@ import (
 	"strconv"
 	"time"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/services/runservice/types"
 	"github.com/rs/zerolog"
-	errors "golang.org/x/xerrors"
 )
 
 type taskSubmissionHandler struct {
@@ -119,7 +119,7 @@ func (h *logsHandler) readLogs(taskID string, setup bool, step int, logPath stri
 		} else {
 			http.Error(w, "", http.StatusInternalServerError)
 		}
-		return err
+		return errors.WithStack(err)
 	}
 	defer f.Close()
 
@@ -132,7 +132,7 @@ func (h *logsHandler) readLogs(taskID string, setup bool, step int, logPath stri
 	if !follow {
 		fi, err := f.Stat()
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		w.Header().Set("Content-Length", strconv.FormatInt(fi.Size(), 10))
 	}
@@ -157,11 +157,11 @@ func (h *logsHandler) readLogs(taskID string, setup bool, step int, logPath stri
 		n, err := f.Read(buf)
 		if err != nil {
 			if err != io.EOF {
-				return err
+				return errors.WithStack(err)
 			}
 			if !flushstop && follow {
 				if _, err := f.Seek(-int64(n), io.SeekCurrent); err != nil {
-					return errors.Errorf("failed to seek in log file %q: %w", logPath, err)
+					return errors.Wrapf(err, "failed to seek in log file %q", logPath)
 				}
 				// check if the step is finished, if so flush until EOF and stop
 				rt, ok := h.e.runningTasks.get(taskID)
@@ -182,7 +182,7 @@ func (h *logsHandler) readLogs(taskID string, setup bool, step int, logPath stri
 			}
 		}
 		if _, err := w.Write(buf[:n]); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if flusher != nil {
 			flusher.Flush()
@@ -234,12 +234,12 @@ func (h *archivesHandler) readArchive(taskID string, step int, w http.ResponseWr
 
 	f, err := os.Open(archivePath)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	defer f.Close()
 	fi, err := f.Stat()
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	w.Header().Set("Content-Length", strconv.FormatInt(fi.Size(), 10))
@@ -247,5 +247,5 @@ func (h *archivesHandler) readArchive(taskID string, step int, w http.ResponseWr
 	br := bufio.NewReader(f)
 
 	_, err = io.Copy(w, br)
-	return err
+	return errors.WithStack(err)
 }

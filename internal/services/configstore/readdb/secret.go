@@ -19,11 +19,11 @@ import (
 	"encoding/json"
 
 	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
 
 	sq "github.com/Masterminds/squirrel"
-	errors "golang.org/x/xerrors"
 )
 
 var (
@@ -34,18 +34,18 @@ var (
 func (r *ReadDB) insertSecret(tx *db.Tx, data []byte) error {
 	secret := types.Secret{}
 	if err := json.Unmarshal(data, &secret); err != nil {
-		return errors.Errorf("failed to unmarshal secret: %w", err)
+		return errors.Wrapf(err, "failed to unmarshal secret")
 	}
 	// poor man insert or update...
 	if err := r.deleteSecret(tx, secret.ID); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	q, args, err := secretInsert.Values(secret.ID, secret.Name, secret.Parent.ID, secret.Parent.Type, data).ToSql()
 	if err != nil {
-		return errors.Errorf("failed to build query: %w", err)
+		return errors.Wrapf(err, "failed to build query")
 	}
 	if _, err = tx.Exec(q, args...); err != nil {
-		return errors.Errorf("failed to insert secret: %w", err)
+		return errors.Wrapf(err, "failed to insert secret")
 	}
 
 	return nil
@@ -54,7 +54,7 @@ func (r *ReadDB) insertSecret(tx *db.Tx, data []byte) error {
 func (r *ReadDB) deleteSecret(tx *db.Tx, id string) error {
 	// poor man insert or update...
 	if _, err := tx.Exec("delete from secret where id = $1", id); err != nil {
-		return errors.Errorf("failed to delete secret: %w", err)
+		return errors.Wrapf(err, "failed to delete secret")
 	}
 	return nil
 }
@@ -63,12 +63,12 @@ func (r *ReadDB) GetSecretByID(tx *db.Tx, secretID string) (*types.Secret, error
 	q, args, err := secretSelect.Where(sq.Eq{"id": secretID}).ToSql()
 	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Errorf("failed to build query: %w", err)
+		return nil, errors.Wrapf(err, "failed to build query")
 	}
 
 	secrets, _, err := fetchSecrets(tx, q, args...)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if len(secrets) > 1 {
 		return nil, errors.Errorf("too many rows returned")
@@ -83,12 +83,12 @@ func (r *ReadDB) GetSecretByName(tx *db.Tx, parentID, name string) (*types.Secre
 	q, args, err := secretSelect.Where(sq.Eq{"parentid": parentID, "name": name}).ToSql()
 	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Errorf("failed to build query: %w", err)
+		return nil, errors.Wrapf(err, "failed to build query")
 	}
 
 	secrets, _, err := fetchSecrets(tx, q, args...)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if len(secrets) > 1 {
 		return nil, errors.Errorf("too many rows returned")
@@ -103,18 +103,18 @@ func (r *ReadDB) GetSecrets(tx *db.Tx, parentID string) ([]*types.Secret, error)
 	q, args, err := secretSelect.Where(sq.Eq{"parentid": parentID}).ToSql()
 	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Errorf("failed to build query: %w", err)
+		return nil, errors.Wrapf(err, "failed to build query")
 	}
 
 	secrets, _, err := fetchSecrets(tx, q, args...)
-	return secrets, err
+	return secrets, errors.WithStack(err)
 }
 
 func (r *ReadDB) GetSecretTree(tx *db.Tx, parentType types.ConfigType, parentID, name string) (*types.Secret, error) {
 	for parentType == types.ConfigTypeProjectGroup || parentType == types.ConfigTypeProject {
 		secret, err := r.GetSecretByName(tx, parentID, name)
 		if err != nil {
-			return nil, errors.Errorf("failed to get secret with name %q: %w", name, err)
+			return nil, errors.Wrapf(err, "failed to get secret with name %q", name)
 		}
 		if secret != nil {
 			return secret, nil
@@ -124,7 +124,7 @@ func (r *ReadDB) GetSecretTree(tx *db.Tx, parentType types.ConfigType, parentID,
 		case types.ConfigTypeProjectGroup:
 			projectGroup, err := r.GetProjectGroup(tx, parentID)
 			if err != nil {
-				return nil, err
+				return nil, errors.WithStack(err)
 			}
 			if projectGroup == nil {
 				return nil, errors.Errorf("projectgroup with id %q doesn't exist", parentID)
@@ -134,7 +134,7 @@ func (r *ReadDB) GetSecretTree(tx *db.Tx, parentType types.ConfigType, parentID,
 		case types.ConfigTypeProject:
 			project, err := r.GetProject(tx, parentID)
 			if err != nil {
-				return nil, err
+				return nil, errors.WithStack(err)
 			}
 			if project == nil {
 				return nil, errors.Errorf("project with id %q doesn't exist", parentID)
@@ -153,7 +153,7 @@ func (r *ReadDB) GetSecretsTree(tx *db.Tx, parentType types.ConfigType, parentID
 	for parentType == types.ConfigTypeProjectGroup || parentType == types.ConfigTypeProject {
 		secrets, err := r.GetSecrets(tx, parentID)
 		if err != nil {
-			return nil, errors.Errorf("failed to get secrets for %s %q: %w", parentType, parentID, err)
+			return nil, errors.Wrapf(err, "failed to get secrets for %s %q", parentType, parentID)
 		}
 		allSecrets = append(allSecrets, secrets...)
 
@@ -161,7 +161,7 @@ func (r *ReadDB) GetSecretsTree(tx *db.Tx, parentType types.ConfigType, parentID
 		case types.ConfigTypeProjectGroup:
 			projectGroup, err := r.GetProjectGroup(tx, parentID)
 			if err != nil {
-				return nil, err
+				return nil, errors.WithStack(err)
 			}
 			if projectGroup == nil {
 				return nil, errors.Errorf("projectgroup with id %q doesn't exist", parentID)
@@ -171,7 +171,7 @@ func (r *ReadDB) GetSecretsTree(tx *db.Tx, parentType types.ConfigType, parentID
 		case types.ConfigTypeProject:
 			project, err := r.GetProject(tx, parentID)
 			if err != nil {
-				return nil, err
+				return nil, errors.WithStack(err)
 			}
 			if project == nil {
 				return nil, errors.Errorf("project with id %q doesn't exist", parentID)
@@ -187,7 +187,7 @@ func (r *ReadDB) GetSecretsTree(tx *db.Tx, parentType types.ConfigType, parentID
 func fetchSecrets(tx *db.Tx, q string, args ...interface{}) ([]*types.Secret, []string, error) {
 	rows, err := tx.Query(q, args...)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.WithStack(err)
 	}
 	defer rows.Close()
 	return scanSecrets(rows)
@@ -197,12 +197,12 @@ func scanSecret(rows *sql.Rows, additionalFields ...interface{}) (*types.Secret,
 	var id string
 	var data []byte
 	if err := rows.Scan(&id, &data); err != nil {
-		return nil, "", errors.Errorf("failed to scan rows: %w", err)
+		return nil, "", errors.Wrapf(err, "failed to scan rows")
 	}
 	secret := types.Secret{}
 	if len(data) > 0 {
 		if err := json.Unmarshal(data, &secret); err != nil {
-			return nil, "", errors.Errorf("failed to unmarshal secret: %w", err)
+			return nil, "", errors.Wrapf(err, "failed to unmarshal secret")
 		}
 	}
 
@@ -216,13 +216,13 @@ func scanSecrets(rows *sql.Rows) ([]*types.Secret, []string, error) {
 		p, id, err := scanSecret(rows)
 		if err != nil {
 			rows.Close()
-			return nil, nil, err
+			return nil, nil, errors.WithStack(err)
 		}
 		secrets = append(secrets, p)
 		ids = append(ids, id)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, nil, err
+		return nil, nil, errors.WithStack(err)
 	}
 	return secrets, ids, nil
 }

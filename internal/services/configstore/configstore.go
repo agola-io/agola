@@ -24,6 +24,7 @@ import (
 
 	scommon "agola.io/agola/internal/common"
 	"agola.io/agola/internal/datamanager"
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/services/config"
@@ -39,7 +40,6 @@ import (
 	"github.com/rs/zerolog/log"
 	etcdclientv3 "go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/mvcc/mvccpb"
-	errors "golang.org/x/xerrors"
 )
 
 func (s *Configstore) maintenanceModeWatcherLoop(ctx context.Context, runCtxCancel context.CancelFunc, maintenanceModeEnabled bool) {
@@ -64,7 +64,7 @@ func (s *Configstore) maintenanceModeWatcher(ctx context.Context, runCtxCancel c
 	log.Info().Msgf("watcher: maintenance mode enabled: %t", maintenanceModeEnabled)
 	resp, err := s.e.Get(ctx, common.EtcdMaintenanceKey, 0)
 	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
-		return err
+		return errors.WithStack(err)
 	}
 
 	if len(resp.Kvs) > 0 {
@@ -83,7 +83,7 @@ func (s *Configstore) maintenanceModeWatcher(ctx context.Context, runCtxCancel c
 
 	for wresp := range wch {
 		if wresp.Canceled {
-			return wresp.Err()
+			return errors.WithStack(wresp.Err())
 		}
 
 		for _, ev := range wresp.Events {
@@ -124,11 +124,11 @@ func NewConfigstore(ctx context.Context, log zerolog.Logger, c *config.Configsto
 
 	ost, err := scommon.NewObjectStorage(&c.ObjectStorage)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	e, err := scommon.NewEtcd(&c.Etcd, log, "configstore")
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	cs := &Configstore{
@@ -155,11 +155,11 @@ func NewConfigstore(ctx context.Context, log zerolog.Logger, c *config.Configsto
 	}
 	dm, err := datamanager.NewDataManager(ctx, log, dmConf)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	readDB, err := readdb.NewReadDB(ctx, log, filepath.Join(c.DataDir, "readdb"), e, ost, dm)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	cs.dm = dm
@@ -340,13 +340,13 @@ func (s *Configstore) run(ctx context.Context) error {
 		tlsConfig, err = util.NewTLSConfig(s.c.Web.TLSCertFile, s.c.Web.TLSKeyFile, "", false)
 		if err != nil {
 			s.log.Err(err).Send()
-			return err
+			return errors.WithStack(err)
 		}
 	}
 
 	resp, err := s.e.Get(ctx, common.EtcdMaintenanceKey, 0)
 	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
-		return err
+		return errors.WithStack(err)
 	}
 
 	maintenanceMode := false
@@ -405,12 +405,12 @@ func (s *Configstore) run(ctx context.Context) error {
 	case err := <-lerrCh:
 		if err != nil {
 			log.Err(err).Msgf("http server listen error")
-			return err
+			return errors.WithStack(err)
 		}
 	case err := <-errCh:
 		if err != nil {
 			s.log.Err(err).Send()
-			return err
+			return errors.WithStack(err)
 		}
 	}
 
@@ -418,5 +418,5 @@ func (s *Configstore) run(ctx context.Context) error {
 	httpServer.Close()
 	wg.Wait()
 
-	return err
+	return errors.WithStack(err)
 }

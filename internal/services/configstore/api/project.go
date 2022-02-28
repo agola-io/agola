@@ -22,6 +22,8 @@ import (
 	"path"
 
 	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/errors"
+
 	"agola.io/agola/internal/services/configstore/action"
 	"agola.io/agola/internal/services/configstore/readdb"
 	"agola.io/agola/internal/util"
@@ -35,7 +37,7 @@ import (
 func projectResponse(ctx context.Context, readDB *readdb.ReadDB, project *types.Project) (*csapitypes.Project, error) {
 	r, err := projectsResponse(ctx, readDB, []*types.Project{project})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	return r[0], nil
 }
@@ -47,18 +49,18 @@ func projectsResponse(ctx context.Context, readDB *readdb.ReadDB, projects []*ty
 		for i, project := range projects {
 			pp, err := readDB.GetPath(tx, project.Parent.Type, project.Parent.ID)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 
 			ownerType, ownerID, err := readDB.GetProjectOwnerID(tx, project)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 
 			// calculate global visibility
 			visibility, err := getGlobalVisibility(readDB, tx, project.Visibility, &project.Parent)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 
 			// we calculate the path here from parent path since the db could not yet be
@@ -76,7 +78,7 @@ func projectsResponse(ctx context.Context, readDB *readdb.ReadDB, projects []*ty
 		return nil
 	})
 
-	return resProjects, err
+	return resProjects, errors.WithStack(err)
 }
 
 func getGlobalVisibility(readDB *readdb.ReadDB, tx *db.Tx, curVisibility types.Visibility, parent *types.Parent) (types.Visibility, error) {
@@ -88,7 +90,7 @@ func getGlobalVisibility(readDB *readdb.ReadDB, tx *db.Tx, curVisibility types.V
 	for curParent.Type == types.ConfigTypeProjectGroup {
 		projectGroup, err := readDB.GetProjectGroupByID(tx, curParent.ID)
 		if err != nil {
-			return "", err
+			return "", errors.WithStack(err)
 		}
 		if projectGroup.Visibility == types.VisibilityPrivate {
 			return types.VisibilityPrivate, nil
@@ -101,7 +103,7 @@ func getGlobalVisibility(readDB *readdb.ReadDB, tx *db.Tx, curVisibility types.V
 	if curParent.Type == types.ConfigTypeOrg {
 		org, err := readDB.GetOrg(tx, curParent.ID)
 		if err != nil {
-			return "", err
+			return "", errors.WithStack(err)
 		}
 		if org.Visibility == types.VisibilityPrivate {
 			return types.VisibilityPrivate, nil

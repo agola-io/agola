@@ -18,17 +18,16 @@ import (
 	"context"
 	"io"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/services/configstore/common"
 	"agola.io/agola/internal/util"
-
-	errors "golang.org/x/xerrors"
 )
 
 func (h *ActionHandler) MaintenanceMode(ctx context.Context, enable bool) error {
 	resp, err := h.e.Get(ctx, common.EtcdMaintenanceKey, 0)
 	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
-		return err
+		return errors.WithStack(err)
 	}
 
 	if enable && len(resp.Kvs) > 0 {
@@ -41,7 +40,7 @@ func (h *ActionHandler) MaintenanceMode(ctx context.Context, enable bool) error 
 	if enable {
 		txResp, err := h.e.AtomicPut(ctx, common.EtcdMaintenanceKey, []byte{}, 0, nil)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if !txResp.Succeeded {
 			return errors.Errorf("failed to create maintenance mode key due to concurrent update")
@@ -51,7 +50,7 @@ func (h *ActionHandler) MaintenanceMode(ctx context.Context, enable bool) error 
 	if !enable {
 		txResp, err := h.e.AtomicDelete(ctx, common.EtcdMaintenanceKey, resp.Kvs[0].ModRevision)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if !txResp.Succeeded {
 			return errors.Errorf("failed to delete maintenance mode key due to concurrent update")
@@ -62,12 +61,12 @@ func (h *ActionHandler) MaintenanceMode(ctx context.Context, enable bool) error 
 }
 
 func (h *ActionHandler) Export(ctx context.Context, w io.Writer) error {
-	return h.dm.Export(ctx, w)
+	return errors.WithStack(h.dm.Export(ctx, w))
 }
 
 func (h *ActionHandler) Import(ctx context.Context, r io.Reader) error {
 	if !h.maintenanceMode {
 		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("not in maintenance mode"))
 	}
-	return h.dm.Import(ctx, r)
+	return errors.WithStack(h.dm.Import(ctx, r))
 }

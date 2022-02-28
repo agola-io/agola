@@ -16,9 +16,9 @@ package types
 
 import (
 	"encoding/json"
-	"fmt"
 	"time"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/services/types"
 	"agola.io/agola/util"
 )
@@ -189,7 +189,7 @@ func (rs *RemoteSource) UnmarshalJSON(b []byte) error {
 	trs := (*remoteSource)(rs)
 
 	if err := json.Unmarshal(b, &trs); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	if trs.RegistrationEnabled == nil {
@@ -212,7 +212,7 @@ func SourceSupportedAuthTypes(rsType RemoteSourceType) []RemoteSourceAuthType {
 		return []RemoteSourceAuthType{RemoteSourceAuthTypeOauth2}
 
 	default:
-		panic(fmt.Errorf("unsupported remote source type: %q", rsType))
+		panic(errors.Errorf("unsupported remote source type: %q", rsType))
 	}
 }
 

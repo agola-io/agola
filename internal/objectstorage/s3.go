@@ -21,8 +21,8 @@ import (
 	"os"
 	"strings"
 
+	"agola.io/agola/internal/errors"
 	minio "github.com/minio/minio-go/v6"
-	errors "golang.org/x/xerrors"
 )
 
 type S3Storage struct {
@@ -35,21 +35,21 @@ type S3Storage struct {
 func NewS3(bucket, location, endpoint, accessKeyID, secretAccessKey string, secure bool) (*S3Storage, error) {
 	minioClient, err := minio.New(endpoint, accessKeyID, secretAccessKey, secure)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	minioCore, err := minio.NewCore(endpoint, accessKeyID, secretAccessKey, secure)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	exists, err := minioClient.BucketExists(bucket)
 	if err != nil {
-		return nil, errors.Errorf("cannot check if bucket %q in location %q exits: %w", bucket, location, err)
+		return nil, errors.Wrapf(err, "cannot check if bucket %q in location %q exits", bucket, location)
 	}
 	if !exists {
 		if err := minioClient.MakeBucket(bucket, location); err != nil {
-			return nil, errors.Errorf("cannot create bucket %q in location %q: %w", bucket, location, err)
+			return nil, errors.Wrapf(err, "cannot create bucket %q in location %q", bucket, location)
 		}
 	}
 
@@ -67,7 +67,7 @@ func (s *S3Storage) Stat(p string) (*ObjectInfo, error) {
 		if merr.StatusCode == http.StatusNotFound {
 			return nil, NewErrNotExist(errors.Errorf("object %q doesn't exist", p))
 		}
-		return nil, merr
+		return nil, errors.WithStack(merr)
 	}
 
 	return &ObjectInfo{Path: p, LastModified: oi.LastModified, Size: oi.Size}, nil
@@ -79,9 +79,12 @@ func (s *S3Storage) ReadObject(filepath string) (ReadSeekCloser, error) {
 		if merr.StatusCode == http.StatusNotFound {
 			return nil, NewErrNotExist(errors.Errorf("object %q doesn't exist", filepath))
 		}
-		return nil, merr
+		return nil, errors.WithStack(merr)
 	}
-	return s.minioClient.GetObject(s.bucket, filepath, minio.GetObjectOptions{})
+
+	o, err := s.minioClient.GetObject(s.bucket, filepath, minio.GetObjectOptions{})
+
+	return o, errors.WithStack(err)
 }
 
 func (s *S3Storage) WriteObject(filepath string, data io.Reader, size int64, persist bool) error {
@@ -92,30 +95,30 @@ func (s *S3Storage) WriteObject(filepath string, data io.Reader, size int64, per
 	if size >= 0 {
 		lr := io.LimitReader(data, size)
 		_, err := s.minioClient.PutObject(s.bucket, filepath, lr, size, minio.PutObjectOptions{ContentType: "application/octet-stream"})
-		return err
+		return errors.WithStack(err)
 	}
 
 	// hack to know the real file size or minio will do this in memory with big memory usage since s3 doesn't support real streaming of unknown sizes
 	// TODO(sgotti) wait for minio client to expose an api to provide the max object size so we can remove this
 	tmpfile, err := ioutil.TempFile(os.TempDir(), "s3")
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	defer tmpfile.Close()
 	defer os.Remove(tmpfile.Name())
 	size, err = io.Copy(tmpfile, data)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	if _, err := tmpfile.Seek(0, 0); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	_, err = s.minioClient.PutObject(s.bucket, filepath, tmpfile, size, minio.PutObjectOptions{ContentType: "application/octet-stream"})
-	return err
+	return errors.WithStack(err)
 }
 
 func (s *S3Storage) DeleteObject(filepath string) error {
-	return s.minioClient.RemoveObject(s.bucket, filepath)
+	return errors.WithStack(s.minioClient.RemoveObject(s.bucket, filepath))
 }
 
 func (s *S3Storage) List(prefix, startWith, delimiter string, doneCh <-chan struct{}) <-chan ObjectInfo {

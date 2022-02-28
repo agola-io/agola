@@ -21,6 +21,7 @@ import (
 	"sort"
 	"strconv"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
@@ -30,7 +31,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
-	errors "golang.org/x/xerrors"
 )
 
 type CreateUserHandler struct {
@@ -193,7 +193,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		limit, err = strconv.Atoi(limitS)
 		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot parse limit: %w", err)))
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit")))
 			return
 		}
 	}
@@ -273,7 +273,7 @@ func (h *CreateUserLAHandler) createUserLA(ctx context.Context, userRef string, 
 	h.log.Info().Msgf("creating linked account")
 	cresp, err := h.ah.HandleRemoteSourceAuth(ctx, req.RemoteSourceName, req.RemoteSourceLoginName, req.RemoteSourceLoginPassword, action.RemoteSourceRequestTypeCreateUserLA, creq)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if cresp.Oauth2Redirect != "" {
 		return &gwapitypes.CreateUserLAResponse{
@@ -427,7 +427,7 @@ func (h *RegisterUserHandler) registerUser(ctx context.Context, req *gwapitypes.
 
 	cresp, err := h.ah.HandleRemoteSourceAuth(ctx, req.CreateUserLARequest.RemoteSourceName, req.CreateUserLARequest.RemoteSourceLoginName, req.CreateUserLARequest.RemoteSourceLoginPassword, action.RemoteSourceRequestTypeRegisterUser, creq)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if cresp.Oauth2Redirect != "" {
 		return &gwapitypes.RegisterUserResponse{
@@ -477,7 +477,7 @@ func (h *AuthorizeHandler) authorize(ctx context.Context, req *gwapitypes.LoginU
 
 	cresp, err := h.ah.HandleRemoteSourceAuth(ctx, req.RemoteSourceName, req.LoginName, req.LoginPassword, action.RemoteSourceRequestTypeAuthorize, creq)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if cresp.Oauth2Redirect != "" {
 		return &gwapitypes.AuthorizeResponse{
@@ -535,7 +535,7 @@ func (h *LoginUserHandler) loginUser(ctx context.Context, req *gwapitypes.LoginU
 	h.log.Info().Msgf("logging in user")
 	cresp, err := h.ah.HandleRemoteSourceAuth(ctx, req.RemoteSourceName, req.LoginName, req.LoginPassword, action.RemoteSourceRequestTypeLoginUser, creq)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if cresp.Oauth2Redirect != "" {
 		return &gwapitypes.LoginUserResponse{

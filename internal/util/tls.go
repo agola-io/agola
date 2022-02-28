@@ -19,6 +19,8 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"io/ioutil"
+
+	"agola.io/agola/internal/errors"
 )
 
 func NewTLSConfig(certFile, keyFile, caFile string, insecureSkipVerify bool) (*tls.Config, error) {
@@ -28,7 +30,7 @@ func NewTLSConfig(certFile, keyFile, caFile string, insecureSkipVerify bool) (*t
 	if caFile != "" {
 		pemBytes, err := ioutil.ReadFile(caFile)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 		roots := x509.NewCertPool()
 
@@ -40,7 +42,7 @@ func NewTLSConfig(certFile, keyFile, caFile string, insecureSkipVerify bool) (*t
 			}
 			cert, err := x509.ParseCertificate(block.Bytes)
 			if err != nil {
-				return nil, err
+				return nil, errors.WithStack(err)
 			}
 			roots.AddCert(cert)
 		}
@@ -53,7 +55,7 @@ func NewTLSConfig(certFile, keyFile, caFile string, insecureSkipVerify bool) (*t
 	if certFile != "" && keyFile != "" {
 		cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 		tlsConfig.Certificates = []tls.Certificate{cert}
 	}

@@ -16,9 +16,10 @@ package util
 
 import (
 	"context"
-	"errors"
 	"math/rand"
 	"time"
+
+	"agola.io/agola/internal/errors"
 )
 
 // DefaultRetry is the recommended retry for a conflict where multiple clients
@@ -105,7 +106,7 @@ func ExponentialBackoff(ctx context.Context, backoff Backoff, condition Conditio
 			duration = time.Duration(float64(duration) * backoff.Factor)
 		}
 		if ok, err := condition(); err != nil || ok {
-			return err
+			return errors.WithStack(err)
 		}
 	}
 	return ErrWaitTimeout

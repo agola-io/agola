@@ -20,12 +20,12 @@ import (
 	"regexp"
 	"strings"
 
+	"agola.io/agola/internal/errors"
 	itypes "agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/types"
 
 	"github.com/ghodss/yaml"
-	errors "golang.org/x/xerrors"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -201,7 +201,7 @@ type SaveContent struct {
 func (s *Steps) UnmarshalJSON(b []byte) error {
 	var stepsRaw []json.RawMessage
 	if err := json.Unmarshal(b, &stepsRaw); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	steps := make(Steps, len(stepsRaw))
@@ -210,13 +210,13 @@ func (s *Steps) UnmarshalJSON(b []byte) error {
 
 		var stepMap map[string]json.RawMessage
 		if err := json.Unmarshal(stepRaw, &stepMap); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		// handle default step definition using format { type: "steptype", other steps fields }
 		if _, ok := stepMap["type"]; ok {
 			var stepTypeI interface{}
 			if err := json.Unmarshal(stepMap["type"], &stepTypeI); err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			stepType, ok := stepTypeI.(string)
 			if !ok {
@@ -227,7 +227,7 @@ func (s *Steps) UnmarshalJSON(b []byte) error {
 			case "clone":
 				var s CloneStep
 				if err := json.Unmarshal(stepRaw, &s); err != nil {
-					return err
+					return errors.WithStack(err)
 				}
 				s.Type = stepType
 				step = &s
@@ -235,7 +235,7 @@ func (s *Steps) UnmarshalJSON(b []byte) error {
 			case "run":
 				var s RunStep
 				if err := json.Unmarshal(stepRaw, &s); err != nil {
-					return err
+					return errors.WithStack(err)
 				}
 				if s.Tty == nil {
 					s.Tty = util.BoolP(true)
@@ -246,7 +246,7 @@ func (s *Steps) UnmarshalJSON(b []byte) error {
 			case "save_to_workspace":
 				var s SaveToWorkspaceStep
 				if err := json.Unmarshal(stepRaw, &s); err != nil {
-					return err
+					return errors.WithStack(err)
 				}
 				s.Type = stepType
 				step = &s
@@ -254,7 +254,7 @@ func (s *Steps) UnmarshalJSON(b []byte) error {
 			case "restore_workspace":
 				var s RestoreWorkspaceStep
 				if err := json.Unmarshal(stepRaw, &s); err != nil {
-					return err
+					return errors.WithStack(err)
 				}
 				s.Type = stepType
 				step = &s
@@ -262,7 +262,7 @@ func (s *Steps) UnmarshalJSON(b []byte) error {
 			case "save_cache":
 				var s SaveCacheStep
 				if err := json.Unmarshal(stepRaw, &s); err != nil {
-					return err
+					return errors.WithStack(err)
 				}
 				s.Type = stepType
 				step = &s
@@ -270,7 +270,7 @@ func (s *Steps) UnmarshalJSON(b []byte) error {
 			case "restore_cache":
 				var s RestoreCacheStep
 				if err := json.Unmarshal(stepRaw, &s); err != nil {
-					return err
+					return errors.WithStack(err)
 				}
 				s.Type = stepType
 				step = &s
@@ -285,14 +285,14 @@ func (s *Steps) UnmarshalJSON(b []byte) error {
 			for stepType, stepSpecRaw := range stepMap {
 				var stepSpec interface{}
 				if err := json.Unmarshal(stepSpecRaw, &stepSpec); err != nil {
-					return err
+					return errors.WithStack(err)
 				}
 
 				switch stepType {
 				case "clone":
 					var s CloneStep
 					if err := json.Unmarshal(stepSpecRaw, &s); err != nil {
-						return err
+						return errors.WithStack(err)
 					}
 					s.Type = stepType
 					step = &s
@@ -304,7 +304,7 @@ func (s *Steps) UnmarshalJSON(b []byte) error {
 						s.Command = stepSpec
 					default:
 						if err := json.Unmarshal(stepSpecRaw, &s); err != nil {
-							return err
+							return errors.WithStack(err)
 						}
 					}
 					s.Type = stepType
@@ -313,7 +313,7 @@ func (s *Steps) UnmarshalJSON(b []byte) error {
 				case "save_to_workspace":
 					var s SaveToWorkspaceStep
 					if err := json.Unmarshal(stepSpecRaw, &s); err != nil {
-						return err
+						return errors.WithStack(err)
 					}
 					s.Type = stepType
 					step = &s
@@ -321,7 +321,7 @@ func (s *Steps) UnmarshalJSON(b []byte) error {
 				case "restore_workspace":
 					var s RestoreWorkspaceStep
 					if err := json.Unmarshal(stepSpecRaw, &s); err != nil {
-						return err
+						return errors.WithStack(err)
 					}
 					s.Type = stepType
 					step = &s
@@ -329,7 +329,7 @@ func (s *Steps) UnmarshalJSON(b []byte) error {
 				case "save_cache":
 					var s SaveCacheStep
 					if err := json.Unmarshal(stepSpecRaw, &s); err != nil {
-						return err
+						return errors.WithStack(err)
 					}
 					s.Type = stepType
 					step = &s
@@ -337,7 +337,7 @@ func (s *Steps) UnmarshalJSON(b []byte) error {
 				case "restore_cache":
 					var s RestoreCacheStep
 					if err := json.Unmarshal(stepSpecRaw, &s); err != nil {
-						return err
+						return errors.WithStack(err)
 					}
 					s.Type = stepType
 					step = &s
@@ -359,14 +359,14 @@ func (d *Depends) UnmarshalJSON(b []byte) error {
 	var dependsRaw []json.RawMessage
 
 	if err := json.Unmarshal(b, &dependsRaw); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	depends := make([]*Depend, len(dependsRaw))
 	for i, dependRaw := range dependsRaw {
 		var dependi interface{}
 		if err := json.Unmarshal(dependRaw, &dependi); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		var depend *Depend
 		isSimpler := false
@@ -391,7 +391,7 @@ func (d *Depends) UnmarshalJSON(b []byte) error {
 			if !isSimpler {
 				// handle default depends definition using format "task": "taskname", conditions: [ list of conditions ]
 				if err := json.Unmarshal(dependRaw, &depend); err != nil {
-					return err
+					return errors.WithStack(err)
 				}
 			} else {
 				// handle simpler (for yaml) depends definition using format "taskname": [ list of conditions ]
@@ -401,7 +401,7 @@ func (d *Depends) UnmarshalJSON(b []byte) error {
 				type deplist map[string][]DependCondition
 				var dl deplist
 				if err := json.Unmarshal(dependRaw, &dl); err != nil {
-					return err
+					return errors.WithStack(err)
 				}
 				if len(dl) != 1 {
 					return errors.Errorf("unsupported depend entry format")
@@ -440,7 +440,7 @@ type Value struct {
 func (val *Value) UnmarshalJSON(b []byte) error {
 	var ival interface{}
 	if err := json.Unmarshal(b, &ival); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	switch valValue := ival.(type) {
 	case string:
@@ -479,7 +479,7 @@ func (w *When) ToWhen() *types.When {
 func (w *When) UnmarshalJSON(b []byte) error {
 	var wi *when
 	if err := json.Unmarshal(b, &wi); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	var err error
@@ -487,21 +487,21 @@ func (w *When) UnmarshalJSON(b []byte) error {
 	if wi.Branch != nil {
 		w.Branch, err = parseWhenConditions(wi.Branch)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	}
 
 	if wi.Tag != nil {
 		w.Tag, err = parseWhenConditions(wi.Tag)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	}
 
 	if wi.Ref != nil {
 		w.Ref, err = parseWhenConditions(wi.Ref)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	}
 
@@ -521,7 +521,7 @@ func parseWhenConditions(wi interface{}) (*types.WhenConditions, error) {
 	case []interface{}:
 		ss, err := parseSliceString(c)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 		include = ss
 	case map[string]interface{}:
@@ -530,12 +530,12 @@ func parseWhenConditions(wi interface{}) (*types.WhenConditions, error) {
 			case "include":
 				include, err = parseStringOrSlice(v)
 				if err != nil {
-					return nil, err
+					return nil, errors.WithStack(err)
 				}
 			case "exclude":
 				exclude, err = parseStringOrSlice(v)
 				if err != nil {
-					return nil, err
+					return nil, errors.WithStack(err)
 				}
 			default:
 				return nil, errors.Errorf(`expected one of "include" or "exclude", got %s`, k)
@@ -547,11 +547,11 @@ func parseWhenConditions(wi interface{}) (*types.WhenConditions, error) {
 
 	w.Include, err = parseWhenConditionSlice(include)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	w.Exclude, err = parseWhenConditionSlice(exclude)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return w, nil
@@ -566,7 +566,7 @@ func parseWhenConditionSlice(conds []string) ([]types.WhenCondition, error) {
 	for _, cond := range conds {
 		wc, err := parseWhenCondition(cond)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 		wcs = append(wcs, *wc)
 	}
@@ -590,7 +590,7 @@ func parseWhenCondition(s string) (*types.WhenCondition, error) {
 
 	if isRegExp {
 		if _, err := regexp.Compile(s); err != nil {
-			return nil, errors.Errorf("wrong regular expression: %w", err)
+			return nil, errors.Wrapf(err, "wrong regular expression")
 		}
 		wc.Type = types.WhenConditionTypeRegExp
 	} else {
@@ -608,7 +608,7 @@ func parseStringOrSlice(si interface{}) ([]string, error) {
 		var err error
 		ss, err = parseSliceString(c)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 	}
 	return ss, nil
@@ -669,14 +669,14 @@ func ParseConfig(configData []byte, format ConfigFormat, configContext *ConfigCo
 		var err error
 		configData, err = execJsonnet(configData, configContext)
 		if err != nil {
-			return nil, errors.Errorf("failed to execute jsonnet: %w", err)
+			return nil, errors.Wrapf(err, "failed to execute jsonnet")
 		}
 	case ConfigFormatStarlark:
 		// Generate json from starlark
 		var err error
 		configData, err = execStarlark(configData, configContext)
 		if err != nil {
-			return nil, errors.Errorf("failed to execute starlark: %w", err)
+			return nil, errors.Wrapf(err, "failed to execute starlark")
 		}
 	}
 
@@ -686,7 +686,7 @@ func ParseConfig(configData []byte, format ConfigFormat, configContext *ConfigCo
 
 	config := DefaultConfig
 	if err := yaml.Unmarshal(configData, &config); err != nil {
-		return nil, errors.Errorf("failed to unmarshal config: %w", err)
+		return nil, errors.Wrapf(err, "failed to unmarshal config")
 	}
 
 	return &config, checkConfig(&config)

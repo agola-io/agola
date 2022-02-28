@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"agola.io/agola/internal/errors"
 	gitsource "agola.io/agola/internal/gitsources"
 	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
@@ -75,29 +76,31 @@ func (c *Client) SetHTTPClient(client *http.Client) {
 func (c *Client) doRequest(method, path string, query url.Values, header http.Header, ibody io.Reader) (*http.Response, error) {
 	u, err := url.Parse(c.url + "/" + path)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	u.RawQuery = query.Encode()
 
 	req, err := http.NewRequest(method, u.String(), ibody)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	for k, v := range header {
 		req.Header[k] = v
 	}
 
-	return c.client.Do(req)
+	res, err := c.client.Do(req)
+
+	return res, errors.WithStack(err)
 }
 
 func (c *Client) getResponse(method, path string, query url.Values, header http.Header, ibody io.Reader) (*http.Response, error) {
 	resp, err := c.doRequest(method, path, query, header, ibody)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	if err := util.ErrFromRemote(resp); err != nil {
-		return resp, err
+		return resp, errors.WithStack(err)
 	}
 
 	return resp, nil
@@ -114,12 +117,12 @@ func (c *Client) GetRepoInfo(repopath string) (*gitsource.RepoInfo, error) {
 func (c *Client) GetFile(repopath, commit, file string) ([]byte, error) {
 	resp, err := c.getResponse("GET", fmt.Sprintf("%s.git/raw/%s/%s", repopath, commit, file), nil, nil, nil)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	defer resp.Body.Close()
 
 	data, err := ioutil.ReadAll(resp.Body)
-	return data, err
+	return data, errors.WithStack(err)
 }
 
 func (c *Client) CreateDeployKey(repopath, title, pubKey string, readonly bool) error {
@@ -174,7 +177,7 @@ func (c *Client) RefType(ref string) (gitsource.RefType, string, error) {
 		}
 	}
 
-	return -1, "", fmt.Errorf("unsupported ref: %s", ref)
+	return -1, "", errors.Errorf("unsupported ref: %s", ref)
 }
 
 func (c *Client) GetCommit(repopath, commitSHA string) (*gitsource.Commit, error) {

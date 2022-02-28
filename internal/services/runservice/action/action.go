@@ -16,12 +16,12 @@ package action
 
 import (
 	"context"
-	"fmt"
 	"path"
 	"time"
 
 	"agola.io/agola/internal/datamanager"
 	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/runconfig"
@@ -33,7 +33,6 @@ import (
 	"agola.io/agola/services/runservice/types"
 
 	"github.com/rs/zerolog"
-	errors "golang.org/x/xerrors"
 )
 
 type ActionHandler struct {
@@ -69,12 +68,12 @@ type RunChangePhaseRequest struct {
 func (h *ActionHandler) ChangeRunPhase(ctx context.Context, req *RunChangePhaseRequest) error {
 	cgt, err := types.UnmarshalChangeGroupsUpdateToken(req.ChangeGroupsUpdateToken)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	r, _, err := store.GetRun(ctx, h.e, req.RunID)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	var runEvent *types.RunEvent
@@ -87,7 +86,7 @@ func (h *ActionHandler) ChangeRunPhase(ctx context.Context, req *RunChangePhaseR
 		r.ChangePhase(types.RunPhaseRunning)
 		runEvent, err = common.NewRunEvent(ctx, h.e, r.ID, r.Phase, r.Result)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	case types.RunPhaseCancelled:
 		if r.Phase != types.RunPhaseQueued {
@@ -96,7 +95,7 @@ func (h *ActionHandler) ChangeRunPhase(ctx context.Context, req *RunChangePhaseR
 		r.ChangePhase(types.RunPhaseCancelled)
 		runEvent, err = common.NewRunEvent(ctx, h.e, r.ID, r.Phase, r.Result)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	default:
 		return errors.Errorf("unsupport change phase %q", req.Phase)
@@ -104,7 +103,7 @@ func (h *ActionHandler) ChangeRunPhase(ctx context.Context, req *RunChangePhaseR
 	}
 
 	_, err = store.AtomicPutRun(ctx, h.e, r, runEvent, cgt)
-	return err
+	return errors.WithStack(err)
 }
 
 type RunStopRequest struct {
@@ -115,12 +114,12 @@ type RunStopRequest struct {
 func (h *ActionHandler) StopRun(ctx context.Context, req *RunStopRequest) error {
 	cgt, err := types.UnmarshalChangeGroupsUpdateToken(req.ChangeGroupsUpdateToken)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	r, _, err := store.GetRun(ctx, h.e, req.RunID)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	if r.Phase != types.RunPhaseRunning {
@@ -132,7 +131,7 @@ func (h *ActionHandler) StopRun(ctx context.Context, req *RunStopRequest) error 
 	}
 
 	_, err = store.AtomicPutRun(ctx, h.e, r, nil, cgt)
-	return err
+	return errors.WithStack(err)
 }
 
 type RunCreateRequest struct {
@@ -158,7 +157,7 @@ type RunCreateRequest struct {
 func (h *ActionHandler) CreateRun(ctx context.Context, req *RunCreateRequest) (*types.RunBundle, error) {
 	runcgt, err := types.UnmarshalChangeGroupsUpdateToken(req.ChangeGroupsUpdateToken)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	var rb *types.RunBundle
@@ -168,7 +167,7 @@ func (h *ActionHandler) CreateRun(ctx context.Context, req *RunCreateRequest) (*
 		rb, err = h.recreateRun(ctx, req)
 	}
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return rb, h.saveRun(ctx, rb, runcgt)
@@ -191,7 +190,7 @@ func (h *ActionHandler) newRun(ctx context.Context, req *RunCreateRequest) (*typ
 	// generate a new run sequence that will be the same for the run and runconfig
 	seq, err := sequence.IncSequence(ctx, h.e, common.EtcdRunSequenceKey)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	id := seq.String()
 
@@ -233,7 +232,7 @@ func (h *ActionHandler) recreateRun(ctx context.Context, req *RunCreateRequest) 
 	// generate a new run sequence that will be the same for the run and runconfig
 	seq, err := sequence.IncSequence(ctx, h.e, common.EtcdRunSequenceKey)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	id := seq.String()
 
@@ -241,15 +240,15 @@ func (h *ActionHandler) recreateRun(ctx context.Context, req *RunCreateRequest) 
 	h.log.Info().Msgf("creating run from existing run")
 	rc, err := store.OSTGetRunConfig(h.dm, req.RunID)
 	if err != nil {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("runconfig %q doesn't exist: %w", req.RunID, err))
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "runconfig %q doesn't exist", req.RunID))
 	}
 
 	run, err := store.GetRunEtcdOrOST(ctx, h.e, h.dm, req.RunID)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if run == nil {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("run %q doesn't exist: %w", req.RunID, err))
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "run %q doesn't exist", req.RunID))
 	}
 
 	h.log.Debug().Msgf("rc: %s", util.Dump(rc))
@@ -300,7 +299,7 @@ func recreateRun(uuid util.UUIDGenerator, run *types.Run, rc *types.RunConfig, n
 		if req.FromStart || rt.Status != types.RunTaskStatusSuccess {
 			rct, ok := rc.Tasks[rt.ID]
 			if !ok {
-				panic(fmt.Errorf("no runconfig task %q", rt.ID))
+				panic(errors.Errorf("no runconfig task %q", rt.ID))
 			}
 			// change rct id
 			rct.ID = uuid.New(rct.Name).String()
@@ -393,7 +392,7 @@ func (h *ActionHandler) saveRun(ctx context.Context, rb *types.RunBundle, runcgt
 	c, cgt, err := h.getRunCounter(ctx, run.Group)
 	h.log.Debug().Msgf("c: %d, cgt: %s", c, util.Dump(cgt))
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	c++
 	run.Counter = c
@@ -405,27 +404,27 @@ func (h *ActionHandler) saveRun(ctx context.Context, rb *types.RunBundle, runcgt
 	// persist group counter
 	rca, err := store.OSTUpdateRunCounterAction(ctx, c, run.Group)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	actions = append(actions, rca)
 
 	// persist run config
 	rca, err = store.OSTSaveRunConfigAction(rc)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	actions = append(actions, rca)
 
 	if _, err = h.dm.WriteWal(ctx, actions, cgt); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	runEvent, err := common.NewRunEvent(ctx, h.e, run.ID, run.Phase, run.Result)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	if _, err := store.AtomicPutRun(ctx, h.e, run, runEvent, runcgt); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	return nil
 }
@@ -500,12 +499,12 @@ type RunTaskSetAnnotationsRequest struct {
 func (h *ActionHandler) RunTaskSetAnnotations(ctx context.Context, req *RunTaskSetAnnotationsRequest) error {
 	cgt, err := types.UnmarshalChangeGroupsUpdateToken(req.ChangeGroupsUpdateToken)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	r, _, err := store.GetRun(ctx, h.e, req.RunID)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	task, ok := r.Tasks[req.TaskID]
@@ -516,7 +515,7 @@ func (h *ActionHandler) RunTaskSetAnnotations(ctx context.Context, req *RunTaskS
 	task.Annotations = req.Annotations
 
 	_, err = store.AtomicPutRun(ctx, h.e, r, nil, cgt)
-	return err
+	return errors.WithStack(err)
 }
 
 type RunTaskApproveRequest struct {
@@ -528,12 +527,12 @@ type RunTaskApproveRequest struct {
 func (h *ActionHandler) ApproveRunTask(ctx context.Context, req *RunTaskApproveRequest) error {
 	cgt, err := types.UnmarshalChangeGroupsUpdateToken(req.ChangeGroupsUpdateToken)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	r, _, err := store.GetRun(ctx, h.e, req.RunID)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	task, ok := r.Tasks[req.TaskID]
@@ -553,12 +552,12 @@ func (h *ActionHandler) ApproveRunTask(ctx context.Context, req *RunTaskApproveR
 	task.Approved = true
 
 	_, err = store.AtomicPutRun(ctx, h.e, r, nil, cgt)
-	return err
+	return errors.WithStack(err)
 }
 
 func (h *ActionHandler) DeleteExecutor(ctx context.Context, executorID string) error {
 	if err := store.DeleteExecutor(ctx, h.e, executorID); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	return nil
@@ -577,13 +576,13 @@ func (h *ActionHandler) getRunCounter(ctx context.Context, group string) (uint64
 		var err error
 		c, err = h.readDB.GetRunCounterOST(tx, pl[1])
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		cgt, err = h.readDB.GetChangeGroupsUpdateTokensOST(tx, []string{"counter-" + pl[1]})
-		return err
+		return errors.WithStack(err)
 	})
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, errors.WithStack(err)
 	}
 
 	return c, cgt, nil
@@ -592,7 +591,7 @@ func (h *ActionHandler) getRunCounter(ctx context.Context, group string) (uint64
 func (h *ActionHandler) GetExecutorTask(ctx context.Context, etID string) (*types.ExecutorTask, error) {
 	et, err := store.GetExecutorTask(ctx, h.e, etID)
 	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if et == nil {
 		return nil, util.NewAPIError(util.ErrNotExist, errors.Errorf("executor task %q not found", etID))
@@ -600,11 +599,11 @@ func (h *ActionHandler) GetExecutorTask(ctx context.Context, etID string) (*type
 
 	r, _, err := store.GetRun(ctx, h.e, et.Spec.RunID)
 	if err != nil {
-		return nil, errors.Errorf("cannot get run %q: %w", et.Spec.RunID, err)
+		return nil, errors.Wrapf(err, "cannot get run %q", et.Spec.RunID)
 	}
 	rc, err := store.OSTGetRunConfig(h.dm, r.ID)
 	if err != nil {
-		return nil, errors.Errorf("cannot get run config %q: %w", r.ID, err)
+		return nil, errors.Wrapf(err, "cannot get run config %q", r.ID)
 	}
 	rt, ok := r.Tasks[et.ID]
 	if !ok {
@@ -620,17 +619,17 @@ func (h *ActionHandler) GetExecutorTask(ctx context.Context, etID string) (*type
 func (h *ActionHandler) GetExecutorTasks(ctx context.Context, executorID string) ([]*types.ExecutorTask, error) {
 	ets, err := store.GetExecutorTasksForExecutor(ctx, h.e, executorID)
 	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	for _, et := range ets {
 		r, _, err := store.GetRun(ctx, h.e, et.Spec.RunID)
 		if err != nil {
-			return nil, errors.Errorf("cannot get run %q: %w", et.Spec.RunID, err)
+			return nil, errors.Wrapf(err, "cannot get run %q", et.Spec.RunID)
 		}
 		rc, err := store.OSTGetRunConfig(h.dm, r.ID)
 		if err != nil {
-			return nil, errors.Errorf("cannot get run config %q: %w", r.ID, err)
+			return nil, errors.Wrapf(err, "cannot get run config %q", r.ID)
 		}
 		rt, ok := r.Tasks[et.ID]
 		if !ok {

@@ -18,6 +18,8 @@ import (
 	"context"
 
 	"agola.io/agola/internal/common"
+	"agola.io/agola/internal/errors"
+
 	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/services/config"
 	csclient "agola.io/agola/services/configstore/client"
@@ -46,7 +48,7 @@ func NewNotificationService(ctx context.Context, log zerolog.Logger, gc *config.
 
 	e, err := common.NewEtcd(&c.Etcd, log, "notification")
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	configstoreClient := csclient.NewClient(c.ConfigstoreURL)

@@ -17,11 +17,11 @@ package cmd
 import (
 	"context"
 
+	"agola.io/agola/internal/errors"
 	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	errors "golang.org/x/xerrors"
 )
 
 var cmdUserLADelete = &cobra.Command{
@@ -66,7 +66,7 @@ func userLADelete(cmd *cobra.Command, args []string) error {
 	log.Info().Msgf("deleting linked account %q for user %q", laID, userName)
 	_, err := gwclient.DeleteUserLA(context.TODO(), userName, laID)
 	if err != nil {
-		return errors.Errorf("failed to delete linked account: %w", err)
+		return errors.Wrapf(err, "failed to delete linked account")
 	}
 
 	log.Info().Msgf("linked account %q for user %q deleted", laID, userName)

@@ -16,13 +16,13 @@ package archive
 
 import (
 	"archive/tar"
-	"fmt"
 	"io"
 	"log"
 	"os"
 	"path"
 	"path/filepath"
 
+	"agola.io/agola/internal/errors"
 	"github.com/bmatcuk/doublestar"
 )
 
@@ -50,10 +50,10 @@ func CreateTar(archiveInfos []*ArchiveInfo, w io.Writer) error {
 
 		sourceDirInfo, err := os.Stat(sourceDir)
 		if err != nil {
-			return fmt.Errorf("%s: stat: %w", sourceDir, err)
+			return errors.Wrapf(err, "%s: stat", sourceDir)
 		}
 		if !sourceDirInfo.IsDir() {
-			return fmt.Errorf("sourceDir %q is not a directory", sourceDir)
+			return errors.Errorf("sourceDir %q is not a directory", sourceDir)
 		}
 		err = filepath.Walk(sourceDir, func(path string, fi os.FileInfo, err error) error {
 			// skip sourceDir
@@ -62,17 +62,17 @@ func CreateTar(archiveInfos []*ArchiveInfo, w io.Writer) error {
 			}
 
 			if err != nil {
-				return fmt.Errorf("error accessing path %q: %w. Skipping.", path, err)
+				return errors.Wrapf(err, "error accessing path %q. Skipping.", path)
 			}
 			match := false
 			for _, pattern := range ai.Paths {
 				rel, err := filepath.Rel(sourceDir, path)
 				if err != nil {
-					return err
+					return errors.WithStack(err)
 				}
 				ok, err := doublestar.Match(pattern, rel)
 				if err != nil {
-					return err
+					return errors.WithStack(err)
 				}
 				if ok {
 					match = true
@@ -87,10 +87,10 @@ func CreateTar(archiveInfos []*ArchiveInfo, w io.Writer) error {
 			// generate the path to save in the header
 			destPath, err := archivePath(sourceDirInfo, sourceDir, destDir, path)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			if _, ok := seenDestPaths[destPath]; ok {
-				return fmt.Errorf("archive destination path %q already exists. Source path: %q", destPath, path)
+				return errors.Errorf("archive destination path %q already exists. Source path: %q", destPath, path)
 			}
 			seenDestPaths[destPath] = struct{}{}
 
@@ -104,19 +104,19 @@ func CreateTar(archiveInfos []*ArchiveInfo, w io.Writer) error {
 				var err error
 				linkTarget, err = os.Readlink(path)
 				if err != nil {
-					return fmt.Errorf("%s: readlink: %w", path, err)
+					return errors.Wrapf(err, "%s: readlink", path)
 				}
 			}
 
 			hdr, err := tar.FileInfoHeader(fi, filepath.ToSlash(linkTarget))
 			if err != nil {
-				return fmt.Errorf("%s: making header: %w", path, err)
+				return errors.Wrapf(err, "%s: making header", path)
 			}
 			hdr.Name = destPath
 
 			err = tw.WriteHeader(hdr)
 			if err != nil {
-				return fmt.Errorf("%s: writing header: %w", hdr.Name, err)
+				return errors.Wrapf(err, "%s: writing header", hdr.Name)
 			}
 
 			if fi.IsDir() {
@@ -126,18 +126,18 @@ func CreateTar(archiveInfos []*ArchiveInfo, w io.Writer) error {
 			if fi.Mode().IsRegular() {
 				f, err := os.Open(path)
 				if err != nil {
-					return err
+					return errors.WithStack(err)
 				}
 				defer f.Close()
 				if _, err := io.Copy(tw, f); err != nil {
-					return fmt.Errorf("%s: copying contents: %w", f.Name(), err)
+					return errors.Wrapf(err, "%s: copying contents", f.Name())
 				}
 			}
 
 			return nil
 		})
 		if err != nil {
-			return fmt.Errorf("error walking the path %q: %w", sourceDir, err)
+			return errors.Wrapf(err, "error walking the path %q", sourceDir)
 		}
 	}
 
@@ -151,16 +151,16 @@ func archivePath(sourceDirInfo os.FileInfo, sourceDir, baseDir, fpath string) (s
 		var err error
 		baseDir, err = filepath.Rel("/", baseDir)
 		if err != nil {
-			return "", err
+			return "", errors.WithStack(err)
 		}
 	}
 	if !sourceDirInfo.IsDir() {
-		return "", fmt.Errorf("sourceDir %q is not a directory", sourceDir)
+		return "", errors.Errorf("sourceDir %q is not a directory", sourceDir)
 	}
 
 	rel, err := filepath.Rel(sourceDir, fpath)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	return path.Join(baseDir, rel), nil
 }

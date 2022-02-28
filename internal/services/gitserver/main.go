@@ -23,6 +23,7 @@ import (
 	"regexp"
 	"strings"
 
+	"agola.io/agola/internal/errors"
 	handlers "agola.io/agola/internal/git-handler"
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/util"
@@ -30,7 +31,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	errors "golang.org/x/xerrors"
 )
 
 const (
@@ -49,13 +49,13 @@ func repoPathIsValid(reposDir, repoPath string) (bool, error) {
 	// check that a subdirectory doesn't exists
 	reposDir, err := filepath.Abs(reposDir)
 	if err != nil {
-		return false, err
+		return false, errors.WithStack(err)
 	}
 
 	path := repoPath
 	_, err = os.Stat(path)
 	if err != nil && !os.IsNotExist(err) {
-		return false, err
+		return false, errors.WithStack(err)
 	}
 	if !os.IsNotExist(err) {
 		// if it exists assume it's valid
@@ -70,7 +70,7 @@ func repoPathIsValid(reposDir, repoPath string) (bool, error) {
 
 		_, err := os.Stat(path)
 		if err != nil && !os.IsNotExist(err) {
-			return false, err
+			return false, errors.WithStack(err)
 		}
 		// a parent path cannot end with .git
 		if strings.HasSuffix(path, gitSuffix) {
@@ -88,7 +88,7 @@ func repoPathIsValid(reposDir, repoPath string) (bool, error) {
 func repoExists(repoAbsPath string) (bool, error) {
 	_, err := os.Stat(repoAbsPath)
 	if err != nil && !os.IsNotExist(err) {
-		return false, err
+		return false, errors.WithStack(err)
 	}
 	return !os.IsNotExist(err), nil
 }
@@ -96,7 +96,7 @@ func repoExists(repoAbsPath string) (bool, error) {
 func repoAbsPath(reposDir, repoPath string) (string, bool, error) {
 	valid, err := repoPathIsValid(reposDir, repoPath)
 	if err != nil {
-		return "", false, err
+		return "", false, errors.WithStack(err)
 	}
 	if !valid {
 		return "", false, handlers.ErrWrongRepoPath
@@ -104,12 +104,12 @@ func repoAbsPath(reposDir, repoPath string) (string, bool, error) {
 
 	repoFSPath, err := filepath.Abs(filepath.Join(reposDir, repoPath))
 	if err != nil {
-		return "", false, err
+		return "", false, errors.WithStack(err)
 	}
 
 	exists, err := repoExists(repoFSPath)
 	if err != nil {
-		return "", false, err
+		return "", false, errors.WithStack(err)
 	}
 
 	return repoFSPath, exists, nil
@@ -153,7 +153,7 @@ func (s *Gitserver) Run(ctx context.Context) error {
 		tlsConfig, err = util.NewTLSConfig(s.c.Web.TLSCertFile, s.c.Web.TLSKeyFile, "", false)
 		if err != nil {
 			s.log.Err(err).Send()
-			return err
+			return errors.WithStack(err)
 		}
 	}
 
@@ -182,7 +182,7 @@ func (s *Gitserver) Run(ctx context.Context) error {
 	case err := <-lerrCh:
 		if err != nil {
 			s.log.Err(err).Msgf("http server listen error")
-			return err
+			return errors.WithStack(err)
 		}
 	}
 

@@ -20,6 +20,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"agola.io/agola/internal/errors"
 )
 
 // writeFileAtomicFunc atomically writes a file, it achieves this by creating a
@@ -30,7 +32,7 @@ import (
 func writeFileAtomicFunc(p, baseDir, tmpDir string, perm os.FileMode, persist bool, writeFunc func(f io.Writer) error) error {
 	f, err := ioutil.TempFile(tmpDir, "tmpfile")
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	err = writeFunc(f)
 	if persist && err == nil {
@@ -47,7 +49,7 @@ func writeFileAtomicFunc(p, baseDir, tmpDir string, perm os.FileMode, persist bo
 	}
 	if err != nil {
 		os.Remove(f.Name())
-		return err
+		return errors.WithStack(err)
 	}
 
 	if !persist {
@@ -80,7 +82,7 @@ func writeFileAtomic(filename, baseDir, tmpDir string, perm os.FileMode, persist
 	return writeFileAtomicFunc(filename, baseDir, tmpDir, perm, persist,
 		func(f io.Writer) error {
 			_, err := f.Write(data)
-			return err
+			return errors.WithStack(err)
 		})
 }
 */

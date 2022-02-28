@@ -15,43 +15,48 @@
 package common
 
 import (
+	"agola.io/agola/internal/errors"
 	gitsource "agola.io/agola/internal/gitsources"
 	"agola.io/agola/internal/gitsources/gitea"
 	"agola.io/agola/internal/gitsources/github"
 	"agola.io/agola/internal/gitsources/gitlab"
 	cstypes "agola.io/agola/services/configstore/types"
-
-	errors "golang.org/x/xerrors"
 )
 
 func newGitea(rs *cstypes.RemoteSource, accessToken string) (*gitea.Client, error) {
-	return gitea.New(gitea.Opts{
+	c, err := gitea.New(gitea.Opts{
 		APIURL:         rs.APIURL,
 		SkipVerify:     rs.SkipVerify,
 		Token:          accessToken,
 		Oauth2ClientID: rs.Oauth2ClientID,
 		Oauth2Secret:   rs.Oauth2ClientSecret,
 	})
+
+	return c, errors.WithStack(err)
 }
 
 func newGitlab(rs *cstypes.RemoteSource, accessToken string) (*gitlab.Client, error) {
-	return gitlab.New(gitlab.Opts{
+	c, err := gitlab.New(gitlab.Opts{
 		APIURL:         rs.APIURL,
 		SkipVerify:     rs.SkipVerify,
 		Token:          accessToken,
 		Oauth2ClientID: rs.Oauth2ClientID,
 		Oauth2Secret:   rs.Oauth2ClientSecret,
 	})
+
+	return c, errors.WithStack(err)
 }
 
 func newGithub(rs *cstypes.RemoteSource, accessToken string) (*github.Client, error) {
-	return github.New(github.Opts{
+	c, err := github.New(github.Opts{
 		APIURL:         rs.APIURL,
 		SkipVerify:     rs.SkipVerify,
 		Token:          accessToken,
 		Oauth2ClientID: rs.Oauth2ClientID,
 		Oauth2Secret:   rs.Oauth2ClientSecret,
 	})
+
+	return c, errors.WithStack(err)
 }
 
 func GetAccessToken(rs *cstypes.RemoteSource, userAccessToken, oauth2AccessToken string) (string, error) {
@@ -71,7 +76,7 @@ func GetGitSource(rs *cstypes.RemoteSource, la *cstypes.LinkedAccount) (gitsourc
 		var err error
 		accessToken, err = GetAccessToken(rs, la.UserAccessToken, la.Oauth2AccessToken)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 	}
 
@@ -88,7 +93,7 @@ func GetGitSource(rs *cstypes.RemoteSource, la *cstypes.LinkedAccount) (gitsourc
 		return nil, errors.Errorf("remote source %s isn't a valid git source", rs.Name)
 	}
 
-	return gitSource, err
+	return gitSource, errors.WithStack(err)
 }
 
 func GetUserSource(rs *cstypes.RemoteSource, accessToken string) (gitsource.UserSource, error) {
@@ -103,7 +108,7 @@ func GetUserSource(rs *cstypes.RemoteSource, accessToken string) (gitsource.User
 		return nil, errors.Errorf("unknown remote source auth type")
 	}
 
-	return userSource, err
+	return userSource, errors.WithStack(err)
 }
 
 func GetOauth2Source(rs *cstypes.RemoteSource, accessToken string) (gitsource.Oauth2Source, error) {
@@ -120,7 +125,7 @@ func GetOauth2Source(rs *cstypes.RemoteSource, accessToken string) (gitsource.Oa
 		return nil, errors.Errorf("remote source %s isn't a valid oauth2 source", rs.Name)
 	}
 
-	return oauth2Source, err
+	return oauth2Source, errors.WithStack(err)
 }
 
 func GetPasswordSource(rs *cstypes.RemoteSource, accessToken string) (gitsource.PasswordSource, error) {
@@ -133,5 +138,5 @@ func GetPasswordSource(rs *cstypes.RemoteSource, accessToken string) (gitsource.
 		return nil, errors.Errorf("remote source %s isn't a valid oauth2 source", rs.Name)
 	}
 
-	return passwordSource, err
+	return passwordSource, errors.WithStack(err)
 }

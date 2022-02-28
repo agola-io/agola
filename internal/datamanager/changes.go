@@ -24,11 +24,11 @@ import (
 	"sync"
 	"time"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/etcd"
 
 	etcdclientv3rpc "go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
 	"go.etcd.io/etcd/mvcc/mvccpb"
-	errors "golang.org/x/xerrors"
 )
 
 // TODO(sgotti) rewrite this to use a sqlite local cache
@@ -132,7 +132,7 @@ func (d *DataManager) applyWalChanges(ctx context.Context, walData *WalData, rev
 
 	walDataFile, err := d.ost.ReadObject(walDataFilePath)
 	if err != nil {
-		return errors.Errorf("failed to read waldata %q: %w", walDataFilePath, err)
+		return errors.Wrapf(err, "failed to read waldata %q", walDataFilePath)
 	}
 	defer walDataFile.Close()
 	dec := json.NewDecoder(walDataFile)
@@ -148,7 +148,7 @@ func (d *DataManager) applyWalChanges(ctx context.Context, walData *WalData, rev
 			break
 		}
 		if err != nil {
-			return errors.Errorf("failed to decode wal file: %w", err)
+			return errors.Wrapf(err, "failed to decode wal file")
 		}
 
 		d.applyWalChangesAction(ctx, action, walData.WalSequence, revision)
@@ -200,7 +200,7 @@ func (d *DataManager) initializeChanges(ctx context.Context) error {
 	for {
 		listResp, err := d.e.ListPaged(ctx, etcdWalsDir+"/", 0, 10, continuation)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		resp := listResp.Resp
 		continuation = listResp.Continuation
@@ -210,10 +210,10 @@ func (d *DataManager) initializeChanges(ctx context.Context) error {
 		for _, kv := range resp.Kvs {
 			var walData *WalData
 			if err := json.Unmarshal(kv.Value, &walData); err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			if err := d.applyWalChanges(ctx, walData, revision); err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 		}
 		if !listResp.HasMore {
@@ -226,7 +226,7 @@ func (d *DataManager) initializeChanges(ctx context.Context) error {
 	for {
 		listResp, err := d.e.ListPaged(ctx, etcdChangeGroupsDir+"/", 0, 10, continuation)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		resp := listResp.Resp
 		continuation = listResp.Continuation
@@ -267,7 +267,7 @@ func (d *DataManager) watcher(ctx context.Context) error {
 				d.changes.initialized = false
 				d.changes.Unlock()
 			}
-			return errors.Errorf("watch error: %w", err)
+			return errors.Wrapf(err, "watch error")
 		}
 		revision := wresp.Header.Revision
 
@@ -280,13 +280,13 @@ func (d *DataManager) watcher(ctx context.Context) error {
 				case mvccpb.PUT:
 					var walData *WalData
 					if err := json.Unmarshal(ev.Kv.Value, &walData); err != nil {
-						return err
+						return errors.WithStack(err)
 					}
 					if walData.WalStatus != WalStatusCommitted {
 						continue
 					}
 					if err := d.applyWalChanges(ctx, walData, revision); err != nil {
-						return err
+						return errors.WithStack(err)
 					}
 				case mvccpb.DELETE:
 					walseq := path.Base(string(key))

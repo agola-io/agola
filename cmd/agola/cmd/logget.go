@@ -19,12 +19,12 @@ import (
 	"io"
 	"os"
 
+	"agola.io/agola/internal/errors"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	errors "golang.org/x/xerrors"
 )
 
 var cmdLogGet = &cobra.Command{
@@ -102,7 +102,7 @@ func logGet(cmd *cobra.Command, args []string) error {
 
 		run, _, err := gwclient.GetRun(context.TODO(), logGetOpts.runid)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		for _, t := range run.Tasks {
 			if t.Name == logGetOpts.taskname {
@@ -127,7 +127,7 @@ func logGet(cmd *cobra.Command, args []string) error {
 	if flags.Changed("output") {
 		f, err := os.Create(logGetOpts.output)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		defer f.Close()
 		if _, err := io.Copy(f, resp.Body); err != nil {

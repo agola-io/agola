@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
 	cstypes "agola.io/agola/services/configstore/types"
@@ -26,7 +27,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/gorilla/mux"
-	errors "golang.org/x/xerrors"
 )
 
 type CreateRemoteSourceHandler struct {
@@ -175,7 +175,7 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		var err error
 		limit, err = strconv.Atoi(limitS)
 		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot parse limit: %w", err)))
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit")))
 			return
 		}
 	}

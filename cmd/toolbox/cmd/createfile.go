@@ -21,6 +21,7 @@ import (
 	"log"
 	"os"
 
+	"agola.io/agola/internal/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -48,18 +49,18 @@ func createFile(r io.Reader) (string, error) {
 	// create a temp dir if the image doesn't have one
 	tmpDir := os.TempDir()
 	if err := os.MkdirAll(tmpDir, 0777); err != nil {
-		return "", fmt.Errorf("failed to create tmp dir %q", tmpDir)
+		return "", errors.Errorf("failed to create tmp dir %q", tmpDir)
 	}
 
 	file, err := ioutil.TempFile("", "")
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	filename := file.Name()
 	if _, err := io.Copy(file, r); err != nil {
 		file.Close()
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	file.Close()
 

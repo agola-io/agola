@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/sequence"
@@ -34,7 +35,6 @@ import (
 	"go.etcd.io/etcd/clientv3/concurrency"
 	etcdclientv3rpc "go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
 	"go.etcd.io/etcd/mvcc/mvccpb"
-	errors "golang.org/x/xerrors"
 )
 
 type ActionType string
@@ -127,7 +127,7 @@ func (d *DataManager) ReadObject(dataType, id string, cgNames []string) (io.Read
 	}
 
 	f, err := d.Read(dataType, id)
-	return ioutil.NopCloser(f), cgt, err
+	return ioutil.NopCloser(f), cgt, errors.WithStack(err)
 }
 
 func (d *DataManager) HasOSTWal(walseq string) (bool, error) {
@@ -150,7 +150,7 @@ func (d *DataManager) ReadWal(walseq string) (*WalHeader, error) {
 	dec := json.NewDecoder(walFilef)
 	var header *WalHeader
 	if err = dec.Decode(&header); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return header, nil
@@ -260,7 +260,7 @@ func (d *DataManager) ListEtcdChangeGroups(ctx context.Context, revision int64) 
 	changeGroupsRevisions := changeGroupsRevisions{}
 	resp, err := d.e.List(ctx, etcdChangeGroupsDir, "", revision)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	for _, kv := range resp.Kvs {
 		changegroupID := path.Base(string(kv.Key))
@@ -277,7 +277,7 @@ func (d *DataManager) FirstAvailableWalData(ctx context.Context) (*WalData, int6
 	// list waldata and just get the first if available
 	listResp, err := d.e.ListPaged(ctx, etcdWalsDir, 0, 1, nil)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, errors.WithStack(err)
 	}
 	resp := listResp.Resp
 	revision := resp.Header.Revision
@@ -288,7 +288,7 @@ func (d *DataManager) FirstAvailableWalData(ctx context.Context) (*WalData, int6
 
 	var walData *WalData
 	if err := json.Unmarshal(resp.Kvs[0].Value, &walData); err != nil {
-		return nil, 0, err
+		return nil, 0, errors.WithStack(err)
 	}
 
 	return walData, revision, nil
@@ -297,7 +297,7 @@ func (d *DataManager) FirstAvailableWalData(ctx context.Context) (*WalData, int6
 func (d *DataManager) LastCommittedStorageWal(ctx context.Context) (string, int64, error) {
 	resp, err := d.e.Get(ctx, etcdLastCommittedStorageWalSeqKey, 0)
 	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
-		return "", 0, err
+		return "", 0, errors.WithStack(err)
 	}
 	if errors.Is(err, etcd.ErrKeyNotFound) {
 		return "", 0, errors.Errorf("no last committedstorage wal on etcd")
@@ -424,17 +424,17 @@ func (d *DataManager) WriteWalAdditionalOps(ctx context.Context, actions []*Acti
 
 	walSequence, err := sequence.IncSequence(ctx, d.e, etcdWalSeqKey)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	resp, err := d.e.Get(ctx, etcdWalsDataKey, 0)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	var walsData WalsData
 	if err := json.Unmarshal(resp.Kvs[0].Value, &walsData); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	walsData.Revision = resp.Kvs[0].ModRevision
 
@@ -446,10 +446,10 @@ func (d *DataManager) WriteWalAdditionalOps(ctx context.Context, actions []*Acti
 	for _, action := range actions {
 		actionj, err := json.Marshal(action)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 		if _, err := buf.Write(actionj); err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 	}
 	if err := d.ost.WriteObject(walDataFilePath, bytes.NewReader(buf.Bytes()), int64(buf.Len()), true); err != nil {
@@ -468,11 +468,11 @@ func (d *DataManager) WriteWalAdditionalOps(ctx context.Context, actions []*Acti
 
 	walsDataj, err := json.Marshal(walsData)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	walDataj, err := json.Marshal(walData)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	if cmp == nil {
@@ -512,7 +512,7 @@ func (d *DataManager) WriteWalAdditionalOps(ctx context.Context, actions []*Acti
 	txn := d.e.Client().Txn(ctx).If(cmp...).Then(then...).Else(getWalsData, getWal)
 	tresp, err := txn.Commit()
 	if err != nil {
-		return nil, etcd.FromEtcdError(err)
+		return nil, errors.WithStack(etcd.FromEtcdError(err))
 	}
 	if !tresp.Succeeded {
 		walsDataRev := tresp.Responses[0].GetResponseRange().Kvs[0].ModRevision
@@ -559,7 +559,7 @@ func (d *DataManager) syncLoop(ctx context.Context) {
 func (d *DataManager) sync(ctx context.Context) error {
 	session, err := concurrency.NewSession(d.e.Client(), concurrency.WithTTL(5), concurrency.WithContext(ctx))
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	defer session.Close()
 
@@ -569,18 +569,18 @@ func (d *DataManager) sync(ctx context.Context) error {
 		if errors.Is(err, etcd.ErrLocked) {
 			return nil
 		}
-		return err
+		return errors.WithStack(err)
 	}
 	defer func() { _ = m.Unlock(ctx) }()
 
 	resp, err := d.e.List(ctx, etcdWalsDir+"/", "", 0)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	for _, kv := range resp.Kvs {
 		var walData WalData
 		if err := json.Unmarshal(kv.Value, &walData); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		// wals must be committed and checkpointed in order.
 		// TODO(sgotti) this could be optimized by parallelizing writes of wals that don't have common change groups
@@ -594,7 +594,7 @@ func (d *DataManager) sync(ctx context.Context) error {
 			}
 			headerj, err := json.Marshal(header)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 
 			walFileCommittedPath := walFilePath + ".committed"
@@ -606,7 +606,7 @@ func (d *DataManager) sync(ctx context.Context) error {
 			walData.WalStatus = WalStatusCommittedStorage
 			walDataj, err := json.Marshal(walData)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 
 			cmp := []etcdclientv3.Cmp{}
@@ -619,7 +619,7 @@ func (d *DataManager) sync(ctx context.Context) error {
 			txn := d.e.Client().Txn(ctx).If(cmp...).Then(then...)
 			tresp, err := txn.Commit()
 			if err != nil {
-				return etcd.FromEtcdError(err)
+				return errors.WithStack(etcd.FromEtcdError(err))
 			}
 			if !tresp.Succeeded {
 				return errors.Errorf("failed to write committedstorage wal: concurrent update")
@@ -648,7 +648,7 @@ func (d *DataManager) checkpointLoop(ctx context.Context) {
 func (d *DataManager) checkpoint(ctx context.Context, force bool) error {
 	session, err := concurrency.NewSession(d.e.Client(), concurrency.WithTTL(5), concurrency.WithContext(ctx))
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	defer session.Close()
 
@@ -658,19 +658,19 @@ func (d *DataManager) checkpoint(ctx context.Context, force bool) error {
 		if errors.Is(err, etcd.ErrLocked) {
 			return nil
 		}
-		return err
+		return errors.WithStack(err)
 	}
 	defer func() { _ = m.Unlock(ctx) }()
 
 	resp, err := d.e.List(ctx, etcdWalsDir+"/", "", 0)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	walsData := []*WalData{}
 	for _, kv := range resp.Kvs {
 		var walData *WalData
 		if err := json.Unmarshal(kv.Value, &walData); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		walData.Revision = kv.ModRevision
 
@@ -692,7 +692,7 @@ func (d *DataManager) checkpoint(ctx context.Context, force bool) error {
 	}
 
 	if err := d.writeDataSnapshot(ctx, walsData); err != nil {
-		return errors.Errorf("checkpoint function error: %w", err)
+		return errors.Wrapf(err, "checkpoint function error")
 	}
 
 	for _, walData := range walsData {
@@ -700,11 +700,11 @@ func (d *DataManager) checkpoint(ctx context.Context, force bool) error {
 		walData.WalStatus = WalStatusCheckpointed
 		walDataj, err := json.Marshal(walData)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		walKey := etcdWalKey(walData.WalSequence)
 		if _, err := d.e.AtomicPut(ctx, walKey, walDataj, walData.Revision, nil); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	}
 
@@ -730,7 +730,7 @@ func (d *DataManager) checkpointCleanLoop(ctx context.Context) {
 func (d *DataManager) checkpointClean(ctx context.Context) error {
 	session, err := concurrency.NewSession(d.e.Client(), concurrency.WithTTL(5), concurrency.WithContext(ctx))
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	defer session.Close()
 
@@ -740,12 +740,12 @@ func (d *DataManager) checkpointClean(ctx context.Context) error {
 		if errors.Is(err, etcd.ErrLocked) {
 			return nil
 		}
-		return err
+		return errors.WithStack(err)
 	}
 	defer func() { _ = m.Unlock(ctx) }()
 
 	if err := d.CleanOldCheckpoints(ctx); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	return nil
@@ -773,7 +773,7 @@ func (d *DataManager) etcdWalCleanerLoop(ctx context.Context) {
 func (d *DataManager) etcdWalCleaner(ctx context.Context) error {
 	session, err := concurrency.NewSession(d.e.Client(), concurrency.WithTTL(5), concurrency.WithContext(ctx))
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	defer session.Close()
 
@@ -783,13 +783,13 @@ func (d *DataManager) etcdWalCleaner(ctx context.Context) error {
 		if errors.Is(err, etcd.ErrLocked) {
 			return nil
 		}
-		return err
+		return errors.WithStack(err)
 	}
 	defer func() { _ = m.Unlock(ctx) }()
 
 	resp, err := d.e.List(ctx, etcdWalsDir+"/", "", 0)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	if len(resp.Kvs) <= d.etcdWalsKeepNum {
 		return nil
@@ -799,7 +799,7 @@ func (d *DataManager) etcdWalCleaner(ctx context.Context) error {
 	for _, kv := range resp.Kvs {
 		var walData WalData
 		if err := json.Unmarshal(kv.Value, &walData); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if walData.WalStatus != WalStatusCheckpointed {
 			break
@@ -814,7 +814,7 @@ func (d *DataManager) etcdWalCleaner(ctx context.Context) error {
 		// arrive to a differnt S3 server that is not yet in sync?
 		d.log.Info().Msgf("removing wal %q from etcd", walData.WalSequence)
 		if _, err := d.e.AtomicDelete(ctx, string(kv.Key), kv.ModRevision); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		removeCount--
@@ -846,7 +846,7 @@ func (d *DataManager) storageWalCleanerLoop(ctx context.Context) {
 func (d *DataManager) storageWalCleaner(ctx context.Context) error {
 	session, err := concurrency.NewSession(d.e.Client(), concurrency.WithTTL(5), concurrency.WithContext(ctx))
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	defer session.Close()
 
@@ -856,13 +856,13 @@ func (d *DataManager) storageWalCleaner(ctx context.Context) error {
 		if errors.Is(err, etcd.ErrLocked) {
 			return nil
 		}
-		return err
+		return errors.WithStack(err)
 	}
 	defer func() { _ = m.Unlock(ctx) }()
 
 	firstDataStatus, err := d.GetFirstDataStatus()
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	firstWalSequence := firstDataStatus.WalSequence
 
@@ -870,14 +870,14 @@ func (d *DataManager) storageWalCleaner(ctx context.Context) error {
 	// it's lesser than the first data status wal sequence
 	resp, err := d.e.List(ctx, etcdWalsDir+"/", "", 0)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	if len(resp.Kvs) == 0 {
 		return errors.Errorf("no wals in etcd")
 	}
 	var walData WalData
 	if err := json.Unmarshal(resp.Kvs[0].Value, &walData); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	if walData.WalSequence < firstWalSequence {
 		firstWalSequence = walData.WalSequence
@@ -902,7 +902,7 @@ func (d *DataManager) storageWalCleaner(ctx context.Context) error {
 
 			header, err := d.ReadWal(walSequence)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 
 			// first remove wal data file
@@ -956,7 +956,7 @@ func (d *DataManager) compactChangeGroupsLoop(ctx context.Context) {
 func (d *DataManager) compactChangeGroups(ctx context.Context) error {
 	session, err := concurrency.NewSession(d.e.Client(), concurrency.WithTTL(5), concurrency.WithContext(ctx))
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	defer session.Close()
 
@@ -966,13 +966,13 @@ func (d *DataManager) compactChangeGroups(ctx context.Context) error {
 		if errors.Is(err, etcd.ErrLocked) {
 			return nil
 		}
-		return err
+		return errors.WithStack(err)
 	}
 	defer func() { _ = m.Unlock(ctx) }()
 
 	resp, err := d.e.Client().Get(ctx, etcdChangeGroupMinRevisionKey)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	if len(resp.Kvs) == 0 {
@@ -986,7 +986,8 @@ func (d *DataManager) compactChangeGroups(ctx context.Context) error {
 	txn := d.e.Client().Txn(ctx).If(cmp).Then(then)
 	tresp, err := txn.Commit()
 	if err != nil {
-		return etcd.FromEtcdError(err)
+		return errors.WithStack(etcd.FromEtcdError(err))
+
 	}
 	if !tresp.Succeeded {
 		return errors.Errorf("failed to update change group min revision key due to concurrent update")
@@ -997,7 +998,7 @@ func (d *DataManager) compactChangeGroups(ctx context.Context) error {
 	// then remove all the groups keys with modrevision < minrevision
 	resp, err = d.e.List(ctx, etcdChangeGroupsDir, "", 0)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	for _, kv := range resp.Kvs {
 		if kv.ModRevision < revision-etcdChangeGroupMinRevisionRange {
@@ -1006,7 +1007,7 @@ func (d *DataManager) compactChangeGroups(ctx context.Context) error {
 			txn := d.e.Client().Txn(ctx).If(cmp).Then(then)
 			tresp, err := txn.Commit()
 			if err != nil {
-				return etcd.FromEtcdError(err)
+				return errors.WithStack(etcd.FromEtcdError(err))
 			}
 			if !tresp.Succeeded {
 				d.log.Err(err).Msgf("failed to update change group min revision key due to concurrent update")
@@ -1040,7 +1041,7 @@ func (d *DataManager) etcdPingerLoop(ctx context.Context) {
 
 func (d *DataManager) etcdPinger(ctx context.Context) error {
 	if _, err := d.e.Put(ctx, etcdPingKey, []byte{}, nil); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	return nil
 }
@@ -1055,7 +1056,7 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 		var header *WalHeader
 		if err = dec.Decode(&header); err != nil && !errors.Is(err, io.EOF) {
 			walFile.Close()
-			return err
+			return errors.WithStack(err)
 		}
 		walFile.Close()
 
@@ -1073,7 +1074,7 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 		}
 		walDataj, err := json.Marshal(walData)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		cmp := []etcdclientv3.Cmp{}
@@ -1084,7 +1085,7 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 		txn := d.e.Client().Txn(ctx).If(cmp...).Then(then...)
 		tresp, err := txn.Commit()
 		if err != nil {
-			return etcd.FromEtcdError(err)
+			return errors.WithStack(etcd.FromEtcdError(err))
 		}
 		if !tresp.Succeeded {
 			return errors.Errorf("failed to sync etcd: wal %q already written", wal.WalSequence)
@@ -1094,7 +1095,7 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 
 	session, err := concurrency.NewSession(d.e.Client(), concurrency.WithTTL(5), concurrency.WithContext(ctx))
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	defer session.Close()
 
@@ -1104,7 +1105,7 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 		if errors.Is(err, etcd.ErrLocked) {
 			return nil
 		}
-		return err
+		return errors.WithStack(err)
 	}
 	defer func() { _ = m.Unlock(ctx) }()
 
@@ -1113,7 +1114,7 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 	_, err = d.e.Get(ctx, etcdWalsDataKey, 0)
 	if err != nil {
 		if !errors.Is(err, etcd.ErrKeyNotFound) {
-			return err
+			return errors.WithStack(err)
 		}
 		mustInit = true
 	}
@@ -1123,7 +1124,7 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 
 		// delete all wals from etcd
 		if err := d.deleteEtcd(ctx); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	}
 
@@ -1135,7 +1136,7 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 	then = append(then, etcdclientv3.OpPut(etcdChangeGroupMinRevisionKey, ""))
 	txn := d.e.Client().Txn(ctx).If(cmp...).Then(then...)
 	if _, err := txn.Commit(); err != nil {
-		return etcd.FromEtcdError(err)
+		return errors.WithStack(etcd.FromEtcdError(err))
 	}
 
 	if !mustInit {
@@ -1150,7 +1151,7 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 	} else {
 		dataStatus, err = d.GetLastDataStatus()
 		if err != nil && !errors.Is(err, ErrNoDataStatus) {
-			return err
+			return errors.WithStack(err)
 		}
 		// set the first wal to import in etcd if there's a snapshot. In this way we'll
 		// ignore older wals (or wals left after an import)
@@ -1172,7 +1173,7 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 		}
 		d.log.Debug().Msgf("wal: %s", wal)
 		if wal.Err != nil {
-			return wal.Err
+			return errors.WithStack(wal.Err)
 		}
 
 		if wal.WalSequence < firstWal {
@@ -1182,7 +1183,7 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 		lastCommittedStorageWalSequence = wal.WalSequence
 
 		if err := writeWal(wal, previousWalSequence); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		previousWalSequence = wal.WalSequence
 		wroteWals++
@@ -1192,7 +1193,7 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 	//  insert an empty wal and make it already committedstorage
 	walSequence, err := sequence.IncSequence(ctx, d.e, etcdWalSeqKey)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	walDataFileID := uuid.Must(uuid.NewV4()).String()
@@ -1212,7 +1213,7 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 	}
 	headerj, err := json.Marshal(header)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	walFileCommittedPath := walFilePath + ".committed"
 	if err := d.ost.WriteObject(walFileCommittedPath, bytes.NewReader(headerj), int64(len(headerj)), true); err != nil {
@@ -1234,12 +1235,12 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 
 	walDataj, err := json.Marshal(walData)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	walsDataj, err := json.Marshal(walsData)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	// save walsdata and lastcommittedstoragewalseq only after writing all the
@@ -1256,7 +1257,7 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 	txn = d.e.Client().Txn(ctx).If(cmp...).Then(then...)
 	tresp, err := txn.Commit()
 	if err != nil {
-		return etcd.FromEtcdError(err)
+		return errors.WithStack(etcd.FromEtcdError(err))
 	}
 	if !tresp.Succeeded {
 		return errors.Errorf("failed to sync etcd: walsdata already written")
@@ -1264,7 +1265,7 @@ func (d *DataManager) InitEtcd(ctx context.Context, dataStatus *DataStatus) erro
 
 	// force a checkpoint
 	if err := d.checkpoint(ctx, true); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	return nil

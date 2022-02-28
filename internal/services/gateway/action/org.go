@@ -17,11 +17,10 @@ package action
 import (
 	"context"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
 	cstypes "agola.io/agola/services/configstore/types"
-
-	errors "golang.org/x/xerrors"
 )
 
 func (h *ActionHandler) GetOrg(ctx context.Context, orgRef string) (*cstypes.Organization, error) {
@@ -110,7 +109,7 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*
 	h.log.Info().Msgf("creating organization")
 	org, _, err := h.configstoreClient.CreateOrg(ctx, org)
 	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to create organization: %w", err))
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to create organization"))
 	}
 	h.log.Info().Msgf("organization %s created, ID: %s", org.Name, org.ID)
 
@@ -125,14 +124,14 @@ func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 
 	isOrgOwner, err := h.IsOrgOwner(ctx, org.ID)
 	if err != nil {
-		return errors.Errorf("failed to determine ownership: %w", err)
+		return errors.Wrapf(err, "failed to determine ownership")
 	}
 	if !isOrgOwner {
 		return util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
 	}
 
 	if _, err := h.configstoreClient.DeleteOrg(ctx, orgRef); err != nil {
-		return util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to delete org: %w", err))
+		return util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to delete org"))
 	}
 	return nil
 }
@@ -155,7 +154,7 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 
 	isOrgOwner, err := h.IsOrgOwner(ctx, org.ID)
 	if err != nil {
-		return nil, errors.Errorf("failed to determine ownership: %w", err)
+		return nil, errors.Wrapf(err, "failed to determine ownership")
 	}
 	if !isOrgOwner {
 		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
@@ -163,7 +162,7 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 
 	orgmember, _, err := h.configstoreClient.AddOrgMember(ctx, orgRef, userRef, role)
 	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to add/update organization member: %w", err))
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to add/update organization member"))
 	}
 
 	return &AddOrgMemberResponse{
@@ -181,14 +180,14 @@ func (h *ActionHandler) RemoveOrgMember(ctx context.Context, orgRef, userRef str
 
 	isOrgOwner, err := h.IsOrgOwner(ctx, org.ID)
 	if err != nil {
-		return errors.Errorf("failed to determine ownership: %w", err)
+		return errors.Wrapf(err, "failed to determine ownership")
 	}
 	if !isOrgOwner {
 		return util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
 	}
 
 	if _, err = h.configstoreClient.RemoveOrgMember(ctx, orgRef, userRef); err != nil {
-		return util.NewAPIError(util.KindFromRemoteError(err), errors.Errorf("failed to remove organization member: %w", err))
+		return util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to remove organization member"))
 	}
 
 	return nil

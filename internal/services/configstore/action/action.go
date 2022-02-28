@@ -17,13 +17,13 @@ package action
 import (
 	"agola.io/agola/internal/datamanager"
 	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/services/configstore/readdb"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
 
 	"github.com/rs/zerolog"
-	errors "golang.org/x/xerrors"
 )
 
 type ActionHandler struct {
@@ -53,7 +53,7 @@ func (h *ActionHandler) ResolveConfigID(tx *db.Tx, configType types.ConfigType, 
 	case types.ConfigTypeProjectGroup:
 		group, err := h.readDB.GetProjectGroup(tx, ref)
 		if err != nil {
-			return "", err
+			return "", errors.WithStack(err)
 		}
 		if group == nil {
 			return "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("group with ref %q doesn't exists", ref))
@@ -63,7 +63,7 @@ func (h *ActionHandler) ResolveConfigID(tx *db.Tx, configType types.ConfigType, 
 	case types.ConfigTypeProject:
 		project, err := h.readDB.GetProject(tx, ref)
 		if err != nil {
-			return "", err
+			return "", errors.WithStack(err)
 		}
 		if project == nil {
 			return "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("project with ref %q doesn't exists", ref))

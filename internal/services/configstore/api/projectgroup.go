@@ -22,6 +22,8 @@ import (
 	"path"
 
 	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/errors"
+
 	"agola.io/agola/internal/services/configstore/action"
 	"agola.io/agola/internal/services/configstore/readdb"
 	"agola.io/agola/internal/util"
@@ -35,7 +37,7 @@ import (
 func projectGroupResponse(ctx context.Context, readDB *readdb.ReadDB, projectGroup *types.ProjectGroup) (*csapitypes.ProjectGroup, error) {
 	r, err := projectGroupsResponse(ctx, readDB, []*types.ProjectGroup{projectGroup})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	return r[0], nil
 }
@@ -47,18 +49,18 @@ func projectGroupsResponse(ctx context.Context, readDB *readdb.ReadDB, projectGr
 		for i, projectGroup := range projectGroups {
 			pp, err := readDB.GetPath(tx, projectGroup.Parent.Type, projectGroup.Parent.ID)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 
 			ownerType, ownerID, err := readDB.GetProjectGroupOwnerID(tx, projectGroup)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 
 			// calculate global visibility
 			visibility, err := getGlobalVisibility(readDB, tx, projectGroup.Visibility, &projectGroup.Parent)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 
 			// we calculate the path here from parent path since the db could not yet be
@@ -76,7 +78,7 @@ func projectGroupsResponse(ctx context.Context, readDB *readdb.ReadDB, projectGr
 		return nil
 	})
 
-	return resProjectGroups, err
+	return resProjectGroups, errors.WithStack(err)
 }
 
 type ProjectGroupHandler struct {

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/services/types"
 	"agola.io/agola/util"
 
@@ -568,20 +569,20 @@ func (et *Steps) UnmarshalJSON(b []byte) error {
 
 	var rs rawSteps
 	if err := json.Unmarshal(b, &rs); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	steps := make(Steps, len(rs))
 	for i, step := range rs {
 		var bs BaseStep
 		if err := json.Unmarshal(step, &bs); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		switch bs.Type {
 		case "run":
 			var s RunStep
 			if err := json.Unmarshal(step, &s); err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			if s.Tty == nil {
 				s.Tty = util.BoolP(true)
@@ -590,25 +591,25 @@ func (et *Steps) UnmarshalJSON(b []byte) error {
 		case "save_to_workspace":
 			var s SaveToWorkspaceStep
 			if err := json.Unmarshal(step, &s); err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			steps[i] = &s
 		case "restore_workspace":
 			var s RestoreWorkspaceStep
 			if err := json.Unmarshal(step, &s); err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			steps[i] = &s
 		case "save_cache":
 			var s SaveCacheStep
 			if err := json.Unmarshal(step, &s); err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			steps[i] = &s
 		case "restore_cache":
 			var s RestoreCacheStep
 			if err := json.Unmarshal(step, &s); err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			steps[i] = &s
 		}
@@ -629,7 +630,7 @@ type ChangeGroupsRevisions map[string]int64
 func MarshalChangeGroupsUpdateToken(t *ChangeGroupsUpdateToken) (string, error) {
 	tj, err := json.Marshal(t)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	return base64.StdEncoding.EncodeToString(tj), nil
 }
@@ -641,11 +642,11 @@ func UnmarshalChangeGroupsUpdateToken(s string) (*ChangeGroupsUpdateToken, error
 
 	tj, err := base64.StdEncoding.DecodeString(s)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	var t *ChangeGroupsUpdateToken
 	if err := json.Unmarshal(tj, &t); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	return t, nil
 }

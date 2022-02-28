@@ -22,6 +22,7 @@ import (
 	"regexp"
 
 	"agola.io/agola/internal/config"
+	"agola.io/agola/internal/errors"
 	gitsource "agola.io/agola/internal/gitsources"
 	"agola.io/agola/internal/runconfig"
 	scommon "agola.io/agola/internal/services/common"
@@ -32,8 +33,6 @@ import (
 	rsapitypes "agola.io/agola/services/runservice/api/types"
 	rstypes "agola.io/agola/services/runservice/types"
 	"agola.io/agola/services/types"
-
-	errors "golang.org/x/xerrors"
 )
 
 const (
@@ -80,7 +79,7 @@ func (h *ActionHandler) GetRun(ctx context.Context, runID string) (*rsapitypes.R
 	}
 	canGetRun, err := h.CanGetRun(ctx, runResp.RunConfig.Group)
 	if err != nil {
-		return nil, errors.Errorf("failed to determine permissions: %w", err)
+		return nil, errors.Wrapf(err, "failed to determine permissions")
 	}
 	if !canGetRun {
 		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
@@ -103,7 +102,7 @@ type GetRunsRequest struct {
 func (h *ActionHandler) GetRuns(ctx context.Context, req *GetRunsRequest) (*rsapitypes.GetRunsResponse, error) {
 	canGetRun, err := h.CanGetRun(ctx, req.Group)
 	if err != nil {
-		return nil, errors.Errorf("failed to determine permissions: %w", err)
+		return nil, errors.Wrapf(err, "failed to determine permissions")
 	}
 	if !canGetRun {
 		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
@@ -133,7 +132,7 @@ func (h *ActionHandler) GetLogs(ctx context.Context, req *GetLogsRequest) (*http
 	}
 	canGetRun, err := h.CanGetRun(ctx, runResp.RunConfig.Group)
 	if err != nil {
-		return nil, errors.Errorf("failed to determine permissions: %w", err)
+		return nil, errors.Wrapf(err, "failed to determine permissions")
 	}
 	if !canGetRun {
 		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
@@ -161,7 +160,7 @@ func (h *ActionHandler) DeleteLogs(ctx context.Context, req *DeleteLogsRequest) 
 	}
 	canDoRunActions, err := h.CanDoRunActions(ctx, runResp.RunConfig.Group)
 	if err != nil {
-		return errors.Errorf("failed to determine permissions: %w", err)
+		return errors.Wrapf(err, "failed to determine permissions")
 	}
 	if !canDoRunActions {
 		return util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
@@ -197,7 +196,7 @@ func (h *ActionHandler) RunAction(ctx context.Context, req *RunActionsRequest) (
 	}
 	canGetRun, err := h.CanDoRunActions(ctx, runResp.RunConfig.Group)
 	if err != nil {
-		return nil, errors.Errorf("failed to determine permissions: %w", err)
+		return nil, errors.Wrapf(err, "failed to determine permissions")
 	}
 	if !canGetRun {
 		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
@@ -261,7 +260,7 @@ func (h *ActionHandler) RunTaskAction(ctx context.Context, req *RunTaskActionsRe
 	}
 	canDoRunAction, err := h.CanDoRunActions(ctx, runResp.RunConfig.Group)
 	if err != nil {
-		return errors.Errorf("failed to determine permissions: %w", err)
+		return errors.Wrapf(err, "failed to determine permissions")
 	}
 	if !canDoRunAction {
 		return util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
@@ -286,7 +285,7 @@ func (h *ActionHandler) RunTaskAction(ctx context.Context, req *RunTaskActionsRe
 		approversAnnotation, ok := annotations[scommon.ApproversAnnotation]
 		if ok {
 			if err := json.Unmarshal([]byte(approversAnnotation), &approvers); err != nil {
-				return errors.Errorf("failed to unmarshal run task approvers annotation: %w", err)
+				return errors.Wrapf(err, "failed to unmarshal run task approvers annotation")
 			}
 		}
 
@@ -299,7 +298,7 @@ func (h *ActionHandler) RunTaskAction(ctx context.Context, req *RunTaskActionsRe
 
 		approversj, err := json.Marshal(approvers)
 		if err != nil {
-			return errors.Errorf("failed to marshal run task approvers annotation: %w", err)
+			return errors.Wrapf(err, "failed to marshal run task approvers annotation")
 		}
 
 		annotations[scommon.ApproversAnnotation] = string(approversj)
@@ -398,7 +397,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 
 	gitURL, err := util.ParseGitURL(req.CloneURL)
 	if err != nil {
-		return errors.Errorf("failed to parse clone url: %w", err)
+		return errors.Wrapf(err, "failed to parse clone url")
 	}
 	gitHost := gitURL.Hostname()
 	gitPort := gitURL.Port()
@@ -434,7 +433,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 			var err error
 			variables, err = h.genRunVariables(ctx, req)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 		}
 	} else {
@@ -481,7 +480,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 
 	data, filename, err := h.fetchConfigFiles(ctx, req.GitSource, req.RepoPath, req.CommitSHA)
 	if err != nil {
-		return util.NewAPIError(util.ErrInternal, errors.Errorf("failed to fetch config file: %w", err))
+		return util.NewAPIError(util.ErrInternal, errors.Wrapf(err, "failed to fetch config file"))
 	}
 	h.log.Debug().Msgf("data: %s", data)
 
@@ -577,7 +576,7 @@ func (h *ActionHandler) fetchConfigFiles(ctx context.Context, gitSource gitsourc
 		return false, nil
 	})
 	if err != nil {
-		return nil, "", err
+		return nil, "", errors.WithStack(err)
 	}
 	return data, filename, nil
 }
@@ -588,7 +587,7 @@ func (h *ActionHandler) genRunVariables(ctx context.Context, req *CreateRunReque
 	// get project variables
 	pvars, _, err := h.configstoreClient.GetProjectVariables(ctx, req.Project.ID, true)
 	if err != nil {
-		return nil, errors.Errorf("failed to get project variables: %w", err)
+		return nil, errors.Wrapf(err, "failed to get project variables")
 	}
 
 	// remove overriden variables
@@ -597,7 +596,7 @@ func (h *ActionHandler) genRunVariables(ctx context.Context, req *CreateRunReque
 	// get project secrets
 	secrets, _, err := h.configstoreClient.GetProjectSecrets(ctx, req.Project.ID, true)
 	if err != nil {
-		return nil, errors.Errorf("failed to get project secrets: %w", err)
+		return nil, errors.Wrapf(err, "failed to get project secrets")
 	}
 	for _, pvar := range pvars {
 		// find the value match

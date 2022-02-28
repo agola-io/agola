@@ -27,9 +27,8 @@ import (
 	"strconv"
 	"strings"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/types"
-
-	errors "golang.org/x/xerrors"
 )
 
 const (
@@ -48,7 +47,7 @@ const (
 func (c *Client) ParseWebhook(r *http.Request, secret string) (*types.WebhookData, error) {
 	data, err := ioutil.ReadAll(io.LimitReader(r.Body, 10*1024*1024))
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	// verify signature
@@ -83,7 +82,7 @@ func parsePushHook(data []byte) (*types.WebhookData, error) {
 	push := new(pushHook)
 	err := json.Unmarshal(data, push)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return webhookDataFromPush(push)
@@ -93,7 +92,7 @@ func parsePullRequestHook(data []byte) (*types.WebhookData, error) {
 	prhook := new(pullRequestHook)
 	err := json.Unmarshal(data, prhook)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	// skip non open pull requests
@@ -144,7 +143,7 @@ func webhookDataFromPush(hook *pushHook) (*types.WebhookData, error) {
 		whd.Message = fmt.Sprintf("Tag %s", whd.Tag)
 	default:
 		// ignore received webhook since it doesn't have a ref we're interested in
-		return nil, fmt.Errorf("unsupported webhook ref %q", hook.Ref)
+		return nil, errors.Errorf("unsupported webhook ref %q", hook.Ref)
 	}
 
 	return whd, nil

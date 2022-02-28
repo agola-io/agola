@@ -27,15 +27,15 @@ import (
 	"strings"
 	"syscall"
 
-	errors "golang.org/x/xerrors"
+	"agola.io/agola/internal/errors"
 )
 
 // scpSyntaxRe matches the SCP-like addresses used by Git to access repositories
 // by SSH.
 var scpSyntaxRe = regexp.MustCompile(`^([a-zA-Z0-9_]+)@([a-zA-Z0-9._-]+):(.*)$`)
 
-func ParseGitURL(u string) (*url.URL, error) {
-	if m := scpSyntaxRe.FindStringSubmatch(u); m != nil {
+func ParseGitURL(us string) (*url.URL, error) {
+	if m := scpSyntaxRe.FindStringSubmatch(us); m != nil {
 		// Match SCP-like syntax and convert it to a URL.
 		// Eg, "git@github.com:user/repo" becomes
 		// "ssh://git@github.com/user/repo".
@@ -46,7 +46,10 @@ func ParseGitURL(u string) (*url.URL, error) {
 			Path:   m[3],
 		}, nil
 	}
-	return url.Parse(u)
+
+	u, err := url.Parse(us)
+
+	return u, errors.WithStack(err)
 }
 
 type Git struct {
@@ -86,17 +89,17 @@ func (g *Git) Output(ctx context.Context, stdin io.Reader, args ...string) ([]by
 		if len(gitErr) > 0 {
 			return nil, errors.New(stderr.String())
 		} else {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 	}
 
-	return out, err
+	return out, errors.WithStack(err)
 }
 
 func (g *Git) OutputLines(ctx context.Context, stdin io.Reader, args ...string) ([]string, error) {
 	out, err := g.Output(ctx, stdin, args...)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	scanner := bufio.NewScanner(bytes.NewReader(out))
@@ -105,7 +108,7 @@ func (g *Git) OutputLines(ctx context.Context, stdin io.Reader, args ...string) 
 		lines = append(lines, scanner.Text())
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	return lines, nil
 }
@@ -117,17 +120,17 @@ func (g *Git) Pipe(ctx context.Context, w io.Writer, r io.Reader, args ...string
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	stderr := &bytes.Buffer{}
 	cmd.Stderr = stderr
 
 	if err := cmd.Start(); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	if _, err := io.Copy(w, stdout); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	if err := cmd.Wait(); err != nil {
@@ -135,7 +138,7 @@ func (g *Git) Pipe(ctx context.Context, w io.Writer, r io.Reader, args ...string
 		if len(gitErr) > 0 {
 			return errors.New(stderr.String())
 		} else {
-			return err
+			return errors.WithStack(err)
 		}
 	}
 	return nil
@@ -162,7 +165,7 @@ func (g *Git) ConfigGet(ctx context.Context, args ...string) (string, error) {
 				}
 			}
 		}
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	return strings.TrimRight(string(out), "\000"), nil
@@ -181,7 +184,7 @@ func (g *Git) ConfigSet(ctx context.Context, args ...string) (string, error) {
 				}
 			}
 		}
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	return strings.TrimRight(string(out), "\000"), nil

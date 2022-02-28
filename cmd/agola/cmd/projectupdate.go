@@ -17,12 +17,12 @@ package cmd
 import (
 	"context"
 
+	"agola.io/agola/internal/errors"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	errors "golang.org/x/xerrors"
 )
 
 var cmdProjectUpdate = &cobra.Command{
@@ -88,7 +88,7 @@ func projectUpdate(cmd *cobra.Command, args []string) error {
 	log.Info().Msgf("updating project")
 	project, _, err := gwclient.UpdateProject(context.TODO(), projectUpdateOpts.ref, req)
 	if err != nil {
-		return errors.Errorf("failed to update project: %w", err)
+		return errors.Wrapf(err, "failed to update project")
 	}
 	log.Info().Msgf("project %s update, ID: %s", project.Name, project.ID)
 

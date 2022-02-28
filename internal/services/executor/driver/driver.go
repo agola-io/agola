@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/executor/registry"
 	"agola.io/agola/services/types"
 )
@@ -121,7 +122,7 @@ func toolboxExecPath(toolboxDir string, arch types.Arch) (string, error) {
 	toolboxPath := filepath.Join(toolboxDir, fmt.Sprintf("%s-linux-%s", toolboxPrefix, arch))
 	_, err := os.Stat(toolboxPath)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	return toolboxPath, nil
 }

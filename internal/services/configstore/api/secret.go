@@ -19,6 +19,8 @@ import (
 	"net/http"
 
 	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/errors"
+
 	"agola.io/agola/internal/services/configstore/action"
 	"agola.io/agola/internal/services/configstore/readdb"
 	"agola.io/agola/internal/util"
@@ -92,11 +94,11 @@ func (h *SecretsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		for _, s := range resSecrets {
 			pp, err := h.readDB.GetPath(tx, s.Parent.Type, s.Parent.ID)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			s.ParentPath = pp
 		}
-		return err
+		return errors.WithStack(err)
 	})
 	if err != nil {
 		h.log.Err(err).Send()

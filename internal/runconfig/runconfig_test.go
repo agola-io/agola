@@ -20,13 +20,13 @@ import (
 	"testing"
 
 	"agola.io/agola/internal/config"
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/util"
 	rstypes "agola.io/agola/services/runservice/types"
 	"agola.io/agola/services/types"
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/google/go-cmp/cmp"
-	errors "golang.org/x/xerrors"
 )
 
 var uuid = &util.TestUUIDGenerator{}
@@ -128,7 +128,7 @@ func TestGenTasksLevels(t *testing.T) {
 					},
 				},
 			},
-			err: fmt.Errorf("circular dependency detected"),
+			err: errors.Errorf("circular dependency detected"),
 		},
 		{
 			name: "Test circular dependency between 3 tasks: a -> b -> c -> a",
@@ -155,7 +155,7 @@ func TestGenTasksLevels(t *testing.T) {
 					},
 				},
 			},
-			err: fmt.Errorf("circular dependency detected"),
+			err: errors.Errorf("circular dependency detected"),
 		},
 		{
 			name: "Test circular dependency between 3 tasks: a -> b -> c -> b",
@@ -182,7 +182,7 @@ func TestGenTasksLevels(t *testing.T) {
 					},
 				},
 			},
-			err: fmt.Errorf("circular dependency detected"),
+			err: errors.Errorf("circular dependency detected"),
 		},
 	}
 	for _, tt := range tests {

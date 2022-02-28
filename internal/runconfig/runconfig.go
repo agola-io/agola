@@ -19,12 +19,11 @@ import (
 	"strings"
 
 	"agola.io/agola/internal/config"
+	"agola.io/agola/internal/errors"
 	itypes "agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 	rstypes "agola.io/agola/services/runservice/types"
 	"agola.io/agola/services/types"
-
-	errors "golang.org/x/xerrors"
 )
 
 const (
@@ -192,7 +191,7 @@ fi
 		return rws
 
 	default:
-		panic(fmt.Errorf("unknown config step type: %s", util.Dump(cs)))
+		panic(errors.Errorf("unknown config step type: %s", util.Dump(cs)))
 	}
 }
 
@@ -461,7 +460,7 @@ func genValue(val config.Value, variables map[string]string) string {
 	case config.ValueTypeFromVariable:
 		return variables[val.Value]
 	default:
-		panic(fmt.Errorf("wrong value type: %q", val.Value))
+		panic(errors.Errorf("wrong value type: %q", val.Value))
 	}
 }
 

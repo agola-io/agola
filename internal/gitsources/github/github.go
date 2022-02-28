@@ -28,11 +28,11 @@ import (
 	"strings"
 	"time"
 
+	"agola.io/agola/internal/errors"
 	gitsource "agola.io/agola/internal/gitsources"
 
 	"github.com/google/go-github/v29/github"
 	"golang.org/x/oauth2"
-	errors "golang.org/x/xerrors"
 )
 
 var (
@@ -81,7 +81,7 @@ func fromCommitStatus(status gitsource.CommitStatus) string {
 	case gitsource.CommitStatusFailed:
 		return "failure"
 	default:
-		panic(fmt.Errorf("unknown commit status %q", status))
+		panic(errors.Errorf("unknown commit status %q", status))
 	}
 }
 
@@ -102,6 +102,8 @@ func (t *TokenTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	if t.token != "" {
 		r.Header.Set("Authorization", "Bearer "+t.token)
 	}
+
+	//nolint:wrapcheck
 	return t.rt.RoundTrip(r)
 }
 
@@ -184,7 +186,7 @@ func (c *Client) RequestOauth2Token(callbackURL, code string) (*oauth2.Token, er
 	var config = c.oauth2Config(callbackURL)
 	token, err := config.Exchange(ctx, code)
 	if err != nil {
-		return nil, errors.Errorf("cannot get oauth2 token: %w", err)
+		return nil, errors.Wrapf(err, "cannot get oauth2 token")
 	}
 	return token, nil
 }
@@ -196,13 +198,15 @@ func (c *Client) RefreshOauth2Token(refreshToken string) (*oauth2.Token, error) 
 	var config = c.oauth2Config("")
 	token := &oauth2.Token{RefreshToken: refreshToken}
 	ts := config.TokenSource(ctx, token)
-	return ts.Token()
+	ntoken, err := ts.Token()
+
+	return ntoken, errors.WithStack(err)
 }
 
 func (c *Client) GetUserInfo() (*gitsource.UserInfo, error) {
 	user, _, err := c.client.Users.Get(context.TODO(), "")
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	userInfo := &gitsource.UserInfo{
@@ -219,11 +223,11 @@ func (c *Client) GetUserInfo() (*gitsource.UserInfo, error) {
 func (c *Client) GetRepoInfo(repopath string) (*gitsource.RepoInfo, error) {
 	owner, reponame, err := parseRepoPath(repopath)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	rr, _, err := c.client.Repositories.Get(context.TODO(), owner, reponame)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	return fromGithubRepo(rr), nil
 }
@@ -231,28 +235,29 @@ func (c *Client) GetRepoInfo(repopath string) (*gitsource.RepoInfo, error) {
 func (c *Client) GetFile(repopath, commit, file string) ([]byte, error) {
 	owner, reponame, err := parseRepoPath(repopath)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	r, err := c.client.Repositories.DownloadContents(context.TODO(), owner, reponame, file, &github.RepositoryContentGetOptions{Ref: commit})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	defer r.Close()
 
-	return ioutil.ReadAll(r)
+	d, err := ioutil.ReadAll(r)
+	return d, errors.WithStack(err)
 }
 
 func (c *Client) CreateDeployKey(repopath, title, pubKey string, readonly bool) error {
 	owner, reponame, err := parseRepoPath(repopath)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	if _, _, err = c.client.Repositories.CreateKey(context.TODO(), owner, reponame, &github.Key{
 		Title:    github.String(title),
 		Key:      github.String(pubKey),
 		ReadOnly: github.Bool(readonly),
 	}); err != nil {
-		return errors.Errorf("error creating deploy key: %w", err)
+		return errors.Wrapf(err, "error creating deploy key")
 	}
 	return nil
 }
@@ -260,7 +265,7 @@ func (c *Client) CreateDeployKey(repopath, title, pubKey string, readonly bool) 
 func (c *Client) UpdateDeployKey(repopath, title, pubKey string, readonly bool) error {
 	owner, reponame, err := parseRepoPath(repopath)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	// NOTE(sgotti) gitea has a bug where if we delete and remove the same key with
 	// the same value it is correctly readded and the admin must force a
@@ -268,7 +273,7 @@ func (c *Client) UpdateDeployKey(repopath, title, pubKey string, readonly bool) 
 	// when the public key value has changed
 	keys, _, err := c.client.Repositories.ListKeys(context.TODO(), owner, reponame, nil)
 	if err != nil {
-		return errors.Errorf("error retrieving existing deploy keys: %w", err)
+		return errors.Wrapf(err, "error retrieving existing deploy keys")
 	}
 
 	for _, key := range keys {
@@ -277,7 +282,7 @@ func (c *Client) UpdateDeployKey(repopath, title, pubKey string, readonly bool) 
 				return nil
 			}
 			if _, err := c.client.Repositories.DeleteKey(context.TODO(), owner, reponame, *key.ID); err != nil {
-				return errors.Errorf("error removing existing deploy key: %w", err)
+				return errors.Wrapf(err, "error removing existing deploy key")
 			}
 		}
 	}
@@ -287,7 +292,7 @@ func (c *Client) UpdateDeployKey(repopath, title, pubKey string, readonly bool) 
 		Key:      github.String(pubKey),
 		ReadOnly: github.Bool(readonly),
 	}); err != nil {
-		return errors.Errorf("error creating deploy key: %w", err)
+		return errors.Wrapf(err, "error creating deploy key")
 	}
 
 	return nil
@@ -296,17 +301,17 @@ func (c *Client) UpdateDeployKey(repopath, title, pubKey string, readonly bool) 
 func (c *Client) DeleteDeployKey(repopath, title string) error {
 	owner, reponame, err := parseRepoPath(repopath)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	keys, _, err := c.client.Repositories.ListKeys(context.TODO(), owner, reponame, nil)
 	if err != nil {
-		return errors.Errorf("error retrieving existing deploy keys: %w", err)
+		return errors.Wrapf(err, "error retrieving existing deploy keys")
 	}
 
 	for _, key := range keys {
 		if *key.Title == title {
 			if _, err := c.client.Repositories.DeleteKey(context.TODO(), owner, reponame, *key.ID); err != nil {
-				return errors.Errorf("error removing existing deploy key: %w", err)
+				return errors.Wrapf(err, "error removing existing deploy key")
 			}
 		}
 	}
@@ -317,7 +322,7 @@ func (c *Client) DeleteDeployKey(repopath, title string) error {
 func (c *Client) CreateRepoWebhook(repopath, url, secret string) error {
 	owner, reponame, err := parseRepoPath(repopath)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	hook := &github.Hook{
@@ -331,7 +336,7 @@ func (c *Client) CreateRepoWebhook(repopath, url, secret string) error {
 	}
 
 	if _, _, err = c.client.Repositories.CreateHook(context.TODO(), owner, reponame, hook); err != nil {
-		return errors.Errorf("error creating repository webhook: %w", err)
+		return errors.Wrapf(err, "error creating repository webhook")
 	}
 
 	return nil
@@ -340,7 +345,7 @@ func (c *Client) CreateRepoWebhook(repopath, url, secret string) error {
 func (c *Client) DeleteRepoWebhook(repopath, u string) error {
 	owner, reponame, err := parseRepoPath(repopath)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	hooks := []*github.Hook{}
@@ -349,7 +354,7 @@ func (c *Client) DeleteRepoWebhook(repopath, u string) error {
 	for {
 		pHooks, resp, err := c.client.Repositories.ListHooks(context.TODO(), owner, reponame, opt)
 		if err != nil {
-			return errors.Errorf("error retrieving repository webhooks: %w", err)
+			return errors.Wrapf(err, "error retrieving repository webhooks")
 		}
 		hooks = append(hooks, pHooks...)
 		if resp.NextPage == 0 {
@@ -363,7 +368,7 @@ func (c *Client) DeleteRepoWebhook(repopath, u string) error {
 	for _, hook := range hooks {
 		if hook.Config["url"] == u {
 			if _, err := c.client.Repositories.DeleteHook(context.TODO(), owner, reponame, *hook.ID); err != nil {
-				return errors.Errorf("error deleting existing repository webhook: %w", err)
+				return errors.Wrapf(err, "error deleting existing repository webhook")
 			}
 		}
 	}
@@ -374,7 +379,7 @@ func (c *Client) DeleteRepoWebhook(repopath, u string) error {
 func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource.CommitStatus, targetURL, description, statusContext string) error {
 	owner, reponame, err := parseRepoPath(repopath)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	_, _, err = c.client.Repositories.CreateStatus(context.TODO(), owner, reponame, commitSHA, &github.RepoStatus{
 		State:       github.String(fromCommitStatus(status)),
@@ -382,7 +387,7 @@ func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource
 		Description: github.String(description),
 		Context:     github.String(statusContext),
 	})
-	return err
+	return errors.WithStack(err)
 }
 
 func (c *Client) ListUserRepos() ([]*gitsource.RepoInfo, error) {
@@ -392,7 +397,7 @@ func (c *Client) ListUserRepos() ([]*gitsource.RepoInfo, error) {
 	for {
 		pRemoteRepos, resp, err := c.client.Repositories.List(context.TODO(), "", opt)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 		remoteRepos = append(remoteRepos, pRemoteRepos...)
 		if resp.NextPage == 0 {
@@ -429,12 +434,12 @@ func fromGithubRepo(rr *github.Repository) *gitsource.RepoInfo {
 func (c *Client) GetRef(repopath, ref string) (*gitsource.Ref, error) {
 	owner, reponame, err := parseRepoPath(repopath)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	remoteRef, _, err := c.client.Git.GetRef(context.TODO(), owner, reponame, ref)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return fromGithubRef(remoteRef)
@@ -445,7 +450,7 @@ func fromGithubRef(remoteRef *github.Reference) (*gitsource.Ref, error) {
 	switch t {
 	case "commit":
 	default:
-		return nil, fmt.Errorf("unsupported object type: %s", t)
+		return nil, errors.Errorf("unsupported object type: %s", t)
 	}
 
 	return &gitsource.Ref{
@@ -467,19 +472,19 @@ func (c *Client) RefType(ref string) (gitsource.RefType, string, error) {
 		return gitsource.RefTypePullRequest, m[1], nil
 
 	default:
-		return -1, "", fmt.Errorf("unsupported ref: %s", ref)
+		return -1, "", errors.Errorf("unsupported ref: %s", ref)
 	}
 }
 
 func (c *Client) GetCommit(repopath, commitSHA string) (*gitsource.Commit, error) {
 	owner, reponame, err := parseRepoPath(repopath)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	commit, _, err := c.client.Git.GetCommit(context.TODO(), owner, reponame, commitSHA)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return &gitsource.Commit{

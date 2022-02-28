@@ -19,7 +19,7 @@ import (
 	"encoding/json"
 	"time"
 
-	errors "golang.org/x/xerrors"
+	"agola.io/agola/internal/errors"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -52,7 +52,7 @@ func (d *K8sDriver) updateLease(ctx context.Context) error {
 		lease, err := leaseClient.Get(name, metav1.GetOptions{})
 		if err != nil {
 			if !apierrors.IsNotFound(err) {
-				return err
+				return errors.WithStack(err)
 			}
 		} else {
 			found = true
@@ -61,7 +61,7 @@ func (d *K8sDriver) updateLease(ctx context.Context) error {
 		if found {
 			lease.Spec.RenewTime = &now
 			_, err := leaseClient.Update(lease)
-			return err
+			return errors.WithStack(err)
 		}
 
 		lease = &coordinationv1.Lease{
@@ -77,14 +77,14 @@ func (d *K8sDriver) updateLease(ctx context.Context) error {
 			},
 		}
 		_, err = leaseClient.Create(lease)
-		return err
+		return errors.WithStack(err)
 	} else {
 		cmClient := d.client.CoreV1().ConfigMaps(d.namespace)
 		found := false
 		cm, err := cmClient.Get(name, metav1.GetOptions{})
 		if err != nil {
 			if !apierrors.IsNotFound(err) {
-				return err
+				return errors.WithStack(err)
 			}
 		} else {
 			found = true
@@ -103,22 +103,22 @@ func (d *K8sDriver) updateLease(ctx context.Context) error {
 			}
 			if recordBytes, found := cm.Annotations[cmLeaseKey]; found {
 				if err := json.Unmarshal([]byte(recordBytes), &ld); err != nil {
-					return err
+					return errors.WithStack(err)
 				}
 			}
 			ld.RenewTime = now
 			ldj, err := json.Marshal(ld)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			cm.Annotations[cmLeaseKey] = string(ldj)
 			_, err = cmClient.Update(cm)
-			return err
+			return errors.WithStack(err)
 		}
 
 		ldj, err := json.Marshal(ld)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		cm = &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
@@ -129,7 +129,7 @@ func (d *K8sDriver) updateLease(ctx context.Context) error {
 		}
 		cm.Annotations[cmLeaseKey] = string(ldj)
 		_, err = cmClient.Create(cm)
-		return err
+		return errors.WithStack(err)
 	}
 }
 
@@ -144,7 +144,7 @@ func (d *K8sDriver) getLeases(ctx context.Context) ([]string, error) {
 
 		leases, err := leaseClient.List(metav1.ListOptions{LabelSelector: apilabels.SelectorFromSet(labels).String()})
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 		for _, lease := range leases.Items {
 			if v, ok := lease.Labels[executorIDKey]; ok {
@@ -156,7 +156,7 @@ func (d *K8sDriver) getLeases(ctx context.Context) ([]string, error) {
 
 		cms, err := cmClient.List(metav1.ListOptions{LabelSelector: apilabels.SelectorFromSet(labels).String()})
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 		for _, cm := range cms.Items {
 			if v, ok := cm.Labels[executorIDKey]; ok {
@@ -177,7 +177,7 @@ func (d *K8sDriver) cleanStaleExecutorsLease(ctx context.Context) error {
 
 		leases, err := d.leaseLister.List(apilabels.SelectorFromSet(labels))
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		for _, lease := range leases {
 			if lease.Spec.HolderIdentity == nil {
@@ -204,7 +204,7 @@ func (d *K8sDriver) cleanStaleExecutorsLease(ctx context.Context) error {
 
 		cms, err := d.cmLister.List(apilabels.SelectorFromSet(labels))
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		for _, cm := range cms {
 			var ld *LeaseData
@@ -215,7 +215,7 @@ func (d *K8sDriver) cleanStaleExecutorsLease(ctx context.Context) error {
 			}
 			if recordBytes, found := cm.Annotations[cmLeaseKey]; found {
 				if err := json.Unmarshal([]byte(recordBytes), &ld); err != nil {
-					return err
+					return errors.WithStack(err)
 				}
 			}
 			// skip our lease

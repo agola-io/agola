@@ -35,7 +35,6 @@ require (
 	go.starlark.net v0.0.0-20200203144150-6677ee5c7211
 	golang.org/x/crypto v0.0.0-20211215165025-cf75a172585e
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
-	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 	gopkg.in/src-d/go-billy.v4 v4.3.2
 	gopkg.in/src-d/go-git.v4 v4.13.1
 	gopkg.in/yaml.v2 v2.2.8

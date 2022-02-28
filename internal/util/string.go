@@ -18,6 +18,8 @@ import (
 	"bufio"
 	"io"
 	"strings"
+
+	"agola.io/agola/internal/errors"
 )
 
 func CountLines(s string) (uint, error) {
@@ -34,7 +36,7 @@ func CountLines(s string) (uint, error) {
 		_, err := br.ReadBytes('\n')
 		if err != nil {
 			if err != io.EOF {
-				return 0, err
+				return 0, errors.WithStack(err)
 			}
 			stop = true
 		}

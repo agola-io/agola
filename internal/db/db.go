@@ -20,8 +20,8 @@ import (
 	"regexp"
 	"time"
 
+	"agola.io/agola/internal/errors"
 	"github.com/mattn/go-sqlite3"
-	errors "golang.org/x/xerrors"
 )
 
 type Type string
@@ -128,7 +128,7 @@ func NewDB(dbType Type, dbConnString string) (*DB, error) {
 
 	sqldb, err := sql.Open(driverName, dbConnString)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	db := &DB{
@@ -151,11 +151,12 @@ type Tx struct {
 }
 
 func (db *DB) Close() error {
-	return db.db.Close()
+	return errors.WithStack(db.db.Close())
 }
 
 func (db *DB) Conn(ctx context.Context) (*sql.Conn, error) {
-	return db.db.Conn(ctx)
+	c, err := db.db.Conn(ctx)
+	return c, errors.WithStack(err)
 }
 
 func (db *DB) NewUnstartedTx() *Tx {
@@ -167,7 +168,7 @@ func (db *DB) NewUnstartedTx() *Tx {
 func (db *DB) NewTx(ctx context.Context) (*Tx, error) {
 	tx := db.NewUnstartedTx()
 	if err := tx.Start(ctx); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return tx, nil
@@ -188,14 +189,14 @@ func (db *DB) Do(ctx context.Context, f func(tx *Tx) error) error {
 				}
 			}
 		}
-		return err
+		return errors.WithStack(err)
 	}
 }
 
 func (db *DB) do(ctx context.Context, f func(tx *Tx) error) error {
 	tx, err := db.NewTx(ctx)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	defer func() {
 		if p := recover(); p != nil {
@@ -205,7 +206,7 @@ func (db *DB) do(ctx context.Context, f func(tx *Tx) error) error {
 	}()
 	if err = f(tx); err != nil {
 		_ = tx.Rollback()
-		return err
+		return errors.WithStack(err)
 	}
 	return tx.Commit()
 }
@@ -213,12 +214,12 @@ func (db *DB) do(ctx context.Context, f func(tx *Tx) error) error {
 func (tx *Tx) Start(ctx context.Context) error {
 	wtx, err := tx.db.db.Begin()
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	switch tx.db.data.t {
 	case Postgres:
 		if _, err := wtx.Exec("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ"); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	}
 	tx.tx = wtx
@@ -230,26 +231,26 @@ func (tx *Tx) Commit() error {
 	if tx.tx == nil {
 		return nil
 	}
-	return tx.tx.Commit()
+	return errors.WithStack(tx.tx.Commit())
 }
 
 func (tx *Tx) Rollback() error {
 	if tx.tx == nil {
 		return nil
 	}
-	return tx.tx.Rollback()
+	return errors.WithStack(tx.tx.Rollback())
 }
 
 func (tx *Tx) Exec(query string, args ...interface{}) (sql.Result, error) {
 	query = tx.db.data.translate(query)
 	r, err := tx.tx.ExecContext(tx.ctx, query, tx.db.data.translateArgs(args)...)
-	return r, err
+	return r, errors.WithStack(err)
 }
 
 func (tx *Tx) Query(query string, args ...interface{}) (*sql.Rows, error) {
 	query = tx.db.data.translate(query)
 	r, err := tx.tx.QueryContext(tx.ctx, query, tx.db.data.translateArgs(args)...)
-	return r, err
+	return r, errors.WithStack(err)
 }
 
 func (tx *Tx) QueryRow(query string, args ...interface{}) *sql.Row {
@@ -262,13 +263,14 @@ func (tx *Tx) CurTime() (time.Time, error) {
 	case Sqlite3:
 		var timestring string
 		if err := tx.QueryRow("select now()").Scan(&timestring); err != nil {
-			return time.Time{}, err
+			return time.Time{}, errors.WithStack(err)
 		}
-		return time.ParseInLocation("2006-01-02 15:04:05.999999999", timestring, time.UTC)
+		t, err := time.ParseInLocation("2006-01-02 15:04:05.999999999", timestring, time.UTC)
+		return t, errors.WithStack(err)
 	case Postgres:
 		var now time.Time
 		if err := tx.QueryRow("select now()").Scan(&now); err != nil {
-			return time.Time{}, err
+			return time.Time{}, errors.WithStack(err)
 		}
 		return now, nil
 	}

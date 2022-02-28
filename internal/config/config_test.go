@@ -15,14 +15,13 @@
 package config
 
 import (
-	"fmt"
 	"testing"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/types"
 
 	"github.com/google/go-cmp/cmp"
-	errors "golang.org/x/xerrors"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -35,14 +34,14 @@ func TestParseConfig(t *testing.T) {
 		{
 			name: "test no runs 1",
 			in:   ``,
-			err:  fmt.Errorf(`no runs defined`),
+			err:  errors.Errorf(`no runs defined`),
 		},
 		{
 			name: "test no runs 2",
 			in: `
                 runs:
                 `,
-			err: fmt.Errorf(`no runs defined`),
+			err: errors.Errorf(`no runs defined`),
 		},
 		{
 			name: "test empty run",
@@ -50,7 +49,7 @@ func TestParseConfig(t *testing.T) {
                 runs:
                   -
                 `,
-			err: fmt.Errorf(`run at index 0 is empty`),
+			err: errors.Errorf(`run at index 0 is empty`),
 		},
 		{
 			name: "test empty task",
@@ -60,7 +59,7 @@ func TestParseConfig(t *testing.T) {
                     tasks:
                       -
                 `,
-			err: fmt.Errorf(`run "run01": task at index 0 is empty`),
+			err: errors.Errorf(`run "run01": task at index 0 is empty`),
 		},
 		{
 			name: "test empty runtime arch",
@@ -88,7 +87,7 @@ func TestParseConfig(t *testing.T) {
                           containers:
                             - image: busybox
                 `,
-			err: fmt.Errorf(`task "task01" runtime: invalid arch "invalidarch"`),
+			err: errors.Errorf(`task "task01" runtime: invalid arch "invalidarch"`),
 		},
 		{
 			name: "test missing task dependency",
@@ -104,7 +103,7 @@ func TestParseConfig(t *testing.T) {
                         depends:
                           - task02
                 `,
-			err: fmt.Errorf(`run task "task02" needed by task "task01" doesn't exist`),
+			err: errors.Errorf(`run task "task02" needed by task "task01" doesn't exist`),
 		},
 		{
 			name: "test circular dependency between 2 tasks a -> b -> a",

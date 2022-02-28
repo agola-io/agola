@@ -17,6 +17,7 @@ package api
 import (
 	"net/http"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/services/types"
@@ -25,7 +26,6 @@ import (
 	rsclient "agola.io/agola/services/runservice/client"
 
 	"github.com/rs/zerolog"
-	errors "golang.org/x/xerrors"
 )
 
 type webhooksHandler struct {
@@ -70,13 +70,13 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) error {
 
 	csProject, _, err := h.configstoreClient.GetProject(ctx, projectID)
 	if err != nil {
-		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("failed to get project %s: %w", projectID, err))
+		return util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "failed to get project %s", projectID))
 	}
 	project := csProject.Project
 
 	user, _, err := h.configstoreClient.GetUserByLinkedAccount(ctx, project.LinkedAccountID)
 	if err != nil {
-		return util.NewAPIError(util.ErrInternal, errors.Errorf("failed to get user by linked account %q: %w", project.LinkedAccountID, err))
+		return util.NewAPIError(util.ErrInternal, errors.Wrapf(err, "failed to get user by linked account %q", project.LinkedAccountID))
 	}
 	la := user.LinkedAccounts[project.LinkedAccountID]
 	if la == nil {
@@ -84,12 +84,12 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) error {
 	}
 	rs, _, err := h.configstoreClient.GetRemoteSource(ctx, la.RemoteSourceID)
 	if err != nil {
-		return util.NewAPIError(util.ErrInternal, errors.Errorf("failed to get remote source %q: %w", la.RemoteSourceID, err))
+		return util.NewAPIError(util.ErrInternal, errors.Wrapf(err, "failed to get remote source %q", la.RemoteSourceID))
 	}
 
 	gitSource, err := h.ah.GetGitSource(ctx, rs, user.Name, la)
 	if err != nil {
-		return util.NewAPIError(util.ErrInternal, errors.Errorf("failed to create gitea client: %w", err))
+		return util.NewAPIError(util.ErrInternal, errors.Wrapf(err, "failed to create gitea client"))
 	}
 
 	sshPrivKey := project.SSHPrivateKey
@@ -102,7 +102,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) error {
 
 	webhookData, err := gitSource.ParseWebhook(r, project.WebhookSecret)
 	if err != nil {
-		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("failed to parse webhook: %w", err))
+		return util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "failed to parse webhook"))
 	}
 	// skip nil webhook data
 	// TODO(sgotti) report the reason of the skip
@@ -141,7 +141,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) error {
 		CompareLink:     webhookData.CompareLink,
 	}
 	if err := h.ah.CreateRuns(ctx, req); err != nil {
-		return util.NewAPIError(util.ErrInternal, errors.Errorf("failed to create run: %w", err))
+		return util.NewAPIError(util.ErrInternal, errors.Wrapf(err, "failed to create run"))
 	}
 
 	return nil

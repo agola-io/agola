@@ -19,11 +19,11 @@ import (
 	"encoding/json"
 
 	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
 
 	sq "github.com/Masterminds/squirrel"
-	errors "golang.org/x/xerrors"
 )
 
 var (
@@ -34,18 +34,18 @@ var (
 func (r *ReadDB) insertVariable(tx *db.Tx, data []byte) error {
 	variable := types.Variable{}
 	if err := json.Unmarshal(data, &variable); err != nil {
-		return errors.Errorf("failed to unmarshal variable: %w", err)
+		return errors.Wrapf(err, "failed to unmarshal variable")
 	}
 	// poor man insert or update...
 	if err := r.deleteVariable(tx, variable.ID); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	q, args, err := variableInsert.Values(variable.ID, variable.Name, variable.Parent.ID, variable.Parent.Type, data).ToSql()
 	if err != nil {
-		return errors.Errorf("failed to build query: %w", err)
+		return errors.Wrapf(err, "failed to build query")
 	}
 	if _, err = tx.Exec(q, args...); err != nil {
-		return errors.Errorf("failed to insert variable: %w", err)
+		return errors.Wrapf(err, "failed to insert variable")
 	}
 
 	return nil
@@ -54,7 +54,7 @@ func (r *ReadDB) insertVariable(tx *db.Tx, data []byte) error {
 func (r *ReadDB) deleteVariable(tx *db.Tx, id string) error {
 	// poor man insert or update...
 	if _, err := tx.Exec("delete from variable where id = $1", id); err != nil {
-		return errors.Errorf("failed to delete variable: %w", err)
+		return errors.Wrapf(err, "failed to delete variable")
 	}
 	return nil
 }
@@ -63,12 +63,12 @@ func (r *ReadDB) GetVariableByID(tx *db.Tx, variableID string) (*types.Variable,
 	q, args, err := variableSelect.Where(sq.Eq{"id": variableID}).ToSql()
 	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Errorf("failed to build query: %w", err)
+		return nil, errors.Wrapf(err, "failed to build query")
 	}
 
 	variables, _, err := fetchVariables(tx, q, args...)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if len(variables) > 1 {
 		return nil, errors.Errorf("too many rows returned")
@@ -83,12 +83,12 @@ func (r *ReadDB) GetVariableByName(tx *db.Tx, parentID, name string) (*types.Var
 	q, args, err := variableSelect.Where(sq.Eq{"parentid": parentID, "name": name}).ToSql()
 	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Errorf("failed to build query: %w", err)
+		return nil, errors.Wrapf(err, "failed to build query")
 	}
 
 	variables, _, err := fetchVariables(tx, q, args...)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if len(variables) > 1 {
 		return nil, errors.Errorf("too many rows returned")
@@ -103,11 +103,11 @@ func (r *ReadDB) GetVariables(tx *db.Tx, parentID string) ([]*types.Variable, er
 	q, args, err := variableSelect.Where(sq.Eq{"parentid": parentID}).ToSql()
 	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Errorf("failed to build query: %w", err)
+		return nil, errors.Wrapf(err, "failed to build query")
 	}
 
 	variables, _, err := fetchVariables(tx, q, args...)
-	return variables, err
+	return variables, errors.WithStack(err)
 }
 
 func (r *ReadDB) GetVariablesTree(tx *db.Tx, parentType types.ConfigType, parentID string) ([]*types.Variable, error) {
@@ -116,7 +116,7 @@ func (r *ReadDB) GetVariablesTree(tx *db.Tx, parentType types.ConfigType, parent
 	for parentType == types.ConfigTypeProjectGroup || parentType == types.ConfigTypeProject {
 		vars, err := r.GetVariables(tx, parentID)
 		if err != nil {
-			return nil, errors.Errorf("failed to get variables for %s %q: %w", parentType, parentID, err)
+			return nil, errors.Wrapf(err, "failed to get variables for %s %q", parentType, parentID)
 		}
 		allVariables = append(allVariables, vars...)
 
@@ -124,7 +124,7 @@ func (r *ReadDB) GetVariablesTree(tx *db.Tx, parentType types.ConfigType, parent
 		case types.ConfigTypeProjectGroup:
 			projectGroup, err := r.GetProjectGroup(tx, parentID)
 			if err != nil {
-				return nil, err
+				return nil, errors.WithStack(err)
 			}
 			if projectGroup == nil {
 				return nil, errors.Errorf("projectgroup with id %q doesn't exist", parentID)
@@ -134,7 +134,7 @@ func (r *ReadDB) GetVariablesTree(tx *db.Tx, parentType types.ConfigType, parent
 		case types.ConfigTypeProject:
 			project, err := r.GetProject(tx, parentID)
 			if err != nil {
-				return nil, err
+				return nil, errors.WithStack(err)
 			}
 			if project == nil {
 				return nil, errors.Errorf("project with id %q doesn't exist", parentID)
@@ -150,7 +150,7 @@ func (r *ReadDB) GetVariablesTree(tx *db.Tx, parentType types.ConfigType, parent
 func fetchVariables(tx *db.Tx, q string, args ...interface{}) ([]*types.Variable, []string, error) {
 	rows, err := tx.Query(q, args...)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.WithStack(err)
 	}
 	defer rows.Close()
 	return scanVariables(rows)
@@ -160,12 +160,12 @@ func scanVariable(rows *sql.Rows, additionalFields ...interface{}) (*types.Varia
 	var id string
 	var data []byte
 	if err := rows.Scan(&id, &data); err != nil {
-		return nil, "", errors.Errorf("failed to scan rows: %w", err)
+		return nil, "", errors.Wrapf(err, "failed to scan rows")
 	}
 	variable := types.Variable{}
 	if len(data) > 0 {
 		if err := json.Unmarshal(data, &variable); err != nil {
-			return nil, "", errors.Errorf("failed to unmarshal variable: %w", err)
+			return nil, "", errors.Wrapf(err, "failed to unmarshal variable")
 		}
 	}
 
@@ -179,13 +179,13 @@ func scanVariables(rows *sql.Rows) ([]*types.Variable, []string, error) {
 		p, id, err := scanVariable(rows)
 		if err != nil {
 			rows.Close()
-			return nil, nil, err
+			return nil, nil, errors.WithStack(err)
 		}
 		variables = append(variables, p)
 		ids = append(ids, id)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, nil, err
+		return nil, nil, errors.WithStack(err)
 	}
 	return variables, ids, nil
 }

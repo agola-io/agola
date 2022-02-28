@@ -17,6 +17,8 @@ package util
 import (
 	"bytes"
 	"io"
+
+	"agola.io/agola/internal/errors"
 )
 
 type LimitedBuffer struct {
@@ -24,11 +26,13 @@ type LimitedBuffer struct {
 	cap int
 }
 
-func (b *LimitedBuffer) Write(p []byte) (n int, err error) {
+func (b *LimitedBuffer) Write(p []byte) (int, error) {
 	if len(p)+b.Len() > b.cap {
 		return 0, io.EOF
 	}
-	return b.Buffer.Write(p)
+	n, err := b.Buffer.Write(p)
+
+	return n, errors.WithStack(err)
 }
 
 func NewLimitedBuffer(cap int) *LimitedBuffer {

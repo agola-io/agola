@@ -17,11 +17,11 @@ package cmd
 import (
 	"context"
 
+	"agola.io/agola/internal/errors"
 	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	errors "golang.org/x/xerrors"
 )
 
 var cmdOrgDelete = &cobra.Command{
@@ -57,7 +57,7 @@ func orgDelete(cmd *cobra.Command, args []string) error {
 
 	log.Info().Msgf("deleting organization %q", orgDeleteOpts.name)
 	if _, err := gwclient.DeleteOrg(context.TODO(), orgDeleteOpts.name); err != nil {
-		return errors.Errorf("failed to delete organization: %w", err)
+		return errors.Wrapf(err, "failed to delete organization")
 	}
 
 	return nil

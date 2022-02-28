@@ -16,8 +16,8 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 
+	"agola.io/agola/internal/errors"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
@@ -76,7 +76,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		set++
 	}
 	if set != 1 {
-		return fmt.Errorf(`one of "--branch", "--tag" or "--ref" must be provided`)
+		return errors.Errorf(`one of "--branch", "--tag" or "--ref" must be provided`)
 	}
 
 	req := &gwapitypes.ProjectCreateRunRequest{
@@ -88,5 +88,5 @@ func runCreate(cmd *cobra.Command, args []string) error {
 
 	_, err := gwclient.ProjectCreateRun(context.TODO(), runCreateOpts.projectRef, req)
 
-	return err
+	return errors.WithStack(err)
 }

@@ -19,12 +19,11 @@ import (
 	"fmt"
 	"net/url"
 
+	"agola.io/agola/internal/errors"
 	gitsource "agola.io/agola/internal/gitsources"
 	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/gateway/action"
 	rstypes "agola.io/agola/services/runservice/types"
-
-	errors "golang.org/x/xerrors"
 )
 
 func (n *NotificationService) updateCommitStatus(ctx context.Context, ev *rstypes.RunEvent) error {
@@ -55,11 +54,11 @@ func (n *NotificationService) updateCommitStatus(ctx context.Context, ev *rstype
 
 	run, _, err := n.runserviceClient.GetRun(ctx, ev.RunID, nil)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	groupType, groupID, err := common.GroupTypeIDFromRunGroup(run.RunConfig.Group)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	// ignore user direct runs
@@ -69,12 +68,12 @@ func (n *NotificationService) updateCommitStatus(ctx context.Context, ev *rstype
 
 	project, _, err := n.configstoreClient.GetProject(ctx, groupID)
 	if err != nil {
-		return errors.Errorf("failed to get project %s: %w", groupID, err)
+		return errors.Wrapf(err, "failed to get project %s", groupID)
 	}
 
 	user, _, err := n.configstoreClient.GetUserByLinkedAccount(ctx, project.LinkedAccountID)
 	if err != nil {
-		return errors.Errorf("failed to get user by linked account %q: %w", project.LinkedAccountID, err)
+		return errors.Wrapf(err, "failed to get user by linked account %q", project.LinkedAccountID)
 	}
 	la := user.LinkedAccounts[project.LinkedAccountID]
 	if la == nil {
@@ -82,24 +81,24 @@ func (n *NotificationService) updateCommitStatus(ctx context.Context, ev *rstype
 	}
 	rs, _, err := n.configstoreClient.GetRemoteSource(ctx, la.RemoteSourceID)
 	if err != nil {
-		return errors.Errorf("failed to get remote source %q: %w", la.RemoteSourceID, err)
+		return errors.Wrapf(err, "failed to get remote source %q", la.RemoteSourceID)
 	}
 
 	// TODO(sgotti) handle refreshing oauth2 tokens
 	gitSource, err := common.GetGitSource(rs, la)
 	if err != nil {
-		return errors.Errorf("failed to create gitea client: %w", err)
+		return errors.Wrapf(err, "failed to create gitea client")
 	}
 
 	targetURL, err := webRunURL(n.c.WebExposedURL, project.ID, run.Run.ID)
 	if err != nil {
-		return errors.Errorf("failed to generate commit status target url: %w", err)
+		return errors.Wrapf(err, "failed to generate commit status target url")
 	}
 	description := statusDescription(commitStatus)
 	context := fmt.Sprintf("%s/%s/%s", n.gc.ID, project.Name, run.RunConfig.Name)
 
 	if err := gitSource.CreateCommitStatus(project.RepositoryPath, run.Run.Annotations[action.AnnotationCommitSHA], commitStatus, targetURL, description, context); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	return nil
@@ -108,7 +107,7 @@ func (n *NotificationService) updateCommitStatus(ctx context.Context, ev *rstype
 func webRunURL(webExposedURL, projectID, runID string) (string, error) {
 	u, err := url.Parse(webExposedURL + "/run")
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	q := url.Values{}
 	q.Set("projectref", projectID)

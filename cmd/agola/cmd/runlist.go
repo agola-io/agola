@@ -20,9 +20,9 @@ import (
 	"path"
 	"sort"
 
+	"agola.io/agola/internal/errors"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
-	errors "golang.org/x/xerrors"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -104,14 +104,14 @@ func runList(cmd *cobra.Command, args []string) error {
 	groups := []string{path.Join("/project", project.ID)}
 	runsResp, _, err := gwclient.GetRuns(context.TODO(), runListOpts.phaseFilter, nil, groups, nil, runListOpts.start, runListOpts.limit, false)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	runs := make([]*runDetails, len(runsResp))
 	for i, runResponse := range runsResp {
 		run, _, err := gwclient.GetRun(context.TODO(), runResponse.ID)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		tasks := []*taskDetails{}

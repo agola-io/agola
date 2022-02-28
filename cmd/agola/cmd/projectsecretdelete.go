@@ -17,11 +17,11 @@ package cmd
 import (
 	"context"
 
+	"agola.io/agola/internal/errors"
 	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	errors "golang.org/x/xerrors"
 )
 
 var cmdProjectSecretDelete = &cobra.Command{
@@ -65,14 +65,14 @@ func secretDelete(cmd *cobra.Command, ownertype string, args []string) error {
 		log.Info().Msgf("deleting project secret")
 		_, err := gwclient.DeleteProjectSecret(context.TODO(), secretDeleteOpts.parentRef, secretDeleteOpts.name)
 		if err != nil {
-			return errors.Errorf("failed to delete project secret: %w", err)
+			return errors.Wrapf(err, "failed to delete project secret")
 		}
 		log.Info().Msgf("project secret deleted")
 	case "projectgroup":
 		log.Info().Msgf("deleting project group secret")
 		_, err := gwclient.DeleteProjectGroupSecret(context.TODO(), secretDeleteOpts.parentRef, secretDeleteOpts.name)
 		if err != nil {
-			return errors.Errorf("failed to delete project group secret: %w", err)
+			return errors.Wrapf(err, "failed to delete project group secret")
 		}
 		log.Info().Msgf("project group secret deleted")
 	}

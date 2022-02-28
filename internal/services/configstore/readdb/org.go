@@ -19,12 +19,12 @@ import (
 	"encoding/json"
 
 	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/configstore/common"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
 
 	sq "github.com/Masterminds/squirrel"
-	errors "golang.org/x/xerrors"
 )
 
 var (
@@ -38,19 +38,19 @@ var (
 func (r *ReadDB) insertOrg(tx *db.Tx, data []byte) error {
 	org := types.Organization{}
 	if err := json.Unmarshal(data, &org); err != nil {
-		return errors.Errorf("failed to unmarshal org: %w", err)
+		return errors.Wrapf(err, "failed to unmarshal org")
 	}
 	r.log.Debug().Msgf("inserting org: %s", util.Dump(org))
 	// poor man insert or update...
 	if err := r.deleteOrg(tx, org.ID); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	q, args, err := orgInsert.Values(org.ID, org.Name, data).ToSql()
 	if err != nil {
-		return errors.Errorf("failed to build query: %w", err)
+		return errors.Wrapf(err, "failed to build query")
 	}
 	if _, err := tx.Exec(q, args...); err != nil {
-		return errors.Errorf("failed to insert org: %w", err)
+		return errors.Wrapf(err, "failed to insert org")
 	}
 
 	return nil
@@ -58,7 +58,7 @@ func (r *ReadDB) insertOrg(tx *db.Tx, data []byte) error {
 
 func (r *ReadDB) deleteOrg(tx *db.Tx, orgID string) error {
 	if _, err := tx.Exec("delete from org where id = $1", orgID); err != nil {
-		return errors.Errorf("failed to delete org: %w", err)
+		return errors.Wrapf(err, "failed to delete org")
 	}
 	return nil
 }
@@ -66,7 +66,7 @@ func (r *ReadDB) deleteOrg(tx *db.Tx, orgID string) error {
 func (r *ReadDB) GetOrg(tx *db.Tx, orgRef string) (*types.Organization, error) {
 	refType, err := common.ParseNameRef(orgRef)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	var org *types.Organization
@@ -76,19 +76,19 @@ func (r *ReadDB) GetOrg(tx *db.Tx, orgRef string) (*types.Organization, error) {
 	case common.RefTypeName:
 		org, err = r.GetOrgByName(tx, orgRef)
 	}
-	return org, err
+	return org, errors.WithStack(err)
 }
 
 func (r *ReadDB) GetOrgByID(tx *db.Tx, orgID string) (*types.Organization, error) {
 	q, args, err := orgSelect.Where(sq.Eq{"id": orgID}).ToSql()
 	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Errorf("failed to build query: %w", err)
+		return nil, errors.Wrapf(err, "failed to build query")
 	}
 
 	orgs, _, err := fetchOrgs(tx, q, args...)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if len(orgs) > 1 {
 		return nil, errors.Errorf("too many rows returned")
@@ -103,12 +103,12 @@ func (r *ReadDB) GetOrgByName(tx *db.Tx, name string) (*types.Organization, erro
 	q, args, err := orgSelect.Where(sq.Eq{"name": name}).ToSql()
 	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Errorf("failed to build query: %w", err)
+		return nil, errors.Wrapf(err, "failed to build query")
 	}
 
 	orgs, _, err := fetchOrgs(tx, q, args...)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if len(orgs) > 1 {
 		return nil, errors.Errorf("too many rows returned")
@@ -149,22 +149,22 @@ func (r *ReadDB) GetOrgs(tx *db.Tx, startOrgName string, limit int, asc bool) ([
 	q, args, err := s.ToSql()
 	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Errorf("failed to build query: %w", err)
+		return nil, errors.Wrapf(err, "failed to build query")
 	}
 
 	rows, err := tx.Query(q, args...)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	orgs, _, err = scanOrgs(rows)
-	return orgs, err
+	return orgs, errors.WithStack(err)
 }
 
 func fetchOrgs(tx *db.Tx, q string, args ...interface{}) ([]*types.Organization, []string, error) {
 	rows, err := tx.Query(q, args...)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.WithStack(err)
 	}
 	defer rows.Close()
 	return scanOrgs(rows)
@@ -174,12 +174,12 @@ func scanOrg(rows *sql.Rows, additionalFields ...interface{}) (*types.Organizati
 	var id string
 	var data []byte
 	if err := rows.Scan(&id, &data); err != nil {
-		return nil, "", errors.Errorf("failed to scan rows: %w", err)
+		return nil, "", errors.Wrapf(err, "failed to scan rows")
 	}
 	org := types.Organization{}
 	if len(data) > 0 {
 		if err := json.Unmarshal(data, &org); err != nil {
-			return nil, "", errors.Errorf("failed to unmarshal org: %w", err)
+			return nil, "", errors.Wrapf(err, "failed to unmarshal org")
 		}
 	}
 
@@ -193,13 +193,13 @@ func scanOrgs(rows *sql.Rows) ([]*types.Organization, []string, error) {
 		org, id, err := scanOrg(rows)
 		if err != nil {
 			rows.Close()
-			return nil, nil, err
+			return nil, nil, errors.WithStack(err)
 		}
 		orgs = append(orgs, org)
 		ids = append(ids, id)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, nil, err
+		return nil, nil, errors.WithStack(err)
 	}
 	return orgs, ids, nil
 }
@@ -207,19 +207,19 @@ func scanOrgs(rows *sql.Rows) ([]*types.Organization, []string, error) {
 func (r *ReadDB) insertOrgMember(tx *db.Tx, data []byte) error {
 	orgmember := types.OrganizationMember{}
 	if err := json.Unmarshal(data, &orgmember); err != nil {
-		return errors.Errorf("failed to unmarshal orgmember: %w", err)
+		return errors.Wrapf(err, "failed to unmarshal orgmember")
 	}
 	r.log.Debug().Msgf("inserting orgmember: %s", util.Dump(orgmember))
 	// poor man insert or update...
 	if err := r.deleteOrgMember(tx, orgmember.ID); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	q, args, err := orgmemberInsert.Values(orgmember.ID, orgmember.OrganizationID, orgmember.UserID, orgmember.MemberRole, data).ToSql()
 	if err != nil {
-		return errors.Errorf("failed to build query: %w", err)
+		return errors.Wrapf(err, "failed to build query")
 	}
 	if _, err := tx.Exec(q, args...); err != nil {
-		return errors.Errorf("failed to insert orgmember: %w", err)
+		return errors.Wrapf(err, "failed to insert orgmember")
 	}
 
 	return nil
@@ -227,7 +227,7 @@ func (r *ReadDB) insertOrgMember(tx *db.Tx, data []byte) error {
 
 func (r *ReadDB) deleteOrgMember(tx *db.Tx, orgmemberID string) error {
 	if _, err := tx.Exec("delete from orgmember where id = $1", orgmemberID); err != nil {
-		return errors.Errorf("failed to delete orgmember: %w", err)
+		return errors.Wrapf(err, "failed to delete orgmember")
 	}
 	return nil
 }
@@ -236,12 +236,12 @@ func (r *ReadDB) GetOrgMemberByOrgUserID(tx *db.Tx, orgID, userID string) (*type
 	q, args, err := orgmemberSelect.Where(sq.Eq{"orgmember.orgid": orgID, "orgmember.userid": userID}).ToSql()
 	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Errorf("failed to build query: %w", err)
+		return nil, errors.Wrapf(err, "failed to build query")
 	}
 
 	oms, _, err := fetchOrgMembers(tx, q, args...)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if len(oms) > 1 {
 		return nil, errors.Errorf("too many rows returned")
@@ -255,7 +255,7 @@ func (r *ReadDB) GetOrgMemberByOrgUserID(tx *db.Tx, orgID, userID string) (*type
 func fetchOrgMembers(tx *db.Tx, q string, args ...interface{}) ([]*types.OrganizationMember, []string, error) {
 	rows, err := tx.Query(q, args...)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.WithStack(err)
 	}
 	defer rows.Close()
 	return scanOrgMembers(rows)
@@ -265,12 +265,12 @@ func scanOrgMember(rows *sql.Rows, additionalFields ...interface{}) (*types.Orga
 	var id string
 	var data []byte
 	if err := rows.Scan(&id, &data); err != nil {
-		return nil, "", errors.Errorf("failed to scan rows: %w", err)
+		return nil, "", errors.Wrapf(err, "failed to scan rows")
 	}
 	orgmember := types.OrganizationMember{}
 	if len(data) > 0 {
 		if err := json.Unmarshal(data, &orgmember); err != nil {
-			return nil, "", errors.Errorf("failed to unmarshal org: %w", err)
+			return nil, "", errors.Wrapf(err, "failed to unmarshal org")
 		}
 	}
 
@@ -284,13 +284,13 @@ func scanOrgMembers(rows *sql.Rows) ([]*types.OrganizationMember, []string, erro
 		orgmember, id, err := scanOrgMember(rows)
 		if err != nil {
 			rows.Close()
-			return nil, nil, err
+			return nil, nil, errors.WithStack(err)
 		}
 		orgmembers = append(orgmembers, orgmember)
 		ids = append(ids, id)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, nil, err
+		return nil, nil, errors.WithStack(err)
 	}
 	return orgmembers, ids, nil
 }
@@ -309,12 +309,12 @@ func (r *ReadDB) GetOrgUsers(tx *db.Tx, orgID string) ([]*OrgUser, error) {
 	q, args, err := s.ToSql()
 	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Errorf("failed to build query: %w", err)
+		return nil, errors.Wrapf(err, "failed to build query")
 	}
 
 	rows, err := tx.Query(q, args...)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	defer rows.Close()
 
@@ -325,13 +325,13 @@ func (r *ReadDB) GetOrgUsers(tx *db.Tx, orgID string) ([]*OrgUser, error) {
 		var orgmemberdata []byte
 		var userdata []byte
 		if err := rows.Scan(&orgmemberdata, &userdata); err != nil {
-			return nil, errors.Errorf("failed to scan rows: %w", err)
+			return nil, errors.Wrapf(err, "failed to scan rows")
 		}
 		if err := json.Unmarshal(orgmemberdata, &orgmember); err != nil {
-			return nil, errors.Errorf("failed to unmarshal orgmember: %w", err)
+			return nil, errors.Wrapf(err, "failed to unmarshal orgmember")
 		}
 		if err := json.Unmarshal(userdata, &user); err != nil {
-			return nil, errors.Errorf("failed to unmarshal org: %w", err)
+			return nil, errors.Wrapf(err, "failed to unmarshal org")
 		}
 
 		orgusers = append(orgusers, &OrgUser{
@@ -340,7 +340,7 @@ func (r *ReadDB) GetOrgUsers(tx *db.Tx, orgID string) ([]*OrgUser, error) {
 		})
 	}
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return orgusers, nil
@@ -360,12 +360,12 @@ func (r *ReadDB) GetUserOrgs(tx *db.Tx, userID string) ([]*UserOrg, error) {
 	q, args, err := s.ToSql()
 	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 	if err != nil {
-		return nil, errors.Errorf("failed to build query: %w", err)
+		return nil, errors.Wrapf(err, "failed to build query")
 	}
 
 	rows, err := tx.Query(q, args...)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	defer rows.Close()
 
@@ -376,13 +376,13 @@ func (r *ReadDB) GetUserOrgs(tx *db.Tx, userID string) ([]*UserOrg, error) {
 		var orgmemberdata []byte
 		var orgdata []byte
 		if err := rows.Scan(&orgmemberdata, &orgdata); err != nil {
-			return nil, errors.Errorf("failed to scan rows: %w", err)
+			return nil, errors.Wrapf(err, "failed to scan rows")
 		}
 		if err := json.Unmarshal(orgmemberdata, &orgmember); err != nil {
-			return nil, errors.Errorf("failed to unmarshal orgmember: %w", err)
+			return nil, errors.Wrapf(err, "failed to unmarshal orgmember")
 		}
 		if err := json.Unmarshal(orgdata, &org); err != nil {
-			return nil, errors.Errorf("failed to unmarshal org: %w", err)
+			return nil, errors.Wrapf(err, "failed to unmarshal org")
 		}
 
 		userorgs = append(userorgs, &UserOrg{
@@ -391,7 +391,7 @@ func (r *ReadDB) GetUserOrgs(tx *db.Tx, userID string) ([]*UserOrg, error) {
 		})
 	}
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return userorgs, nil

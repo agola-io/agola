@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 
+	"agola.io/agola/internal/errors"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
@@ -62,7 +63,7 @@ func userList(cmd *cobra.Command, args []string) error {
 
 	users, _, err := gwclient.GetUsers(context.TODO(), userListOpts.start, userListOpts.limit, false)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	printUsers(users)

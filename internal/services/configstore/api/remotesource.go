@@ -20,6 +20,7 @@ import (
 	"strconv"
 
 	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/configstore/action"
 	"agola.io/agola/internal/services/configstore/readdb"
 	"agola.io/agola/internal/util"
@@ -27,7 +28,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
-	errors "golang.org/x/xerrors"
 )
 
 type RemoteSourceHandler struct {
@@ -48,7 +48,7 @@ func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		remoteSource, err = h.readDB.GetRemoteSource(tx, rsRef)
-		return err
+		return errors.WithStack(err)
 	})
 	if err != nil {
 		h.log.Err(err).Send()
@@ -181,7 +181,7 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		var err error
 		limit, err = strconv.Atoi(limitS)
 		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot parse limit: %w", err)))
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit")))
 			return
 		}
 	}

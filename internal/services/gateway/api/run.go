@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
@@ -27,7 +28,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
-	errors "golang.org/x/xerrors"
 )
 
 func createRunResponse(r *rstypes.Run, rc *rstypes.RunConfig) *gwapitypes.RunResponse {
@@ -269,7 +269,7 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		limit, err = strconv.Atoi(limitS)
 		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot parse limit: %w", err)))
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit")))
 			return
 		}
 	}
@@ -427,7 +427,7 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		step, err = strconv.Atoi(stepStr)
 		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot parse step number: %w", err)))
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse step number")))
 			return
 		}
 	}
@@ -487,7 +487,7 @@ func sendLogs(w io.Writer, r io.Reader) error {
 		n, err := r.Read(buf)
 		if err != nil {
 			if err != io.EOF {
-				return err
+				return errors.WithStack(err)
 			}
 			if n == 0 {
 				return nil
@@ -495,7 +495,7 @@ func sendLogs(w io.Writer, r io.Reader) error {
 			stop = true
 		}
 		if _, err := w.Write(buf[:n]); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if flusher != nil {
 			flusher.Flush()
@@ -544,7 +544,7 @@ func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		step, err = strconv.Atoi(stepStr)
 		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot parse step number: %w", err)))
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse step number")))
 			return
 		}
 	}

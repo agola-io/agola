@@ -15,9 +15,10 @@
 package sequence
 
 import (
-	"errors"
 	"math"
 	"testing"
+
+	"agola.io/agola/internal/errors"
 
 	"github.com/google/go-cmp/cmp"
 )

@@ -16,13 +16,13 @@ package unarchive
 
 import (
 	"archive/tar"
-	"errors"
-	"fmt"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"runtime"
+
+	"agola.io/agola/internal/errors"
 )
 
 const (
@@ -33,19 +33,27 @@ func Unarchive(source io.Reader, destDir string, overwrite, removeDestDir bool) 
 	var err error
 	destDir, err = filepath.Abs(destDir)
 	if err != nil {
-		return fmt.Errorf("failed to calculate destination dir absolute path: %w", err)
+		return errors.Wrapf(err, "failed to calculate destination dir absolute path")
 	}
 	// don't follow destdir if it's a symlink
 	fi, err := os.Lstat(destDir)
 	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to lstat destination dir: %w", err)
+		return errors.Wrapf(err, "failed to lstat destination dir")
 	}
 	if fi != nil && !fi.IsDir() {
-		return fmt.Errorf("destination path %q already exists and it's not a directory (mode: %q)", destDir, fi.Mode().String())
+		return errors.Errorf(
+			"destination path %q already exists and it's not a directory (mode: %q)",
+			destDir,
+			fi.Mode().String(),
+		)
 	}
 	if fi != nil && fi.IsDir() && removeDestDir {
 		if err := os.RemoveAll(destDir); err != nil {
-			return fmt.Errorf("destination path %q already exists and it's not a directory (mode: %q)", destDir, fi.Mode().String())
+			return errors.Errorf(
+				"destination path %q already exists and it's not a directory (mode: %q)",
+				destDir,
+				fi.Mode().String(),
+			)
 		}
 	}
 
@@ -57,7 +65,7 @@ func Unarchive(source io.Reader, destDir string, overwrite, removeDestDir bool) 
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("error reading file in tar archive: %w", err)
+			return errors.Wrapf(err, "error reading file in tar archive")
 		}
 	}
 
@@ -67,61 +75,61 @@ func Unarchive(source io.Reader, destDir string, overwrite, removeDestDir bool) 
 func untarNext(tr *tar.Reader, destDir string, overwrite bool) error {
 	hdr, err := tr.Next()
 	if err != nil {
-		return err // don't wrap error; calling loop must break on io.EOF
+		return errors.WithStack(err)
 	}
 	destPath := filepath.Join(destDir, hdr.Name)
 	log.Printf("file: %q", destPath)
 
 	// do not overwrite existing files, if configured
 	if !overwrite && fileExists(destPath) {
-		return fmt.Errorf("file already exists: %s", destPath)
+		return errors.Errorf("file already exists: %s", destPath)
 	}
 	// if "to" is a file and now exits and it's not a file then remove it
 	if err := os.RemoveAll(destPath); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	switch hdr.Typeflag {
 	case tar.TypeDir:
 		fi, err := os.Lstat(destPath)
 		if err != nil && !os.IsNotExist(err) {
-			return err
+			return errors.WithStack(err)
 		}
 		if fi != nil && !fi.IsDir() {
 			if err := os.RemoveAll(destPath); err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 		}
 		return mkdir(destPath, hdr.FileInfo().Mode())
 	case tar.TypeReg, tar.TypeRegA, tar.TypeChar, tar.TypeBlock, tar.TypeFifo:
 		fi, err := os.Lstat(destPath)
 		if err != nil && !os.IsNotExist(err) {
-			return err
+			return errors.WithStack(err)
 		}
 		if fi != nil && !fi.Mode().IsRegular() {
 			if err := os.RemoveAll(destPath); err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 		}
 		return writeNewFile(destPath, tr, hdr.FileInfo().Mode())
 	case tar.TypeSymlink:
 		if fileExists(destPath) {
 			if err := os.RemoveAll(destPath); err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 		}
 		return writeNewSymbolicLink(destPath, hdr.Linkname)
 	case tar.TypeLink:
 		if fileExists(destPath) {
 			if err := os.RemoveAll(destPath); err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 		}
 		return writeNewHardLink(destPath, filepath.Join(destPath, hdr.Linkname))
 	case tar.TypeXGlobalHeader:
 		return nil // ignore the pax global header from git-generated tarballs
 	default:
-		return fmt.Errorf("%s: unknown type flag: %c", hdr.Name, hdr.Typeflag)
+		return errors.Errorf("%s: unknown type flag: %c", hdr.Name, hdr.Typeflag)
 	}
 }
 
@@ -133,7 +141,7 @@ func fileExists(name string) bool {
 func mkdir(dirPath string, mode os.FileMode) error {
 	err := os.MkdirAll(dirPath, mode)
 	if err != nil {
-		return fmt.Errorf("%s: making directory: %w", dirPath, err)
+		return errors.Wrapf(err, "%s: making directory", dirPath)
 	}
 	return nil
 }
@@ -141,23 +149,23 @@ func mkdir(dirPath string, mode os.FileMode) error {
 func writeNewFile(fpath string, in io.Reader, mode os.FileMode) error {
 	err := os.MkdirAll(filepath.Dir(fpath), defaultDirPerm)
 	if err != nil {
-		return fmt.Errorf("%s: making directory for file: %w", fpath, err)
+		return errors.Wrapf(err, "%s: making directory for file", fpath)
 	}
 
 	out, err := os.Create(fpath)
 	if err != nil {
-		return fmt.Errorf("%s: creating new file: %w", fpath, err)
+		return errors.Wrapf(err, "%s: creating new file", fpath)
 	}
 	defer out.Close()
 
 	err = out.Chmod(mode)
 	if err != nil && runtime.GOOS != "windows" {
-		return fmt.Errorf("%s: changing file mode: %w", fpath, err)
+		return errors.Wrapf(err, "%s: changing file mode", fpath)
 	}
 
 	_, err = io.Copy(out, in)
 	if err != nil {
-		return fmt.Errorf("%s: writing file: %w", fpath, err)
+		return errors.Wrapf(err, "%s: writing file", fpath)
 	}
 	return nil
 }
@@ -165,11 +173,11 @@ func writeNewFile(fpath string, in io.Reader, mode os.FileMode) error {
 func writeNewSymbolicLink(fpath string, target string) error {
 	err := os.MkdirAll(filepath.Dir(fpath), defaultDirPerm)
 	if err != nil {
-		return fmt.Errorf("%s: making directory for file: %w", fpath, err)
+		return errors.Wrapf(err, "%s: making directory for file", fpath)
 	}
 	err = os.Symlink(target, fpath)
 	if err != nil {
-		return fmt.Errorf("%s: making symbolic link for: %w", fpath, err)
+		return errors.Wrapf(err, "%s: making symbolic link for", fpath)
 	}
 	return nil
 }
@@ -177,11 +185,11 @@ func writeNewSymbolicLink(fpath string, target string) error {
 func writeNewHardLink(fpath string, target string) error {
 	err := os.MkdirAll(filepath.Dir(fpath), defaultDirPerm)
 	if err != nil {
-		return fmt.Errorf("%s: making directory for file: %w", fpath, err)
+		return errors.Wrapf(err, "%s: making directory for file", fpath)
 	}
 	err = os.Link(target, fpath)
 	if err != nil {
-		return fmt.Errorf("%s: making hard link for: %w", fpath, err)
+		return errors.Wrapf(err, "%s: making hard link for", fpath)
 	}
 	return nil
 }

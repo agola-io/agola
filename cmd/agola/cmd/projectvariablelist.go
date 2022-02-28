@@ -19,12 +19,12 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"agola.io/agola/internal/errors"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	errors "golang.org/x/xerrors"
 )
 
 var cmdProjectVariableList = &cobra.Command{
@@ -57,10 +57,10 @@ func init() {
 
 func variableList(cmd *cobra.Command, ownertype string, args []string) error {
 	if err := printVariables(ownertype, fmt.Sprintf("%s variables", ownertype), false, false); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	if err := printVariables(ownertype, "All variables (local and inherited)", true, true); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	return nil
 }
@@ -79,11 +79,11 @@ func printVariables(ownertype, description string, tree, removeoverridden bool) 
 		variables, _, err = gwclient.GetProjectGroupVariables(context.TODO(), variableListOpts.parentRef, tree, removeoverridden)
 	}
 	if err != nil {
-		return errors.Errorf("failed to list %s variables: %w", ownertype, err)
+		return errors.Wrapf(err, "failed to list %s variables", ownertype)
 	}
 	prettyJSON, err := json.MarshalIndent(variables, "", "\t")
 	if err != nil {
-		return errors.Errorf("failed to convert %s variables to json: %w", ownertype, err)
+		return errors.Wrapf(err, "failed to convert %s variables to json", ownertype)
 	}
 	fmt.Printf("%s:\n%s\n", description, string(prettyJSON))
 	return nil

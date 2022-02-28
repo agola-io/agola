@@ -15,10 +15,11 @@
 package gitsource
 
 import (
-	"errors"
 	"net/http"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/types"
+
 	"golang.org/x/oauth2"
 )
 

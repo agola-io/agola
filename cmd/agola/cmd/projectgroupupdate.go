@@ -17,12 +17,12 @@ package cmd
 import (
 	"context"
 
+	"agola.io/agola/internal/errors"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	errors "golang.org/x/xerrors"
 )
 
 var cmdProjectGroupUpdate = &cobra.Command{
@@ -82,7 +82,7 @@ func projectGroupUpdate(cmd *cobra.Command, args []string) error {
 	log.Info().Msgf("updating project group")
 	projectGroup, _, err := gwclient.UpdateProjectGroup(context.TODO(), projectGroupUpdateOpts.ref, req)
 	if err != nil {
-		return errors.Errorf("failed to update project group: %w", err)
+		return errors.Wrapf(err, "failed to update project group")
 	}
 	log.Info().Msgf("project group %s update, ID: %s", projectGroup.Name, projectGroup.ID)
 

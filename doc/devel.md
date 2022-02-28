@@ -2,7 +2,7 @@
 
 #### Start the web interface
 
-* Clone the [agola-web repository](https://github.com/agola-io/agola-web)
+- Clone the [agola-web repository](https://github.com/agola-io/agola-web)
 
 For the first time you'll need the `vue cli` and its services installed as global modules:
 
@@ -27,7 +27,7 @@ make
 
 ### Start the agola server
 
-* Copy the `example/config.yml` where you prefer
+- Copy the `example/config.yml` where you prefer
 
 ```
 ./bin/agola serve --embedded-etcd --config /path/to/your/config.yml --components all-base,executor
@@ -38,3 +38,9 @@ or use an external etcd (set it in the config.yml):
 ```
 ./bin/agola serve --config /path/to/your/config.yml --components all-base,executor
 ```
+
+### Error handling
+
+Use the `--detailed-errors` option to easily follow the errors chain.
+
+When developing you should wrap every error using `errors.Wrap[f]` or `errors.WithStack`. The ci uses `golangci-lint` with the `wrapcheck` linter enabled to check if some errors aren't wrapped.

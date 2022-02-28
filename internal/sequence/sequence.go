@@ -23,8 +23,8 @@ import (
 	"strings"
 	"time"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/etcd"
-	errors "golang.org/x/xerrors"
 )
 
 type Sequence struct {
@@ -55,11 +55,11 @@ func Parse(s string) (*Sequence, error) {
 	}
 	epoch, err := strconv.ParseUint(parts[0], 32, 64)
 	if err != nil {
-		return nil, errors.Errorf("cannot parse sequence epoch %q: %w", epoch, err)
+		return nil, errors.Wrapf(err, "cannot parse sequence epoch %q", epoch)
 	}
 	c, err := strconv.ParseUint(parts[1], 32, 64)
 	if err != nil {
-		return nil, errors.Errorf("cannot parse sequence count %q: %w", c, err)
+		return nil, errors.Wrapf(err, "cannot parse sequence count %q", c)
 	}
 	return &Sequence{
 		Epoch: epoch,
@@ -74,7 +74,7 @@ func (s *Sequence) EqualEpoch(s2 *Sequence) bool {
 func CurSequence(ctx context.Context, e *etcd.Store, key string) (*Sequence, bool, error) {
 	resp, err := e.Get(ctx, key, 0)
 	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
-		return nil, false, err
+		return nil, false, errors.WithStack(err)
 	}
 	if errors.Is(err, etcd.ErrKeyNotFound) {
 		return nil, false, nil
@@ -84,7 +84,7 @@ func CurSequence(ctx context.Context, e *etcd.Store, key string) (*Sequence, boo
 	if !errors.Is(err, etcd.ErrKeyNotFound) {
 		kv := resp.Kvs[0]
 		if err := json.Unmarshal(kv.Value, &seq); err != nil {
-			return nil, false, err
+			return nil, false, errors.WithStack(err)
 		}
 	}
 	return seq, true, nil
@@ -93,7 +93,7 @@ func CurSequence(ctx context.Context, e *etcd.Store, key string) (*Sequence, boo
 func IncSequence(ctx context.Context, e *etcd.Store, key string) (*Sequence, error) {
 	resp, err := e.Get(ctx, key, 0)
 	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	var revision int64
@@ -101,7 +101,7 @@ func IncSequence(ctx context.Context, e *etcd.Store, key string) (*Sequence, err
 	if !errors.Is(err, etcd.ErrKeyNotFound) {
 		kv := resp.Kvs[0]
 		if err := json.Unmarshal(kv.Value, &seq); err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 		revision = kv.ModRevision
 	}
@@ -120,12 +120,12 @@ func IncSequence(ctx context.Context, e *etcd.Store, key string) (*Sequence, err
 
 	seqj, err := json.Marshal(seq)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	_, err = e.AtomicPut(ctx, key, seqj, revision, nil)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return seq, nil
