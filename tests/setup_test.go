@@ -189,7 +189,7 @@ func startAgola(ctx context.Context, t *testing.T, log zerolog.Logger, dir strin
 	return errCh, nil
 }
 
-func setup(ctx context.Context, t *testing.T, dir string) (*testutil.TestEmbeddedEtcd, *testutil.TestGitea, *config.Config) {
+func setup(ctx context.Context, t *testing.T, dir string, gitea bool) (*testutil.TestEmbeddedEtcd, *testutil.TestGitea, *config.Config) {
 	log := testutil.NewLogger(t)
 
 	dockerBridgeAddress := os.Getenv("DOCKER_BRIDGE_ADDRESS")
@@ -297,7 +297,10 @@ func setup(ctx context.Context, t *testing.T, dir string) (*testutil.TestEmbedde
 		},
 	}
 
-	tgitea := setupGitea(t, dir, dockerBridgeAddress)
+	var tgitea *testutil.TestGitea
+	if gitea {
+		tgitea = setupGitea(t, dir, dockerBridgeAddress)
+	}
 
 	etcdDir := filepath.Join(dir, "etcd")
 	tetcd := setupEtcd(t, log, etcdDir)
@@ -375,7 +378,7 @@ func TestCreateLinkedAccount(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	tetcd, tgitea, c := setup(ctx, t, dir)
+	tetcd, tgitea, c := setup(ctx, t, dir, true)
 	defer shutdownGitea(tgitea)
 	defer shutdownEtcd(tetcd)
 
@@ -451,7 +454,7 @@ func TestCreateProject(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	tetcd, tgitea, c := setup(ctx, t, dir)
+	tetcd, tgitea, c := setup(ctx, t, dir, true)
 	defer shutdownGitea(tgitea)
 	defer shutdownEtcd(tetcd)
 
@@ -497,7 +500,7 @@ func TestUpdateProject(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		tetcd, tgitea, c := setup(ctx, t, dir)
+		tetcd, tgitea, c := setup(ctx, t, dir, true)
 		defer shutdownGitea(tgitea)
 		defer shutdownEtcd(tetcd)
 
@@ -803,7 +806,7 @@ func TestPush(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			tetcd, tgitea, c := setup(ctx, t, dir)
+			tetcd, tgitea, c := setup(ctx, t, dir, true)
 			defer shutdownGitea(tgitea)
 			defer shutdownEtcd(tetcd)
 
@@ -994,8 +997,7 @@ func TestDirectRun(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			tetcd, tgitea, c := setup(ctx, t, dir)
-			defer shutdownGitea(tgitea)
+			tetcd, _, c := setup(ctx, t, dir, false)
 			defer shutdownEtcd(tetcd)
 
 			gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
@@ -1147,8 +1149,7 @@ func TestDirectRunVariables(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			tetcd, tgitea, c := setup(ctx, t, dir)
-			defer shutdownGitea(tgitea)
+			tetcd, _, c := setup(ctx, t, dir, false)
 			defer shutdownEtcd(tetcd)
 
 			gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
@@ -1318,8 +1319,7 @@ func TestDirectRunLogs(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			tetcd, tgitea, c := setup(ctx, t, dir)
-			defer shutdownGitea(tgitea)
+			tetcd, _, c := setup(ctx, t, dir, false)
 			defer shutdownEtcd(tetcd)
 
 			gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
@@ -1498,7 +1498,7 @@ func TestPullRequest(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			tetcd, tgitea, c := setup(ctx, t, dir)
+			tetcd, tgitea, c := setup(ctx, t, dir, true)
 			defer shutdownGitea(tgitea)
 			defer shutdownEtcd(tetcd)
 
@@ -1837,8 +1837,7 @@ def main(ctx):
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				tetcd, tgitea, c := setup(ctx, t, dir)
-				defer shutdownGitea(tgitea)
+				tetcd, _, c := setup(ctx, t, dir, false)
 				defer shutdownEtcd(tetcd)
 
 				gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
@@ -1946,7 +1945,7 @@ func TestUserOrgs(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	tetcd, tgitea, c := setup(ctx, t, dir)
+	tetcd, tgitea, c := setup(ctx, t, dir, true)
 	defer shutdownGitea(tgitea)
 	defer shutdownEtcd(tetcd)
 
