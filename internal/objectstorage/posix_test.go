@@ -16,7 +16,6 @@ package objectstorage
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -25,11 +24,7 @@ import (
 func TestPosixDeleteObject(t *testing.T) {
 	objects := []string{"☺☺☺☺a☺☺☺☺☺☺b☺☺☺☺", "s3/is/nota/fil.fa", "s3/is/not/a/file///system/fi%l%%e01"}
 
-	dir, err := ioutil.TempDir("", "objectstorage")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	//defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	ls, err := NewPosix(dir)
 	if err != nil {

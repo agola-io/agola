@@ -17,7 +17,6 @@ package objectstorage
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -47,11 +46,7 @@ func setupS3(t *testing.T, dir string) (*S3Storage, error) {
 }
 
 func TestList(t *testing.T) {
-	dir, err := ioutil.TempDir("", "objectstorage")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	ps, err := setupPosix(t, dir)
 	if err != nil {
@@ -302,11 +297,7 @@ func TestList(t *testing.T) {
 }
 
 func TestWriteObject(t *testing.T) {
-	dir, err := ioutil.TempDir("", "objectstorage")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	ps, err := setupPosix(t, dir)
 	if err != nil {

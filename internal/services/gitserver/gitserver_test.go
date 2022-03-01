@@ -16,7 +16,6 @@ package gitserver
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -87,12 +86,7 @@ func TestRepoCleaner(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			log := testutil.NewLogger(t)
-
-			dir, err := ioutil.TempDir("", "agola")
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
-			defer os.RemoveAll(dir)
+			dir := t.TempDir()
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
