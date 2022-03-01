@@ -58,12 +58,7 @@ func shutdownEtcd(tetcd *testutil.TestEmbeddedEtcd) {
 }
 
 func TestEtcdReset(t *testing.T) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
+	dir := t.TempDir()
 	log := testutil.NewLogger(t)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
@@ -167,12 +162,7 @@ func TestEtcdReset(t *testing.T) {
 }
 
 func TestEtcdResetWalsGap(t *testing.T) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
+	dir := t.TempDir()
 	log := testutil.NewLogger(t)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
@@ -295,12 +285,7 @@ func TestEtcdResetWalsGap(t *testing.T) {
 }
 
 func TestConcurrentUpdate(t *testing.T) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
+	dir := t.TempDir()
 	log := testutil.NewLogger(t)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
@@ -388,12 +373,7 @@ func TestConcurrentUpdate(t *testing.T) {
 }
 
 func TestEtcdWalCleaner(t *testing.T) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
+	dir := t.TempDir()
 	log := testutil.NewLogger(t)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
@@ -464,12 +444,7 @@ func TestEtcdWalCleaner(t *testing.T) {
 }
 
 func TestReadObject(t *testing.T) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
+	dir := t.TempDir()
 	log := testutil.NewLogger(t)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
@@ -759,12 +734,7 @@ func TestCheckpoint(t *testing.T) {
 }
 
 func testCheckpoint(t *testing.T, basePath string) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
+	dir := t.TempDir()
 	log := testutil.NewLogger(t)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
@@ -977,12 +947,7 @@ func testCheckpoint(t *testing.T, basePath string) {
 }
 
 func TestRead(t *testing.T) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
+	dir := t.TempDir()
 	log := testutil.NewLogger(t)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
@@ -1093,12 +1058,7 @@ func TestClean(t *testing.T) {
 }
 
 func testClean(t *testing.T, basePath string) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
+	dir := t.TempDir()
 	log := testutil.NewLogger(t)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
@@ -1213,12 +1173,7 @@ func TestCleanConcurrentCheckpoint(t *testing.T) {
 }
 
 func testCleanConcurrentCheckpoint(t *testing.T, basePath string) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
+	dir := t.TempDir()
 	log := testutil.NewLogger(t)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
@@ -1344,12 +1299,7 @@ func TestStorageWalCleaner(t *testing.T) {
 }
 
 func testStorageWalCleaner(t *testing.T, basePath string) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
+	dir := t.TempDir()
 	log := testutil.NewLogger(t)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
@@ -1486,12 +1436,7 @@ func testStorageWalCleaner(t *testing.T, basePath string) {
 }
 
 func TestExportImport(t *testing.T) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
+	dir := t.TempDir()
 	log := testutil.NewLogger(t)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")

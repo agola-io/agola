@@ -369,11 +369,7 @@ func setup(ctx context.Context, t *testing.T, dir string, gitea bool) (*testutil
 }
 
 func TestCreateLinkedAccount(t *testing.T) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -445,11 +441,7 @@ func createLinkedAccount(ctx context.Context, t *testing.T, tgitea *testutil.Tes
 }
 
 func TestCreateProject(t *testing.T) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -491,11 +483,7 @@ func TestUpdateProject(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		dir, err := ioutil.TempDir("", "agola")
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
-		defer os.RemoveAll(dir)
+		dir := t.TempDir()
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -797,11 +785,7 @@ func TestPush(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			dir, err := ioutil.TempDir("", "agola")
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
-			defer os.RemoveAll(dir)
+			dir := t.TempDir()
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -988,11 +972,7 @@ func TestDirectRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dir, err := ioutil.TempDir("", "agola")
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
-			defer os.RemoveAll(dir)
+			dir := t.TempDir()
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -1136,11 +1116,7 @@ func TestDirectRunVariables(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dir, err := ioutil.TempDir("", "agola")
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
-			defer os.RemoveAll(dir)
+			dir := t.TempDir()
 
 			if err := ioutil.WriteFile(filepath.Join(dir, "varfile01.yml"), []byte(varfile01), 0644); err != nil {
 				t.Fatalf("unexpected err: %v", err)
@@ -1310,11 +1286,7 @@ func TestDirectRunLogs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dir, err := ioutil.TempDir("", "agola")
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
-			defer os.RemoveAll(dir)
+			dir := t.TempDir()
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -1489,11 +1461,7 @@ func TestPullRequest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			dir, err := ioutil.TempDir("", "agola")
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
-			defer os.RemoveAll(dir)
+			dir := t.TempDir()
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -1828,11 +1796,7 @@ def main(ctx):
 					config = starlarkConfig
 				}
 
-				dir, err := ioutil.TempDir("", "agola")
-				if err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
-				defer os.RemoveAll(dir)
+				dir := t.TempDir()
 
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
@@ -1936,11 +1900,7 @@ def main(ctx):
 }
 
 func TestUserOrgs(t *testing.T) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

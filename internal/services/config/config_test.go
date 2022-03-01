@@ -16,7 +16,6 @@ package config
 
 import (
 	"io/ioutil"
-	"os"
 	"path"
 	"testing"
 
@@ -229,14 +228,10 @@ gitserver:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dir, err := ioutil.TempDir("", "ParseConfig")
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
-			defer os.RemoveAll(dir)
+			dir := t.TempDir()
 
 			content := []byte(tt.in)
-			err = ioutil.WriteFile(path.Join(dir, "config.yml"), content, 0644)
+			err := ioutil.WriteFile(path.Join(dir, "config.yml"), content, 0644)
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}

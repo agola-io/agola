@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"os"
 	"path"
 	"reflect"
 	"sync"
@@ -124,12 +123,7 @@ func getUsers(ctx context.Context, cs *Configstore) ([]*types.User, error) {
 }
 
 func TestResync(t *testing.T) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
+	dir := t.TempDir()
 	log := testutil.NewLogger(t)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
@@ -300,12 +294,7 @@ func TestResync(t *testing.T) {
 }
 
 func TestExportImport(t *testing.T) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
+	dir := t.TempDir()
 	log := testutil.NewLogger(t)
 
 	etcdDir, err := ioutil.TempDir(dir, "etcd")
@@ -549,12 +538,7 @@ func compareUsers(u1, u2 []*types.User) bool {
 }
 
 func TestUser(t *testing.T) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
+	dir := t.TempDir()
 	ctx := context.Background()
 	log := testutil.NewLogger(t)
 
@@ -617,12 +601,7 @@ func TestUser(t *testing.T) {
 }
 
 func TestProjectGroupsAndProjectsCreate(t *testing.T) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
+	dir := t.TempDir()
 	ctx := context.Background()
 	log := testutil.NewLogger(t)
 
@@ -765,12 +744,7 @@ func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 }
 
 func TestProjectUpdate(t *testing.T) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
+	dir := t.TempDir()
 	ctx := context.Background()
 	log := testutil.NewLogger(t)
 
@@ -842,12 +816,7 @@ func TestProjectUpdate(t *testing.T) {
 }
 
 func TestProjectGroupUpdate(t *testing.T) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
+	dir := t.TempDir()
 	ctx := context.Background()
 	log := testutil.NewLogger(t)
 
@@ -993,12 +962,7 @@ func TestProjectGroupUpdate(t *testing.T) {
 }
 
 func TestProjectGroupDelete(t *testing.T) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
+	dir := t.TempDir()
 	ctx := context.Background()
 	log := testutil.NewLogger(t)
 
@@ -1050,12 +1014,7 @@ func TestProjectGroupDelete(t *testing.T) {
 }
 
 func TestProjectGroupDeleteDontSeeOldChildObjects(t *testing.T) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
+	dir := t.TempDir()
 	ctx := context.Background()
 	log := testutil.NewLogger(t)
 
@@ -1186,12 +1145,7 @@ func TestProjectGroupDeleteDontSeeOldChildObjects(t *testing.T) {
 }
 
 func TestOrgMembers(t *testing.T) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
+	dir := t.TempDir()
 	ctx := context.Background()
 	log := testutil.NewLogger(t)
 
@@ -1277,12 +1231,7 @@ func TestOrgMembers(t *testing.T) {
 }
 
 func TestRemoteSource(t *testing.T) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
+	dir := t.TempDir()
 	log := testutil.NewLogger(t)
 
 	tests := []struct {
