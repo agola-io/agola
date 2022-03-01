@@ -237,7 +237,7 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string
 					Type:     rstypes.DockerRegistryAuthType(auth.Type),
 					Username: genValue(auth.Username, variables),
 					Password: genValue(auth.Password, variables),
-					Auth:     auth.Auth,
+					Auth:     genValue(auth.Auth, variables),
 				}
 			}
 		}
@@ -249,7 +249,7 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string
 					Type:     rstypes.DockerRegistryAuthType(auth.Type),
 					Username: genValue(auth.Username, variables),
 					Password: genValue(auth.Password, variables),
-					Auth:     auth.Auth,
+					Auth:     genValue(auth.Auth, variables),
 				}
 			}
 		}
@@ -261,7 +261,7 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string
 					Type:     rstypes.DockerRegistryAuthType(auth.Type),
 					Username: genValue(auth.Username, variables),
 					Password: genValue(auth.Password, variables),
-					Auth:     auth.Auth,
+					Auth:     genValue(auth.Auth, variables),
 				}
 			}
 		}
