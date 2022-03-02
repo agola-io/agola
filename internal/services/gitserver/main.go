@@ -54,10 +54,10 @@ func repoPathIsValid(reposDir, repoPath string) (bool, error) {
 
 	path := repoPath
 	_, err = os.Stat(path)
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return false, errors.WithStack(err)
 	}
-	if !os.IsNotExist(err) {
+	if !errors.Is(err, os.ErrNotExist) {
 		// if it exists assume it's valid
 		return true, nil
 	}
@@ -69,14 +69,14 @@ func repoPathIsValid(reposDir, repoPath string) (bool, error) {
 		}
 
 		_, err := os.Stat(path)
-		if err != nil && !os.IsNotExist(err) {
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return false, errors.WithStack(err)
 		}
 		// a parent path cannot end with .git
 		if strings.HasSuffix(path, gitSuffix) {
 			return false, nil
 		}
-		if !os.IsNotExist(err) {
+		if !errors.Is(err, os.ErrNotExist) {
 			// if a parent exists return not valid
 			return false, nil
 		}
@@ -87,10 +87,10 @@ func repoPathIsValid(reposDir, repoPath string) (bool, error) {
 
 func repoExists(repoAbsPath string) (bool, error) {
 	_, err := os.Stat(repoAbsPath)
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return false, errors.WithStack(err)
 	}
-	return !os.IsNotExist(err), nil
+	return !errors.Is(err, os.ErrNotExist), nil
 }
 
 func repoAbsPath(reposDir, repoPath string) (string, bool, error) {

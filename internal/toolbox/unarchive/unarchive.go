@@ -37,7 +37,7 @@ func Unarchive(source io.Reader, destDir string, overwrite, removeDestDir bool) 
 	}
 	// don't follow destdir if it's a symlink
 	fi, err := os.Lstat(destDir)
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return errors.Wrapf(err, "failed to lstat destination dir")
 	}
 	if fi != nil && !fi.IsDir() {
@@ -92,7 +92,7 @@ func untarNext(tr *tar.Reader, destDir string, overwrite bool) error {
 	switch hdr.Typeflag {
 	case tar.TypeDir:
 		fi, err := os.Lstat(destPath)
-		if err != nil && !os.IsNotExist(err) {
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return errors.WithStack(err)
 		}
 		if fi != nil && !fi.IsDir() {
@@ -103,7 +103,7 @@ func untarNext(tr *tar.Reader, destDir string, overwrite bool) error {
 		return mkdir(destPath, hdr.FileInfo().Mode())
 	case tar.TypeReg, tar.TypeRegA, tar.TypeChar, tar.TypeBlock, tar.TypeFifo:
 		fi, err := os.Lstat(destPath)
-		if err != nil && !os.IsNotExist(err) {
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return errors.WithStack(err)
 		}
 		if fi != nil && !fi.Mode().IsRegular() {
@@ -135,7 +135,7 @@ func untarNext(tr *tar.Reader, destDir string, overwrite bool) error {
 
 func fileExists(name string) bool {
 	_, err := os.Lstat(name)
-	return !os.IsNotExist(err)
+	return !errors.Is(err, os.ErrNotExist)
 }
 
 func mkdir(dirPath string, mode os.FileMode) error {

@@ -51,10 +51,10 @@ func copyFile(src, dest string) error {
 
 func fileExists(path string) (bool, error) {
 	_, err := os.Stat(path)
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return false, errors.WithStack(err)
 	}
-	return !os.IsNotExist(err), nil
+	return !errors.Is(err, os.ErrNotExist), nil
 }
 
 // GitDir returns the git dir relative to the working dir

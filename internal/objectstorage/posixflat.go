@@ -238,7 +238,7 @@ func (s *PosixFlatStorage) Stat(p string) (*ObjectInfo, error) {
 
 	fi, err := os.Stat(fspath)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			return nil, NewErrNotExist(errors.Errorf("object %q doesn't exist", p))
 		}
 		return nil, errors.WithStack(err)
@@ -254,7 +254,7 @@ func (s *PosixFlatStorage) ReadObject(p string) (ReadSeekCloser, error) {
 	}
 
 	f, err := os.Open(fspath)
-	if err != nil && os.IsNotExist(err) {
+	if err != nil && errors.Is(err, os.ErrNotExist) {
 		return nil, NewErrNotExist(errors.Errorf("object %q doesn't exist", p))
 	}
 	return f, errors.WithStack(err)
@@ -287,7 +287,7 @@ func (s *PosixFlatStorage) DeleteObject(p string) error {
 	}
 
 	if err := os.Remove(fspath); err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			return NewErrNotExist(errors.Errorf("object %q doesn't exist", p))
 		}
 		return errors.WithStack(err)
@@ -353,10 +353,10 @@ func (s *PosixFlatStorage) List(prefix, startWith, delimiter string, doneCh <-ch
 		var prevp string
 		defer close(objectCh)
 		err := filepath.Walk(root, func(ep string, info os.FileInfo, err error) error {
-			if err != nil && !os.IsNotExist(err) {
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
 				return errors.WithStack(err)
 			}
-			if os.IsNotExist(err) {
+			if errors.Is(err, os.ErrNotExist) {
 				return nil
 			}
 			p := ep
@@ -389,10 +389,10 @@ func (s *PosixFlatStorage) List(prefix, startWith, delimiter string, doneCh <-ch
 			// just be listed
 			hasFile := true
 			_, err = os.Stat(ep + ".f")
-			if err != nil && !os.IsNotExist(err) {
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
 				return errors.WithStack(err)
 			}
-			if os.IsNotExist(err) {
+			if errors.Is(err, os.ErrNotExist) {
 				hasFile = false
 			}
 			if info.IsDir() && !hasFile {

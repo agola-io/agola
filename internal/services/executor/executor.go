@@ -1334,7 +1334,7 @@ func (e *Executor) handleTasks(ctx context.Context, c <-chan *types.ExecutorTask
 
 func (e *Executor) getExecutorID() (string, error) {
 	id, err := ioutil.ReadFile(e.executorIDPath())
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return "", errors.WithStack(err)
 	}
 	return string(id), nil

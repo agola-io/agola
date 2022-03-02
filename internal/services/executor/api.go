@@ -114,7 +114,7 @@ func (h *logsHandler) readTaskLogs(taskID string, setup bool, step int, w http.R
 func (h *logsHandler) readLogs(taskID string, setup bool, step int, logPath string, w http.ResponseWriter, follow bool) error {
 	f, err := os.Open(logPath)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			http.Error(w, "", http.StatusNotFound)
 		} else {
 			http.Error(w, "", http.StatusInternalServerError)
@@ -220,7 +220,7 @@ func (h *archivesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 
 	if err := h.readArchive(taskID, step, w); err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			http.Error(w, "", http.StatusNotFound)
 		} else {
 			http.Error(w, "", http.StatusInternalServerError)
