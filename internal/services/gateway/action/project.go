@@ -108,8 +108,14 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get remote source %q", req.RemoteSourceName))
 	}
+
+	linkedAccounts, _, err := h.configstoreClient.GetUserLinkedAccounts(ctx, user.ID)
+	if err != nil {
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q linked accounts", user.ID))
+	}
+
 	var la *cstypes.LinkedAccount
-	for _, v := range user.LinkedAccounts {
+	for _, v := range linkedAccounts {
 		if v.RemoteSourceID == rs.ID {
 			la = v
 			break
@@ -138,7 +144,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 	creq := &csapitypes.CreateUpdateProjectRequest{
 		Name: req.Name,
 		Parent: cstypes.Parent{
-			Type: cstypes.ConfigTypeProjectGroup,
+			Kind: cstypes.ObjectKindProjectGroup,
 			ID:   parentRef,
 		},
 		Visibility:                 req.Visibility,
@@ -262,8 +268,14 @@ func (h *ActionHandler) ProjectUpdateRepoLinkedAccount(ctx context.Context, proj
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get remote source %q", p.RemoteSourceID))
 	}
+
+	linkedAccounts, _, err := h.configstoreClient.GetUserLinkedAccounts(ctx, user.ID)
+	if err != nil {
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q linked accounts", user.ID))
+	}
+
 	var la *cstypes.LinkedAccount
-	for _, v := range user.LinkedAccounts {
+	for _, v := range linkedAccounts {
 		if v.RemoteSourceID == rs.ID {
 			la = v
 			break
@@ -476,8 +488,14 @@ func (h *ActionHandler) ProjectCreateRun(ctx context.Context, projectRef, branch
 	if err != nil {
 		return util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get remote source %q", p.RemoteSourceID))
 	}
+
+	linkedAccounts, _, err := h.configstoreClient.GetUserLinkedAccounts(ctx, user.ID)
+	if err != nil {
+		return util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q linked accounts", user.ID))
+	}
+
 	var la *cstypes.LinkedAccount
-	for _, v := range user.LinkedAccounts {
+	for _, v := range linkedAccounts {
 		if v.RemoteSourceID == rs.ID {
 			la = v
 			break
@@ -615,9 +633,21 @@ func (h *ActionHandler) getRemoteRepoAccessData(ctx context.Context, linkedAccou
 		return nil, nil, nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user with linked account id %q", linkedAccountID))
 	}
 
-	la := user.LinkedAccounts[linkedAccountID]
+	linkedAccounts, _, err := h.configstoreClient.GetUserLinkedAccounts(ctx, user.ID)
+	if err != nil {
+		return nil, nil, nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q linked accounts", user.ID))
+	}
+
+	var la *cstypes.LinkedAccount
+	for _, v := range linkedAccounts {
+		if v.ID == linkedAccountID {
+			la = v
+			break
+		}
+	}
+
 	if la == nil {
-		return nil, nil, nil, errors.Errorf("linked account %q in user %q doesn't exist", linkedAccountID, user.Name)
+		return nil, nil, nil, errors.Errorf("linked account %q for user %q doesn't exist", linkedAccountID, user.Name)
 	}
 
 	rs, _, err := h.configstoreClient.GetRemoteSource(ctx, la.RemoteSourceID)

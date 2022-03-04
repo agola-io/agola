@@ -153,8 +153,9 @@ type Configstore struct {
 
 	DataDir string `yaml:"dataDir"`
 
+	DB DB `yaml:"db"`
+
 	Web           Web           `yaml:"web"`
-	Etcd          Etcd          `yaml:"etcd"`
 	ObjectStorage ObjectStorage `yaml:"objectStorage"`
 }
 
@@ -366,6 +367,9 @@ func Validate(c *Config, componentsNames []string) error {
 
 	// Configstore
 	if isComponentEnabled(componentsNames, "configstore") {
+		if err := validateDB(&c.Runservice.DB); err != nil {
+			return errors.Wrapf(err, "db configuration error")
+		}
 		if c.Configstore.DataDir == "" {
 			return errors.Errorf("configstore dataDir is empty")
 		}

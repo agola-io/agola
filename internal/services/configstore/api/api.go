@@ -29,14 +29,14 @@ type ErrorResponse struct {
 	Message string `json:"message"`
 }
 
-func GetConfigTypeRef(r *http.Request) (types.ConfigType, string, error) {
+func GetObjectKindRef(r *http.Request) (types.ObjectKind, string, error) {
 	vars := mux.Vars(r)
 	projectRef, err := url.PathUnescape(vars["projectref"])
 	if err != nil {
 		return "", "", util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "wrong projectref %q", vars["projectref"]))
 	}
 	if projectRef != "" {
-		return types.ConfigTypeProject, projectRef, nil
+		return types.ObjectKindProject, projectRef, nil
 	}
 
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
@@ -44,7 +44,7 @@ func GetConfigTypeRef(r *http.Request) (types.ConfigType, string, error) {
 		return "", "", util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "wrong projectgroupref %q", vars["projectgroupref"]))
 	}
 	if projectGroupRef != "" {
-		return types.ConfigTypeProjectGroup, projectGroupRef, nil
+		return types.ObjectKindProjectGroup, projectGroupRef, nil
 	}
 
 	return "", "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot get project or projectgroup ref"))

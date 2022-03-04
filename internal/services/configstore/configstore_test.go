@@ -21,16 +21,15 @@ import (
 	"io/ioutil"
 	"net"
 	"path"
-	"reflect"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
-	"agola.io/agola/internal/dbold"
 	"agola.io/agola/internal/errors"
-
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/configstore/action"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/testutil"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
@@ -39,33 +38,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-func setupEtcd(t *testing.T, log zerolog.Logger, dir string) *testutil.TestEmbeddedEtcd {
-	tetcd, err := testutil.NewTestEmbeddedEtcd(t, log, dir)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	if err := tetcd.Start(); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	if err := tetcd.WaitUp(30 * time.Second); err != nil {
-		t.Fatalf("error waiting on etcd up: %v", err)
-	}
-	return tetcd
-}
-
-func shutdownEtcd(tetcd *testutil.TestEmbeddedEtcd) {
-	if tetcd.Etcd != nil {
-		_ = tetcd.Kill()
-	}
-}
-
-func setupConfigstore(ctx context.Context, t *testing.T, log zerolog.Logger, dir string) (*Configstore, *testutil.TestEmbeddedEtcd) {
-	etcdDir, err := ioutil.TempDir(dir, "etcd")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	tetcd := setupEtcd(t, log, etcdDir)
-
+func setupConfigstore(ctx context.Context, t *testing.T, log zerolog.Logger, dir string) *Configstore {
 	listenAddress, port, err := testutil.GetFreePort(true, false)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -81,8 +54,9 @@ func setupConfigstore(ctx context.Context, t *testing.T, log zerolog.Logger, dir
 	}
 
 	baseConfig := config.Configstore{
-		Etcd: config.Etcd{
-			Endpoints: tetcd.Endpoint,
+		DB: config.DB{
+			Type:       sql.Sqlite3,
+			ConnString: filepath.Join(dir, "db"),
 		},
 		ObjectStorage: config.ObjectStorage{
 			Type: config.ObjectStorageTypePosix,
@@ -96,445 +70,313 @@ func setupConfigstore(ctx context.Context, t *testing.T, log zerolog.Logger, dir
 
 	cs, err := NewConfigstore(ctx, log, &csConfig)
 	if err != nil {
-		t.Fatalf("err: %v", err)
+		t.Fatalf("unexpected err: %v", err)
 	}
 
-	return cs, tetcd
+	return cs
+}
+
+func getRemoteSources(ctx context.Context, cs *Configstore) ([]*types.RemoteSource, error) {
+	var users []*types.RemoteSource
+	err := cs.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		users, err = cs.d.GetRemoteSources(tx, "", 0, true)
+		return errors.WithStack(err)
+	})
+
+	return users, errors.WithStack(err)
+}
+func getUsers(ctx context.Context, cs *Configstore) ([]*types.User, error) {
+	var users []*types.User
+	err := cs.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		users, err = cs.d.GetUsers(tx, "", 0, true)
+		return errors.WithStack(err)
+	})
+
+	return users, errors.WithStack(err)
+}
+
+func getOrgs(ctx context.Context, cs *Configstore) ([]*types.Organization, error) {
+	var orgs []*types.Organization
+	err := cs.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		orgs, err = cs.d.GetOrgs(tx, "", 0, true)
+		return errors.WithStack(err)
+	})
+
+	return orgs, errors.WithStack(err)
+}
+
+func getProjectGroups(ctx context.Context, cs *Configstore) ([]*types.ProjectGroup, error) {
+	var projectGroups []*types.ProjectGroup
+	err := cs.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		projectGroups, err = cs.d.GetAllProjectGroups(tx)
+		return errors.WithStack(err)
+	})
+
+	return projectGroups, errors.WithStack(err)
 }
 
 func getProjects(ctx context.Context, cs *Configstore) ([]*types.Project, error) {
 	var projects []*types.Project
-	err := cs.readDB.Do(ctx, func(tx *db.Tx) error {
+	err := cs.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		projects, err = cs.readDB.GetAllProjects(tx)
+		projects, err = cs.d.GetAllProjects(tx)
 		return errors.WithStack(err)
 	})
+
 	return projects, errors.WithStack(err)
 }
 
-func getUsers(ctx context.Context, cs *Configstore) ([]*types.User, error) {
-	var users []*types.User
-	err := cs.readDB.Do(ctx, func(tx *db.Tx) error {
+func getSecrets(ctx context.Context, cs *Configstore) ([]*types.Secret, error) {
+	var secrets []*types.Secret
+	err := cs.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		users, err = cs.readDB.GetUsers(tx, "", 0, true)
+		secrets, err = cs.d.GetAllSecrets(tx)
 		return errors.WithStack(err)
 	})
-	return users, errors.WithStack(err)
+
+	return secrets, errors.WithStack(err)
 }
 
-func TestResync(t *testing.T) {
-	dir := t.TempDir()
-	log := testutil.NewLogger(t)
+func getVariables(ctx context.Context, cs *Configstore) ([]*types.Variable, error) {
+	var variables []*types.Variable
+	err := cs.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		variables, err = cs.d.GetAllVariables(tx)
+		return errors.WithStack(err)
+	})
 
-	etcdDir, err := ioutil.TempDir(dir, "etcd")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	tetcd := setupEtcd(t, log, etcdDir)
-	defer shutdownEtcd(tetcd)
+	return variables, errors.WithStack(err)
+}
 
-	listenAddress1, port1, err := testutil.GetFreePort(true, false)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	listenAddress2, port2, err := testutil.GetFreePort(true, false)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	listenAddress3, port3, err := testutil.GetFreePort(true, false)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
+func compareObjects(u1, u2 interface{}) bool {
+	if diff := cmp.Diff(u1, u2); diff != "" {
+		return false
 	}
 
-	ctx := context.Background()
-
-	ostDir, err := ioutil.TempDir(dir, "ost")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	csDir1, err := ioutil.TempDir(dir, "cs1")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	csDir2, err := ioutil.TempDir(dir, "cs2")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	csDir3, err := ioutil.TempDir(dir, "cs3")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-
-	baseConfig := config.Configstore{
-		Etcd: config.Etcd{
-			Endpoints: tetcd.Endpoint,
-		},
-		ObjectStorage: config.ObjectStorage{
-			Type: config.ObjectStorageTypePosix,
-			Path: ostDir,
-		},
-		Web: config.Web{},
-	}
-	cs1Config := baseConfig
-	cs1Config.DataDir = csDir1
-	cs1Config.Web.ListenAddress = net.JoinHostPort(listenAddress1, port1)
-
-	cs2Config := baseConfig
-	cs2Config.DataDir = csDir2
-	cs2Config.Web.ListenAddress = net.JoinHostPort(listenAddress2, port2)
-
-	cs1, err := NewConfigstore(ctx, log.With().Str("name", "cs1").Logger(), &cs1Config)
-	if err != nil {
-		t.Fatalf("err: %v", err)
-	}
-	cs2, err := NewConfigstore(ctx, log.With().Str("name", "cs2").Logger(), &cs2Config)
-	if err != nil {
-		t.Fatalf("err: %v", err)
-	}
-
-	ctx1 := context.Background()
-	ctx2, cancel2 := context.WithCancel(context.Background())
-
-	t.Logf("starting cs1")
-	go func() { _ = cs1.Run(ctx1) }()
-	t.Logf("starting cs2")
-	go func() { _ = cs2.Run(ctx2) }()
-
-	time.Sleep(1 * time.Second)
-
-	for i := 0; i < 10; i++ {
-		if _, err := cs1.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)}); err != nil {
-			t.Fatalf("err: %v", err)
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
-
-	time.Sleep(5 * time.Second)
-
-	// stop cs2
-	log.Info().Msgf("stopping cs2")
-	cancel2()
-
-	// Do some more changes
-	for i := 10; i < 20; i++ {
-		if _, err := cs1.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)}); err != nil {
-			t.Fatalf("err: %v", err)
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
-
-	time.Sleep(5 * time.Second)
-
-	// compact etcd
-	if err := tetcd.Compact(); err != nil {
-		t.Fatalf("err: %v", err)
-	}
-
-	// start cs2
-	// it should resync from wals since the etcd revision as been compacted
-	cs2, err = NewConfigstore(ctx, log.With().Str("name", "cs2").Logger(), &cs2Config)
-	if err != nil {
-		t.Fatalf("err: %v", err)
-	}
-	log.Info().Msgf("starting cs2")
-	ctx2 = context.Background()
-	go func() { _ = cs2.Run(ctx2) }()
-
-	time.Sleep(5 * time.Second)
-
-	users1, err := getUsers(ctx, cs1)
-	if err != nil {
-		t.Fatalf("err: %v", err)
-	}
-	if len(users1) != 20 {
-		t.Logf("users1: %s", util.Dump(users1))
-		t.Fatalf("expected %d users, got %d users", 20, len(users1))
-	}
-
-	users2, err := getUsers(ctx, cs2)
-	if err != nil {
-		t.Fatalf("err: %v", err)
-	}
-
-	if !compareUsers(users1, users2) {
-		t.Logf("len(users1): %d", len(users1))
-		t.Logf("len(users2): %d", len(users2))
-		t.Logf("users1: %s", util.Dump(users1))
-		t.Logf("users2: %s", util.Dump(users2))
-		t.Fatalf("users are different between the two readdbs")
-	}
-
-	// start cs3, since it's a new instance it should do a full resync
-	cs3Config := baseConfig
-	cs3Config.DataDir = csDir3
-	cs3Config.Web.ListenAddress = net.JoinHostPort(listenAddress3, port3)
-
-	cs3, err := NewConfigstore(ctx, log.With().Str("name", "cs3").Logger(), &cs3Config)
-	if err != nil {
-		t.Fatalf("err: %v", err)
-	}
-	log.Info().Msgf("starting cs3")
-	ctx3 := context.Background()
-	go func() { _ = cs3.Run(ctx3) }()
-
-	time.Sleep(5 * time.Second)
-
-	users3, err := getUsers(ctx, cs3)
-	if err != nil {
-		t.Fatalf("err: %v", err)
-	}
-
-	if !compareUsers(users1, users3) {
-		t.Logf("len(users1): %d", len(users1))
-		t.Logf("len(users3): %d", len(users3))
-		t.Logf("users1: %s", util.Dump(users1))
-		t.Logf("users3: %s", util.Dump(users3))
-		t.Fatalf("users are different between the two readdbs")
-	}
+	return true
 }
 
 func TestExportImport(t *testing.T) {
 	dir := t.TempDir()
+	ctx := context.Background()
 	log := testutil.NewLogger(t)
 
-	etcdDir, err := ioutil.TempDir(dir, "etcd")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	tetcd := setupEtcd(t, log, etcdDir)
-	defer shutdownEtcd(tetcd)
+	cs := setupConfigstore(ctx, t, log, dir)
 
-	listenAddress1, port1, err := testutil.GetFreePort(true, false)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	listenAddress2, port2, err := testutil.GetFreePort(true, false)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	listenAddress3, port3, err := testutil.GetFreePort(true, false)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-
-	ctx := context.Background()
-
-	ostDir, err := ioutil.TempDir(dir, "ost")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	csDir1, err := ioutil.TempDir(dir, "cs1")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	csDir2, err := ioutil.TempDir(dir, "cs2")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	csDir3, err := ioutil.TempDir(dir, "cs3")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-
-	baseConfig := config.Configstore{
-		Etcd: config.Etcd{
-			Endpoints: tetcd.Endpoint,
-		},
-		ObjectStorage: config.ObjectStorage{
-			Type: config.ObjectStorageTypePosix,
-			Path: ostDir,
-		},
-		Web: config.Web{},
-	}
-	cs1Config := baseConfig
-	cs1Config.DataDir = csDir1
-	cs1Config.Web.ListenAddress = net.JoinHostPort(listenAddress1, port1)
-
-	cs2Config := baseConfig
-	cs2Config.DataDir = csDir2
-	cs2Config.Web.ListenAddress = net.JoinHostPort(listenAddress2, port2)
-
-	cs3Config := baseConfig
-	cs3Config.DataDir = csDir3
-	cs3Config.Web.ListenAddress = net.JoinHostPort(listenAddress3, port3)
-
-	cs1, err := NewConfigstore(ctx, log.With().Str("name", "cs1").Logger(), &cs1Config)
-	if err != nil {
-		t.Fatalf("err: %v", err)
-	}
-	cs2, err := NewConfigstore(ctx, log.With().Str("name", "cs2").Logger(), &cs2Config)
-	if err != nil {
-		t.Fatalf("err: %v", err)
-	}
-	cs3, err := NewConfigstore(ctx, log.With().Str("name", "cs3").Logger(), &cs3Config)
-	if err != nil {
-		t.Fatalf("err: %v", err)
-	}
-
-	ctx1 := context.Background()
-	ctx2, cancel2 := context.WithCancel(context.Background())
-	ctx3, cancel3 := context.WithCancel(context.Background())
-
-	t.Logf("starting cs1")
-	go func() { _ = cs1.Run(ctx1) }()
-	t.Logf("starting cs2")
-	go func() { _ = cs2.Run(ctx2) }()
-	t.Logf("starting cs3")
-	go func() { _ = cs3.Run(ctx3) }()
+	t.Logf("starting cs")
+	go func() { _ = cs.Run(ctx) }()
 
 	time.Sleep(1 * time.Second)
 
+	var expectedRemoteSourcesCount int
+	var expectedUsersCount int
+	var expectedOrgsCount int
+	var expectedProjectGroupsCount int
+	var expectedProjectsCount int
+	var expectedSecretsCount int
+	var expectedVariablesCount int
+
+	if _, err := cs.ah.CreateRemoteSource(ctx, &action.CreateUpdateRemoteSourceRequest{Name: "rs01", Type: types.RemoteSourceTypeGitea, AuthType: types.RemoteSourceAuthTypePassword, APIURL: "http://example.com"}); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedRemoteSourcesCount++
+
 	for i := 0; i < 10; i++ {
-		if _, err := cs1.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)}); err != nil {
-			t.Fatalf("err: %v", err)
+		if _, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)}); err != nil {
+			t.Fatalf("unexpected err: %v", err)
 		}
-		time.Sleep(200 * time.Millisecond)
+		expectedUsersCount++
+		expectedProjectGroupsCount++
 	}
 
 	time.Sleep(5 * time.Second)
-
-	// stop cs2
-	log.Info().Msgf("stopping cs2")
-	cancel2()
-	// stop cs3
-	log.Info().Msgf("stopping cs3")
-	cancel3()
 
 	// Do some more changes
 	for i := 10; i < 20; i++ {
-		if _, err := cs1.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)}); err != nil {
-			t.Fatalf("err: %v", err)
+		if _, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)}); err != nil {
+			t.Fatalf("unexpected err: %v", err)
 		}
-		time.Sleep(200 * time.Millisecond)
+		expectedUsersCount++
+		expectedProjectGroupsCount++
 	}
 
-	time.Sleep(5 * time.Second)
-
-	users1, err := getUsers(ctx, cs1)
+	user, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"})
 	if err != nil {
-		t.Fatalf("err: %v", err)
+		t.Fatalf("unexpected err: %v", err)
 	}
-	if len(users1) != 20 {
-		t.Logf("users1: %s", util.Dump(users1))
-		t.Fatalf("expected %d users, got %d users", 20, len(users1))
+	expectedUsersCount++
+	expectedProjectGroupsCount++
+
+	org, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: "org01", Visibility: types.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedOrgsCount++
+	expectedProjectGroupsCount++
+
+	if _, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedProjectsCount++
+
+	if _, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic}); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedProjectGroupsCount++
+
+	if _, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedProjectsCount++
+
+	if _, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic}); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedProjectGroupsCount++
+
+	if _, err := cs.ah.CreateSecret(ctx, &action.CreateUpdateSecretRequest{Name: "secret01", Parent: types.Parent{Kind: types.ObjectKindProject, ID: path.Join("user", user.Name, "projectgroup01", "project01")}, Type: types.SecretTypeInternal, Data: map[string]string{"secret01": "secretvar01"}}); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedSecretsCount++
+
+	if _, err := cs.ah.CreateVariable(ctx, &action.CreateUpdateVariableRequest{Name: "variable01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Values: []types.VariableValue{{SecretName: "secret01", SecretVar: "secretvar01"}}}); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedVariablesCount++
+
+	remoteSources, err := getRemoteSources(ctx, cs)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	users, err := getUsers(ctx, cs)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	orgs, err := getOrgs(ctx, cs)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	projectGroups, err := getProjectGroups(ctx, cs)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	projects, err := getProjects(ctx, cs)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	secrets, err := getSecrets(ctx, cs)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	variables, err := getVariables(ctx, cs)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	if len(remoteSources) != expectedRemoteSourcesCount {
+		t.Logf("remoteSources: %s", util.Dump(remoteSources))
+		t.Fatalf("expected %d remoteSources, got %d remoteSources", expectedRemoteSourcesCount, len(remoteSources))
+	}
+	if len(users) != expectedUsersCount {
+		t.Logf("users: %s", util.Dump(users))
+		t.Fatalf("expected %d users, got %d users", expectedUsersCount, len(users))
+	}
+	if len(orgs) != expectedOrgsCount {
+		t.Logf("orgs: %s", util.Dump(orgs))
+		t.Fatalf("expected %d orgs, got %d orgs", expectedOrgsCount, len(orgs))
+	}
+	if len(projectGroups) != expectedProjectGroupsCount {
+		t.Logf("projectGroups: %s", util.Dump(projectGroups))
+		t.Fatalf("expected %d projectGroups, got %d projectGroups", expectedProjectGroupsCount, len(projectGroups))
+	}
+	if len(projects) != expectedProjectsCount {
+		t.Logf("projects: %s", util.Dump(projects))
+		t.Fatalf("expected %d projects, got %d projects", expectedProjectsCount, len(projects))
+	}
+	if len(secrets) != expectedSecretsCount {
+		t.Logf("secrets: %s", util.Dump(secrets))
+		t.Fatalf("expected %d secrets, got %d secrets", expectedSecretsCount, len(secrets))
+	}
+	if len(variables) != expectedVariablesCount {
+		t.Logf("variables: %s", util.Dump(variables))
+		t.Fatalf("expected %d variables, got %d variables", expectedVariablesCount, len(variables))
 	}
 
 	var export bytes.Buffer
-	if err := cs1.ah.Export(ctx, &export); err != nil {
+	if err := cs.ah.Export(ctx, &export); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	if err := cs1.ah.MaintenanceMode(ctx, true); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-
-	time.Sleep(5 * time.Second)
-
-	if err := cs1.ah.Import(ctx, &export); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-
-	if err := cs1.ah.MaintenanceMode(ctx, false); err != nil {
+	if err := cs.ah.MaintenanceMode(ctx, true); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
 	time.Sleep(5 * time.Second)
 
-	newUsers1, err := getUsers(ctx, cs1)
-	if err != nil {
-		t.Fatalf("err: %v", err)
+	if err := cs.ah.Import(ctx, &export); err != nil {
+		t.Fatalf("unexpected err: %v", err)
 	}
 
-	if !compareUsers(users1, newUsers1) {
-		t.Logf("len(users1): %d", len(users1))
-		t.Logf("len(newUsers1): %d", len(newUsers1))
-		t.Logf("users1: %s", util.Dump(users1))
-		t.Logf("newUsers1: %s", util.Dump(newUsers1))
-		t.Fatalf("users are different between the two readdbs")
-	}
-
-	// start cs2
-	// it should do a full resync since we have imported new data and there's now wal in etcd
-	cs2, err = NewConfigstore(ctx, log.With().Str("name", "cs2").Logger(), &cs2Config)
-	if err != nil {
-		t.Fatalf("err: %v", err)
-	}
-	log.Info().Msgf("starting cs2")
-	ctx2 = context.Background()
-	go func() { _ = cs2.Run(ctx2) }()
-
-	time.Sleep(5 * time.Second)
-
-	users2, err := getUsers(ctx, cs2)
-	if err != nil {
-		t.Fatalf("err: %v", err)
-	}
-
-	if !compareUsers(users1, users2) {
-		t.Logf("len(users1): %d", len(users1))
-		t.Logf("len(users2): %d", len(users2))
-		t.Logf("users1: %s", util.Dump(users1))
-		t.Logf("users2: %s", util.Dump(users2))
-		t.Fatalf("users are different between the two readdbs")
-	}
-
-	// Do some more changes
-	for i := 20; i < 30; i++ {
-		if _, err := cs1.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)}); err != nil {
-			t.Fatalf("err: %v", err)
-		}
-		time.Sleep(200 * time.Millisecond)
+	if err := cs.ah.MaintenanceMode(ctx, false); err != nil {
+		t.Fatalf("unexpected err: %v", err)
 	}
 
 	time.Sleep(5 * time.Second)
 
-	users1, err = getUsers(ctx, cs1)
+	newRemoteSources, err := getRemoteSources(ctx, cs)
 	if err != nil {
-		t.Fatalf("err: %v", err)
+		t.Fatalf("unexpected err: %v", err)
 	}
-	if len(users1) != 30 {
-		t.Logf("users1: %s", util.Dump(users1))
-		t.Fatalf("expected %d users, got %d users", 30, len(users1))
-	}
-
-	// start cs3
-	// it should do a full resync since we have imported new data and there're some wals with a different epoch
-	cs3, err = NewConfigstore(ctx, log.With().Str("name", "cs3").Logger(), &cs3Config)
+	newUsers, err := getUsers(ctx, cs)
 	if err != nil {
-		t.Fatalf("err: %v", err)
+		t.Fatalf("unexpected err: %v", err)
 	}
-	log.Info().Msgf("starting cs3")
-	ctx3 = context.Background()
-	go func() { _ = cs3.Run(ctx3) }()
-
-	time.Sleep(5 * time.Second)
-
-	users3, err := getUsers(ctx, cs3)
+	newOrgs, err := getOrgs(ctx, cs)
 	if err != nil {
-		t.Fatalf("err: %v", err)
+		t.Fatalf("unexpected err: %v", err)
+	}
+	newProjectGroups, err := getProjectGroups(ctx, cs)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	newProjects, err := getProjects(ctx, cs)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	newSecrets, err := getSecrets(ctx, cs)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	newVariables, err := getVariables(ctx, cs)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
 	}
 
-	if !compareUsers(users1, users3) {
-		t.Logf("len(users1): %d", len(users1))
-		t.Logf("len(users3): %d", len(users3))
-		t.Logf("users1: %s", util.Dump(users1))
-		t.Logf("users3: %s", util.Dump(users3))
-		t.Fatalf("users are different between the two readdbs")
+	if !compareObjects(remoteSources, newRemoteSources) {
+		t.Fatalf("remoteSources are different between before and after import")
 	}
-}
-
-func compareUsers(u1, u2 []*types.User) bool {
-	u1ids := map[string]struct{}{}
-	u2ids := map[string]struct{}{}
-
-	for _, u := range u1 {
-		u1ids[u.ID] = struct{}{}
+	if !compareObjects(users, newUsers) {
+		t.Fatalf("users are different between before and after import")
 	}
-	for _, u := range u2 {
-		u2ids[u.ID] = struct{}{}
+	if !compareObjects(orgs, newOrgs) {
+		t.Fatalf("orgs are different between before and after import")
 	}
-
-	return reflect.DeepEqual(u1ids, u2ids)
+	if !compareObjects(projectGroups, newProjectGroups) {
+		t.Fatalf("projectGroups are different between before and after import")
+	}
+	if !compareObjects(projects, newProjects) {
+		t.Fatalf("projects are different between before and after import")
+	}
+	if !compareObjects(secrets, newSecrets) {
+		t.Fatalf("secrets are different between before and after import")
+	}
+	if !compareObjects(variables, newVariables) {
+		t.Fatalf("variables are different between before and after import")
+	}
 }
 
 func TestUser(t *testing.T) {
@@ -542,16 +384,12 @@ func TestUser(t *testing.T) {
 	ctx := context.Background()
 	log := testutil.NewLogger(t)
 
-	cs, tetcd := setupConfigstore(ctx, t, log, dir)
-	defer shutdownEtcd(tetcd)
+	cs := setupConfigstore(ctx, t, log, dir)
 
 	t.Logf("starting cs")
 	go func() {
 		_ = cs.Run(ctx)
 	}()
-
-	// TODO(sgotti) change the sleep with a real check that all is ready
-	time.Sleep(2 * time.Second)
 
 	t.Run("create user", func(t *testing.T) {
 		_, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"})
@@ -559,9 +397,6 @@ func TestUser(t *testing.T) {
 			t.Fatalf("unexpected err: %v", err)
 		}
 	})
-
-	// TODO(sgotti) change the sleep with a real check that user is in readdb
-	time.Sleep(2 * time.Second)
 
 	t.Run("create duplicated user", func(t *testing.T) {
 		expectedErr := fmt.Sprintf("user with name %q already exists", "user01")
@@ -582,12 +417,12 @@ func TestUser(t *testing.T) {
 		wg := sync.WaitGroup{}
 		for i := 0; i < 10; i++ {
 			wg.Add(1)
-			go func() { _, _ = cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user02"}) }()
-			wg.Done()
+			go func() {
+				_, _ = cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user02"})
+				wg.Done()
+			}()
 		}
 		wg.Wait()
-
-		time.Sleep(5 * time.Second)
 
 		users, err := getUsers(ctx, cs)
 		if err != nil {
@@ -605,16 +440,12 @@ func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 	ctx := context.Background()
 	log := testutil.NewLogger(t)
 
-	cs, tetcd := setupConfigstore(ctx, t, log, dir)
-	defer shutdownEtcd(tetcd)
+	cs := setupConfigstore(ctx, t, log, dir)
 
 	t.Logf("starting cs")
 	go func() {
 		_ = cs.Run(ctx)
 	}()
-
-	// TODO(sgotti) change the sleep with a real check that all is ready
-	time.Sleep(2 * time.Second)
 
 	user, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"})
 	if err != nil {
@@ -625,41 +456,38 @@ func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	// TODO(sgotti) change the sleep with a real check that user is in readdb
-	time.Sleep(2 * time.Second)
-
 	t.Run("create a project in user root project group", func(t *testing.T) {
-		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
 	})
 	t.Run("create a project in org root project group", func(t *testing.T) {
-		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
 	})
 	t.Run("create a projectgroup in user root project group", func(t *testing.T) {
-		_, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic})
+		_, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
 	})
 	t.Run("create a projectgroup in org root project group", func(t *testing.T) {
-		_, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
+		_, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
 	})
 	t.Run("create a project in user non root project group with same name as a root project", func(t *testing.T) {
-		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
 	})
 	t.Run("create a project in org non root project group with same name as a root project", func(t *testing.T) {
-		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -668,7 +496,7 @@ func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 	t.Run("create duplicated project in user root project group", func(t *testing.T) {
 		projectName := "project01"
 		expectedErr := fmt.Sprintf("project with name %q, path %q already exists", projectName, path.Join("user", user.Name, projectName))
-		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: projectName, Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
@@ -676,7 +504,7 @@ func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 	t.Run("create duplicated project in org root project group", func(t *testing.T) {
 		projectName := "project01"
 		expectedErr := fmt.Sprintf("project with name %q, path %q already exists", projectName, path.Join("org", org.Name, projectName))
-		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: projectName, Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
@@ -685,7 +513,7 @@ func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 	t.Run("create duplicated project in user non root project group", func(t *testing.T) {
 		projectName := "project01"
 		expectedErr := fmt.Sprintf("project with name %q, path %q already exists", projectName, path.Join("user", user.Name, "projectgroup01", projectName))
-		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: projectName, Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
@@ -693,7 +521,7 @@ func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 	t.Run("create duplicated project in org non root project group", func(t *testing.T) {
 		projectName := "project01"
 		expectedErr := fmt.Sprintf("project with name %q, path %q already exists", projectName, path.Join("org", org.Name, "projectgroup01", projectName))
-		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: projectName, Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
@@ -701,7 +529,7 @@ func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 
 	t.Run("create project in unexistent project group", func(t *testing.T) {
 		expectedErr := `project group with id "unexistentid" doesn't exist`
-		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: "unexistentid"}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: "unexistentid"}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
@@ -724,13 +552,11 @@ func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			wg.Add(1)
 			go func() {
-				_, _ = cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project02", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+				_, _ = cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project02", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+				wg.Done()
 			}()
-			wg.Done()
 		}
 		wg.Wait()
-
-		time.Sleep(1 * time.Second)
 
 		projects, err := getProjects(ctx, cs)
 		if err != nil {
@@ -748,37 +574,30 @@ func TestProjectUpdate(t *testing.T) {
 	ctx := context.Background()
 	log := testutil.NewLogger(t)
 
-	cs, tetcd := setupConfigstore(ctx, t, log, dir)
-	defer shutdownEtcd(tetcd)
+	cs := setupConfigstore(ctx, t, log, dir)
 
 	t.Logf("starting cs")
 	go func() {
 		_ = cs.Run(ctx)
 	}()
 
-	// TODO(sgotti) change the sleep with a real check that all is ready
-	time.Sleep(2 * time.Second)
-
 	user, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	// TODO(sgotti) change the sleep with a real check that user is in readdb
-	time.Sleep(2 * time.Second)
-
-	if _, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic}); err != nil {
+	if _, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic}); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	p01 := &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}
+	p01 := &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}
 	if _, err := cs.ah.CreateProject(ctx, p01); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	p02 := &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}
+	p02 := &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}
 	if _, err := cs.ah.CreateProject(ctx, p02); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	p03 := &action.CreateUpdateProjectRequest{Name: "project02", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}
+	p03 := &action.CreateUpdateProjectRequest{Name: "project02", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}
 	if _, err := cs.ah.CreateProject(ctx, p03); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -816,47 +635,40 @@ func TestProjectGroupUpdate(t *testing.T) {
 	ctx := context.Background()
 	log := testutil.NewLogger(t)
 
-	cs, tetcd := setupConfigstore(ctx, t, log, dir)
-	defer shutdownEtcd(tetcd)
+	cs := setupConfigstore(ctx, t, log, dir)
 
 	t.Logf("starting cs")
 	go func() {
 		_ = cs.Run(ctx)
 	}()
 
-	// TODO(sgotti) change the sleep with a real check that all is ready
-	time.Sleep(2 * time.Second)
-
 	user, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-
-	// TODO(sgotti) change the sleep with a real check that user is in readdb
-	time.Sleep(2 * time.Second)
 
 	rootPG, err := cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	pg01req := &action.CreateUpdateProjectGroupRequest{Name: "pg01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic}
+	pg01req := &action.CreateUpdateProjectGroupRequest{Name: "pg01", Parent: types.Parent{Kind: types.ProjectGroupKind, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic}
 	if _, err := cs.ah.CreateProjectGroup(ctx, pg01req); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	pg02req := &action.CreateUpdateProjectGroupRequest{Name: "pg02", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic}
+	pg02req := &action.CreateUpdateProjectGroupRequest{Name: "pg02", Parent: types.Parent{Kind: types.ProjectGroupKind, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic}
 	if _, err := cs.ah.CreateProjectGroup(ctx, pg02req); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	pg03req := &action.CreateUpdateProjectGroupRequest{Name: "pg03", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic}
+	pg03req := &action.CreateUpdateProjectGroupRequest{Name: "pg03", Parent: types.Parent{Kind: types.ProjectGroupKind, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic}
 	if _, err := cs.ah.CreateProjectGroup(ctx, pg03req); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	pg04req := &action.CreateUpdateProjectGroupRequest{Name: "pg01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "pg01")}, Visibility: types.VisibilityPublic}
+	pg04req := &action.CreateUpdateProjectGroupRequest{Name: "pg01", Parent: types.Parent{Kind: types.ProjectGroupKind, ID: path.Join("user", user.Name, "pg01")}, Visibility: types.VisibilityPublic}
 	if _, err := cs.ah.CreateProjectGroup(ctx, pg04req); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	pg05req := &action.CreateUpdateProjectGroupRequest{Name: "pg01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "pg02")}, Visibility: types.VisibilityPublic}
+	pg05req := &action.CreateUpdateProjectGroupRequest{Name: "pg01", Parent: types.Parent{Kind: types.ProjectGroupKind, ID: path.Join("user", user.Name, "pg02")}, Visibility: types.VisibilityPublic}
 	if _, err := cs.ah.CreateProjectGroup(ctx, pg05req); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -907,16 +719,16 @@ func TestProjectGroupUpdate(t *testing.T) {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
 	})
-	t.Run("change root project group parent type", func(t *testing.T) {
+	t.Run("change root project group parent kind", func(t *testing.T) {
 		var rootPG *types.ProjectGroup
 		rootPG, err := cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
-		rootPG.Parent.Type = types.ConfigTypeProjectGroup
+		rootPG.Parent.Kind = types.ObjectKindProjectGroup
 		rootPG.Name = "rootpg"
 
-		expectedErr := "changing project group parent type isn't supported"
+		expectedErr := "changing project group parent kind isn't supported"
 		_, err = cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name), &action.CreateUpdateProjectGroupRequest{Name: rootPG.Name, Parent: rootPG.Parent, Visibility: rootPG.Visibility})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
@@ -930,7 +742,7 @@ func TestProjectGroupUpdate(t *testing.T) {
 		}
 		rootPG.Parent.ID = path.Join("user", user.Name, "pg01")
 
-		expectedErr := "cannot change root project group parent type or id"
+		expectedErr := "cannot change root project group parent kind or id"
 		_, err = cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name), &action.CreateUpdateProjectGroupRequest{Name: rootPG.Name, Parent: rootPG.Parent, Visibility: rootPG.Visibility})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
@@ -977,33 +789,26 @@ func TestProjectGroupDelete(t *testing.T) {
 	ctx := context.Background()
 	log := testutil.NewLogger(t)
 
-	cs, tetcd := setupConfigstore(ctx, t, log, dir)
-	defer shutdownEtcd(tetcd)
+	cs := setupConfigstore(ctx, t, log, dir)
 
 	t.Logf("starting cs")
 	go func() {
 		_ = cs.Run(ctx)
 	}()
 
-	// TODO(sgotti) change the sleep with a real check that all is ready
-	time.Sleep(2 * time.Second)
-
 	org, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: "org01", Visibility: types.VisibilityPublic})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	// TODO(sgotti) change the sleep with a real check that user is in readdb
-	time.Sleep(2 * time.Second)
-
 	// create a projectgroup in org root project group
-	pg01, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
+	pg01, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
 	// create a child projectgroup in org root project group
-	if _, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "subprojectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: pg01.ID}, Visibility: types.VisibilityPublic}); err != nil {
+	if _, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "subprojectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: pg01.ID}, Visibility: types.VisibilityPublic}); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
@@ -1028,49 +833,42 @@ func TestProjectGroupDeleteDontSeeOldChildObjects(t *testing.T) {
 	ctx := context.Background()
 	log := testutil.NewLogger(t)
 
-	cs, tetcd := setupConfigstore(ctx, t, log, dir)
-	defer shutdownEtcd(tetcd)
+	cs := setupConfigstore(ctx, t, log, dir)
 
 	t.Logf("starting cs")
 	go func() {
 		_ = cs.Run(ctx)
 	}()
 
-	// TODO(sgotti) change the sleep with a real check that all is ready
-	time.Sleep(2 * time.Second)
-
 	org, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: "org01", Visibility: types.VisibilityPublic})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	// TODO(sgotti) change the sleep with a real check that user is in readdb
-	time.Sleep(2 * time.Second)
-
 	// create a projectgroup in org root project group
-	pg01, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
+	pg01, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
 	// create a child projectgroup in org root project group
-	spg01, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "subprojectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: pg01.ID}, Visibility: types.VisibilityPublic})
+	spg01, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "subprojectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: pg01.ID}, Visibility: types.VisibilityPublic})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
 	// create a project inside child projectgroup
-	project, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: spg01.ID}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+	project, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: spg01.ID}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
 	// create project secret
-	if _, err := cs.ah.CreateSecret(ctx, &action.CreateUpdateSecretRequest{Name: "secret01", Parent: types.Parent{Type: types.ConfigTypeProject, ID: project.ID}, Type: types.SecretTypeInternal, Data: map[string]string{"secret01": "secretvar01"}}); err != nil {
+	if _, err := cs.ah.CreateSecret(ctx, &action.CreateUpdateSecretRequest{Name: "secret01", Parent: types.Parent{Kind: types.ObjectKindProject, ID: project.ID}, Type: types.SecretTypeInternal, Data: map[string]string{"secret01": "secretvar01"}}); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	// create project variable
-	if _, err := cs.ah.CreateVariable(ctx, &action.CreateUpdateVariableRequest{Name: "variable01", Parent: types.Parent{Type: types.ConfigTypeProject, ID: project.ID}, Values: []types.VariableValue{{SecretName: "secret01", SecretVar: "secretvar01"}}}); err != nil {
+	if _, err = cs.ah.CreateVariable(ctx, &action.CreateUpdateVariableRequest{Name: "variable01", Parent: types.Parent{Kind: types.ObjectKindProject, ID: project.ID}, Values: []types.VariableValue{{SecretName: "secret01", SecretVar: "secretvar01"}}}); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
@@ -1080,23 +878,23 @@ func TestProjectGroupDeleteDontSeeOldChildObjects(t *testing.T) {
 	}
 
 	// recreate the same hierarchj using the paths
-	pg01, err = cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
+	pg01, err = cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	spg01, err = cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "subprojectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name, pg01.Name)}, Visibility: types.VisibilityPublic})
+	spg01, err = cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "subprojectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name, pg01.Name)}, Visibility: types.VisibilityPublic})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	project, err = cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name, pg01.Name, spg01.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+	project, err = cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name, pg01.Name, spg01.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	secret, err := cs.ah.CreateSecret(ctx, &action.CreateUpdateSecretRequest{Name: "secret01", Parent: types.Parent{Type: types.ConfigTypeProject, ID: path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name)}, Type: types.SecretTypeInternal, Data: map[string]string{"secret01": "secretvar01"}})
+	secret, err := cs.ah.CreateSecret(ctx, &action.CreateUpdateSecretRequest{Name: "secret01", Parent: types.Parent{Kind: types.ObjectKindProject, ID: path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name)}, Type: types.SecretTypeInternal, Data: map[string]string{"secret01": "secretvar01"}})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	variable, err := cs.ah.CreateVariable(ctx, &action.CreateUpdateVariableRequest{Name: "variable01", Parent: types.Parent{Type: types.ConfigTypeProject, ID: path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name)}, Values: []types.VariableValue{{SecretName: "secret01", SecretVar: "secretvar01"}}})
+	variable, err := cs.ah.CreateVariable(ctx, &action.CreateUpdateVariableRequest{Name: "variable01", Parent: types.Parent{Kind: types.ObjectKindProject, ID: path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name)}, Values: []types.VariableValue{{SecretName: "secret01", SecretVar: "secretvar01"}}})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -1119,7 +917,7 @@ func TestProjectGroupDeleteDontSeeOldChildObjects(t *testing.T) {
 		t.Error(diff)
 	}
 
-	secrets, err := cs.ah.GetSecrets(ctx, types.ConfigTypeProject, project.ID, false)
+	secrets, err := cs.ah.GetSecrets(ctx, types.ObjectKindProject, project.ID, false)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -1127,7 +925,7 @@ func TestProjectGroupDeleteDontSeeOldChildObjects(t *testing.T) {
 		t.Error(diff)
 	}
 
-	secrets, err = cs.ah.GetSecrets(ctx, types.ConfigTypeProject, path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name), false)
+	secrets, err = cs.ah.GetSecrets(ctx, types.ObjectKindProject, path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name), false)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -1135,7 +933,7 @@ func TestProjectGroupDeleteDontSeeOldChildObjects(t *testing.T) {
 		t.Error(diff)
 	}
 
-	variables, err := cs.ah.GetVariables(ctx, types.ConfigTypeProject, project.ID, false)
+	variables, err := cs.ah.GetVariables(ctx, types.ObjectKindProject, project.ID, false)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -1143,7 +941,7 @@ func TestProjectGroupDeleteDontSeeOldChildObjects(t *testing.T) {
 		t.Error(diff)
 	}
 
-	variables, err = cs.ah.GetVariables(ctx, types.ConfigTypeProject, path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name), false)
+	variables, err = cs.ah.GetVariables(ctx, types.ObjectKindProject, path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name), false)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -1157,14 +955,10 @@ func TestOrgMembers(t *testing.T) {
 	ctx := context.Background()
 	log := testutil.NewLogger(t)
 
-	cs, tetcd := setupConfigstore(ctx, t, log, dir)
-	defer shutdownEtcd(tetcd)
+	cs := setupConfigstore(ctx, t, log, dir)
 
 	t.Logf("starting cs")
 	go func() { _ = cs.Run(ctx) }()
-
-	// TODO(sgotti) change the sleep with a real check that all is ready
-	time.Sleep(2 * time.Second)
 
 	user, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"})
 	if err != nil {
@@ -1174,9 +968,6 @@ func TestOrgMembers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-
-	// TODO(sgotti) change the sleep with a real check that all is ready
-	time.Sleep(2 * time.Second)
 
 	t.Run("test user org creator is org member with owner role", func(t *testing.T) {
 		expectedResponse := []*action.UserOrgsResponse{
@@ -1198,15 +989,14 @@ func TestOrgMembers(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		org, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: fmt.Sprintf("org%d", i), Visibility: types.VisibilityPublic, CreatorUserID: user.ID})
 		if err != nil {
-			t.Fatalf("err: %v", err)
+			t.Fatalf("unexpected err: %v", err)
 		}
 		orgs = append(orgs, org)
-		time.Sleep(200 * time.Millisecond)
 	}
 
 	for i := 0; i < 5; i++ {
 		if err := cs.ah.DeleteOrg(ctx, fmt.Sprintf("org%d", i)); err != nil {
-			t.Fatalf("err: %v", err)
+			t.Fatalf("unexpected err: %v", err)
 		}
 	}
 
@@ -1232,10 +1022,6 @@ func TestOrgMembers(t *testing.T) {
 			t.Error(diff)
 		}
 	})
-
-	// TODO(sgotti) change the sleep with a real check that user is in readdb
-	time.Sleep(2 * time.Second)
-
 }
 
 func TestRemoteSource(t *testing.T) {
@@ -1371,14 +1157,10 @@ func TestRemoteSource(t *testing.T) {
 			}
 			ctx := context.Background()
 
-			cs, tetcd := setupConfigstore(ctx, t, log, dir)
-			defer shutdownEtcd(tetcd)
+			cs := setupConfigstore(ctx, t, log, dir)
 
 			t.Logf("starting cs")
 			go func() { _ = cs.Run(ctx) }()
-
-			// TODO(sgotti) change the sleep with a real check that all is ready
-			time.Sleep(2 * time.Second)
 
 			tt.f(ctx, t, cs)
 		})

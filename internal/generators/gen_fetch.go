@@ -5,6 +5,7 @@ import (
 	"text/template"
 
 	idb "agola.io/agola/internal/db"
+	csobjects "agola.io/agola/internal/services/configstore/db/objects"
 	rsobjects "agola.io/agola/internal/services/runservice/db/objects"
 )
 
@@ -24,6 +25,14 @@ func genFetch() {
 		}{
 			ObjectInfos: rsobjects.ObjectsInfo,
 			TypesPath:   "agola.io/agola/services/runservice/types",
+		})
+	case "configstore":
+		err = fetchTemplate.Execute(f, struct {
+			ObjectInfos []idb.ObjectInfo
+			TypesPath   string
+		}{
+			ObjectInfos: csobjects.ObjectsInfo,
+			TypesPath:   "agola.io/agola/services/configstore/types",
 		})
 	}
 	if err != nil {

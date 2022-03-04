@@ -28,11 +28,16 @@ type CreateUserRequest struct {
 	UserName string `json:"username"`
 }
 
-type UserResponse struct {
+type PrivateUserResponse struct {
 	ID             string                   `json:"id"`
 	UserName       string                   `json:"username"`
 	Tokens         []string                 `json:"tokens"`
 	LinkedAccounts []*LinkedAccountResponse `json:"linked_accounts"`
+}
+
+type UserResponse struct {
+	ID       string `json:"id"`
+	UserName string `json:"username"`
 }
 
 type LinkedAccountResponse struct {

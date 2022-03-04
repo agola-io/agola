@@ -111,13 +111,13 @@ func (h *CurrentUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.ah.GetUser(ctx, userID)
+	user, tokens, linkedAccounts, err := h.ah.GetCurrentUser(ctx, userID)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	res := createUserResponse(user)
+	res := createPrivateUserResponse(user, tokens, linkedAccounts)
 	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
 		h.log.Err(err).Send()
 	}
@@ -149,25 +149,34 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func createUserResponse(u *cstypes.User) *gwapitypes.UserResponse {
-	user := &gwapitypes.UserResponse{
+func createPrivateUserResponse(u *cstypes.User, tokens []*cstypes.UserToken, linkedAccounts []*cstypes.LinkedAccount) *gwapitypes.PrivateUserResponse {
+	user := &gwapitypes.PrivateUserResponse{
 		ID:             u.ID,
 		UserName:       u.Name,
-		Tokens:         make([]string, 0, len(u.Tokens)),
-		LinkedAccounts: make([]*gwapitypes.LinkedAccountResponse, 0, len(u.LinkedAccounts)),
+		Tokens:         make([]string, 0, len(tokens)),
+		LinkedAccounts: make([]*gwapitypes.LinkedAccountResponse, 0, len(linkedAccounts)),
 	}
-	for tokenName := range u.Tokens {
-		user.Tokens = append(user.Tokens, tokenName)
+	for _, token := range tokens {
+		user.Tokens = append(user.Tokens, token.Name)
 	}
 	sort.Strings(user.Tokens)
 
-	for _, la := range u.LinkedAccounts {
+	for _, la := range linkedAccounts {
 		user.LinkedAccounts = append(user.LinkedAccounts, &gwapitypes.LinkedAccountResponse{
 			ID:                  la.ID,
 			RemoteSourceID:      la.RemoteSourceID,
 			RemoteUserName:      la.RemoteUserName,
 			RemoteUserAvatarURL: la.RemoteUserAvatarURL,
 		})
+	}
+
+	return user
+}
+
+func createUserResponse(u *cstypes.User) *gwapitypes.UserResponse {
+	user := &gwapitypes.UserResponse{
+		ID:       u.ID,
+		UserName: u.Name,
 	}
 
 	return user

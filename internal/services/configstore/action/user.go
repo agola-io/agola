@@ -16,14 +16,11 @@ package action
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
-	"agola.io/agola/internal/datamanager"
-	"agola.io/agola/internal/dbold"
 	"agola.io/agola/internal/errors"
-
-	"agola.io/agola/internal/services/configstore/readdb"
+	"agola.io/agola/internal/services/configstore/db"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
 
@@ -44,22 +41,12 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid user name %q", req.UserName))
 	}
 
-	var cgt *datamanager.ChangeGroupsUpdateToken
-	// changegroup is the username (and in future the email) to ensure no
-	// concurrent user creation/modification using the same name
-	cgNames := []string{util.EncodeSha256Hex("username-" + req.UserName)}
-	var rs *types.RemoteSource
-
-	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	var user *types.User
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
-		if err != nil {
-			return errors.WithStack(err)
-		}
 
 		// check duplicate user name
-		u, err := h.readDB.GetUserByName(tx, req.UserName)
+		u, err := h.d.GetUserByName(tx, req.UserName)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -67,101 +54,76 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user with name %q already exists", u.Name))
 		}
 
+		var rs *types.RemoteSource
 		if req.CreateUserLARequest != nil {
-			rs, err = h.readDB.GetRemoteSourceByName(tx, req.CreateUserLARequest.RemoteSourceName)
+			rs, err = h.d.GetRemoteSourceByName(tx, req.CreateUserLARequest.RemoteSourceName)
 			if err != nil {
 				return errors.WithStack(err)
 			}
 			if rs == nil {
 				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remote source %q doesn't exist", req.CreateUserLARequest.RemoteSourceName))
 			}
-			user, err := h.readDB.GetUserByLinkedAccountRemoteUserIDandSource(tx, req.CreateUserLARequest.RemoteUserID, rs.ID)
+			la, err := h.d.GetLinkedAccountByRemoteUserIDandSource(tx, req.CreateUserLARequest.RemoteUserID, rs.ID)
 			if err != nil {
-				return errors.Wrapf(err, "failed to get user for remote user id %q and remote source %q", req.CreateUserLARequest.RemoteUserID, rs.ID)
+				return errors.Wrapf(err, "failed to get linked account for remote user id %q and remote source %q", req.CreateUserLARequest.RemoteUserID, rs.ID)
 			}
-			if user != nil {
-				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user for remote user id %q for remote source %q already exists", req.CreateUserLARequest.RemoteUserID, req.CreateUserLARequest.RemoteSourceName))
+			if la != nil {
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("linked account for remote user id %q for remote source %q already exists", req.CreateUserLARequest.RemoteUserID, req.CreateUserLARequest.RemoteSourceName))
 			}
 		}
+
+		user = types.NewUser()
+		user.Name = req.UserName
+		user.Secret = util.EncodeSha1Hex(uuid.Must(uuid.NewV4()).String())
+
+		if req.CreateUserLARequest != nil {
+
+			la := types.NewLinkedAccount()
+			la.UserID = user.ID
+			la.RemoteSourceID = rs.ID
+			la.RemoteUserID = req.CreateUserLARequest.RemoteUserID
+			la.RemoteUserName = req.CreateUserLARequest.RemoteUserName
+			la.UserAccessToken = req.CreateUserLARequest.UserAccessToken
+			la.Oauth2AccessToken = req.CreateUserLARequest.Oauth2AccessToken
+			la.Oauth2RefreshToken = req.CreateUserLARequest.Oauth2RefreshToken
+			la.Oauth2AccessTokenExpiresAt = req.CreateUserLARequest.Oauth2AccessTokenExpiresAt
+
+			if err := h.d.InsertLinkedAccount(tx, la); err != nil {
+				return errors.WithStack(err)
+			}
+		}
+
+		// create root user project group
+		pg := types.NewProjectGroup()
+		// use public visibility
+		pg.Visibility = types.VisibilityPublic
+		pg.Parent = types.Parent{
+			Kind: types.ObjectKindUser,
+			ID:   user.ID,
+		}
+
+		if err := h.d.InsertUser(tx, user); err != nil {
+			return errors.WithStack(err)
+		}
+		if err := h.d.InsertProjectGroup(tx, pg); err != nil {
+			return errors.WithStack(err)
+		}
+
 		return nil
 	})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	user := &types.User{
-		ID:     uuid.Must(uuid.NewV4()).String(),
-		Name:   req.UserName,
-		Secret: util.EncodeSha1Hex(uuid.Must(uuid.NewV4()).String()),
-	}
-	if req.CreateUserLARequest != nil {
-		if user.LinkedAccounts == nil {
-			user.LinkedAccounts = make(map[string]*types.LinkedAccount)
-		}
-
-		la := &types.LinkedAccount{
-			ID:                         uuid.Must(uuid.NewV4()).String(),
-			RemoteSourceID:             rs.ID,
-			RemoteUserID:               req.CreateUserLARequest.RemoteUserID,
-			RemoteUserName:             req.CreateUserLARequest.RemoteUserName,
-			UserAccessToken:            req.CreateUserLARequest.UserAccessToken,
-			Oauth2AccessToken:          req.CreateUserLARequest.Oauth2AccessToken,
-			Oauth2RefreshToken:         req.CreateUserLARequest.Oauth2RefreshToken,
-			Oauth2AccessTokenExpiresAt: req.CreateUserLARequest.Oauth2AccessTokenExpiresAt,
-		}
-
-		user.LinkedAccounts[la.ID] = la
-	}
-
-	userj, err := json.Marshal(user)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal user")
-	}
-
-	// create root user project group
-	pg := &types.ProjectGroup{
-		ID: uuid.Must(uuid.NewV4()).String(),
-		// use public visibility
-		Visibility: types.VisibilityPublic,
-		Parent: types.Parent{
-			Type: types.ConfigTypeUser,
-			ID:   user.ID,
-		},
-	}
-	pgj, err := json.Marshal(pg)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal project group")
-	}
-
-	actions := []*datamanager.Action{
-		{
-			ActionType: datamanager.ActionTypePut,
-			DataType:   string(types.ConfigTypeUser),
-			ID:         user.ID,
-			Data:       userj,
-		},
-		{
-			ActionType: datamanager.ActionTypePut,
-			DataType:   string(types.ConfigTypeProjectGroup),
-			ID:         pg.ID,
-			Data:       pgj,
-		},
-	}
-
-	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return user, errors.WithStack(err)
+	return user, nil
 }
 
 func (h *ActionHandler) DeleteUser(ctx context.Context, userRef string) error {
-	var user *types.User
-
-	var cgt *datamanager.ChangeGroupsUpdateToken
-	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
 
 		// check user existance
-		user, err = h.readDB.GetUser(tx, userRef)
+		user, err := h.d.GetUser(tx, userRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -169,28 +131,17 @@ func (h *ActionHandler) DeleteUser(ctx context.Context, userRef string) error {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", userRef))
 		}
 
-		// changegroup is the userid
-		cgNames := []string{util.EncodeSha256Hex("userid-" + user.ID)}
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
-		if err != nil {
+		if err := h.d.DeleteUser(tx, user.ID); err != nil {
 			return errors.WithStack(err)
 		}
 
 		return nil
+
 	})
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	actions := []*datamanager.Action{
-		{
-			ActionType: datamanager.ActionTypeDelete,
-			DataType:   string(types.ConfigTypeUser),
-			ID:         user.ID,
-		},
-	}
-
-	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return errors.WithStack(err)
 }
 
@@ -201,15 +152,11 @@ type UpdateUserRequest struct {
 }
 
 func (h *ActionHandler) UpdateUser(ctx context.Context, req *UpdateUserRequest) (*types.User, error) {
-	var cgt *datamanager.ChangeGroupsUpdateToken
-
-	cgNames := []string{}
 	var user *types.User
 
-	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		user, err = h.readDB.GetUser(tx, req.UserRef)
+		user, err = h.d.GetUser(tx, req.UserRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -217,23 +164,21 @@ func (h *ActionHandler) UpdateUser(ctx context.Context, req *UpdateUserRequest) 
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", req.UserRef))
 		}
 
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-
 		if req.UserName != "" {
 			// check duplicate user name
-			u, err := h.readDB.GetUserByName(tx, req.UserName)
+			u, err := h.d.GetUserByName(tx, req.UserName)
 			if err != nil {
 				return errors.WithStack(err)
 			}
 			if u != nil {
 				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user with name %q already exists", u.Name))
 			}
-			// changegroup is the username (and in future the email) to ensure no
-			// concurrent user creation/modification using the same name
-			cgNames = append(cgNames, util.EncodeSha256Hex("username-"+req.UserName))
+
+			user.Name = req.UserName
+		}
+
+		if err := h.d.UpdateUser(tx, user); err != nil {
+			return errors.WithStack(err)
 		}
 
 		return nil
@@ -242,26 +187,36 @@ func (h *ActionHandler) UpdateUser(ctx context.Context, req *UpdateUserRequest) 
 		return nil, errors.WithStack(err)
 	}
 
-	if req.UserName != "" {
-		user.Name = req.UserName
-	}
-
-	userj, err := json.Marshal(user)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal user")
-	}
-
-	actions := []*datamanager.Action{
-		{
-			ActionType: datamanager.ActionTypePut,
-			DataType:   string(types.ConfigTypeUser),
-			ID:         user.ID,
-			Data:       userj,
-		},
-	}
-
-	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return user, errors.WithStack(err)
+}
+
+func (h *ActionHandler) GetUserLinkedAccounts(ctx context.Context, userRef string) ([]*types.LinkedAccount, error) {
+	if userRef == "" {
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user ref required"))
+	}
+
+	var linkedAccounts []*types.LinkedAccount
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		user, err := h.d.GetUser(tx, userRef)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if user == nil {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", userRef))
+		}
+
+		linkedAccounts, err = h.d.GetUserLinkedAccounts(tx, user.ID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return linkedAccounts, errors.WithStack(err)
 }
 
 type CreateUserLARequest struct {
@@ -284,15 +239,9 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("remote source name required"))
 	}
 
-	var user *types.User
-	var rs *types.RemoteSource
-
-	var cgt *datamanager.ChangeGroupsUpdateToken
-
-	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
-		var err error
-		user, err = h.readDB.GetUser(tx, req.UserRef)
+	var la *types.LinkedAccount
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		user, err := h.d.GetUser(tx, req.UserRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -300,14 +249,7 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", req.UserRef))
 		}
 
-		// changegroup is the userid
-		cgNames := []string{util.EncodeSha256Hex("userid-" + user.ID)}
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-
-		rs, err = h.readDB.GetRemoteSourceByName(tx, req.RemoteSourceName)
+		rs, err := h.d.GetRemoteSourceByName(tx, req.RemoteSourceName)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -315,50 +257,34 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remote source %q doesn't exist", req.RemoteSourceName))
 		}
 
-		user, err := h.readDB.GetUserByLinkedAccountRemoteUserIDandSource(tx, req.RemoteUserID, rs.ID)
+		la, err = h.d.GetLinkedAccountByRemoteUserIDandSource(tx, req.RemoteUserID, rs.ID)
 		if err != nil {
-			return errors.Wrapf(err, "failed to get user for remote user id %q and remote source %q", req.RemoteUserID, rs.ID)
+			return errors.Wrapf(err, "failed to get linked account for remote user id %q and remote source %q", req.RemoteUserID, rs.ID)
 		}
-		if user != nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user for remote user id %q for remote source %q already exists", req.RemoteUserID, req.RemoteSourceName))
+		if la != nil {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("linked account for remote user id %q for remote source %q already exists", req.RemoteUserID, req.RemoteSourceName))
 		}
+
+		la = types.NewLinkedAccount()
+		la.UserID = user.ID
+		la.RemoteSourceID = rs.ID
+		la.RemoteUserID = req.RemoteUserID
+		la.RemoteUserName = req.RemoteUserName
+		la.UserAccessToken = req.UserAccessToken
+		la.Oauth2AccessToken = req.Oauth2AccessToken
+		la.Oauth2RefreshToken = req.Oauth2RefreshToken
+		la.Oauth2AccessTokenExpiresAt = req.Oauth2AccessTokenExpiresAt
+
+		if err := h.d.InsertLinkedAccount(tx, la); err != nil {
+			return errors.WithStack(err)
+		}
+
 		return nil
 	})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	if user.LinkedAccounts == nil {
-		user.LinkedAccounts = make(map[string]*types.LinkedAccount)
-	}
-
-	la := &types.LinkedAccount{
-		ID:                         uuid.Must(uuid.NewV4()).String(),
-		RemoteSourceID:             rs.ID,
-		RemoteUserID:               req.RemoteUserID,
-		RemoteUserName:             req.RemoteUserName,
-		UserAccessToken:            req.UserAccessToken,
-		Oauth2AccessToken:          req.Oauth2AccessToken,
-		Oauth2RefreshToken:         req.Oauth2RefreshToken,
-		Oauth2AccessTokenExpiresAt: req.Oauth2AccessTokenExpiresAt,
-	}
-
-	user.LinkedAccounts[la.ID] = la
-
-	userj, err := json.Marshal(user)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal user")
-	}
-	actions := []*datamanager.Action{
-		{
-			ActionType: datamanager.ActionTypePut,
-			DataType:   string(types.ConfigTypeUser),
-			ID:         user.ID,
-			Data:       userj,
-		},
-	}
-
-	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return la, errors.WithStack(err)
 }
 
@@ -372,12 +298,9 @@ func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) 
 
 	var user *types.User
 
-	var cgt *datamanager.ChangeGroupsUpdateToken
-
-	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		user, err = h.readDB.GetUser(tx, userRef)
+		user, err = h.d.GetUser(tx, userRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -385,10 +308,20 @@ func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) 
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", userRef))
 		}
 
-		// changegroup is the userid
-		cgNames := []string{util.EncodeSha256Hex("userid-" + user.ID)}
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		la, err := h.d.GetLinkedAccount(tx, laID)
 		if err != nil {
+			return errors.WithStack(err)
+		}
+		if la == nil {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("linked account id %q for user %q doesn't exist", laID, userRef))
+		}
+
+		// check that the linked account belongs to the right user
+		if user.ID != la.UserID {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("linked account id %q for user %q doesn't exist", laID, userRef))
+		}
+
+		if err := h.d.DeleteLinkedAccount(tx, la.ID); err != nil {
 			return errors.WithStack(err)
 		}
 
@@ -398,27 +331,6 @@ func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) 
 		return errors.WithStack(err)
 	}
 
-	_, ok := user.LinkedAccounts[laID]
-	if !ok {
-		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("linked account id %q for user %q doesn't exist", laID, userRef))
-	}
-
-	delete(user.LinkedAccounts, laID)
-
-	userj, err := json.Marshal(user)
-	if err != nil {
-		return errors.Wrapf(err, "failed to marshal user")
-	}
-	actions := []*datamanager.Action{
-		{
-			ActionType: datamanager.ActionTypePut,
-			DataType:   string(types.ConfigTypeUser),
-			ID:         user.ID,
-			Data:       userj,
-		},
-	}
-
-	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return errors.WithStack(err)
 }
 
@@ -439,15 +351,9 @@ func (h *ActionHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLAReque
 		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user ref required"))
 	}
 
-	var user *types.User
-	var rs *types.RemoteSource
-
-	var cgt *datamanager.ChangeGroupsUpdateToken
-
-	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
-		var err error
-		user, err = h.readDB.GetUser(tx, req.UserRef)
+	var la *types.LinkedAccount
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		user, err := h.d.GetUser(tx, req.UserRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -455,73 +361,55 @@ func (h *ActionHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLAReque
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", req.UserRef))
 		}
 
-		// changegroup is the userid
-		cgNames := []string{util.EncodeSha256Hex("userid-" + user.ID)}
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		la, err = h.d.GetLinkedAccount(tx, req.LinkedAccountID)
 		if err != nil {
 			return errors.WithStack(err)
 		}
-
-		la, ok := user.LinkedAccounts[req.LinkedAccountID]
-		if !ok {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("linked account id %q for user %q doesn't exist", req.LinkedAccountID, user.Name))
+		if la == nil {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("linked account id %q for user %q doesn't exist", req.LinkedAccountID, req.UserRef))
 		}
 
-		rs, err = h.readDB.GetRemoteSource(tx, la.RemoteSourceID)
+		// check that the linked account belongs to the right user
+		if user.ID != la.UserID {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("linked account id %q for user %q doesn't exist", req.LinkedAccountID, req.UserRef))
+		}
+
+		rs, err := h.d.GetRemoteSource(tx, la.RemoteSourceID)
 		if err != nil {
 			return errors.WithStack(err)
 		}
 		if rs == nil {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remote source with id %q doesn't exist", la.RemoteSourceID))
 		}
+
+		la.RemoteUserID = req.RemoteUserID
+		la.RemoteUserName = req.RemoteUserName
+		la.UserAccessToken = req.UserAccessToken
+		la.Oauth2AccessToken = req.Oauth2AccessToken
+		la.Oauth2RefreshToken = req.Oauth2RefreshToken
+		la.Oauth2AccessTokenExpiresAt = req.Oauth2AccessTokenExpiresAt
+
+		if err := h.d.UpdateUser(tx, user); err != nil {
+			return errors.WithStack(err)
+		}
+
 		return nil
 	})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	la := user.LinkedAccounts[req.LinkedAccountID]
-
-	la.RemoteUserID = req.RemoteUserID
-	la.RemoteUserName = req.RemoteUserName
-	la.UserAccessToken = req.UserAccessToken
-	la.Oauth2AccessToken = req.Oauth2AccessToken
-	la.Oauth2RefreshToken = req.Oauth2RefreshToken
-	la.Oauth2AccessTokenExpiresAt = req.Oauth2AccessTokenExpiresAt
-
-	userj, err := json.Marshal(user)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal user")
-	}
-	actions := []*datamanager.Action{
-		{
-			ActionType: datamanager.ActionTypePut,
-			DataType:   string(types.ConfigTypeUser),
-			ID:         user.ID,
-			Data:       userj,
-		},
-	}
-
-	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return la, errors.WithStack(err)
 }
 
-func (h *ActionHandler) CreateUserToken(ctx context.Context, userRef, tokenName string) (string, error) {
+func (h *ActionHandler) GetUserTokens(ctx context.Context, userRef string) ([]*types.UserToken, error) {
 	if userRef == "" {
-		return "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("user ref required"))
-	}
-	if tokenName == "" {
-		return "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("token name required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user ref required"))
 	}
 
-	var user *types.User
-
-	var cgt *datamanager.ChangeGroupsUpdateToken
-
-	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
-		var err error
-		user, err = h.readDB.GetUser(tx, userRef)
+	var tokens []*types.UserToken
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		user, err := h.d.GetUser(tx, userRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -529,9 +417,7 @@ func (h *ActionHandler) CreateUserToken(ctx context.Context, userRef, tokenName 
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", userRef))
 		}
 
-		// changegroup is the userid
-		cgNames := []string{util.EncodeSha256Hex("userid-" + user.ID)}
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		tokens, err = h.d.GetUserTokens(tx, user.ID)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -539,35 +425,54 @@ func (h *ActionHandler) CreateUserToken(ctx context.Context, userRef, tokenName 
 		return nil
 	})
 	if err != nil {
-		return "", errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
-	if user.Tokens != nil {
-		if _, ok := user.Tokens[tokenName]; ok {
-			return "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("token %q for user %q already exists", tokenName, userRef))
+
+	return tokens, errors.WithStack(err)
+}
+
+func (h *ActionHandler) CreateUserToken(ctx context.Context, userRef, tokenName string) (*types.UserToken, error) {
+	if userRef == "" {
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user ref required"))
+	}
+	if tokenName == "" {
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("token name required"))
+	}
+
+	var token *types.UserToken
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		user, err := h.d.GetUser(tx, userRef)
+		if err != nil {
+			return errors.WithStack(err)
 		}
-	}
+		if user == nil {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", userRef))
+		}
 
-	if user.Tokens == nil {
-		user.Tokens = make(map[string]string)
-	}
+		userToken, err := h.d.GetUserToken(tx, user.ID, tokenName)
+		if err != nil {
+			return errors.WithStack(err)
+		}
 
-	token := util.EncodeSha1Hex(uuid.Must(uuid.NewV4()).String())
-	user.Tokens[tokenName] = token
+		if userToken != nil {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("token %q for user %q already exists", tokenName, userRef))
+		}
 
-	userj, err := json.Marshal(user)
+		token = types.NewUserToken()
+		token.UserID = user.ID
+		token.Name = tokenName
+		token.Value = util.EncodeSha1Hex(uuid.Must(uuid.NewV4()).String())
+
+		if err := h.d.InsertUserToken(tx, token); err != nil {
+			return errors.WithStack(err)
+		}
+
+		return nil
+	})
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to marshal user")
-	}
-	actions := []*datamanager.Action{
-		{
-			ActionType: datamanager.ActionTypePut,
-			DataType:   string(types.ConfigTypeUser),
-			ID:         user.ID,
-			Data:       userj,
-		},
+		return nil, errors.WithStack(err)
 	}
 
-	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return token, errors.WithStack(err)
 }
 
@@ -579,14 +484,8 @@ func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName 
 		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("token name required"))
 	}
 
-	var user *types.User
-
-	var cgt *datamanager.ChangeGroupsUpdateToken
-
-	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
-		var err error
-		user, err = h.readDB.GetUser(tx, userRef)
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		user, err := h.d.GetUser(tx, userRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -594,10 +493,16 @@ func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName 
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", userRef))
 		}
 
-		// changegroup is the userid
-		cgNames := []string{util.EncodeSha256Hex("userid-" + user.ID)}
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
+		userToken, err := h.d.GetUserToken(tx, user.ID, tokenName)
 		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		if userToken == nil {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("token %q for user %q doesn't exist", tokenName, userRef))
+		}
+
+		if err := h.d.DeleteUserToken(tx, userToken.ID); err != nil {
 			return errors.WithStack(err)
 		}
 
@@ -607,27 +512,6 @@ func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName 
 		return errors.WithStack(err)
 	}
 
-	_, ok := user.Tokens[tokenName]
-	if !ok {
-		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("token %q for user %q doesn't exist", tokenName, userRef))
-	}
-
-	delete(user.Tokens, tokenName)
-
-	userj, err := json.Marshal(user)
-	if err != nil {
-		return errors.Wrapf(err, "failed to marshal user")
-	}
-	actions := []*datamanager.Action{
-		{
-			ActionType: datamanager.ActionTypePut,
-			DataType:   string(types.ConfigTypeUser),
-			ID:         user.ID,
-			Data:       userj,
-		},
-	}
-
-	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return errors.WithStack(err)
 }
 
@@ -636,7 +520,7 @@ type UserOrgsResponse struct {
 	Role         types.MemberRole
 }
 
-func userOrgsResponse(userOrg *readdb.UserOrg) *UserOrgsResponse {
+func userOrgsResponse(userOrg *db.UserOrg) *UserOrgsResponse {
 	return &UserOrgsResponse{
 		Organization: userOrg.Organization,
 		Role:         userOrg.Role,
@@ -644,10 +528,10 @@ func userOrgsResponse(userOrg *readdb.UserOrg) *UserOrgsResponse {
 }
 
 func (h *ActionHandler) GetUserOrgs(ctx context.Context, userRef string) ([]*UserOrgsResponse, error) {
-	var userOrgs []*readdb.UserOrg
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	var userOrgs []*db.UserOrg
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		user, err := h.readDB.GetUser(tx, userRef)
+		user, err := h.d.GetUser(tx, userRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -655,7 +539,7 @@ func (h *ActionHandler) GetUserOrgs(ctx context.Context, userRef string) ([]*Use
 			return util.NewAPIError(util.ErrNotExist, errors.Errorf("user %q doesn't exist", userRef))
 		}
 
-		userOrgs, err = h.readDB.GetUserOrgs(tx, user.ID)
+		userOrgs, err = h.d.GetUserOrgs(tx, user.ID)
 		return errors.WithStack(err)
 	})
 	if err != nil {

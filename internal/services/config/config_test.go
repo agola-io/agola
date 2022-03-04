@@ -59,8 +59,9 @@ notification:
 
 configstore:
   dataDir: /data/agola/configstore
-  etcd:
-    endpoints: "http://localhost:2379"
+  db:
+    type: sqlite3
+    connString: /opt/data/agola/configstore/db
   objectStorage:
     type: posix
     path: /agola/configstore/ost
@@ -126,8 +127,9 @@ notification:
 
 configstore:
   dataDir: /data/agola/configstore
-  etcd:
-    endpoints: "http://localhost:2379"
+  db:
+    type: sqlite3
+    connString: /opt/data/agola/configstore/db
   objectStorage:
     type: posix
     path: /agola/configstore/ost

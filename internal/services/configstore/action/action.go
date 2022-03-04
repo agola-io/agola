@@ -15,11 +15,10 @@
 package action
 
 import (
-	"agola.io/agola/internal/datamanager"
-	"agola.io/agola/internal/dbold"
 	"agola.io/agola/internal/errors"
-	"agola.io/agola/internal/etcd"
-	"agola.io/agola/internal/services/configstore/readdb"
+	"agola.io/agola/internal/lock"
+	"agola.io/agola/internal/services/configstore/db"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
 
@@ -28,18 +27,16 @@ import (
 
 type ActionHandler struct {
 	log             zerolog.Logger
-	readDB          *readdb.ReadDB
-	dm              *datamanager.DataManager
-	e               *etcd.Store
+	d               *db.DB
+	lf              lock.LockFactory
 	maintenanceMode bool
 }
 
-func NewActionHandler(log zerolog.Logger, readDB *readdb.ReadDB, dm *datamanager.DataManager, e *etcd.Store) *ActionHandler {
+func NewActionHandler(log zerolog.Logger, d *db.DB, lf lock.LockFactory) *ActionHandler {
 	return &ActionHandler{
 		log:             log,
-		readDB:          readDB,
-		dm:              dm,
-		e:               e,
+		d:               d,
+		lf:              lf,
 		maintenanceMode: false,
 	}
 }
@@ -48,10 +45,10 @@ func (h *ActionHandler) SetMaintenanceMode(maintenanceMode bool) {
 	h.maintenanceMode = maintenanceMode
 }
 
-func (h *ActionHandler) ResolveConfigID(tx *db.Tx, configType types.ConfigType, ref string) (string, error) {
-	switch configType {
-	case types.ConfigTypeProjectGroup:
-		group, err := h.readDB.GetProjectGroup(tx, ref)
+func (h *ActionHandler) ResolveObjectID(tx *sql.Tx, objectKind types.ObjectKind, ref string) (string, error) {
+	switch objectKind {
+	case types.ObjectKindProjectGroup:
+		group, err := h.d.GetProjectGroup(tx, ref)
 		if err != nil {
 			return "", errors.WithStack(err)
 		}
@@ -60,8 +57,8 @@ func (h *ActionHandler) ResolveConfigID(tx *db.Tx, configType types.ConfigType, 
 		}
 		return group.ID, nil
 
-	case types.ConfigTypeProject:
-		project, err := h.readDB.GetProject(tx, ref)
+	case types.ObjectKindProject:
+		project, err := h.d.GetProject(tx, ref)
 		if err != nil {
 			return "", errors.WithStack(err)
 		}
@@ -71,6 +68,6 @@ func (h *ActionHandler) ResolveConfigID(tx *db.Tx, configType types.ConfigType, 
 		return project.ID, nil
 
 	default:
-		return "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("unknown config type %q", configType))
+		return "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("unknown object kind %q", objectKind))
 	}
 }

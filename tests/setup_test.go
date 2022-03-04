@@ -278,16 +278,17 @@ func setup(ctx context.Context, t *testing.T, dir string, gitea bool) (*testutil
 		Configstore: config.Configstore{
 			Debug:   false,
 			DataDir: filepath.Join(dir, "configstore"),
+			DB: config.DB{
+				Type:       sql.Sqlite3,
+				ConnString: filepath.Join(dir, "configstore", "db"),
+			},
 			Web: config.Web{
 				ListenAddress: ":4002",
 				TLS:           false,
 			},
-			Etcd: config.Etcd{
-				Endpoints: "",
-			},
 			ObjectStorage: config.ObjectStorage{
 				Type: "posix",
-				Path: filepath.Join(dir, "configstore/ost"),
+				Path: filepath.Join(dir, "configstore", "ost"),
 			},
 		},
 		Gitserver: config.Gitserver{
@@ -311,8 +312,6 @@ func setup(ctx context.Context, t *testing.T, dir string, gitea bool) (*testutil
 
 	etcdDir := filepath.Join(dir, "etcd")
 	tetcd := setupEtcd(t, log, etcdDir)
-
-	c.Configstore.Etcd.Endpoints = tetcd.Endpoint
 
 	_, gwPort, err := testutil.GetFreePort(true, false)
 	if err != nil {

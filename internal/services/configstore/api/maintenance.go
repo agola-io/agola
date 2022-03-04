@@ -17,7 +17,6 @@ package api
 import (
 	"net/http"
 
-	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/services/configstore/action"
 	"agola.io/agola/internal/util"
 
@@ -27,11 +26,10 @@ import (
 type MaintenanceModeHandler struct {
 	log zerolog.Logger
 	ah  *action.ActionHandler
-	e   *etcd.Store
 }
 
-func NewMaintenanceModeHandler(log zerolog.Logger, ah *action.ActionHandler, e *etcd.Store) *MaintenanceModeHandler {
-	return &MaintenanceModeHandler{log: log, ah: ah, e: e}
+func NewMaintenanceModeHandler(log zerolog.Logger, ah *action.ActionHandler) *MaintenanceModeHandler {
+	return &MaintenanceModeHandler{log: log, ah: ah}
 }
 
 func (h *MaintenanceModeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -55,7 +53,6 @@ func (h *MaintenanceModeHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	if err := util.HTTPResponse(w, http.StatusOK, nil); err != nil {
 		h.log.Err(err).Send()
 	}
-
 }
 
 type ExportHandler struct {

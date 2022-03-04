@@ -23,6 +23,7 @@ import (
 	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 	csclient "agola.io/agola/services/configstore/client"
+	cstypes "agola.io/agola/services/configstore/types"
 	rsclient "agola.io/agola/services/runservice/client"
 
 	"github.com/rs/zerolog"
@@ -78,10 +79,23 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) error {
 	if err != nil {
 		return util.NewAPIError(util.ErrInternal, errors.Wrapf(err, "failed to get user by linked account %q", project.LinkedAccountID))
 	}
-	la := user.LinkedAccounts[project.LinkedAccountID]
-	if la == nil {
-		return util.NewAPIError(util.ErrInternal, errors.Errorf("linked account %q in user %q doesn't exist", project.LinkedAccountID, user.Name))
+	linkedAccounts, _, err := h.configstoreClient.GetUserLinkedAccounts(ctx, user.ID)
+	if err != nil {
+		return util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q linked accounts", user.ID))
 	}
+
+	var la *cstypes.LinkedAccount
+	for _, v := range linkedAccounts {
+		if v.ID == project.LinkedAccountID {
+			la = v
+			break
+		}
+	}
+
+	if la == nil {
+		return util.NewAPIError(util.ErrInternal, errors.Errorf("linked account %q for user %q doesn't exist", project.LinkedAccountID, user.Name))
+	}
+
 	rs, _, err := h.configstoreClient.GetRemoteSource(ctx, la.RemoteSourceID)
 	if err != nil {
 		return util.NewAPIError(util.ErrInternal, errors.Wrapf(err, "failed to get remote source %q", la.RemoteSourceID))

@@ -16,29 +16,25 @@ package action
 
 import (
 	"context"
-	"encoding/json"
 
-	"agola.io/agola/internal/datamanager"
-	"agola.io/agola/internal/dbold"
 	"agola.io/agola/internal/errors"
+	"agola.io/agola/internal/sql"
 
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
-
-	"github.com/gofrs/uuid"
 )
 
-func (h *ActionHandler) GetVariables(ctx context.Context, parentType types.ConfigType, parentRef string, tree bool) ([]*types.Variable, error) {
+func (h *ActionHandler) GetVariables(ctx context.Context, parentKind types.ObjectKind, parentRef string, tree bool) ([]*types.Variable, error) {
 	var variables []*types.Variable
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
-		parentID, err := h.ResolveConfigID(tx, parentType, parentRef)
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		parentID, err := h.ResolveObjectID(tx, parentKind, parentRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
 		if tree {
-			variables, err = h.readDB.GetVariablesTree(tx, parentType, parentID)
+			variables, err = h.d.GetVariablesTree(tx, parentKind, parentID)
 		} else {
-			variables, err = h.readDB.GetVariables(tx, parentID)
+			variables, err = h.d.GetVariables(tx, parentID)
 		}
 		return errors.WithStack(err)
 	})
@@ -59,14 +55,14 @@ func (h *ActionHandler) ValidateVariableReq(ctx context.Context, req *CreateUpda
 	if len(req.Values) == 0 {
 		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("variable values required"))
 	}
-	if req.Parent.Type == "" {
-		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("variable parent type required"))
+	if req.Parent.Kind == "" {
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("variable parent kind required"))
 	}
 	if req.Parent.ID == "" {
 		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("variable parent id required"))
 	}
-	if req.Parent.Type != types.ConfigTypeProject && req.Parent.Type != types.ConfigTypeProjectGroup {
-		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid variable parent type %q", req.Parent.Type))
+	if req.Parent.Kind != types.ObjectKindProject && req.Parent.Kind != types.ObjectKindProjectGroup {
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid variable parent kind %q", req.Parent.Kind))
 	}
 
 	return nil
@@ -83,31 +79,30 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateUpdateVar
 		return nil, errors.WithStack(err)
 	}
 
-	var cgt *datamanager.ChangeGroupsUpdateToken
-	// changegroup is the variable name
-	cgNames := []string{util.EncodeSha256Hex("variablename-" + req.Name)}
-
-	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
-		var err error
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-
-		parentID, err := h.ResolveConfigID(tx, req.Parent.Type, req.Parent.ID)
+	var variable *types.Variable
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		parentID, err := h.ResolveObjectID(tx, req.Parent.Kind, req.Parent.ID)
 		if err != nil {
 			return errors.WithStack(err)
 		}
 		req.Parent.ID = parentID
 
 		// check duplicate variable name
-		s, err := h.readDB.GetVariableByName(tx, req.Parent.ID, req.Name)
+		s, err := h.d.GetVariableByName(tx, req.Parent.ID, req.Name)
 		if err != nil {
 			return errors.WithStack(err)
 		}
 		if s != nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("variable with name %q for %s with id %q already exists", req.Name, req.Parent.Type, req.Parent.ID))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("variable with name %q for %s with id %q already exists", req.Name, req.Parent.Kind, req.Parent.ID))
+		}
+
+		variable = types.NewVariable()
+		variable.Name = req.Name
+		variable.Parent = req.Parent
+		variable.Values = req.Values
+
+		if err := h.d.InsertVariable(tx, variable); err != nil {
+			return errors.WithStack(err)
 		}
 
 		return nil
@@ -116,26 +111,6 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateUpdateVar
 		return nil, errors.WithStack(err)
 	}
 
-	variable := &types.Variable{}
-	variable.ID = uuid.Must(uuid.NewV4()).String()
-	variable.Name = req.Name
-	variable.Parent = req.Parent
-	variable.Values = req.Values
-
-	variablej, err := json.Marshal(variable)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal variable")
-	}
-	actions := []*datamanager.Action{
-		{
-			ActionType: datamanager.ActionTypePut,
-			DataType:   string(types.ConfigTypeVariable),
-			ID:         variable.ID,
-			Data:       variablej,
-		},
-	}
-
-	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return variable, errors.WithStack(err)
 }
 
@@ -144,37 +119,31 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, curVariableName stri
 		return nil, errors.WithStack(err)
 	}
 
-	var cgt *datamanager.ChangeGroupsUpdateToken
-	// changegroup is the variable name
-
 	var variable *types.Variable
-	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
-		var err error
-
-		parentID, err := h.ResolveConfigID(tx, req.Parent.Type, req.Parent.ID)
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		parentID, err := h.ResolveObjectID(tx, req.Parent.Kind, req.Parent.ID)
 		if err != nil {
 			return errors.WithStack(err)
 		}
 		req.Parent.ID = parentID
 
 		// check variable exists
-		variable, err = h.readDB.GetVariableByName(tx, req.Parent.ID, curVariableName)
+		variable, err = h.d.GetVariableByName(tx, req.Parent.ID, curVariableName)
 		if err != nil {
 			return errors.WithStack(err)
 		}
 		if variable == nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("variable with name %q for %s with id %q doesn't exists", curVariableName, req.Parent.Type, req.Parent.ID))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("variable with name %q for %s with id %q doesn't exists", curVariableName, req.Parent.Kind, req.Parent.ID))
 		}
 
 		if variable.Name != req.Name {
 			// check duplicate variable name
-			u, err := h.readDB.GetVariableByName(tx, req.Parent.ID, req.Name)
+			u, err := h.d.GetVariableByName(tx, req.Parent.ID, req.Name)
 			if err != nil {
 				return errors.WithStack(err)
 			}
 			if u != nil {
-				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("variable with name %q for %s with id %q already exists", req.Name, req.Parent.Type, req.Parent.ID))
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("variable with name %q for %s with id %q already exists", req.Name, req.Parent.Kind, req.Parent.ID))
 			}
 		}
 
@@ -183,12 +152,7 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, curVariableName stri
 		variable.Parent = req.Parent
 		variable.Values = req.Values
 
-		cgNames := []string{
-			util.EncodeSha256Hex("variablename-" + variable.ID),
-			util.EncodeSha256Hex("variablename-" + variable.Name),
-		}
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
-		if err != nil {
+		if err := h.d.UpdateVariable(tx, variable); err != nil {
 			return errors.WithStack(err)
 		}
 
@@ -198,38 +162,18 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, curVariableName stri
 		return nil, errors.WithStack(err)
 	}
 
-	variablej, err := json.Marshal(variable)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal variable")
-	}
-	actions := []*datamanager.Action{
-		{
-			ActionType: datamanager.ActionTypePut,
-			DataType:   string(types.ConfigTypeVariable),
-			ID:         variable.ID,
-			Data:       variablej,
-		},
-	}
-
-	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return variable, errors.WithStack(err)
 }
 
-func (h *ActionHandler) DeleteVariable(ctx context.Context, parentType types.ConfigType, parentRef, variableName string) error {
-	var variable *types.Variable
-
-	var cgt *datamanager.ChangeGroupsUpdateToken
-
-	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
-		var err error
-		parentID, err := h.ResolveConfigID(tx, parentType, parentRef)
+func (h *ActionHandler) DeleteVariable(ctx context.Context, parentKind types.ObjectKind, parentRef, variableName string) error {
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		parentID, err := h.ResolveObjectID(tx, parentKind, parentRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
 
 		// check variable existance
-		variable, err = h.readDB.GetVariableByName(tx, parentID, variableName)
+		variable, err := h.d.GetVariableByName(tx, parentID, variableName)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -237,26 +181,15 @@ func (h *ActionHandler) DeleteVariable(ctx context.Context, parentType types.Con
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("variable with name %q doesn't exist", variableName))
 		}
 
-		// changegroup is the variable id
-		cgNames := []string{util.EncodeSha256Hex("variableid-" + variable.ID)}
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
-		if err != nil {
+		if err := h.d.DeleteVariable(tx, variable.ID); err != nil {
 			return errors.WithStack(err)
 		}
+
 		return nil
 	})
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	actions := []*datamanager.Action{
-		{
-			ActionType: datamanager.ActionTypeDelete,
-			DataType:   string(types.ConfigTypeVariable),
-			ID:         variable.ID,
-		},
-	}
-
-	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return errors.WithStack(err)
 }

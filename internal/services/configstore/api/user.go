@@ -19,10 +19,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"agola.io/agola/internal/dbold"
 	"agola.io/agola/internal/errors"
 	action "agola.io/agola/internal/services/configstore/action"
-	"agola.io/agola/internal/services/configstore/readdb"
+	"agola.io/agola/internal/services/configstore/db"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	"agola.io/agola/services/configstore/types"
@@ -32,12 +32,12 @@ import (
 )
 
 type UserHandler struct {
-	log    zerolog.Logger
-	readDB *readdb.ReadDB
+	log zerolog.Logger
+	d   *db.DB
 }
 
-func NewUserHandler(log zerolog.Logger, readDB *readdb.ReadDB) *UserHandler {
-	return &UserHandler{log: log, readDB: readDB}
+func NewUserHandler(log zerolog.Logger, d *db.DB) *UserHandler {
+	return &UserHandler{log: log, d: d}
 }
 
 func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -46,9 +46,9 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	userRef := vars["userref"]
 
 	var user *types.User
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		user, err = h.readDB.GetUser(tx, userRef)
+		user, err = h.d.GetUser(tx, userRef)
 		return errors.WithStack(err)
 	})
 	if err != nil {
@@ -180,12 +180,12 @@ const (
 )
 
 type UsersHandler struct {
-	log    zerolog.Logger
-	readDB *readdb.ReadDB
+	log zerolog.Logger
+	d   *db.DB
 }
 
-func NewUsersHandler(log zerolog.Logger, readDB *readdb.ReadDB) *UsersHandler {
-	return &UsersHandler{log: log, readDB: readDB}
+func NewUsersHandler(log zerolog.Logger, d *db.DB) *UsersHandler {
+	return &UsersHandler{log: log, d: d}
 }
 
 func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -220,77 +220,88 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	queryType := query.Get("query_type")
 
 	var users []*types.User
-	switch queryType {
-	case "bytoken":
-		token := query.Get("token")
-		var user *types.User
-		err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		switch queryType {
+		case "bytoken":
+			token := query.Get("token")
+			user, err := h.d.GetUserByTokenValue(tx, token)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			if user == nil {
+				return util.NewAPIError(util.ErrNotExist, errors.Errorf("user with required token doesn't exist"))
+			}
+			users = []*types.User{user}
+		case "bylinkedaccount":
+			linkedAccountID := query.Get("linkedaccountid")
+			user, err := h.d.GetUserByLinkedAccount(tx, linkedAccountID)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			if user == nil {
+				return util.NewAPIError(util.ErrNotExist, errors.Errorf("user with linked account %q token doesn't exist", linkedAccountID))
+			}
+			users = []*types.User{user}
+		case "byremoteuser":
+			remoteUserID := query.Get("remoteuserid")
+			remoteSourceID := query.Get("remotesourceid")
+			la, err := h.d.GetLinkedAccountByRemoteUserIDandSource(tx, remoteUserID, remoteSourceID)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			if la == nil {
+				return util.NewAPIError(util.ErrNotExist, errors.Errorf("linked account with remote user %q for remote source %q token doesn't exist", remoteUserID, remoteSourceID))
+			}
+
+			user, err := h.d.GetUser(tx, la.UserID)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			if user == nil {
+				return util.NewAPIError(util.ErrNotExist, errors.Errorf("user with remote user %q for remote source %q token doesn't exist", remoteUserID, remoteSourceID))
+			}
+			users = []*types.User{user}
+		default:
+			// default query
 			var err error
-			user, err = h.readDB.GetUserByTokenValue(tx, token)
+			users, err = h.d.GetUsers(tx, start, limit, asc)
 			return errors.WithStack(err)
-		})
-		if err != nil {
-			h.log.Err(err).Send()
-			util.HTTPError(w, err)
-			return
 		}
-		if user == nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("user with required token doesn't exist")))
-			return
-		}
-		users = []*types.User{user}
-	case "bylinkedaccount":
-		linkedAccountID := query.Get("linkedaccountid")
-		var user *types.User
-		err := h.readDB.Do(ctx, func(tx *db.Tx) error {
-			var err error
-			user, err = h.readDB.GetUserByLinkedAccount(tx, linkedAccountID)
-			return errors.WithStack(err)
-		})
-		if err != nil {
-			h.log.Err(err).Send()
-			util.HTTPError(w, err)
-			return
-		}
-		if user == nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("user with linked account %q token doesn't exist", linkedAccountID)))
-			return
-		}
-		users = []*types.User{user}
-	case "byremoteuser":
-		remoteUserID := query.Get("remoteuserid")
-		remoteSourceID := query.Get("remotesourceid")
-		var user *types.User
-		err := h.readDB.Do(ctx, func(tx *db.Tx) error {
-			var err error
-			user, err = h.readDB.GetUserByLinkedAccountRemoteUserIDandSource(tx, remoteUserID, remoteSourceID)
-			return errors.WithStack(err)
-		})
-		if err != nil {
-			h.log.Err(err).Send()
-			util.HTTPError(w, err)
-			return
-		}
-		if user == nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("user with remote user %q for remote source %q token doesn't exist", remoteUserID, remoteSourceID)))
-			return
-		}
-		users = []*types.User{user}
-	default:
-		// default query
-		err := h.readDB.Do(ctx, func(tx *db.Tx) error {
-			var err error
-			users, err = h.readDB.GetUsers(tx, start, limit, asc)
-			return errors.WithStack(err)
-		})
-		if err != nil {
-			h.log.Err(err).Send()
-			util.HTTPError(w, err)
-			return
-		}
+
+		return nil
+	})
+	if err != nil {
+		h.log.Err(err).Send()
+		util.HTTPError(w, err)
+		return
 	}
 
 	if err := util.HTTPResponse(w, http.StatusOK, users); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+type UserLinkedAccountsHandler struct {
+	log zerolog.Logger
+	ah  *action.ActionHandler
+}
+
+func NewUserLinkedAccountsHandler(log zerolog.Logger, ah *action.ActionHandler) *UserLinkedAccountsHandler {
+	return &UserLinkedAccountsHandler{log: log, ah: ah}
+}
+
+func (h *UserLinkedAccountsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	userRef := vars["userref"]
+
+	linkedAccounts, err := h.ah.GetUserLinkedAccounts(ctx, userRef)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusCreated, linkedAccounts); err != nil {
 		h.log.Err(err).Send()
 	}
 }
@@ -404,6 +415,31 @@ func (h *UpdateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+type UserTokensHandler struct {
+	log zerolog.Logger
+	ah  *action.ActionHandler
+}
+
+func NewUserTokensHandler(log zerolog.Logger, ah *action.ActionHandler) *UserTokensHandler {
+	return &UserTokensHandler{log: log, ah: ah}
+}
+
+func (h *UserTokensHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	userRef := vars["userref"]
+
+	linkedAccounts, err := h.ah.GetUserTokens(ctx, userRef)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusCreated, linkedAccounts); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
 type CreateUserTokenHandler struct {
 	log zerolog.Logger
 	ah  *action.ActionHandler
@@ -432,7 +468,8 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	}
 
 	resp := &csapitypes.CreateUserTokenResponse{
-		Token: token,
+		Name:  token.Name,
+		Token: token.Value,
 	}
 	if err := util.HTTPResponse(w, http.StatusCreated, resp); err != nil {
 		h.log.Err(err).Send()

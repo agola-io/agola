@@ -87,7 +87,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProje
 	creq := &csapitypes.CreateUpdateProjectGroupRequest{
 		Name: req.Name,
 		Parent: cstypes.Parent{
-			Type: cstypes.ConfigTypeProjectGroup,
+			Kind: cstypes.ObjectKindProjectGroup,
 			ID:   parentRef,
 		},
 		Visibility: req.Visibility,

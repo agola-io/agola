@@ -18,37 +18,35 @@ import (
 	"context"
 	"crypto/tls"
 	"net/http"
-	"path/filepath"
 	"sync"
 	"time"
 
 	scommon "agola.io/agola/internal/common"
-	"agola.io/agola/internal/datamanager"
+	idb "agola.io/agola/internal/db"
 	"agola.io/agola/internal/errors"
-	"agola.io/agola/internal/etcd"
+	"agola.io/agola/internal/lock"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/services/config"
 	action "agola.io/agola/internal/services/configstore/action"
 	"agola.io/agola/internal/services/configstore/api"
-	"agola.io/agola/internal/services/configstore/common"
-	"agola.io/agola/internal/services/configstore/readdb"
+	"agola.io/agola/internal/services/configstore/db"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
-	"agola.io/agola/services/configstore/types"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	etcdclientv3 "go.etcd.io/etcd/clientv3"
-	"go.etcd.io/etcd/mvcc/mvccpb"
 )
 
 func (s *Configstore) maintenanceModeWatcherLoop(ctx context.Context, runCtxCancel context.CancelFunc, maintenanceModeEnabled bool) {
+	s.log.Info().Msgf("maintenance mode watcher: maintenance mode enabled: %t", maintenanceModeEnabled)
+
 	for {
-		log.Debug().Msgf("maintenanceModeWatcherLoop")
+		s.log.Debug().Msgf("maintenanceModeWatcherLoop")
 
 		// at first watch restart from previous processed revision
 		if err := s.maintenanceModeWatcher(ctx, runCtxCancel, maintenanceModeEnabled); err != nil {
-			log.Err(err).Send()
+			s.log.Err(err).Msgf("maintenance mode watcher error")
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
@@ -61,46 +59,14 @@ func (s *Configstore) maintenanceModeWatcherLoop(ctx context.Context, runCtxCanc
 }
 
 func (s *Configstore) maintenanceModeWatcher(ctx context.Context, runCtxCancel context.CancelFunc, maintenanceModeEnabled bool) error {
-	log.Info().Msgf("watcher: maintenance mode enabled: %t", maintenanceModeEnabled)
-	resp, err := s.e.Get(ctx, common.EtcdMaintenanceKey, 0)
-	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
+	maintenanceEnabled, err := s.ah.IsMaintenanceEnabled(ctx)
+	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	if len(resp.Kvs) > 0 {
-		log.Info().Msgf("maintenance mode key is present")
-		if !maintenanceModeEnabled {
-			runCtxCancel()
-		}
-	}
-
-	revision := resp.Header.Revision
-
-	wctx := etcdclientv3.WithRequireLeader(ctx)
-
-	// restart from previous processed revision
-	wch := s.e.Watch(wctx, common.EtcdMaintenanceKey, revision)
-
-	for wresp := range wch {
-		if wresp.Canceled {
-			return errors.WithStack(wresp.Err())
-		}
-
-		for _, ev := range wresp.Events {
-			switch ev.Type {
-			case mvccpb.PUT:
-				log.Info().Msgf("maintenance mode key set")
-				if !maintenanceModeEnabled {
-					runCtxCancel()
-				}
-
-			case mvccpb.DELETE:
-				log.Info().Msgf("maintenance mode key removed")
-				if maintenanceModeEnabled {
-					runCtxCancel()
-				}
-			}
-		}
+	if maintenanceEnabled != maintenanceModeEnabled {
+		s.log.Info().Msgf("maintenance mode changed to %t", maintenanceEnabled)
+		runCtxCancel()
 	}
 
 	return nil
@@ -109,10 +75,9 @@ func (s *Configstore) maintenanceModeWatcher(ctx context.Context, runCtxCancel c
 type Configstore struct {
 	log             zerolog.Logger
 	c               *config.Configstore
-	e               *etcd.Store
-	dm              *datamanager.DataManager
-	readDB          *readdb.ReadDB
 	ost             *objectstorage.ObjStorage
+	d               *db.DB
+	lf              lock.LockFactory
 	ah              *action.ActionHandler
 	maintenanceMode bool
 }
@@ -126,94 +91,92 @@ func NewConfigstore(ctx context.Context, log zerolog.Logger, c *config.Configsto
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	e, err := scommon.NewEtcd(&c.Etcd, log, "configstore")
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
 
 	cs := &Configstore{
 		log: log,
 		c:   c,
-		e:   e,
 		ost: ost,
 	}
 
-	dmConf := &datamanager.DataManagerConfig{
-		BasePath: "configdata",
-		E:        e,
-		OST:      ost,
-		DataTypes: []string{
-			string(types.ConfigTypeUser),
-			string(types.ConfigTypeOrg),
-			string(types.ConfigTypeOrgMember),
-			string(types.ConfigTypeProjectGroup),
-			string(types.ConfigTypeProject),
-			string(types.ConfigTypeRemoteSource),
-			string(types.ConfigTypeSecret),
-			string(types.ConfigTypeVariable),
-		},
-	}
-	dm, err := datamanager.NewDataManager(ctx, log, dmConf)
+	sdb, err := sql.NewDB(c.DB.Type, c.DB.ConnString)
 	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	readDB, err := readdb.NewReadDB(ctx, log, filepath.Join(c.DataDir, "readdb"), e, ost, dm)
-	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, errors.Wrapf(err, "new db error")
 	}
 
-	cs.dm = dm
-	cs.readDB = readDB
+	d, err := db.NewDB(log, sdb)
+	if err != nil {
+		return nil, errors.Wrapf(err, "new db error")
+	}
+	cs.d = d
 
-	ah := action.NewActionHandler(log, readDB, dm, e)
+	var lf lock.LockFactory
+	switch c.DB.Type {
+	case sql.Sqlite3:
+		ll := lock.NewLocalLocks()
+		lf = lock.NewLocalLockFactory(ll)
+	case sql.Postgres:
+		lf = lock.NewPGLockFactory(sdb)
+	default:
+		return nil, errors.Errorf("unknown type %q", c.DB.Type)
+	}
+	cs.lf = lf
+
+	if err := idb.Setup(ctx, log, d, lf); err != nil {
+		return nil, errors.Wrapf(err, "create db error")
+	}
+
+	ah := action.NewActionHandler(log, d, lf)
 	cs.ah = ah
 
 	return cs, nil
 }
 
 func (s *Configstore) setupDefaultRouter() http.Handler {
-	maintenanceModeHandler := api.NewMaintenanceModeHandler(s.log, s.ah, s.e)
+	maintenanceModeHandler := api.NewMaintenanceModeHandler(s.log, s.ah)
 	exportHandler := api.NewExportHandler(s.log, s.ah)
+	importHandler := api.NewImportHandler(s.log, s.ah)
 
-	projectGroupHandler := api.NewProjectGroupHandler(s.log, s.ah, s.readDB)
-	projectGroupSubgroupsHandler := api.NewProjectGroupSubgroupsHandler(s.log, s.ah, s.readDB)
-	projectGroupProjectsHandler := api.NewProjectGroupProjectsHandler(s.log, s.ah, s.readDB)
-	createProjectGroupHandler := api.NewCreateProjectGroupHandler(s.log, s.ah, s.readDB)
-	updateProjectGroupHandler := api.NewUpdateProjectGroupHandler(s.log, s.ah, s.readDB)
+	projectGroupHandler := api.NewProjectGroupHandler(s.log, s.ah, s.d)
+	projectGroupSubgroupsHandler := api.NewProjectGroupSubgroupsHandler(s.log, s.ah, s.d)
+	projectGroupProjectsHandler := api.NewProjectGroupProjectsHandler(s.log, s.ah, s.d)
+	createProjectGroupHandler := api.NewCreateProjectGroupHandler(s.log, s.ah, s.d)
+	updateProjectGroupHandler := api.NewUpdateProjectGroupHandler(s.log, s.ah, s.d)
 	deleteProjectGroupHandler := api.NewDeleteProjectGroupHandler(s.log, s.ah)
 
-	projectHandler := api.NewProjectHandler(s.log, s.ah, s.readDB)
-	createProjectHandler := api.NewCreateProjectHandler(s.log, s.ah, s.readDB)
-	updateProjectHandler := api.NewUpdateProjectHandler(s.log, s.ah, s.readDB)
+	projectHandler := api.NewProjectHandler(s.log, s.ah, s.d)
+	createProjectHandler := api.NewCreateProjectHandler(s.log, s.ah, s.d)
+	updateProjectHandler := api.NewUpdateProjectHandler(s.log, s.ah, s.d)
 	deleteProjectHandler := api.NewDeleteProjectHandler(s.log, s.ah)
 
-	secretsHandler := api.NewSecretsHandler(s.log, s.ah, s.readDB)
+	secretsHandler := api.NewSecretsHandler(s.log, s.ah, s.d)
 	createSecretHandler := api.NewCreateSecretHandler(s.log, s.ah)
 	updateSecretHandler := api.NewUpdateSecretHandler(s.log, s.ah)
 	deleteSecretHandler := api.NewDeleteSecretHandler(s.log, s.ah)
 
-	variablesHandler := api.NewVariablesHandler(s.log, s.ah, s.readDB)
+	variablesHandler := api.NewVariablesHandler(s.log, s.ah, s.d)
 	createVariableHandler := api.NewCreateVariableHandler(s.log, s.ah)
 	updateVariableHandler := api.NewUpdateVariableHandler(s.log, s.ah)
 	deleteVariableHandler := api.NewDeleteVariableHandler(s.log, s.ah)
 
-	userHandler := api.NewUserHandler(s.log, s.readDB)
-	usersHandler := api.NewUsersHandler(s.log, s.readDB)
+	userHandler := api.NewUserHandler(s.log, s.d)
+	usersHandler := api.NewUsersHandler(s.log, s.d)
 	createUserHandler := api.NewCreateUserHandler(s.log, s.ah)
 	updateUserHandler := api.NewUpdateUserHandler(s.log, s.ah)
 	deleteUserHandler := api.NewDeleteUserHandler(s.log, s.ah)
 
+	userLinkedAccountsHandler := api.NewUserLinkedAccountsHandler(s.log, s.ah)
 	createUserLAHandler := api.NewCreateUserLAHandler(s.log, s.ah)
 	deleteUserLAHandler := api.NewDeleteUserLAHandler(s.log, s.ah)
 	updateUserLAHandler := api.NewUpdateUserLAHandler(s.log, s.ah)
 
+	userTokensHandler := api.NewUserTokensHandler(s.log, s.ah)
 	createUserTokenHandler := api.NewCreateUserTokenHandler(s.log, s.ah)
 	deleteUserTokenHandler := api.NewDeleteUserTokenHandler(s.log, s.ah)
 
 	userOrgsHandler := api.NewUserOrgsHandler(s.log, s.ah)
 
-	orgHandler := api.NewOrgHandler(s.log, s.readDB)
-	orgsHandler := api.NewOrgsHandler(s.log, s.readDB)
+	orgHandler := api.NewOrgHandler(s.log, s.d)
+	orgsHandler := api.NewOrgsHandler(s.log, s.d)
 	createOrgHandler := api.NewCreateOrgHandler(s.log, s.ah)
 	deleteOrgHandler := api.NewDeleteOrgHandler(s.log, s.ah)
 
@@ -221,8 +184,8 @@ func (s *Configstore) setupDefaultRouter() http.Handler {
 	addOrgMemberHandler := api.NewAddOrgMemberHandler(s.log, s.ah)
 	removeOrgMemberHandler := api.NewRemoveOrgMemberHandler(s.log, s.ah)
 
-	remoteSourceHandler := api.NewRemoteSourceHandler(s.log, s.readDB)
-	remoteSourcesHandler := api.NewRemoteSourcesHandler(s.log, s.readDB)
+	remoteSourceHandler := api.NewRemoteSourceHandler(s.log, s.d)
+	remoteSourcesHandler := api.NewRemoteSourcesHandler(s.log, s.d)
 	createRemoteSourceHandler := api.NewCreateRemoteSourceHandler(s.log, s.ah)
 	updateRemoteSourceHandler := api.NewUpdateRemoteSourceHandler(s.log, s.ah)
 	deleteRemoteSourceHandler := api.NewDeleteRemoteSourceHandler(s.log, s.ah)
@@ -266,9 +229,11 @@ func (s *Configstore) setupDefaultRouter() http.Handler {
 	apirouter.Handle("/users/{userref}", updateUserHandler).Methods("PUT")
 	apirouter.Handle("/users/{userref}", deleteUserHandler).Methods("DELETE")
 
+	apirouter.Handle("/users/{userref}/linkedaccounts", userLinkedAccountsHandler).Methods("GET")
 	apirouter.Handle("/users/{userref}/linkedaccounts", createUserLAHandler).Methods("POST")
 	apirouter.Handle("/users/{userref}/linkedaccounts/{laid}", deleteUserLAHandler).Methods("DELETE")
 	apirouter.Handle("/users/{userref}/linkedaccounts/{laid}", updateUserLAHandler).Methods("PUT")
+	apirouter.Handle("/users/{userref}/tokens", userTokensHandler).Methods("GET")
 	apirouter.Handle("/users/{userref}/tokens", createUserTokenHandler).Methods("POST")
 	apirouter.Handle("/users/{userref}/tokens/{tokenname}", deleteUserTokenHandler).Methods("DELETE")
 
@@ -291,6 +256,7 @@ func (s *Configstore) setupDefaultRouter() http.Handler {
 	apirouter.Handle("/maintenance", maintenanceModeHandler).Methods("PUT", "DELETE")
 
 	apirouter.Handle("/export", exportHandler).Methods("GET")
+	apirouter.Handle("/import", importHandler).Methods("POST")
 
 	mainrouter := mux.NewRouter()
 	mainrouter.PathPrefix("/").Handler(router)
@@ -299,7 +265,7 @@ func (s *Configstore) setupDefaultRouter() http.Handler {
 }
 
 func (s *Configstore) setupMaintenanceRouter() http.Handler {
-	maintenanceModeHandler := api.NewMaintenanceModeHandler(s.log, s.ah, s.e)
+	maintenanceModeHandler := api.NewMaintenanceModeHandler(s.log, s.ah)
 	exportHandler := api.NewExportHandler(s.log, s.ah)
 	importHandler := api.NewImportHandler(s.log, s.ah)
 
@@ -344,25 +310,18 @@ func (s *Configstore) run(ctx context.Context) error {
 		}
 	}
 
-	resp, err := s.e.Get(ctx, common.EtcdMaintenanceKey, 0)
-	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
+	maintenanceEnabled, err := s.ah.IsMaintenanceEnabled(ctx)
+	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	maintenanceMode := false
-	if len(resp.Kvs) > 0 {
-		log.Info().Msgf("maintenance mode key is present")
-		maintenanceMode = true
-	}
-
-	s.maintenanceMode = maintenanceMode
-	s.dm.SetMaintenanceMode(maintenanceMode)
-	s.ah.SetMaintenanceMode(maintenanceMode)
+	s.maintenanceMode = maintenanceEnabled
+	s.ah.SetMaintenanceMode(s.maintenanceMode)
 
 	ctx, cancel := context.WithCancel(ctx)
 	errCh := make(chan error, 100)
 	var wg sync.WaitGroup
-	dmReadyCh := make(chan struct{})
+	// dmReadyCh := make(chan struct{})
 
 	var mainrouter http.Handler
 	if s.maintenanceMode {
@@ -375,12 +334,6 @@ func (s *Configstore) run(ctx context.Context) error {
 		util.GoWait(&wg, func() { s.maintenanceModeWatcherLoop(ctx, cancel, s.maintenanceMode) })
 
 		// TODO(sgotti) wait for all goroutines exiting
-		util.GoWait(&wg, func() { errCh <- s.dm.Run(ctx, dmReadyCh) })
-
-		// wait for dm to be ready
-		<-dmReadyCh
-
-		util.GoWait(&wg, func() { errCh <- s.readDB.Run(ctx) })
 	}
 
 	httpServer := http.Server{
@@ -402,15 +355,13 @@ func (s *Configstore) run(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		log.Info().Msgf("configstore run exiting")
-	case err := <-lerrCh:
+	case err = <-lerrCh:
 		if err != nil {
 			log.Err(err).Msgf("http server listen error")
-			return errors.WithStack(err)
 		}
-	case err := <-errCh:
+	case err = <-errCh:
 		if err != nil {
 			s.log.Err(err).Send()
-			return errors.WithStack(err)
 		}
 	}
 
@@ -418,5 +369,5 @@ func (s *Configstore) run(ctx context.Context) error {
 	httpServer.Close()
 	wg.Wait()
 
-	return errors.WithStack(err)
+	return nil
 }

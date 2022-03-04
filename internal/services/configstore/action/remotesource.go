@@ -16,16 +16,12 @@ package action
 
 import (
 	"context"
-	"encoding/json"
 
-	"agola.io/agola/internal/datamanager"
-	"agola.io/agola/internal/dbold"
 	"agola.io/agola/internal/errors"
+	"agola.io/agola/internal/sql"
 
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
-
-	"github.com/gofrs/uuid"
 )
 
 func (h *ActionHandler) ValidateRemoteSourceReq(ctx context.Context, req *CreateUpdateRemoteSourceRequest) error {
@@ -84,60 +80,40 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateUpdat
 		return nil, errors.WithStack(err)
 	}
 
-	var cgt *datamanager.ChangeGroupsUpdateToken
-	// changegroup is the remotesource name
-	cgNames := []string{util.EncodeSha256Hex("remotesourcename-" + req.Name)}
-
-	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
-		var err error
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-
+	var remoteSource *types.RemoteSource
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		// check duplicate remoteSource name
-		u, err := h.readDB.GetRemoteSourceByName(tx, req.Name)
+		curRemoteSource, err := h.d.GetRemoteSourceByName(tx, req.Name)
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		if u != nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource %q already exists", u.Name))
+		if curRemoteSource != nil {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource %q already exists", req.Name))
 		}
+
+		remoteSource = types.NewRemoteSource()
+		remoteSource.Name = req.Name
+		remoteSource.APIURL = req.APIURL
+		remoteSource.SkipVerify = req.SkipVerify
+		remoteSource.Type = req.Type
+		remoteSource.AuthType = req.AuthType
+		remoteSource.Oauth2ClientID = req.Oauth2ClientID
+		remoteSource.Oauth2ClientSecret = req.Oauth2ClientSecret
+		remoteSource.SSHHostKey = req.SSHHostKey
+		remoteSource.SkipSSHHostKeyCheck = req.SkipSSHHostKeyCheck
+		remoteSource.RegistrationEnabled = req.RegistrationEnabled
+		remoteSource.LoginEnabled = req.LoginEnabled
+
+		if err := h.d.InsertRemoteSource(tx, remoteSource); err != nil {
+			return errors.WithStack(err)
+		}
+
 		return nil
 	})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	remoteSource := &types.RemoteSource{}
-	remoteSource.ID = uuid.Must(uuid.NewV4()).String()
-	remoteSource.Name = req.Name
-	remoteSource.APIURL = req.APIURL
-	remoteSource.SkipVerify = req.SkipVerify
-	remoteSource.Type = req.Type
-	remoteSource.AuthType = req.AuthType
-	remoteSource.Oauth2ClientID = req.Oauth2ClientID
-	remoteSource.Oauth2ClientSecret = req.Oauth2ClientSecret
-	remoteSource.SSHHostKey = req.SSHHostKey
-	remoteSource.SkipSSHHostKeyCheck = req.SkipSSHHostKeyCheck
-	remoteSource.RegistrationEnabled = req.RegistrationEnabled
-	remoteSource.LoginEnabled = req.LoginEnabled
-
-	rsj, err := json.Marshal(remoteSource)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal remotesource")
-	}
-	actions := []*datamanager.Action{
-		{
-			ActionType: datamanager.ActionTypePut,
-			DataType:   string(types.ConfigTypeRemoteSource),
-			ID:         remoteSource.ID,
-			Data:       rsj,
-		},
-	}
-
-	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return remoteSource, errors.WithStack(err)
 }
 
@@ -146,15 +122,12 @@ func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, remoteSourceRef 
 		return nil, errors.WithStack(err)
 	}
 
-	var cgt *datamanager.ChangeGroupsUpdateToken
-
 	var remoteSource *types.RemoteSource
-	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
 
 		// check remotesource exists
-		remoteSource, err = h.readDB.GetRemoteSourceByName(tx, remoteSourceRef)
+		remoteSource, err = h.d.GetRemoteSourceByName(tx, remoteSourceRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -164,7 +137,7 @@ func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, remoteSourceRef 
 
 		if remoteSource.Name != req.Name {
 			// check duplicate remoteSource name
-			u, err := h.readDB.GetRemoteSourceByName(tx, req.Name)
+			u, err := h.d.GetRemoteSourceByName(tx, req.Name)
 			if err != nil {
 				return errors.WithStack(err)
 			}
@@ -185,46 +158,23 @@ func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, remoteSourceRef 
 		remoteSource.RegistrationEnabled = req.RegistrationEnabled
 		remoteSource.LoginEnabled = req.LoginEnabled
 
-		// changegroup is the remotesource id and also name since we could change the
-		// name so concurrently updating on the new name
-		cgNames := []string{util.EncodeSha256Hex("remotesourcename-" + remoteSource.Name), util.EncodeSha256Hex("remotesourceid-" + remoteSource.ID)}
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
-		if err != nil {
+		if err := h.d.UpdateRemoteSource(tx, remoteSource); err != nil {
 			return errors.WithStack(err)
 		}
+
 		return nil
 	})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	rsj, err := json.Marshal(remoteSource)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal remotesource")
-	}
-	actions := []*datamanager.Action{
-		{
-			ActionType: datamanager.ActionTypePut,
-			DataType:   string(types.ConfigTypeRemoteSource),
-			ID:         remoteSource.ID,
-			Data:       rsj,
-		},
-	}
-
-	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return remoteSource, errors.WithStack(err)
 }
 
 func (h *ActionHandler) DeleteRemoteSource(ctx context.Context, remoteSourceName string) error {
-	var remoteSource *types.RemoteSource
-	var cgt *datamanager.ChangeGroupsUpdateToken
-
-	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
-		var err error
-
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		// check remoteSource existance
-		remoteSource, err = h.readDB.GetRemoteSourceByName(tx, remoteSourceName)
+		remoteSource, err := h.d.GetRemoteSourceByName(tx, remoteSourceName)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -232,10 +182,7 @@ func (h *ActionHandler) DeleteRemoteSource(ctx context.Context, remoteSourceName
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource %q doesn't exist", remoteSourceName))
 		}
 
-		// changegroup is the remotesource id
-		cgNames := []string{util.EncodeSha256Hex("remotesourceid-" + remoteSource.ID)}
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
-		if err != nil {
+		if err := h.d.DeleteRemoteSource(tx, remoteSource.ID); err != nil {
 			return errors.WithStack(err)
 		}
 
@@ -245,15 +192,5 @@ func (h *ActionHandler) DeleteRemoteSource(ctx context.Context, remoteSourceName
 		return errors.WithStack(err)
 	}
 
-	actions := []*datamanager.Action{
-		{
-			ActionType: datamanager.ActionTypeDelete,
-			DataType:   string(types.ConfigTypeRemoteSource),
-			ID:         remoteSource.ID,
-		},
-	}
-
-	// changegroup is all the remotesources
-	_, err = h.dm.WriteWal(ctx, actions, cgt)
 	return errors.WithStack(err)
 }

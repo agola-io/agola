@@ -52,7 +52,7 @@ func (h *ActionHandler) IsOrgOwner(ctx context.Context, orgID string) (bool, err
 	return false, nil
 }
 
-func (h *ActionHandler) IsProjectOwner(ctx context.Context, ownerType cstypes.ConfigType, ownerID string) (bool, error) {
+func (h *ActionHandler) IsProjectOwner(ctx context.Context, ownerType cstypes.ObjectKind, ownerID string) (bool, error) {
 	isAdmin := common.IsUserAdmin(ctx)
 	if isAdmin {
 		return true, nil
@@ -63,13 +63,13 @@ func (h *ActionHandler) IsProjectOwner(ctx context.Context, ownerType cstypes.Co
 		return false, nil
 	}
 
-	if ownerType == cstypes.ConfigTypeUser {
+	if ownerType == cstypes.ObjectKindUser {
 		if userID == ownerID {
 			return true, nil
 		}
 	}
 
-	if ownerType == cstypes.ConfigTypeOrg {
+	if ownerType == cstypes.ObjectKindOrg {
 		userOrgs, _, err := h.configstoreClient.GetUserOrgs(ctx, userID)
 		if err != nil {
 			return false, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user orgs"))
@@ -88,7 +88,7 @@ func (h *ActionHandler) IsProjectOwner(ctx context.Context, ownerType cstypes.Co
 	return false, nil
 }
 
-func (h *ActionHandler) IsProjectMember(ctx context.Context, ownerType cstypes.ConfigType, ownerID string) (bool, error) {
+func (h *ActionHandler) IsProjectMember(ctx context.Context, ownerType cstypes.ObjectKind, ownerID string) (bool, error) {
 	isAdmin := common.IsUserAdmin(ctx)
 	if isAdmin {
 		return true, nil
@@ -99,13 +99,13 @@ func (h *ActionHandler) IsProjectMember(ctx context.Context, ownerType cstypes.C
 		return false, nil
 	}
 
-	if ownerType == cstypes.ConfigTypeUser {
+	if ownerType == cstypes.ObjectKindUser {
 		if userID == ownerID {
 			return true, nil
 		}
 	}
 
-	if ownerType == cstypes.ConfigTypeOrg {
+	if ownerType == cstypes.ObjectKindOrg {
 		userOrgs, _, err := h.configstoreClient.GetUserOrgs(ctx, userID)
 		if err != nil {
 			return false, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user orgs"))
@@ -122,18 +122,18 @@ func (h *ActionHandler) IsProjectMember(ctx context.Context, ownerType cstypes.C
 	return false, nil
 }
 
-func (h *ActionHandler) IsVariableOwner(ctx context.Context, parentType cstypes.ConfigType, parentRef string) (bool, error) {
-	var ownerType cstypes.ConfigType
+func (h *ActionHandler) IsVariableOwner(ctx context.Context, parentType cstypes.ObjectKind, parentRef string) (bool, error) {
+	var ownerType cstypes.ObjectKind
 	var ownerID string
 	switch parentType {
-	case cstypes.ConfigTypeProjectGroup:
+	case cstypes.ObjectKindProjectGroup:
 		pg, _, err := h.configstoreClient.GetProjectGroup(ctx, parentRef)
 		if err != nil {
 			return false, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get project group %q", parentRef))
 		}
 		ownerType = pg.OwnerType
 		ownerID = pg.OwnerID
-	case cstypes.ConfigTypeProject:
+	case cstypes.ObjectKindProject:
 		p, _, err := h.configstoreClient.GetProject(ctx, parentRef)
 		if err != nil {
 			return false, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get project  %q", parentRef))
@@ -147,7 +147,7 @@ func (h *ActionHandler) IsVariableOwner(ctx context.Context, parentType cstypes.
 
 func (h *ActionHandler) CanGetRun(ctx context.Context, groupType scommon.GroupType, ref string) (bool, string, error) {
 	var visibility cstypes.Visibility
-	var ownerType cstypes.ConfigType
+	var ownerType cstypes.ObjectKind
 	var refID string
 	var ownerID string
 	switch groupType {
@@ -168,7 +168,7 @@ func (h *ActionHandler) CanGetRun(ctx context.Context, groupType scommon.GroupTy
 
 		// user direct runs
 		refID = u.ID
-		ownerType = cstypes.ConfigTypeUser
+		ownerType = cstypes.ObjectKindUser
 		ownerID = u.ID
 		visibility = cstypes.VisibilityPrivate
 	}
@@ -187,7 +187,7 @@ func (h *ActionHandler) CanGetRun(ctx context.Context, groupType scommon.GroupTy
 }
 
 func (h *ActionHandler) CanDoRunActions(ctx context.Context, groupType scommon.GroupType, ref string) (bool, string, error) {
-	var ownerType cstypes.ConfigType
+	var ownerType cstypes.ObjectKind
 	var refID string
 	var ownerID string
 	switch groupType {
@@ -207,7 +207,7 @@ func (h *ActionHandler) CanDoRunActions(ctx context.Context, groupType scommon.G
 
 		// user direct runs
 		refID = u.ID
-		ownerType = cstypes.ConfigTypeUser
+		ownerType = cstypes.ObjectKindUser
 		ownerID = u.ID
 	}
 

@@ -1,4 +1,4 @@
-// Copyright 2019 Sorint.lab
+// Copyright 2022 Sorint.lab
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,23 +15,35 @@
 package types
 
 import (
-	cstypes "agola.io/agola/services/configstore/types"
+	stypes "agola.io/agola/services/types"
+
+	"github.com/gofrs/uuid"
 )
 
-type CreateUpdateProjectGroupRequest struct {
-	Name       string
-	Parent     cstypes.Parent
-	Visibility cstypes.Visibility
+const (
+	ProjectGroupKind    = "projectgroup"
+	ProjectGroupVersion = "v0.1.0"
+)
+
+type ProjectGroup struct {
+	stypes.TypeMeta
+	stypes.ObjectMeta
+
+	Name string `json:"name,omitempty"`
+
+	Parent Parent `json:"parent,omitempty"`
+
+	Visibility Visibility `json:"visibility,omitempty"`
 }
 
-// ProjectGroup augments cstypes.ProjectGroup with dynamic data
-type ProjectGroup struct {
-	*cstypes.ProjectGroup
-
-	// dynamic data
-	OwnerType        cstypes.ObjectKind
-	OwnerID          string
-	Path             string
-	ParentPath       string
-	GlobalVisibility cstypes.Visibility
+func NewProjectGroup() *ProjectGroup {
+	return &ProjectGroup{
+		TypeMeta: stypes.TypeMeta{
+			Kind:    ProjectGroupKind,
+			Version: ProjectGroupVersion,
+		},
+		ObjectMeta: stypes.ObjectMeta{
+			ID: uuid.Must(uuid.NewV4()).String(),
+		},
+	}
 }
