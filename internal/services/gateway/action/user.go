@@ -74,6 +74,10 @@ func (h *ActionHandler) GetUser(ctx context.Context, userRef string) (*cstypes.U
 		return nil, errors.Errorf("user not logged in")
 	}
 
+	if userRef == "" {
+		return nil, errors.Errorf("user not authenticated")
+	}
+
 	user, _, err := h.configstoreClient.GetUser(ctx, userRef)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
@@ -81,12 +85,17 @@ func (h *ActionHandler) GetUser(ctx context.Context, userRef string) (*cstypes.U
 	return user, nil
 }
 
-func (h *ActionHandler) GetUserOrgs(ctx context.Context, userRef string) ([]*csapitypes.UserOrgsResponse, error) {
+func (h *ActionHandler) GetUserOrgs(ctx context.Context) ([]*csapitypes.UserOrgsResponse, error) {
 	if !common.IsUserLogged(ctx) {
 		return nil, errors.Errorf("user not logged in")
 	}
 
-	orgs, _, err := h.configstoreClient.GetUserOrgs(ctx, userRef)
+	userID := common.CurrentUserID(ctx)
+	if userID == "" {
+		return nil, errors.Errorf("user not authenticated")
+	}
+
+	orgs, _, err := h.configstoreClient.GetUserOrgs(ctx, userID)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}

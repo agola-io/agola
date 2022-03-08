@@ -106,10 +106,6 @@ func (h *CurrentUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	userID := common.CurrentUserID(ctx)
-	if userID == "" {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user not authenticated")))
-		return
-	}
 
 	user, tokens, linkedAccounts, err := h.ah.GetCurrentUser(ctx, userID)
 	if util.HTTPError(w, err) {
@@ -613,13 +609,7 @@ func NewUserOrgsHandler(log zerolog.Logger, ah *action.ActionHandler) *UserOrgsH
 func (h *UserOrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	userID := common.CurrentUserID(ctx)
-	if userID == "" {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user not authenticated")))
-		return
-	}
-
-	userOrgs, err := h.ah.GetUserOrgs(ctx, userID)
+	userOrgs, err := h.ah.GetUserOrgs(ctx)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
