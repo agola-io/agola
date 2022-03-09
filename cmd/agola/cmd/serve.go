@@ -33,7 +33,6 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"go.etcd.io/etcd/embed"
 )
 
 var (
@@ -64,10 +63,8 @@ var cmdServe = &cobra.Command{
 }
 
 type serveOptions struct {
-	config              string
-	components          []string
-	embeddedEtcd        bool
-	embeddedEtcdDataDir string
+	config     string
+	components []string
 }
 
 var serveOpts serveOptions
@@ -77,38 +74,12 @@ func init() {
 
 	flags.StringVar(&serveOpts.config, "config", "./config.yml", "config file path")
 	flags.StringSliceVar(&serveOpts.components, "components", []string{}, `list of components to start. Specify "all-base" to start all base components (excluding the executor).`)
-	flags.BoolVar(&serveOpts.embeddedEtcd, "embedded-etcd", false, "start and use an embedded etcd, only for testing purpose")
-	flags.StringVar(&serveOpts.embeddedEtcdDataDir, "embedded-etcd-data-dir", "/tmp/agola/etcd", "embedded etcd data dir, only for testing purpose")
 
 	if err := cmdServe.MarkFlagRequired("components"); err != nil {
 		log.Fatal().Err(err).Send()
 	}
 
 	cmdAgola.AddCommand(cmdServe)
-}
-
-func embeddedEtcd(ctx context.Context) error {
-	cfg := embed.NewConfig()
-	cfg.Dir = serveOpts.embeddedEtcdDataDir
-	cfg.Logger = "zap"
-	cfg.LogOutputs = []string{"stderr"}
-
-	log.Info().Msgf("starting embedded etcd server")
-	e, err := embed.StartEtcd(cfg)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	go func() {
-		<-e.Server.ReadyNotify()
-		log.Info().Msgf("embedded etcd server is ready")
-
-		<-ctx.Done()
-		log.Info().Msgf("stopping embedded etcd server")
-		e.Close()
-	}()
-
-	return nil
 }
 
 func isComponentEnabled(name string) bool {
@@ -133,12 +104,6 @@ func serve(cmd *cobra.Command, args []string) error {
 	c, err := config.Parse(serveOpts.config, serveOpts.components)
 	if err != nil {
 		return errors.Wrapf(err, "config error")
-	}
-
-	if serveOpts.embeddedEtcd {
-		if err := embeddedEtcd(ctx); err != nil {
-			return errors.Wrapf(err, "failed to start run service scheduler")
-		}
 	}
 
 	var rs *rsscheduler.Runservice

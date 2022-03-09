@@ -59,7 +59,6 @@ type Gateway struct {
 	GitserverURL   string `yaml:"gitserverURL"`
 
 	Web           Web           `yaml:"web"`
-	Etcd          Etcd          `yaml:"etcd"`
 	ObjectStorage ObjectStorage `yaml:"objectStorage"`
 
 	TokenSigning TokenSigning `yaml:"tokenSigning"`
@@ -165,7 +164,6 @@ type Gitserver struct {
 	DataDir string `yaml:"dataDir"`
 
 	Web           Web           `yaml:"web"`
-	Etcd          Etcd          `yaml:"etcd"`
 	ObjectStorage ObjectStorage `yaml:"objectStorage"`
 
 	RepositoryCleanupInterval    time.Duration `yaml:"repositoryCleanupInterval"`
@@ -216,16 +214,6 @@ type ObjectStorage struct {
 	AccessKey       string `yaml:"accessKey"`
 	SecretAccessKey string `yaml:"secretAccessKey"`
 	DisableTLS      bool   `yaml:"disableTLS"`
-}
-
-type Etcd struct {
-	Endpoints string `yaml:"endpoints"`
-
-	// TODO(sgotti) support encrypted private keys (add a private key password config entry)
-	TLSCertFile   string `yaml:"tlsCertFile"`
-	TLSKeyFile    string `yaml:"tlsKeyFile"`
-	TLSCAFile     string `yaml:"tlsCAFile"`
-	TLSSkipVerify bool   `yaml:"tlsSkipVerify"`
 }
 
 type DriverType string

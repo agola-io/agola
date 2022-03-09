@@ -54,8 +54,6 @@ notification:
   webExposedURL: "http://localhost:8000"
   runserviceURL: "http://localhost:4000"
   configstoreURL: "http://localhost:4002"
-  etcd:
-    endpoints: "http://localhost:2379"
 
 configstore:
   dataDir: /data/agola/configstore
@@ -122,8 +120,6 @@ notification:
   webExposedURL: "http://localhost:8000"
   runserviceURL: "http://localhost:4000"
   configstoreURL: "http://localhost:4002"
-  etcd:
-    endpoints: "http://localhost:2379"
 
 configstore:
   dataDir: /data/agola/configstore
@@ -178,8 +174,6 @@ notification:
   webExposedURL: "http://localhost:8000"
   runserviceURL: "http://localhost:4000"
   configstoreURL: "http://localhost:4002"
-  etcd:
-    endpoints: "http://localhost:2379"
 
 configstore:
   dataDir: 
@@ -215,8 +209,6 @@ notification:
   webExposedURL: "http://localhost:8000"
   runserviceURL: "http://localhost:4000"
   configstoreURL: "http://localhost:4002"
-  etcd:
-    endpoints: "http://localhost:2379"
 
 configstore:
   dataDir:

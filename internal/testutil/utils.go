@@ -17,11 +17,9 @@ package testutil
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"fmt"
 	"io/ioutil"
 	"net"
-	"net/url"
 	"os"
 	"os/exec"
 	"os/user"
@@ -33,9 +31,6 @@ import (
 	"time"
 
 	"agola.io/agola/internal/errors"
-	"agola.io/agola/internal/etcd"
-	"github.com/rs/zerolog"
-	"go.etcd.io/etcd/embed"
 
 	"github.com/gofrs/uuid"
 	"github.com/sgotti/gexpect"
@@ -43,7 +38,6 @@ import (
 
 const (
 	sleepInterval = 500 * time.Millisecond
-	etcdTimeout   = 5 * time.Second
 
 	MinPort = 2048
 	MaxPort = 16384
@@ -138,211 +132,6 @@ func (p *Process) Wait(timeout time.Duration) error {
 	case <-endCh:
 		return nil
 	}
-}
-
-type TestEmbeddedEtcd struct {
-	t *testing.T
-	*TestEtcd
-	Etcd          *embed.Etcd
-	Endpoint      string
-	ListenAddress string
-	Port          string
-}
-
-func NewTestEmbeddedEtcd(t *testing.T, log zerolog.Logger, dir string, a ...string) (*TestEmbeddedEtcd, error) {
-	u := uuid.Must(uuid.NewV4())
-	uid := fmt.Sprintf("%x", u[:4])
-
-	dataDir := filepath.Join(dir, fmt.Sprintf("etcd%s", uid))
-
-	listenAddress, port, err := GetFreePort(true, false)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	listenAddress2, port2, err := GetFreePort(true, false)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	cfg := embed.NewConfig()
-	cfg.Name = uid
-	cfg.Dir = dataDir
-	cfg.Logger = "zap"
-	cfg.LogLevel = "fatal"
-	cfg.LogOutputs = []string{"stdout"}
-	lcurl, _ := url.Parse(fmt.Sprintf("http://%s:%s", listenAddress, port))
-	lpurl, _ := url.Parse(fmt.Sprintf("http://%s:%s", listenAddress2, port2))
-
-	cfg.LCUrls = []url.URL{*lcurl}
-	cfg.ACUrls = []url.URL{*lcurl}
-	cfg.LPUrls = []url.URL{*lpurl}
-	cfg.APUrls = []url.URL{*lpurl}
-
-	cfg.InitialCluster = cfg.InitialClusterFromName(cfg.Name)
-
-	t.Logf("starting embedded etcd server")
-	embeddedEtcd, err := embed.StartEtcd(cfg)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	storeEndpoint := fmt.Sprintf("http://%s:%s", listenAddress, port)
-
-	storeConfig := etcd.Config{
-		Log:       log,
-		Endpoints: storeEndpoint,
-	}
-	e, err := etcd.New(storeConfig)
-	if err != nil {
-		return nil, errors.Wrapf(err, "cannot create store")
-	}
-
-	tectd := &TestEmbeddedEtcd{
-		t: t,
-		TestEtcd: &TestEtcd{
-			e,
-			t,
-		},
-		Etcd:          embeddedEtcd,
-		Endpoint:      storeEndpoint,
-		ListenAddress: listenAddress,
-		Port:          port,
-	}
-	return tectd, nil
-}
-
-func (te *TestEmbeddedEtcd) Start() error {
-	<-te.Etcd.Server.ReadyNotify()
-	return nil
-}
-
-func (te *TestEmbeddedEtcd) Stop() error {
-	te.Etcd.Close()
-	return nil
-}
-
-func (te *TestEmbeddedEtcd) Kill() error {
-	te.Etcd.Close()
-	return nil
-}
-
-type TestExternalEtcd struct {
-	t *testing.T
-	*TestEtcd
-	Process
-	Endpoint      string
-	ListenAddress string
-	Port          string
-}
-
-func NewTestExternalEtcd(t *testing.T, log zerolog.Logger, dir string, a ...string) (*TestExternalEtcd, error) {
-	u := uuid.Must(uuid.NewV4())
-	uid := fmt.Sprintf("%x", u[:4])
-
-	dataDir := filepath.Join(dir, fmt.Sprintf("etcd%s", uid))
-
-	listenAddress, port, err := GetFreePort(true, false)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	listenAddress2, port2, err := GetFreePort(true, false)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	args := []string{}
-	args = append(args, fmt.Sprintf("--name=%s", uid))
-	args = append(args, fmt.Sprintf("--data-dir=%s", dataDir))
-	args = append(args, fmt.Sprintf("--listen-client-urls=http://%s:%s", listenAddress, port))
-	args = append(args, fmt.Sprintf("--advertise-client-urls=http://%s:%s", listenAddress, port))
-	args = append(args, fmt.Sprintf("--listen-peer-urls=http://%s:%s", listenAddress2, port2))
-	args = append(args, fmt.Sprintf("--initial-advertise-peer-urls=http://%s:%s", listenAddress2, port2))
-	args = append(args, fmt.Sprintf("--initial-cluster=%s=http://%s:%s", uid, listenAddress2, port2))
-	args = append(args, a...)
-
-	storeEndpoint := fmt.Sprintf("http://%s:%s", listenAddress, port)
-
-	storeConfig := etcd.Config{
-		Log:       log,
-		Endpoints: storeEndpoint,
-	}
-	e, err := etcd.New(storeConfig)
-	if err != nil {
-		return nil, errors.Wrapf(err, "cannot create store")
-	}
-
-	bin := os.Getenv("ETCD_BIN")
-	if bin == "" {
-		return nil, errors.Errorf("missing ETCD_BIN env")
-	}
-	tectd := &TestExternalEtcd{
-		t: t,
-		TestEtcd: &TestEtcd{
-			e,
-			t,
-		},
-		Process: Process{
-			t:    t,
-			uid:  uid,
-			name: "etcd",
-			bin:  bin,
-			args: args,
-		},
-		Endpoint:      storeEndpoint,
-		ListenAddress: listenAddress,
-		Port:          port,
-	}
-	return tectd, nil
-}
-
-type TestEtcd struct {
-	*etcd.Store
-	t *testing.T
-}
-
-func (te *TestEtcd) Compact() error {
-	ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
-	defer cancel()
-	resp, err := te.Get(ctx, "anykey", 0)
-	if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
-		return errors.WithStack(err)
-	}
-
-	_, err = te.Client().Compact(ctx, resp.Header.Revision)
-	return errors.WithStack(err)
-}
-
-func (te *TestEtcd) WaitUp(timeout time.Duration) error {
-	start := time.Now()
-	for time.Now().Add(-timeout).Before(start) {
-		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
-		defer cancel()
-		_, err := te.Get(ctx, "anykey", 0)
-		if err != nil && errors.Is(err, etcd.ErrKeyNotFound) {
-			return nil
-		}
-		if err == nil {
-			return nil
-		}
-		time.Sleep(sleepInterval)
-	}
-
-	return errors.Errorf("timeout")
-}
-
-func (te *TestEtcd) WaitDown(timeout time.Duration) error {
-	start := time.Now()
-	for time.Now().Add(-timeout).Before(start) {
-		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
-		defer cancel()
-		_, err := te.Get(ctx, "anykey", 0)
-		if err != nil && !errors.Is(err, etcd.ErrKeyNotFound) {
-			return nil
-		}
-		time.Sleep(sleepInterval)
-	}
-
-	return errors.Errorf("timeout")
 }
 
 const (

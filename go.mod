@@ -32,7 +32,6 @@ require (
 	github.com/sgotti/gexpect v0.0.0-20210315095146-1ec64e69809b
 	github.com/spf13/cobra v0.0.5
 	github.com/xanzy/go-gitlab v0.26.0
-	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738
 	go.starlark.net v0.0.0-20200203144150-6677ee5c7211
 	golang.org/x/crypto v0.0.0-20211215165025-cf75a172585e
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
