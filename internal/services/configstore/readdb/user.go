@@ -18,7 +18,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/dbold"
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/configstore/common"
 	"agola.io/agola/internal/util"

@@ -16,7 +16,7 @@ package action
 
 import (
 	"agola.io/agola/internal/datamanager"
-	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/dbold"
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/services/configstore/readdb"

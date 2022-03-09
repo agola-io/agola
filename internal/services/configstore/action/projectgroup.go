@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"agola.io/agola/internal/datamanager"
-	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/dbold"
 	"agola.io/agola/internal/errors"
 
 	"agola.io/agola/internal/util"

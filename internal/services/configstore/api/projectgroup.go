@@ -21,7 +21,7 @@ import (
 	"net/url"
 	"path"
 
-	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/dbold"
 	"agola.io/agola/internal/errors"
 
 	"agola.io/agola/internal/services/configstore/action"
