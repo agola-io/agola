@@ -21,18 +21,15 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"path"
 	"time"
 
 	"agola.io/agola/internal/errors"
-	"agola.io/agola/internal/etcd"
+	"agola.io/agola/internal/lock"
 	rstypes "agola.io/agola/services/runservice/types"
-
-	"go.etcd.io/etcd/clientv3/concurrency"
 )
 
-var (
-	etcdRunEventsLockKey = path.Join("locks", "runevents")
+const (
+	RunEventsLockKey = "runevents"
 )
 
 func (n *NotificationService) runEventsHandlerLoop(ctx context.Context) {
@@ -51,21 +48,14 @@ func (n *NotificationService) runEventsHandlerLoop(ctx context.Context) {
 }
 
 func (n *NotificationService) runEventsHandler(ctx context.Context) error {
-	session, err := concurrency.NewSession(n.e.Client(), concurrency.WithTTL(5), concurrency.WithContext(ctx))
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	defer session.Close()
-
-	m := etcd.NewMutex(session, etcdRunEventsLockKey)
-
-	if err := m.TryLock(ctx); err != nil {
-		if errors.Is(err, etcd.ErrLocked) {
+	l := n.lf.NewLock(RunEventsLockKey)
+	if err := l.TryLock(ctx); err != nil {
+		if errors.Is(err, lock.ErrLocked) {
 			return nil
 		}
 		return errors.WithStack(err)
 	}
-	defer func() { _ = m.Unlock(ctx) }()
+	defer func() { _ = l.Unlock() }()
 
 	resp, err := n.runserviceClient.GetRunEvents(ctx, "")
 	if err != nil {
@@ -108,7 +98,7 @@ func (n *NotificationService) runEventsHandler(ctx context.Context) error {
 
 			// TODO(sgotti)
 			// this is just a basic handling. Improve it to store received events and
-			// their status to etcd so we can also do more logic like retrying and handle
+			// their status in the db so we can also do more logic like retrying and handle
 			// multiple kind of notifications (email etc...)
 			if err := n.updateCommitStatus(ctx, ev); err != nil {
 				n.log.Info().Msgf("failed to update commit status: %v", err)

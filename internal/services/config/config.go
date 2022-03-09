@@ -83,7 +83,7 @@ type Notification struct {
 	RunserviceURL  string `yaml:"runserviceURL"`
 	ConfigstoreURL string `yaml:"configstoreURL"`
 
-	Etcd Etcd `yaml:"etcd"`
+	DB DB `yaml:"db"`
 }
 
 type Runservice struct {

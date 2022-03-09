@@ -236,8 +236,9 @@ func setup(ctx context.Context, t *testing.T, dir string, gitea bool) (*testutil
 			WebExposedURL:  "",
 			RunserviceURL:  "",
 			ConfigstoreURL: "",
-			Etcd: config.Etcd{
-				Endpoints: "",
+			DB: config.DB{
+				Type:       sql.Sqlite3,
+				ConnString: filepath.Join(dir, "notification", "db"),
 			},
 		},
 		Runservice: config.Runservice{
