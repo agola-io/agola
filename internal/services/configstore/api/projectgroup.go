@@ -204,14 +204,20 @@ func NewCreateProjectGroupHandler(log zerolog.Logger, ah *action.ActionHandler, 
 func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var req types.ProjectGroup
+	var req *csapitypes.CreateUpdateProjectGroupRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
-	projectGroup, err := h.ah.CreateProjectGroup(ctx, &req)
+	areq := &action.CreateUpdateProjectGroupRequest{
+		Name:       req.Name,
+		Parent:     req.Parent,
+		Visibility: req.Visibility,
+	}
+
+	projectGroup, err := h.ah.CreateProjectGroup(ctx, areq)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
@@ -248,18 +254,20 @@ func (h *UpdateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	var projectGroup *types.ProjectGroup
+	var req *csapitypes.CreateUpdateProjectGroupRequest
 	d := json.NewDecoder(r.Body)
-	if err := d.Decode(&projectGroup); err != nil {
+	if err := d.Decode(&req); err != nil {
 		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
-	areq := &action.UpdateProjectGroupRequest{
-		ProjectGroupRef: projectGroupRef,
-		ProjectGroup:    projectGroup,
+	areq := &action.CreateUpdateProjectGroupRequest{
+		Name:       req.Name,
+		Parent:     req.Parent,
+		Visibility: req.Visibility,
 	}
-	projectGroup, err = h.ah.UpdateProjectGroup(ctx, areq)
+
+	projectGroup, err := h.ah.UpdateProjectGroup(ctx, projectGroupRef, areq)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return

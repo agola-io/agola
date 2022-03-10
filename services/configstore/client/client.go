@@ -115,25 +115,25 @@ func (c *Client) GetProjectGroupProjects(ctx context.Context, projectGroupRef st
 	return projects, resp, errors.WithStack(err)
 }
 
-func (c *Client) CreateProjectGroup(ctx context.Context, projectGroup *cstypes.ProjectGroup) (*csapitypes.ProjectGroup, *http.Response, error) {
-	pj, err := json.Marshal(projectGroup)
+func (c *Client) CreateProjectGroup(ctx context.Context, req *csapitypes.CreateUpdateProjectGroupRequest) (*csapitypes.ProjectGroup, *http.Response, error) {
+	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
 	}
 
 	resProjectGroup := new(csapitypes.ProjectGroup)
-	resp, err := c.getParsedResponse(ctx, "POST", "/projectgroups", nil, jsonContent, bytes.NewReader(pj), resProjectGroup)
+	resp, err := c.getParsedResponse(ctx, "POST", "/projectgroups", nil, jsonContent, bytes.NewReader(reqj), resProjectGroup)
 	return resProjectGroup, resp, errors.WithStack(err)
 }
 
-func (c *Client) UpdateProjectGroup(ctx context.Context, projectGroupRef string, projectGroup *cstypes.ProjectGroup) (*csapitypes.ProjectGroup, *http.Response, error) {
-	pj, err := json.Marshal(projectGroup)
+func (c *Client) UpdateProjectGroup(ctx context.Context, projectGroupRef string, req *csapitypes.CreateUpdateProjectGroupRequest) (*csapitypes.ProjectGroup, *http.Response, error) {
+	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
 	}
 
 	resProjectGroup := new(csapitypes.ProjectGroup)
-	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/projectgroups/%s", url.PathEscape(projectGroupRef)), nil, jsonContent, bytes.NewReader(pj), resProjectGroup)
+	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/projectgroups/%s", url.PathEscape(projectGroupRef)), nil, jsonContent, bytes.NewReader(reqj), resProjectGroup)
 	return resProjectGroup, resp, errors.WithStack(err)
 }
 
@@ -147,25 +147,25 @@ func (c *Client) GetProject(ctx context.Context, projectRef string) (*csapitypes
 	return project, resp, errors.WithStack(err)
 }
 
-func (c *Client) CreateProject(ctx context.Context, project *cstypes.Project) (*csapitypes.Project, *http.Response, error) {
-	pj, err := json.Marshal(project)
+func (c *Client) CreateProject(ctx context.Context, req *csapitypes.CreateUpdateProjectRequest) (*csapitypes.Project, *http.Response, error) {
+	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
 	}
 
 	resProject := new(csapitypes.Project)
-	resp, err := c.getParsedResponse(ctx, "POST", "/projects", nil, jsonContent, bytes.NewReader(pj), resProject)
+	resp, err := c.getParsedResponse(ctx, "POST", "/projects", nil, jsonContent, bytes.NewReader(reqj), resProject)
 	return resProject, resp, errors.WithStack(err)
 }
 
-func (c *Client) UpdateProject(ctx context.Context, projectRef string, project *cstypes.Project) (*csapitypes.Project, *http.Response, error) {
-	pj, err := json.Marshal(project)
+func (c *Client) UpdateProject(ctx context.Context, projectRef string, req *csapitypes.CreateUpdateProjectRequest) (*csapitypes.Project, *http.Response, error) {
+	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
 	}
 
 	resProject := new(csapitypes.Project)
-	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/projects/%s", url.PathEscape(projectRef)), nil, jsonContent, bytes.NewReader(pj), resProject)
+	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/projects/%s", url.PathEscape(projectRef)), nil, jsonContent, bytes.NewReader(reqj), resProject)
 	return resProject, resp, errors.WithStack(err)
 }
 
@@ -195,47 +195,47 @@ func (c *Client) GetProjectSecrets(ctx context.Context, projectRef string, tree 
 	return secrets, resp, errors.WithStack(err)
 }
 
-func (c *Client) CreateProjectGroupSecret(ctx context.Context, projectGroupRef string, secret *cstypes.Secret) (*csapitypes.Secret, *http.Response, error) {
-	pj, err := json.Marshal(secret)
+func (c *Client) CreateProjectGroupSecret(ctx context.Context, projectGroupRef string, req *csapitypes.CreateUpdateSecretRequest) (*csapitypes.Secret, *http.Response, error) {
+	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
 	}
 
 	resSecret := new(csapitypes.Secret)
-	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/projectgroups/%s/secrets", url.PathEscape(projectGroupRef)), nil, jsonContent, bytes.NewReader(pj), resSecret)
+	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/projectgroups/%s/secrets", url.PathEscape(projectGroupRef)), nil, jsonContent, bytes.NewReader(reqj), resSecret)
 	return resSecret, resp, errors.WithStack(err)
 }
 
-func (c *Client) CreateProjectSecret(ctx context.Context, projectRef string, secret *cstypes.Secret) (*csapitypes.Secret, *http.Response, error) {
-	pj, err := json.Marshal(secret)
+func (c *Client) CreateProjectSecret(ctx context.Context, projectRef string, req *csapitypes.CreateUpdateSecretRequest) (*csapitypes.Secret, *http.Response, error) {
+	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
 	}
 
 	resSecret := new(csapitypes.Secret)
-	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/projects/%s/secrets", url.PathEscape(projectRef)), nil, jsonContent, bytes.NewReader(pj), resSecret)
+	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/projects/%s/secrets", url.PathEscape(projectRef)), nil, jsonContent, bytes.NewReader(reqj), resSecret)
 	return resSecret, resp, errors.WithStack(err)
 }
 
-func (c *Client) UpdateProjectGroupSecret(ctx context.Context, projectGroupRef, secretName string, secret *cstypes.Secret) (*csapitypes.Secret, *http.Response, error) {
-	pj, err := json.Marshal(secret)
+func (c *Client) UpdateProjectGroupSecret(ctx context.Context, projectGroupRef, secretName string, req *csapitypes.CreateUpdateSecretRequest) (*csapitypes.Secret, *http.Response, error) {
+	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
 	}
 
 	resSecret := new(csapitypes.Secret)
-	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/projectgroups/%s/secrets/%s", url.PathEscape(projectGroupRef), secretName), nil, jsonContent, bytes.NewReader(pj), resSecret)
+	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/projectgroups/%s/secrets/%s", url.PathEscape(projectGroupRef), secretName), nil, jsonContent, bytes.NewReader(reqj), resSecret)
 	return resSecret, resp, errors.WithStack(err)
 }
 
-func (c *Client) UpdateProjectSecret(ctx context.Context, projectRef, secretName string, secret *cstypes.Secret) (*csapitypes.Secret, *http.Response, error) {
-	pj, err := json.Marshal(secret)
+func (c *Client) UpdateProjectSecret(ctx context.Context, projectRef, secretName string, req *csapitypes.CreateUpdateSecretRequest) (*csapitypes.Secret, *http.Response, error) {
+	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
 	}
 
 	resSecret := new(csapitypes.Secret)
-	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/projects/%s/secrets/%s", url.PathEscape(projectRef), secretName), nil, jsonContent, bytes.NewReader(pj), resSecret)
+	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/projects/%s/secrets/%s", url.PathEscape(projectRef), secretName), nil, jsonContent, bytes.NewReader(reqj), resSecret)
 	return resSecret, resp, errors.WithStack(err)
 }
 
@@ -269,47 +269,47 @@ func (c *Client) GetProjectVariables(ctx context.Context, projectRef string, tre
 	return variables, resp, errors.WithStack(err)
 }
 
-func (c *Client) CreateProjectGroupVariable(ctx context.Context, projectGroupRef string, variable *cstypes.Variable) (*csapitypes.Variable, *http.Response, error) {
-	pj, err := json.Marshal(variable)
+func (c *Client) CreateProjectGroupVariable(ctx context.Context, projectGroupRef string, req *csapitypes.CreateUpdateVariableRequest) (*csapitypes.Variable, *http.Response, error) {
+	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
 	}
 
 	resVariable := new(csapitypes.Variable)
-	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/projectgroups/%s/variables", url.PathEscape(projectGroupRef)), nil, jsonContent, bytes.NewReader(pj), resVariable)
+	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/projectgroups/%s/variables", url.PathEscape(projectGroupRef)), nil, jsonContent, bytes.NewReader(reqj), resVariable)
 	return resVariable, resp, errors.WithStack(err)
 }
 
-func (c *Client) UpdateProjectGroupVariable(ctx context.Context, projectGroupRef, variableName string, variable *cstypes.Variable) (*csapitypes.Variable, *http.Response, error) {
-	pj, err := json.Marshal(variable)
+func (c *Client) UpdateProjectGroupVariable(ctx context.Context, projectGroupRef, variableName string, req *csapitypes.CreateUpdateVariableRequest) (*csapitypes.Variable, *http.Response, error) {
+	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
 	}
 
 	resVariable := new(csapitypes.Variable)
-	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/projectgroups/%s/variables/%s", url.PathEscape(projectGroupRef), variableName), nil, jsonContent, bytes.NewReader(pj), resVariable)
+	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/projectgroups/%s/variables/%s", url.PathEscape(projectGroupRef), variableName), nil, jsonContent, bytes.NewReader(reqj), resVariable)
 	return resVariable, resp, errors.WithStack(err)
 }
 
-func (c *Client) CreateProjectVariable(ctx context.Context, projectRef string, variable *cstypes.Variable) (*csapitypes.Variable, *http.Response, error) {
-	pj, err := json.Marshal(variable)
+func (c *Client) CreateProjectVariable(ctx context.Context, projectRef string, req *csapitypes.CreateUpdateVariableRequest) (*csapitypes.Variable, *http.Response, error) {
+	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
 	}
 
 	resVariable := new(csapitypes.Variable)
-	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/projects/%s/variables", url.PathEscape(projectRef)), nil, jsonContent, bytes.NewReader(pj), resVariable)
+	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/projects/%s/variables", url.PathEscape(projectRef)), nil, jsonContent, bytes.NewReader(reqj), resVariable)
 	return resVariable, resp, errors.WithStack(err)
 }
 
-func (c *Client) UpdateProjectVariable(ctx context.Context, projectRef, variableName string, variable *cstypes.Variable) (*csapitypes.Variable, *http.Response, error) {
-	pj, err := json.Marshal(variable)
+func (c *Client) UpdateProjectVariable(ctx context.Context, projectRef, variableName string, req *csapitypes.CreateUpdateVariableRequest) (*csapitypes.Variable, *http.Response, error) {
+	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
 	}
 
 	resVariable := new(csapitypes.Variable)
-	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/projects/%s/variables/%s", url.PathEscape(projectRef), variableName), nil, jsonContent, bytes.NewReader(pj), resVariable)
+	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/projects/%s/variables/%s", url.PathEscape(projectRef), variableName), nil, jsonContent, bytes.NewReader(reqj), resVariable)
 	return resVariable, resp, errors.WithStack(err)
 }
 
@@ -480,25 +480,25 @@ func (c *Client) GetRemoteSources(ctx context.Context, start string, limit int, 
 	return rss, resp, errors.WithStack(err)
 }
 
-func (c *Client) CreateRemoteSource(ctx context.Context, rs *cstypes.RemoteSource) (*cstypes.RemoteSource, *http.Response, error) {
-	rsj, err := json.Marshal(rs)
+func (c *Client) CreateRemoteSource(ctx context.Context, req *csapitypes.CreateUpdateRemoteSourceRequest) (*cstypes.RemoteSource, *http.Response, error) {
+	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
 	}
 
-	rs = new(cstypes.RemoteSource)
-	resp, err := c.getParsedResponse(ctx, "POST", "/remotesources", nil, jsonContent, bytes.NewReader(rsj), rs)
+	rs := new(cstypes.RemoteSource)
+	resp, err := c.getParsedResponse(ctx, "POST", "/remotesources", nil, jsonContent, bytes.NewReader(reqj), rs)
 	return rs, resp, errors.WithStack(err)
 }
 
-func (c *Client) UpdateRemoteSource(ctx context.Context, remoteSourceRef string, remoteSource *cstypes.RemoteSource) (*cstypes.RemoteSource, *http.Response, error) {
-	rsj, err := json.Marshal(remoteSource)
+func (c *Client) UpdateRemoteSource(ctx context.Context, remoteSourceRef string, req *csapitypes.CreateUpdateRemoteSourceRequest) (*cstypes.RemoteSource, *http.Response, error) {
+	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
 	}
 
 	resRemoteSource := new(cstypes.RemoteSource)
-	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/remotesources/%s", url.PathEscape(remoteSourceRef)), nil, jsonContent, bytes.NewReader(rsj), resRemoteSource)
+	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/remotesources/%s", url.PathEscape(remoteSourceRef)), nil, jsonContent, bytes.NewReader(reqj), resRemoteSource)
 	return resRemoteSource, resp, errors.WithStack(err)
 }
 
@@ -506,14 +506,14 @@ func (c *Client) DeleteRemoteSource(ctx context.Context, rsRef string) (*http.Re
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/remotesources/%s", rsRef), nil, jsonContent, nil)
 }
 
-func (c *Client) CreateOrg(ctx context.Context, org *cstypes.Organization) (*cstypes.Organization, *http.Response, error) {
-	oj, err := json.Marshal(org)
+func (c *Client) CreateOrg(ctx context.Context, req *csapitypes.CreateOrgRequest) (*cstypes.Organization, *http.Response, error) {
+	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
 	}
 
-	org = new(cstypes.Organization)
-	resp, err := c.getParsedResponse(ctx, "POST", "/orgs", nil, jsonContent, bytes.NewReader(oj), org)
+	org := new(cstypes.Organization)
+	resp, err := c.getParsedResponse(ctx, "POST", "/orgs", nil, jsonContent, bytes.NewReader(reqj), org)
 	return org, resp, errors.WithStack(err)
 }
 

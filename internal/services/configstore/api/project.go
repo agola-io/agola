@@ -162,14 +162,28 @@ func NewCreateProjectHandler(log zerolog.Logger, ah *action.ActionHandler, readD
 func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var req types.Project
+	var req *csapitypes.CreateUpdateProjectRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
-	project, err := h.ah.CreateProject(ctx, &req)
+	areq := &action.CreateUpdateProjectRequest{
+		Name:                       req.Name,
+		Parent:                     req.Parent,
+		Visibility:                 req.Visibility,
+		RemoteRepositoryConfigType: req.RemoteRepositoryConfigType,
+		RemoteSourceID:             req.RemoteSourceID,
+		LinkedAccountID:            req.LinkedAccountID,
+		RepositoryID:               req.RepositoryID,
+		RepositoryPath:             req.RepositoryPath,
+		SSHPrivateKey:              req.SSHPrivateKey,
+		SkipSSHHostKeyCheck:        req.SkipSSHHostKeyCheck,
+		PassVarsToForkedPR:         req.PassVarsToForkedPR,
+	}
+
+	project, err := h.ah.CreateProject(ctx, areq)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
@@ -206,18 +220,28 @@ func (h *UpdateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var project *types.Project
+	var req *csapitypes.CreateUpdateProjectRequest
 	d := json.NewDecoder(r.Body)
-	if err := d.Decode(&project); err != nil {
+	if err := d.Decode(&req); err != nil {
 		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
-	areq := &action.UpdateProjectRequest{
-		ProjectRef: projectRef,
-		Project:    project,
+	areq := &action.CreateUpdateProjectRequest{
+		Name:                       req.Name,
+		Parent:                     req.Parent,
+		Visibility:                 req.Visibility,
+		RemoteRepositoryConfigType: req.RemoteRepositoryConfigType,
+		RemoteSourceID:             req.RemoteSourceID,
+		LinkedAccountID:            req.LinkedAccountID,
+		RepositoryID:               req.RepositoryID,
+		RepositoryPath:             req.RepositoryPath,
+		SSHPrivateKey:              req.SSHPrivateKey,
+		SkipSSHHostKeyCheck:        req.SkipSSHHostKeyCheck,
+		PassVarsToForkedPR:         req.PassVarsToForkedPR,
 	}
-	project, err = h.ah.UpdateProject(ctx, areq)
+
+	project, err := h.ah.UpdateProject(ctx, projectRef, areq)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return

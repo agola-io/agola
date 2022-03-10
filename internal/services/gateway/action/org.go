@@ -20,6 +20,7 @@ import (
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
+	csapitypes "agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"
 )
 
@@ -98,16 +99,16 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*
 		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid organization name %q", req.Name))
 	}
 
-	org := &cstypes.Organization{
+	creq := &csapitypes.CreateOrgRequest{
 		Name:       req.Name,
 		Visibility: req.Visibility,
 	}
 	if req.CreatorUserID != "" {
-		org.CreatorUserID = req.CreatorUserID
+		creq.CreatorUserID = req.CreatorUserID
 	}
 
 	h.log.Info().Msgf("creating organization")
-	org, _, err := h.configstoreClient.CreateOrg(ctx, org)
+	org, _, err := h.configstoreClient.CreateOrg(ctx, creq)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to create organization"))
 	}

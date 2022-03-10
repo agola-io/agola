@@ -620,7 +620,7 @@ func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	org, err := cs.ah.CreateOrg(ctx, &types.Organization{Name: "org01", Visibility: types.VisibilityPublic})
+	org, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: "org01", Visibility: types.VisibilityPublic})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -629,37 +629,37 @@ func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	t.Run("create a project in user root project group", func(t *testing.T) {
-		_, err := cs.ah.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
 	})
 	t.Run("create a project in org root project group", func(t *testing.T) {
-		_, err := cs.ah.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
 	})
 	t.Run("create a projectgroup in user root project group", func(t *testing.T) {
-		_, err := cs.ah.CreateProjectGroup(ctx, &types.ProjectGroup{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic})
+		_, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
 	})
 	t.Run("create a projectgroup in org root project group", func(t *testing.T) {
-		_, err := cs.ah.CreateProjectGroup(ctx, &types.ProjectGroup{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
+		_, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
 	})
 	t.Run("create a project in user non root project group with same name as a root project", func(t *testing.T) {
-		_, err := cs.ah.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
 	})
 	t.Run("create a project in org non root project group with same name as a root project", func(t *testing.T) {
-		_, err := cs.ah.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -668,7 +668,7 @@ func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 	t.Run("create duplicated project in user root project group", func(t *testing.T) {
 		projectName := "project01"
 		expectedErr := fmt.Sprintf("project with name %q, path %q already exists", projectName, path.Join("user", user.Name, projectName))
-		_, err := cs.ah.CreateProject(ctx, &types.Project{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
@@ -676,7 +676,7 @@ func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 	t.Run("create duplicated project in org root project group", func(t *testing.T) {
 		projectName := "project01"
 		expectedErr := fmt.Sprintf("project with name %q, path %q already exists", projectName, path.Join("org", org.Name, projectName))
-		_, err := cs.ah.CreateProject(ctx, &types.Project{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
@@ -685,7 +685,7 @@ func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 	t.Run("create duplicated project in user non root project group", func(t *testing.T) {
 		projectName := "project01"
 		expectedErr := fmt.Sprintf("project with name %q, path %q already exists", projectName, path.Join("user", user.Name, "projectgroup01", projectName))
-		_, err := cs.ah.CreateProject(ctx, &types.Project{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
@@ -693,7 +693,7 @@ func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 	t.Run("create duplicated project in org non root project group", func(t *testing.T) {
 		projectName := "project01"
 		expectedErr := fmt.Sprintf("project with name %q, path %q already exists", projectName, path.Join("org", org.Name, "projectgroup01", projectName))
-		_, err := cs.ah.CreateProject(ctx, &types.Project{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: projectName, Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
@@ -701,14 +701,14 @@ func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 
 	t.Run("create project in unexistent project group", func(t *testing.T) {
 		expectedErr := `project group with id "unexistentid" doesn't exist`
-		_, err := cs.ah.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: "unexistentid"}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: "unexistentid"}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
 	})
 	t.Run("create project without parent id specified", func(t *testing.T) {
 		expectedErr := "project parent id required"
-		_, err := cs.ah.CreateProject(ctx, &types.Project{Name: "project01", Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
@@ -724,7 +724,7 @@ func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			wg.Add(1)
 			go func() {
-				_, _ = cs.ah.CreateProject(ctx, &types.Project{Name: "project02", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+				_, _ = cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project02", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 			}()
 			wg.Done()
 		}
@@ -767,30 +767,26 @@ func TestProjectUpdate(t *testing.T) {
 	// TODO(sgotti) change the sleep with a real check that user is in readdb
 	time.Sleep(2 * time.Second)
 
-	_, err = cs.ah.CreateProjectGroup(ctx, &types.ProjectGroup{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic})
-	if err != nil {
+	if _, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic}); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	p01 := &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}
-	_, err = cs.ah.CreateProject(ctx, p01)
-	if err != nil {
+	p01 := &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}
+	if _, err := cs.ah.CreateProject(ctx, p01); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	p02 := &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}
-	_, err = cs.ah.CreateProject(ctx, p02)
-	if err != nil {
+	p02 := &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}
+	if _, err := cs.ah.CreateProject(ctx, p02); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	p03 := &types.Project{Name: "project02", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}
-	_, err = cs.ah.CreateProject(ctx, p03)
-	if err != nil {
+	p03 := &action.CreateUpdateProjectRequest{Name: "project02", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}
+	if _, err := cs.ah.CreateProject(ctx, p03); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
 	t.Run("rename project keeping same parent", func(t *testing.T) {
 		projectName := "project02"
 		p03.Name = "newproject02"
-		_, err := cs.ah.UpdateProject(ctx, &action.UpdateProjectRequest{ProjectRef: path.Join("user", user.Name, "projectgroup01", projectName), Project: p03})
+		_, err := cs.ah.UpdateProject(ctx, path.Join("user", user.Name, "projectgroup01", projectName), p03)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -799,7 +795,7 @@ func TestProjectUpdate(t *testing.T) {
 		projectName := "project01"
 		expectedErr := fmt.Sprintf("project with name %q, path %q already exists", projectName, path.Join("user", user.Name, projectName))
 		p02.Parent.ID = path.Join("user", user.Name)
-		_, err := cs.ah.UpdateProject(ctx, &action.UpdateProjectRequest{ProjectRef: path.Join("user", user.Name, "projectgroup01", projectName), Project: p02})
+		_, err := cs.ah.UpdateProject(ctx, path.Join("user", user.Name, "projectgroup01", projectName), p02)
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
@@ -808,7 +804,7 @@ func TestProjectUpdate(t *testing.T) {
 		projectName := "project01"
 		p02.Name = "newproject01"
 		p02.Parent.ID = path.Join("user", user.Name)
-		_, err := cs.ah.UpdateProject(ctx, &action.UpdateProjectRequest{ProjectRef: path.Join("user", user.Name, "projectgroup01", projectName), Project: p02})
+		_, err := cs.ah.UpdateProject(ctx, path.Join("user", user.Name, "projectgroup01", projectName), p02)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -839,63 +835,65 @@ func TestProjectGroupUpdate(t *testing.T) {
 	// TODO(sgotti) change the sleep with a real check that user is in readdb
 	time.Sleep(2 * time.Second)
 
-	pg01 := &types.ProjectGroup{Name: "pg01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic}
-	pg01, err = cs.ah.CreateProjectGroup(ctx, pg01)
+	rootPG, err := cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	pg02 := &types.ProjectGroup{Name: "pg02", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic}
-	pg02, err = cs.ah.CreateProjectGroup(ctx, pg02)
-	if err != nil {
+
+	pg01req := &action.CreateUpdateProjectGroupRequest{Name: "pg01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic}
+	if _, err := cs.ah.CreateProjectGroup(ctx, pg01req); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	pg03 := &types.ProjectGroup{Name: "pg03", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic}
-	pg03, err = cs.ah.CreateProjectGroup(ctx, pg03)
-	if err != nil {
+	pg02req := &action.CreateUpdateProjectGroupRequest{Name: "pg02", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic}
+	if _, err := cs.ah.CreateProjectGroup(ctx, pg02req); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	pg04 := &types.ProjectGroup{Name: "pg01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "pg01")}, Visibility: types.VisibilityPublic}
-	_, err = cs.ah.CreateProjectGroup(ctx, pg04)
-	if err != nil {
+	pg03req := &action.CreateUpdateProjectGroupRequest{Name: "pg03", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic}
+	if _, err := cs.ah.CreateProjectGroup(ctx, pg03req); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	pg05 := &types.ProjectGroup{Name: "pg01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "pg02")}, Visibility: types.VisibilityPublic}
-	pg05, err = cs.ah.CreateProjectGroup(ctx, pg05)
-	if err != nil {
+	pg04req := &action.CreateUpdateProjectGroupRequest{Name: "pg01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "pg01")}, Visibility: types.VisibilityPublic}
+	if _, err := cs.ah.CreateProjectGroup(ctx, pg04req); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	pg05req := &action.CreateUpdateProjectGroupRequest{Name: "pg01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("user", user.Name, "pg02")}, Visibility: types.VisibilityPublic}
+	if _, err := cs.ah.CreateProjectGroup(ctx, pg05req); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
 	t.Run("rename project group keeping same parent", func(t *testing.T) {
 		projectGroupName := "pg03"
-		pg03.Name = "newpg03"
-		_, err := cs.ah.UpdateProjectGroup(ctx, &action.UpdateProjectGroupRequest{ProjectGroupRef: path.Join("user", user.Name, projectGroupName), ProjectGroup: pg03})
-		if err != nil {
+		pg03req.Name = "newpg03"
+		if _, err := cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name, projectGroupName), pg03req); err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
 	})
 	t.Run("move project to project group having project with same name", func(t *testing.T) {
 		projectGroupName := "pg01"
 		expectedErr := fmt.Sprintf("project group with name %q, path %q already exists", projectGroupName, path.Join("user", user.Name, projectGroupName))
-		pg05.Parent.ID = path.Join("user", user.Name)
-		_, err := cs.ah.UpdateProjectGroup(ctx, &action.UpdateProjectGroupRequest{ProjectGroupRef: path.Join("user", user.Name, "pg02", projectGroupName), ProjectGroup: pg05})
+		pg05req.Parent.ID = path.Join("user", user.Name)
+		_, err := cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name, "pg02", projectGroupName), pg05req)
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
 	})
-	t.Run("move project group to project group changing name", func(t *testing.T) {
+	t.Run("move project group to root project group changing name", func(t *testing.T) {
 		projectGroupName := "pg01"
-		pg05.Name = "newpg01"
-		pg05.Parent.ID = path.Join("user", user.Name)
-		_, err := cs.ah.UpdateProjectGroup(ctx, &action.UpdateProjectGroupRequest{ProjectGroupRef: path.Join("user", user.Name, "pg02", projectGroupName), ProjectGroup: pg05})
+		pg05req.Name = "newpg01"
+		pg05req.Parent.ID = path.Join("user", user.Name)
+		pg05, err := cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name, "pg02", projectGroupName), pg05req)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
+		}
+		if pg05.Parent.ID != rootPG.ID {
+			t.Fatalf("expected project group parent id as root project group id")
 		}
 	})
 	t.Run("move project group inside itself", func(t *testing.T) {
 		projectGroupName := "pg02"
 		expectedErr := "cannot move project group inside itself or child project group"
-		pg02.Parent.ID = path.Join("user", user.Name, "pg02")
-		_, err := cs.ah.UpdateProjectGroup(ctx, &action.UpdateProjectGroupRequest{ProjectGroupRef: path.Join("user", user.Name, projectGroupName), ProjectGroup: pg02})
+		pg02req.Parent.ID = path.Join("user", user.Name, "pg02")
+		_, err := cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name, projectGroupName), pg02req)
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
@@ -903,14 +901,28 @@ func TestProjectGroupUpdate(t *testing.T) {
 	t.Run("move project group to child project group", func(t *testing.T) {
 		projectGroupName := "pg01"
 		expectedErr := "cannot move project group inside itself or child project group"
-		pg01.Parent.ID = path.Join("user", user.Name, "pg01", "pg01")
-		_, err := cs.ah.UpdateProjectGroup(ctx, &action.UpdateProjectGroupRequest{ProjectGroupRef: path.Join("user", user.Name, projectGroupName), ProjectGroup: pg01})
+		pg01req.Parent.ID = path.Join("user", user.Name, "pg01", "pg01")
+		_, err := cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name, projectGroupName), pg01req)
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
 	})
-	t.Run("change root project group parent", func(t *testing.T) {
+	t.Run("change root project group parent type", func(t *testing.T) {
+		var rootPG *types.ProjectGroup
+		rootPG, err := cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		rootPG.Parent.Type = types.ConfigTypeProjectGroup
+		rootPG.Name = "rootpg"
 
+		expectedErr := "changing project group parent type isn't supported"
+		_, err = cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name), &action.CreateUpdateProjectGroupRequest{Name: rootPG.Name, Parent: rootPG.Parent, Visibility: rootPG.Visibility})
+		if err.Error() != expectedErr {
+			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+		}
+	})
+	t.Run("change root project group parent id", func(t *testing.T) {
 		var rootPG *types.ProjectGroup
 		rootPG, err := cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
 		if err != nil {
@@ -919,7 +931,7 @@ func TestProjectGroupUpdate(t *testing.T) {
 		rootPG.Parent.ID = path.Join("user", user.Name, "pg01")
 
 		expectedErr := "cannot change root project group parent type or id"
-		_, err = cs.ah.UpdateProjectGroup(ctx, &action.UpdateProjectGroupRequest{ProjectGroupRef: path.Join("user", user.Name), ProjectGroup: rootPG})
+		_, err = cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name), &action.CreateUpdateProjectGroupRequest{Name: rootPG.Name, Parent: rootPG.Parent, Visibility: rootPG.Visibility})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
@@ -933,7 +945,7 @@ func TestProjectGroupUpdate(t *testing.T) {
 		rootPG.Name = "rootpgnewname"
 
 		expectedErr := "project group name for root project group must be empty"
-		_, err = cs.ah.UpdateProjectGroup(ctx, &action.UpdateProjectGroupRequest{ProjectGroupRef: path.Join("user", user.Name), ProjectGroup: rootPG})
+		_, err = cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name), &action.CreateUpdateProjectGroupRequest{Name: rootPG.Name, Parent: rootPG.Parent, Visibility: rootPG.Visibility})
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
@@ -946,8 +958,7 @@ func TestProjectGroupUpdate(t *testing.T) {
 		}
 		rootPG.Visibility = types.VisibilityPrivate
 
-		_, err = cs.ah.UpdateProjectGroup(ctx, &action.UpdateProjectGroupRequest{ProjectGroupRef: path.Join("user", user.Name), ProjectGroup: rootPG})
-		if err != nil {
+		if _, err := cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name), &action.CreateUpdateProjectGroupRequest{Name: rootPG.Name, Parent: rootPG.Parent, Visibility: rootPG.Visibility}); err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
 
@@ -977,7 +988,7 @@ func TestProjectGroupDelete(t *testing.T) {
 	// TODO(sgotti) change the sleep with a real check that all is ready
 	time.Sleep(2 * time.Second)
 
-	org, err := cs.ah.CreateOrg(ctx, &types.Organization{Name: "org01", Visibility: types.VisibilityPublic})
+	org, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: "org01", Visibility: types.VisibilityPublic})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -986,14 +997,13 @@ func TestProjectGroupDelete(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	// create a projectgroup in org root project group
-	pg01, err := cs.ah.CreateProjectGroup(ctx, &types.ProjectGroup{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
+	pg01, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
 	// create a child projectgroup in org root project group
-	_, err = cs.ah.CreateProjectGroup(ctx, &types.ProjectGroup{Name: "subprojectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: pg01.ID}, Visibility: types.VisibilityPublic})
-	if err != nil {
+	if _, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "subprojectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: pg01.ID}, Visibility: types.VisibilityPublic}); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
@@ -1029,7 +1039,7 @@ func TestProjectGroupDeleteDontSeeOldChildObjects(t *testing.T) {
 	// TODO(sgotti) change the sleep with a real check that all is ready
 	time.Sleep(2 * time.Second)
 
-	org, err := cs.ah.CreateOrg(ctx, &types.Organization{Name: "org01", Visibility: types.VisibilityPublic})
+	org, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: "org01", Visibility: types.VisibilityPublic})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -1038,57 +1048,55 @@ func TestProjectGroupDeleteDontSeeOldChildObjects(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	// create a projectgroup in org root project group
-	pg01, err := cs.ah.CreateProjectGroup(ctx, &types.ProjectGroup{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
+	pg01, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
 	// create a child projectgroup in org root project group
-	spg01, err := cs.ah.CreateProjectGroup(ctx, &types.ProjectGroup{Name: "subprojectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: pg01.ID}, Visibility: types.VisibilityPublic})
+	spg01, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "subprojectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: pg01.ID}, Visibility: types.VisibilityPublic})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
 	// create a project inside child projectgroup
-	project, err := cs.ah.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: spg01.ID}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+	project, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: spg01.ID}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
 	// create project secret
-	_, err = cs.ah.CreateSecret(ctx, &types.Secret{Name: "secret01", Parent: types.Parent{Type: types.ConfigTypeProject, ID: project.ID}, Type: types.SecretTypeInternal, Data: map[string]string{"secret01": "secretvar01"}})
-	if err != nil {
+	if _, err := cs.ah.CreateSecret(ctx, &action.CreateUpdateSecretRequest{Name: "secret01", Parent: types.Parent{Type: types.ConfigTypeProject, ID: project.ID}, Type: types.SecretTypeInternal, Data: map[string]string{"secret01": "secretvar01"}}); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	// create project variable
-	_, err = cs.ah.CreateVariable(ctx, &types.Variable{Name: "variable01", Parent: types.Parent{Type: types.ConfigTypeProject, ID: project.ID}, Values: []types.VariableValue{{SecretName: "secret01", SecretVar: "secretvar01"}}})
-	if err != nil {
+	if _, err := cs.ah.CreateVariable(ctx, &action.CreateUpdateVariableRequest{Name: "variable01", Parent: types.Parent{Type: types.ConfigTypeProject, ID: project.ID}, Values: []types.VariableValue{{SecretName: "secret01", SecretVar: "secretvar01"}}}); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
 	// delete projectgroup
-	if err = cs.ah.DeleteProjectGroup(ctx, pg01.ID); err != nil {
+	if err := cs.ah.DeleteProjectGroup(ctx, pg01.ID); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
 	// recreate the same hierarchj using the paths
-	pg01, err = cs.ah.CreateProjectGroup(ctx, &types.ProjectGroup{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
+	pg01, err = cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	spg01, err = cs.ah.CreateProjectGroup(ctx, &types.ProjectGroup{Name: "subprojectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name, pg01.Name)}, Visibility: types.VisibilityPublic})
+	spg01, err = cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "subprojectgroup01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name, pg01.Name)}, Visibility: types.VisibilityPublic})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	project, err = cs.ah.CreateProject(ctx, &types.Project{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name, pg01.Name, spg01.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+	project, err = cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Type: types.ConfigTypeProjectGroup, ID: path.Join("org", org.Name, pg01.Name, spg01.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	secret, err := cs.ah.CreateSecret(ctx, &types.Secret{Name: "secret01", Parent: types.Parent{Type: types.ConfigTypeProject, ID: path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name)}, Type: types.SecretTypeInternal, Data: map[string]string{"secret01": "secretvar01"}})
+	secret, err := cs.ah.CreateSecret(ctx, &action.CreateUpdateSecretRequest{Name: "secret01", Parent: types.Parent{Type: types.ConfigTypeProject, ID: path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name)}, Type: types.SecretTypeInternal, Data: map[string]string{"secret01": "secretvar01"}})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	variable, err := cs.ah.CreateVariable(ctx, &types.Variable{Name: "variable01", Parent: types.Parent{Type: types.ConfigTypeProject, ID: path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name)}, Values: []types.VariableValue{{SecretName: "secret01", SecretVar: "secretvar01"}}})
+	variable, err := cs.ah.CreateVariable(ctx, &action.CreateUpdateVariableRequest{Name: "variable01", Parent: types.Parent{Type: types.ConfigTypeProject, ID: path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name)}, Values: []types.VariableValue{{SecretName: "secret01", SecretVar: "secretvar01"}}})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -1162,7 +1170,7 @@ func TestOrgMembers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	org, err := cs.ah.CreateOrg(ctx, &types.Organization{Name: "org01", Visibility: types.VisibilityPublic, CreatorUserID: user.ID})
+	org, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: "org01", Visibility: types.VisibilityPublic, CreatorUserID: user.ID})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -1188,7 +1196,7 @@ func TestOrgMembers(t *testing.T) {
 
 	orgs := []*types.Organization{}
 	for i := 0; i < 10; i++ {
-		org, err := cs.ah.CreateOrg(ctx, &types.Organization{Name: fmt.Sprintf("org%d", i), Visibility: types.VisibilityPublic, CreatorUserID: user.ID})
+		org, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: fmt.Sprintf("org%d", i), Visibility: types.VisibilityPublic, CreatorUserID: user.ID})
 		if err != nil {
 			t.Fatalf("err: %v", err)
 		}
@@ -1241,7 +1249,7 @@ func TestRemoteSource(t *testing.T) {
 		{
 			name: "test create remote source",
 			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
-				rs := &types.RemoteSource{
+				rsreq := &action.CreateUpdateRemoteSourceRequest{
 					Name:               "rs01",
 					APIURL:             "https://api.example.com",
 					Type:               types.RemoteSourceTypeGitea,
@@ -1249,8 +1257,7 @@ func TestRemoteSource(t *testing.T) {
 					Oauth2ClientID:     "clientid",
 					Oauth2ClientSecret: "clientsecret",
 				}
-				_, err := cs.ah.CreateRemoteSource(ctx, rs)
-				if err != nil {
+				if _, err := cs.ah.CreateRemoteSource(ctx, rsreq); err != nil {
 					t.Fatalf("unexpected err: %v", err)
 				}
 			},
@@ -1258,7 +1265,7 @@ func TestRemoteSource(t *testing.T) {
 		{
 			name: "test create duplicate remote source",
 			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
-				rs := &types.RemoteSource{
+				rsreq := &action.CreateUpdateRemoteSourceRequest{
 					Name:               "rs01",
 					APIURL:             "https://api.example.com",
 					Type:               types.RemoteSourceTypeGitea,
@@ -1266,13 +1273,12 @@ func TestRemoteSource(t *testing.T) {
 					Oauth2ClientID:     "clientid",
 					Oauth2ClientSecret: "clientsecret",
 				}
-				rs, err := cs.ah.CreateRemoteSource(ctx, rs)
-				if err != nil {
+				if _, err := cs.ah.CreateRemoteSource(ctx, rsreq); err != nil {
 					t.Fatalf("unexpected err: %v", err)
 				}
 
 				expectedError := util.NewAPIError(util.ErrBadRequest, errors.Errorf(`remotesource "rs01" already exists`))
-				_, err = cs.ah.CreateRemoteSource(ctx, rs)
+				_, err := cs.ah.CreateRemoteSource(ctx, rsreq)
 				if err.Error() != expectedError.Error() {
 					t.Fatalf("expected err: %v, got err: %v", expectedError.Error(), err.Error())
 				}
@@ -1281,7 +1287,7 @@ func TestRemoteSource(t *testing.T) {
 		{
 			name: "test rename remote source",
 			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
-				rs := &types.RemoteSource{
+				rsreq := &action.CreateUpdateRemoteSourceRequest{
 					Name:               "rs01",
 					APIURL:             "https://api.example.com",
 					Type:               types.RemoteSourceTypeGitea,
@@ -1289,18 +1295,12 @@ func TestRemoteSource(t *testing.T) {
 					Oauth2ClientID:     "clientid",
 					Oauth2ClientSecret: "clientsecret",
 				}
-				rs, err := cs.ah.CreateRemoteSource(ctx, rs)
-				if err != nil {
+				if _, err := cs.ah.CreateRemoteSource(ctx, rsreq); err != nil {
 					t.Fatalf("unexpected err: %v", err)
 				}
 
-				rs.Name = "rs02"
-				req := &action.UpdateRemoteSourceRequest{
-					RemoteSourceRef: "rs01",
-					RemoteSource:    rs,
-				}
-				_, err = cs.ah.UpdateRemoteSource(ctx, req)
-				if err != nil {
+				rsreq.Name = "rs02"
+				if _, err := cs.ah.UpdateRemoteSource(ctx, "rs01", rsreq); err != nil {
 					t.Fatalf("unexpected err: %v", err)
 				}
 			},
@@ -1308,7 +1308,7 @@ func TestRemoteSource(t *testing.T) {
 		{
 			name: "test update remote source keeping same name",
 			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
-				rs01 := &types.RemoteSource{
+				rsreq := &action.CreateUpdateRemoteSourceRequest{
 					Name:               "rs01",
 					APIURL:             "https://api.example.com",
 					Type:               types.RemoteSourceTypeGitea,
@@ -1316,18 +1316,12 @@ func TestRemoteSource(t *testing.T) {
 					Oauth2ClientID:     "clientid",
 					Oauth2ClientSecret: "clientsecret",
 				}
-				rs01, err := cs.ah.CreateRemoteSource(ctx, rs01)
-				if err != nil {
+				if _, err := cs.ah.CreateRemoteSource(ctx, rsreq); err != nil {
 					t.Fatalf("unexpected err: %v", err)
 				}
 
-				rs01.APIURL = "https://api01.example.com"
-				req := &action.UpdateRemoteSourceRequest{
-					RemoteSourceRef: "rs01",
-					RemoteSource:    rs01,
-				}
-				_, err = cs.ah.UpdateRemoteSource(ctx, req)
-				if err != nil {
+				rsreq.APIURL = "https://api01.example.com"
+				if _, err := cs.ah.UpdateRemoteSource(ctx, "rs01", rsreq); err != nil {
 					t.Fatalf("unexpected err: %v", err)
 				}
 			},
@@ -1335,7 +1329,7 @@ func TestRemoteSource(t *testing.T) {
 		{
 			name: "test rename remote source to an already existing name",
 			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
-				rs01 := &types.RemoteSource{
+				rs01req := &action.CreateUpdateRemoteSourceRequest{
 					Name:               "rs01",
 					APIURL:             "https://api.example.com",
 					Type:               types.RemoteSourceTypeGitea,
@@ -1343,12 +1337,11 @@ func TestRemoteSource(t *testing.T) {
 					Oauth2ClientID:     "clientid",
 					Oauth2ClientSecret: "clientsecret",
 				}
-				rs01, err := cs.ah.CreateRemoteSource(ctx, rs01)
-				if err != nil {
+				if _, err := cs.ah.CreateRemoteSource(ctx, rs01req); err != nil {
 					t.Fatalf("unexpected err: %v", err)
 				}
 
-				rs02 := &types.RemoteSource{
+				rs02req := &action.CreateUpdateRemoteSourceRequest{
 					Name:               "rs02",
 					APIURL:             "https://api.example.com",
 					Type:               types.RemoteSourceTypeGitea,
@@ -1356,17 +1349,13 @@ func TestRemoteSource(t *testing.T) {
 					Oauth2ClientID:     "clientid",
 					Oauth2ClientSecret: "clientsecret",
 				}
-				if _, err = cs.ah.CreateRemoteSource(ctx, rs02); err != nil {
+				if _, err := cs.ah.CreateRemoteSource(ctx, rs02req); err != nil {
 					t.Fatalf("unexpected err: %v", err)
 				}
 
 				expectedError := util.NewAPIError(util.ErrBadRequest, errors.Errorf(`remotesource "rs02" already exists`))
-				rs01.Name = "rs02"
-				req := &action.UpdateRemoteSourceRequest{
-					RemoteSourceRef: "rs01",
-					RemoteSource:    rs01,
-				}
-				_, err = cs.ah.UpdateRemoteSource(ctx, req)
+				rs01req.Name = "rs02"
+				_, err := cs.ah.UpdateRemoteSource(ctx, "rs01", rs01req)
 				if err.Error() != expectedError.Error() {
 					t.Fatalf("expected err: %v, got err: %v", expectedError.Error(), err.Error())
 				}

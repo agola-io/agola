@@ -1,4 +1,4 @@
-// Copyright 2019 Sorint.lab
+// Copyright 2022 Sorint.lab
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,20 +18,16 @@ import (
 	cstypes "agola.io/agola/services/configstore/types"
 )
 
-type CreateUpdateProjectGroupRequest struct {
-	Name       string
-	Parent     cstypes.Parent
-	Visibility cstypes.Visibility
-}
-
-// ProjectGroup augments cstypes.ProjectGroup with dynamic data
-type ProjectGroup struct {
-	*cstypes.ProjectGroup
-
-	// dynamic data
-	OwnerType        cstypes.ConfigType
-	OwnerID          string
-	Path             string
-	ParentPath       string
-	GlobalVisibility cstypes.Visibility
+type CreateUpdateRemoteSourceRequest struct {
+	Name                string
+	APIURL              string
+	SkipVerify          bool
+	Type                cstypes.RemoteSourceType
+	AuthType            cstypes.RemoteSourceAuthType
+	Oauth2ClientID      string
+	Oauth2ClientSecret  string
+	SSHHostKey          string
+	SkipSSHHostKeyCheck bool
+	RegistrationEnabled *bool
+	LoginEnabled        *bool
 }

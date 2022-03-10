@@ -128,17 +128,26 @@ func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var secret *types.Secret
+	var req *csapitypes.CreateUpdateSecretRequest
 	d := json.NewDecoder(r.Body)
-	if err := d.Decode(&secret); err != nil {
+	if err := d.Decode(&req); err != nil {
 		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
-	secret.Parent.Type = parentType
-	secret.Parent.ID = parentRef
+	areq := &action.CreateUpdateSecretRequest{
+		Name: req.Name,
+		Parent: types.Parent{
+			Type: parentType,
+			ID:   parentRef,
+		},
+		Type:             req.Type,
+		Data:             req.Data,
+		SecretProviderID: req.SecretProviderID,
+		Path:             req.Path,
+	}
 
-	secret, err = h.ah.CreateSecret(ctx, secret)
+	secret, err := h.ah.CreateSecret(ctx, areq)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
@@ -169,21 +178,26 @@ func (h *UpdateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var secret *types.Secret
+	var req *csapitypes.CreateUpdateSecretRequest
 	d := json.NewDecoder(r.Body)
-	if err := d.Decode(&secret); err != nil {
+	if err := d.Decode(&req); err != nil {
 		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
-	secret.Parent.Type = parentType
-	secret.Parent.ID = parentRef
-
-	areq := &action.UpdateSecretRequest{
-		SecretName: secretName,
-		Secret:     secret,
+	areq := &action.CreateUpdateSecretRequest{
+		Name: req.Name,
+		Parent: types.Parent{
+			Type: parentType,
+			ID:   parentRef,
+		},
+		Type:             req.Type,
+		Data:             req.Data,
+		SecretProviderID: req.SecretProviderID,
+		Path:             req.Path,
 	}
-	secret, err = h.ah.UpdateSecret(ctx, areq)
+
+	secret, err := h.ah.UpdateSecret(ctx, secretName, areq)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return

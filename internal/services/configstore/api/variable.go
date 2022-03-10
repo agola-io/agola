@@ -101,17 +101,23 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	var variable *types.Variable
+	var req *csapitypes.CreateUpdateVariableRequest
 	d := json.NewDecoder(r.Body)
-	if err := d.Decode(&variable); err != nil {
+	if err := d.Decode(&req); err != nil {
 		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
-	variable.Parent.Type = parentType
-	variable.Parent.ID = parentRef
+	areq := &action.CreateUpdateVariableRequest{
+		Name: req.Name,
+		Parent: types.Parent{
+			Type: parentType,
+			ID:   parentRef,
+		},
+		Values: req.Values,
+	}
 
-	variable, err = h.ah.CreateVariable(ctx, variable)
+	variable, err := h.ah.CreateVariable(ctx, areq)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
@@ -142,21 +148,23 @@ func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	var variable *types.Variable
+	var req *csapitypes.CreateUpdateVariableRequest
 	d := json.NewDecoder(r.Body)
-	if err := d.Decode(&variable); err != nil {
+	if err := d.Decode(&req); err != nil {
 		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
-	variable.Parent.Type = parentType
-	variable.Parent.ID = parentRef
-
-	areq := &action.UpdateVariableRequest{
-		VariableName: variableName,
-		Variable:     variable,
+	areq := &action.CreateUpdateVariableRequest{
+		Name: req.Name,
+		Parent: types.Parent{
+			Type: parentType,
+			ID:   parentRef,
+		},
+		Values: req.Values,
 	}
-	variable, err = h.ah.UpdateVariable(ctx, areq)
+
+	variable, err := h.ah.UpdateVariable(ctx, variableName, areq)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return

@@ -82,7 +82,7 @@ func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretReque
 		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid secret name %q", req.Name))
 	}
 
-	s := &cstypes.Secret{
+	creq := &csapitypes.CreateUpdateSecretRequest{
 		Name: req.Name,
 		Type: req.Type,
 		Data: req.Data,
@@ -92,10 +92,10 @@ func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretReque
 	switch req.ParentType {
 	case cstypes.ConfigTypeProjectGroup:
 		h.log.Info().Msgf("creating project group secret")
-		rs, _, err = h.configstoreClient.CreateProjectGroupSecret(ctx, req.ParentRef, s)
+		rs, _, err = h.configstoreClient.CreateProjectGroupSecret(ctx, req.ParentRef, creq)
 	case cstypes.ConfigTypeProject:
 		h.log.Info().Msgf("creating project secret")
-		rs, _, err = h.configstoreClient.CreateProjectSecret(ctx, req.ParentRef, s)
+		rs, _, err = h.configstoreClient.CreateProjectSecret(ctx, req.ParentRef, creq)
 	}
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to create secret"))
@@ -136,7 +136,7 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretReque
 		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid secret name %q", req.Name))
 	}
 
-	s := &cstypes.Secret{
+	creq := &csapitypes.CreateUpdateSecretRequest{
 		Name: req.Name,
 		Type: req.Type,
 		Data: req.Data,
@@ -146,10 +146,10 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretReque
 	switch req.ParentType {
 	case cstypes.ConfigTypeProjectGroup:
 		h.log.Info().Msgf("updating project group secret")
-		rs, _, err = h.configstoreClient.UpdateProjectGroupSecret(ctx, req.ParentRef, req.SecretName, s)
+		rs, _, err = h.configstoreClient.UpdateProjectGroupSecret(ctx, req.ParentRef, req.SecretName, creq)
 	case cstypes.ConfigTypeProject:
 		h.log.Info().Msgf("updating project secret")
-		rs, _, err = h.configstoreClient.UpdateProjectSecret(ctx, req.ParentRef, req.SecretName, s)
+		rs, _, err = h.configstoreClient.UpdateProjectSecret(ctx, req.ParentRef, req.SecretName, creq)
 	}
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to update secret"))

@@ -70,20 +70,26 @@ func (h *ActionHandler) GetOrgMembers(ctx context.Context, orgRef string) ([]*Or
 	return res, nil
 }
 
-func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) (*types.Organization, error) {
-	if org.Name == "" {
+type CreateOrgRequest struct {
+	Name          string
+	Visibility    types.Visibility
+	CreatorUserID string
+}
+
+func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*types.Organization, error) {
+	if req.Name == "" {
 		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("organization name required"))
 	}
-	if !util.ValidateName(org.Name) {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid organization name %q", org.Name))
+	if !util.ValidateName(req.Name) {
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid organization name %q", req.Name))
 	}
-	if !types.IsValidVisibility(org.Visibility) {
+	if !types.IsValidVisibility(req.Visibility) {
 		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid organization visibility"))
 	}
 
 	var cgt *datamanager.ChangeGroupsUpdateToken
 	// changegroup is the org name
-	cgNames := []string{util.EncodeSha256Hex("orgname-" + org.Name)}
+	cgNames := []string{util.EncodeSha256Hex("orgname-" + req.Name)}
 
 	// must do all the checks in a single transaction to avoid concurrent changes
 	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
@@ -94,7 +100,7 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) 
 		}
 
 		// check duplicate org name
-		o, err := h.readDB.GetOrgByName(tx, org.Name)
+		o, err := h.readDB.GetOrgByName(tx, req.Name)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -102,13 +108,13 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) 
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("org %q already exists", o.Name))
 		}
 
-		if org.CreatorUserID != "" {
-			user, err := h.readDB.GetUser(tx, org.CreatorUserID)
+		if req.CreatorUserID != "" {
+			user, err := h.readDB.GetUser(tx, req.CreatorUserID)
 			if err != nil {
 				return errors.WithStack(err)
 			}
 			if user == nil {
-				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("creator user %q doesn't exist", org.CreatorUserID))
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("creator user %q doesn't exist", req.CreatorUserID))
 			}
 		}
 
@@ -120,8 +126,13 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) 
 
 	actions := []*datamanager.Action{}
 
+	org := &types.Organization{}
 	org.ID = uuid.Must(uuid.NewV4()).String()
 	org.CreatedAt = time.Now()
+	org.Name = req.Name
+	org.Visibility = req.Visibility
+	org.CreatorUserID = req.CreatorUserID
+
 	orgj, err := json.Marshal(org)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to marshal org")
