@@ -55,6 +55,7 @@ type Config struct {
 	Runs []*Run `json:"runs"`
 
 	DockerRegistriesAuth map[string]*DockerRegistryAuth `json:"docker_registries_auth"`
+	TaskTimeoutInterval  *types.Duration                `json:"task_timeout_interval"`
 }
 
 type RuntimeType string
@@ -113,6 +114,7 @@ type Run struct {
 	Tasks                []*Task                        `json:"tasks"`
 	When                 *When                          `json:"when"`
 	DockerRegistriesAuth map[string]*DockerRegistryAuth `json:"docker_registries_auth"`
+	TaskTimeoutInterval  *types.Duration                `json:"task_timeout_interval"`
 }
 
 type Task struct {
@@ -128,6 +130,7 @@ type Task struct {
 	Approval             bool                           `json:"approval"`
 	When                 *When                          `json:"when"`
 	DockerRegistriesAuth map[string]*DockerRegistryAuth `json:"docker_registries_auth"`
+	TaskTimeoutInterval  *types.Duration                `json:"task_timeout_interval"`
 }
 
 type DependCondition string

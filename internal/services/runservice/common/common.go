@@ -144,6 +144,7 @@ func GenExecutorTaskSpecData(r *types.Run, rt *types.RunTask, rc *types.RunConfi
 		Steps:                rct.Steps,
 		CachePrefix:          cachePrefix,
 		DockerRegistriesAuth: rct.DockerRegistriesAuth,
+		TaskTimeoutInterval:  rct.TaskTimeoutInterval,
 	}
 
 	// calculate workspace operations

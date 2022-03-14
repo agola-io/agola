@@ -79,12 +79,15 @@ type ExecutorTaskSpecData struct {
 	CachePrefix string `json:"cache_prefix,omitempty"`
 
 	Steps Steps `json:"steps,omitempty"`
+
+	TaskTimeoutInterval time.Duration `json:"task_timeout_interval"`
 }
 
 type ExecutorTaskStatus struct {
 	ID string `json:"id,omitempty"`
 
-	Phase ExecutorTaskPhase `json:"phase,omitempty"`
+	Phase    ExecutorTaskPhase `json:"phase,omitempty"`
+	Timedout bool              `json:"timedout,omitempty"`
 
 	FailError string `json:"fail_error,omitempty"`
 

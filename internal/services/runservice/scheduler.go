@@ -796,6 +796,7 @@ func (s *Runservice) updateRunTaskStatus(et *types.ExecutorTask, r *types.Run) e
 		rt.Status = types.RunTaskStatusFailed
 	}
 
+	rt.Timedout = et.Status.Timedout
 	rt.SetupStep.Phase = et.Status.SetupStep.Phase
 	rt.SetupStep.StartTime = et.Status.SetupStep.StartTime
 	rt.SetupStep.EndTime = et.Status.SetupStep.EndTime

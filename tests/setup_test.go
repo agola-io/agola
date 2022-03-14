@@ -41,6 +41,7 @@ import (
 	"agola.io/agola/internal/util"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
+	"agola.io/agola/services/runservice/types"
 	rstypes "agola.io/agola/services/runservice/types"
 
 	"code.gitea.io/sdk/gitea"
@@ -1926,5 +1927,280 @@ func TestUserOrgs(t *testing.T) {
 
 	if diff := cmp.Diff(expectedOrgs, orgs); diff != "" {
 		t.Fatalf("user orgs mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestTaskTimeout(t *testing.T) {
+	tests := []struct {
+		name                 string
+		config               string
+		tasksResultExpected  map[string]rstypes.RunTaskStatus
+		taskTimedoutExpected map[string]bool
+	}{
+		{
+			name:                 "test timeout string value",
+			tasksResultExpected:  map[string]rstypes.RunTaskStatus{"task01": types.RunTaskStatusFailed},
+			taskTimedoutExpected: map[string]bool{"task01": true},
+			config: `
+			{
+			  runs: [
+				{
+				  name: 'run01',
+				  tasks: [
+					{
+					  name: 'task01',
+					  runtime: {
+						containers: [
+						  {
+							image: 'alpine/git',
+						  },
+						],
+					  },
+					  task_timeout_interval: "15s",
+					  steps: [
+						  { type: 'run', command: 'sleep 30' },
+					  ],
+					},
+				  ],
+				},
+			  ],
+			}
+		  `,
+		},
+		{
+			name:                 "test timeout int value",
+			tasksResultExpected:  map[string]rstypes.RunTaskStatus{"task01": types.RunTaskStatusFailed},
+			taskTimedoutExpected: map[string]bool{"task01": true},
+			config: `
+			{
+			  runs: [
+				{
+				  name: 'run01',
+				  tasks: [
+					{
+					  name: 'task01',
+					  runtime: {
+						containers: [
+						  {
+							image: 'alpine/git',
+						  },
+						],
+					  },
+					  task_timeout_interval: 15000000000,
+					  steps: [
+						  { type: 'run', command: 'sleep 30' },
+					  ],
+					},
+				  ],
+				},
+			  ],
+			}
+		  `,
+		},
+		{
+			name:                 "test timeout child timeout",
+			tasksResultExpected:  map[string]rstypes.RunTaskStatus{"task01": types.RunTaskStatusSuccess, "task02": types.RunTaskStatusFailed},
+			taskTimedoutExpected: map[string]bool{"task01": false, "task02": true},
+			config: `
+			{
+			  runs: [
+				{
+				  name: 'run01',
+				  tasks: [
+					{
+					  name: 'task01',
+					  runtime: {
+						containers: [
+						  {
+							image: 'alpine/git',
+						  },
+						],
+					  },
+					  steps: [
+						  { type: 'run', command: 'sleep 30' },
+					  ],
+					},
+					{
+						name: 'task02',
+						depends: ['task01'],
+						runtime: {
+						  containers: [
+							{
+							  image: 'alpine/git',
+							},
+						  ],
+						},
+						task_timeout_interval: "15s",
+						steps: [
+							{ type: 'run', command: 'sleep 30' },
+						],
+					  },
+				  ],
+				},
+			  ],
+			}
+		  `,
+		},
+		{
+			name:                 "test timeout parent timeout",
+			tasksResultExpected:  map[string]rstypes.RunTaskStatus{"task01": types.RunTaskStatusFailed, "task02": types.RunTaskStatusSkipped},
+			taskTimedoutExpected: map[string]bool{"task01": true, "task02": false},
+			config: `
+			{
+			  runs: [
+				{
+				  name: 'run01',
+				  tasks: [
+					{
+					  name: 'task01',
+					  runtime: {
+						containers: [
+						  {
+							image: 'alpine/git',
+						  },
+						],
+					  },
+					  task_timeout_interval: "15s",
+					  steps: [
+						  { type: 'run', command: 'sleep 30' },
+					  ],
+					},
+					{
+						name: 'task02',
+						depends: ['task01'],
+						runtime: {
+						  containers: [
+							{
+							  image: 'alpine/git',
+							},
+						  ],
+						},
+						steps: [
+							{ type: 'run', command: 'sleep 30' },
+						],
+					  },
+				  ],
+				},
+			  ],
+			}
+		  `,
+		},
+		{
+			name:                 "test timeout parent and child timeout",
+			tasksResultExpected:  map[string]rstypes.RunTaskStatus{"task01": types.RunTaskStatusFailed, "task02": types.RunTaskStatusSkipped},
+			taskTimedoutExpected: map[string]bool{"task01": true, "task02": false},
+			config: `
+			{
+			  runs: [
+				{
+				  name: 'run01',
+				  tasks: [
+					{
+					  name: 'task01',
+					  runtime: {
+						containers: [
+						  {
+							image: 'alpine/git',
+						  },
+						],
+					  },
+					  task_timeout_interval: "15s",
+					  steps: [
+						  { type: 'run', command: 'sleep 30' },
+					  ],
+					},
+					{
+						name: 'task02',
+						depends: ['task01'],
+						runtime: {
+						  containers: [
+							{
+							  image: 'alpine/git',
+							},
+						  ],
+						},
+						task_timeout_interval: "15s",
+						steps: [
+							{ type: 'run', command: 'sleep 30' },
+						],
+					  },
+				  ],
+				},
+			  ],
+			}
+		  `,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			_, c := setup(ctx, t, dir, false)
+
+			gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
+			user, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			t.Logf("created agola user: %s", user.UserName)
+
+			token := createAgolaUserToken(ctx, t, c)
+
+			// From now use the user token
+			gwClient = gwclient.NewClient(c.Gateway.APIExposedURL, token)
+
+			directRun(t, dir, tt.config, ConfigFormatJsonnet, c.Gateway.APIExposedURL, token)
+
+			time.Sleep(30 * time.Second)
+
+			_ = testutil.Wait(120*time.Second, func() (bool, error) {
+				run, _, err := gwClient.GetUserRun(ctx, user.ID, 1)
+				if err != nil {
+					return false, nil
+				}
+
+				if run == nil {
+					return false, nil
+				}
+
+				if run.Phase != rstypes.RunPhaseFinished {
+					return false, nil
+				}
+
+				return true, nil
+			})
+
+			run, _, err := gwClient.GetUserRun(ctx, user.ID, 1)
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			t.Logf("runs: %s", util.Dump(run))
+
+			if run == nil {
+				t.Fatalf("user run not found")
+			}
+			if run.Phase != rstypes.RunPhaseFinished {
+				t.Fatalf("expected run finished got: %s", run.Phase)
+			}
+			if run.Result != rstypes.RunResultFailed {
+				t.Fatalf("expected run failed")
+			}
+			if len(run.Tasks) != len(tt.tasksResultExpected) {
+				t.Fatalf("expected 1 task got: %d", len(run.Tasks))
+			}
+			for _, task := range run.Tasks {
+				if task.Status != tt.tasksResultExpected[task.Name] {
+					t.Fatalf("expected task status %s got: %s", tt.tasksResultExpected[task.Name], task.Status)
+				}
+				if task.Timedout != tt.taskTimedoutExpected[task.Name] {
+					t.Fatalf("expected task timedout %v got: %v", tt.taskTimedoutExpected[task.Name], task.Timedout)
+				}
+			}
+		})
 	}
 }

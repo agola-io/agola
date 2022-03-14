@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"agola.io/agola/internal/config"
 	"agola.io/agola/internal/errors"
@@ -1355,6 +1356,162 @@ func TestGenRunConfig(t *testing.T) {
 					Environment: map[string]string{},
 					Steps:       rstypes.Steps{},
 					Skip:        false,
+				},
+			},
+		},
+		{
+			name: "test runconfig generation task timeout global",
+			in: &config.Config{
+				Runs: []*config.Run{
+					&config.Run{
+						Name: "run01",
+						Tasks: []*config.Task{
+							&config.Task{
+								Name: "task01",
+								Runtime: &config.Runtime{
+									Type: "pod",
+									Arch: "",
+									Containers: []*config.Container{
+										&config.Container{
+											Image: "image01",
+										},
+									},
+								},
+
+								Depends:    []*config.Depend{},
+								WorkingDir: "",
+								Shell:      "",
+								User:       "",
+							},
+						},
+					},
+				},
+				TaskTimeoutInterval: &types.Duration{Duration: 10 * time.Second},
+			},
+			out: map[string]*rstypes.RunConfigTask{
+				uuid.New("task01").String(): &rstypes.RunConfigTask{
+					ID:   uuid.New("task01").String(),
+					Name: "task01", Depends: map[string]*rstypes.RunConfigTaskDepend{},
+					DockerRegistriesAuth: map[string]rstypes.DockerRegistryAuth{},
+					TaskTimeoutInterval:  10 * time.Second,
+					Runtime: &rstypes.Runtime{Type: rstypes.RuntimeType("pod"),
+						Containers: []*rstypes.Container{
+							{
+								Image:       "image01",
+								Volumes:     []rstypes.Volume{},
+								Environment: map[string]string{},
+							},
+						},
+					},
+					Environment: map[string]string{},
+					Skip:        false,
+					Steps:       rstypes.Steps{},
+					Shell:       "/bin/sh -e",
+				},
+			},
+		},
+		{
+			name: "test global task timeout override by run",
+			in: &config.Config{
+				Runs: []*config.Run{
+					&config.Run{
+						Name: "run01",
+						Tasks: []*config.Task{
+							&config.Task{
+								Name: "task01",
+								Runtime: &config.Runtime{
+									Type: "pod",
+									Arch: "",
+									Containers: []*config.Container{
+										&config.Container{
+											Image: "image01",
+										},
+									},
+								},
+
+								Depends:    []*config.Depend{},
+								WorkingDir: "",
+								Shell:      "",
+								User:       "",
+							},
+						},
+						TaskTimeoutInterval: &types.Duration{Duration: 15 * time.Second},
+					},
+				},
+				TaskTimeoutInterval: &types.Duration{Duration: 10 * time.Second},
+			},
+			out: map[string]*rstypes.RunConfigTask{
+				uuid.New("task01").String(): &rstypes.RunConfigTask{
+					ID:   uuid.New("task01").String(),
+					Name: "task01", Depends: map[string]*rstypes.RunConfigTaskDepend{},
+					DockerRegistriesAuth: map[string]rstypes.DockerRegistryAuth{},
+					TaskTimeoutInterval:  15 * time.Second,
+					Runtime: &rstypes.Runtime{Type: rstypes.RuntimeType("pod"),
+						Containers: []*rstypes.Container{
+							{
+								Image:       "image01",
+								Volumes:     []rstypes.Volume{},
+								Environment: map[string]string{},
+							},
+						},
+					},
+					Environment: map[string]string{},
+					Skip:        false,
+					Steps:       rstypes.Steps{},
+					Shell:       "/bin/sh -e",
+				},
+			},
+		},
+		{
+			name: "test global task timeout override by task",
+			in: &config.Config{
+				Runs: []*config.Run{
+					&config.Run{
+						Name: "run01",
+						Tasks: []*config.Task{
+							&config.Task{
+								Name:                "task01",
+								TaskTimeoutInterval: &types.Duration{Duration: 20 * time.Second},
+								Runtime: &config.Runtime{
+									Type: "pod",
+									Arch: "",
+									Containers: []*config.Container{
+										&config.Container{
+											Image: "image01",
+										},
+									},
+								},
+
+								Depends:    []*config.Depend{},
+								WorkingDir: "",
+								Shell:      "",
+								User:       "",
+							},
+						},
+						TaskTimeoutInterval: &types.Duration{Duration: 15 * time.Second},
+					},
+				},
+				TaskTimeoutInterval: &types.Duration{Duration: 10 * time.Second},
+			},
+			out: map[string]*rstypes.RunConfigTask{
+				uuid.New("task01").String(): &rstypes.RunConfigTask{
+					ID:   uuid.New("task01").String(),
+					Name: "task01", Depends: map[string]*rstypes.RunConfigTaskDepend{},
+					DockerRegistriesAuth: map[string]rstypes.DockerRegistryAuth{},
+					TaskTimeoutInterval:  20 * time.Second,
+					Runtime: &rstypes.Runtime{Type: rstypes.RuntimeType("pod"),
+						Containers: []*rstypes.Container{
+							{
+								Image:       "image01",
+								Volumes:     []rstypes.Volume{},
+								Environment: map[string]string{},
+							},
+						},
+					},
+					Environment: map[string]string{},
+					Skip:        false,
+					Steps:       rstypes.Steps{},
+					Shell:       "/bin/sh -e",
 				},
 			},
 		},

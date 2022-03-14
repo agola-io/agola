@@ -201,6 +201,9 @@ type RunTask struct {
 	// there're no executor tasks scheduled
 	Status RunTaskStatus `json:"status,omitempty"`
 
+	// Timedout represent if the task has timed out
+	Timedout bool `json:"timedout,omitempty"`
+
 	// Annotations contain custom task annotations
 	// these are opaque to the runservice and used for multiple pourposes. For
 	// example to stores task approval metadata.
@@ -220,6 +223,8 @@ type RunTask struct {
 
 	StartTime *time.Time `json:"start_time,omitempty"`
 	EndTime   *time.Time `json:"end_time,omitempty"`
+
+	TaskTimeoutInterval *time.Duration `json:"task_timeout_interval"`
 }
 
 func (rt *RunTask) LogsFetchFinished() bool {
