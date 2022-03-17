@@ -439,19 +439,43 @@ func (c *Client) DeleteUserToken(ctx context.Context, userRef, tokenName string)
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/users/%s/tokens/%s", userRef, tokenName), nil, jsonContent, nil)
 }
 
-func (c *Client) GetRun(ctx context.Context, runID string) (*gwapitypes.RunResponse, *http.Response, error) {
+func (c *Client) GetProjectRun(ctx context.Context, projectRef string, runNumber uint64) (*gwapitypes.RunResponse, *http.Response, error) {
+	return c.getRun(ctx, "projects", projectRef, runNumber)
+}
+
+func (c *Client) GetUserRun(ctx context.Context, userRef string, runNumber uint64) (*gwapitypes.RunResponse, *http.Response, error) {
+	return c.getRun(ctx, "users", userRef, runNumber)
+}
+
+func (c *Client) getRun(ctx context.Context, groupType, groupRef string, runNumber uint64) (*gwapitypes.RunResponse, *http.Response, error) {
 	run := new(gwapitypes.RunResponse)
-	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/runs/%s", runID), nil, jsonContent, nil, run)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/%s/%s/runs/%d", groupType, url.PathEscape(groupRef), runNumber), nil, jsonContent, nil, run)
 	return run, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetRunTask(ctx context.Context, runID, taskID string) (*gwapitypes.RunTaskResponse, *http.Response, error) {
+func (c *Client) GetProjectRunTask(ctx context.Context, projectRef string, runNumber uint64, taskID string) (*gwapitypes.RunTaskResponse, *http.Response, error) {
+	return c.getRunTask(ctx, "projects", projectRef, runNumber, taskID)
+}
+
+func (c *Client) GetUserRunTask(ctx context.Context, userRef string, runNumber uint64, taskID string) (*gwapitypes.RunTaskResponse, *http.Response, error) {
+	return c.getRunTask(ctx, "users", userRef, runNumber, taskID)
+}
+
+func (c *Client) getRunTask(ctx context.Context, groupType, groupRef string, runNumber uint64, taskID string) (*gwapitypes.RunTaskResponse, *http.Response, error) {
 	task := new(gwapitypes.RunTaskResponse)
-	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/runs/%s/tasks/%s", runID, taskID), nil, jsonContent, nil, task)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/%s/%s/runs/%d/tasks/%s", groupType, url.PathEscape(groupRef), runNumber, taskID), nil, jsonContent, nil, task)
 	return task, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetRuns(ctx context.Context, phaseFilter, resultFilter, groups, runGroups []string, start string, limit int, asc bool) ([]*gwapitypes.RunsResponse, *http.Response, error) {
+func (c *Client) GetProjectRuns(ctx context.Context, projectRef string, phaseFilter, resultFilter []string, start uint64, limit int, asc bool) ([]*gwapitypes.RunsResponse, *http.Response, error) {
+	return c.getRuns(ctx, "projects", projectRef, phaseFilter, resultFilter, start, limit, asc)
+}
+
+func (c *Client) GetUserRuns(ctx context.Context, userRef string, phaseFilter, resultFilter []string, start uint64, limit int, asc bool) ([]*gwapitypes.RunsResponse, *http.Response, error) {
+	return c.getRuns(ctx, "users", userRef, phaseFilter, resultFilter, start, limit, asc)
+}
+
+func (c *Client) getRuns(ctx context.Context, groupType, groupRef string, phaseFilter, resultFilter []string, start uint64, limit int, asc bool) ([]*gwapitypes.RunsResponse, *http.Response, error) {
 	q := url.Values{}
 	for _, phase := range phaseFilter {
 		q.Add("phase", phase)
@@ -459,14 +483,8 @@ func (c *Client) GetRuns(ctx context.Context, phaseFilter, resultFilter, groups,
 	for _, result := range resultFilter {
 		q.Add("result", result)
 	}
-	for _, group := range groups {
-		q.Add("group", group)
-	}
-	for _, runGroup := range runGroups {
-		q.Add("rungroup", runGroup)
-	}
-	if start != "" {
-		q.Add("start", start)
+	if start > 0 {
+		q.Add("start", strconv.FormatUint(start, 10))
 	}
 	if limit > 0 {
 		q.Add("limit", strconv.Itoa(limit))
@@ -476,14 +494,20 @@ func (c *Client) GetRuns(ctx context.Context, phaseFilter, resultFilter, groups,
 	}
 
 	getRunsResponse := []*gwapitypes.RunsResponse{}
-	resp, err := c.getParsedResponse(ctx, "GET", "/runs", q, jsonContent, nil, &getRunsResponse)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/%s/%s/runs", groupType, url.PathEscape(groupRef)), q, jsonContent, nil, &getRunsResponse)
 	return getRunsResponse, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetLogs(ctx context.Context, runID, taskID string, setup bool, step int, follow bool) (*http.Response, error) {
+func (c *Client) GetProjectLogs(ctx context.Context, projectRef string, runNumber uint64, taskID string, setup bool, step int, follow bool) (*http.Response, error) {
+	return c.getLogs(ctx, "projects", projectRef, runNumber, taskID, setup, step, follow)
+}
+
+func (c *Client) GetUserLogs(ctx context.Context, userRef string, runNumber uint64, taskID string, setup bool, step int, follow bool) (*http.Response, error) {
+	return c.getLogs(ctx, "users", userRef, runNumber, taskID, setup, step, follow)
+}
+
+func (c *Client) getLogs(ctx context.Context, groupType, groupRef string, runNumber uint64, taskID string, setup bool, step int, follow bool) (*http.Response, error) {
 	q := url.Values{}
-	q.Add("runID", runID)
-	q.Add("taskID", taskID)
 	if setup {
 		q.Add("setup", "")
 	} else {
@@ -492,20 +516,26 @@ func (c *Client) GetLogs(ctx context.Context, runID, taskID string, setup bool, 
 	if follow {
 		q.Add("follow", "")
 	}
-	return c.getResponse(ctx, "GET", "/logs", q, nil, nil)
+	return c.getResponse(ctx, "GET", fmt.Sprintf("/%s/%s/runs/%d/tasks/%s/logs", groupType, url.PathEscape(groupRef), runNumber, taskID), q, nil, nil)
 }
 
-func (c *Client) DeleteLogs(ctx context.Context, runID, taskID string, setup bool, step int) (*http.Response, error) {
+func (c *Client) DeleteProjectLogs(ctx context.Context, projectRef string, runNumber uint64, taskID string, setup bool, step int) (*http.Response, error) {
+	return c.deleteLogs(ctx, "projects", projectRef, runNumber, taskID, setup, step)
+}
+
+func (c *Client) DeleteUserLogs(ctx context.Context, userRef string, runNumber uint64, taskID string, setup bool, step int) (*http.Response, error) {
+	return c.deleteLogs(ctx, "users", userRef, runNumber, taskID, setup, step)
+}
+
+func (c *Client) deleteLogs(ctx context.Context, groupType, groupRef string, runNumber uint64, taskID string, setup bool, step int) (*http.Response, error) {
 	q := url.Values{}
-	q.Add("runID", runID)
-	q.Add("taskID", taskID)
 	if setup {
 		q.Add("setup", "")
 	} else {
 		q.Add("step", strconv.Itoa(step))
 	}
 
-	return c.getResponse(ctx, "DELETE", "/logs", q, nil, nil)
+	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/%s/%s/runs/%d/tasks/%s/logs", groupType, url.PathEscape(groupRef), runNumber, taskID), q, nil, nil)
 }
 
 func (c *Client) GetRemoteSource(ctx context.Context, rsRef string) (*gwapitypes.RemoteSourceResponse, *http.Response, error) {

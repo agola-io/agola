@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"strconv"
 
 	"agola.io/agola/internal/errors"
 	gitsource "agola.io/agola/internal/gitsources"
@@ -90,7 +91,7 @@ func (n *NotificationService) updateCommitStatus(ctx context.Context, ev *rstype
 		return errors.Wrapf(err, "failed to create gitea client")
 	}
 
-	targetURL, err := webRunURL(n.c.WebExposedURL, project.ID, run.Run.ID)
+	targetURL, err := webRunURL(n.c.WebExposedURL, project.ID, run.Run.Counter)
 	if err != nil {
 		return errors.Wrapf(err, "failed to generate commit status target url")
 	}
@@ -104,14 +105,14 @@ func (n *NotificationService) updateCommitStatus(ctx context.Context, ev *rstype
 	return nil
 }
 
-func webRunURL(webExposedURL, projectID, runID string) (string, error) {
+func webRunURL(webExposedURL, projectID string, runNumber uint64) (string, error) {
 	u, err := url.Parse(webExposedURL + "/run")
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
 	q := url.Values{}
 	q.Set("projectref", projectID)
-	q.Set("runid", runID)
+	q.Set("runnumber", strconv.FormatUint(runNumber, 10))
 
 	u.RawQuery = q.Encode()
 

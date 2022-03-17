@@ -202,14 +202,21 @@ func (g *Gateway) Run(ctx context.Context) error {
 	addOrgMemberHandler := api.NewAddOrgMemberHandler(g.log, g.ah)
 	removeOrgMemberHandler := api.NewRemoveOrgMemberHandler(g.log, g.ah)
 
-	runHandler := api.NewRunHandler(g.log, g.ah)
-	runsHandler := api.NewRunsHandler(g.log, g.ah)
-	runtaskHandler := api.NewRuntaskHandler(g.log, g.ah)
-	runActionsHandler := api.NewRunActionsHandler(g.log, g.ah)
-	runTaskActionsHandler := api.NewRunTaskActionsHandler(g.log, g.ah)
+	projectRunsHandler := api.NewRunsHandler(g.log, g.ah, common.GroupTypeProject)
+	projectRunHandler := api.NewRunHandler(g.log, g.ah, common.GroupTypeProject)
+	projectRuntaskHandler := api.NewRuntaskHandler(g.log, g.ah, common.GroupTypeProject)
+	projectRunActionsHandler := api.NewRunActionsHandler(g.log, g.ah, common.GroupTypeProject)
+	projectRunTaskActionsHandler := api.NewRunTaskActionsHandler(g.log, g.ah, common.GroupTypeProject)
+	projectRunLogsHandler := api.NewLogsHandler(g.log, g.ah, common.GroupTypeProject)
+	projectRunLogsDeleteHandler := api.NewLogsDeleteHandler(g.log, g.ah, common.GroupTypeProject)
 
-	logsHandler := api.NewLogsHandler(g.log, g.ah)
-	logsDeleteHandler := api.NewLogsDeleteHandler(g.log, g.ah)
+	userRunsHandler := api.NewRunsHandler(g.log, g.ah, common.GroupTypeUser)
+	userRunHandler := api.NewRunHandler(g.log, g.ah, common.GroupTypeUser)
+	userRuntaskHandler := api.NewRuntaskHandler(g.log, g.ah, common.GroupTypeUser)
+	userRunActionsHandler := api.NewRunActionsHandler(g.log, g.ah, common.GroupTypeUser)
+	userRunTaskActionsHandler := api.NewRunTaskActionsHandler(g.log, g.ah, common.GroupTypeUser)
+	userRunLogsHandler := api.NewLogsHandler(g.log, g.ah, common.GroupTypeUser)
+	userRunLogsDeleteHandler := api.NewLogsDeleteHandler(g.log, g.ah, common.GroupTypeUser)
 
 	userRemoteReposHandler := api.NewUserRemoteReposHandler(g.log, g.ah, g.configstoreClient)
 
@@ -234,9 +241,6 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	router.PathPrefix("/api/v1alpha").Handler(apirouter)
 
-	apirouter.Handle("/logs", authOptionalHandler(logsHandler)).Methods("GET")
-	apirouter.Handle("/logs", authForcedHandler(logsDeleteHandler)).Methods("DELETE")
-
 	//apirouter.Handle("/projectgroups", authForcedHandler(projectsHandler)).Methods("GET")
 	apirouter.Handle("/projectgroups/{projectgroupref}", authForcedHandler(projectGroupHandler)).Methods("GET")
 	apirouter.Handle("/projectgroups/{projectgroupref}/subgroups", authForcedHandler(projectGroupSubgroupsHandler)).Methods("GET")
@@ -252,6 +256,13 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/projects/{projectref}/reconfig", authForcedHandler(projectReconfigHandler)).Methods("PUT")
 	apirouter.Handle("/projects/{projectref}/updaterepolinkedaccount", authForcedHandler(projectUpdateRepoLinkedAccountHandler)).Methods("PUT")
 	apirouter.Handle("/projects/{projectref}/createrun", authForcedHandler(projectCreateRunHandler)).Methods("POST")
+	apirouter.Handle("/projects/{projectref}/runs", authForcedHandler(projectRunsHandler)).Methods("GET")
+	apirouter.Handle("/projects/{projectref}/runs/{runnumber}", authOptionalHandler(projectRunHandler)).Methods("GET")
+	apirouter.Handle("/projects/{projectref}/runs/{runnumber}/actions", authForcedHandler(projectRunActionsHandler)).Methods("PUT")
+	apirouter.Handle("/projects/{projectref}/runs/{runnumber}/tasks/{taskid}", authOptionalHandler(projectRuntaskHandler)).Methods("GET")
+	apirouter.Handle("/projects/{projectref}/runs/{runnumber}/tasks/{taskid}/actions", authForcedHandler(projectRunTaskActionsHandler)).Methods("PUT")
+	apirouter.Handle("/projects/{projectref}/runs/{runnumber}/tasks/{taskid}/logs", authOptionalHandler(projectRunLogsHandler)).Methods("GET")
+	apirouter.Handle("/projects/{projectref}/runs/{runnumber}/tasks/{taskid}/logs", authForcedHandler(projectRunLogsDeleteHandler)).Methods("DELETE")
 
 	apirouter.Handle("/projectgroups/{projectgroupref}/secrets", authForcedHandler(secretHandler)).Methods("GET")
 	apirouter.Handle("/projects/{projectref}/secrets", authForcedHandler(secretHandler)).Methods("GET")
@@ -279,6 +290,14 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/user/createrun", authForcedHandler(userCreateRunHandler)).Methods("POST")
 	apirouter.Handle("/user/orgs", authForcedHandler(userOrgsHandler)).Methods("GET")
 
+	apirouter.Handle("/users/{userref}/runs", authForcedHandler(userRunsHandler)).Methods("GET")
+	apirouter.Handle("/users/{userref}/runs/{runnumber}", authOptionalHandler(userRunHandler)).Methods("GET")
+	apirouter.Handle("/users/{userref}/runs/{runnumber}/actions", authForcedHandler(userRunActionsHandler)).Methods("PUT")
+	apirouter.Handle("/users/{userref}/runs/{runnumber}/tasks/{taskid}", authOptionalHandler(userRuntaskHandler)).Methods("GET")
+	apirouter.Handle("/users/{userref}/runs/{runnumber}/tasks/{taskid}/actions", authForcedHandler(userRunTaskActionsHandler)).Methods("PUT")
+	apirouter.Handle("/users/{userref}/runs/{runnumber}/tasks/{taskid}/logs", authOptionalHandler(userRunLogsHandler)).Methods("GET")
+	apirouter.Handle("/users/{userref}/runs/{runnumber}/tasks/{taskid}/logs", authForcedHandler(userRunLogsDeleteHandler)).Methods("DELETE")
+
 	apirouter.Handle("/users/{userref}/linkedaccounts", authForcedHandler(createUserLAHandler)).Methods("POST")
 	apirouter.Handle("/users/{userref}/linkedaccounts/{laid}", authForcedHandler(deleteUserLAHandler)).Methods("DELETE")
 	apirouter.Handle("/users/{userref}/tokens", authForcedHandler(createUserTokenHandler)).Methods("POST")
@@ -297,12 +316,6 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/orgs/{orgref}/members", authForcedHandler(orgMembersHandler)).Methods("GET")
 	apirouter.Handle("/orgs/{orgref}/members/{userref}", authForcedHandler(addOrgMemberHandler)).Methods("PUT")
 	apirouter.Handle("/orgs/{orgref}/members/{userref}", authForcedHandler(removeOrgMemberHandler)).Methods("DELETE")
-
-	apirouter.Handle("/runs/{runid}", authOptionalHandler(runHandler)).Methods("GET")
-	apirouter.Handle("/runs/{runid}/actions", authForcedHandler(runActionsHandler)).Methods("PUT")
-	apirouter.Handle("/runs/{runid}/tasks/{taskid}", authOptionalHandler(runtaskHandler)).Methods("GET")
-	apirouter.Handle("/runs/{runid}/tasks/{taskid}/actions", authForcedHandler(runTaskActionsHandler)).Methods("PUT")
-	apirouter.Handle("/runs", authForcedHandler(runsHandler)).Methods("GET")
 
 	apirouter.Handle("/user/remoterepos/{remotesourceref}", authForcedHandler(userRemoteReposHandler)).Methods("GET")
 

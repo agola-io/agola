@@ -213,6 +213,32 @@ func (c *Client) GetGroupLastRun(ctx context.Context, group string, changeGroups
 	return c.GetRuns(ctx, nil, nil, []string{group}, false, changeGroups, "", 1, false)
 }
 
+func (c *Client) GetGroupRuns(ctx context.Context, phaseFilter, resultFilter []string, group string, changeGroups []string, startRunCounter uint64, limit int, asc bool) (*rsapitypes.GetRunsResponse, *http.Response, error) {
+	q := url.Values{}
+	for _, phase := range phaseFilter {
+		q.Add("phase", phase)
+	}
+	for _, result := range resultFilter {
+		q.Add("result", result)
+	}
+	for _, changeGroup := range changeGroups {
+		q.Add("changegroup", changeGroup)
+	}
+	if startRunCounter > 0 {
+		q.Add("start", strconv.FormatUint(startRunCounter, 10))
+	}
+	if limit > 0 {
+		q.Add("limit", strconv.Itoa(limit))
+	}
+	if asc {
+		q.Add("asc", "")
+	}
+
+	getRunsResponse := new(rsapitypes.GetRunsResponse)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/runs/group/%s", url.PathEscape(group)), q, jsonContent, nil, getRunsResponse)
+	return getRunsResponse, resp, errors.WithStack(err)
+}
+
 func (c *Client) CreateRun(ctx context.Context, req *rsapitypes.RunCreateRequest) (*rsapitypes.RunResponse, *http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
@@ -277,6 +303,17 @@ func (c *Client) GetRun(ctx context.Context, runID string, changeGroups []string
 
 	runResponse := new(rsapitypes.RunResponse)
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/runs/%s", runID), q, jsonContent, nil, runResponse)
+	return runResponse, resp, errors.WithStack(err)
+}
+
+func (c *Client) GetRunByGroup(ctx context.Context, group string, runNumber uint64, changeGroups []string) (*rsapitypes.RunResponse, *http.Response, error) {
+	q := url.Values{}
+	for _, changeGroup := range changeGroups {
+		q.Add("changegroup", changeGroup)
+	}
+
+	runResponse := new(rsapitypes.RunResponse)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/runs/group/%s/%d", url.PathEscape(group), runNumber), q, jsonContent, nil, runResponse)
 	return runResponse, resp, errors.WithStack(err)
 }
 

@@ -51,10 +51,14 @@ func WebHookEventToRunRefType(we types.WebhookEvent) types.RunRefType {
 	panic(errors.Errorf("invalid webhook event type: %q", we))
 }
 
+func GenBaseRunGroup(baseGroupType GroupType, baseGroupID string) string {
+	return path.Join("/", string(baseGroupType), baseGroupID)
+}
+
 func GenRunGroup(baseGroupType GroupType, baseGroupID string, groupType GroupType, group string) string {
 	// we pathescape the branch name to handle branches with slashes and make the
 	// branch a single path entry
-	return path.Join("/", string(baseGroupType), baseGroupID, string(groupType), url.PathEscape(group))
+	return path.Join(GenBaseRunGroup(baseGroupType, baseGroupID), string(groupType), url.PathEscape(group))
 }
 
 func GroupTypeIDFromRunGroup(group string) (GroupType, string, error) {

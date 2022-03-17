@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"agola.io/agola/internal/datamanager"
@@ -447,6 +448,96 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type RunByGroupHandler struct {
+	log    zerolog.Logger
+	e      *etcd.Store
+	dm     *datamanager.DataManager
+	readDB *readdb.ReadDB
+}
+
+func NewRunByGroupHandler(log zerolog.Logger, e *etcd.Store, dm *datamanager.DataManager, readDB *readdb.ReadDB) *RunByGroupHandler {
+	return &RunByGroupHandler{
+		log:    log,
+		e:      e,
+		dm:     dm,
+		readDB: readDB,
+	}
+}
+
+func (h *RunByGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+
+	query := r.URL.Query()
+	changeGroups := query["changegroup"]
+
+	group, err := url.PathUnescape(vars["group"])
+	if err != nil {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("group is empty")))
+		return
+	}
+
+	runCounterStr := vars["runcounter"]
+
+	var runCounter uint64
+	if runCounterStr == "" {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("runcounter is empty")))
+	}
+	if runCounterStr != "" {
+		var err error
+		runCounter, err = strconv.ParseUint(runCounterStr, 10, 64)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse runcounter")))
+			return
+		}
+	}
+
+	var run *types.Run
+	var cgt *types.ChangeGroupsUpdateToken
+
+	err = h.readDB.Do(ctx, func(tx *db.Tx) error {
+		var err error
+		run, err = h.readDB.GetRunByGroup(tx, group, runCounter)
+		if err != nil {
+			h.log.Err(err).Send()
+			return errors.WithStack(err)
+		}
+
+		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, changeGroups)
+		return errors.WithStack(err)
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if run == nil {
+		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("run for group %q with counter %d doesn't exist", group, runCounter)))
+		return
+	}
+
+	cgts, err := types.MarshalChangeGroupsUpdateToken(cgt)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	rc, err := store.OSTGetRunConfig(h.dm, run.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	res := &rsapitypes.RunResponse{
+		Run:                     run,
+		RunConfig:               rc,
+		ChangeGroupsUpdateToken: cgts,
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
 const (
 	DefaultRunsLimit = 25
 	MaxRunsLimit     = 40
@@ -504,6 +595,100 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
 		var err error
 		runs, err = h.readDB.GetRuns(tx, groups, lastRun, phaseFilter, resultFilter, start, limit, sortOrder)
+		if err != nil {
+			h.log.Err(err).Send()
+			return errors.WithStack(err)
+		}
+
+		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, changeGroups)
+		return errors.WithStack(err)
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	cgts, err := types.MarshalChangeGroupsUpdateToken(cgt)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	res := &rsapitypes.GetRunsResponse{
+		Runs:                    runs,
+		ChangeGroupsUpdateToken: cgts,
+	}
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+type RunsByGroupHandler struct {
+	log    zerolog.Logger
+	readDB *readdb.ReadDB
+}
+
+func NewRunsByGroupHandler(log zerolog.Logger, readDB *readdb.ReadDB) *RunsByGroupHandler {
+	return &RunsByGroupHandler{
+		log:    log,
+		readDB: readDB,
+	}
+}
+
+func (h *RunsByGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	query := r.URL.Query()
+	phaseFilter := types.RunPhaseFromStringSlice(query["phase"])
+	resultFilter := types.RunResultFromStringSlice(query["result"])
+
+	changeGroups := query["changegroup"]
+
+	group, err := url.PathUnescape(vars["group"])
+	if err != nil {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("group is empty")))
+		return
+	}
+
+	limitS := query.Get("limit")
+	limit := DefaultRunsLimit
+	if limitS != "" {
+		var err error
+		limit, err = strconv.Atoi(limitS)
+		if err != nil {
+			http.Error(w, "", http.StatusBadRequest)
+			return
+		}
+	}
+	if limit < 0 {
+		http.Error(w, "limit must be greater or equal than 0", http.StatusBadRequest)
+		return
+	}
+	if limit > MaxRunsLimit {
+		limit = MaxRunsLimit
+	}
+	sortOrder := types.SortOrderDesc
+	if _, ok := query["asc"]; ok {
+		sortOrder = types.SortOrderAsc
+	}
+
+	var startRunCounter uint64
+	startRunCounterStr := query.Get("start")
+	if startRunCounterStr != "" {
+		var err error
+		startRunCounter, err = strconv.ParseUint(startRunCounterStr, 10, 64)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse runcounter")))
+			return
+		}
+	}
+
+	var runs []*types.Run
+	var cgt *types.ChangeGroupsUpdateToken
+
+	err = h.readDB.Do(ctx, func(tx *db.Tx) error {
+		var err error
+		runs, err = h.readDB.GetGroupRuns(tx, group, phaseFilter, resultFilter, startRunCounter, limit, sortOrder)
 		if err != nil {
 			h.log.Err(err).Send()
 			return errors.WithStack(err)

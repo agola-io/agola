@@ -59,7 +59,7 @@ var (
 	revisionInsert = sb.Insert("revision").Columns("revision")
 
 	//runSelect = sb.Select("id", "grouppath", "phase", "result").From("run")
-	runInsert = sb.Insert("run").Columns("id", "grouppath", "phase", "result")
+	runInsert = sb.Insert("run").Columns("id", "grouppath", "counter", "phase", "result")
 
 	rundataInsert = sb.Insert("rundata").Columns("id", "data")
 
@@ -74,7 +74,7 @@ var (
 	revisionOSTInsert = sb.Insert("revision_ost").Columns("revision")
 
 	//runOSTSelect = sb.Select("id", "grouppath", "phase", "result").From("run_ost")
-	runOSTInsert = sb.Insert("run_ost").Columns("id", "grouppath", "phase", "result")
+	runOSTInsert = sb.Insert("run_ost").Columns("id", "grouppath", "counter", "phase", "result")
 
 	rundataOSTInsert = sb.Insert("rundata_ost").Columns("id", "data")
 
@@ -1011,7 +1011,7 @@ func insertRun(tx *db.Tx, run *types.Run, data []byte) error {
 	if _, err := tx.Exec("delete from run where id = $1", run.ID); err != nil {
 		return errors.Wrapf(err, "failed to delete run")
 	}
-	q, args, err := runInsert.Values(run.ID, groupPath, run.Phase, run.Result).ToSql()
+	q, args, err := runInsert.Values(run.ID, groupPath, run.Counter, run.Phase, run.Result).ToSql()
 	if err != nil {
 		return errors.Wrapf(err, "failed to build query")
 	}
@@ -1045,7 +1045,7 @@ func (r *ReadDB) insertRunOST(tx *db.Tx, run *types.Run, data []byte) error {
 	if _, err := tx.Exec("delete from run_ost where id = $1", run.ID); err != nil {
 		return errors.Wrapf(err, "failed to delete run objectstorage")
 	}
-	q, args, err := runOSTInsert.Values(run.ID, groupPath, run.Phase, run.Result).ToSql()
+	q, args, err := runOSTInsert.Values(run.ID, groupPath, run.Counter, run.Phase, run.Result).ToSql()
 	if err != nil {
 		return errors.Wrapf(err, "failed to build query")
 	}
@@ -1322,6 +1322,147 @@ func (r *ReadDB) GetRunsFilteredOST(tx *db.Tx, groups []string, lastRun bool, ph
 	return fetchRuns(tx, q, args...)
 }
 
+func (r *ReadDB) GetGroupRuns(tx *db.Tx, group string, phaseFilter []types.RunPhase, resultFilter []types.RunResult, startRunCounter uint64, limit int, sortOrder types.SortOrder) ([]*types.Run, error) {
+	useObjectStorage := false
+	for _, phase := range phaseFilter {
+		if phase == types.RunPhaseFinished || phase == types.RunPhaseCancelled {
+			useObjectStorage = true
+		}
+	}
+	if len(phaseFilter) == 0 {
+		useObjectStorage = true
+	}
+
+	runDataRDB, err := r.getGroupRunsFilteredActive(tx, group, phaseFilter, resultFilter, startRunCounter, limit, sortOrder)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	runsMap := map[string]*RunData{}
+	for _, r := range runDataRDB {
+		runsMap[r.ID] = r
+	}
+
+	if useObjectStorage {
+		// skip if the phase requested is not finished
+		runDataOST, err := r.GetGroupRunsFilteredOST(tx, group, phaseFilter, resultFilter, startRunCounter, limit, sortOrder)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		for _, rd := range runDataOST {
+			runsMap[rd.ID] = rd
+		}
+	}
+
+	var keys []string
+	for k := range runsMap {
+		keys = append(keys, k)
+	}
+	switch sortOrder {
+	case types.SortOrderAsc:
+		sort.Sort(sort.StringSlice(keys))
+	case types.SortOrderDesc:
+		sort.Sort(sort.Reverse(sort.StringSlice(keys)))
+	}
+
+	aruns := make([]*types.Run, 0, len(runsMap))
+
+	count := 0
+	for _, runID := range keys {
+		if count >= limit {
+			break
+		}
+		count++
+
+		rd := runsMap[runID]
+		if rd.Run != nil {
+			aruns = append(aruns, rd.Run)
+			continue
+		}
+
+		// get run from objectstorage
+		run, err := store.OSTGetRun(r.dm, runID)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		aruns = append(aruns, run)
+	}
+
+	return aruns, nil
+}
+
+func (r *ReadDB) getGroupRunsFilteredQuery(phaseFilter []types.RunPhase, resultFilter []types.RunResult, groupPath string, startRunCounter uint64, limit int, sortOrder types.SortOrder, objectstorage bool) sq.SelectBuilder {
+	runt := "run"
+	rundatat := "rundata"
+	fields := []string{"run.id", "run.grouppath", "run.phase", "rundata.data"}
+	if objectstorage {
+		runt = "run_ost"
+		rundatat = "rundata_ost"
+	}
+
+	r.log.Debug().Msgf("runt: %s", runt)
+	s := sb.Select(fields...).From(runt + " as run")
+	switch sortOrder {
+	case types.SortOrderAsc:
+		s = s.OrderBy("run.counter asc")
+	case types.SortOrderDesc:
+		s = s.OrderBy("run.counter desc")
+	}
+	if len(phaseFilter) > 0 {
+		s = s.Where(sq.Eq{"phase": phaseFilter})
+	}
+	if len(resultFilter) > 0 {
+		s = s.Where(sq.Eq{"result": resultFilter})
+	}
+	if startRunCounter > 0 {
+		switch sortOrder {
+		case types.SortOrderAsc:
+			s = s.Where(sq.Gt{"run.counter": startRunCounter})
+		case types.SortOrderDesc:
+			s = s.Where(sq.Lt{"run.counter": startRunCounter})
+		}
+	}
+	if limit > 0 {
+		s = s.Limit(uint64(limit))
+	}
+
+	s = s.Join(fmt.Sprintf("%s as rundata on rundata.id = run.id", rundatat))
+
+	// add ending slash to distinguish between final group (i.e project/projectid/branch/feature and project/projectid/branch/feature02)
+	if !strings.HasSuffix(groupPath, "/") {
+		groupPath += "/"
+	}
+
+	s = s.Where(sq.Like{"run.grouppath": groupPath + "%"})
+
+	return s
+}
+
+func (r *ReadDB) getGroupRunsFilteredActive(tx *db.Tx, group string, phaseFilter []types.RunPhase, resultFilter []types.RunResult, startRunCounter uint64, limit int, sortOrder types.SortOrder) ([]*RunData, error) {
+	s := r.getGroupRunsFilteredQuery(phaseFilter, resultFilter, group, startRunCounter, limit, sortOrder, false)
+
+	q, args, err := s.ToSql()
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to build query")
+	}
+
+	return fetchRuns(tx, q, args...)
+}
+
+func (r *ReadDB) GetGroupRunsFilteredOST(tx *db.Tx, group string, phaseFilter []types.RunPhase, resultFilter []types.RunResult, startRunCounter uint64, limit int, sortOrder types.SortOrder) ([]*RunData, error) {
+	s := r.getGroupRunsFilteredQuery(phaseFilter, resultFilter, group, startRunCounter, limit, sortOrder, true)
+
+	q, args, err := s.ToSql()
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to build query")
+	}
+
+	return fetchRuns(tx, q, args...)
+}
+
 func (r *ReadDB) GetRun(tx *db.Tx, runID string) (*types.Run, error) {
 	run, err := r.getRun(tx, runID, false)
 	if err != nil {
@@ -1381,6 +1522,74 @@ func (r *ReadDB) getRunQuery(runID string, objectstorage bool) sq.SelectBuilder 
 	}
 
 	s := sb.Select(fields...).From(runt + " as run").Where(sq.Eq{"run.id": runID})
+	s = s.Join(fmt.Sprintf("%s as rundata on rundata.id = run.id", rundatat))
+
+	return s
+}
+
+func (r *ReadDB) GetRunByGroup(tx *db.Tx, groupPath string, runCounter uint64) (*types.Run, error) {
+	run, err := r.getRunByGroup(tx, groupPath, runCounter, false)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	if run != nil {
+		return run, nil
+	}
+
+	// try to fetch from ost
+	return r.getRunByGroup(tx, groupPath, runCounter, true)
+}
+
+func (r *ReadDB) getRunByGroup(tx *db.Tx, groupPath string, runCounter uint64, ost bool) (*types.Run, error) {
+	s := r.getRunByGroupQuery(groupPath, runCounter, ost)
+
+	q, args, err := s.ToSql()
+	r.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to build query")
+	}
+
+	runsData, err := fetchRuns(tx, q, args...)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	if len(runsData) > 1 {
+		return nil, errors.Errorf("too many rows returned")
+	}
+	if len(runsData) == 0 {
+		return nil, nil
+	}
+
+	run := runsData[0].Run
+	if run == nil {
+		var err error
+		if !ost {
+			return nil, errors.Errorf("nil active run data. This should never happen")
+		}
+		// get run from objectstorage
+		run, err = store.OSTGetRun(r.dm, runsData[0].ID)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+	}
+
+	return run, nil
+}
+
+func (r *ReadDB) getRunByGroupQuery(groupPath string, runCounter uint64, objectstorage bool) sq.SelectBuilder {
+	runt := "run"
+	rundatat := "rundata"
+	fields := []string{"run.id", "run.grouppath", "run.phase", "rundata.data"}
+	if objectstorage {
+		runt = "run_ost"
+		rundatat = "rundata_ost"
+	}
+
+	if !strings.HasSuffix(groupPath, "/") {
+		groupPath += "/"
+	}
+
+	s := sb.Select(fields...).From(runt + " as run").Where(sq.And{sq.Like{"run.grouppath": groupPath + "%"}, sq.Eq{"run.counter": runCounter}})
 	s = s.Join(fmt.Sprintf("%s as rundata on rundata.id = run.id", rundatat))
 
 	return s

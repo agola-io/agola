@@ -73,6 +73,11 @@ const (
 	ConfigFormatStarlark ConfigFormat = "starlark"
 )
 
+const (
+	GroupTypeProjects = "projects"
+	GroupTypeUsers    = "users"
+)
+
 func setupEtcd(t *testing.T, log zerolog.Logger, dir string) *testutil.TestEmbeddedEtcd {
 	tetcd, err := testutil.NewTestEmbeddedEtcd(t, log, dir)
 	if err != nil {
@@ -806,7 +811,7 @@ func TestPush(t *testing.T) {
 			push(t, tt.config, giteaRepo.CloneURL, giteaToken, tt.message, false)
 
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/project", project.ID)}, nil, "", 0, false)
+				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 				if err != nil {
 					return false, nil
 				}
@@ -822,7 +827,7 @@ func TestPush(t *testing.T) {
 				return true, nil
 			})
 
-			runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/project", project.ID)}, nil, "", 0, false)
+			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
@@ -995,7 +1000,7 @@ func TestDirectRun(t *testing.T) {
 			directRun(t, dir, config, ConfigFormatJsonnet, c.Gateway.APIExposedURL, token, tt.args...)
 
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/user", user.ID)}, nil, "", 0, false)
+				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
 				if err != nil {
 					return false, nil
 				}
@@ -1012,7 +1017,7 @@ func TestDirectRun(t *testing.T) {
 				return true, nil
 			})
 
-			runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/user", user.ID)}, nil, "", 0, false)
+			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
@@ -1144,7 +1149,7 @@ func TestDirectRunVariables(t *testing.T) {
 
 			// TODO(sgotti) add an util to wait for a run phase
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/user", user.ID)}, nil, "", 0, false)
+				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
 				if err != nil {
 					return false, nil
 				}
@@ -1161,7 +1166,7 @@ func TestDirectRunVariables(t *testing.T) {
 				return true, nil
 			})
 
-			runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/user", user.ID)}, nil, "", 0, false)
+			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
@@ -1172,7 +1177,7 @@ func TestDirectRunVariables(t *testing.T) {
 				t.Fatalf("expected 1 run got: %d", len(runs))
 			}
 
-			run, _, err := gwClient.GetRun(ctx, runs[0].ID)
+			run, _, err := gwClient.GetUserRun(ctx, user.ID, runs[0].Number)
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
@@ -1191,7 +1196,7 @@ func TestDirectRunVariables(t *testing.T) {
 				}
 			}
 
-			resp, err := gwClient.GetLogs(ctx, run.ID, task.ID, false, 1, false)
+			resp, err := gwClient.GetUserLogs(ctx, user.ID, run.Number, task.ID, false, 1, false)
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
@@ -1309,7 +1314,7 @@ func TestDirectRunLogs(t *testing.T) {
 			directRun(t, dir, config, ConfigFormatJsonnet, c.Gateway.APIExposedURL, token)
 
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/user", user.ID)}, nil, "", 0, false)
+				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
 				if err != nil {
 					return false, nil
 				}
@@ -1326,7 +1331,7 @@ func TestDirectRunLogs(t *testing.T) {
 				return true, nil
 			})
 
-			runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/user", user.ID)}, nil, "", 0, false)
+			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
@@ -1337,7 +1342,7 @@ func TestDirectRunLogs(t *testing.T) {
 				t.Fatalf("expected 1 run got: %d", len(runs))
 			}
 
-			run, _, err := gwClient.GetRun(ctx, runs[0].ID)
+			run, _, err := gwClient.GetUserRun(ctx, user.ID, runs[0].Number)
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
@@ -1358,7 +1363,7 @@ func TestDirectRunLogs(t *testing.T) {
 			}
 
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
-				t, _, err := gwClient.GetRunTask(ctx, runs[0].ID, task.ID)
+				t, _, err := gwClient.GetUserRunTask(ctx, user.ID, runs[0].Number, task.ID)
 				if err != nil {
 					return false, nil
 				}
@@ -1372,9 +1377,9 @@ func TestDirectRunLogs(t *testing.T) {
 			})
 
 			if tt.delete {
-				_, err = gwClient.DeleteLogs(ctx, run.ID, task.ID, tt.setup, tt.step)
+				_, err = gwClient.DeleteUserLogs(ctx, user.ID, run.Number, task.ID, tt.setup, tt.step)
 			} else {
-				_, err = gwClient.GetLogs(ctx, run.ID, task.ID, tt.setup, tt.step, false)
+				_, err = gwClient.GetUserLogs(ctx, user.ID, run.Number, task.ID, tt.setup, tt.step, false)
 			}
 
 			if err != nil {
@@ -1611,7 +1616,7 @@ func TestPullRequest(t *testing.T) {
 				}
 			}
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/project", project.ID)}, nil, "", 0, false)
+				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 				if err != nil {
 					return false, nil
 				}
@@ -1627,14 +1632,14 @@ func TestPullRequest(t *testing.T) {
 				return true, nil
 			})
 
-			runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/project", project.ID)}, nil, "", 0, false)
+			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
 
 			t.Logf("runs: %s", util.Dump(runs))
 
-			run, _, err := gwClient.GetRun(ctx, runs[0].ID)
+			run, _, err := gwClient.GetProjectRun(ctx, project.ID, runs[0].Number)
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
@@ -1655,7 +1660,7 @@ func TestPullRequest(t *testing.T) {
 				if run.Result != rstypes.RunResultSuccess {
 					t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, run.Result)
 				}
-				resp, err := gwClient.GetLogs(ctx, run.ID, task.ID, false, 1, false)
+				resp, err := gwClient.GetProjectLogs(ctx, project.ID, run.Number, task.ID, false, 1, false)
 				if err != nil {
 					t.Fatalf("failed to get log: %v", err)
 				}
@@ -1820,7 +1825,7 @@ def main(ctx):
 
 				// TODO(sgotti) add an util to wait for a run phase
 				_ = testutil.Wait(30*time.Second, func() (bool, error) {
-					runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/user", user.ID)}, nil, "", 0, false)
+					runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
 					if err != nil {
 						return false, nil
 					}
@@ -1837,7 +1842,7 @@ def main(ctx):
 					return true, nil
 				})
 
-				runs, _, err := gwClient.GetRuns(ctx, nil, nil, []string{path.Join("/user", user.ID)}, nil, "", 0, false)
+				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
 				if err != nil {
 					t.Fatalf("unexpected err: %v", err)
 				}
@@ -1848,7 +1853,7 @@ def main(ctx):
 					t.Fatalf("expected 1 run got: %d", len(runs))
 				}
 
-				run, _, err := gwClient.GetRun(ctx, runs[0].ID)
+				run, _, err := gwClient.GetUserRun(ctx, user.ID, runs[0].Number)
 				if err != nil {
 					t.Fatalf("unexpected err: %v", err)
 				}
@@ -1867,7 +1872,7 @@ def main(ctx):
 					}
 				}
 
-				resp, err := gwClient.GetLogs(ctx, run.ID, task.ID, false, 1, false)
+				resp, err := gwClient.GetUserLogs(ctx, user.ID, run.Number, task.ID, false, 1, false)
 				if err != nil {
 					t.Fatalf("unexpected err: %v", err)
 				}

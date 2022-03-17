@@ -20,9 +20,14 @@ import (
 	rstypes "agola.io/agola/services/runservice/types"
 )
 
+// TODO(sgotti) We currently don't provide a run id.
+// We could return the runservice run id but if in future we're going
+// to shard to multiple runservices we'd need a global id that should be
+// calculated considering also the related run service id (or use a global
+// sequential id generator).
+
 type RunsResponse struct {
-	ID          string            `json:"id"`
-	Counter     uint64            `json:"counter"`
+	Number      uint64            `json:"number"`
 	Name        string            `json:"name"`
 	Annotations map[string]string `json:"annotations"`
 	Phase       rstypes.RunPhase  `json:"phase"`
@@ -36,8 +41,7 @@ type RunsResponse struct {
 }
 
 type RunResponse struct {
-	ID          string            `json:"id"`
-	Counter     uint64            `json:"counter"`
+	Number      uint64            `json:"number"`
 	Name        string            `json:"name"`
 	Annotations map[string]string `json:"annotations"`
 	Phase       rstypes.RunPhase  `json:"phase"`

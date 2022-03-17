@@ -17,7 +17,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"path"
 	"sort"
 
 	"agola.io/agola/internal/errors"
@@ -35,14 +34,15 @@ var cmdRunList = &cobra.Command{
 			log.Fatal().Err(err).Send()
 		}
 	},
-	Short: "list",
+	Short: "list runs for a specific project or user (direct runs)",
 }
 
 type runListOptions struct {
 	projectRef  string
+	username    string
 	phaseFilter []string
 	limit       int
-	start       string
+	start       uint64
 }
 
 type runDetails struct {
@@ -63,20 +63,17 @@ func init() {
 	flags := cmdRunList.Flags()
 
 	flags.StringVar(&runListOpts.projectRef, "project", "", "project id or full path")
+	flags.StringVar(&runListOpts.username, "username", "", "User name for user direct runs")
 	flags.StringSliceVarP(&runListOpts.phaseFilter, "phase", "s", nil, "filter runs matching the provided phase. This option can be repeated multiple times")
 	flags.IntVar(&runListOpts.limit, "limit", 10, "max number of runs to show")
-	flags.StringVar(&runListOpts.start, "start", "", "starting run id (excluded) to fetch")
-
-	if err := cmdRunList.MarkFlagRequired("project"); err != nil {
-		log.Fatal().Err(err).Send()
-	}
+	flags.Uint64Var(&runListOpts.start, "start", 0, "starting run number (excluded) to fetch")
 
 	cmdRun.AddCommand(cmdRunList)
 }
 
 func printRuns(runs []*runDetails) {
 	for _, run := range runs {
-		fmt.Printf("%s: Phase: %s, Result: %s\n", run.runResponse.ID, run.runResponse.Phase, run.runResponse.Result)
+		fmt.Printf("%d: Phase: %s, Result: %s\n", run.runResponse.Number, run.runResponse.Phase, run.runResponse.Result)
 		for _, task := range run.tasks {
 			fmt.Printf("\tTaskName: %s, TaskID: %s, Status: %s\n", task.runTaskResponse.Name, task.runTaskResponse.ID, task.runTaskResponse.Status)
 			if task.retrieveError != nil {
@@ -95,28 +92,51 @@ func printRuns(runs []*runDetails) {
 }
 
 func runList(cmd *cobra.Command, args []string) error {
+	flags := cmd.Flags()
+
+	if flags.Changed("username") && flags.Changed("project") {
+		return errors.Errorf(`only one of "--username" or "--project" can be provided`)
+	}
+	if !flags.Changed("username") && !flags.Changed("project") {
+		return errors.Errorf(`one of "--username" or "--project" must be provided`)
+	}
+
 	gwclient := gwclient.NewClient(gatewayURL, token)
 
-	project, _, err := gwclient.GetProject(context.TODO(), runListOpts.projectRef)
-	if err != nil {
-		return errors.Errorf("failed to get project %s: %v", runListOpts.projectRef, err)
+	isProject := !flags.Changed("username")
+
+	var runsResp []*gwapitypes.RunsResponse
+	var err error
+	if isProject {
+		runsResp, _, err = gwclient.GetProjectRuns(context.TODO(), runListOpts.projectRef, runListOpts.phaseFilter, nil, runListOpts.start, runListOpts.limit, false)
+	} else {
+		runsResp, _, err = gwclient.GetUserRuns(context.TODO(), runListOpts.username, runListOpts.phaseFilter, nil, runListOpts.start, runListOpts.limit, false)
 	}
-	groups := []string{path.Join("/project", project.ID)}
-	runsResp, _, err := gwclient.GetRuns(context.TODO(), runListOpts.phaseFilter, nil, groups, nil, runListOpts.start, runListOpts.limit, false)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
 	runs := make([]*runDetails, len(runsResp))
 	for i, runResponse := range runsResp {
-		run, _, err := gwclient.GetRun(context.TODO(), runResponse.ID)
+		var err error
+		var run *gwapitypes.RunResponse
+		if isProject {
+			run, _, err = gwclient.GetProjectRun(context.TODO(), runListOpts.projectRef, runResponse.Number)
+		} else {
+			run, _, err = gwclient.GetUserRun(context.TODO(), runListOpts.username, runResponse.Number)
+		}
 		if err != nil {
 			return errors.WithStack(err)
 		}
 
 		tasks := []*taskDetails{}
 		for _, task := range run.Tasks {
-			runTaskResponse, _, err := gwclient.GetRunTask(context.TODO(), run.ID, task.ID)
+			var runTaskResponse *gwapitypes.RunTaskResponse
+			if isProject {
+				runTaskResponse, _, err = gwclient.GetUserRunTask(context.TODO(), runListOpts.projectRef, run.Number, task.ID)
+			} else {
+				runTaskResponse, _, err = gwclient.GetProjectRunTask(context.TODO(), runListOpts.username, run.Number, task.ID)
+			}
 			t := &taskDetails{
 				name:            task.Name,
 				level:           task.Level,
