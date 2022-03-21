@@ -83,9 +83,10 @@ func createRunResponseTask(r *rstypes.Run, rt *rstypes.RunTask, rct *rstypes.Run
 
 func createRunTaskResponse(rt *rstypes.RunTask, rct *rstypes.RunConfigTask) *gwapitypes.RunTaskResponse {
 	t := &gwapitypes.RunTaskResponse{
-		ID:     rt.ID,
-		Name:   rct.Name,
-		Status: rt.Status,
+		ID:         rt.ID,
+		Name:       rct.Name,
+		Status:     rt.Status,
+		Containers: []gwapitypes.RunTaskResponseContainer{},
 
 		WaitingApproval:     rt.WaitingApproval,
 		Approved:            rt.Approved,
@@ -102,6 +103,16 @@ func createRunTaskResponse(rt *rstypes.RunTask, rct *rstypes.RunConfigTask) *gwa
 		Phase:     rt.SetupStep.Phase,
 		StartTime: rt.SetupStep.StartTime,
 		EndTime:   rt.SetupStep.EndTime,
+	}
+
+	if rct.Runtime != nil {
+		for _, rctContainer := range rct.Runtime.Containers {
+			container := gwapitypes.RunTaskResponseContainer{}
+			if rctContainer != nil {
+				container.Image = rctContainer.Image
+			}
+			t.Containers = append(t.Containers, container)
+		}
 	}
 
 	for i := 0; i < len(t.Steps); i++ {
