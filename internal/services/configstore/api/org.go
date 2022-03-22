@@ -79,14 +79,20 @@ func NewCreateOrgHandler(log zerolog.Logger, ah *action.ActionHandler) *CreateOr
 func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var req types.Organization
+	var req *csapitypes.CreateOrgRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
-	org, err := h.ah.CreateOrg(ctx, &req)
+	creq := &action.CreateOrgRequest{
+		Name:          req.Name,
+		Visibility:    req.Visibility,
+		CreatorUserID: req.CreatorUserID,
+	}
+
+	org, err := h.ah.CreateOrg(ctx, creq)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
@@ -197,7 +203,7 @@ func (h *AddOrgMemberHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	orgRef := vars["orgref"]
 	userRef := vars["userref"]
 
-	var req csapitypes.AddOrgMemberRequest
+	var req *csapitypes.AddOrgMemberRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))

@@ -18,6 +18,14 @@ import (
 	cstypes "agola.io/agola/services/configstore/types"
 )
 
+type CreateUpdateSecretRequest struct {
+	Name             string
+	Type             cstypes.SecretType
+	Data             map[string]string
+	SecretProviderID string
+	Path             string
+}
+
 // Secret augments cstypes.Secret with dynamic data
 type Secret struct {
 	*cstypes.Secret

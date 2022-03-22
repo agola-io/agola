@@ -84,7 +84,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProje
 		parentRef = path.Join("user", user.Name)
 	}
 
-	p := &cstypes.ProjectGroup{
+	creq := &csapitypes.CreateUpdateProjectGroupRequest{
 		Name: req.Name,
 		Parent: cstypes.Parent{
 			Type: cstypes.ConfigTypeProjectGroup,
@@ -94,7 +94,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProje
 	}
 
 	h.log.Info().Msgf("creating projectGroup")
-	rp, _, err := h.configstoreClient.CreateProjectGroup(ctx, p)
+	rp, _, err := h.configstoreClient.CreateProjectGroup(ctx, creq)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to create projectGroup"))
 	}
@@ -134,8 +134,14 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, projectGroupRef 
 		pg.Visibility = *req.Visibility
 	}
 
+	creq := &csapitypes.CreateUpdateProjectGroupRequest{
+		Name:       pg.Name,
+		Parent:     pg.Parent,
+		Visibility: pg.Visibility,
+	}
+
 	h.log.Info().Msgf("updating project group")
-	rp, _, err := h.configstoreClient.UpdateProjectGroup(ctx, pg.ID, pg.ProjectGroup)
+	rp, _, err := h.configstoreClient.UpdateProjectGroup(ctx, pg.ID, creq)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to update project group"))
 	}

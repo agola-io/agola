@@ -20,6 +20,7 @@ import (
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
+	csapitypes "agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"
 )
 
@@ -95,7 +96,7 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemot
 		}
 	}
 
-	rs := &cstypes.RemoteSource{
+	creq := &csapitypes.CreateUpdateRemoteSourceRequest{
 		Name:                req.Name,
 		Type:                cstypes.RemoteSourceType(req.Type),
 		AuthType:            cstypes.RemoteSourceAuthType(req.AuthType),
@@ -110,7 +111,7 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemot
 	}
 
 	h.log.Info().Msgf("creating remotesource")
-	rs, _, err := h.configstoreClient.CreateRemoteSource(ctx, rs)
+	rs, _, err := h.configstoreClient.CreateRemoteSource(ctx, creq)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create remotesource")
 	}
@@ -171,8 +172,22 @@ func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, req *UpdateRemot
 		rs.LoginEnabled = req.LoginEnabled
 	}
 
+	creq := &csapitypes.CreateUpdateRemoteSourceRequest{
+		Name:                rs.Name,
+		Type:                rs.Type,
+		AuthType:            rs.AuthType,
+		APIURL:              rs.APIURL,
+		SkipVerify:          rs.SkipVerify,
+		Oauth2ClientID:      rs.Oauth2ClientID,
+		Oauth2ClientSecret:  rs.Oauth2ClientSecret,
+		SSHHostKey:          rs.SSHHostKey,
+		SkipSSHHostKeyCheck: rs.SkipSSHHostKeyCheck,
+		RegistrationEnabled: rs.RegistrationEnabled,
+		LoginEnabled:        rs.LoginEnabled,
+	}
+
 	h.log.Info().Msgf("updating remotesource")
-	rs, _, err = h.configstoreClient.UpdateRemoteSource(ctx, req.RemoteSourceRef, rs)
+	rs, _, err = h.configstoreClient.UpdateRemoteSource(ctx, req.RemoteSourceRef, creq)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to update remotesource")
 	}

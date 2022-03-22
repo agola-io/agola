@@ -135,7 +135,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 		return nil, errors.Wrapf(err, "failed to generate ssh key pair")
 	}
 
-	p := &cstypes.Project{
+	creq := &csapitypes.CreateUpdateProjectRequest{
 		Name: req.Name,
 		Parent: cstypes.Parent{
 			Type: cstypes.ConfigTypeProjectGroup,
@@ -147,13 +147,13 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 		LinkedAccountID:            la.ID,
 		RepositoryID:               repo.ID,
 		RepositoryPath:             req.RepoPath,
-		SkipSSHHostKeyCheck:        req.SkipSSHHostKeyCheck,
 		SSHPrivateKey:              string(privateKey),
+		SkipSSHHostKeyCheck:        req.SkipSSHHostKeyCheck,
 		PassVarsToForkedPR:         req.PassVarsToForkedPR,
 	}
 
 	h.log.Info().Msgf("creating project")
-	rp, _, err := h.configstoreClient.CreateProject(ctx, p)
+	rp, _, err := h.configstoreClient.CreateProject(ctx, creq)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to create project"))
 	}
@@ -213,8 +213,22 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, projectRef string, re
 		p.PassVarsToForkedPR = *req.PassVarsToForkedPR
 	}
 
+	creq := &csapitypes.CreateUpdateProjectRequest{
+		Name:                       p.Name,
+		Parent:                     p.Parent,
+		Visibility:                 p.Visibility,
+		RemoteRepositoryConfigType: p.RemoteRepositoryConfigType,
+		RemoteSourceID:             p.RemoteSourceID,
+		LinkedAccountID:            p.LinkedAccountID,
+		RepositoryID:               p.RepositoryID,
+		RepositoryPath:             p.RepositoryPath,
+		SSHPrivateKey:              p.SSHPrivateKey,
+		SkipSSHHostKeyCheck:        p.SkipSSHHostKeyCheck,
+		PassVarsToForkedPR:         p.PassVarsToForkedPR,
+	}
+
 	h.log.Info().Msgf("updating project")
-	rp, _, err := h.configstoreClient.UpdateProject(ctx, p.ID, p.Project)
+	rp, _, err := h.configstoreClient.UpdateProject(ctx, p.ID, creq)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to update project"))
 	}
@@ -272,8 +286,22 @@ func (h *ActionHandler) ProjectUpdateRepoLinkedAccount(ctx context.Context, proj
 
 	p.LinkedAccountID = la.ID
 
+	creq := &csapitypes.CreateUpdateProjectRequest{
+		Name:                       p.Name,
+		Parent:                     p.Parent,
+		Visibility:                 p.Visibility,
+		RemoteRepositoryConfigType: p.RemoteRepositoryConfigType,
+		RemoteSourceID:             p.RemoteSourceID,
+		LinkedAccountID:            p.LinkedAccountID,
+		RepositoryID:               p.RepositoryID,
+		RepositoryPath:             p.RepositoryPath,
+		SSHPrivateKey:              p.SSHPrivateKey,
+		SkipSSHHostKeyCheck:        p.SkipSSHHostKeyCheck,
+		PassVarsToForkedPR:         p.PassVarsToForkedPR,
+	}
+
 	h.log.Info().Msgf("updating project")
-	rp, _, err := h.configstoreClient.UpdateProject(ctx, p.ID, p.Project)
+	rp, _, err := h.configstoreClient.UpdateProject(ctx, p.ID, creq)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to update project"))
 	}

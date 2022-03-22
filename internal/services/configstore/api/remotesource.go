@@ -24,6 +24,7 @@ import (
 	"agola.io/agola/internal/services/configstore/action"
 	"agola.io/agola/internal/services/configstore/readdb"
 	"agola.io/agola/internal/util"
+	csapitypes "agola.io/agola/services/configstore/api/types"
 	"agola.io/agola/services/configstore/types"
 
 	"github.com/gorilla/mux"
@@ -78,14 +79,27 @@ func NewCreateRemoteSourceHandler(log zerolog.Logger, ah *action.ActionHandler) 
 func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var req types.RemoteSource
+	var req *csapitypes.CreateUpdateRemoteSourceRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
-	remoteSource, err := h.ah.CreateRemoteSource(ctx, &req)
+	areq := &action.CreateUpdateRemoteSourceRequest{
+		Name:                req.Name,
+		APIURL:              req.APIURL,
+		SkipVerify:          req.SkipVerify,
+		Type:                req.Type,
+		AuthType:            req.AuthType,
+		Oauth2ClientID:      req.Oauth2ClientID,
+		Oauth2ClientSecret:  req.Oauth2ClientSecret,
+		SkipSSHHostKeyCheck: req.SkipSSHHostKeyCheck,
+		RegistrationEnabled: req.RegistrationEnabled,
+		LoginEnabled:        req.LoginEnabled,
+	}
+
+	remoteSource, err := h.ah.CreateRemoteSource(ctx, areq)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
@@ -111,18 +125,26 @@ func (h *UpdateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	vars := mux.Vars(r)
 	rsRef := vars["remotesourceref"]
 
-	var remoteSource *types.RemoteSource
+	var req *csapitypes.CreateUpdateRemoteSourceRequest
 	d := json.NewDecoder(r.Body)
-	if err := d.Decode(&remoteSource); err != nil {
+	if err := d.Decode(&req); err != nil {
 		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
-	areq := &action.UpdateRemoteSourceRequest{
-		RemoteSourceRef: rsRef,
-		RemoteSource:    remoteSource,
+	areq := &action.CreateUpdateRemoteSourceRequest{
+		Name:                req.Name,
+		APIURL:              req.APIURL,
+		SkipVerify:          req.SkipVerify,
+		Type:                req.Type,
+		AuthType:            req.AuthType,
+		Oauth2ClientID:      req.Oauth2ClientID,
+		Oauth2ClientSecret:  req.Oauth2ClientSecret,
+		SkipSSHHostKeyCheck: req.SkipSSHHostKeyCheck,
+		RegistrationEnabled: req.RegistrationEnabled,
+		LoginEnabled:        req.LoginEnabled,
 	}
-	remoteSource, err := h.ah.UpdateRemoteSource(ctx, areq)
+	remoteSource, err := h.ah.UpdateRemoteSource(ctx, rsRef, areq)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return

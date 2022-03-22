@@ -18,6 +18,12 @@ import (
 	cstypes "agola.io/agola/services/configstore/types"
 )
 
+type CreateOrgRequest struct {
+	Name          string
+	Visibility    cstypes.Visibility
+	CreatorUserID string
+}
+
 type AddOrgMemberRequest struct {
 	Role cstypes.MemberRole
 }

@@ -18,6 +18,11 @@ import (
 	cstypes "agola.io/agola/services/configstore/types"
 )
 
+type CreateUpdateVariableRequest struct {
+	Name   string
+	Values []cstypes.VariableValue
+}
+
 // Variable augments cstypes.Variable with dynamic data
 type Variable struct {
 	*cstypes.Variable
