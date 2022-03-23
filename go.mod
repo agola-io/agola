@@ -26,6 +26,7 @@ require (
 	github.com/minio/minio-go/v6 v6.0.48
 	github.com/mitchellh/copystructure v1.0.0
 	github.com/mitchellh/go-homedir v1.1.0
+	github.com/mitchellh/mapstructure v1.4.3
 	github.com/opencontainers/runc v0.1.1 // indirect
 	github.com/rs/zerolog v1.26.1
 	github.com/sanity-io/litter v1.2.0
