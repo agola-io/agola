@@ -109,6 +109,10 @@ Host $AGOLA_GIT_HOST
 	Port $AGOLA_GIT_PORT
 	StrictHostKeyChecking ${STRICT_HOST_KEY_CHECKING}
 	PasswordAuthentication no
+
+	IgnoreUnknown PubkeyAcceptedKeyTypes,PubkeyAcceptedAlgorithms
+	PubkeyAcceptedKeyTypes +ssh-rsa
+	PubkeyAcceptedAlgorithms +ssh-rsa
 EOF
 )
 
