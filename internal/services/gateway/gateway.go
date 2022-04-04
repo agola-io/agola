@@ -182,6 +182,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	deleteUserHandler := api.NewDeleteUserHandler(g.log, g.ah)
 	userCreateRunHandler := api.NewUserCreateRunHandler(g.log, g.ah)
 	userOrgsHandler := api.NewUserOrgsHandler(g.log, g.ah)
+	userProjectsHandler := api.NewUserProjectsHandler(g.log, g.ah)
 
 	createUserLAHandler := api.NewCreateUserLAHandler(g.log, g.ah)
 	deleteUserLAHandler := api.NewDeleteUserLAHandler(g.log, g.ah)
@@ -291,6 +292,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/users/{userref}", authForcedHandler(deleteUserHandler)).Methods("DELETE")
 	apirouter.Handle("/user/createrun", authForcedHandler(userCreateRunHandler)).Methods("POST")
 	apirouter.Handle("/user/orgs", authForcedHandler(userOrgsHandler)).Methods("GET")
+	apirouter.Handle("/user/projects", authForcedHandler(userProjectsHandler)).Methods("GET")
 
 	apirouter.Handle("/users/{userref}/runs", authForcedHandler(userRunsHandler)).Methods("GET")
 	apirouter.Handle("/users/{userref}/runs/{runnumber}", authOptionalHandler(userRunHandler)).Methods("GET")

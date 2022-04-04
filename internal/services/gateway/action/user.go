@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -1026,4 +1027,87 @@ func (h *ActionHandler) GetUserGitSource(ctx context.Context, remoteSourceRef, u
 	}
 
 	return gitSource, rs, la, nil
+}
+
+type GetUserProjectsRequest struct {
+	UserRef string
+	Limit   int
+	Page    int
+}
+
+func ProjectsPaginate(page int, limit int, data []*csapitypes.Project) []*csapitypes.Project {
+	start := page * limit
+
+	if start > len(data) {
+		return nil
+	}
+
+	end := start + limit
+	if end > len(data) {
+		end = len(data)
+	}
+
+	return data[start:end]
+}
+
+func (h *ActionHandler) GetUserProjects(ctx context.Context, req *GetUserProjectsRequest) ([]*csapitypes.Project, error) {
+	if !common.IsUserLogged(ctx) {
+		return nil, errors.Errorf("user not logged in")
+	}
+	user, _, err := h.configstoreClient.GetUser(ctx, req.UserRef)
+	if err != nil {
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q", req.UserRef))
+	}
+
+	projects := make([]*csapitypes.Project, 0)
+
+	prj, err := h.GetProjectgroupProjects(ctx, "user"+"/"+user.Name)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get projects for user %q", user.Name)
+	}
+	projects = append(projects, prj...)
+
+	userOrgs, err := h.GetUserOrgs(ctx, req.UserRef)
+	if err != nil {
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get organizations for user %q", req.UserRef))
+	}
+	for _, org := range userOrgs {
+		prj, err := h.GetProjectgroupProjects(ctx, "org"+"/"+org.Organization.Name)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get projects for org %q", org.Organization.Name)
+		}
+		projects = append(projects, prj...)
+	}
+
+	sort.SliceStable(projects, func(i, j int) bool {
+		return strings.Compare(strings.ToLower(projects[i].Path), strings.ToLower(projects[j].Path)) < 0
+	})
+
+	projects = ProjectsPaginate(req.Page, req.Limit, projects)
+
+	return projects, nil
+}
+
+func (h *ActionHandler) GetProjectgroupProjects(ctx context.Context, projectgroup string) ([]*csapitypes.Project, error) {
+	projects := make([]*csapitypes.Project, 0)
+
+	prj, err := h.GetProjectGroupProjects(ctx, projectgroup)
+	if err != nil {
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get projects for group %q", projectgroup))
+	}
+	projects = append(projects, prj...)
+
+	subgroups, err := h.GetProjectGroupSubgroups(ctx, projectgroup)
+	if err != nil {
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get subgroups for group %q", projectgroup))
+	}
+	for _, s := range subgroups {
+		prj, err := h.GetProjectgroupProjects(ctx, s.ID)
+		if err != nil {
+			return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get projects for group %q", s.ID))
+		}
+		projects = append(projects, prj...)
+	}
+
+	return projects, nil
 }
