@@ -15,7 +15,6 @@
 package runservice
 
 import (
-	"context"
 	"sort"
 	"testing"
 	"time"
@@ -27,6 +26,8 @@ import (
 )
 
 func TestAdvanceRunTasks(t *testing.T) {
+	log := testutil.NewLogger(t)
+
 	// a global run config for all tests
 	rc := &types.RunConfig{
 		Tasks: map[string]*types.RunConfigTask{
@@ -345,7 +346,12 @@ func TestAdvanceRunTasks(t *testing.T) {
 				return run
 			}(),
 			scheduledExecutorTasks: []*types.ExecutorTask{
-				&types.ExecutorTask{ID: "task01"},
+				{
+					ObjectMeta: ctypes.ObjectMeta{ID: "executortask01"},
+					Spec: types.ExecutorTaskSpec{
+						RunTaskID: "task01",
+					},
+				},
 			},
 			out: func() *types.Run {
 				run := run.DeepCopy()
@@ -373,7 +379,12 @@ func TestAdvanceRunTasks(t *testing.T) {
 				return run
 			}(),
 			scheduledExecutorTasks: []*types.ExecutorTask{
-				&types.ExecutorTask{ID: "task01"},
+				{
+					ObjectMeta: ctypes.ObjectMeta{ID: "executortask01"},
+					Spec: types.ExecutorTaskSpec{
+						RunTaskID: "task01",
+					},
+				},
 			},
 			out: func() *types.Run {
 				run := run.DeepCopy()
@@ -390,10 +401,7 @@ func TestAdvanceRunTasks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
-			log := testutil.NewLogger(t)
-
-			r, err := advanceRunTasks(ctx, log, tt.r, tt.rc, tt.scheduledExecutorTasks)
+			r, err := advanceRunTasks(log, tt.r, tt.rc, tt.scheduledExecutorTasks)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -405,6 +413,8 @@ func TestAdvanceRunTasks(t *testing.T) {
 }
 
 func TestGetTasksToRun(t *testing.T) {
+	log := testutil.NewLogger(t)
+
 	// a global run config for all tests
 	rc := &types.RunConfig{
 		Tasks: map[string]*types.RunConfigTask{
@@ -553,10 +563,7 @@ func TestGetTasksToRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
-			log := testutil.NewLogger(t)
-
-			tasks, err := getTasksToRun(ctx, log, tt.r, tt.rc)
+			tasks, err := getTasksToRun(log, tt.r, tt.rc)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -576,37 +583,39 @@ func TestGetTasksToRun(t *testing.T) {
 
 func TestChooseExecutor(t *testing.T) {
 	executorOK := &types.Executor{
-		ID:                   "executorOK",
-		Archs:                []ctypes.Arch{ctypes.ArchAMD64},
-		ActiveTasksLimit:     2,
-		ActiveTasks:          0,
-		LastStatusUpdateTime: time.Now(),
+		ExecutorID:       "executorOK",
+		Archs:            []ctypes.Arch{ctypes.ArchAMD64},
+		ActiveTasksLimit: 2,
+		ActiveTasks:      0,
+		ObjectMeta: ctypes.ObjectMeta{
+			UpdateTime: time.Now(),
+		},
 	}
 
 	executorNoFreeTaskSlots := func() *types.Executor {
 		e := executorOK.DeepCopy()
-		e.ID = "executorNoFreeTasksSlots"
+		e.ExecutorID = "executorNoFreeTasksSlots"
 		e.ActiveTasks = 2
 		return e
 	}()
 
 	executorNotAlive := func() *types.Executor {
 		e := executorOK.DeepCopy()
-		e.ID = "executorNotAlive"
-		e.LastStatusUpdateTime = time.Now().Add(-120 * time.Second)
+		e.ExecutorID = "executorNotAlive"
+		e.UpdateTime = time.Now().Add(-120 * time.Second)
 		return e
 	}()
 
 	executorOKMultipleArchs := func() *types.Executor {
 		e := executorOK.DeepCopy()
-		e.ID = "executorOKMultipleArchs"
+		e.ExecutorID = "executorOKMultipleArchs"
 		e.Archs = []ctypes.Arch{ctypes.ArchAMD64, ctypes.ArchARM64}
 		return e
 	}()
 
 	executorOKAllowsPriviledContainers := func() *types.Executor {
 		e := executorOK.DeepCopy()
-		e.ID = "executorOKAllowsPrivilegedContainers"
+		e.ExecutorID = "executorOKAllowsPrivilegedContainers"
 		e.AllowPrivilegedContainers = true
 		return e
 	}()

@@ -17,11 +17,10 @@ package notification
 import (
 	"context"
 
-	"agola.io/agola/internal/common"
 	"agola.io/agola/internal/errors"
-
-	"agola.io/agola/internal/etcd"
+	"agola.io/agola/internal/lock"
 	"agola.io/agola/internal/services/config"
+	"agola.io/agola/internal/sql"
 	csclient "agola.io/agola/services/configstore/client"
 	rsclient "agola.io/agola/services/runservice/client"
 
@@ -33,7 +32,7 @@ type NotificationService struct {
 	gc  *config.Config
 	c   *config.Notification
 
-	e *etcd.Store
+	lf lock.LockFactory
 
 	runserviceClient  *rsclient.Client
 	configstoreClient *csclient.Client
@@ -46,9 +45,22 @@ func NewNotificationService(ctx context.Context, log zerolog.Logger, gc *config.
 		log = log.Level(zerolog.DebugLevel)
 	}
 
-	e, err := common.NewEtcd(&c.Etcd, log, "notification")
+	sdb, err := sql.NewDB(c.DB.Type, c.DB.ConnString)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, errors.Wrapf(err, "new db error")
+	}
+
+	// We are currently using the db only for locking. No tables are created.
+
+	var lf lock.LockFactory
+	switch c.DB.Type {
+	case sql.Sqlite3:
+		ll := lock.NewLocalLocks()
+		lf = lock.NewLocalLockFactory(ll)
+	case sql.Postgres:
+		lf = lock.NewPGLockFactory(sdb)
+	default:
+		return nil, errors.Errorf("unknown type %q", c.DB.Type)
 	}
 
 	configstoreClient := csclient.NewClient(c.ConfigstoreURL)
@@ -58,7 +70,7 @@ func NewNotificationService(ctx context.Context, log zerolog.Logger, gc *config.
 		log:               log,
 		gc:                gc,
 		c:                 c,
-		e:                 e,
+		lf:                lf,
 		runserviceClient:  runserviceClient,
 		configstoreClient: configstoreClient,
 	}, nil

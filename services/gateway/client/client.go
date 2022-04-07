@@ -345,8 +345,8 @@ func (c *Client) ReconfigProject(ctx context.Context, projectRef string) (*http.
 	return c.getResponse(ctx, "PUT", fmt.Sprintf("/projects/%s/reconfig", url.PathEscape(projectRef)), nil, jsonContent, nil)
 }
 
-func (c *Client) GetCurrentUser(ctx context.Context) (*gwapitypes.UserResponse, *http.Response, error) {
-	user := new(gwapitypes.UserResponse)
+func (c *Client) GetCurrentUser(ctx context.Context) (*gwapitypes.PrivateUserResponse, *http.Response, error) {
+	user := new(gwapitypes.PrivateUserResponse)
 	resp, err := c.getParsedResponse(ctx, "GET", "/user", nil, jsonContent, nil, user)
 	return user, resp, errors.WithStack(err)
 }

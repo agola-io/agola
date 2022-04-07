@@ -24,13 +24,15 @@ notification:
   webExposedURL: "http://172.17.0.1:8000"
   runserviceURL: "http://localhost:4000"
   configstoreURL: "http://localhost:4002"
-  etcd:
-    endpoints: "http://localhost:2379"
+  db:
+    type: sqlite3
+    connString: /data/agola/notification/db
 
 configstore:
   dataDir: /data/agola/configstore
-  etcd:
-    endpoints: "http://localhost:2379"
+  db:
+    type: sqlite3
+    connString: /data/agola/configstore/db
   objectStorage:
     type: posix
     path: /data/agola/configstore/ost
@@ -40,8 +42,9 @@ configstore:
 runservice:
   #debug: true
   dataDir: /data/agola/runservice
-  etcd:
-    endpoints: "http://localhost:2379"
+  db:
+    type: sqlite3
+    connString: /data/agola/runservice/db
   objectStorage:
     type: posix
     path: /data/agola/runservice/ost

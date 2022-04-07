@@ -1,4 +1,3 @@
-
 # The client service. It's a node port for easier testing on minikube. Change
 # it to become a LoadBalancer if needed.
 apiVersion: v1
@@ -15,7 +14,6 @@ spec:
   type: NodePort
 
 ---
-
 # The service for internal components communication with the runservice.
 apiVersion: v1
 kind: Service
@@ -29,7 +27,6 @@ spec:
     component: runservice
 
 ---
-
 # The service for internal components communication with the configstore.
 apiVersion: v1
 kind: Service
@@ -43,7 +40,6 @@ spec:
     component: configstore
 
 ---
-
 # The service for internal components communication with the gitserver.
 apiVersion: v1
 kind: Service
@@ -57,7 +53,6 @@ spec:
     component: gitserver
 
 ---
-
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -94,13 +89,17 @@ data:
       webExposedURL: "http://192.168.39.188:30002"
       runserviceURL: "http://agola-runservice:4000"
       configstoreURL: "http://agola-configstore:4002"
-      etcd:
-        endpoints: "http://localhost:2379"
+      db:
+        # example with a postgres db
+        type: postgres
+        connString: "postgres://@postgres-service/agola_notification?sslmode=disable"
 
     configstore:
       dataDir: /mnt/agola/local/configstore
-      etcd:
-        endpoints: "http://etcd:2379"
+      db:
+        # example with a postgres db
+        type: postgres
+        connString: "postgres://@postgres-service/agola_configstore?sslmode=disable"
       objectStorage:
         type: s3
         # example with minio
@@ -114,8 +113,10 @@ data:
     runservice:
       #debug: true
       dataDir: /mnt/agola/local/runservice
-      etcd:
-        endpoints: "http://etcd:2379"
+      db:
+        # example with a postgres db
+        type: postgres
+        connString: "postgres://@postgres-service/agola_runservice?sslmode=disable"
       objectStorage:
         type: s3
         # example with minio
@@ -144,7 +145,6 @@ data:
         listenAddress: ":4003"
 
 ---
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -162,31 +162,30 @@ spec:
         component: gateway-others
     spec:
       containers:
-      - name: agola
-        image: agola
-        command:
-          - /bin/agola
-          - serve
-          - "--config"
-          - /mnt/agola/config/config.yml
-          - "--components"
-          - gateway,scheduler,notification
-        env:
-        ports:
-          - containerPort: 8000
-        volumeMounts:
-          - name: config-volume
-            mountPath: /mnt/agola/config
-          - name: agola-localdata
-            mountPath: /mnt/agola/local
+        - name: agola
+          image: agola
+          command:
+            - /bin/agola
+            - serve
+            - "--config"
+            - /mnt/agola/config/config.yml
+            - "--components"
+            - gateway,scheduler,notification
+          env:
+          ports:
+            - containerPort: 8000
+          volumeMounts:
+            - name: config-volume
+              mountPath: /mnt/agola/config
+            - name: agola-localdata
+              mountPath: /mnt/agola/local
       volumes:
-          - name: config-volume
-            configMap:
-              name: agola
-          - name: agola-localdata
-            emptyDir: {}
+        - name: config-volume
+          configMap:
+            name: agola
+        - name: agola-localdata
+          emptyDir: {}
 ---
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -204,32 +203,31 @@ spec:
         component: runservice
     spec:
       containers:
-      - name: agola
-        image: agola
-        command:
-          - /bin/agola
-          - serve
-          - "--config"
-          - /mnt/agola/config/config.yml
-          - "--components"
-          - runservice
-        env:
-        ports:
-          - containerPort: 4000
-        volumeMounts:
-          - name: config-volume
-            mountPath: /mnt/agola/config
-          - name: agola-localdata
-            mountPath: /mnt/agola/local
+        - name: agola
+          image: agola
+          command:
+            - /bin/agola
+            - serve
+            - "--config"
+            - /mnt/agola/config/config.yml
+            - "--components"
+            - runservice
+          env:
+          ports:
+            - containerPort: 4000
+          volumeMounts:
+            - name: config-volume
+              mountPath: /mnt/agola/config
+            - name: agola-localdata
+              mountPath: /mnt/agola/local
       volumes:
-          - name: config-volume
-            configMap:
-              name: agola
-          - name: agola-localdata
-            emptyDir: {}
+        - name: config-volume
+          configMap:
+            name: agola
+        - name: agola-localdata
+          emptyDir: {}
 
 ---
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -247,32 +245,31 @@ spec:
         component: executor
     spec:
       containers:
-      - name: agola
-        image: agola
-        command:
-          - /bin/agola
-          - serve
-          - "--config"
-          - /mnt/agola/config/config.yml
-          - "--components"
-          - executor
-        env:
-        ports:
-          - containerPort: 4001
-        volumeMounts:
-          - name: config-volume
-            mountPath: /mnt/agola/config
-          - name: agola-localdata
-            mountPath: /mnt/agola/local
+        - name: agola
+          image: agola
+          command:
+            - /bin/agola
+            - serve
+            - "--config"
+            - /mnt/agola/config/config.yml
+            - "--components"
+            - executor
+          env:
+          ports:
+            - containerPort: 4001
+          volumeMounts:
+            - name: config-volume
+              mountPath: /mnt/agola/config
+            - name: agola-localdata
+              mountPath: /mnt/agola/local
       volumes:
-          - name: config-volume
-            configMap:
-              name: agola
-          - name: agola-localdata
-            emptyDir: {}
+        - name: config-volume
+          configMap:
+            name: agola
+        - name: agola-localdata
+          emptyDir: {}
 
 ---
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -290,32 +287,31 @@ spec:
         component: configstore
     spec:
       containers:
-      - name: agola
-        image: agola
-        command:
-          - /bin/agola
-          - serve
-          - "--config"
-          - /mnt/agola/config/config.yml
-          - "--components"
-          - configstore
-        env:
-        ports:
-          - containerPort: 4002
-        volumeMounts:
-          - name: config-volume
-            mountPath: /mnt/agola/config
-          - name: agola-localdata
-            mountPath: /mnt/agola/local
+        - name: agola
+          image: agola
+          command:
+            - /bin/agola
+            - serve
+            - "--config"
+            - /mnt/agola/config/config.yml
+            - "--components"
+            - configstore
+          env:
+          ports:
+            - containerPort: 4002
+          volumeMounts:
+            - name: config-volume
+              mountPath: /mnt/agola/config
+            - name: agola-localdata
+              mountPath: /mnt/agola/local
       volumes:
-          - name: config-volume
-            configMap:
-              name: agola
-          - name: agola-localdata
-            emptyDir: {}
+        - name: config-volume
+          configMap:
+            name: agola
+        - name: agola-localdata
+          emptyDir: {}
 
 ---
-
 # The gitserver. Since it'll primarily store temporary git build data the
 # simple way to deploy it is to use a deployment with 1 replica and an emptyDir
 # volume. A statefulset with 1 replica and a persistent volume will be a better
@@ -338,26 +334,26 @@ spec:
         component: gitserver
     spec:
       containers:
-      - name: agola
-        image: agola
-        command:
-          - /bin/agola
-          - serve
-          - "--config"
-          - /mnt/agola/config/config.yml
-          - "--components"
-          - gitserver
-        env:
-        ports:
-          - containerPort: 4003
-        volumeMounts:
-          - name: config-volume
-            mountPath: /mnt/agola/config
-          - name: agola-localdata
-            mountPath: /mnt/agola/local
+        - name: agola
+          image: agola
+          command:
+            - /bin/agola
+            - serve
+            - "--config"
+            - /mnt/agola/config/config.yml
+            - "--components"
+            - gitserver
+          env:
+          ports:
+            - containerPort: 4003
+          volumeMounts:
+            - name: config-volume
+              mountPath: /mnt/agola/config
+            - name: agola-localdata
+              mountPath: /mnt/agola/local
       volumes:
-          - name: config-volume
-            configMap:
-              name: agola
-          - name: agola-localdata
-            emptyDir: {}
+        - name: config-volume
+          configMap:
+            name: agola
+        - name: agola-localdata
+          emptyDir: {}

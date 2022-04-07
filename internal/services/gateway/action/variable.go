@@ -25,7 +25,7 @@ import (
 )
 
 type GetVariablesRequest struct {
-	ParentType cstypes.ConfigType
+	ParentType cstypes.ObjectKind
 	ParentRef  string
 
 	Tree             bool
@@ -37,7 +37,7 @@ func (h *ActionHandler) GetVariables(ctx context.Context, req *GetVariablesReque
 	var cssecrets []*csapitypes.Secret
 
 	switch req.ParentType {
-	case cstypes.ConfigTypeProjectGroup:
+	case cstypes.ObjectKindProjectGroup:
 		var err error
 		csvars, _, err = h.configstoreClient.GetProjectGroupVariables(ctx, req.ParentRef, req.Tree)
 		if err != nil {
@@ -47,7 +47,7 @@ func (h *ActionHandler) GetVariables(ctx context.Context, req *GetVariablesReque
 		if err != nil {
 			return nil, nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 		}
-	case cstypes.ConfigTypeProject:
+	case cstypes.ObjectKindProject:
 		var err error
 		csvars, _, err = h.configstoreClient.GetProjectVariables(ctx, req.ParentRef, req.Tree)
 		if err != nil {
@@ -70,7 +70,7 @@ func (h *ActionHandler) GetVariables(ctx context.Context, req *GetVariablesReque
 type CreateVariableRequest struct {
 	Name string
 
-	ParentType cstypes.ConfigType
+	ParentType cstypes.ObjectKind
 	ParentRef  string
 
 	Values []cstypes.VariableValue
@@ -102,7 +102,7 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateVariableR
 	var rv *csapitypes.Variable
 
 	switch req.ParentType {
-	case cstypes.ConfigTypeProjectGroup:
+	case cstypes.ObjectKindProjectGroup:
 		var err error
 		cssecrets, _, err = h.configstoreClient.GetProjectGroupSecrets(ctx, req.ParentRef, true)
 		if err != nil {
@@ -114,7 +114,7 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateVariableR
 		if err != nil {
 			return nil, nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to create variable"))
 		}
-	case cstypes.ConfigTypeProject:
+	case cstypes.ObjectKindProject:
 		var err error
 		cssecrets, _, err = h.configstoreClient.GetProjectSecrets(ctx, req.ParentRef, true)
 		if err != nil {
@@ -137,7 +137,7 @@ type UpdateVariableRequest struct {
 
 	Name string
 
-	ParentType cstypes.ConfigType
+	ParentType cstypes.ObjectKind
 	ParentRef  string
 
 	Values []cstypes.VariableValue
@@ -169,7 +169,7 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableR
 	var rv *csapitypes.Variable
 
 	switch req.ParentType {
-	case cstypes.ConfigTypeProjectGroup:
+	case cstypes.ObjectKindProjectGroup:
 		var err error
 		cssecrets, _, err = h.configstoreClient.GetProjectGroupSecrets(ctx, req.ParentRef, true)
 		if err != nil {
@@ -181,7 +181,7 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableR
 		if err != nil {
 			return nil, nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to create variable"))
 		}
-	case cstypes.ConfigTypeProject:
+	case cstypes.ObjectKindProject:
 		var err error
 		cssecrets, _, err = h.configstoreClient.GetProjectSecrets(ctx, req.ParentRef, true)
 		if err != nil {
@@ -199,7 +199,7 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableR
 	return rv, cssecrets, nil
 }
 
-func (h *ActionHandler) DeleteVariable(ctx context.Context, parentType cstypes.ConfigType, parentRef, name string) error {
+func (h *ActionHandler) DeleteVariable(ctx context.Context, parentType cstypes.ObjectKind, parentRef, name string) error {
 	isVariableOwner, err := h.IsVariableOwner(ctx, parentType, parentRef)
 	if err != nil {
 		return errors.Wrapf(err, "failed to determine ownership")
@@ -209,10 +209,10 @@ func (h *ActionHandler) DeleteVariable(ctx context.Context, parentType cstypes.C
 	}
 
 	switch parentType {
-	case cstypes.ConfigTypeProjectGroup:
+	case cstypes.ObjectKindProjectGroup:
 		h.log.Info().Msgf("deleting project group variable")
 		_, err = h.configstoreClient.DeleteProjectGroupVariable(ctx, parentRef, name)
-	case cstypes.ConfigTypeProject:
+	case cstypes.ObjectKindProject:
 		h.log.Info().Msgf("deleting project variable")
 		_, err = h.configstoreClient.DeleteProjectVariable(ctx, parentRef, name)
 	}

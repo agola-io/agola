@@ -21,11 +21,10 @@ import (
 	"net/url"
 	"path"
 
-	"agola.io/agola/internal/db"
 	"agola.io/agola/internal/errors"
-
 	"agola.io/agola/internal/services/configstore/action"
-	"agola.io/agola/internal/services/configstore/readdb"
+	"agola.io/agola/internal/services/configstore/db"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	"agola.io/agola/services/configstore/types"
@@ -34,31 +33,31 @@ import (
 	"github.com/rs/zerolog"
 )
 
-func projectGroupResponse(ctx context.Context, readDB *readdb.ReadDB, projectGroup *types.ProjectGroup) (*csapitypes.ProjectGroup, error) {
-	r, err := projectGroupsResponse(ctx, readDB, []*types.ProjectGroup{projectGroup})
+func projectGroupResponse(ctx context.Context, d *db.DB, projectGroup *types.ProjectGroup) (*csapitypes.ProjectGroup, error) {
+	r, err := projectGroupsResponse(ctx, d, []*types.ProjectGroup{projectGroup})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 	return r[0], nil
 }
 
-func projectGroupsResponse(ctx context.Context, readDB *readdb.ReadDB, projectGroups []*types.ProjectGroup) ([]*csapitypes.ProjectGroup, error) {
+func projectGroupsResponse(ctx context.Context, d *db.DB, projectGroups []*types.ProjectGroup) ([]*csapitypes.ProjectGroup, error) {
 	resProjectGroups := make([]*csapitypes.ProjectGroup, len(projectGroups))
 
-	err := readDB.Do(ctx, func(tx *db.Tx) error {
+	err := d.Do(ctx, func(tx *sql.Tx) error {
 		for i, projectGroup := range projectGroups {
-			pp, err := readDB.GetPath(tx, projectGroup.Parent.Type, projectGroup.Parent.ID)
+			pp, err := d.GetPath(tx, projectGroup.Parent.Kind, projectGroup.Parent.ID)
 			if err != nil {
 				return errors.WithStack(err)
 			}
 
-			ownerType, ownerID, err := readDB.GetProjectGroupOwnerID(tx, projectGroup)
+			ownerType, ownerID, err := d.GetProjectGroupOwnerID(tx, projectGroup)
 			if err != nil {
 				return errors.WithStack(err)
 			}
 
 			// calculate global visibility
-			visibility, err := getGlobalVisibility(readDB, tx, projectGroup.Visibility, &projectGroup.Parent)
+			visibility, err := getGlobalVisibility(d, tx, projectGroup.Visibility, &projectGroup.Parent)
 			if err != nil {
 				return errors.WithStack(err)
 			}
@@ -84,10 +83,10 @@ func projectGroupsResponse(ctx context.Context, readDB *readdb.ReadDB, projectGr
 type ProjectGroupHandler struct {
 	log    zerolog.Logger
 	ah     *action.ActionHandler
-	readDB *readdb.ReadDB
+	readDB *db.DB
 }
 
-func NewProjectGroupHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *ProjectGroupHandler {
+func NewProjectGroupHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *db.DB) *ProjectGroupHandler {
 	return &ProjectGroupHandler{log: log, ah: ah, readDB: readDB}
 }
 
@@ -121,10 +120,10 @@ func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 type ProjectGroupProjectsHandler struct {
 	log    zerolog.Logger
 	ah     *action.ActionHandler
-	readDB *readdb.ReadDB
+	readDB *db.DB
 }
 
-func NewProjectGroupProjectsHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *ProjectGroupProjectsHandler {
+func NewProjectGroupProjectsHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *db.DB) *ProjectGroupProjectsHandler {
 	return &ProjectGroupProjectsHandler{log: log, ah: ah, readDB: readDB}
 }
 
@@ -158,10 +157,10 @@ func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 type ProjectGroupSubgroupsHandler struct {
 	log    zerolog.Logger
 	ah     *action.ActionHandler
-	readDB *readdb.ReadDB
+	readDB *db.DB
 }
 
-func NewProjectGroupSubgroupsHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *ProjectGroupSubgroupsHandler {
+func NewProjectGroupSubgroupsHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *db.DB) *ProjectGroupSubgroupsHandler {
 	return &ProjectGroupSubgroupsHandler{log: log, ah: ah, readDB: readDB}
 }
 
@@ -194,10 +193,10 @@ func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.
 type CreateProjectGroupHandler struct {
 	log    zerolog.Logger
 	ah     *action.ActionHandler
-	readDB *readdb.ReadDB
+	readDB *db.DB
 }
 
-func NewCreateProjectGroupHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *CreateProjectGroupHandler {
+func NewCreateProjectGroupHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *db.DB) *CreateProjectGroupHandler {
 	return &CreateProjectGroupHandler{log: log, ah: ah, readDB: readDB}
 }
 
@@ -237,10 +236,10 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 type UpdateProjectGroupHandler struct {
 	log    zerolog.Logger
 	ah     *action.ActionHandler
-	readDB *readdb.ReadDB
+	readDB *db.DB
 }
 
-func NewUpdateProjectGroupHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *UpdateProjectGroupHandler {
+func NewUpdateProjectGroupHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *db.DB) *UpdateProjectGroupHandler {
 	return &UpdateProjectGroupHandler{log: log, ah: ah, readDB: readDB}
 }
 

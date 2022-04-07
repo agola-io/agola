@@ -22,11 +22,8 @@ import (
 	"path"
 
 	"agola.io/agola/internal/errors"
-	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/services/config"
-
-	"github.com/rs/zerolog"
 )
 
 const (
@@ -108,21 +105,4 @@ func NewObjectStorage(c *config.ObjectStorage) (*objectstorage.ObjStorage, error
 	}
 
 	return objectstorage.NewObjStorage(ost, "/"), nil
-}
-
-func NewEtcd(c *config.Etcd, log zerolog.Logger, prefix string) (*etcd.Store, error) {
-	e, err := etcd.New(etcd.Config{
-		Log:           log,
-		Endpoints:     c.Endpoints,
-		Prefix:        prefix,
-		CertFile:      c.TLSCertFile,
-		KeyFile:       c.TLSKeyFile,
-		CAFile:        c.TLSCAFile,
-		SkipTLSVerify: c.TLSSkipVerify,
-	})
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create etcd store")
-	}
-
-	return e, nil
 }

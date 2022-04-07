@@ -21,11 +21,10 @@ import (
 	"net/url"
 	"path"
 
-	"agola.io/agola/internal/db"
 	"agola.io/agola/internal/errors"
-
 	"agola.io/agola/internal/services/configstore/action"
-	"agola.io/agola/internal/services/configstore/readdb"
+	"agola.io/agola/internal/services/configstore/db"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	"agola.io/agola/services/configstore/types"
@@ -34,31 +33,33 @@ import (
 	"github.com/rs/zerolog"
 )
 
-func projectResponse(ctx context.Context, readDB *readdb.ReadDB, project *types.Project) (*csapitypes.Project, error) {
-	r, err := projectsResponse(ctx, readDB, []*types.Project{project})
+func projectResponse(ctx context.Context, d *db.DB, project *types.Project) (*csapitypes.Project, error) {
+	r, err := projectsResponse(ctx, d, []*types.Project{project})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 	return r[0], nil
 }
 
-func projectsResponse(ctx context.Context, readDB *readdb.ReadDB, projects []*types.Project) ([]*csapitypes.Project, error) {
+// TODO(sgotti) do these queries inside the action handler?
+func projectsResponse(ctx context.Context, d *db.DB, projects []*types.Project) ([]*csapitypes.Project, error) {
 	resProjects := make([]*csapitypes.Project, len(projects))
 
-	err := readDB.Do(ctx, func(tx *db.Tx) error {
+	// TODO(sgotti) use a single query to get all the paths
+	err := d.Do(ctx, func(tx *sql.Tx) error {
 		for i, project := range projects {
-			pp, err := readDB.GetPath(tx, project.Parent.Type, project.Parent.ID)
+			pp, err := d.GetPath(tx, project.Parent.Kind, project.Parent.ID)
 			if err != nil {
 				return errors.WithStack(err)
 			}
 
-			ownerType, ownerID, err := readDB.GetProjectOwnerID(tx, project)
+			ownerType, ownerID, err := d.GetProjectOwnerID(tx, project)
 			if err != nil {
 				return errors.WithStack(err)
 			}
 
 			// calculate global visibility
-			visibility, err := getGlobalVisibility(readDB, tx, project.Visibility, &project.Parent)
+			visibility, err := getGlobalVisibility(d, tx, project.Visibility, &project.Parent)
 			if err != nil {
 				return errors.WithStack(err)
 			}
@@ -81,13 +82,13 @@ func projectsResponse(ctx context.Context, readDB *readdb.ReadDB, projects []*ty
 	return resProjects, errors.WithStack(err)
 }
 
-func getGlobalVisibility(readDB *readdb.ReadDB, tx *db.Tx, curVisibility types.Visibility, parent *types.Parent) (types.Visibility, error) {
+func getGlobalVisibility(readDB *db.DB, tx *sql.Tx, curVisibility types.Visibility, parent *types.Parent) (types.Visibility, error) {
 	curParent := parent
 	if curVisibility == types.VisibilityPrivate {
 		return curVisibility, nil
 	}
 
-	for curParent.Type == types.ConfigTypeProjectGroup {
+	for curParent.Kind == types.ObjectKindProjectGroup {
 		projectGroup, err := readDB.GetProjectGroupByID(tx, curParent.ID)
 		if err != nil {
 			return "", errors.WithStack(err)
@@ -100,7 +101,7 @@ func getGlobalVisibility(readDB *readdb.ReadDB, tx *db.Tx, curVisibility types.V
 	}
 
 	// check parent visibility
-	if curParent.Type == types.ConfigTypeOrg {
+	if curParent.Kind == types.ObjectKindOrg {
 		org, err := readDB.GetOrg(tx, curParent.ID)
 		if err != nil {
 			return "", errors.WithStack(err)
@@ -116,10 +117,10 @@ func getGlobalVisibility(readDB *readdb.ReadDB, tx *db.Tx, curVisibility types.V
 type ProjectHandler struct {
 	log    zerolog.Logger
 	ah     *action.ActionHandler
-	readDB *readdb.ReadDB
+	readDB *db.DB
 }
 
-func NewProjectHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *ProjectHandler {
+func NewProjectHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *db.DB) *ProjectHandler {
 	return &ProjectHandler{log: log, ah: ah, readDB: readDB}
 }
 
@@ -152,10 +153,10 @@ func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 type CreateProjectHandler struct {
 	log    zerolog.Logger
 	ah     *action.ActionHandler
-	readDB *readdb.ReadDB
+	readDB *db.DB
 }
 
-func NewCreateProjectHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *CreateProjectHandler {
+func NewCreateProjectHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *db.DB) *CreateProjectHandler {
 	return &CreateProjectHandler{log: log, ah: ah, readDB: readDB}
 }
 
@@ -203,10 +204,10 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 type UpdateProjectHandler struct {
 	log    zerolog.Logger
 	ah     *action.ActionHandler
-	readDB *readdb.ReadDB
+	readDB *db.DB
 }
 
-func NewUpdateProjectHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *UpdateProjectHandler {
+func NewUpdateProjectHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *db.DB) *UpdateProjectHandler {
 	return &UpdateProjectHandler{log: log, ah: ah, readDB: readDB}
 }
 

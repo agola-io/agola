@@ -22,44 +22,33 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 
-	"agola.io/agola/internal/datamanager"
-	"agola.io/agola/internal/db"
 	"agola.io/agola/internal/errors"
-	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/services/runservice/action"
-	"agola.io/agola/internal/services/runservice/common"
-	"agola.io/agola/internal/services/runservice/readdb"
+	"agola.io/agola/internal/services/runservice/db"
 	"agola.io/agola/internal/services/runservice/store"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
 	rsapitypes "agola.io/agola/services/runservice/api/types"
 	"agola.io/agola/services/runservice/types"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
-	etcdclientv3 "go.etcd.io/etcd/clientv3"
-	etcdclientv3rpc "go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
-	"go.etcd.io/etcd/mvcc/mvccpb"
 )
-
-type ErrorResponse struct {
-	Message string `json:"message"`
-}
 
 type LogsHandler struct {
 	log zerolog.Logger
-	e   *etcd.Store
+	d   *db.DB
 	ost *objectstorage.ObjStorage
-	dm  *datamanager.DataManager
 }
 
-func NewLogsHandler(log zerolog.Logger, e *etcd.Store, ost *objectstorage.ObjStorage, dm *datamanager.DataManager) *LogsHandler {
+func NewLogsHandler(log zerolog.Logger, d *db.DB, ost *objectstorage.ObjStorage) *LogsHandler {
 	return &LogsHandler{
 		log: log,
-		e:   e,
+		d:   d,
 		ost: ost,
-		dm:  dm,
 	}
 }
 
@@ -119,10 +108,19 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, setup bool, step int, w http.ResponseWriter, follow bool) (bool, error) {
-	r, err := store.GetRunEtcdOrOST(ctx, h.e, h.dm, runID)
+	var r *types.Run
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		r, err = h.d.GetRun(tx, runID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		return nil
+	})
 	if err != nil {
 		return true, errors.WithStack(err)
 	}
+
 	if r == nil {
 		return true, util.NewAPIError(util.ErrNotExist, errors.Errorf("no such run with id: %s", runID))
 	}
@@ -154,26 +152,38 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 		return false, sendLogs(w, f)
 	}
 
-	et, err := store.GetExecutorTask(ctx, h.e, task.ID)
-	if err != nil {
-		if errors.Is(err, etcd.ErrKeyNotFound) {
-			return true, util.NewAPIError(util.ErrNotExist, errors.Errorf("executor task with id %q doesn't exist", task.ID))
+	var et *types.ExecutorTask
+	var executor *types.Executor
+	err = h.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+
+		et, err = h.d.GetExecutorTaskByRunTask(tx, runID, task.ID)
+		if err != nil {
+			return errors.WithStack(err)
 		}
-		return true, errors.WithStack(err)
-	}
-	executor, err := store.GetExecutor(ctx, h.e, et.Spec.ExecutorID)
-	if err != nil {
-		if errors.Is(err, etcd.ErrKeyNotFound) {
-			return true, util.NewAPIError(util.ErrNotExist, errors.Errorf("executor with id %q doesn't exist", et.Spec.ExecutorID))
+		if et == nil {
+			return util.NewAPIError(util.ErrNotExist, errors.Errorf("executor task for run task with id %q doesn't exist", task.ID))
 		}
+
+		executor, err = h.d.GetExecutorByExecutorID(tx, et.Spec.ExecutorID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if executor == nil {
+			return util.NewAPIError(util.ErrNotExist, errors.Errorf("executor with id %q doesn't exist", et.Spec.ExecutorID))
+		}
+
+		return nil
+	})
+	if err != nil {
 		return true, errors.WithStack(err)
 	}
 
 	var url string
 	if setup {
-		url = fmt.Sprintf("%s/api/v1alpha/executor/logs?taskid=%s&setup", executor.ListenURL, taskID)
+		url = fmt.Sprintf("%s/api/v1alpha/executor/logs?taskid=%s&setup", executor.ListenURL, et.ID)
 	} else {
-		url = fmt.Sprintf("%s/api/v1alpha/executor/logs?taskid=%s&step=%d", executor.ListenURL, taskID, step)
+		url = fmt.Sprintf("%s/api/v1alpha/executor/logs?taskid=%s&step=%d", executor.ListenURL, et.ID, step)
 	}
 	if follow {
 		url += "&follow"
@@ -240,17 +250,15 @@ func sendLogs(w http.ResponseWriter, r io.Reader) error {
 
 type LogsDeleteHandler struct {
 	log zerolog.Logger
-	e   *etcd.Store
+	d   *db.DB
 	ost *objectstorage.ObjStorage
-	dm  *datamanager.DataManager
 }
 
-func NewLogsDeleteHandler(log zerolog.Logger, e *etcd.Store, ost *objectstorage.ObjStorage, dm *datamanager.DataManager) *LogsDeleteHandler {
+func NewLogsDeleteHandler(log zerolog.Logger, d *db.DB, ost *objectstorage.ObjStorage) *LogsDeleteHandler {
 	return &LogsDeleteHandler{
 		log: log,
-		e:   e,
+		d:   d,
 		ost: ost,
-		dm:  dm,
 	}
 }
 
@@ -303,10 +311,19 @@ func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *LogsDeleteHandler) deleteTaskLogs(ctx context.Context, runID, taskID string, setup bool, step int, w http.ResponseWriter) error {
-	r, err := store.GetRunEtcdOrOST(ctx, h.e, h.dm, runID)
+	var r *types.Run
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		r, err = h.d.GetRun(tx, runID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		return nil
+	})
 	if err != nil {
 		return errors.WithStack(err)
 	}
+
 	if r == nil {
 		return util.NewAPIError(util.ErrNotExist, errors.Errorf("no such run with id: %s", runID))
 	}
@@ -339,14 +356,16 @@ func (h *LogsDeleteHandler) deleteTaskLogs(ctx context.Context, runID, taskID st
 }
 
 type ChangeGroupsUpdateTokensHandler struct {
-	log    zerolog.Logger
-	readDB *readdb.ReadDB
+	log zerolog.Logger
+	d   *db.DB
+	ah  *action.ActionHandler
 }
 
-func NewChangeGroupsUpdateTokensHandler(log zerolog.Logger, readDB *readdb.ReadDB) *ChangeGroupsUpdateTokensHandler {
+func NewChangeGroupsUpdateTokensHandler(log zerolog.Logger, d *db.DB, ah *action.ActionHandler) *ChangeGroupsUpdateTokensHandler {
 	return &ChangeGroupsUpdateTokensHandler{
-		log:    log,
-		readDB: readDB,
+		log: log,
+		d:   d,
+		ah:  ah,
 	}
 }
 
@@ -357,9 +376,9 @@ func (h *ChangeGroupsUpdateTokensHandler) ServeHTTP(w http.ResponseWriter, r *ht
 
 	var cgt *types.ChangeGroupsUpdateToken
 
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, groups)
+		cgt, err = h.ah.GetChangeGroupsUpdateTokens(tx, groups)
 		return errors.WithStack(err)
 	})
 	if err != nil {
@@ -379,41 +398,48 @@ func (h *ChangeGroupsUpdateTokensHandler) ServeHTTP(w http.ResponseWriter, r *ht
 }
 
 type RunHandler struct {
-	log    zerolog.Logger
-	e      *etcd.Store
-	dm     *datamanager.DataManager
-	readDB *readdb.ReadDB
+	log zerolog.Logger
+	d   *db.DB
+	ah  *action.ActionHandler
 }
 
-func NewRunHandler(log zerolog.Logger, e *etcd.Store, dm *datamanager.DataManager, readDB *readdb.ReadDB) *RunHandler {
+func NewRunHandler(log zerolog.Logger, d *db.DB, ah *action.ActionHandler) *RunHandler {
 	return &RunHandler{
-		log:    log,
-		e:      e,
-		dm:     dm,
-		readDB: readDB,
+		log: log,
+		d:   d,
+		ah:  ah,
 	}
 }
 
 func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	runID := vars["runid"]
+	runRef := vars["runid"]
 
 	query := r.URL.Query()
 	changeGroups := query["changegroup"]
 
 	var run *types.Run
+	var rc *types.RunConfig
 	var cgt *types.ChangeGroupsUpdateToken
 
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		run, err = h.readDB.GetRun(tx, runID)
+		run, err = h.d.GetRun(tx, runRef)
 		if err != nil {
-			h.log.Err(err).Send()
 			return errors.WithStack(err)
 		}
 
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, changeGroups)
+		if run == nil {
+			return nil
+		}
+
+		rc, err = h.d.GetRunConfig(tx, run.RunConfigID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		cgt, err = h.ah.GetChangeGroupsUpdateTokens(tx, changeGroups)
 		return errors.WithStack(err)
 	})
 	if err != nil {
@@ -421,17 +447,16 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if run == nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("run %q doesn't exist", runID)))
+		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("run with id %q doesn't exist", runRef)))
+		return
+	}
+
+	if rc == nil {
+		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("run config for run with id %q doesn't exist", runRef)))
 		return
 	}
 
 	cgts, err := types.MarshalChangeGroupsUpdateToken(cgt)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	rc, err := store.OSTGetRunConfig(h.dm, run.ID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -449,18 +474,16 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type RunByGroupHandler struct {
-	log    zerolog.Logger
-	e      *etcd.Store
-	dm     *datamanager.DataManager
-	readDB *readdb.ReadDB
+	log zerolog.Logger
+	d   *db.DB
+	ah  *action.ActionHandler
 }
 
-func NewRunByGroupHandler(log zerolog.Logger, e *etcd.Store, dm *datamanager.DataManager, readDB *readdb.ReadDB) *RunByGroupHandler {
+func NewRunByGroupHandler(log zerolog.Logger, d *db.DB, ah *action.ActionHandler) *RunByGroupHandler {
 	return &RunByGroupHandler{
-		log:    log,
-		e:      e,
-		dm:     dm,
-		readDB: readDB,
+		log: log,
+		d:   d,
+		ah:  ah,
 	}
 }
 
@@ -493,35 +516,43 @@ func (h *RunByGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var run *types.Run
+	var rc *types.RunConfig
 	var cgt *types.ChangeGroupsUpdateToken
 
-	err = h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err = h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		run, err = h.readDB.GetRunByGroup(tx, group, runCounter)
+		run, err = h.d.GetRunByGroup(tx, group, runCounter)
 		if err != nil {
-			h.log.Err(err).Send()
 			return errors.WithStack(err)
 		}
 
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, changeGroups)
+		if run == nil {
+			return nil
+		}
+
+		rc, err = h.d.GetRunConfig(tx, run.RunConfigID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		cgt, err = h.ah.GetChangeGroupsUpdateTokens(tx, changeGroups)
 		return errors.WithStack(err)
 	})
 	if err != nil {
+		h.log.Err(err).Send()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if run == nil {
 		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("run for group %q with counter %d doesn't exist", group, runCounter)))
+	}
+
+	if rc == nil {
+		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("run config for run with id %q doesn't exist", run.ID)))
 		return
 	}
 
 	cgts, err := types.MarshalChangeGroupsUpdateToken(cgt)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	rc, err := store.OSTGetRunConfig(h.dm, run.ID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -536,22 +567,27 @@ func (h *RunByGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
 		h.log.Err(err).Send()
 	}
+
 }
 
 const (
-	DefaultRunsLimit = 25
-	MaxRunsLimit     = 40
+	DefaultRunsLimit  = 25
+	MaxRunsLimit      = 40
+	MaxRunEventsLimit = 40
 )
 
 type RunsHandler struct {
-	log    zerolog.Logger
-	readDB *readdb.ReadDB
+	log zerolog.Logger
+	d   *db.DB
+
+	ah *action.ActionHandler
 }
 
-func NewRunsHandler(log zerolog.Logger, readDB *readdb.ReadDB) *RunsHandler {
+func NewRunsHandler(log zerolog.Logger, d *db.DB, ah *action.ActionHandler) *RunsHandler {
 	return &RunsHandler{
-		log:    log,
-		readDB: readDB,
+		log: log,
+		d:   d,
+		ah:  ah,
 	}
 }
 
@@ -587,29 +623,39 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		sortOrder = types.SortOrderAsc
 	}
 
-	start := query.Get("start")
+	var startRunSequence uint64
+	startRunSequenceStr := query.Get("start")
+	if startRunSequenceStr != "" {
+		var err error
+		startRunSequence, err = strconv.ParseUint(startRunSequenceStr, 10, 64)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse run sequence")))
+			return
+		}
+	}
 
 	var runs []*types.Run
 	var cgt *types.ChangeGroupsUpdateToken
 
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		runs, err = h.readDB.GetRuns(tx, groups, lastRun, phaseFilter, resultFilter, start, limit, sortOrder)
+		runs, err = h.d.GetRuns(tx, groups, lastRun, phaseFilter, resultFilter, startRunSequence, limit, sortOrder)
 		if err != nil {
-			h.log.Err(err).Send()
 			return errors.WithStack(err)
 		}
 
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, changeGroups)
+		cgt, err = h.ah.GetChangeGroupsUpdateTokens(tx, changeGroups)
 		return errors.WithStack(err)
 	})
 	if err != nil {
+		h.log.Err(err).Send()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	cgts, err := types.MarshalChangeGroupsUpdateToken(cgt)
 	if err != nil {
+		h.log.Err(err).Send()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -624,14 +670,16 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type RunsByGroupHandler struct {
-	log    zerolog.Logger
-	readDB *readdb.ReadDB
+	log zerolog.Logger
+	d   *db.DB
+	ah  *action.ActionHandler
 }
 
-func NewRunsByGroupHandler(log zerolog.Logger, readDB *readdb.ReadDB) *RunsByGroupHandler {
+func NewRunsByGroupHandler(log zerolog.Logger, d *db.DB, ah *action.ActionHandler) *RunsByGroupHandler {
 	return &RunsByGroupHandler{
-		log:    log,
-		readDB: readDB,
+		log: log,
+		d:   d,
+		ah:  ah,
 	}
 }
 
@@ -686,15 +734,15 @@ func (h *RunsByGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var runs []*types.Run
 	var cgt *types.ChangeGroupsUpdateToken
 
-	err = h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err = h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		runs, err = h.readDB.GetGroupRuns(tx, group, phaseFilter, resultFilter, startRunCounter, limit, sortOrder)
+		runs, err = h.d.GetGroupRuns(tx, group, phaseFilter, resultFilter, startRunCounter, limit, sortOrder)
 		if err != nil {
 			h.log.Err(err).Send()
 			return errors.WithStack(err)
 		}
 
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, changeGroups)
+		cgt, err = h.ah.GetChangeGroupsUpdateTokens(tx, changeGroups)
 		return errors.WithStack(err)
 	})
 	if err != nil {
@@ -883,17 +931,15 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 type RunEventsHandler struct {
 	log zerolog.Logger
-	e   *etcd.Store
+	d   *db.DB
 	ost *objectstorage.ObjStorage
-	dm  *datamanager.DataManager
 }
 
-func NewRunEventsHandler(log zerolog.Logger, e *etcd.Store, ost *objectstorage.ObjStorage, dm *datamanager.DataManager) *RunEventsHandler {
+func NewRunEventsHandler(log zerolog.Logger, d *db.DB, ost *objectstorage.ObjStorage) *RunEventsHandler {
 	return &RunEventsHandler{
 		log: log,
-		e:   e,
+		d:   d,
 		ost: ost,
-		dm:  dm,
 	}
 }
 
@@ -904,14 +950,23 @@ func (h *RunEventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
 	// TODO(sgotti) handle additional events filtering (by type, etc...)
-	startRunEventID := q.Get("startruneventid")
+	var startRunEventSequence uint64
+	startRunEventSequenceStr := q.Get("startsequence")
+	if startRunEventSequenceStr != "" {
+		var err error
+		startRunEventSequence, err = strconv.ParseUint(startRunEventSequenceStr, 10, 64)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse startsequence")))
+			return
+		}
+	}
 
-	if err := h.sendRunEvents(ctx, startRunEventID, w); err != nil {
+	if err := h.sendRunEvents(ctx, startRunEventSequence, w); err != nil {
 		h.log.Err(err).Send()
 	}
 }
 
-func (h *RunEventsHandler) sendRunEvents(ctx context.Context, startRunEventID string, w http.ResponseWriter) error {
+func (h *RunEventsHandler) sendRunEvents(ctx context.Context, startRunEventSequence uint64, w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -921,38 +976,66 @@ func (h *RunEventsHandler) sendRunEvents(ctx context.Context, startRunEventID st
 		flusher = fl
 	}
 
-	// TODO(sgotti) fetch from previous events (handle startRunEventID).
-	// Use the readdb instead of etcd
+	// TODO(sgotti) use a notify system instead of polling the database
 
-	wctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	wctx = etcdclientv3.WithRequireLeader(wctx)
-	wch := h.e.WatchKey(wctx, common.EtcdRunEventKey, 0)
-	for wresp := range wch {
-		if wresp.Canceled {
-			err := wresp.Err()
-			if errors.Is(err, etcdclientv3rpc.ErrCompacted) {
-				h.log.Err(err).Msgf("required events already compacted")
-			}
-			return errors.Wrapf(err, "watch error")
-		}
+	curEventSequence := startRunEventSequence
 
-		for _, ev := range wresp.Events {
-			switch ev.Type {
-			case mvccpb.PUT:
-				var runEvent *types.RunEvent
-				if err := json.Unmarshal(ev.Kv.Value, &runEvent); err != nil {
-					return errors.Wrapf(err, "failed to unmarshal run")
-				}
-				if _, err := w.Write([]byte(fmt.Sprintf("data: %s\n\n", ev.Kv.Value))); err != nil {
-					return errors.WithStack(err)
-				}
+	if startRunEventSequence == 0 {
+		err := h.d.Do(ctx, func(tx *sql.Tx) error {
+			// start from last event
+			runEvent, err := h.d.GetLastRunEvent(tx)
+			if err != nil {
+				return errors.WithStack(err)
 			}
-		}
-		if flusher != nil {
-			flusher.Flush()
+			if runEvent == nil {
+				return nil
+			}
+
+			curEventSequence = runEvent.Sequence
+
+			return nil
+		})
+		if err != nil {
+			return errors.WithStack(err)
 		}
 	}
 
-	return nil
+	for {
+		var runEvents []*types.RunEvent
+		err := h.d.Do(ctx, func(tx *sql.Tx) error {
+			var err error
+			runEvents, err = h.d.GetRunEventsFromSequence(tx, curEventSequence, MaxRunEventsLimit)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+
+			return nil
+		})
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		for _, runEvent := range runEvents {
+			curEventSequence = runEvent.Sequence
+
+			runEventj, err := json.Marshal(runEvent)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+
+			if _, err := w.Write([]byte(fmt.Sprintf("data: %s\n\n", runEventj))); err != nil {
+				return errors.WithStack(err)
+			}
+
+			curEventSequence = runEvent.Sequence
+		}
+
+		if flusher != nil {
+			flusher.Flush()
+		}
+
+		if len(runEvents) < MaxRunEventsLimit {
+			time.Sleep(1 * time.Second)
+		}
+	}
 }

@@ -46,6 +46,29 @@ func isAccessTokenExpired(expiresAt time.Time) bool {
 	return expiresAt.Add(-expireTimeRange).Before(time.Now())
 }
 
+func (h *ActionHandler) GetCurrentUser(ctx context.Context, userRef string) (*cstypes.User, []*cstypes.UserToken, []*cstypes.LinkedAccount, error) {
+	if !common.IsUserLoggedOrAdmin(ctx) {
+		return nil, nil, nil, errors.Errorf("user not logged in")
+	}
+
+	user, _, err := h.configstoreClient.GetUser(ctx, userRef)
+	if err != nil {
+		return nil, nil, nil, util.NewAPIError(util.KindFromRemoteError(err), err)
+	}
+
+	tokens, _, err := h.configstoreClient.GetUserTokens(ctx, user.ID)
+	if err != nil {
+		return nil, nil, nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q tokens", user.ID))
+	}
+
+	linkedAccounts, _, err := h.configstoreClient.GetUserLinkedAccounts(ctx, user.ID)
+	if err != nil {
+		return nil, nil, nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q linked accounts", user.ID))
+	}
+
+	return user, tokens, linkedAccounts, nil
+}
+
 func (h *ActionHandler) GetUser(ctx context.Context, userRef string) (*cstypes.User, error) {
 	if !common.IsUserLoggedOrAdmin(ctx) {
 		return nil, errors.Errorf("user not logged in")
@@ -137,7 +160,20 @@ func (h *ActionHandler) CreateUserToken(ctx context.Context, req *CreateUserToke
 	if !isAdmin && user.ID != userID {
 		return "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("logged in user cannot create token for another user"))
 	}
-	if _, ok := user.Tokens[req.TokenName]; ok {
+
+	tokens, _, err := h.configstoreClient.GetUserTokens(ctx, user.ID)
+	if err != nil {
+		return "", util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q tokens", user.ID))
+	}
+
+	var token *cstypes.UserToken
+	for _, v := range tokens {
+		if v.Name == req.TokenName {
+			token = v
+			break
+		}
+	}
+	if token != nil {
 		return "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q already have a token with name %q", userRef, req.TokenName))
 	}
 
@@ -166,16 +202,17 @@ type CreateUserLARequest struct {
 
 func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequest) (*cstypes.LinkedAccount, error) {
 	userRef := req.UserRef
-	user, _, err := h.configstoreClient.GetUser(ctx, userRef)
-	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q", userRef))
-	}
 	rs, _, err := h.configstoreClient.GetRemoteSource(ctx, req.RemoteSourceName)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get remote source %q", req.RemoteSourceName))
 	}
+	linkedAccounts, _, err := h.configstoreClient.GetUserLinkedAccounts(ctx, userRef)
+	if err != nil {
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q linked accounts", userRef))
+	}
+
 	var la *cstypes.LinkedAccount
-	for _, v := range user.LinkedAccounts {
+	for _, v := range linkedAccounts {
 		if v.RemoteSourceID == rs.ID {
 			la = v
 			break
@@ -223,12 +260,13 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 }
 
 func (h *ActionHandler) UpdateUserLA(ctx context.Context, userRef string, la *cstypes.LinkedAccount) error {
-	user, _, err := h.configstoreClient.GetUser(ctx, userRef)
+	linkedAccounts, _, err := h.configstoreClient.GetUserLinkedAccounts(ctx, userRef)
 	if err != nil {
-		return util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q", userRef))
+		return util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q linked accounts", userRef))
 	}
+
 	laFound := false
-	for _, ula := range user.LinkedAccounts {
+	for _, ula := range linkedAccounts {
 		if ula.ID == la.ID {
 			laFound = true
 			break
@@ -406,8 +444,13 @@ func (h *ActionHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (*
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user for remote user id %q and remote source %q", remoteUserInfo.ID, rs.ID))
 	}
 
+	linkedAccounts, _, err := h.configstoreClient.GetUserLinkedAccounts(ctx, user.ID)
+	if err != nil {
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q linked accounts", user.ID))
+	}
+
 	var la *cstypes.LinkedAccount
-	for _, v := range user.LinkedAccounts {
+	for _, v := range linkedAccounts {
 		if v.RemoteSourceID == rs.ID {
 			la = v
 			break
@@ -524,8 +567,13 @@ func (h *ActionHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSource
 			return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("logged in user cannot create linked account for another user"))
 		}
 
+		linkedAccounts, _, err := h.configstoreClient.GetUserLinkedAccounts(ctx, user.ID)
+		if err != nil {
+			return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q linked accounts", user.ID))
+		}
+
 		var la *cstypes.LinkedAccount
-		for _, v := range user.LinkedAccounts {
+		for _, v := range linkedAccounts {
 			if v.RemoteSourceID == rs.ID {
 				la = v
 				break

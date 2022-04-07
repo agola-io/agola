@@ -58,6 +58,14 @@ gocovmerge:
 webbundle/bindata.go: go-bindata $(WEBDISTPATH)
 	./tools/bin/go-bindata -o webbundle/bindata.go -tags webbundle -pkg webbundle -prefix "$(WEBDISTPATH)" -nocompress=true "$(WEBDISTPATH)/..."
 
+.PHONY: generate
+generate: generators
+	go generate ./...
+
+.PHONY: generators
+generators:
+	GOBIN=$(PROJDIR)/tools/bin go install ./internal/generators
+
 .PHONY: docker-agola
 docker-agola:
 	docker build --target agola . -t agola

@@ -25,14 +25,14 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func GetConfigTypeRef(r *http.Request) (cstypes.ConfigType, string, error) {
+func GetConfigTypeRef(r *http.Request) (cstypes.ObjectKind, string, error) {
 	vars := mux.Vars(r)
 	projectRef, err := url.PathUnescape(vars["projectref"])
 	if err != nil {
 		return "", "", util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "wrong projectref %q", vars["projectref"]))
 	}
 	if projectRef != "" {
-		return cstypes.ConfigTypeProject, projectRef, nil
+		return cstypes.ObjectKindProject, projectRef, nil
 	}
 
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
@@ -40,7 +40,7 @@ func GetConfigTypeRef(r *http.Request) (cstypes.ConfigType, string, error) {
 		return "", "", util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "wrong projectgroupref %q", vars["projectgroupref"]))
 	}
 	if projectGroupRef != "" {
-		return cstypes.ConfigTypeProjectGroup, projectGroupRef, nil
+		return cstypes.ObjectKindProjectGroup, projectGroupRef, nil
 	}
 
 	return "", "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot get project or projectgroup ref"))

@@ -19,10 +19,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"agola.io/agola/internal/db"
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/configstore/action"
-	"agola.io/agola/internal/services/configstore/readdb"
+	"agola.io/agola/internal/services/configstore/db"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	"agola.io/agola/services/configstore/types"
@@ -32,12 +32,12 @@ import (
 )
 
 type RemoteSourceHandler struct {
-	log    zerolog.Logger
-	readDB *readdb.ReadDB
+	log zerolog.Logger
+	d   *db.DB
 }
 
-func NewRemoteSourceHandler(log zerolog.Logger, readDB *readdb.ReadDB) *RemoteSourceHandler {
-	return &RemoteSourceHandler{log: log, readDB: readDB}
+func NewRemoteSourceHandler(log zerolog.Logger, d *db.DB) *RemoteSourceHandler {
+	return &RemoteSourceHandler{log: log, d: d}
 }
 
 func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -46,9 +46,9 @@ func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	rsRef := vars["remotesourceref"]
 
 	var remoteSource *types.RemoteSource
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		remoteSource, err = h.readDB.GetRemoteSource(tx, rsRef)
+		remoteSource, err = h.d.GetRemoteSource(tx, rsRef)
 		return errors.WithStack(err)
 	})
 	if err != nil {
@@ -144,6 +144,7 @@ func (h *UpdateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		RegistrationEnabled: req.RegistrationEnabled,
 		LoginEnabled:        req.LoginEnabled,
 	}
+
 	remoteSource, err := h.ah.UpdateRemoteSource(ctx, rsRef, areq)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
@@ -185,12 +186,12 @@ const (
 )
 
 type RemoteSourcesHandler struct {
-	log    zerolog.Logger
-	readDB *readdb.ReadDB
+	log zerolog.Logger
+	d   *db.DB
 }
 
-func NewRemoteSourcesHandler(log zerolog.Logger, readDB *readdb.ReadDB) *RemoteSourcesHandler {
-	return &RemoteSourcesHandler{log: log, readDB: readDB}
+func NewRemoteSourcesHandler(log zerolog.Logger, d *db.DB) *RemoteSourcesHandler {
+	return &RemoteSourcesHandler{log: log, d: d}
 }
 
 func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -221,7 +222,12 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 
 	start := query.Get("start")
 
-	remoteSources, err := h.readDB.GetRemoteSources(ctx, start, limit, asc)
+	var remoteSources []*types.RemoteSource
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		remoteSources, err = h.d.GetRemoteSources(tx, start, limit, asc)
+		return errors.WithStack(err)
+	})
 	if err != nil {
 		h.log.Err(err).Send()
 		util.HTTPError(w, err)

@@ -29,7 +29,7 @@ type ProjectGroup struct {
 	*cstypes.ProjectGroup
 
 	// dynamic data
-	OwnerType        cstypes.ConfigType
+	OwnerType        cstypes.ObjectKind
 	OwnerID          string
 	Path             string
 	ParentPath       string

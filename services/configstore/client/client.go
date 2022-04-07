@@ -410,6 +410,12 @@ func (c *Client) GetUsers(ctx context.Context, start string, limit int, asc bool
 	return users, resp, errors.WithStack(err)
 }
 
+func (c *Client) GetUserLinkedAccounts(ctx context.Context, userRef string) ([]*cstypes.LinkedAccount, *http.Response, error) {
+	linkedAccounts := []*cstypes.LinkedAccount{}
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/users/%s/linkedaccounts", userRef), nil, jsonContent, nil, &linkedAccounts)
+	return linkedAccounts, resp, errors.WithStack(err)
+}
+
 func (c *Client) CreateUserLA(ctx context.Context, userRef string, req *csapitypes.CreateUserLARequest) (*cstypes.LinkedAccount, *http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
@@ -434,6 +440,12 @@ func (c *Client) UpdateUserLA(ctx context.Context, userRef, laID string, req *cs
 	la := new(cstypes.LinkedAccount)
 	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/users/%s/linkedaccounts/%s", userRef, laID), nil, jsonContent, bytes.NewReader(reqj), la)
 	return la, resp, errors.WithStack(err)
+}
+
+func (c *Client) GetUserTokens(ctx context.Context, userRef string) ([]*cstypes.UserToken, *http.Response, error) {
+	tokens := []*cstypes.UserToken{}
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/users/%s/tokens", userRef), nil, jsonContent, nil, &tokens)
+	return tokens, resp, errors.WithStack(err)
 }
 
 func (c *Client) CreateUserToken(ctx context.Context, userRef string, req *csapitypes.CreateUserTokenRequest) (*csapitypes.CreateUserTokenResponse, *http.Response, error) {

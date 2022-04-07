@@ -18,11 +18,10 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"agola.io/agola/internal/db"
 	"agola.io/agola/internal/errors"
-
 	"agola.io/agola/internal/services/configstore/action"
-	"agola.io/agola/internal/services/configstore/readdb"
+	"agola.io/agola/internal/services/configstore/db"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	"agola.io/agola/services/configstore/types"
@@ -32,13 +31,13 @@ import (
 )
 
 type VariablesHandler struct {
-	log    zerolog.Logger
-	ah     *action.ActionHandler
-	readDB *readdb.ReadDB
+	log zerolog.Logger
+	ah  *action.ActionHandler
+	d   *db.DB
 }
 
-func NewVariablesHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *VariablesHandler {
-	return &VariablesHandler{log: log, ah: ah, readDB: readDB}
+func NewVariablesHandler(log zerolog.Logger, ah *action.ActionHandler, d *db.DB) *VariablesHandler {
+	return &VariablesHandler{log: log, ah: ah, d: d}
 }
 
 func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -46,13 +45,13 @@ func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	_, tree := query["tree"]
 
-	parentType, parentRef, err := GetConfigTypeRef(r)
+	parentKind, parentRef, err := GetObjectKindRef(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	variables, err := h.ah.GetVariables(ctx, parentType, parentRef, tree)
+	variables, err := h.ah.GetVariables(ctx, parentKind, parentRef, tree)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
@@ -62,10 +61,10 @@ func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for i, v := range variables {
 		resVariables[i] = &csapitypes.Variable{Variable: v}
 	}
-	err = h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err = h.d.Do(ctx, func(tx *sql.Tx) error {
 		// populate parent path
 		for _, v := range resVariables {
-			pp, err := h.readDB.GetPath(tx, v.Parent.Type, v.Parent.ID)
+			pp, err := h.d.GetPath(tx, v.Parent.Kind, v.Parent.ID)
 			if err != nil {
 				return errors.WithStack(err)
 			}
@@ -95,7 +94,7 @@ func NewCreateVariableHandler(log zerolog.Logger, ah *action.ActionHandler) *Cre
 
 func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	parentType, parentRef, err := GetConfigTypeRef(r)
+	parentKind, parentRef, err := GetObjectKindRef(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
@@ -111,7 +110,7 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	areq := &action.CreateUpdateVariableRequest{
 		Name: req.Name,
 		Parent: types.Parent{
-			Type: parentType,
+			Kind: parentKind,
 			ID:   parentRef,
 		},
 		Values: req.Values,
@@ -142,7 +141,7 @@ func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	vars := mux.Vars(r)
 	variableName := vars["variablename"]
 
-	parentType, parentRef, err := GetConfigTypeRef(r)
+	parentKind, parentRef, err := GetObjectKindRef(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
@@ -158,7 +157,7 @@ func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	areq := &action.CreateUpdateVariableRequest{
 		Name: req.Name,
 		Parent: types.Parent{
-			Type: parentType,
+			Kind: parentKind,
 			ID:   parentRef,
 		},
 		Values: req.Values,
@@ -189,13 +188,13 @@ func (h *DeleteVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	vars := mux.Vars(r)
 	variableName := vars["variablename"]
 
-	parentType, parentRef, err := GetConfigTypeRef(r)
+	parentKind, parentRef, err := GetObjectKindRef(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	err = h.ah.DeleteVariable(ctx, parentType, parentRef, variableName)
+	err = h.ah.DeleteVariable(ctx, parentKind, parentRef, variableName)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 	}

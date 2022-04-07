@@ -36,6 +36,7 @@ import (
 	"agola.io/agola/internal/services/notification"
 	rsscheduler "agola.io/agola/internal/services/runservice"
 	"agola.io/agola/internal/services/scheduler"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/testutil"
 	"agola.io/agola/internal/util"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
@@ -77,26 +78,6 @@ const (
 	GroupTypeProjects = "projects"
 	GroupTypeUsers    = "users"
 )
-
-func setupEtcd(t *testing.T, log zerolog.Logger, dir string) *testutil.TestEmbeddedEtcd {
-	tetcd, err := testutil.NewTestEmbeddedEtcd(t, log, dir)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	if err := tetcd.Start(); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	if err := tetcd.WaitUp(30 * time.Second); err != nil {
-		t.Fatalf("error waiting on etcd up: %v", err)
-	}
-	return tetcd
-}
-
-func shutdownEtcd(tetcd *testutil.TestEmbeddedEtcd) {
-	if tetcd.Etcd != nil {
-		_ = tetcd.Kill()
-	}
-}
 
 func setupGitea(t *testing.T, dir, dockerBridgeAddress string) *testutil.TestGitea {
 	tgitea, err := testutil.NewTestGitea(t, dir, dockerBridgeAddress)
@@ -194,7 +175,7 @@ func startAgola(ctx context.Context, t *testing.T, log zerolog.Logger, dir strin
 	return errCh, nil
 }
 
-func setup(ctx context.Context, t *testing.T, dir string, gitea bool) (*testutil.TestEmbeddedEtcd, *testutil.TestGitea, *config.Config) {
+func setup(ctx context.Context, t *testing.T, dir string, gitea bool) (*testutil.TestGitea, *config.Config) {
 	log := testutil.NewLogger(t)
 
 	dockerBridgeAddress := os.Getenv("DOCKER_BRIDGE_ADDRESS")
@@ -235,23 +216,25 @@ func setup(ctx context.Context, t *testing.T, dir string, gitea bool) (*testutil
 			WebExposedURL:  "",
 			RunserviceURL:  "",
 			ConfigstoreURL: "",
-			Etcd: config.Etcd{
-				Endpoints: "",
+			DB: config.DB{
+				Type:       sql.Sqlite3,
+				ConnString: filepath.Join(dir, "notification", "db"),
 			},
 		},
 		Runservice: config.Runservice{
 			Debug:   false,
 			DataDir: filepath.Join(dir, "runservice"),
+			DB: config.DB{
+				Type:       sql.Sqlite3,
+				ConnString: filepath.Join(dir, "runservice", "db"),
+			},
 			Web: config.Web{
 				ListenAddress: ":4000",
 				TLS:           false,
 			},
-			Etcd: config.Etcd{
-				Endpoints: "",
-			},
 			ObjectStorage: config.ObjectStorage{
 				Type: "posix",
-				Path: filepath.Join(dir, "runservice/ost"),
+				Path: filepath.Join(dir, "runservice", "ost"),
 			},
 			RunCacheExpireInterval: 604800000000000,
 		},
@@ -276,16 +259,17 @@ func setup(ctx context.Context, t *testing.T, dir string, gitea bool) (*testutil
 		Configstore: config.Configstore{
 			Debug:   false,
 			DataDir: filepath.Join(dir, "configstore"),
+			DB: config.DB{
+				Type:       sql.Sqlite3,
+				ConnString: filepath.Join(dir, "configstore", "db"),
+			},
 			Web: config.Web{
 				ListenAddress: ":4002",
 				TLS:           false,
 			},
-			Etcd: config.Etcd{
-				Endpoints: "",
-			},
 			ObjectStorage: config.ObjectStorage{
 				Type: "posix",
-				Path: filepath.Join(dir, "configstore/ost"),
+				Path: filepath.Join(dir, "configstore", "ost"),
 			},
 		},
 		Gitserver: config.Gitserver{
@@ -295,9 +279,6 @@ func setup(ctx context.Context, t *testing.T, dir string, gitea bool) (*testutil
 				ListenAddress: ":4003",
 				TLS:           false,
 			},
-			Etcd: config.Etcd{
-				Endpoints: "",
-			},
 			RepositoryCleanupInterval: 24 * time.Hour,
 		},
 	}
@@ -306,12 +287,6 @@ func setup(ctx context.Context, t *testing.T, dir string, gitea bool) (*testutil
 	if gitea {
 		tgitea = setupGitea(t, dir, dockerBridgeAddress)
 	}
-
-	etcdDir := filepath.Join(dir, "etcd")
-	tetcd := setupEtcd(t, log, etcdDir)
-
-	c.Runservice.Etcd.Endpoints = tetcd.Endpoint
-	c.Configstore.Etcd.Endpoints = tetcd.Endpoint
 
 	_, gwPort, err := testutil.GetFreePort(true, false)
 	if err != nil {
@@ -370,7 +345,7 @@ func setup(ctx context.Context, t *testing.T, dir string, gitea bool) (*testutil
 		}
 	}()
 
-	return tetcd, tgitea, c
+	return tgitea, c
 }
 
 func TestCreateLinkedAccount(t *testing.T) {
@@ -379,9 +354,8 @@ func TestCreateLinkedAccount(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	tetcd, tgitea, c := setup(ctx, t, dir, true)
+	tgitea, c := setup(ctx, t, dir, true)
 	defer shutdownGitea(tgitea)
-	defer shutdownEtcd(tetcd)
 
 	createLinkedAccount(ctx, t, tgitea, c)
 }
@@ -451,9 +425,8 @@ func TestCreateProject(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	tetcd, tgitea, c := setup(ctx, t, dir, true)
+	tgitea, c := setup(ctx, t, dir, true)
 	defer shutdownGitea(tgitea)
-	defer shutdownEtcd(tetcd)
 
 	giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
 
@@ -493,9 +466,8 @@ func TestUpdateProject(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		tetcd, tgitea, c := setup(ctx, t, dir, true)
+		tgitea, c := setup(ctx, t, dir, true)
 		defer shutdownGitea(tgitea)
-		defer shutdownEtcd(tetcd)
 
 		giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
 
@@ -795,9 +767,8 @@ func TestPush(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			tetcd, tgitea, c := setup(ctx, t, dir, true)
+			tgitea, c := setup(ctx, t, dir, true)
 			defer shutdownGitea(tgitea)
-			defer shutdownEtcd(tetcd)
 
 			giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
 
@@ -982,8 +953,7 @@ func TestDirectRun(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			tetcd, _, c := setup(ctx, t, dir, false)
-			defer shutdownEtcd(tetcd)
+			_, c := setup(ctx, t, dir, false)
 
 			gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
 			user, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
@@ -1130,8 +1100,7 @@ func TestDirectRunVariables(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			tetcd, _, c := setup(ctx, t, dir, false)
-			defer shutdownEtcd(tetcd)
+			_, c := setup(ctx, t, dir, false)
 
 			gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
 			user, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
@@ -1296,8 +1265,7 @@ func TestDirectRunLogs(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			tetcd, _, c := setup(ctx, t, dir, false)
-			defer shutdownEtcd(tetcd)
+			_, c := setup(ctx, t, dir, false)
 
 			gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
 			user, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
@@ -1471,9 +1439,8 @@ func TestPullRequest(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			tetcd, tgitea, c := setup(ctx, t, dir, true)
+			tgitea, c := setup(ctx, t, dir, true)
 			defer shutdownGitea(tgitea)
-			defer shutdownEtcd(tetcd)
 
 			giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
 
@@ -1806,8 +1773,7 @@ def main(ctx):
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				tetcd, _, c := setup(ctx, t, dir, false)
-				defer shutdownEtcd(tetcd)
+				_, c := setup(ctx, t, dir, false)
 
 				gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
 				user, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
@@ -1910,9 +1876,8 @@ func TestUserOrgs(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	tetcd, tgitea, c := setup(ctx, t, dir, true)
+	tgitea, c := setup(ctx, t, dir, true)
 	defer shutdownGitea(tgitea)
-	defer shutdownEtcd(tetcd)
 
 	gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
 

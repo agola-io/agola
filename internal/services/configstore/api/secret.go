@@ -18,11 +18,10 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"agola.io/agola/internal/db"
 	"agola.io/agola/internal/errors"
-
 	"agola.io/agola/internal/services/configstore/action"
-	"agola.io/agola/internal/services/configstore/readdb"
+	"agola.io/agola/internal/services/configstore/db"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	"agola.io/agola/services/configstore/types"
@@ -32,13 +31,13 @@ import (
 )
 
 type SecretHandler struct {
-	log    zerolog.Logger
-	ah     *action.ActionHandler
-	readDB *readdb.ReadDB
+	log zerolog.Logger
+	ah  *action.ActionHandler
+	d   *db.DB
 }
 
-func NewSecretHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *SecretHandler {
-	return &SecretHandler{log: log, ah: ah, readDB: readDB}
+func NewSecretHandler(log zerolog.Logger, ah *action.ActionHandler, d *db.DB) *SecretHandler {
+	return &SecretHandler{log: log, ah: ah, d: d}
 }
 
 func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -58,13 +57,13 @@ func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type SecretsHandler struct {
-	log    zerolog.Logger
-	ah     *action.ActionHandler
-	readDB *readdb.ReadDB
+	log zerolog.Logger
+	ah  *action.ActionHandler
+	d   *db.DB
 }
 
-func NewSecretsHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *SecretsHandler {
-	return &SecretsHandler{log: log, ah: ah, readDB: readDB}
+func NewSecretsHandler(log zerolog.Logger, ah *action.ActionHandler, d *db.DB) *SecretsHandler {
+	return &SecretsHandler{log: log, ah: ah, d: d}
 }
 
 func (h *SecretsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -72,13 +71,13 @@ func (h *SecretsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	_, tree := query["tree"]
 
-	parentType, parentRef, err := GetConfigTypeRef(r)
+	parentKind, parentRef, err := GetObjectKindRef(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	secrets, err := h.ah.GetSecrets(ctx, parentType, parentRef, tree)
+	secrets, err := h.ah.GetSecrets(ctx, parentKind, parentRef, tree)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
@@ -89,10 +88,10 @@ func (h *SecretsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		resSecrets[i] = &csapitypes.Secret{Secret: s}
 	}
 
-	err = h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err = h.d.Do(ctx, func(tx *sql.Tx) error {
 		// populate parent path
 		for _, s := range resSecrets {
-			pp, err := h.readDB.GetPath(tx, s.Parent.Type, s.Parent.ID)
+			pp, err := h.d.GetPath(tx, s.Parent.Kind, s.Parent.ID)
 			if err != nil {
 				return errors.WithStack(err)
 			}
@@ -122,7 +121,7 @@ func NewCreateSecretHandler(log zerolog.Logger, ah *action.ActionHandler) *Creat
 
 func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	parentType, parentRef, err := GetConfigTypeRef(r)
+	parentKind, parentRef, err := GetObjectKindRef(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
@@ -138,7 +137,7 @@ func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	areq := &action.CreateUpdateSecretRequest{
 		Name: req.Name,
 		Parent: types.Parent{
-			Type: parentType,
+			Kind: parentKind,
 			ID:   parentRef,
 		},
 		Type:             req.Type,
@@ -172,7 +171,7 @@ func (h *UpdateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	vars := mux.Vars(r)
 	secretName := vars["secretname"]
 
-	parentType, parentRef, err := GetConfigTypeRef(r)
+	parentKind, parentRef, err := GetObjectKindRef(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
@@ -188,7 +187,7 @@ func (h *UpdateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	areq := &action.CreateUpdateSecretRequest{
 		Name: req.Name,
 		Parent: types.Parent{
-			Type: parentType,
+			Kind: parentKind,
 			ID:   parentRef,
 		},
 		Type:             req.Type,
@@ -222,13 +221,13 @@ func (h *DeleteSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	vars := mux.Vars(r)
 	secretName := vars["secretname"]
 
-	parentType, parentRef, err := GetConfigTypeRef(r)
+	parentKind, parentRef, err := GetObjectKindRef(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	err = h.ah.DeleteSecret(ctx, parentType, parentRef, secretName)
+	err = h.ah.DeleteSecret(ctx, parentKind, parentRef, secretName)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 	}

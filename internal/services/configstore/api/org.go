@@ -19,10 +19,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"agola.io/agola/internal/db"
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/configstore/action"
-	"agola.io/agola/internal/services/configstore/readdb"
+	"agola.io/agola/internal/services/configstore/db"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	"agola.io/agola/services/configstore/types"
@@ -32,12 +32,12 @@ import (
 )
 
 type OrgHandler struct {
-	log    zerolog.Logger
-	readDB *readdb.ReadDB
+	log zerolog.Logger
+	d   *db.DB
 }
 
-func NewOrgHandler(log zerolog.Logger, readDB *readdb.ReadDB) *OrgHandler {
-	return &OrgHandler{log: log, readDB: readDB}
+func NewOrgHandler(log zerolog.Logger, d *db.DB) *OrgHandler {
+	return &OrgHandler{log: log, d: d}
 }
 
 func (h *OrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -46,9 +46,9 @@ func (h *OrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	orgRef := vars["orgref"]
 
 	var org *types.Organization
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		org, err = h.readDB.GetOrg(tx, orgRef)
+		org, err = h.d.GetOrg(tx, orgRef)
 		return errors.WithStack(err)
 	})
 	if err != nil {
@@ -134,12 +134,12 @@ const (
 )
 
 type OrgsHandler struct {
-	log    zerolog.Logger
-	readDB *readdb.ReadDB
+	log zerolog.Logger
+	d   *db.DB
 }
 
-func NewOrgsHandler(log zerolog.Logger, readDB *readdb.ReadDB) *OrgsHandler {
-	return &OrgsHandler{log: log, readDB: readDB}
+func NewOrgsHandler(log zerolog.Logger, d *db.DB) *OrgsHandler {
+	return &OrgsHandler{log: log, d: d}
 }
 
 func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -171,9 +171,9 @@ func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := query.Get("start")
 
 	var orgs []*types.Organization
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		orgs, err = h.readDB.GetOrgs(tx, start, limit, asc)
+		orgs, err = h.d.GetOrgs(tx, start, limit, asc)
 		return errors.WithStack(err)
 	})
 	if err != nil {

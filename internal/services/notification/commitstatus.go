@@ -24,6 +24,7 @@ import (
 	gitsource "agola.io/agola/internal/gitsources"
 	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/gateway/action"
+	cstypes "agola.io/agola/services/configstore/types"
 	rstypes "agola.io/agola/services/runservice/types"
 )
 
@@ -76,9 +77,21 @@ func (n *NotificationService) updateCommitStatus(ctx context.Context, ev *rstype
 	if err != nil {
 		return errors.Wrapf(err, "failed to get user by linked account %q", project.LinkedAccountID)
 	}
-	la := user.LinkedAccounts[project.LinkedAccountID]
+
+	linkedAccounts, _, err := n.configstoreClient.GetUserLinkedAccounts(ctx, user.ID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get user %q linked accounts", user.Name)
+	}
+
+	var la *cstypes.LinkedAccount
+	for _, v := range linkedAccounts {
+		if v.ID == project.LinkedAccountID {
+			la = v
+			break
+		}
+	}
 	if la == nil {
-		return errors.Errorf("linked account %q in user %q doesn't exist", project.LinkedAccountID, user.Name)
+		return errors.Errorf("linked account %q for user %q doesn't exist", project.LinkedAccountID, user.Name)
 	}
 	rs, _, err := n.configstoreClient.GetRemoteSource(ctx, la.RemoteSourceID)
 	if err != nil {

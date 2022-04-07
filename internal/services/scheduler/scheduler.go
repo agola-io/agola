@@ -50,9 +50,9 @@ func (s *Scheduler) schedule(ctx context.Context) error {
 	// create a list of project and users with queued runs
 	groups := map[string]struct{}{}
 
-	var lastRunID string
+	var lastRunSequence uint64
 	for {
-		queuedRunsResponse, _, err := s.runserviceClient.GetQueuedRuns(ctx, lastRunID, 0, nil)
+		queuedRunsResponse, _, err := s.runserviceClient.GetQueuedRuns(ctx, lastRunSequence, 0, nil)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get queued runs")
 		}
@@ -65,7 +65,7 @@ func (s *Scheduler) schedule(ctx context.Context) error {
 			break
 		}
 
-		lastRunID = queuedRunsResponse.Runs[len(queuedRunsResponse.Runs)-1].ID
+		lastRunSequence = queuedRunsResponse.Runs[len(queuedRunsResponse.Runs)-1].Sequence
 	}
 
 	for groupID := range groups {
@@ -96,7 +96,6 @@ func (s *Scheduler) scheduleRun(ctx context.Context, groupID string) error {
 	}
 	if len(runningRunsResponse.Runs) == 0 {
 		log.Info().Msgf("starting run %s", run.ID)
-		log.Debug().Msgf("changegroups: %s", runningRunsResponse.ChangeGroupsUpdateToken)
 		if _, err := s.runserviceClient.StartRun(ctx, run.ID, runningRunsResponse.ChangeGroupsUpdateToken); err != nil {
 			s.log.Err(err).Msgf("failed to start run %s", run.ID)
 		}
@@ -121,9 +120,9 @@ func (s *Scheduler) approveLoop(ctx context.Context) {
 }
 
 func (s *Scheduler) approve(ctx context.Context) error {
-	var lastRunID string
+	var lastRunSequence uint64
 	for {
-		runningRunsResponse, _, err := s.runserviceClient.GetRunningRuns(ctx, lastRunID, 0, nil)
+		runningRunsResponse, _, err := s.runserviceClient.GetRunningRuns(ctx, lastRunSequence, 0, nil)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get running runs")
 		}
@@ -139,7 +138,7 @@ func (s *Scheduler) approve(ctx context.Context) error {
 			}
 		}
 
-		lastRunID = runningRunsResponse.Runs[len(runningRunsResponse.Runs)-1].ID
+		lastRunSequence = runningRunsResponse.Runs[len(runningRunsResponse.Runs)-1].Sequence
 	}
 
 	return nil

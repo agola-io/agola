@@ -72,8 +72,14 @@ func (h *UserRemoteReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	linkedAccounts, _, err := h.configstoreClient.GetUserLinkedAccounts(ctx, user.ID)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
 	var la *cstypes.LinkedAccount
-	for _, v := range user.LinkedAccounts {
+	for _, v := range linkedAccounts {
 		if v.RemoteSourceID == rs.ID {
 			la = v
 			break

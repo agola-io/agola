@@ -27,13 +27,7 @@ make
 
 ### Start the agola server
 
-- Copy the `example/config.yml` where you prefer
-
-```
-./bin/agola serve --embedded-etcd --config /path/to/your/config.yml --components all-base,executor
-```
-
-or use an external etcd (set it in the config.yml):
+- Copy the `example/agolademo/config.yml` where you prefer
 
 ```
 ./bin/agola serve --config /path/to/your/config.yml --components all-base,executor

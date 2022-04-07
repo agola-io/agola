@@ -25,7 +25,7 @@ import (
 )
 
 type GetSecretsRequest struct {
-	ParentType cstypes.ConfigType
+	ParentType cstypes.ObjectKind
 	ParentRef  string
 
 	Tree             bool
@@ -36,9 +36,9 @@ func (h *ActionHandler) GetSecrets(ctx context.Context, req *GetSecretsRequest) 
 	var cssecrets []*csapitypes.Secret
 	var err error
 	switch req.ParentType {
-	case cstypes.ConfigTypeProjectGroup:
+	case cstypes.ObjectKindProjectGroup:
 		cssecrets, _, err = h.configstoreClient.GetProjectGroupSecrets(ctx, req.ParentRef, req.Tree)
-	case cstypes.ConfigTypeProject:
+	case cstypes.ObjectKindProject:
 		cssecrets, _, err = h.configstoreClient.GetProjectSecrets(ctx, req.ParentRef, req.Tree)
 	}
 	if err != nil {
@@ -56,7 +56,7 @@ func (h *ActionHandler) GetSecrets(ctx context.Context, req *GetSecretsRequest) 
 type CreateSecretRequest struct {
 	Name string
 
-	ParentType cstypes.ConfigType
+	ParentType cstypes.ObjectKind
 	ParentRef  string
 
 	Type cstypes.SecretType
@@ -90,10 +90,10 @@ func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretReque
 
 	var rs *csapitypes.Secret
 	switch req.ParentType {
-	case cstypes.ConfigTypeProjectGroup:
+	case cstypes.ObjectKindProjectGroup:
 		h.log.Info().Msgf("creating project group secret")
 		rs, _, err = h.configstoreClient.CreateProjectGroupSecret(ctx, req.ParentRef, creq)
-	case cstypes.ConfigTypeProject:
+	case cstypes.ObjectKindProject:
 		h.log.Info().Msgf("creating project secret")
 		rs, _, err = h.configstoreClient.CreateProjectSecret(ctx, req.ParentRef, creq)
 	}
@@ -110,7 +110,7 @@ type UpdateSecretRequest struct {
 
 	Name string
 
-	ParentType cstypes.ConfigType
+	ParentType cstypes.ObjectKind
 	ParentRef  string
 
 	Type cstypes.SecretType
@@ -144,10 +144,10 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretReque
 
 	var rs *csapitypes.Secret
 	switch req.ParentType {
-	case cstypes.ConfigTypeProjectGroup:
+	case cstypes.ObjectKindProjectGroup:
 		h.log.Info().Msgf("updating project group secret")
 		rs, _, err = h.configstoreClient.UpdateProjectGroupSecret(ctx, req.ParentRef, req.SecretName, creq)
-	case cstypes.ConfigTypeProject:
+	case cstypes.ObjectKindProject:
 		h.log.Info().Msgf("updating project secret")
 		rs, _, err = h.configstoreClient.UpdateProjectSecret(ctx, req.ParentRef, req.SecretName, creq)
 	}
@@ -159,7 +159,7 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretReque
 	return rs, nil
 }
 
-func (h *ActionHandler) DeleteSecret(ctx context.Context, parentType cstypes.ConfigType, parentRef, name string) error {
+func (h *ActionHandler) DeleteSecret(ctx context.Context, parentType cstypes.ObjectKind, parentRef, name string) error {
 	isVariableOwner, err := h.IsVariableOwner(ctx, parentType, parentRef)
 	if err != nil {
 		return errors.Wrapf(err, "failed to determine ownership")
@@ -169,10 +169,10 @@ func (h *ActionHandler) DeleteSecret(ctx context.Context, parentType cstypes.Con
 	}
 
 	switch parentType {
-	case cstypes.ConfigTypeProjectGroup:
+	case cstypes.ObjectKindProjectGroup:
 		h.log.Info().Msgf("deleting project group secret")
 		_, err = h.configstoreClient.DeleteProjectGroupSecret(ctx, parentRef, name)
-	case cstypes.ConfigTypeProject:
+	case cstypes.ObjectKindProject:
 		h.log.Info().Msgf("deleting project secret")
 		_, err = h.configstoreClient.DeleteProjectSecret(ctx, parentRef, name)
 	}

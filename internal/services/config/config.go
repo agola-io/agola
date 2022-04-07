@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"agola.io/agola/internal/errors"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
 
 	yaml "gopkg.in/yaml.v2"
@@ -58,7 +59,6 @@ type Gateway struct {
 	GitserverURL   string `yaml:"gitserverURL"`
 
 	Web           Web           `yaml:"web"`
-	Etcd          Etcd          `yaml:"etcd"`
 	ObjectStorage ObjectStorage `yaml:"objectStorage"`
 
 	TokenSigning TokenSigning `yaml:"tokenSigning"`
@@ -82,15 +82,18 @@ type Notification struct {
 	RunserviceURL  string `yaml:"runserviceURL"`
 	ConfigstoreURL string `yaml:"configstoreURL"`
 
-	Etcd Etcd `yaml:"etcd"`
+	DB DB `yaml:"db"`
 }
 
 type Runservice struct {
 	Debug bool `yaml:"debug"`
 
-	DataDir       string        `yaml:"dataDir"`
-	Web           Web           `yaml:"web"`
-	Etcd          Etcd          `yaml:"etcd"`
+	DataDir string `yaml:"dataDir"`
+
+	DB DB `yaml:"db"`
+
+	Web Web `yaml:"web"`
+
 	ObjectStorage ObjectStorage `yaml:"objectStorage"`
 
 	RunCacheExpireInterval     time.Duration `yaml:"runCacheExpireInterval"`
@@ -149,8 +152,9 @@ type Configstore struct {
 
 	DataDir string `yaml:"dataDir"`
 
+	DB DB `yaml:"db"`
+
 	Web           Web           `yaml:"web"`
-	Etcd          Etcd          `yaml:"etcd"`
 	ObjectStorage ObjectStorage `yaml:"objectStorage"`
 }
 
@@ -160,7 +164,6 @@ type Gitserver struct {
 	DataDir string `yaml:"dataDir"`
 
 	Web           Web           `yaml:"web"`
-	Etcd          Etcd          `yaml:"etcd"`
 	ObjectStorage ObjectStorage `yaml:"objectStorage"`
 
 	RepositoryCleanupInterval    time.Duration `yaml:"repositoryCleanupInterval"`
@@ -186,6 +189,11 @@ type Web struct {
 	AllowedOrigins []string `yaml:"allowedOrigins"`
 }
 
+type DB struct {
+	Type       sql.Type `yaml:"type"`
+	ConnString string   `yaml:"connString"`
+}
+
 type ObjectStorageType string
 
 const (
@@ -206,16 +214,6 @@ type ObjectStorage struct {
 	AccessKey       string `yaml:"accessKey"`
 	SecretAccessKey string `yaml:"secretAccessKey"`
 	DisableTLS      bool   `yaml:"disableTLS"`
-}
-
-type Etcd struct {
-	Endpoints string `yaml:"endpoints"`
-
-	// TODO(sgotti) support encrypted private keys (add a private key password config entry)
-	TLSCertFile   string `yaml:"tlsCertFile"`
-	TLSKeyFile    string `yaml:"tlsKeyFile"`
-	TLSCAFile     string `yaml:"tlsCAFile"`
-	TLSSkipVerify bool   `yaml:"tlsSkipVerify"`
 }
 
 type DriverType string
@@ -284,6 +282,24 @@ func Parse(configFile string, componentsNames []string) (*Config, error) {
 	return c, Validate(c, componentsNames)
 }
 
+func validateDB(db *DB) error {
+	switch db.Type {
+	case sql.Sqlite3:
+	case sql.Postgres:
+	default:
+		if db.Type == "" {
+			return errors.Errorf("type is not defined")
+		}
+		return errors.Errorf("unknown type %q", db.Type)
+	}
+
+	if db.ConnString == "" {
+		return errors.Errorf("db connection string undefined")
+	}
+
+	return nil
+}
+
 func validateWeb(w *Web) error {
 	if w.ListenAddress == "" {
 		return errors.Errorf("listen address undefined")
@@ -339,6 +355,9 @@ func Validate(c *Config, componentsNames []string) error {
 
 	// Configstore
 	if isComponentEnabled(componentsNames, "configstore") {
+		if err := validateDB(&c.Runservice.DB); err != nil {
+			return errors.Wrapf(err, "db configuration error")
+		}
 		if c.Configstore.DataDir == "" {
 			return errors.Errorf("configstore dataDir is empty")
 		}
@@ -349,6 +368,9 @@ func Validate(c *Config, componentsNames []string) error {
 
 	// Runservice
 	if isComponentEnabled(componentsNames, "runservice") {
+		if err := validateDB(&c.Runservice.DB); err != nil {
+			return errors.Wrapf(err, "db configuration error")
+		}
 		if c.Runservice.DataDir == "" {
 			return errors.Errorf("runservice dataDir is empty")
 		}

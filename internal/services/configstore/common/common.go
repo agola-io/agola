@@ -22,10 +22,6 @@ import (
 	"github.com/gofrs/uuid"
 )
 
-const (
-	EtcdMaintenanceKey = "maintenance"
-)
-
 type RefType int
 
 const (
