@@ -21,7 +21,35 @@ import (
 	"agola.io/agola/internal/util"
 
 	"github.com/rs/zerolog"
+
+	csapitypes "agola.io/agola/services/configstore/api/types"
 )
+
+type MaintenanceStatusHandler struct {
+	log               zerolog.Logger
+	ah                *action.ActionHandler
+	maintenanceRouter bool
+}
+
+func NewMaintenanceStatusHandler(log zerolog.Logger, ah *action.ActionHandler, maintenanceRouter bool) *MaintenanceStatusHandler {
+	return &MaintenanceStatusHandler{log: log, ah: ah, maintenanceRouter: maintenanceRouter}
+}
+
+func (h *MaintenanceStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	requestedStatus, err := h.ah.IsMaintenanceEnabled(ctx)
+	if err != nil {
+		h.log.Err(err).Send()
+		util.HTTPError(w, err)
+		return
+	}
+
+	resp := csapitypes.MaintenanceStatusResponse{RequestedStatus: requestedStatus, CurrentStatus: h.maintenanceRouter}
+	if err := util.HTTPResponse(w, http.StatusOK, resp); err != nil {
+		h.log.Err(err).Send()
+	}
+}
 
 type MaintenanceModeHandler struct {
 	log zerolog.Logger

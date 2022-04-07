@@ -1,4 +1,4 @@
-// Copyright 2019 Sorint.lab
+// Copyright 2022 Sorint.lab
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,37 +15,39 @@
 package api
 
 import (
+	"io"
 	"net/http"
 
-	"agola.io/agola/internal/services/runservice/action"
+	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
 
+	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
-
-	rsapitypes "agola.io/agola/services/runservice/api/types"
 )
 
 type MaintenanceStatusHandler struct {
-	log               zerolog.Logger
-	ah                *action.ActionHandler
-	maintenanceRouter bool
+	log zerolog.Logger
+	ah  *action.ActionHandler
 }
 
-func NewMaintenanceStatusHandler(log zerolog.Logger, ah *action.ActionHandler, maintenanceRouter bool) *MaintenanceStatusHandler {
-	return &MaintenanceStatusHandler{log: log, ah: ah, maintenanceRouter: maintenanceRouter}
+func NewMaintenanceStatusHandler(log zerolog.Logger, ah *action.ActionHandler) *MaintenanceStatusHandler {
+	return &MaintenanceStatusHandler{log: log, ah: ah}
 }
 
 func (h *MaintenanceStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	vars := mux.Vars(r)
+	serviceName := vars["servicename"]
 
-	requestedStatus, err := h.ah.IsMaintenanceEnabled(ctx)
+	ares, err := h.ah.IsMaintenanceEnabled(ctx, serviceName)
 	if err != nil {
 		h.log.Err(err).Send()
 		util.HTTPError(w, err)
 		return
 	}
 
-	resp := rsapitypes.MaintenanceStatusResponse{RequestedStatus: requestedStatus, CurrentStatus: h.maintenanceRouter}
+	resp := gwapitypes.MaintenanceStatusResponse{RequestedStatus: ares.RequestedStatus, CurrentStatus: ares.CurrentStatus}
 	if err := util.HTTPResponse(w, http.StatusOK, resp); err != nil {
 		h.log.Err(err).Send()
 	}
@@ -62,6 +64,8 @@ func NewMaintenanceModeHandler(log zerolog.Logger, ah *action.ActionHandler) *Ma
 
 func (h *MaintenanceModeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	vars := mux.Vars(r)
+	serviceName := vars["servicename"]
 
 	enable := false
 	switch r.Method {
@@ -71,7 +75,7 @@ func (h *MaintenanceModeHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		enable = false
 	}
 
-	err := h.ah.MaintenanceMode(ctx, enable)
+	err := h.ah.MaintenanceMode(ctx, serviceName, enable)
 	if err != nil {
 		h.log.Err(err).Send()
 		util.HTTPError(w, err)
@@ -94,15 +98,24 @@ func NewExportHandler(log zerolog.Logger, ah *action.ActionHandler) *ExportHandl
 
 func (h *ExportHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	vars := mux.Vars(r)
+	serviceName := vars["servicename"]
 
-	err := h.ah.Export(ctx, w)
+	resp, err := h.ah.Export(ctx, serviceName)
 	if err != nil {
 		h.log.Err(err).Send()
-		// since we already answered with a 200 we cannot return another error code
-		// So abort the connection and the client will detect the missing ending chunk
-		// and consider this an error
-		//
-		// this is the way to force close a request without logging the panic
+		util.HTTPError(w, err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if err := util.HTTPResponse(w, http.StatusOK, nil); err != nil {
+		h.log.Err(err).Send()
+	}
+
+	_, err = io.Copy(w, resp.Body)
+	if err != nil {
+		h.log.Err(err).Send()
 		panic(http.ErrAbortHandler)
 	}
 }
@@ -118,8 +131,10 @@ func NewImportHandler(log zerolog.Logger, ah *action.ActionHandler) *ImportHandl
 
 func (h *ImportHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	vars := mux.Vars(r)
+	serviceName := vars["servicename"]
 
-	err := h.ah.Import(ctx, r.Body)
+	err := h.ah.Import(ctx, r.Body, serviceName)
 	if err != nil {
 		h.log.Err(err).Send()
 		util.HTTPError(w, err)

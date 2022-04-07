@@ -239,6 +239,11 @@ func (g *Gateway) Run(ctx context.Context) error {
 	registerHandler := api.NewRegisterUserHandler(g.log, g.ah)
 	oauth2callbackHandler := api.NewOAuth2CallbackHandler(g.log, g.ah)
 
+	maintenanceStatusHandler := api.NewMaintenanceStatusHandler(g.log, g.ah)
+	maintenanceModeHandler := api.NewMaintenanceModeHandler(g.log, g.ah)
+	exportHandler := api.NewExportHandler(g.log, g.ah)
+	importHandler := api.NewImportHandler(g.log, g.ah)
+
 	router := mux.NewRouter()
 	reposRouter := mux.NewRouter()
 
@@ -343,6 +348,11 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/auth/authorize", authorizeHandler).Methods("POST")
 	apirouter.Handle("/auth/register", registerHandler).Methods("POST")
 	apirouter.Handle("/auth/oauth2/callback", oauth2callbackHandler).Methods("GET")
+
+	apirouter.Handle("/maintenance/{servicename}", maintenanceStatusHandler).Methods("GET")
+	apirouter.Handle("/maintenance/{servicename}", authForcedHandler(maintenanceModeHandler)).Methods("PUT", "DELETE")
+	apirouter.Handle("/export/{servicename}", authForcedHandler(exportHandler)).Methods("GET")
+	apirouter.Handle("/import/{servicename}", authForcedHandler(importHandler)).Methods("POST")
 
 	// TODO(sgotti) add auth to these requests
 	reposRouter.Handle("/repos/{rest:.*}", reposHandler).Methods("GET", "POST")

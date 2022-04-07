@@ -735,3 +735,25 @@ func (c *Client) UserOrgInvitationAction(ctx context.Context, orgRef string, req
 	resp, err := c.getResponse(ctx, "PUT", fmt.Sprintf("/user/org_invitations/%s/actions", orgRef), nil, jsonContent, bytes.NewReader(reqj))
 	return resp, errors.WithStack(err)
 }
+
+func (c *Client) GetMaintenanceStatus(ctx context.Context, serviceName string) (*gwapitypes.MaintenanceStatusResponse, *http.Response, error) {
+	maintenanceStatus := new(gwapitypes.MaintenanceStatusResponse)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/maintenance/%s", serviceName), nil, jsonContent, nil, maintenanceStatus)
+	return maintenanceStatus, resp, errors.WithStack(err)
+}
+
+func (c *Client) EnableMaintenance(ctx context.Context, serviceName string) (*http.Response, error) {
+	return c.getResponse(ctx, "PUT", fmt.Sprintf("/maintenance/%s", serviceName), nil, jsonContent, nil)
+}
+
+func (c *Client) DisableMaintenance(ctx context.Context, serviceName string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/maintenance/%s", serviceName), nil, jsonContent, nil)
+}
+
+func (c *Client) Export(ctx context.Context, serviceName string) (*http.Response, error) {
+	return c.getResponse(ctx, "GET", fmt.Sprintf("/export/%s", serviceName), nil, jsonContent, nil)
+}
+
+func (c *Client) Import(ctx context.Context, serviceName string, r io.Reader) (*http.Response, error) {
+	return c.getResponse(ctx, "POST", fmt.Sprintf("/import/%s", serviceName), nil, jsonContent, r)
+}

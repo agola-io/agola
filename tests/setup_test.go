@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -73,6 +74,9 @@ const (
 	agolaOrg01 = "org01"
 	agolaOrg02 = "org02"
 	agolaOrg03 = "org03"
+
+	configstoreService = "configstore"
+	runserviceService  = "runservice"
 )
 
 type ConfigFormat string
@@ -3128,5 +3132,506 @@ func TestGetUsers(t *testing.T) {
 
 			tt.f(ctx, t, sc)
 		})
+	}
+}
+
+func TestMaintenance(t *testing.T) {
+	tests := []struct {
+		name string
+		f    func(ctx context.Context, t *testing.T, sc *setupContext)
+	}{
+		{
+			name: "test admin user enable maintenance",
+			f: func(ctx context.Context, t *testing.T, sc *setupContext) {
+				gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
+
+				_, err := gwClient.EnableMaintenance(ctx, configstoreService)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				_, err = gwClient.EnableMaintenance(ctx, runserviceService)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+			},
+		},
+		{
+			name: "test user enable maintenance",
+			f: func(ctx context.Context, t *testing.T, sc *setupContext) {
+				gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
+
+				_, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				token, _, err := gwClient.CreateUserToken(ctx, agolaUser01, &gwapitypes.CreateUserTokenRequest{TokenName: "tokenuser01"})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				gwClient = gwclient.NewClient(sc.config.Gateway.APIExposedURL, token.Token)
+
+				expectedErr := "remote error unauthorized"
+				_, err = gwClient.EnableMaintenance(ctx, configstoreService)
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", expectedErr)
+				}
+				if err.Error() != expectedErr {
+					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+				}
+
+				_, err = gwClient.EnableMaintenance(ctx, runserviceService)
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", expectedErr)
+				}
+				if err.Error() != expectedErr {
+					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+				}
+			},
+		},
+		{
+			name: "test user disable maintenance",
+			f: func(ctx context.Context, t *testing.T, sc *setupContext) {
+				gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
+
+				_, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				token, _, err := gwClient.CreateUserToken(ctx, agolaUser01, &gwapitypes.CreateUserTokenRequest{TokenName: "tokenuser01"})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				gwClient = gwclient.NewClient(sc.config.Gateway.APIExposedURL, token.Token)
+
+				expectedErr := "remote error unauthorized"
+				_, err = gwClient.DisableMaintenance(ctx, configstoreService)
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", expectedErr)
+				}
+				if err.Error() != expectedErr {
+					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+				}
+
+				_, err = gwClient.DisableMaintenance(ctx, runserviceService)
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", expectedErr)
+				}
+				if err.Error() != expectedErr {
+					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+				}
+			},
+		},
+		{
+			name: "test admin user enable maintenance already enabled",
+			f: func(ctx context.Context, t *testing.T, sc *setupContext) {
+				gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
+
+				_, err := gwClient.EnableMaintenance(ctx, configstoreService)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				_, err = gwClient.EnableMaintenance(ctx, runserviceService)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				expectedErr := "remote error badrequest"
+				_ = testutil.Wait(30*time.Second, func() (bool, error) {
+					_, err = gwClient.EnableMaintenance(ctx, configstoreService)
+					if err == nil {
+						return false, nil
+					}
+					if err.Error() != expectedErr {
+						return false, nil
+					}
+
+					return true, nil
+				})
+				_, err = gwClient.EnableMaintenance(ctx, configstoreService)
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", expectedErr)
+				}
+				if err.Error() != expectedErr {
+					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+				}
+
+				_ = testutil.Wait(30*time.Second, func() (bool, error) {
+					_, err = gwClient.EnableMaintenance(ctx, runserviceService)
+					if err == nil {
+						return false, nil
+					}
+					if err.Error() != expectedErr {
+						return false, nil
+					}
+
+					return true, nil
+				})
+				_, err = gwClient.EnableMaintenance(ctx, runserviceService)
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", expectedErr)
+				}
+				if err.Error() != expectedErr {
+					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+				}
+			},
+		},
+		{
+			name: "test admin user disable maintenance",
+			f: func(ctx context.Context, t *testing.T, sc *setupContext) {
+				gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
+
+				_, err := gwClient.EnableMaintenance(ctx, configstoreService)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				_, err = gwClient.DisableMaintenance(ctx, configstoreService)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				_, err = gwClient.EnableMaintenance(ctx, runserviceService)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				_, err = gwClient.DisableMaintenance(ctx, runserviceService)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+			},
+		},
+		{
+			name: "test admin user disable maintenance already disabled",
+			f: func(ctx context.Context, t *testing.T, sc *setupContext) {
+				gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
+
+				expectedErr := "remote error badrequest"
+				_, err := gwClient.DisableMaintenance(ctx, configstoreService)
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", expectedErr)
+				}
+				if err.Error() != expectedErr {
+					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+				}
+
+				_, err = gwClient.DisableMaintenance(ctx, runserviceService)
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", expectedErr)
+				}
+				if err.Error() != expectedErr {
+					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+				}
+			},
+		},
+		{
+			name: "test wrong provided servicename",
+			f: func(ctx context.Context, t *testing.T, sc *setupContext) {
+				gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
+
+				expectedErr := "remote error badrequest"
+				_, err := gwClient.EnableMaintenance(ctx, "test")
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", expectedErr)
+				}
+				if err.Error() != expectedErr {
+					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+				}
+
+				_, err = gwClient.DisableMaintenance(ctx, "test")
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", expectedErr)
+				}
+				if err.Error() != expectedErr {
+					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			sc := setup(ctx, t, dir)
+			defer sc.stop()
+
+			tt.f(ctx, t, sc)
+		})
+	}
+}
+
+func TestExportImport(t *testing.T) {
+	dir := t.TempDir()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sc := setup(ctx, t, dir, withGitea(true))
+	defer sc.stop()
+
+	giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+
+	giteaToken, token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+
+	giteaClient := gitea.NewClient(giteaAPIURL, giteaToken)
+	gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
+
+	giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)
+
+	config := `
+				{
+					runs: [
+					  {
+						name: 'run01',
+						tasks: [
+							{
+							name: 'task01',
+							runtime: {
+								containers: [{
+									image: 'alpine/git',
+								},
+							  ],
+							},
+							steps: [
+								{ type: 'clone' },
+								{ type: 'run', command: 'env' },
+						      ],
+							},
+						],
+					  },
+					],
+				}`
+
+	push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
+
+	_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+		if err != nil {
+			return false, nil
+		}
+
+		if len(runs) == 0 {
+			return false, nil
+		}
+		run := runs[0]
+		if run.Phase != rstypes.RunPhaseFinished {
+			return false, nil
+		}
+
+		return true, nil
+	})
+
+	runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(runs) != 1 {
+		t.Fatalf("expected %d run got: %d", 1, len(runs))
+	}
+
+	gwClient = gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
+
+	users, _, err := gwClient.GetUsers(ctx, "", 0, false)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	projectgroup, _, err := gwClient.GetProjectGroup(ctx, "user/user01")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	remotesources, _, err := gwClient.GetRemoteSources(ctx, "", 0, false)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	user01Projects, _, err := gwClient.GetProjectGroupProjects(ctx, "user/user01")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	w, err := os.Create(filepath.Join(dir, "export-configstore"))
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	resp, err := gwClient.Export(ctx, configstoreService)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	defer resp.Body.Close()
+
+	_, err = io.Copy(w, resp.Body)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	w, err = os.Create(filepath.Join(dir, "export-runservice"))
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	resp, err = gwClient.Export(ctx, runserviceService)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	defer resp.Body.Close()
+
+	_, err = io.Copy(w, resp.Body)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	//add some data
+	_, _, err = gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser02})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	_, _, err = gwClient.CreateRemoteSource(ctx, &gwapitypes.CreateRemoteSourceRequest{
+		Name:                "github",
+		Type:                "gitea",
+		APIURL:              giteaAPIURL,
+		AuthType:            "password",
+		SkipSSHHostKeyCheck: true,
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	_, _, err = gwClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg01, Visibility: gwapitypes.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	_, err = gwClient.EnableMaintenance(ctx, configstoreService)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	_, err = gwClient.EnableMaintenance(ctx, runserviceService)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		maintenanceStatus, _, err := gwClient.GetMaintenanceStatus(ctx, configstoreService)
+		if err != nil {
+			return false, nil
+		}
+		if !maintenanceStatus.CurrentStatus {
+			return false, nil
+		}
+
+		maintenanceStatus, _, err = gwClient.GetMaintenanceStatus(ctx, runserviceService)
+		if err != nil {
+			return false, nil
+		}
+		if !maintenanceStatus.CurrentStatus {
+			return false, nil
+		}
+
+		return true, nil
+	})
+
+	r, err := os.Open(filepath.Join(dir, "export-configstore"))
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	_, err = gwClient.Import(ctx, configstoreService, r)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	_, err = gwClient.DisableMaintenance(ctx, configstoreService)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	_, err = gwClient.DisableMaintenance(ctx, runserviceService)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		maintenanceStatus, _, err := gwClient.GetMaintenanceStatus(ctx, configstoreService)
+		if err != nil {
+			return false, nil
+		}
+		if maintenanceStatus.CurrentStatus {
+			return false, nil
+		}
+
+		maintenanceStatus, _, err = gwClient.GetMaintenanceStatus(ctx, runserviceService)
+		if err != nil {
+			return false, nil
+		}
+		if maintenanceStatus.CurrentStatus {
+			return false, nil
+		}
+
+		return true, nil
+	})
+
+	impUsers, _, err := gwClient.GetUsers(ctx, "", 0, false)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if diff := cmp.Diff(users, impUsers); diff != "" {
+		t.Fatalf("users mismatch (-want +got):\n%s", diff)
+	}
+
+	impProjectgroup, _, err := gwClient.GetProjectGroup(ctx, "user/user01")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if diff := cmp.Diff(projectgroup, impProjectgroup); diff != "" {
+		t.Fatalf("projectgroup mismatch (-want +got):\n%s", diff)
+	}
+
+	impRemotesources, _, err := gwClient.GetRemoteSources(ctx, "", 0, false)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if diff := cmp.Diff(remotesources, impRemotesources); diff != "" {
+		t.Fatalf("remotesources mismatch (-want +got):\n%s", diff)
+	}
+
+	impUser01Projects, _, err := gwClient.GetProjectGroupProjects(ctx, "user/user01")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if diff := cmp.Diff(user01Projects, impUser01Projects); diff != "" {
+		t.Fatalf("user01 projects mismatch (-want +got):\n%s", diff)
+	}
+
+	impRuns, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if diff := cmp.Diff(runs, impRuns); diff != "" {
+		t.Fatalf("runs mismatch (-want +got):\n%s", diff)
+	}
+
+	orgs, _, err := gwClient.GetOrgs(ctx, "", 0, false)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(orgs) != 0 {
+		t.Fatalf("expected 0 orgs got: %d", len(orgs))
 	}
 }
