@@ -273,6 +273,12 @@ func (h *ActionHandler) CreateRun(ctx context.Context, req *RunCreateRequest) (*
 		return nil, errors.WithStack(err)
 	}
 
+	dur, err := h.calcAverageDuration(ctx, rb.Run.Group)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	rb.Run.AvgRunTime = &dur
+
 	return rb, h.saveRun(ctx, rb, runcgt)
 }
 
@@ -811,4 +817,30 @@ func (h *ActionHandler) GetExecutorTasks(ctx context.Context, executorID string)
 	}
 
 	return ets, nil
+}
+
+func (h *ActionHandler) calcAverageDuration(ctx context.Context, group string) (time.Duration, error) {
+	var runs []*types.Run
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		runs, err = h.d.GetGroupRuns(tx, group, []types.RunPhase{types.RunPhaseFinished}, []types.RunResult{types.RunResultSuccess}, 0, 10, types.SortOrderDesc)
+		if err != nil {
+			h.log.Err(err).Send()
+			return errors.WithStack(err)
+		}
+
+		return errors.WithStack(err)
+	})
+	if err != nil {
+		return 0, errors.WithStack(err)
+	}
+	var avg time.Duration = 0
+	for _, run := range runs {
+		avg += run.EndTime.Sub(*run.StartTime)
+	}
+	if len(runs) > 0 {
+		return avg / time.Duration(len(runs)), nil
+	}
+
+	return 0, errors.WithStack(err)
 }

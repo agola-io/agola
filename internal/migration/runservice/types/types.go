@@ -125,6 +125,7 @@ type Run struct {
 	EnqueueTime *time.Time          `json:"enqueue_time,omitempty"`
 	StartTime   *time.Time          `json:"start_time,omitempty"`
 	EndTime     *time.Time          `json:"end_time,omitempty"`
+	AvgRunTime  *time.Duration      `json:"avg_run_duration"`
 
 	Archived bool `json:"archived,omitempty"`
 

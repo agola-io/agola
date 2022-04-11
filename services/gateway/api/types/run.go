@@ -35,9 +35,10 @@ type RunsResponse struct {
 
 	TasksWaitingApproval []string `json:"tasks_waiting_approval"`
 
-	EnqueueTime *time.Time `json:"enqueue_time"`
-	StartTime   *time.Time `json:"start_time"`
-	EndTime     *time.Time `json:"end_time"`
+	EnqueueTime *time.Time     `json:"enqueue_time"`
+	StartTime   *time.Time     `json:"start_time"`
+	EndTime     *time.Time     `json:"end_time"`
+	AvgRunTime  *time.Duration `json:"avg_run_duration"`
 }
 
 type RunResponse struct {
@@ -52,9 +53,10 @@ type RunResponse struct {
 	Tasks                map[string]*RunResponseTask `json:"tasks"`
 	TasksWaitingApproval []string                    `json:"tasks_waiting_approval"`
 
-	EnqueueTime *time.Time `json:"enqueue_time"`
-	StartTime   *time.Time `json:"start_time"`
-	EndTime     *time.Time `json:"end_time"`
+	EnqueueTime *time.Time     `json:"enqueue_time"`
+	StartTime   *time.Time     `json:"start_time"`
+	EndTime     *time.Time     `json:"end_time"`
+	AvgRunTime  *time.Duration `json:"avg_run_duration"`
 
 	CanRestartFromScratch     bool `json:"can_restart_from_scratch"`
 	CanRestartFromFailedTasks bool `json:"can_restart_from_failed_tasks"`

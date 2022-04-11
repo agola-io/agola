@@ -1928,3 +1928,93 @@ func TestUserOrgs(t *testing.T) {
 		t.Fatalf("user orgs mismatch (-want +got):\n%s", diff)
 	}
 }
+
+func TestAgerageDuration(t *testing.T) {
+	config := `
+      {
+        runs: [
+          {
+            name: 'run01',
+            tasks: [
+              {
+                name: 'task01',
+                runtime: {
+                  containers: [
+                    {
+                      image: 'alpine/git',
+                    },
+                  ],
+                },
+                steps: [
+                  { type: 'clone' },
+                  { type: 'run', command: 'env' },
+                ],
+              },
+            ],
+          },
+        ],
+      }
+    `
+
+	dir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	_, c := setup(ctx, t, dir, false)
+
+	gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
+
+	user, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
+
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	t.Logf("created agola user: %s", user.UserName)
+
+	token := createAgolaUserToken(ctx, t, c)
+	gwClient = gwclient.NewClient(c.Gateway.APIExposedURL, token)
+
+	for n := 1; n <= 3; n++ {
+		directRun(t, dir, config, ConfigFormatJsonnet, c.Gateway.APIExposedURL, token)
+		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+
+			run, _, err := gwClient.GetUserRun(ctx, user.ID, uint64(n))
+			if err != nil {
+				return false, nil
+			}
+
+			if run.Phase != rstypes.RunPhaseFinished {
+				return false, nil
+			}
+
+			return true, nil
+		})
+
+		run, _, err := gwClient.GetUserRun(ctx, user.ID, uint64(n))
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if run.Phase != rstypes.RunPhaseFinished {
+			t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, run.Phase)
+		}
+		if run.Result != rstypes.RunResultSuccess {
+			t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, run.Result)
+		}
+	}
+
+	runs, _, err := gwClient.GetUserRuns(ctx, user.ID, []string{string(rstypes.RunPhaseFinished)}, []string{string(rstypes.RunResultSuccess)}, 0, 0, true)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	var avg time.Duration = 0
+
+	avg += runs[0].EndTime.Sub(*runs[0].StartTime)
+	avg += runs[1].EndTime.Sub(*runs[1].StartTime)
+	avg = avg / 2
+
+	if diff := cmp.Diff(runs[2].AvgRunTime, &avg); diff != "" {
+		t.Fatalf("average mismatch (-want +got):\n%s", diff)
+	}
+}

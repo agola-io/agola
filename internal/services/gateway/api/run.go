@@ -48,6 +48,7 @@ func createRunResponse(r *rstypes.Run, rc *rstypes.RunConfig) *gwapitypes.RunRes
 		EnqueueTime: r.EnqueueTime,
 		StartTime:   r.StartTime,
 		EndTime:     r.EndTime,
+		AvgRunTime:  r.AvgRunTime,
 	}
 
 	run.CanRestartFromScratch, _ = r.CanRestartFromScratch()
@@ -282,6 +283,7 @@ func createRunsResponse(r *rstypes.Run) *gwapitypes.RunsResponse {
 		EnqueueTime: r.EnqueueTime,
 		StartTime:   r.StartTime,
 		EndTime:     r.EndTime,
+		AvgRunTime:  r.AvgRunTime,
 	}
 
 	return run
