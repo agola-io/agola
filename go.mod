@@ -16,8 +16,10 @@ require (
 	github.com/google/go-containerregistry v0.13.0
 	github.com/google/go-github/v50 v50.1.0
 	github.com/google/go-jsonnet v0.19.1
+	github.com/gorilla/csrf v1.7.1
 	github.com/gorilla/handlers v1.5.1
 	github.com/gorilla/mux v1.8.0
+	github.com/gorilla/securecookie v1.1.1
 	github.com/hashicorp/go-sockaddr v1.0.2
 	github.com/lib/pq v1.10.7
 	github.com/mattn/go-sqlite3 v1.14.16

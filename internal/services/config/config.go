@@ -62,7 +62,11 @@ type Gateway struct {
 	Web           Web           `yaml:"web"`
 	ObjectStorage ObjectStorage `yaml:"objectStorage"`
 
-	TokenSigning TokenSigning `yaml:"tokenSigning"`
+	TokenSigning  TokenSigning  `yaml:"tokenSigning"`
+	CookieSigning CookieSigning `yaml:"cookieSigning"`
+
+	// when true will not set __Host/__Secure and Secure cookies. Should be set only for local development over http
+	UnsecureCookies bool `yaml:"unsecureCookies"`
 
 	AdminToken string `yaml:"adminToken"`
 
@@ -249,6 +253,11 @@ type TokenSigning struct {
 	PublicKeyPath string `yaml:"publicKeyPath"`
 }
 
+type CookieSigning struct {
+	Duration time.Duration `yaml:"duration"`
+	Key      string        `yaml:"key"`
+}
+
 type OrganizationMemberAddingMode string
 
 const (
@@ -268,6 +277,9 @@ var defaultConfig = Config{
 	ID: "agola",
 	Gateway: Gateway{
 		TokenSigning: TokenSigning{
+			Duration: 12 * time.Hour,
+		},
+		CookieSigning: CookieSigning{
 			Duration: 12 * time.Hour,
 		},
 		OrganizationMemberAddingMode: defaultOrganizationMemberAddingMode,
@@ -301,6 +313,14 @@ func Parse(configFile string, componentsNames []string) (*Config, error) {
 	}
 
 	return c, Validate(c, componentsNames)
+}
+
+func validateCookieSigning(s *CookieSigning) error {
+	if s.Key == "" {
+		return errors.Errorf("empty cookie signing key")
+	}
+
+	return nil
 }
 
 func validateDB(db *DB) error {
@@ -368,6 +388,9 @@ func Validate(c *Config, componentsNames []string) error {
 		}
 		if c.Gateway.RunserviceURL == "" {
 			return errors.Errorf("gateway runserviceURL is empty")
+		}
+		if err := validateCookieSigning(&c.Gateway.CookieSigning); err != nil {
+			return errors.Wrap(err, "cookie signing configuration error")
 		}
 		if err := validateWeb(&c.Gateway.Web); err != nil {
 			return errors.Wrapf(err, "gateway web configuration error")

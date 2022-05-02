@@ -95,7 +95,6 @@ type LoginUserRequest struct {
 
 type LoginUserResponse struct {
 	Oauth2Redirect string        `json:"oauth2_redirect"`
-	Token          string        `json:"token"`
 	User           *UserResponse `json:"user"`
 }
 

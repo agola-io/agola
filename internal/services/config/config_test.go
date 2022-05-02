@@ -45,6 +45,8 @@ gateway:
   tokenSigning:
     method: hmac
     key: supersecretsigningkey
+  cookieSigning:
+    key: supersecretsigningkey
   adminToken: "admintoken"
 
 scheduler:

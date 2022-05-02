@@ -62,9 +62,12 @@ func (h *OAuth2CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 	case action.RemoteSourceRequestTypeLoginUser:
 		authresp := cresp.Response.(*action.LoginUserResponse)
+
+		http.SetCookie(w, authresp.Cookie)
+		http.SetCookie(w, authresp.SecondaryCookie)
+
 		response = &gwapitypes.LoginUserResponse{
-			Token: authresp.Token,
-			User:  createUserResponse(authresp.User),
+			User: createUserResponse(authresp.User),
 		}
 
 	case action.RemoteSourceRequestTypeAuthorize:
