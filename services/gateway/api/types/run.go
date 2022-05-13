@@ -76,9 +76,10 @@ type RunResponseTask struct {
 }
 
 type RunTaskResponse struct {
-	ID     string                `json:"id"`
-	Name   string                `json:"name"`
-	Status rstypes.RunTaskStatus `json:"status"`
+	ID         string                     `json:"id"`
+	Name       string                     `json:"name"`
+	Status     rstypes.RunTaskStatus      `json:"status"`
+	Containers []RunTaskResponseContainer `json:"containers"`
 
 	WaitingApproval     bool              `json:"waiting_approval"`
 	Approved            bool              `json:"approved"`
@@ -89,6 +90,10 @@ type RunTaskResponse struct {
 
 	StartTime *time.Time `json:"start_time"`
 	EndTime   *time.Time `json:"end_time"`
+}
+
+type RunTaskResponseContainer struct {
+	Image string `json:"image"`
 }
 
 type RunTaskResponseSetupStep struct {
