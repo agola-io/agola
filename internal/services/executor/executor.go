@@ -1117,6 +1117,9 @@ func (e *Executor) tasksUpdaterLoop(ctx context.Context) {
 // this is useful to catch up when some tasks submissions from the scheduler to the executor
 // APIs fails
 func (e *Executor) tasksUpdater(ctx context.Context) error {
+	e.tasksUpdaterMutex.Lock()
+	defer e.tasksUpdaterMutex.Unlock()
+
 	ets, _, err := e.runserviceClient.GetExecutorTasks(ctx, e.id)
 	if err != nil {
 		e.log.Warn().Err(err).Send()
@@ -1328,7 +1331,9 @@ func (r *runningTasks) ids() []string {
 
 func (e *Executor) handleTasks(ctx context.Context, c <-chan *types.ExecutorTask) {
 	for et := range c {
+		e.tasksUpdaterMutex.Lock()
 		e.taskUpdater(ctx, et)
+		e.tasksUpdaterMutex.Unlock()
 	}
 }
 
@@ -1357,6 +1362,8 @@ type Executor struct {
 	listenAddress    string
 	listenURL        string
 	dynamic          bool
+
+	tasksUpdaterMutex sync.Mutex
 }
 
 func NewExecutor(ctx context.Context, log zerolog.Logger, c *config.Executor) (*Executor, error) {
