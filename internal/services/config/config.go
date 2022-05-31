@@ -135,14 +135,14 @@ const (
 )
 
 type DockerRegistryAuth struct {
-	Type DockerRegistryAuthType `json:"type"`
+	Type DockerRegistryAuthType `yaml:"type"`
 
 	// basic auth
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
 
 	// encoded auth string
-	Auth string `json:"auth"`
+	Auth string `yaml:"auth"`
 
 	// future auths like aws ecr auth
 }
