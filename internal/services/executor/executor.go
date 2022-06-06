@@ -51,6 +51,9 @@ const (
 	defaultShell = "/bin/sh -e"
 
 	toolboxContainerDir = "/mnt/agola"
+
+	// podCreationTimeout is the maximum time to wait for pod creation.
+	podCreationTimeout = time.Minute * 5
 )
 
 var (
@@ -886,7 +889,9 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 	}
 
 	_, _ = outf.WriteString("Starting pod.\n")
-	pod, err := e.driver.NewPod(ctx, podConfig, outf)
+	podCtx, cancel := context.WithTimeout(ctx, podCreationTimeout)
+	defer cancel()
+	pod, err := e.driver.NewPod(podCtx, podConfig, outf)
 	if err != nil {
 		_, _ = outf.WriteString(fmt.Sprintf("Pod failed to start. Error: %s\n", err))
 		return errors.WithStack(err)

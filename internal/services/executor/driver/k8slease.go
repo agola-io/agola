@@ -49,7 +49,7 @@ func (d *K8sDriver) updateLease(ctx context.Context) error {
 
 		leaseClient := d.client.CoordinationV1().Leases(d.namespace)
 		found := false
-		lease, err := leaseClient.Get(name, metav1.GetOptions{})
+		lease, err := leaseClient.Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			if !apierrors.IsNotFound(err) {
 				return errors.WithStack(err)
@@ -60,7 +60,7 @@ func (d *K8sDriver) updateLease(ctx context.Context) error {
 
 		if found {
 			lease.Spec.RenewTime = &now
-			_, err := leaseClient.Update(lease)
+			_, err := leaseClient.Update(ctx, lease, metav1.UpdateOptions{})
 			return errors.WithStack(err)
 		}
 
@@ -76,12 +76,12 @@ func (d *K8sDriver) updateLease(ctx context.Context) error {
 				RenewTime:            &now,
 			},
 		}
-		_, err = leaseClient.Create(lease)
+		_, err = leaseClient.Create(ctx, lease, metav1.CreateOptions{})
 		return errors.WithStack(err)
 	} else {
 		cmClient := d.client.CoreV1().ConfigMaps(d.namespace)
 		found := false
-		cm, err := cmClient.Get(name, metav1.GetOptions{})
+		cm, err := cmClient.Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			if !apierrors.IsNotFound(err) {
 				return errors.WithStack(err)
@@ -112,7 +112,7 @@ func (d *K8sDriver) updateLease(ctx context.Context) error {
 				return errors.WithStack(err)
 			}
 			cm.Annotations[cmLeaseKey] = string(ldj)
-			_, err = cmClient.Update(cm)
+			_, err = cmClient.Update(ctx, cm, metav1.UpdateOptions{})
 			return errors.WithStack(err)
 		}
 
@@ -128,7 +128,7 @@ func (d *K8sDriver) updateLease(ctx context.Context) error {
 			},
 		}
 		cm.Annotations[cmLeaseKey] = string(ldj)
-		_, err = cmClient.Create(cm)
+		_, err = cmClient.Create(ctx, cm, metav1.CreateOptions{})
 		return errors.WithStack(err)
 	}
 }
@@ -142,7 +142,7 @@ func (d *K8sDriver) getLeases(ctx context.Context) ([]string, error) {
 	if d.useLeaseAPI {
 		leaseClient := d.client.CoordinationV1().Leases(d.namespace)
 
-		leases, err := leaseClient.List(metav1.ListOptions{LabelSelector: apilabels.SelectorFromSet(labels).String()})
+		leases, err := leaseClient.List(ctx, metav1.ListOptions{LabelSelector: apilabels.SelectorFromSet(labels).String()})
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
@@ -154,7 +154,7 @@ func (d *K8sDriver) getLeases(ctx context.Context) ([]string, error) {
 	} else {
 		cmClient := d.client.CoreV1().ConfigMaps(d.namespace)
 
-		cms, err := cmClient.List(metav1.ListOptions{LabelSelector: apilabels.SelectorFromSet(labels).String()})
+		cms, err := cmClient.List(ctx, metav1.ListOptions{LabelSelector: apilabels.SelectorFromSet(labels).String()})
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
@@ -194,7 +194,7 @@ func (d *K8sDriver) cleanStaleExecutorsLease(ctx context.Context) error {
 			}
 			if lease.Spec.RenewTime.Add(staleExecutorLeaseInterval).Before(time.Now()) {
 				d.log.Info().Msgf("deleting stale lease %q", lease.Name)
-				if err := leaseClient.Delete(lease.Name, nil); err != nil {
+				if err := leaseClient.Delete(ctx, lease.Name, metav1.DeleteOptions{}); err != nil {
 					d.log.Err(err).Msgf("failed to delete stale lease %q", lease.Name)
 				}
 			}
@@ -224,7 +224,7 @@ func (d *K8sDriver) cleanStaleExecutorsLease(ctx context.Context) error {
 			}
 			if ld.RenewTime.Add(staleExecutorLeaseInterval).Before(time.Now()) {
 				d.log.Info().Msgf("deleting stale configmap lease %q", cm.Name)
-				if err := cmClient.Delete(cm.Name, nil); err != nil {
+				if err := cmClient.Delete(ctx, cm.Name, metav1.DeleteOptions{}); err != nil {
 					d.log.Err(err).Msgf("failed to delete stale configmap lease %q", cm.Name)
 				}
 			}
