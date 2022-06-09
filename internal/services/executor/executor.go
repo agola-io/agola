@@ -758,7 +758,9 @@ func (e *Executor) executeTask(rt *runningTask) {
 		e.log.Err(err).Send()
 	}
 
+	rt.Unlock()
 	if err := e.setupTask(ctx, rt); err != nil {
+		rt.Lock()
 		e.log.Err(err).Send()
 		et.Status.Phase = types.ExecutorTaskPhaseFailed
 		et.Status.EndTime = util.TimeP(time.Now())
@@ -771,6 +773,7 @@ func (e *Executor) executeTask(rt *runningTask) {
 		return
 	}
 
+	rt.Lock()
 	et.Status.SetupStep.Phase = types.ExecutorTaskPhaseSuccess
 	et.Status.SetupStep.EndTime = util.TimeP(time.Now())
 	if err := e.sendExecutorTaskStatus(ctx, et); err != nil {
