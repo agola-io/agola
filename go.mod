@@ -32,6 +32,9 @@ require (
 	github.com/sanity-io/litter v1.2.0
 	github.com/sgotti/gexpect v0.0.0-20210315095146-1ec64e69809b
 	github.com/spf13/cobra v0.0.5
+	github.com/swaggo/files v0.0.0-20210815190702-a29dd2bc99b2
+	github.com/swaggo/http-swagger v1.2.5
+	github.com/swaggo/swag v1.7.9
 	github.com/xanzy/go-gitlab v0.26.0
 	go.starlark.net v0.0.0-20200203144150-6677ee5c7211
 	golang.org/x/crypto v0.0.0-20211215165025-cf75a172585e
@@ -39,7 +42,7 @@ require (
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	gopkg.in/src-d/go-billy.v4 v4.3.2
 	gopkg.in/src-d/go-git.v4 v4.13.1
-	gopkg.in/yaml.v2 v2.2.8
+	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.17.3
 	k8s.io/apimachinery v0.17.3
 	k8s.io/client-go v0.17.3

@@ -1,0 +1,2401 @@
+basePath: /api/v1alpha
+definitions:
+  types.AddOrgMemberRequest:
+    properties:
+      role:
+        type: string
+    type: object
+  types.AddOrgMemberResponse:
+    properties:
+      organization:
+        $ref: '#/definitions/types.OrgResponse'
+      role:
+        type: string
+      user:
+        $ref: '#/definitions/types.UserResponse'
+    type: object
+  types.AuthorizeResponse:
+    properties:
+      oauth2_redirect:
+        type: string
+      remote_source_name:
+        type: string
+      remote_user_info:
+        $ref: '#/definitions/types.UserInfo'
+    type: object
+  types.CreateOrgRequest:
+    properties:
+      name:
+        type: string
+      visibility:
+        type: string
+    type: object
+  types.CreateProjectGroupRequest:
+    properties:
+      name:
+        type: string
+      parent_ref:
+        type: string
+      visibility:
+        type: string
+    type: object
+  types.CreateProjectRequest:
+    properties:
+      name:
+        type: string
+      parent_ref:
+        type: string
+      pass_vars_to_forked_pr:
+        type: boolean
+      remote_source_name:
+        type: string
+      repo_path:
+        type: string
+      skip_ssh_host_key_check:
+        type: boolean
+      visibility:
+        type: string
+    type: object
+  types.CreateRemoteSourceRequest:
+    properties:
+      apiurl:
+        type: string
+      auth_type:
+        type: string
+      login_enabled:
+        type: boolean
+      name:
+        type: string
+      oauth_2_client_id:
+        type: string
+      oauth_2_client_secret:
+        type: string
+      registration_enabled:
+        type: boolean
+      skip_ssh_host_key_check:
+        type: boolean
+      skip_verify:
+        type: boolean
+      ssh_host_key:
+        type: string
+      type:
+        type: string
+    type: object
+  types.CreateSecretRequest:
+    properties:
+      data:
+        additionalProperties:
+          type: string
+        description: internal secret
+        type: object
+      name:
+        type: string
+      path:
+        type: string
+      secret_provider_id:
+        description: external secret
+        type: string
+      type:
+        type: string
+    type: object
+  types.CreateUserLARequest:
+    properties:
+      remote_source_login_name:
+        type: string
+      remote_source_login_password:
+        type: string
+      remote_source_name:
+        type: string
+    type: object
+  types.CreateUserLAResponse:
+    properties:
+      linked_account:
+        $ref: '#/definitions/types.LinkedAccount'
+      oauth2_redirect:
+        type: string
+    type: object
+  types.CreateUserRequest:
+    properties:
+      username:
+        type: string
+    type: object
+  types.CreateUserTokenRequest:
+    properties:
+      token_name:
+        type: string
+    type: object
+  types.CreateUserTokenResponse:
+    properties:
+      token:
+        type: string
+    type: object
+  types.CreateVariableRequest:
+    properties:
+      name:
+        type: string
+      values:
+        items:
+          $ref: '#/definitions/types.VariableValueRequest'
+        type: array
+    type: object
+  types.LinkedAccount:
+    properties:
+      id:
+        type: string
+      remote_source_id:
+        type: string
+      remote_user_avatar_url:
+        type: string
+      remote_user_id:
+        type: string
+      remote_username:
+        type: string
+    type: object
+  types.LinkedAccountResponse:
+    properties:
+      id:
+        type: string
+      remote_source_id:
+        type: string
+      remote_user_avatar_url:
+        type: string
+      remote_user_name:
+        type: string
+    type: object
+  types.LoginUserRequest:
+    properties:
+      login_name:
+        type: string
+      password:
+        type: string
+      remote_source_name:
+        type: string
+    type: object
+  types.LoginUserResponse:
+    properties:
+      oauth2_redirect:
+        type: string
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/types.UserResponse'
+    type: object
+  types.OrgMemberResponse:
+    properties:
+      role:
+        type: string
+      user:
+        $ref: '#/definitions/types.UserResponse'
+    type: object
+  types.OrgMembersResponse:
+    properties:
+      members:
+        items:
+          $ref: '#/definitions/types.OrgMemberResponse'
+        type: array
+      organization:
+        $ref: '#/definitions/types.OrgResponse'
+    type: object
+  types.OrgResponse:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      visibility:
+        type: string
+    type: object
+  types.ProjectCreateRunRequest:
+    properties:
+      branch:
+        type: string
+      commit_sha:
+        type: string
+      ref:
+        type: string
+      tag:
+        type: string
+    type: object
+  types.ProjectGroupResponse:
+    properties:
+      global_visibility:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      parent_path:
+        type: string
+      path:
+        type: string
+      visibility:
+        type: string
+    type: object
+  types.ProjectResponse:
+    properties:
+      global_visibility:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      parent_path:
+        type: string
+      pass_vars_to_forked_pr:
+        type: boolean
+      path:
+        type: string
+      visibility:
+        type: string
+    type: object
+  types.RegisterUserRequest:
+    properties:
+      remote_source_login_name:
+        type: string
+      remote_source_login_password:
+        type: string
+      remote_source_name:
+        type: string
+      username:
+        type: string
+    type: object
+  types.RegisterUserResponse:
+    properties:
+      oauth2_redirect:
+        type: string
+    type: object
+  types.RemoteRepoResponse:
+    properties:
+      id:
+        type: string
+      path:
+        type: string
+    type: object
+  types.RemoteSourceResponse:
+    properties:
+      auth_type:
+        type: string
+      id:
+        type: string
+      login_enabled:
+        type: boolean
+      name:
+        type: string
+      registration_enabled:
+        type: boolean
+    type: object
+  types.RunActionsRequest:
+    properties:
+      action_type:
+        type: string
+      from_start:
+        description: Restart
+        type: boolean
+    type: object
+  types.RunConfigTaskDepend:
+    properties:
+      conditions:
+        items:
+          type: string
+        type: array
+      task_id:
+        type: string
+    type: object
+  types.RunResponse:
+    properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
+      can_restart_from_failed_tasks:
+        type: boolean
+      can_restart_from_scratch:
+        type: boolean
+      end_time:
+        type: string
+      enqueue_time:
+        type: string
+      name:
+        type: string
+      number:
+        type: integer
+      phase:
+        type: string
+      result:
+        type: string
+      setup_errors:
+        items:
+          type: string
+        type: array
+      start_time:
+        type: string
+      stopping:
+        type: boolean
+      tasks:
+        additionalProperties:
+          $ref: '#/definitions/types.RunResponseTask'
+        type: object
+      tasks_waiting_approval:
+        items:
+          type: string
+        type: array
+    type: object
+  types.RunResponseTask:
+    properties:
+      approval_annotations:
+        additionalProperties:
+          type: string
+        type: object
+      approved:
+        type: boolean
+      depends:
+        additionalProperties:
+          $ref: '#/definitions/types.RunConfigTaskDepend'
+        type: object
+      end_time:
+        type: string
+      id:
+        type: string
+      level:
+        type: integer
+      name:
+        type: string
+      start_time:
+        type: string
+      status:
+        type: string
+      waiting_approval:
+        type: boolean
+    type: object
+  types.RunTaskActionsRequest:
+    properties:
+      action_type:
+        type: string
+    type: object
+  types.RunTaskResponse:
+    properties:
+      approval_annotations:
+        additionalProperties:
+          type: string
+        type: object
+      approved:
+        type: boolean
+      end_time:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      setup_step:
+        $ref: '#/definitions/types.RunTaskResponseSetupStep'
+      start_time:
+        type: string
+      status:
+        type: string
+      steps:
+        items:
+          $ref: '#/definitions/types.RunTaskResponseStep'
+        type: array
+      waiting_approval:
+        type: boolean
+    type: object
+  types.RunTaskResponseSetupStep:
+    properties:
+      end_time:
+        type: string
+      name:
+        type: string
+      phase:
+        type: string
+      start_time:
+        type: string
+    type: object
+  types.RunTaskResponseStep:
+    properties:
+      command:
+        type: string
+      end_time:
+        type: string
+      exit_status:
+        type: integer
+      log_archived:
+        type: boolean
+      name:
+        type: string
+      phase:
+        type: string
+      shell:
+        type: string
+      start_time:
+        type: string
+      type:
+        type: string
+    type: object
+  types.RunsResponse:
+    properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
+      end_time:
+        type: string
+      enqueue_time:
+        type: string
+      name:
+        type: string
+      number:
+        type: integer
+      phase:
+        type: string
+      result:
+        type: string
+      start_time:
+        type: string
+      tasks_waiting_approval:
+        items:
+          type: string
+        type: array
+    type: object
+  types.SecretResponse:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      parent_path:
+        type: string
+    type: object
+  types.UpdateProjectGroupRequest:
+    properties:
+      name:
+        type: string
+      parent_ref:
+        type: string
+      visibility:
+        type: string
+    type: object
+  types.UpdateProjectRequest:
+    properties:
+      name:
+        type: string
+      parent_ref:
+        type: string
+      pass_vars_to_forked_pr:
+        type: boolean
+      visibility:
+        type: string
+    type: object
+  types.UpdateRemoteSourceRequest:
+    properties:
+      apiurl:
+        type: string
+      login_enabled:
+        type: boolean
+      name:
+        type: string
+      oauth_2_client_id:
+        type: string
+      oauth_2_client_secret:
+        type: string
+      registration_enabled:
+        type: boolean
+      skip_ssh_host_key_check:
+        type: boolean
+      skip_verify:
+        type: boolean
+      ssh_host_key:
+        type: string
+    type: object
+  types.UpdateSecretRequest:
+    properties:
+      data:
+        additionalProperties:
+          type: string
+        description: internal secret
+        type: object
+      name:
+        type: string
+      path:
+        type: string
+      secret_provider_id:
+        description: external secret
+        type: string
+      type:
+        type: string
+    type: object
+  types.UpdateVariableRequest:
+    properties:
+      name:
+        type: string
+      values:
+        items:
+          $ref: '#/definitions/types.VariableValueRequest'
+        type: array
+    type: object
+  types.UserCreateRunRequest:
+    properties:
+      branch:
+        type: string
+      commit_sha:
+        type: string
+      message:
+        type: string
+      pull_request_ref_regexes:
+        items:
+          type: string
+        type: array
+      ref:
+        type: string
+      repo_path:
+        type: string
+      repo_uuid:
+        type: string
+      tag:
+        type: string
+      variables:
+        additionalProperties:
+          type: string
+        type: object
+    type: object
+  types.UserInfo:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+      loginName:
+        type: string
+    type: object
+  types.UserOrgsResponse:
+    properties:
+      organization:
+        $ref: '#/definitions/types.OrgResponse'
+      role:
+        type: string
+    type: object
+  types.UserResponse:
+    properties:
+      id:
+        type: string
+      linked_accounts:
+        items:
+          $ref: '#/definitions/types.LinkedAccountResponse'
+        type: array
+      tokens:
+        items:
+          type: string
+        type: array
+      username:
+        type: string
+    type: object
+  types.VariableResponse:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      parent_path:
+        type: string
+      values:
+        items:
+          $ref: '#/definitions/types.VariableValue'
+        type: array
+    type: object
+  types.VariableValue:
+    properties:
+      matching_secret_parent_path:
+        type: string
+      secret_name:
+        type: string
+      secret_var:
+        type: string
+      when:
+        $ref: '#/definitions/types.When'
+    type: object
+  types.VariableValueRequest:
+    properties:
+      secret_name:
+        type: string
+      secret_var:
+        type: string
+      when:
+        $ref: '#/definitions/types.When'
+    type: object
+  types.When:
+    properties:
+      branch:
+        $ref: '#/definitions/types.WhenConditions'
+      ref:
+        $ref: '#/definitions/types.WhenConditions'
+      tag:
+        $ref: '#/definitions/types.WhenConditions'
+    type: object
+  types.WhenCondition:
+    properties:
+      match:
+        type: string
+      type:
+        type: string
+    type: object
+  types.WhenConditions:
+    properties:
+      exclude:
+        items:
+          $ref: '#/definitions/types.WhenCondition'
+        type: array
+      include:
+        items:
+          $ref: '#/definitions/types.WhenCondition'
+        type: array
+    type: object
+info:
+  contact: {}
+  title: agola
+  version: v0.6.0
+paths:
+  /auth/authorize:
+    post:
+      description: Authorize
+      parameters:
+      - description: Authorize request
+        in: body
+        name: authorize
+        required: true
+        schema:
+          $ref: '#/definitions/types.LoginUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: created
+          schema:
+            $ref: '#/definitions/types.AuthorizeResponse'
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Authorize
+      tags:
+      - Users
+  /auth/login:
+    post:
+      description: Login
+      parameters:
+      - description: Login request
+        in: body
+        name: login
+        required: true
+        schema:
+          $ref: '#/definitions/types.LoginUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: created
+          schema:
+            $ref: '#/definitions/types.LoginUserResponse'
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Login
+      tags:
+      - Users
+  /auth/register:
+    post:
+      description: Register
+      parameters:
+      - description: Register request
+        in: body
+        name: register
+        required: true
+        schema:
+          $ref: '#/definitions/types.RegisterUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: created
+          schema:
+            $ref: '#/definitions/types.RegisterUserResponse'
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Register
+      tags:
+      - Users
+  /orgs:
+    get:
+      description: Return organizations list
+      parameters:
+      - description: limit response size
+        in: query
+        name: limit
+        type: integer
+      - description: ascending ordering
+        in: query
+        name: asc
+        type: boolean
+      - description: start organization ref
+        in: query
+        name: start
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            items:
+              $ref: '#/definitions/types.OrgResponse'
+            type: array
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Return organizations list
+      tags:
+      - Organizations
+    post:
+      description: Create an organization
+      parameters:
+      - description: Organization request
+        in: body
+        name: organization
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateOrgRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: created
+          schema:
+            $ref: '#/definitions/types.OrgResponse'
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Create an organization
+      tags:
+      - Organizations
+  /orgs/{orgref}:
+    delete:
+      description: Delete an organization
+      parameters:
+      - description: Organization ref
+        in: path
+        name: orgref
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: no content
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Delete an organization
+      tags:
+      - Organizations
+    get:
+      description: Return an organization
+      parameters:
+      - description: Organization ref
+        in: path
+        name: orgref
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            $ref: '#/definitions/types.OrgResponse'
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Return an organization
+      tags:
+      - Organizations
+  /orgs/{orgref}/members:
+    get:
+      description: Return organization members
+      parameters:
+      - description: Organization ref
+        in: path
+        name: orgref
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            $ref: '#/definitions/types.OrgMembersResponse'
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Return organization members
+      tags:
+      - Organizations
+  /orgs/{orgref}/members/{userref}:
+    delete:
+      description: Remove an organization member
+      parameters:
+      - description: Organization ref
+        in: path
+        name: orgref
+        required: true
+        type: string
+      - description: User ref
+        in: path
+        name: userref
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: no content
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Remove an organization member
+      tags:
+      - Organizations
+    put:
+      description: Add an organization member
+      parameters:
+      - description: Organization ref
+        in: path
+        name: orgref
+        required: true
+        type: string
+      - description: User ref
+        in: path
+        name: userref
+        required: true
+        type: string
+      - description: Organization member request
+        in: body
+        name: organization_member
+        required: true
+        schema:
+          $ref: '#/definitions/types.AddOrgMemberRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            $ref: '#/definitions/types.AddOrgMemberResponse'
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Add an organization member
+      tags:
+      - Organizations
+  /projectgroups:
+    post:
+      description: Create a projectggroup
+      parameters:
+      - description: Projectgroup request
+        in: body
+        name: projectgroup
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateProjectGroupRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: created
+          schema:
+            $ref: '#/definitions/types.ProjectGroupResponse'
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Create a projectgroup
+      tags:
+      - Projectgroups
+  /projectgroups/{projectgroupref}:
+    delete:
+      description: Delete a projectggroup
+      parameters:
+      - description: Projectgroup ref
+        in: path
+        name: projectgroupref
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: no content
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Delete a projectgroup
+      tags:
+      - Projectgroups
+    get:
+      description: Return a projectggroup
+      parameters:
+      - description: Projectgroup ref
+        in: path
+        name: projectgroupref
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            $ref: '#/definitions/types.ProjectGroupResponse'
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Return a projectgroup
+      tags:
+      - Projectgroups
+    put:
+      description: Update a projectggroup
+      parameters:
+      - description: Projectgroup ref
+        in: path
+        name: projectgroupref
+        required: true
+        type: string
+      - description: Projectgroup request
+        in: body
+        name: projectgroup
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateProjectGroupRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: created
+          schema:
+            $ref: '#/definitions/types.ProjectGroupResponse'
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Update a projectgroup
+      tags:
+      - Projectgroups
+  /projectgroups/{projectgroupref}/projects:
+    get:
+      description: Return projectgroup projects
+      parameters:
+      - description: Projectgroup ref
+        in: path
+        name: projectgroupref
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            items:
+              $ref: '#/definitions/types.ProjectResponse'
+            type: array
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Return projectgroup projects
+      tags:
+      - Projectgroups
+  /projectgroups/{projectgroupref}/secrets:
+    get:
+      description: Return a list of projectgroup secrets
+      parameters:
+      - description: secret tree
+        in: query
+        name: tree
+        type: boolean
+      - description: filter overridden
+        in: query
+        name: removeoverridden
+        type: boolean
+      - description: Projectgroup ref
+        in: path
+        name: projectgroupref
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            items:
+              $ref: '#/definitions/types.SecretResponse'
+            type: array
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Return a list of projectgroup secrets
+      tags:
+      - Secrets
+    post:
+      description: Create a projectgroup secret
+      parameters:
+      - description: Secret request
+        in: body
+        name: secret
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateSecretRequest'
+      - description: Projectgroup ref
+        in: path
+        name: projectgroupref
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: created
+          schema:
+            $ref: '#/definitions/types.SecretResponse'
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Create a projectgroup secret
+      tags:
+      - Secrets
+  /projectgroups/{projectgroupref}/secrets/{secretname}:
+    delete:
+      description: Delete a projectgroup secret
+      parameters:
+      - description: Projectgroup ref
+        in: path
+        name: projectgroupref
+        required: true
+        type: string
+      - description: Secret name
+        in: path
+        name: secretname
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: no content
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Delete a projectgroup secret
+      tags:
+      - Secrets
+    put:
+      description: Update a projectgroup secret
+      parameters:
+      - description: Secret request
+        in: body
+        name: secret
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateSecretRequest'
+      - description: Projectgroup ref
+        in: path
+        name: projectgroupref
+        required: true
+        type: string
+      - description: Secret name
+        in: path
+        name: secretname
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            $ref: '#/definitions/types.SecretResponse'
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Update a projectgroup secret
+      tags:
+      - Secrets
+  /projectgroups/{projectgroupref}/subgroups:
+    get:
+      description: Return a projectgroup subgroups
+      parameters:
+      - description: Projectgroup ref
+        in: path
+        name: projectgroupref
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            items:
+              $ref: '#/definitions/types.ProjectGroupResponse'
+            type: array
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Return projectgroup subgroups
+      tags:
+      - Projectgroups
+  /projectgroups/{projectgroupref}/variables:
+    get:
+      description: Return a list of projectgroup variables
+      parameters:
+      - description: secret tree
+        in: query
+        name: tree
+        type: boolean
+      - description: filter overridden
+        in: query
+        name: removeoverridden
+        type: boolean
+      - description: Projectgroup ref
+        in: path
+        name: projectgroupref
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            items:
+              $ref: '#/definitions/types.VariableResponse'
+            type: array
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Return a list of projectgroup variables
+      tags:
+      - Variables
+    post:
+      description: Create a projectgroup variable
+      parameters:
+      - description: Variable request
+        in: body
+        name: variable
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateVariableRequest'
+      - description: Projectgroup ref
+        in: path
+        name: projectgroupref
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: created
+          schema:
+            $ref: '#/definitions/types.VariableResponse'
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Create a projectgroup variable
+      tags:
+      - Variables
+  /projectgroups/{projectgroupref}/variables/{variablename}:
+    delete:
+      description: Delete a projectgroup variable
+      parameters:
+      - description: Projectgroup ref
+        in: path
+        name: projectgroupref
+        required: true
+        type: string
+      - description: Variable name
+        in: path
+        name: variablename
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: no content
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Delete a projectgroup variable
+      tags:
+      - Variables
+    put:
+      description: Update a projectgroup variable
+      parameters:
+      - description: Variable request
+        in: body
+        name: variable
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateVariableRequest'
+      - description: Projectgroup ref
+        in: path
+        name: projectgroupref
+        required: true
+        type: string
+      - description: Variable name
+        in: path
+        name: variablename
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            $ref: '#/definitions/types.VariableResponse'
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Update a projectgroup variable
+      tags:
+      - Variables
+  /projects:
+    post:
+      description: Create a project
+      parameters:
+      - description: Project request
+        in: body
+        name: project
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateProjectRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: created
+          schema:
+            $ref: '#/definitions/types.ProjectResponse'
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Create a project
+      tags:
+      - Projects
+  /projects/{projectref}:
+    delete:
+      description: Delete a project
+      parameters:
+      - description: Project ref
+        in: path
+        name: projectref
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: no content
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Delete a project
+      tags:
+      - Projects
+    get:
+      description: Return a project
+      parameters:
+      - description: Project ref
+        in: path
+        name: projectref
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            $ref: '#/definitions/types.ProjectResponse'
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Return a project
+      tags:
+      - Projects
+    put:
+      description: Update a project
+      parameters:
+      - description: Project ref
+        in: path
+        name: projectref
+        required: true
+        type: string
+      - description: Project request
+        in: body
+        name: project
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateProjectRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: created
+          schema:
+            $ref: '#/definitions/types.ProjectResponse'
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Update a project
+      tags:
+      - Projects
+  /projects/{projectref}/createrun:
+    post:
+      description: Create a run
+      parameters:
+      - description: Project ref
+        in: path
+        name: projectref
+        required: true
+        type: string
+      - description: Project run request
+        in: body
+        name: run
+        required: true
+        schema:
+          $ref: '#/definitions/types.ProjectCreateRunRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/types.ProjectGroupResponse'
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Create a run
+      tags:
+      - Projects
+  /projects/{projectref}/reconfig:
+    put:
+      description: Reconfig a project
+      parameters:
+      - description: Project ref
+        in: path
+        name: projectref
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Reconfig a project
+      tags:
+      - Projects
+  /projects/{projectref}/runs:
+    get:
+      description: Return runs list
+      parameters:
+      - description: limit response size
+        in: query
+        name: limit
+        type: integer
+      - description: ascending ordering
+        in: query
+        name: asc
+        type: boolean
+      - description: start run id
+        in: query
+        name: start
+        type: string
+      - description: phase
+        in: query
+        name: phase
+        type: string
+      - description: result
+        in: query
+        name: result
+        type: string
+      - description: changegroup
+        in: query
+        name: changegroup
+        type: string
+      - description: subgroup
+        in: query
+        name: subgroup
+        type: string
+      - description: last run
+        in: query
+        name: lastrun
+        type: boolean
+      - description: Project ref
+        in: path
+        name: projectref
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            items:
+              $ref: '#/definitions/types.RunsResponse'
+            type: array
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Return runs list
+      tags:
+      - Runs
+  /projects/{projectref}/runs/{runnumber}:
+    get:
+      description: Return a run
+      parameters:
+      - description: Project ref
+        in: path
+        name: projectref
+        required: true
+        type: string
+      - description: Run number
+        in: path
+        name: runnumber
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            $ref: '#/definitions/types.RunResponse'
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Return a run
+      tags:
+      - Runs
+  /projects/{projectref}/secrets:
+    get:
+      description: Return a list of project secrets
+      parameters:
+      - description: secret tree
+        in: query
+        name: tree
+        type: boolean
+      - description: filter overridden
+        in: query
+        name: removeoverridden
+        type: boolean
+      - description: Project ref
+        in: path
+        name: projectref
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            items:
+              $ref: '#/definitions/types.SecretResponse'
+            type: array
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Return a list of project secrets
+      tags:
+      - Secrets
+    post:
+      description: Create a project secret
+      parameters:
+      - description: Projectgroup request
+        in: body
+        name: secret
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateSecretRequest'
+      - description: Project ref
+        in: path
+        name: projectref
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: created
+          schema:
+            $ref: '#/definitions/types.SecretResponse'
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Create a project secret
+      tags:
+      - Secrets
+  /projects/{projectref}/secrets/{secretname}:
+    delete:
+      description: Delete a project secret
+      parameters:
+      - description: Project ref
+        in: path
+        name: projectref
+        required: true
+        type: string
+      - description: Secret name
+        in: path
+        name: secretname
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: no content
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Delete a project secret
+      tags:
+      - Secrets
+    put:
+      description: Update a projectgroup secret
+      parameters:
+      - description: Secret request
+        in: body
+        name: secret
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateSecretRequest'
+      - description: Project ref
+        in: path
+        name: projectref
+        required: true
+        type: string
+      - description: Secret name
+        in: path
+        name: secretname
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            $ref: '#/definitions/types.SecretResponse'
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Update a projectgroup secret
+      tags:
+      - Secrets
+  /projects/{projectref}/updaterepolinkedaccount:
+    put:
+      description: Update a project repository linked account
+      parameters:
+      - description: Project ref
+        in: path
+        name: projectref
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            $ref: '#/definitions/types.ProjectResponse'
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Update a project repository linked account
+      tags:
+      - Projects
+  /projects/{projectref}/variables:
+    get:
+      description: Return a list of project variables
+      parameters:
+      - description: secret tree
+        in: query
+        name: tree
+        type: boolean
+      - description: filter overridden
+        in: query
+        name: removeoverridden
+        type: boolean
+      - description: Project ref
+        in: path
+        name: projectref
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            items:
+              $ref: '#/definitions/types.VariableResponse'
+            type: array
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Return a list of project variables
+      tags:
+      - Variables
+    post:
+      description: Create a project variable
+      parameters:
+      - description: Variable request
+        in: body
+        name: variable
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateVariableRequest'
+      - description: Project ref
+        in: path
+        name: projectref
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: created
+          schema:
+            $ref: '#/definitions/types.VariableResponse'
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Create a project variable
+      tags:
+      - Variables
+  /projects/{projectref}/variables/{variablename}:
+    delete:
+      description: Delete a project variable
+      parameters:
+      - description: Project ref
+        in: path
+        name: projectref
+        required: true
+        type: string
+      - description: Variable name
+        in: path
+        name: variablename
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: no content
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Delete a project variable
+      tags:
+      - Variables
+    put:
+      description: Update a project variable
+      parameters:
+      - description: Variable request
+        in: body
+        name: variable
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateVariableRequest'
+      - description: Project ref
+        in: path
+        name: projectref
+        required: true
+        type: string
+      - description: Variable name
+        in: path
+        name: variablename
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            $ref: '#/definitions/types.VariableResponse'
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Update a project variable
+      tags:
+      - Variables
+  /remotesources:
+    get:
+      description: Return remotesources list
+      parameters:
+      - description: limit response size
+        in: query
+        name: limit
+        type: integer
+      - description: ascending ordering
+        in: query
+        name: asc
+        type: boolean
+      - description: start remotesource ref
+        in: query
+        name: start
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            items:
+              $ref: '#/definitions/types.RemoteSourceResponse'
+            type: array
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Return remotesources list
+      tags:
+      - Remotesources
+    post:
+      description: Create a remotesource
+      parameters:
+      - description: Remotesource request
+        in: body
+        name: remotesource
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateRemoteSourceRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: created
+          schema:
+            $ref: '#/definitions/types.RemoteSourceResponse'
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Create a remotesource
+      tags:
+      - Remotesources
+  /remotesources/{remotesourceref}:
+    delete:
+      description: Delete a remotesource
+      parameters:
+      - description: Remotesource ref
+        in: path
+        name: remotesourceref
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: no content
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Delete a remotesource
+      tags:
+      - Remotesources
+    get:
+      description: Return a remotesource
+      parameters:
+      - description: Remotesource ref
+        in: path
+        name: remotesourceref
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            $ref: '#/definitions/types.RemoteSourceResponse'
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Return a remotesource
+      tags:
+      - Remotesources
+    put:
+      description: Update a remotesource
+      parameters:
+      - description: Remotesource ref
+        in: path
+        name: remotesourceref
+        required: true
+        type: string
+      - description: Remotesource request
+        in: body
+        name: remotesource
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateRemoteSourceRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: created
+          schema:
+            $ref: '#/definitions/types.RemoteSourceResponse'
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Update a remotesource
+      tags:
+      - Remotesources
+  /runs/{runid}/actions:
+    put:
+      description: Execute a run action
+      parameters:
+      - description: Run id
+        in: path
+        name: runid
+        required: true
+        type: string
+      - description: Run action request
+        in: body
+        name: action
+        required: true
+        schema:
+          $ref: '#/definitions/types.RunActionsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            $ref: '#/definitions/types.RunResponse'
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Execute a run action
+      tags:
+      - Runs
+  /runs/{runid}/tasks/{taskid}:
+    get:
+      description: Return a task
+      parameters:
+      - description: Run id
+        in: path
+        name: runid
+        required: true
+        type: string
+      - description: Task id
+        in: path
+        name: taskid
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            $ref: '#/definitions/types.RunTaskResponse'
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Return a task
+      tags:
+      - Runs
+  /runs/{runid}/tasks/{taskid}/actions:
+    put:
+      description: Execute a task action
+      parameters:
+      - description: Run id
+        in: path
+        name: runid
+        required: true
+        type: string
+      - description: Task id
+        in: path
+        name: taskid
+        required: true
+        type: string
+      - description: Task action request
+        in: body
+        name: action
+        required: true
+        schema:
+          $ref: '#/definitions/types.RunTaskActionsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            $ref: '#/definitions/types.RunResponse'
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Execute a task action
+      tags:
+      - Runs
+  /user:
+    get:
+      description: Return the current user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            $ref: '#/definitions/types.UserResponse'
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Return the current user
+      tags:
+      - Users
+  /user/createrun:
+    post:
+      description: Create a directrun
+      parameters:
+      - description: Directrun request
+        in: body
+        name: secret
+        required: true
+        schema:
+          $ref: '#/definitions/types.UserCreateRunRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: created
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Create a directrun
+      tags:
+      - Users
+  /user/orgs:
+    get:
+      description: Return user organizations list
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            items:
+              $ref: '#/definitions/types.UserOrgsResponse'
+            type: array
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Return user organizations list
+      tags:
+      - Users
+  /user/projects:
+    get:
+      description: Return user project list
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            items:
+              $ref: '#/definitions/types.ProjectResponse'
+            type: array
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Return user project list
+      tags:
+      - Users
+  /user/remoterepos/{remotesourceref}:
+    get:
+      description: Return user remote repo list
+      parameters:
+      - description: Remotesource ref
+        in: path
+        name: remotesourceref
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            items:
+              $ref: '#/definitions/types.RemoteRepoResponse'
+            type: array
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Return user remote repo list
+      tags:
+      - RemoteRepos
+  /users:
+    get:
+      description: Return users list
+      parameters:
+      - description: limit response size
+        in: query
+        name: limit
+        type: integer
+      - description: ascending ordering
+        in: query
+        name: asc
+        type: boolean
+      - description: start user name
+        in: query
+        name: start
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            items:
+              $ref: '#/definitions/types.UserResponse'
+            type: array
+      security:
+      - ApiKeyToken: []
+      summary: Return users list
+      tags:
+      - Users
+    post:
+      description: Create a user
+      parameters:
+      - description: User request
+        in: body
+        name: secret
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: created
+          schema:
+            $ref: '#/definitions/types.SecretResponse'
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Create a user
+      tags:
+      - Users
+  /users/{userref}:
+    delete:
+      description: Delete a user
+      parameters:
+      - description: User ref
+        in: path
+        name: userref
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: no content
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Delete a user
+      tags:
+      - Users
+    get:
+      description: Return a user
+      parameters:
+      - description: User ref
+        in: path
+        name: userref
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            $ref: '#/definitions/types.UserResponse'
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Return a user
+      tags:
+      - Users
+  /users/{userref}/linkedaccounts:
+    post:
+      description: Create a user linked account
+      parameters:
+      - description: User ref
+        in: path
+        name: userref
+        required: true
+        type: string
+      - description: Linked account request
+        in: body
+        name: linkedAccount
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateUserLARequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: created
+          schema:
+            $ref: '#/definitions/types.CreateUserLAResponse'
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Create a user linked account
+      tags:
+      - Users
+  /users/{userref}/linkedaccounts/{laid}:
+    delete:
+      description: Delete user linked account
+      parameters:
+      - description: User ref
+        in: path
+        name: userref
+        required: true
+        type: string
+      - description: Linked account id
+        in: path
+        name: laid
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: no content
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Delete user linked account
+      tags:
+      - Users
+  /users/{userref}/runs:
+    get:
+      description: Return runs list
+      parameters:
+      - description: limit response size
+        in: query
+        name: limit
+        type: integer
+      - description: ascending ordering
+        in: query
+        name: asc
+        type: boolean
+      - description: start run id
+        in: query
+        name: start
+        type: string
+      - description: phase
+        in: query
+        name: phase
+        type: string
+      - description: result
+        in: query
+        name: result
+        type: string
+      - description: changegroup
+        in: query
+        name: changegroup
+        type: string
+      - description: subgroup
+        in: query
+        name: subgroup
+        type: string
+      - description: last run
+        in: query
+        name: lastrun
+        type: boolean
+      - description: User ref
+        in: path
+        name: users
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            items:
+              $ref: '#/definitions/types.RunsResponse'
+            type: array
+        "400":
+          description: bad request
+      security:
+      - ApiKeyToken: []
+      summary: Return runs list
+      tags:
+      - Runs
+  /users/{userref}/runs/{runnumber}:
+    get:
+      description: Return a run
+      parameters:
+      - description: User ref
+        in: path
+        name: userref
+        required: true
+        type: string
+      - description: Run number
+        in: path
+        name: runnumber
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            $ref: '#/definitions/types.RunResponse'
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Return a run
+      tags:
+      - Runs
+  /users/{userref}/tokens:
+    post:
+      description: Create a user token
+      parameters:
+      - description: User ref
+        in: path
+        name: userref
+        required: true
+        type: string
+      - description: User token request
+        in: body
+        name: userToken
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateUserTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: created
+          schema:
+            $ref: '#/definitions/types.CreateUserTokenResponse'
+        "400":
+          description: bad response
+      security:
+      - ApiKeyToken: []
+      summary: Create a user token
+      tags:
+      - Users
+  /users/{userref}/tokens/{tokenname}:
+    delete:
+      description: Delete a user token
+      parameters:
+      - description: User ref
+        in: path
+        name: userref
+        required: true
+        type: string
+      - description: Token name
+        in: path
+        name: tokenname
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: no content
+        "404":
+          description: not found
+      security:
+      - ApiKeyToken: []
+      summary: Delete a user token
+      tags:
+      - Users
+securityDefinitions:
+  ApiKeyToken:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
