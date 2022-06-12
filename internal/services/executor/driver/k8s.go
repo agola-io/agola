@@ -288,7 +288,7 @@ func (d *K8sDriver) getOrCreateExecutorsGroupID(ctx context.Context) (string, er
 	cmClient := d.client.CoreV1().ConfigMaps(d.namespace)
 
 	// pod and secret name, based on pod id
-	cm, err := cmClient.Get(configMapName, metav1.GetOptions{})
+	cm, err := cmClient.Get(ctx, configMapName, metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return "", errors.WithStack(err)
@@ -305,7 +305,7 @@ func (d *K8sDriver) getOrCreateExecutorsGroupID(ctx context.Context) (string, er
 		},
 		Data: map[string]string{executorsGroupIDConfigMapKey: executorsGroupID},
 	}
-	if _, err = cmClient.Create(cm); err != nil {
+	if _, err = cmClient.Create(ctx, cm, metav1.CreateOptions{}); err != nil {
 		return "", errors.WithStack(err)
 	}
 
@@ -352,7 +352,7 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 		Type: corev1.SecretTypeDockerConfigJson,
 	}
 
-	_, err = secretClient.Create(secret)
+	_, err = secretClient.Create(ctx, secret, metav1.CreateOptions{})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -467,12 +467,12 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 		}
 	}
 
-	pod, err = podClient.Create(pod)
+	pod, err = podClient.Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	watcher, err := podClient.Watch(
+	watcher, err := podClient.Watch(ctx,
 		metav1.SingleObject(pod.ObjectMeta),
 	)
 	if err != nil {
@@ -498,7 +498,7 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 
 	// Remove init container docker auth so it won't be used by user defined containers
 	dur := int64(0)
-	if err := secretClient.Delete(name, &metav1.DeleteOptions{GracePeriodSeconds: &dur}); err != nil {
+	if err := secretClient.Delete(ctx, name, metav1.DeleteOptions{GracePeriodSeconds: &dur}); err != nil {
 		return nil, errors.WithStack(err)
 	}
 
@@ -513,7 +513,7 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 		Type: corev1.SecretTypeDockerConfigJson,
 	}
 
-	_, err = secretClient.Create(secret)
+	_, err = secretClient.Create(ctx, secret, metav1.CreateOptions{})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -638,7 +638,7 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 		return nil, errors.Wrapf(err, "failed to execute command on initcontainer")
 	}
 
-	watcher, err = podClient.Watch(
+	watcher, err = podClient.Watch(ctx,
 		metav1.SingleObject(pod.ObjectMeta),
 	)
 	if err != nil {
@@ -715,11 +715,11 @@ func (p *K8sPod) TaskID() string {
 func (p *K8sPod) Stop(ctx context.Context) error {
 	d := int64(0)
 	secretClient := p.client.CoreV1().Secrets(p.namespace)
-	if err := secretClient.Delete(p.id, &metav1.DeleteOptions{GracePeriodSeconds: &d}); err != nil {
+	if err := secretClient.Delete(ctx, p.id, metav1.DeleteOptions{GracePeriodSeconds: &d}); err != nil {
 		return errors.WithStack(err)
 	}
 	podClient := p.client.CoreV1().Pods(p.namespace)
-	if err := podClient.Delete(p.id, &metav1.DeleteOptions{GracePeriodSeconds: &d}); err != nil {
+	if err := podClient.Delete(ctx, p.id, metav1.DeleteOptions{GracePeriodSeconds: &d}); err != nil {
 		return errors.WithStack(err)
 	}
 	return nil
