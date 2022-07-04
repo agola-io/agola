@@ -1282,3 +1282,257 @@ func (d *DB) deleteVariableData(tx *sql.Tx, id string) error {
 
 	return nil
 }
+
+func (d *DB) InsertOrUpdateHook(tx *sql.Tx, v *types.Hook) error {
+	var err error
+	if v.Revision == 0 {
+		err = d.InsertHook(tx, v)
+	} else {
+		err = d.UpdateHook(tx, v)
+	}
+
+	return errors.WithStack(err)
+}
+
+func (d *DB) InsertHook(tx *sql.Tx, v *types.Hook) error {
+	if v.Revision != 0 {
+		return errors.Errorf("expected revision 0 got %d", v.Revision)
+	}
+
+	data, err := d.insertHookData(tx, v)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return d.insertHookQ(tx, v, data)
+}
+
+func (d *DB) insertHookData(tx *sql.Tx, v *types.Hook) ([]byte, error) {
+	v.Revision = 1
+
+	now := time.Now()
+	v.SetCreationTime(now)
+	v.SetUpdateTime(now)
+
+	data, err := json.Marshal(v)
+	if err != nil {
+		v.Revision = 0
+		return nil, errors.WithStack(err)
+	}
+
+	q := sb.Insert("hook").Columns("id", "revision", "data").Values(v.ID, v.Revision, data)
+	if _, err := d.exec(tx, q); err != nil {
+		v.Revision = 0
+		return nil, errors.Wrap(err, "failed to insert hook")
+	}
+
+	return data, nil
+}
+
+// insertRawHookData should be used only for import.
+// It won't update object times.
+func (d *DB) insertRawHookData(tx *sql.Tx, v *types.Hook) ([]byte, error) {
+	v.Revision = 1
+
+	data, err := json.Marshal(v)
+	if err != nil {
+		v.Revision = 0
+		return nil, errors.WithStack(err)
+	}
+
+	q := sb.Insert("hook").Columns("id", "revision", "data").Values(v.ID, v.Revision, data)
+	if _, err := d.exec(tx, q); err != nil {
+		v.Revision = 0
+		return nil, errors.Wrap(err, "failed to insert hook")
+	}
+
+	return data, nil
+}
+
+func (d *DB) UpdateHook(tx *sql.Tx, v *types.Hook) error {
+	data, err := d.updateHookData(tx, v)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return d.updateHookQ(tx, v, data)
+}
+
+func (d *DB) updateHookData(tx *sql.Tx, v *types.Hook) ([]byte, error) {
+	if v.Revision < 1 {
+		return nil, errors.Errorf("expected revision > 0 got %d", v.Revision)
+	}
+
+	curRevision := v.Revision
+	v.Revision++
+
+	v.SetUpdateTime(time.Now())
+
+	data, err := json.Marshal(v)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	q := sb.Update("hook").SetMap(map[string]interface{}{"id": v.ID, "revision": v.Revision, "data": data}).Where(sq.Eq{"id": v.ID, "revision": curRevision})
+	res, err := d.exec(tx, q)
+	if err != nil {
+		v.Revision = curRevision
+		return nil, errors.Wrap(err, "failed to update hook")
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		v.Revision = curRevision
+		return nil, errors.Wrap(err, "failed to update hook")
+	}
+
+	if rows != 1 {
+		v.Revision = curRevision
+		return nil, idb.ErrConcurrent
+	}
+
+	return data, nil
+}
+
+func (d *DB) DeleteHook(tx *sql.Tx, id string) error {
+	if err := d.deleteHookData(tx, id); err != nil {
+		return errors.WithStack(err)
+	}
+
+	return d.deleteHookQ(tx, id)
+}
+
+func (d *DB) deleteHookData(tx *sql.Tx, id string) error {
+	if _, err := tx.Exec("delete from hook where id = $1", id); err != nil {
+		return errors.Wrap(err, "failed to delete hook")
+	}
+
+	return nil
+}
+
+func (d *DB) InsertOrUpdateWebhookMessage(tx *sql.Tx, v *types.WebhookMessage) error {
+	var err error
+	if v.Revision == 0 {
+		err = d.InsertWebhookMessage(tx, v)
+	} else {
+		err = d.UpdateWebhookMessage(tx, v)
+	}
+
+	return errors.WithStack(err)
+}
+
+func (d *DB) InsertWebhookMessage(tx *sql.Tx, v *types.WebhookMessage) error {
+	if v.Revision != 0 {
+		return errors.Errorf("expected revision 0 got %d", v.Revision)
+	}
+
+	data, err := d.insertWebhookMessageData(tx, v)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return d.insertWebhookMessageQ(tx, v, data)
+}
+
+func (d *DB) insertWebhookMessageData(tx *sql.Tx, v *types.WebhookMessage) ([]byte, error) {
+	v.Revision = 1
+
+	now := time.Now()
+	v.SetCreationTime(now)
+	v.SetUpdateTime(now)
+
+	data, err := json.Marshal(v)
+	if err != nil {
+		v.Revision = 0
+		return nil, errors.WithStack(err)
+	}
+
+	q := sb.Insert("webhookmessage").Columns("id", "revision", "data").Values(v.ID, v.Revision, data)
+	if _, err := d.exec(tx, q); err != nil {
+		v.Revision = 0
+		return nil, errors.Wrap(err, "failed to insert webhookmessage")
+	}
+
+	return data, nil
+}
+
+// insertRawWebhookMessageData should be used only for import.
+// It won't update object times.
+func (d *DB) insertRawWebhookMessageData(tx *sql.Tx, v *types.WebhookMessage) ([]byte, error) {
+	v.Revision = 1
+
+	data, err := json.Marshal(v)
+	if err != nil {
+		v.Revision = 0
+		return nil, errors.WithStack(err)
+	}
+
+	q := sb.Insert("webhookmessage").Columns("id", "revision", "data").Values(v.ID, v.Revision, data)
+	if _, err := d.exec(tx, q); err != nil {
+		v.Revision = 0
+		return nil, errors.Wrap(err, "failed to insert webhookmessage")
+	}
+
+	return data, nil
+}
+
+func (d *DB) UpdateWebhookMessage(tx *sql.Tx, v *types.WebhookMessage) error {
+	data, err := d.updateWebhookMessageData(tx, v)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return d.updateWebhookMessageQ(tx, v, data)
+}
+
+func (d *DB) updateWebhookMessageData(tx *sql.Tx, v *types.WebhookMessage) ([]byte, error) {
+	if v.Revision < 1 {
+		return nil, errors.Errorf("expected revision > 0 got %d", v.Revision)
+	}
+
+	curRevision := v.Revision
+	v.Revision++
+
+	v.SetUpdateTime(time.Now())
+
+	data, err := json.Marshal(v)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	q := sb.Update("webhookmessage").SetMap(map[string]interface{}{"id": v.ID, "revision": v.Revision, "data": data}).Where(sq.Eq{"id": v.ID, "revision": curRevision})
+	res, err := d.exec(tx, q)
+	if err != nil {
+		v.Revision = curRevision
+		return nil, errors.Wrap(err, "failed to update webhookmessage")
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		v.Revision = curRevision
+		return nil, errors.Wrap(err, "failed to update webhookmessage")
+	}
+
+	if rows != 1 {
+		v.Revision = curRevision
+		return nil, idb.ErrConcurrent
+	}
+
+	return data, nil
+}
+
+func (d *DB) DeleteWebhookMessage(tx *sql.Tx, id string) error {
+	if err := d.deleteWebhookMessageData(tx, id); err != nil {
+		return errors.WithStack(err)
+	}
+
+	return d.deleteWebhookMessageQ(tx, id)
+}
+
+func (d *DB) deleteWebhookMessageData(tx *sql.Tx, id string) error {
+	if _, err := tx.Exec("delete from webhookmessage where id = $1", id); err != nil {
+		return errors.Wrap(err, "failed to delete webhookmessage")
+	}
+
+	return nil
+}

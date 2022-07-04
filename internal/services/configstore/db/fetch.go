@@ -671,3 +671,135 @@ func (d *DB) scanVariables(rows *stdsql.Rows) ([]*types.Variable, []string, erro
 	}
 	return vs, ids, nil
 }
+
+func (d *DB) fetchHooks(tx *sql.Tx, q sq.Sqlizer) ([]*types.Hook, []string, error) {
+	rows, err := d.query(tx, q)
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+	defer rows.Close()
+
+	return d.scanHooks(rows)
+}
+
+func (d *DB) scanHook(rows *stdsql.Rows, additionalFields []interface{}) (*types.Hook, string, error) {
+	var id string
+	var revision uint64
+	var data []byte
+	fields := append([]interface{}{&id, &revision, &data}, additionalFields...)
+	if err := rows.Scan(fields...); err != nil {
+		return nil, "", errors.Wrap(err, "failed to scan rows")
+	}
+	v := types.Hook{}
+	if len(data) > 0 {
+		if err := json.Unmarshal(data, &v); err != nil {
+			return nil, "", errors.Wrap(err, "failed to unmarshal Hook")
+		}
+	}
+
+	v.Revision = revision
+
+	return &v, id, nil
+}
+
+func (d *DB) scanHooks(rows *stdsql.Rows) ([]*types.Hook, []string, error) {
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+	fieldsNumber := len(cols)
+	if fieldsNumber < 3 {
+		return nil, nil, errors.Errorf("not enough columns (%d < 3)", len(cols))
+	}
+	var additionalFieldsPtr []interface{}
+	if fieldsNumber > 3 {
+		additionalFieldsNumber := fieldsNumber - 3
+		additionalFields := make([]interface{}, additionalFieldsNumber)
+		additionalFieldsPtr = make([]interface{}, additionalFieldsNumber)
+		for i := 0; i < additionalFieldsNumber; i++ {
+			additionalFieldsPtr[i] = &additionalFields[i]
+		}
+	}
+
+	vs := []*types.Hook{}
+	ids := []string{}
+	for rows.Next() {
+		v, id, err := d.scanHook(rows, additionalFieldsPtr)
+		if err != nil {
+			rows.Close()
+			return nil, nil, errors.WithStack(err)
+		}
+		vs = append(vs, v)
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+	return vs, ids, nil
+}
+
+func (d *DB) fetchWebhookMessages(tx *sql.Tx, q sq.Sqlizer) ([]*types.WebhookMessage, []string, error) {
+	rows, err := d.query(tx, q)
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+	defer rows.Close()
+
+	return d.scanWebhookMessages(rows)
+}
+
+func (d *DB) scanWebhookMessage(rows *stdsql.Rows, additionalFields []interface{}) (*types.WebhookMessage, string, error) {
+	var id string
+	var revision uint64
+	var data []byte
+	fields := append([]interface{}{&id, &revision, &data}, additionalFields...)
+	if err := rows.Scan(fields...); err != nil {
+		return nil, "", errors.Wrap(err, "failed to scan rows")
+	}
+	v := types.WebhookMessage{}
+	if len(data) > 0 {
+		if err := json.Unmarshal(data, &v); err != nil {
+			return nil, "", errors.Wrap(err, "failed to unmarshal WebhookMessage")
+		}
+	}
+
+	v.Revision = revision
+
+	return &v, id, nil
+}
+
+func (d *DB) scanWebhookMessages(rows *stdsql.Rows) ([]*types.WebhookMessage, []string, error) {
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+	fieldsNumber := len(cols)
+	if fieldsNumber < 3 {
+		return nil, nil, errors.Errorf("not enough columns (%d < 3)", len(cols))
+	}
+	var additionalFieldsPtr []interface{}
+	if fieldsNumber > 3 {
+		additionalFieldsNumber := fieldsNumber - 3
+		additionalFields := make([]interface{}, additionalFieldsNumber)
+		additionalFieldsPtr = make([]interface{}, additionalFieldsNumber)
+		for i := 0; i < additionalFieldsNumber; i++ {
+			additionalFieldsPtr[i] = &additionalFields[i]
+		}
+	}
+
+	vs := []*types.WebhookMessage{}
+	ids := []string{}
+	for rows.Next() {
+		v, id, err := d.scanWebhookMessage(rows, additionalFieldsPtr)
+		if err != nil {
+			rows.Close()
+			return nil, nil, errors.WithStack(err)
+		}
+		vs = append(vs, v)
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+	return vs, ids, nil
+}

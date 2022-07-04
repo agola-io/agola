@@ -24,6 +24,7 @@ import (
 	gitsource "agola.io/agola/internal/gitsources"
 	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/gateway/action"
+	"agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"
 	rstypes "agola.io/agola/services/runservice/types"
 )
@@ -93,16 +94,6 @@ func (n *NotificationService) updateCommitStatus(ctx context.Context, ev *rstype
 	if la == nil {
 		return errors.Errorf("linked account %q for user %q doesn't exist", project.LinkedAccountID, user.Name)
 	}
-	rs, _, err := n.configstoreClient.GetRemoteSource(ctx, la.RemoteSourceID)
-	if err != nil {
-		return errors.Wrapf(err, "failed to get remote source %q", la.RemoteSourceID)
-	}
-
-	// TODO(sgotti) handle refreshing oauth2 tokens
-	gitSource, err := common.GetGitSource(rs, la)
-	if err != nil {
-		return errors.Wrapf(err, "failed to create gitea client")
-	}
 
 	targetURL, err := webRunURL(n.c.WebExposedURL, project.ID, run.Run.Counter)
 	if err != nil {
@@ -111,11 +102,55 @@ func (n *NotificationService) updateCommitStatus(ctx context.Context, ev *rstype
 	description := statusDescription(commitStatus)
 	context := fmt.Sprintf("%s/%s/%s", n.gc.ID, project.Name, run.RunConfig.Name)
 
-	if err := gitSource.CreateCommitStatus(project.RepositoryPath, run.Run.Annotations[action.AnnotationCommitSHA], commitStatus, targetURL, description, context); err != nil {
-		return errors.WithStack(err)
+	if _, _, err = n.configstoreClient.CreateWebookMessage(ctx, &types.CreateWebhookMessageRequest{ProjectID: &project.ID, CommitStatus: string(commitStatus), TargetURL: targetURL, Description: description, RepositoryPath: project.RepositoryPath, CommitSha: run.Run.Annotations[action.AnnotationCommitSHA], StatusContext: context}); err != nil {
+		return errors.Wrapf(err, "failed to create webhook message for project ref %s", project.ID)
+	}
+
+	hooks, err := n.getProjectHooksByEvent(ctx, project.ID, commitStatus)
+	if err != nil {
+		return errors.Wrapf(err, "failed to hooks for project ref %s", project.ID)
+	}
+	for _, hook := range hooks {
+		if _, _, err = n.configstoreClient.CreateWebookMessage(ctx, &types.CreateWebhookMessageRequest{IsCustom: true, CommitStatus: string(commitStatus), TargetURL: targetURL, Description: description, RepositoryPath: project.RepositoryPath, CommitSha: run.Run.Annotations[action.AnnotationCommitSHA], StatusContext: context, DestinationURL: &hook.DestinationURL, ContentType: hook.ContentType, Secret: hook.Secret}); err != nil {
+			return errors.Wrapf(err, "failed to create custom webhook message for project ref %s and hooks id %q", project.ID, hook.ID)
+		}
 	}
 
 	return nil
+}
+
+func (n *NotificationService) getProjectHooksByEvent(ctx context.Context, projectRef string, status gitsource.CommitStatus) ([]*cstypes.Hook, error) {
+	hooks, _, err := n.configstoreClient.GetProjectHooks(ctx, projectRef)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get hooks by project ref%s", projectRef)
+	}
+
+	result := []*cstypes.Hook{}
+
+	for _, hook := range hooks {
+		switch status {
+		case gitsource.CommitStatusPending:
+			if hook.PendingEvent == nil || !*hook.PendingEvent {
+				continue
+			}
+		case gitsource.CommitStatusSuccess:
+			if hook.SuccessEvent == nil || !*hook.SuccessEvent {
+				continue
+			}
+		case gitsource.CommitStatusFailed:
+			if hook.FailedEvent == nil || !*hook.FailedEvent {
+				continue
+			}
+		case gitsource.CommitStatusError:
+			if hook.ErrorEvent == nil || !*hook.ErrorEvent {
+				continue
+			}
+		}
+
+		result = append(result, hook)
+	}
+
+	return result, nil
 }
 
 func webRunURL(webExposedURL, projectID string, runNumber uint64) (string, error) {

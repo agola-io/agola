@@ -96,10 +96,6 @@ func (n *NotificationService) runEventsHandler(ctx context.Context) error {
 				return errors.WithStack(err)
 			}
 
-			// TODO(sgotti)
-			// this is just a basic handling. Improve it to store received events and
-			// their status in the db so we can also do more logic like retrying and handle
-			// multiple kind of notifications (email etc...)
 			if err := n.updateCommitStatus(ctx, ev); err != nil {
 				n.log.Info().Msgf("failed to update commit status: %v", err)
 			}

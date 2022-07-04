@@ -28,6 +28,7 @@ import (
 
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/util"
+	"agola.io/agola/services/gateway/api/types"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 )
 
@@ -636,4 +637,42 @@ func (c *Client) GetUserOrgs(ctx context.Context) ([]*gwapitypes.UserOrgsRespons
 	userOrgs := []*gwapitypes.UserOrgsResponse{}
 	resp, err := c.getParsedResponse(ctx, "GET", "/user/orgs", nil, jsonContent, nil, &userOrgs)
 	return userOrgs, resp, errors.WithStack(err)
+}
+
+func (c *Client) GetHook(ctx context.Context, hookID string) (*types.HookResponse, *http.Response, error) {
+	hook := new(types.HookResponse)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/hooks/%s", hookID), nil, jsonContent, nil, hook)
+	return hook, resp, errors.WithStack(err)
+}
+
+func (c *Client) CreateHook(ctx context.Context, req *gwapitypes.CreateHookRequest) (*types.HookResponse, *http.Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+
+	hook := new(types.HookResponse)
+	resp, err := c.getParsedResponse(ctx, "POST", "/hooks", nil, jsonContent, bytes.NewReader(reqj), hook)
+	return hook, resp, errors.WithStack(err)
+}
+
+func (c *Client) UpdateHook(ctx context.Context, hookID string, req *gwapitypes.UpdateHookRequest) (*types.HookResponse, *http.Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+
+	hook := new(types.HookResponse)
+	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/hooks/%s", hookID), nil, jsonContent, bytes.NewReader(reqj), hook)
+	return hook, resp, errors.WithStack(err)
+}
+
+func (c *Client) DeleteHook(ctx context.Context, hookID string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/hooks/%s", hookID), nil, jsonContent, nil)
+}
+
+func (c *Client) GetProjectHooks(ctx context.Context, projectRef string) ([]*types.HookResponse, *http.Response, error) {
+	hooks := []*types.HookResponse{}
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s/hooks", projectRef), nil, jsonContent, nil, &hooks)
+	return hooks, resp, errors.WithStack(err)
 }

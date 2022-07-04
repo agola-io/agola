@@ -163,6 +163,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	projectReconfigHandler := api.NewProjectReconfigHandler(g.log, g.ah)
 	projectUpdateRepoLinkedAccountHandler := api.NewProjectUpdateRepoLinkedAccountHandler(g.log, g.ah)
 	projectCreateRunHandler := api.NewProjectCreateRunHandler(g.log, g.ah)
+	projectHooksHandler := api.NewProjectHooksHandler(g.log, g.ah)
 
 	secretHandler := api.NewSecretHandler(g.log, g.ah)
 	createSecretHandler := api.NewCreateSecretHandler(g.log, g.ah)
@@ -218,6 +219,11 @@ func (g *Gateway) Run(ctx context.Context) error {
 	userRunLogsHandler := api.NewLogsHandler(g.log, g.ah, common.GroupTypeUser)
 	userRunLogsDeleteHandler := api.NewLogsDeleteHandler(g.log, g.ah, common.GroupTypeUser)
 
+	hookHandler := api.NewHookHandler(g.log, g.ah)
+	createHookHandler := api.NewCreateHookHandler(g.log, g.ah)
+	updateHookHandler := api.NewUpdateHookHandler(g.log, g.ah)
+	deleteHookHandler := api.NewDeleteHookHandler(g.log, g.ah)
+
 	userRemoteReposHandler := api.NewUserRemoteReposHandler(g.log, g.ah, g.configstoreClient)
 
 	badgeHandler := api.NewBadgeHandler(g.log, g.ah)
@@ -263,6 +269,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/projects/{projectref}/runs/{runnumber}/tasks/{taskid}/actions", authForcedHandler(projectRunTaskActionsHandler)).Methods("PUT")
 	apirouter.Handle("/projects/{projectref}/runs/{runnumber}/tasks/{taskid}/logs", authOptionalHandler(projectRunLogsHandler)).Methods("GET")
 	apirouter.Handle("/projects/{projectref}/runs/{runnumber}/tasks/{taskid}/logs", authForcedHandler(projectRunLogsDeleteHandler)).Methods("DELETE")
+	apirouter.Handle("/projects/{projectref}/hooks", authForcedHandler(projectHooksHandler)).Methods("GET")
 
 	apirouter.Handle("/projectgroups/{projectgroupref}/secrets", authForcedHandler(secretHandler)).Methods("GET")
 	apirouter.Handle("/projects/{projectref}/secrets", authForcedHandler(secretHandler)).Methods("GET")
@@ -316,6 +323,11 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/orgs/{orgref}/members", authForcedHandler(orgMembersHandler)).Methods("GET")
 	apirouter.Handle("/orgs/{orgref}/members/{userref}", authForcedHandler(addOrgMemberHandler)).Methods("PUT")
 	apirouter.Handle("/orgs/{orgref}/members/{userref}", authForcedHandler(removeOrgMemberHandler)).Methods("DELETE")
+
+	apirouter.Handle("/hooks/{hookid}", authForcedHandler(hookHandler)).Methods("GET")
+	apirouter.Handle("/hooks", authForcedHandler(createHookHandler)).Methods("POST")
+	apirouter.Handle("/hooks/{hookid}", authForcedHandler(updateHookHandler)).Methods("PUT")
+	apirouter.Handle("/hooks/{hookid}", authForcedHandler(deleteHookHandler)).Methods("DELETE")
 
 	apirouter.Handle("/user/remoterepos/{remotesourceref}", authForcedHandler(userRemoteReposHandler)).Methods("GET")
 

@@ -17,7 +17,9 @@ package tests
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -28,10 +30,12 @@ import (
 	"time"
 
 	"agola.io/agola/internal/errors"
+	gitsource "agola.io/agola/internal/gitsources"
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/configstore"
 	"agola.io/agola/internal/services/executor"
 	"agola.io/agola/internal/services/gateway"
+	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/services/gitserver"
 	"agola.io/agola/internal/services/notification"
 	rsscheduler "agola.io/agola/internal/services/runservice"
@@ -45,6 +49,7 @@ import (
 
 	"code.gitea.io/sdk/gitea"
 	"github.com/google/go-cmp/cmp"
+	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
 	"gopkg.in/src-d/go-billy.v4/memfs"
 	"gopkg.in/src-d/go-billy.v4/osfs"
@@ -56,6 +61,8 @@ import (
 	"gopkg.in/src-d/go-git.v4/plumbing/transport/http"
 	"gopkg.in/src-d/go-git.v4/storage/filesystem"
 	"gopkg.in/src-d/go-git.v4/storage/memory"
+
+	nethttp "net/http"
 )
 
 const (
@@ -1927,4 +1934,556 @@ func TestUserOrgs(t *testing.T) {
 	if diff := cmp.Diff(expectedOrgs, orgs); diff != "" {
 		t.Fatalf("user orgs mismatch (-want +got):\n%s", diff)
 	}
+}
+
+func TestHooks(t *testing.T) {
+	dir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	tgitea, c := setup(ctx, t, dir, true)
+	defer shutdownGitea(tgitea)
+
+	giteaTokenUser01, tokenUser01 := createLinkedAccount(ctx, t, tgitea, c)
+
+	giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
+
+	giteaClient := gitea.NewClient(giteaAPIURL, giteaTokenUser01)
+	gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, tokenUser01)
+
+	_, project := createProject(ctx, t, giteaClient, gwClient)
+
+	expectedUnauthorizedErr := util.NewRemoteError(util.ErrUnauthorized, "", "")
+	expectedNotExistErr := util.NewRemoteError(util.ErrNotExist, "", "")
+
+	//create update read a hook
+
+	creq := &gwapitypes.CreateHookRequest{ProjectRef: project.ID, DestinationURL: "http://test", ContentType: "application/json", Secret: "secrettest", PendingEvent: util.BoolP(true), SuccessEvent: util.BoolP(true), ErrorEvent: util.BoolP(true), FailedEvent: util.BoolP(true)}
+
+	hook, _, err := gwClient.CreateHook(ctx, creq)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	ureq := &gwapitypes.UpdateHookRequest{DestinationURL: "http://test2", ContentType: "application/json", Secret: "secrettest", PendingEvent: util.BoolP(false), SuccessEvent: util.BoolP(true), ErrorEvent: util.BoolP(true), FailedEvent: util.BoolP(true)}
+
+	if _, _, err = gwClient.UpdateHook(ctx, hook.ID, ureq); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	expectedHook := &gwapitypes.HookResponse{ID: hook.ID, ProjectRef: project.ID, DestinationURL: "http://test2", ContentType: "application/json", Secret: "secrettest", PendingEvent: util.BoolP(false), SuccessEvent: util.BoolP(true), ErrorEvent: util.BoolP(true), FailedEvent: util.BoolP(true)}
+
+	hook, _, err = gwClient.GetHook(ctx, hook.ID)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if diff := cmp.Diff(expectedHook, hook); diff != "" {
+		t.Fatalf("hook mismatch (-want +got):\n%s", diff)
+	}
+
+	//create, update, delete an hook with a not owner user
+
+	gwClient = gwclient.NewClient(c.Gateway.APIExposedURL, c.Gateway.AdminToken)
+
+	user, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: "user02"})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	tokenUser02, _, err := gwClient.CreateUserToken(ctx, user.ID, &gwapitypes.CreateUserTokenRequest{TokenName: "test"})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	gwClient = gwclient.NewClient(c.Gateway.APIExposedURL, tokenUser02.Token)
+
+	_, _, err = gwClient.CreateHook(ctx, creq)
+	if err == nil {
+		t.Fatalf("got nil error, want error: %v", expectedUnauthorizedErr)
+	} else if !strings.HasPrefix(err.Error(), expectedUnauthorizedErr.Error()) {
+		t.Fatalf("got error: %v, want error: %v", err, expectedUnauthorizedErr)
+	}
+
+	_, _, err = gwClient.UpdateHook(ctx, hook.ID, ureq)
+	if err == nil {
+		t.Fatalf("got nil error, want error: %v", expectedUnauthorizedErr)
+	} else if !strings.HasPrefix(err.Error(), expectedUnauthorizedErr.Error()) {
+		t.Fatalf("got error: %v, want error: %v", err, expectedUnauthorizedErr)
+	}
+
+	_, err = gwClient.DeleteHook(ctx, hook.ID)
+	if err == nil {
+		t.Fatalf("got nil error, want error: %v", expectedUnauthorizedErr)
+	} else if !strings.HasPrefix(err.Error(), expectedUnauthorizedErr.Error()) {
+		t.Fatalf("got error: %v, want error: %v", err, expectedUnauthorizedErr)
+	}
+
+	//create a hook for a project not existing
+
+	creq.ProjectRef = "test"
+	_, _, err = gwClient.CreateHook(ctx, creq)
+	if err == nil {
+		t.Fatalf("got nil error, want error: %v", expectedNotExistErr)
+	} else if !strings.HasPrefix(err.Error(), expectedNotExistErr.Error()) {
+		t.Fatalf("got error: %v, want error: %v", err, expectedNotExistErr)
+	}
+
+	// Delete a not existing hook
+
+	_, err = gwClient.DeleteHook(ctx, "test")
+	if err == nil {
+		t.Fatalf("got nil error, want error: %v", expectedNotExistErr)
+	} else if !strings.HasPrefix(err.Error(), expectedNotExistErr.Error()) {
+		t.Fatalf("got error: %v, want error: %v", err, expectedNotExistErr)
+	}
+
+	// Delete a hook
+
+	gwClient = gwclient.NewClient(c.Gateway.APIExposedURL, tokenUser01)
+
+	_, err = gwClient.DeleteHook(ctx, hook.ID)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	_, _, err = gwClient.GetHook(ctx, hook.ID)
+	if err == nil {
+		t.Fatalf("got nil error, want error: %v", expectedNotExistErr)
+	} else if !strings.HasPrefix(err.Error(), expectedNotExistErr.Error()) {
+		t.Fatalf("got error: %v, want error: %v", err, expectedNotExistErr)
+	}
+}
+
+func TestGitsourceNotification(t *testing.T) {
+	tests := []struct {
+		name           string
+		config         string
+		commitStatuses []gitea.StatusState
+		result         rstypes.RunResult
+		phase          rstypes.RunPhase
+
+		PendingEvent         bool
+		SuccessEvent         bool
+		ErrorEvent           bool
+		FailedEvent          bool
+		customCommitStatuses []string
+	}{
+		{
+			name: "test run event success with all statuses",
+			config: `
+			{
+			  runs: [
+			    {
+			      name: 'run01',
+			      tasks: [
+			        {
+			          name: 'task01',
+			          runtime: {
+			            containers: [
+			              {
+			                image: 'alpine/git',
+			              },
+			            ],
+			          },
+			          steps: [
+						{ type: 'clone' },
+						{ type: 'run', command: 'env' },
+			          ],
+			        },
+			      ],
+			    },
+			  ],
+			}
+			`,
+			commitStatuses:       []gitea.StatusState{gitea.StatusSuccess, gitea.StatusPending},
+			result:               rstypes.RunResultSuccess,
+			phase:                rstypes.RunPhaseFinished,
+			customCommitStatuses: []string{string(gitsource.CommitStatusPending), string(gitsource.CommitStatusSuccess)},
+			SuccessEvent:         true,
+			PendingEvent:         true,
+			ErrorEvent:           true,
+			FailedEvent:          true,
+		},
+		{
+			name: "test run event failed with all statuses",
+			config: `
+			{
+			  runs: [
+			    {
+			      name: 'run01',
+			      tasks: [
+			        {
+			          name: 'task01',
+			          runtime: {
+			            containers: [
+			              {
+			                image: 'alpine/git',
+			              },
+			            ],
+			          },
+			          steps: [
+						{ type: 'clone' },
+			            { type: 'run', command: 'fail test' },
+			          ],
+			        },
+			      ],
+			      when: {
+			        branch: 'master',
+			      },
+			    },
+			  ],
+			}
+			`,
+			commitStatuses:       []gitea.StatusState{gitea.StatusFailure, gitea.StatusPending},
+			result:               rstypes.RunResultFailed,
+			phase:                rstypes.RunPhaseFinished,
+			SuccessEvent:         true,
+			PendingEvent:         true,
+			ErrorEvent:           true,
+			FailedEvent:          true,
+			customCommitStatuses: []string{string(gitsource.CommitStatusPending), string(gitsource.CommitStatusFailed)},
+		},
+		{
+			name: "test run event error with all statuses",
+			config: `
+				{
+				  runserror:
+				}
+				`,
+			commitStatuses:       []gitea.StatusState{gitea.StatusError},
+			result:               rstypes.RunResultUnknown,
+			phase:                rstypes.RunPhaseSetupError,
+			SuccessEvent:         true,
+			PendingEvent:         true,
+			ErrorEvent:           true,
+			FailedEvent:          true,
+			customCommitStatuses: []string{string(gitsource.CommitStatusError)},
+		},
+		{
+			name: "test run event success without pending status",
+			config: `
+			{
+			  runs: [
+			    {
+			      name: 'run01',
+			      tasks: [
+			        {
+			          name: 'task01',
+			          runtime: {
+			            containers: [
+			              {
+			                image: 'alpine/git',
+			              },
+			            ],
+			          },
+			          steps: [
+						{ type: 'clone' },
+						{ type: 'run', command: 'env' },
+			          ],
+			        },
+			      ],
+			    },
+			  ],
+			}
+			`,
+			commitStatuses:       []gitea.StatusState{gitea.StatusSuccess, gitea.StatusPending},
+			result:               rstypes.RunResultSuccess,
+			phase:                rstypes.RunPhaseFinished,
+			customCommitStatuses: []string{string(gitsource.CommitStatusSuccess)},
+			SuccessEvent:         true,
+			PendingEvent:         false,
+			ErrorEvent:           true,
+			FailedEvent:          true,
+		},
+		{
+			name: "test run event failed without pending status",
+			config: `
+			{
+			  runs: [
+			    {
+			      name: 'run01',
+			      tasks: [
+			        {
+			          name: 'task01',
+			          runtime: {
+			            containers: [
+			              {
+			                image: 'alpine/git',
+			              },
+			            ],
+			          },
+			          steps: [
+						{ type: 'clone' },
+			            { type: 'run', command: 'fail test' },
+			          ],
+			        },
+			      ],
+			      when: {
+			        branch: 'master',
+			      },
+			    },
+			  ],
+			}
+			`,
+			commitStatuses:       []gitea.StatusState{gitea.StatusFailure, gitea.StatusPending},
+			result:               rstypes.RunResultFailed,
+			phase:                rstypes.RunPhaseFinished,
+			SuccessEvent:         true,
+			PendingEvent:         false,
+			ErrorEvent:           true,
+			FailedEvent:          true,
+			customCommitStatuses: []string{string(gitsource.CommitStatusFailed)},
+		},
+		{
+			name: "test run event error without error status",
+			config: `
+				{
+				  runserror:
+				}
+				`,
+			commitStatuses:       []gitea.StatusState{gitea.StatusError},
+			result:               rstypes.RunResultUnknown,
+			phase:                rstypes.RunPhaseSetupError,
+			SuccessEvent:         true,
+			PendingEvent:         true,
+			ErrorEvent:           false,
+			FailedEvent:          true,
+			customCommitStatuses: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			tgitea, c := setup(ctx, t, dir, true)
+			defer shutdownGitea(tgitea)
+
+			giteaToken, tokenUser01 := createLinkedAccount(ctx, t, tgitea, c)
+
+			giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
+
+			giteaClient := gitea.NewClient(giteaAPIURL, giteaToken)
+			gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, tokenUser01)
+
+			csListeningAddress := setupCommitStatusServer(t)
+			csUrl := fmt.Sprintf("http://%s", csListeningAddress)
+
+			go startCommitStatusServer(t, ctx, csListeningAddress)
+
+			giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)
+			if tt.SuccessEvent || tt.FailedEvent || tt.ErrorEvent || tt.PendingEvent {
+				_, _, err := gwClient.CreateHook(ctx, &gwapitypes.CreateHookRequest{ProjectRef: project.ID, DestinationURL: fmt.Sprintf("%s/%s", csUrl, "commitevent"), ContentType: "application/json", PendingEvent: &tt.PendingEvent, SuccessEvent: &tt.SuccessEvent, ErrorEvent: &tt.ErrorEvent, FailedEvent: &tt.FailedEvent})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+			}
+
+			push(t, tt.config, giteaRepo.CloneURL, giteaToken, "commit", false)
+
+			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+				if err != nil {
+					return false, nil
+				}
+
+				if len(runs) == 0 {
+					return false, nil
+				}
+				run := runs[0]
+				if run.Phase != tt.phase {
+					return false, nil
+				}
+
+				return true, nil
+			})
+
+			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			t.Logf("runs: %s", util.Dump(runs))
+
+			if len(runs) != 1 {
+				t.Fatalf("expected %d run got: %d", 1, len(runs))
+			}
+
+			run := runs[0]
+			if run.Phase != tt.phase {
+				t.Fatalf("expected run phase %q, got %q", tt.phase, run.Phase)
+			}
+			if run.Result != tt.result {
+				t.Fatalf("expected run result %q, got %q", tt.result, run.Result)
+			}
+
+			// test gitsource webhook
+			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+				statuses, err := giteaClient.ListStatuses(giteaUser01, giteaRepo.Name, run.Annotations[action.AnnotationCommitSHA], gitea.ListStatusesOption{})
+				if err != nil {
+					return false, nil
+				}
+				if len(statuses) < len(tt.commitStatuses) {
+					return false, nil
+				}
+
+				return true, nil
+			})
+
+			statuses, err := giteaClient.ListStatuses(giteaUser01, giteaRepo.Name, run.Annotations[action.AnnotationCommitSHA], gitea.ListStatusesOption{})
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			if len(statuses) != len(tt.commitStatuses) {
+				t.Fatalf("expected statuses len %d, got %d", len(tt.commitStatuses), len(statuses))
+			}
+			for i, status := range statuses {
+				if status.State != tt.commitStatuses[i] {
+					t.Fatalf("expected status %q, got %q", tt.commitStatuses[i], status.State)
+				}
+			}
+
+			// test custom webhook
+			if len(tt.customCommitStatuses) != 0 {
+				_ = testutil.Wait(30*time.Second, func() (bool, error) {
+					statuses, err := getCommitEvents(t, csUrl)
+					if err != nil {
+						return false, nil
+					}
+					if len(statuses) < len(tt.customCommitStatuses) {
+						return false, nil
+					}
+
+					return true, nil
+				})
+			}
+
+			customCommitStatuses, err := getCommitEvents(t, csUrl)
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			if len(customCommitStatuses) != len(tt.customCommitStatuses) {
+				t.Fatalf("expected statuses len %d, got %d", len(tt.customCommitStatuses), len(customCommitStatuses))
+			}
+
+			for i, status := range customCommitStatuses {
+				if status != tt.customCommitStatuses[i] {
+					t.Fatalf("expected status %q, got %q", tt.customCommitStatuses[i], status)
+				}
+			}
+		})
+	}
+
+}
+
+func setupCommitStatusServer(t *testing.T) string {
+	dockerBridgeAddress := os.Getenv("DOCKER_BRIDGE_ADDRESS")
+	if dockerBridgeAddress == "" {
+		dockerBridgeAddress = "172.17.0.1"
+	}
+	_, port, err := testutil.GetFreePort(true, false)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	return fmt.Sprintf("%s:%s", dockerBridgeAddress, port)
+}
+
+func startCommitStatusServer(t *testing.T, ctx context.Context, url string) {
+	commitStatuses := make([]string, 0)
+
+	router := mux.NewRouter()
+
+	router.Handle("/commitevent", NewCreateCommitEventHandler(t, &commitStatuses)).Methods("POST")
+	router.Handle("/commitevent", NewCommitEventsHandler(t, &commitStatuses)).Methods("GET")
+
+	httpServer := nethttp.Server{
+		Addr:    url,
+		Handler: router,
+	}
+
+	lerrCh := make(chan error)
+	go func() {
+		lerrCh <- httpServer.ListenAndServe()
+	}()
+
+	select {
+	case <-ctx.Done():
+		httpServer.Close()
+	case err := <-lerrCh:
+		if err != nil {
+			ctx.Done()
+		}
+
+	}
+}
+
+type createCommitEventHandler struct {
+	t              *testing.T
+	commitStatuses *[]string
+}
+
+func NewCreateCommitEventHandler(t *testing.T, commitStatuses *[]string) *createCommitEventHandler {
+	return &createCommitEventHandler{t: t, commitStatuses: commitStatuses}
+}
+
+func (h *createCommitEventHandler) ServeHTTP(w nethttp.ResponseWriter, r *nethttp.Request) {
+	var req *notification.WemhookMessage
+	d := json.NewDecoder(r.Body)
+	if err := d.Decode(&req); err != nil {
+		h.t.Fatalf("unexpected err: %v", err)
+		return
+	}
+
+	*h.commitStatuses = append(*h.commitStatuses, req.CommitStatus)
+
+	if err := util.HTTPResponse(w, nethttp.StatusCreated, nil); err != nil {
+		h.t.Fatalf("unexpected err: %v", err)
+	}
+}
+
+type commitEventsHandler struct {
+	t              *testing.T
+	commitStatuses *[]string
+}
+
+func NewCommitEventsHandler(t *testing.T, commitStatuses *[]string) *commitEventsHandler {
+	return &commitEventsHandler{t: t, commitStatuses: commitStatuses}
+}
+
+func (h *commitEventsHandler) ServeHTTP(w nethttp.ResponseWriter, r *nethttp.Request) {
+	if err := util.HTTPResponse(w, nethttp.StatusOK, h.commitStatuses); err != nil {
+		h.t.Fatalf("unexpected err: %v", err)
+	}
+}
+
+func getCommitEvents(t *testing.T, url string) ([]string, error) {
+	client := &nethttp.Client{}
+
+	urlRequest := fmt.Sprintf("%s/%s", url, "commitevent")
+
+	var ibody io.Reader
+	req, err := nethttp.NewRequest("GET", urlRequest, ibody)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	defer resp.Body.Close()
+
+	d := json.NewDecoder(resp.Body)
+	var commitEvents []string
+	if err = d.Decode(&commitEvents); err != nil {
+		return nil, err
+	}
+
+	return commitEvents, nil
 }

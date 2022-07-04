@@ -91,6 +91,22 @@ var (
 	variableQUpdate = func(id string, revision uint64, name, parentID string, parentKind types.ObjectKind, data []byte) sq.UpdateBuilder {
 		return sb.Update("variable_q").SetMap(map[string]interface{}{"id": id, "revision": revision, "name": name, "parent_id": parentID, "parent_kind": parentKind, "data": data}).Where(sq.Eq{"id": id})
 	}
+
+	hookQSelect = sb.Select("hook_q.id", "hook_q.revision", "hook_q.data").From("hook_q")
+	hookQInsert = func(id string, revision uint64, projectID string, data []byte) sq.InsertBuilder {
+		return sb.Insert("hook_q").Columns("id", "revision", "project_id", "data").Values(id, revision, projectID, data)
+	}
+	hookQUpdate = func(id string, revision uint64, projectID string, data []byte) sq.UpdateBuilder {
+		return sb.Update("hook_q").SetMap(map[string]interface{}{"id": id, "revision": revision, "project_id": projectID, "data": data}).Where(sq.Eq{"id": id})
+	}
+
+	webhookMessageQSelect = sb.Select("webhookmessage_q.id", "webhookmessage_q.revision", "webhookmessage_q.data").From("webhookmessage_q")
+	webhookMessageQInsert = func(id string, revision uint64, data []byte) sq.InsertBuilder {
+		return sb.Insert("webhookmessage_q").Columns("id", "revision", "data").Values(id, revision, data)
+	}
+	webhookMessageQUpdate = func(id string, revision uint64, data []byte) sq.UpdateBuilder {
+		return sb.Update("webhookmessage_q").SetMap(map[string]interface{}{"id": id, "revision": revision, "data": data}).Where(sq.Eq{"id": id})
+	}
 )
 
 func (d *DB) InsertObjectQ(tx *sql.Tx, obj stypes.Object, data []byte) error {
@@ -115,6 +131,10 @@ func (d *DB) InsertObjectQ(tx *sql.Tx, obj stypes.Object, data []byte) error {
 		return d.insertSecretQ(tx, obj.(*types.Secret), data)
 	case types.VariableKind:
 		return d.insertVariableQ(tx, obj.(*types.Variable), data)
+	case types.HookKind:
+		return d.insertHookQ(tx, obj.(*types.Hook), data)
+	case types.WebhookMessageKind:
+		return d.insertWebhookMessageQ(tx, obj.(*types.WebhookMessage), data)
 
 	default:
 		panic(errors.Errorf("unknown object kind %q", obj.GetKind()))
@@ -376,6 +396,58 @@ func (d *DB) updateVariableQ(tx *sql.Tx, variable *types.Variable, data []byte) 
 func (d *DB) deleteVariableQ(tx *sql.Tx, id string) error {
 	if _, err := tx.Exec("delete from variable_q where id = $1", id); err != nil {
 		return errors.Wrapf(err, "failed to delete variable_q")
+	}
+
+	return nil
+}
+
+func (d *DB) deleteHookQ(tx *sql.Tx, id string) error {
+	if _, err := tx.Exec("delete from hook_q where id = $1", id); err != nil {
+		return errors.Wrapf(err, "failed to delete hook_q")
+	}
+
+	return nil
+}
+
+func (d *DB) insertHookQ(tx *sql.Tx, hook *types.Hook, data []byte) error {
+	q := hookQInsert(hook.ID, hook.Revision, hook.ProjectID, data)
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrapf(err, "failed to insert hook_q")
+	}
+
+	return nil
+}
+
+func (d *DB) updateHookQ(tx *sql.Tx, hook *types.Hook, data []byte) error {
+	q := hookQUpdate(hook.ID, hook.Revision, hook.ProjectID, data)
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrapf(err, "failed to insert hook_q")
+	}
+
+	return nil
+}
+
+func (d *DB) deleteWebhookMessageQ(tx *sql.Tx, id string) error {
+	if _, err := tx.Exec("delete from webhookmessage_q where id = $1", id); err != nil {
+		return errors.Wrapf(err, "failed to delete webhookmessage_q")
+	}
+
+	return nil
+}
+
+func (d *DB) insertWebhookMessageQ(tx *sql.Tx, webhookMessage *types.WebhookMessage, data []byte) error {
+	q := webhookMessageQInsert(webhookMessage.ID, webhookMessage.Revision, data)
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrapf(err, "failed to insert webhookmessage_q")
+	}
+
+	return nil
+}
+
+func (d *DB) updateWebhookMessageQ(tx *sql.Tx, webhookMessage *types.WebhookMessage, data []byte) error {
+	q := webhookMessageQUpdate(webhookMessage.ID, webhookMessage.Revision, data)
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrapf(err, "failed to insert webhookmessage_q")
 	}
 
 	return nil

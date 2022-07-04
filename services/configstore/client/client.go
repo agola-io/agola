@@ -579,3 +579,68 @@ func (c *Client) GetOrgMembers(ctx context.Context, orgRef string) ([]*csapitype
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s/members", orgRef), nil, jsonContent, nil, &orgMembers)
 	return orgMembers, resp, errors.WithStack(err)
 }
+
+func (c *Client) GetHook(ctx context.Context, hookID string) (*cstypes.Hook, *http.Response, error) {
+	hook := new(cstypes.Hook)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/hooks/%s", hookID), nil, jsonContent, nil, hook)
+	return hook, resp, errors.WithStack(err)
+}
+
+func (c *Client) CreateHook(ctx context.Context, req *csapitypes.CreateHookRequest) (*cstypes.Hook, *http.Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+
+	hook := new(cstypes.Hook)
+	resp, err := c.getParsedResponse(ctx, "POST", "/hooks", nil, jsonContent, bytes.NewReader(reqj), hook)
+	return hook, resp, errors.WithStack(err)
+}
+
+func (c *Client) UpdateHook(ctx context.Context, hookID string, req *csapitypes.UpdateHookRequest) (*cstypes.Hook, *http.Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+
+	hook := new(cstypes.Hook)
+	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/hooks/%s", hookID), nil, jsonContent, bytes.NewReader(reqj), hook)
+	return hook, resp, errors.WithStack(err)
+}
+
+func (c *Client) DeleteHook(ctx context.Context, hookID string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/hooks/%s", hookID), nil, jsonContent, nil)
+}
+
+func (c *Client) GetProjectHooks(ctx context.Context, projectRef string) ([]*cstypes.Hook, *http.Response, error) {
+	hooks := []*cstypes.Hook{}
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s/hooks", projectRef), nil, jsonContent, nil, &hooks)
+	return hooks, resp, errors.WithStack(err)
+}
+
+func (c *Client) GetWebhookMessage(ctx context.Context, webhookMessageID string) (*cstypes.WebhookMessage, *http.Response, error) {
+	webhookMessage := new(cstypes.WebhookMessage)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/webhookmessages/%s", webhookMessageID), nil, jsonContent, nil, webhookMessage)
+	return webhookMessage, resp, errors.WithStack(err)
+}
+
+func (c *Client) CreateWebookMessage(ctx context.Context, req *csapitypes.CreateWebhookMessageRequest) (*cstypes.WebhookMessage, *http.Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+
+	webhookMessage := new(cstypes.WebhookMessage)
+	resp, err := c.getParsedResponse(ctx, "POST", "/webhookmessages", nil, jsonContent, bytes.NewReader(reqj), webhookMessage)
+	return webhookMessage, resp, errors.WithStack(err)
+}
+
+func (c *Client) DeleteWebookMessage(ctx context.Context, webhookMessageID string) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/webhookmessages/%s", webhookMessageID), nil, jsonContent, nil)
+}
+
+func (c *Client) GetWebhookMessages(ctx context.Context) ([]*cstypes.WebhookMessage, *http.Response, error) {
+	webhookMessages := []*cstypes.WebhookMessage{}
+	resp, err := c.getParsedResponse(ctx, "GET", "/webhookmessages", nil, jsonContent, nil, &webhookMessages)
+	return webhookMessages, resp, errors.WithStack(err)
+}

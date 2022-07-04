@@ -38,6 +38,8 @@ var dstmts = []string{
 	"create table if not exists project (id varchar, revision bigint, data bytea, PRIMARY KEY (id))",
 	"create table if not exists secret (id varchar, revision bigint, data bytea, PRIMARY KEY (id))",
 	"create table if not exists variable (id varchar, revision bigint, data bytea, PRIMARY KEY (id))",
+	"create table if not exists hook (id varchar, revision bigint, data bytea, PRIMARY KEY (id))",
+	"create table if not exists webhookmessage (id varchar, revision bigint, data bytea, PRIMARY KEY (id))",
 }
 
 var qstmts = []string{
@@ -52,6 +54,8 @@ var qstmts = []string{
 	"create table if not exists project_q (id varchar, revision bigint, name varchar, parent_id varchar, parent_kind varchar, data bytea, PRIMARY KEY (id))",
 	"create table if not exists secret_q (id varchar, revision bigint, name varchar, parent_id varchar, parent_kind varchar, data bytea, PRIMARY KEY (id))",
 	"create table if not exists variable_q (id varchar, revision bigint, name varchar, parent_id varchar, parent_kind varchar, data bytea, PRIMARY KEY (id))",
+	"create table if not exists hook_q (id varchar, revision bigint, project_id varchar, data bytea, PRIMARY KEY (id))",
+	"create table if not exists webhookmessage_q (id varchar, revision bigint, data bytea, PRIMARY KEY (id))",
 }
 
 // denormalized tables for querying, can be rebuilt by query tables.
@@ -149,6 +153,10 @@ func (d *DB) UnmarshalObject(data []byte) (stypes.Object, error) {
 		obj = &types.Secret{}
 	case types.VariableKind:
 		obj = &types.Variable{}
+	case types.HookKind:
+		obj = &types.Hook{}
+	case types.WebhookMessageKind:
+		obj = &types.WebhookMessage{}
 	default:
 		panic(errors.Errorf("unknown object kind %q", om.Kind))
 	}
@@ -181,6 +189,10 @@ func (d *DB) InsertRawObject(tx *sql.Tx, obj stypes.Object) ([]byte, error) {
 		return d.insertRawSecretData(tx, obj.(*types.Secret))
 	case types.VariableKind:
 		return d.insertRawVariableData(tx, obj.(*types.Variable))
+	case types.HookKind:
+		return d.insertRawHookData(tx, obj.(*types.Hook))
+	case types.WebhookMessageKind:
+		return d.insertRawWebhookMessageData(tx, obj.(*types.WebhookMessage))
 	default:
 		panic(errors.Errorf("unknown object kind %q", obj.GetKind()))
 	}
@@ -1221,4 +1233,54 @@ func (d *DB) GetAllVariables(tx *sql.Tx) ([]*types.Variable, error) {
 	variables, _, err := d.fetchVariables(tx, q)
 
 	return variables, errors.WithStack(err)
+}
+
+func (d *DB) GetHook(tx *sql.Tx, hookID string) (*types.Hook, error) {
+	q := hookQSelect.Where(sq.Eq{"id": hookID})
+	hooks, _, err := d.fetchHooks(tx, q)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	if len(hooks) > 1 {
+		return nil, errors.Errorf("too many rows returned")
+	}
+	if len(hooks) == 0 {
+		return nil, nil
+	}
+	return hooks[0], nil
+}
+
+func (d *DB) GetHooks(tx *sql.Tx, projectID string) ([]*types.Hook, error) {
+	q := hookQSelect.Where(sq.Eq{"project_id": projectID})
+	hooks, _, err := d.fetchHooks(tx, q)
+
+	return hooks, errors.WithStack(err)
+}
+
+func (d *DB) GetAllHooks(tx *sql.Tx) ([]*types.Hook, error) {
+	q := hookQSelect.OrderBy("id")
+	hooks, _, err := d.fetchHooks(tx, q)
+
+	return hooks, errors.WithStack(err)
+}
+
+func (d *DB) GetWebhookMessage(tx *sql.Tx, webhookMessageID string) (*types.WebhookMessage, error) {
+	q := webhookMessageQSelect.Where(sq.Eq{"id": webhookMessageID})
+	webhookMessages, _, err := d.fetchWebhookMessages(tx, q)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	if len(webhookMessages) > 1 {
+		return nil, errors.Errorf("too many rows returned")
+	}
+	if len(webhookMessages) == 0 {
+		return nil, nil
+	}
+	return webhookMessages[0], nil
+}
+
+func (d *DB) GetAllWebhookMessagess(tx *sql.Tx) ([]*types.WebhookMessage, error) {
+	webhookMessages, _, err := d.fetchWebhookMessages(tx, webhookMessageQSelect)
+
+	return webhookMessages, errors.WithStack(err)
 }

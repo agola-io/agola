@@ -284,3 +284,37 @@ func (h *ProjectCreateRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
 		h.log.Err(err).Send()
 	}
 }
+
+type ProjectHooksHandler struct {
+	log zerolog.Logger
+	ah  *action.ActionHandler
+}
+
+func NewProjectHooksHandler(log zerolog.Logger, ah *action.ActionHandler) *ProjectHooksHandler {
+	return &ProjectHooksHandler{log: log, ah: ah}
+}
+
+func (h *ProjectHooksHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	projectRef, err := url.PathUnescape(vars["projectref"])
+	if err != nil {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		return
+	}
+
+	hooks, err := h.ah.GetProjectHooks(ctx, projectRef)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	res := make([]*gwapitypes.HookResponse, len(hooks))
+	for i, userOrg := range hooks {
+		res[i] = createHookResponse(userOrg)
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}

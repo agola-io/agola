@@ -78,6 +78,7 @@ func NewNotificationService(ctx context.Context, log zerolog.Logger, gc *config.
 
 func (n *NotificationService) Run(ctx context.Context) error {
 	go n.runEventsHandlerLoop(ctx)
+	go n.webhooksSenderHandlerLoop(ctx)
 
 	<-ctx.Done()
 	n.log.Info().Msgf("notification service exiting")

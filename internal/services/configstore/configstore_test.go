@@ -152,6 +152,28 @@ func getVariables(ctx context.Context, cs *Configstore) ([]*types.Variable, erro
 	return variables, errors.WithStack(err)
 }
 
+func getHooks(ctx context.Context, cs *Configstore) ([]*types.Hook, error) {
+	var hooks []*types.Hook
+	err := cs.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		hooks, err = cs.d.GetAllHooks(tx)
+		return errors.WithStack(err)
+	})
+
+	return hooks, errors.WithStack(err)
+}
+
+func getWebhookMessagess(ctx context.Context, cs *Configstore) ([]*types.WebhookMessage, error) {
+	var webhookMessages []*types.WebhookMessage
+	err := cs.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		webhookMessages, err = cs.d.GetAllWebhookMessagess(tx)
+		return errors.WithStack(err)
+	})
+
+	return webhookMessages, errors.WithStack(err)
+}
+
 func compareObjects(u1, u2 interface{}) bool {
 	if diff := cmp.Diff(u1, u2); diff != "" {
 		return false
@@ -179,6 +201,8 @@ func TestExportImport(t *testing.T) {
 	var expectedProjectsCount int
 	var expectedSecretsCount int
 	var expectedVariablesCount int
+	var expectedHooksCount int
+	var expectedWebhookMessagesCount int
 
 	if _, err := cs.ah.CreateRemoteSource(ctx, &action.CreateUpdateRemoteSourceRequest{Name: "rs01", Type: types.RemoteSourceTypeGitea, AuthType: types.RemoteSourceAuthTypePassword, APIURL: "http://example.com"}); err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -248,6 +272,15 @@ func TestExportImport(t *testing.T) {
 	}
 	expectedVariablesCount++
 
+	if _, err := cs.ah.CreateHook(ctx, &action.CreateHookRequest{DestinationURL: "http://testhook", ProjectRef: path.Join("user", user.Name, "projectgroup01", "project01"), ContentType: "application/json", Secret: "secret01", PendingEvent: true, SuccessEvent: true, ErrorEvent: true, FailedEvent: true}); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedHooksCount++
+	if _, err := cs.ah.CreateWebhookMessage(ctx, &action.CreateWebhookMessageRequest{DestinationURL: "http://testhook", ContentType: "application/json", Secret: "secret01", TargetURL: "http://test", CommitStatus: "running", Description: "test event", RepositoryPath: "testbranch", CommitSha: "test123456", IsCustom: true, StatusContext: "statuscontexttest"}); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedWebhookMessagesCount++
+
 	remoteSources, err := getRemoteSources(ctx, cs)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -273,6 +306,14 @@ func TestExportImport(t *testing.T) {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	variables, err := getVariables(ctx, cs)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	hooks, err := getHooks(ctx, cs)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	webhookMessages, err := getWebhookMessagess(ctx, cs)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -304,6 +345,14 @@ func TestExportImport(t *testing.T) {
 	if len(variables) != expectedVariablesCount {
 		t.Logf("variables: %s", util.Dump(variables))
 		t.Fatalf("expected %d variables, got %d variables", expectedVariablesCount, len(variables))
+	}
+	if len(hooks) != expectedHooksCount {
+		t.Logf("hooks: %s", util.Dump(hooks))
+		t.Fatalf("expected %d hooks, got %d hooks", expectedHooksCount, len(hooks))
+	}
+	if len(webhookMessages) != expectedWebhookMessagesCount {
+		t.Logf("webhookMessages: %s", util.Dump(webhookMessages))
+		t.Fatalf("expected %d webhookMessages, got %d webhookMessages", expectedWebhookMessagesCount, len(webhookMessages))
 	}
 
 	var export bytes.Buffer
@@ -355,6 +404,14 @@ func TestExportImport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
+	newHooks, err := getHooks(ctx, cs)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	newWebhookMessages, err := getWebhookMessagess(ctx, cs)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 
 	if !compareObjects(remoteSources, newRemoteSources) {
 		t.Fatalf("remoteSources are different between before and after import")
@@ -376,6 +433,12 @@ func TestExportImport(t *testing.T) {
 	}
 	if !compareObjects(variables, newVariables) {
 		t.Fatalf("variables are different between before and after import")
+	}
+	if !compareObjects(hooks, newHooks) {
+		t.Fatalf("hooks are different between before and after import")
+	}
+	if !compareObjects(webhookMessages, newWebhookMessages) {
+		t.Fatalf("webhookMessages are different between before and after import")
 	}
 }
 

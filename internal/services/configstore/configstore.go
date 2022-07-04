@@ -147,6 +147,7 @@ func (s *Configstore) setupDefaultRouter() http.Handler {
 	createProjectHandler := api.NewCreateProjectHandler(s.log, s.ah, s.d)
 	updateProjectHandler := api.NewUpdateProjectHandler(s.log, s.ah, s.d)
 	deleteProjectHandler := api.NewDeleteProjectHandler(s.log, s.ah)
+	projectHooksHandler := api.NewProjectHooksHandler(s.log, s.ah)
 
 	secretsHandler := api.NewSecretsHandler(s.log, s.ah, s.d)
 	createSecretHandler := api.NewCreateSecretHandler(s.log, s.ah)
@@ -190,6 +191,16 @@ func (s *Configstore) setupDefaultRouter() http.Handler {
 	updateRemoteSourceHandler := api.NewUpdateRemoteSourceHandler(s.log, s.ah)
 	deleteRemoteSourceHandler := api.NewDeleteRemoteSourceHandler(s.log, s.ah)
 
+	hookHandler := api.NewHookHandler(s.log, s.ah)
+	createHookHandler := api.NewCreateHookHandler(s.log, s.ah)
+	updateHookHandler := api.NewUpdateHookHandler(s.log, s.ah)
+	deleteHookHandler := api.NewDeleteHookHandler(s.log, s.ah)
+
+	webhookMessagesHandler := api.NewWebhookMessagesHandler(s.log, s.ah)
+	webhookMessageHandler := api.NewWebhookMessageHandler(s.log, s.ah)
+	createWebhookMessageHandler := api.NewCreateWebhookMessageHandler(s.log, s.ah)
+	deleteWebhookMessageHandler := api.NewDeleteWebhookMessageHandler(s.log, s.ah)
+
 	router := mux.NewRouter()
 	apirouter := router.PathPrefix("/api/v1alpha").Subrouter().UseEncodedPath()
 
@@ -204,6 +215,7 @@ func (s *Configstore) setupDefaultRouter() http.Handler {
 	apirouter.Handle("/projects", createProjectHandler).Methods("POST")
 	apirouter.Handle("/projects/{projectref}", updateProjectHandler).Methods("PUT")
 	apirouter.Handle("/projects/{projectref}", deleteProjectHandler).Methods("DELETE")
+	apirouter.Handle("/projects/{projectref}/hooks", projectHooksHandler).Methods("GET")
 
 	apirouter.Handle("/projectgroups/{projectgroupref}/secrets", secretsHandler).Methods("GET")
 	apirouter.Handle("/projects/{projectref}/secrets", secretsHandler).Methods("GET")
@@ -252,6 +264,16 @@ func (s *Configstore) setupDefaultRouter() http.Handler {
 	apirouter.Handle("/remotesources", createRemoteSourceHandler).Methods("POST")
 	apirouter.Handle("/remotesources/{remotesourceref}", updateRemoteSourceHandler).Methods("PUT")
 	apirouter.Handle("/remotesources/{remotesourceref}", deleteRemoteSourceHandler).Methods("DELETE")
+
+	apirouter.Handle("/hooks/{hookid}", hookHandler).Methods("GET")
+	apirouter.Handle("/hooks", createHookHandler).Methods("POST")
+	apirouter.Handle("/hooks/{hookid}", updateHookHandler).Methods("PUT")
+	apirouter.Handle("/hooks/{hookid}", deleteHookHandler).Methods("DELETE")
+
+	apirouter.Handle("/webhookmessages", webhookMessagesHandler).Methods("GET")
+	apirouter.Handle("/webhookmessages/{webhookmessageid}", webhookMessageHandler).Methods("GET")
+	apirouter.Handle("/webhookmessages", createWebhookMessageHandler).Methods("POST")
+	apirouter.Handle("/webhookmessages/{webhookmessageid}", deleteWebhookMessageHandler).Methods("DELETE")
 
 	apirouter.Handle("/maintenance", maintenanceModeHandler).Methods("PUT", "DELETE")
 
