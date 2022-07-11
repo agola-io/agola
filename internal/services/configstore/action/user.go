@@ -389,7 +389,7 @@ func (h *ActionHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLAReque
 		la.Oauth2RefreshToken = req.Oauth2RefreshToken
 		la.Oauth2AccessTokenExpiresAt = req.Oauth2AccessTokenExpiresAt
 
-		if err := h.d.UpdateUser(tx, user); err != nil {
+		if err := h.d.UpdateLinkedAccount(tx, la); err != nil {
 			return errors.WithStack(err)
 		}
 

@@ -472,10 +472,10 @@ func (h *ActionHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (*
 		creq := &csapitypes.UpdateUserLARequest{
 			RemoteUserID:               la.RemoteUserID,
 			RemoteUserName:             la.RemoteUserName,
-			UserAccessToken:            la.UserAccessToken,
-			Oauth2AccessToken:          la.Oauth2AccessToken,
-			Oauth2RefreshToken:         la.Oauth2RefreshToken,
-			Oauth2AccessTokenExpiresAt: la.Oauth2AccessTokenExpiresAt,
+			UserAccessToken:            req.UserAccessToken,
+			Oauth2AccessToken:          req.Oauth2AccessToken,
+			Oauth2RefreshToken:         req.Oauth2RefreshToken,
+			Oauth2AccessTokenExpiresAt: req.Oauth2AccessTokenExpiresAt,
 		}
 
 		h.log.Info().Msgf("updating user %q linked account", user.Name)
