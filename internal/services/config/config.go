@@ -98,6 +98,7 @@ type Runservice struct {
 
 	RunCacheExpireInterval     time.Duration `yaml:"runCacheExpireInterval"`
 	RunWorkspaceExpireInterval time.Duration `yaml:"runWorkspaceExpireInterval"`
+	RunLogExpireInterval       time.Duration `yaml:"runLogExpireInterval"`
 }
 
 type Executor struct {
@@ -255,6 +256,7 @@ var defaultConfig = Config{
 	Runservice: Runservice{
 		RunCacheExpireInterval:     7 * 24 * time.Hour,
 		RunWorkspaceExpireInterval: 7 * 24 * time.Hour,
+		RunLogExpireInterval:       30 * 24 * time.Hour,
 	},
 	Executor: Executor{
 		InitImage: InitImage{

@@ -37,6 +37,7 @@ const (
 
 	CacheCleanerLockKey     = "cachecleaner"
 	WorkspaceCleanerLockKey = "workspacecleaner"
+	LogCleanerLockKey       = "logcleaner"
 	TaskUpdaterLockKey      = "taskupdater"
 )
 
