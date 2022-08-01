@@ -270,6 +270,20 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string
 			}
 		}
 
+		if c.TaskTimeoutInterval != nil {
+			t.TaskTimeoutInterval = c.TaskTimeoutInterval.Duration
+		}
+
+		// override with per run task timeout
+		if cr.TaskTimeoutInterval != nil {
+			t.TaskTimeoutInterval = cr.TaskTimeoutInterval.Duration
+		}
+
+		// override with per task timeout
+		if ct.TaskTimeoutInterval != nil {
+			t.TaskTimeoutInterval = ct.TaskTimeoutInterval.Duration
+		}
+
 		rcts[t.ID] = t
 	}
 

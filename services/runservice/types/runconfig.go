@@ -2,6 +2,7 @@ package types
 
 import (
 	"encoding/json"
+	"time"
 
 	"agola.io/agola/internal/errors"
 	stypes "agola.io/agola/services/types"
@@ -80,6 +81,7 @@ type RunConfigTask struct {
 	NeedsApproval        bool                            `json:"needs_approval,omitempty"`
 	Skip                 bool                            `json:"skip,omitempty"`
 	DockerRegistriesAuth map[string]DockerRegistryAuth   `json:"docker_registries_auth"`
+	TaskTimeoutInterval  time.Duration                   `json:"task_timeout_interval"`
 }
 
 func (rct *RunConfigTask) DeepCopy() *RunConfigTask {

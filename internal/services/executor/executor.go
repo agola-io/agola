@@ -54,6 +54,9 @@ const (
 
 	// podCreationTimeout is the maximum time to wait for pod creation.
 	podCreationTimeout = time.Minute * 5
+
+	// tasksTimeoutCleanerInterval is the maximum time to wait for tasks timeout cleaner
+	tasksTimeoutCleanerInterval = time.Second * 2
 )
 
 var (
@@ -777,6 +780,7 @@ func (e *Executor) executeTask(rt *runningTask) {
 	}
 
 	rt.Lock()
+	rt.podStartTime = util.TimeP(time.Now())
 	et.Status.SetupStep.Phase = types.ExecutorTaskPhaseSuccess
 	et.Status.SetupStep.EndTime = util.TimeP(time.Now())
 	if err := e.sendExecutorTaskStatus(ctx, et); err != nil {
@@ -790,7 +794,10 @@ func (e *Executor) executeTask(rt *runningTask) {
 	rt.Lock()
 	if err != nil {
 		e.log.Err(err).Send()
-		if rt.et.Spec.Stop {
+		if rt.timedout {
+			et.Status.Phase = types.ExecutorTaskPhaseFailed
+			et.Status.Timedout = true
+		} else if rt.et.Spec.Stop {
 			et.Status.Phase = types.ExecutorTaskPhaseStopped
 		} else {
 			et.Status.Phase = types.ExecutorTaskPhaseFailed
@@ -1296,6 +1303,12 @@ type runningTask struct {
 
 	et  *types.ExecutorTask
 	pod driver.Pod
+
+	// timedout is used to know when the task is timedout
+	timedout bool
+
+	// podStartTime is used to know when the pod is started
+	podStartTime *time.Time
 }
 
 func (r *runningTasks) get(rtID string) (*runningTask, bool) {
@@ -1496,6 +1509,7 @@ func (e *Executor) Run(ctx context.Context) error {
 	go e.podsCleanerLoop(ctx)
 	go e.tasksUpdaterLoop(ctx)
 	go e.tasksDataCleanerLoop(ctx)
+	go e.tasksTimeoutCleanerLoop(ctx)
 
 	go e.handleTasks(ctx, ch)
 
@@ -1524,4 +1538,35 @@ func (e *Executor) Run(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (e *Executor) tasksTimeoutCleanerLoop(ctx context.Context) {
+	for {
+		e.log.Debug().Msgf("tasksTimeoutCleaner")
+
+		e.tasksTimeoutCleaner()
+
+		sleepCh := time.NewTimer(tasksTimeoutCleanerInterval).C
+		select {
+		case <-ctx.Done():
+			return
+		case <-sleepCh:
+		}
+	}
+}
+
+func (e *Executor) tasksTimeoutCleaner() {
+	for _, rtID := range e.runningTasks.ids() {
+		rt, ok := e.runningTasks.get(rtID)
+		if !ok {
+			continue
+		}
+
+		rt.Lock()
+		if rt.et.Spec.TaskTimeoutInterval != 0 && rt.podStartTime != nil && time.Since(*rt.podStartTime) > rt.et.Spec.TaskTimeoutInterval {
+			rt.timedout = true
+			rt.cancel()
+		}
+		rt.Unlock()
+	}
 }

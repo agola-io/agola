@@ -61,11 +61,12 @@ type RunResponse struct {
 }
 
 type RunResponseTask struct {
-	ID      string                                  `json:"id"`
-	Name    string                                  `json:"name"`
-	Status  rstypes.RunTaskStatus                   `json:"status"`
-	Level   int                                     `json:"level"`
-	Depends map[string]*rstypes.RunConfigTaskDepend `json:"depends"`
+	ID       string                                  `json:"id"`
+	Name     string                                  `json:"name"`
+	Status   rstypes.RunTaskStatus                   `json:"status"`
+	Timedout bool                                    `json:"timedout"`
+	Level    int                                     `json:"level"`
+	Depends  map[string]*rstypes.RunConfigTaskDepend `json:"depends"`
 
 	WaitingApproval     bool              `json:"waiting_approval"`
 	Approved            bool              `json:"approved"`
@@ -73,12 +74,15 @@ type RunResponseTask struct {
 
 	StartTime *time.Time `json:"start_time"`
 	EndTime   *time.Time `json:"end_time"`
+
+	TaskTimeoutInterval time.Duration `json:"task_timeout_interval"`
 }
 
 type RunTaskResponse struct {
 	ID         string                     `json:"id"`
 	Name       string                     `json:"name"`
 	Status     rstypes.RunTaskStatus      `json:"status"`
+	Timedout   bool                       `json:"timedout"`
 	Containers []RunTaskResponseContainer `json:"containers"`
 
 	WaitingApproval     bool              `json:"waiting_approval"`
@@ -90,6 +94,8 @@ type RunTaskResponse struct {
 
 	StartTime *time.Time `json:"start_time"`
 	EndTime   *time.Time `json:"end_time"`
+
+	TaskTimeoutInterval time.Duration `json:"task_timeout_interval"`
 }
 
 type RunTaskResponseContainer struct {

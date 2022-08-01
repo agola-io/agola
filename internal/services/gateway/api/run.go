@@ -63,9 +63,10 @@ func createRunResponse(r *rstypes.Run, rc *rstypes.RunConfig) *gwapitypes.RunRes
 
 func createRunResponseTask(r *rstypes.Run, rt *rstypes.RunTask, rct *rstypes.RunConfigTask) *gwapitypes.RunResponseTask {
 	t := &gwapitypes.RunResponseTask{
-		ID:     rt.ID,
-		Name:   rct.Name,
-		Status: rt.Status,
+		ID:       rt.ID,
+		Name:     rct.Name,
+		Status:   rt.Status,
+		Timedout: rt.Timedout,
 
 		StartTime: rt.StartTime,
 		EndTime:   rt.EndTime,
@@ -76,6 +77,8 @@ func createRunResponseTask(r *rstypes.Run, rt *rstypes.RunTask, rct *rstypes.Run
 
 		Level:   rct.Level,
 		Depends: rct.Depends,
+
+		TaskTimeoutInterval: rct.TaskTimeoutInterval,
 	}
 
 	return t
@@ -86,6 +89,7 @@ func createRunTaskResponse(rt *rstypes.RunTask, rct *rstypes.RunConfigTask) *gwa
 		ID:         rt.ID,
 		Name:       rct.Name,
 		Status:     rt.Status,
+		Timedout:   rt.Timedout,
 		Containers: []gwapitypes.RunTaskResponseContainer{},
 
 		WaitingApproval:     rt.WaitingApproval,
@@ -96,6 +100,8 @@ func createRunTaskResponse(rt *rstypes.RunTask, rct *rstypes.RunConfigTask) *gwa
 
 		StartTime: rt.StartTime,
 		EndTime:   rt.EndTime,
+
+		TaskTimeoutInterval: rct.TaskTimeoutInterval,
 	}
 
 	t.SetupStep = &gwapitypes.RunTaskResponseSetupStep{
