@@ -104,28 +104,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("project %q already exists", projectPath))
 	}
 
-	rs, _, err := h.configstoreClient.GetRemoteSource(ctx, req.RemoteSourceName)
-	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get remote source %q", req.RemoteSourceName))
-	}
-
-	linkedAccounts, _, err := h.configstoreClient.GetUserLinkedAccounts(ctx, user.ID)
-	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q linked accounts", user.ID))
-	}
-
-	var la *cstypes.LinkedAccount
-	for _, v := range linkedAccounts {
-		if v.RemoteSourceID == rs.ID {
-			la = v
-			break
-		}
-	}
-	if la == nil {
-		return nil, errors.Errorf("user doesn't have a linked account for remote source %q", rs.Name)
-	}
-
-	gitSource, err := h.GetGitSource(ctx, rs, user.Name, la)
+	gitSource, rs, la, err := h.GetUserGitSource(ctx, req.RemoteSourceName, curUserID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create gitsource client")
 	}
@@ -246,11 +225,6 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, projectRef string, re
 func (h *ActionHandler) ProjectUpdateRepoLinkedAccount(ctx context.Context, projectRef string) (*csapitypes.Project, error) {
 	curUserID := common.CurrentUserID(ctx)
 
-	user, _, err := h.configstoreClient.GetUser(ctx, curUserID)
-	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q", curUserID))
-	}
-
 	p, _, err := h.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get project %q", projectRef))
@@ -264,28 +238,7 @@ func (h *ActionHandler) ProjectUpdateRepoLinkedAccount(ctx context.Context, proj
 		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
 	}
 
-	rs, _, err := h.configstoreClient.GetRemoteSource(ctx, p.RemoteSourceID)
-	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get remote source %q", p.RemoteSourceID))
-	}
-
-	linkedAccounts, _, err := h.configstoreClient.GetUserLinkedAccounts(ctx, user.ID)
-	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q linked accounts", user.ID))
-	}
-
-	var la *cstypes.LinkedAccount
-	for _, v := range linkedAccounts {
-		if v.RemoteSourceID == rs.ID {
-			la = v
-			break
-		}
-	}
-	if la == nil {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user doesn't have a linked account for remote source %q", rs.Name))
-	}
-
-	gitsource, err := h.GetGitSource(ctx, rs, user.Name, la)
+	gitsource, _, la, err := h.GetUserGitSource(ctx, p.RemoteSourceID, curUserID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create gitsource client")
 	}
@@ -466,11 +419,6 @@ func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) er
 func (h *ActionHandler) ProjectCreateRun(ctx context.Context, projectRef, branch, tag, refName, commitSHA string) error {
 	curUserID := common.CurrentUserID(ctx)
 
-	user, _, err := h.configstoreClient.GetUser(ctx, curUserID)
-	if err != nil {
-		return util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q", curUserID))
-	}
-
 	p, _, err := h.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
 		return util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get project %q", projectRef))
@@ -484,28 +432,7 @@ func (h *ActionHandler) ProjectCreateRun(ctx context.Context, projectRef, branch
 		return util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
 	}
 
-	rs, _, err := h.configstoreClient.GetRemoteSource(ctx, p.RemoteSourceID)
-	if err != nil {
-		return util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get remote source %q", p.RemoteSourceID))
-	}
-
-	linkedAccounts, _, err := h.configstoreClient.GetUserLinkedAccounts(ctx, user.ID)
-	if err != nil {
-		return util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q linked accounts", user.ID))
-	}
-
-	var la *cstypes.LinkedAccount
-	for _, v := range linkedAccounts {
-		if v.RemoteSourceID == rs.ID {
-			la = v
-			break
-		}
-	}
-	if la == nil {
-		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user doesn't have a linked account for remote source %q", rs.Name))
-	}
-
-	gitSource, err := h.GetGitSource(ctx, rs, user.Name, la)
+	gitSource, rs, _, err := h.GetUserGitSource(ctx, p.RemoteSourceID, curUserID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create gitsource client")
 	}

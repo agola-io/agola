@@ -997,3 +997,33 @@ func (h *ActionHandler) UserCreateRun(ctx context.Context, req *UserCreateRunReq
 
 	return h.CreateRuns(ctx, creq)
 }
+
+func (h *ActionHandler) GetUserGitSource(ctx context.Context, remoteSourceRef, userRef string) (gitsource.GitSource, *cstypes.RemoteSource, *cstypes.LinkedAccount, error) {
+	rs, _, err := h.configstoreClient.GetRemoteSource(ctx, remoteSourceRef)
+	if err != nil {
+		return nil, nil, nil, errors.Wrapf(err, "failed to get remote source %q", remoteSourceRef)
+	}
+
+	linkedAccounts, _, err := h.configstoreClient.GetUserLinkedAccounts(ctx, userRef)
+	if err != nil {
+		return nil, nil, nil, errors.Wrapf(err, "failed to get user %q linked accounts", userRef)
+	}
+
+	var la *cstypes.LinkedAccount
+	for _, v := range linkedAccounts {
+		if v.RemoteSourceID == rs.ID {
+			la = v
+			break
+		}
+	}
+	if la == nil {
+		return nil, nil, nil, errors.Errorf("user doesn't have a linked account for remote source %q", rs.Name)
+	}
+
+	gitSource, err := h.GetGitSource(ctx, rs, la.RemoteUserName, la)
+	if err != nil {
+		return nil, nil, nil, errors.Wrapf(err, "failed to create git source")
+	}
+
+	return gitSource, rs, la, nil
+}
