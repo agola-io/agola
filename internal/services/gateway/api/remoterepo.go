@@ -23,7 +23,6 @@ import (
 	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
 	csclient "agola.io/agola/services/configstore/client"
-	cstypes "agola.io/agola/services/configstore/types"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 
 	"github.com/gorilla/mux"
@@ -60,39 +59,7 @@ func (h *UserRemoteReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	user, _, err := h.configstoreClient.GetUser(ctx, userID)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
-	}
-
-	rs, _, err := h.configstoreClient.GetRemoteSource(ctx, remoteSourceRef)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
-	}
-
-	linkedAccounts, _, err := h.configstoreClient.GetUserLinkedAccounts(ctx, user.ID)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
-	}
-
-	var la *cstypes.LinkedAccount
-	for _, v := range linkedAccounts {
-		if v.RemoteSourceID == rs.ID {
-			la = v
-			break
-		}
-	}
-	if la == nil {
-		err := util.NewAPIError(util.ErrBadRequest, errors.Errorf("user doesn't have a linked account for remote source %q", rs.Name))
-		util.HTTPError(w, err)
-		h.log.Err(err).Send()
-		return
-	}
-
-	gitsource, err := h.ah.GetGitSource(ctx, rs, user.Name, la)
+	gitsource, _, _, err := h.ah.GetUserGitSource(ctx, remoteSourceRef, userID)
 	if err != nil {
 		util.HTTPError(w, err)
 		h.log.Err(err).Send()
