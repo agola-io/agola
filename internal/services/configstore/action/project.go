@@ -93,6 +93,7 @@ type CreateUpdateProjectRequest struct {
 	SSHPrivateKey              string
 	SkipSSHHostKeyCheck        bool
 	PassVarsToForkedPR         bool
+	DefaultBranch              string
 }
 
 func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateUpdateProjectRequest) (*types.Project, error) {
@@ -162,6 +163,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateUpdateProj
 		project.SSHPrivateKey = req.SSHPrivateKey
 		project.SkipSSHHostKeyCheck = req.SkipSSHHostKeyCheck
 		project.PassVarsToForkedPR = req.PassVarsToForkedPR
+		project.DefaultBranch = req.DefaultBranch
 
 		// generate the Secret and the WebhookSecret
 		// TODO(sgotti) move this to the gateway?
@@ -271,6 +273,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, curProjectRef string,
 		project.SSHPrivateKey = req.SSHPrivateKey
 		project.SkipSSHHostKeyCheck = req.SkipSSHHostKeyCheck
 		project.PassVarsToForkedPR = req.PassVarsToForkedPR
+		project.DefaultBranch = req.DefaultBranch
 
 		if err := h.d.UpdateProject(tx, project); err != nil {
 			return errors.WithStack(err)

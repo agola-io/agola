@@ -244,6 +244,7 @@ func createProjectResponse(r *csapitypes.Project) *gwapitypes.ProjectResponse {
 		Visibility:         gwapitypes.Visibility(r.Visibility),
 		GlobalVisibility:   string(r.GlobalVisibility),
 		PassVarsToForkedPR: r.PassVarsToForkedPR,
+		DefaultBranch:      r.DefaultBranch,
 	}
 
 	return res
@@ -281,6 +282,36 @@ func (h *ProjectCreateRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	}
 
 	if err := util.HTTPResponse(w, http.StatusCreated, nil); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+type RefreshRemoteRepositoryInfoHandler struct {
+	log zerolog.Logger
+	ah  *action.ActionHandler
+}
+
+func NewRefreshRemoteRepositoryInfoHandler(log zerolog.Logger, ah *action.ActionHandler) *RefreshRemoteRepositoryInfoHandler {
+	return &RefreshRemoteRepositoryInfoHandler{log: log, ah: ah}
+}
+
+func (h *RefreshRemoteRepositoryInfoHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	projectRef, err := url.PathUnescape(vars["projectref"])
+	if err != nil {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		return
+	}
+
+	project, err := h.ah.RefreshRemoteRepositoryInfo(ctx, projectRef)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	res := createProjectResponse(project)
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
 		h.log.Err(err).Send()
 	}
 }

@@ -297,11 +297,12 @@ func (c *Client) ListUserRepos() ([]*gitsource.RepoInfo, error) {
 
 func fromGitlabRepo(rr *gitlab.Project) *gitsource.RepoInfo {
 	return &gitsource.RepoInfo{
-		ID:           strconv.Itoa(rr.ID),
-		Path:         rr.PathWithNamespace,
-		HTMLURL:      rr.WebURL,
-		SSHCloneURL:  rr.SSHURLToRepo,
-		HTTPCloneURL: rr.HTTPURLToRepo,
+		ID:            strconv.Itoa(rr.ID),
+		Path:          rr.PathWithNamespace,
+		HTMLURL:       rr.WebURL,
+		SSHCloneURL:   rr.SSHURLToRepo,
+		HTTPCloneURL:  rr.HTTPURLToRepo,
+		DefaultBranch: rr.DefaultBranch,
 	}
 }
 

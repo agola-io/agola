@@ -637,3 +637,9 @@ func (c *Client) GetUserOrgs(ctx context.Context) ([]*gwapitypes.UserOrgsRespons
 	resp, err := c.getParsedResponse(ctx, "GET", "/user/orgs", nil, jsonContent, nil, &userOrgs)
 	return userOrgs, resp, errors.WithStack(err)
 }
+
+func (c *Client) RefreshRemoteRepo(ctx context.Context, projectRef string) (*gwapitypes.ProjectResponse, *http.Response, error) {
+	project := new(gwapitypes.ProjectResponse)
+	resp, err := c.getParsedResponse(ctx, "POST", path.Join("/projects", url.PathEscape(projectRef), "/refreshremoterepo"), nil, jsonContent, nil, project)
+	return project, resp, err
+}

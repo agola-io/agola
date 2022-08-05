@@ -2204,3 +2204,51 @@ func TestTaskTimeout(t *testing.T) {
 		})
 	}
 }
+
+func TestRefreshRemoteRepositoryInfo(t *testing.T) {
+	dir, err := ioutil.TempDir("", "agola")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	tgitea, c := setup(ctx, t, dir, true)
+	defer shutdownGitea(tgitea)
+
+	giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
+
+	giteaToken, token := createLinkedAccount(ctx, t, tgitea, c)
+
+	giteaClient := gitea.NewClient(giteaAPIURL, giteaToken)
+	gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, token)
+
+	giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)
+
+	if project.DefaultBranch != "master" {
+		t.Fatalf("expected DefaultBranch master got: %s", project.DefaultBranch)
+	}
+
+	_, err = giteaClient.EditRepo(giteaRepo.Owner.UserName, giteaRepo.Name, gitea.EditRepoOption{DefaultBranch: util.StringP("testbranch")})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	project, _, err = gwClient.RefreshRemoteRepo(ctx, project.ID)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if project.DefaultBranch != "testbranch" {
+		t.Fatalf("expected DefaultBranch testbranch got: %s", project.DefaultBranch)
+	}
+
+	p, _, err := gwClient.GetProject(ctx, project.ID)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if diff := cmp.Diff(project, p); diff != "" {
+		t.Fatalf("projects mismatch (-expected +got):\n%s", diff)
+	}
+}

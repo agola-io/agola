@@ -182,6 +182,7 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		SSHPrivateKey:              req.SSHPrivateKey,
 		SkipSSHHostKeyCheck:        req.SkipSSHHostKeyCheck,
 		PassVarsToForkedPR:         req.PassVarsToForkedPR,
+		DefaultBranch:              req.DefaultBranch,
 	}
 
 	project, err := h.ah.CreateProject(ctx, areq)
@@ -240,6 +241,7 @@ func (h *UpdateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		SSHPrivateKey:              req.SSHPrivateKey,
 		SkipSSHHostKeyCheck:        req.SkipSSHHostKeyCheck,
 		PassVarsToForkedPR:         req.PassVarsToForkedPR,
+		DefaultBranch:              req.DefaultBranch,
 	}
 
 	project, err := h.ah.UpdateProject(ctx, projectRef, areq)
