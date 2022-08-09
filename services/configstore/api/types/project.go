@@ -30,6 +30,7 @@ type CreateUpdateProjectRequest struct {
 	SSHPrivateKey              string
 	SkipSSHHostKeyCheck        bool
 	PassVarsToForkedPR         bool
+	DefaultBranch              string
 }
 
 // Project augments cstypes.Project with dynamic data

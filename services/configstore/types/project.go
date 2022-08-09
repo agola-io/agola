@@ -86,6 +86,8 @@ type Project struct {
 	WebhookSecret string `json:"webhook_secret,omitempty"`
 
 	PassVarsToForkedPR bool `json:"pass_vars_to_forked_pr,omitempty"`
+
+	DefaultBranch string `json:"default_branch,omitempty"`
 }
 
 func NewProject() *Project {
