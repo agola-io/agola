@@ -643,3 +643,18 @@ func (c *Client) RefreshRemoteRepo(ctx context.Context, projectRef string) (*gwa
 	resp, err := c.getParsedResponse(ctx, "POST", path.Join("/projects", url.PathEscape(projectRef), "/refreshremoterepo"), nil, jsonContent, nil, project)
 	return project, resp, err
 }
+
+func (c *Client) GetUserProjects(ctx context.Context, page int, limit int) ([]*gwapitypes.ProjectResponse, *http.Response, error) {
+	userProjects := []*gwapitypes.ProjectResponse{}
+
+	q := url.Values{}
+	if page > 0 {
+		q.Add("page", strconv.Itoa(page))
+	}
+	if limit > 0 {
+		q.Add("limit", strconv.Itoa(limit))
+	}
+
+	resp, err := c.getParsedResponse(ctx, "GET", "/user/projects", q, jsonContent, nil, &userProjects)
+	return userProjects, resp, errors.WithStack(err)
+}

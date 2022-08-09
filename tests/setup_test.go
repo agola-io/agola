@@ -2252,3 +2252,66 @@ func TestRefreshRemoteRepositoryInfo(t *testing.T) {
 		t.Fatalf("projects mismatch (-expected +got):\n%s", diff)
 	}
 }
+
+func TestUserProjects(t *testing.T) {
+	dir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	tgitea, c := setup(ctx, t, dir, true)
+	defer shutdownGitea(tgitea)
+
+	giteaToken, token := createLinkedAccount(ctx, t, tgitea, c)
+
+	giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
+	giteaClient := gitea.NewClient(giteaAPIURL, giteaToken)
+
+	giteaRepo, err := giteaClient.CreateRepo(gitea.CreateRepoOption{
+		Name:    "repo01",
+		Private: false,
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	t.Logf("created gitea repo: %s", giteaRepo.Name)
+
+	gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, token)
+
+	project01, _, err := gwClient.CreateProject(ctx, &gwapitypes.CreateProjectRequest{
+		Name:             "Project01",
+		ParentRef:        path.Join("user", agolaUser01),
+		RemoteSourceName: "gitea",
+		RepoPath:         path.Join(giteaUser01, "repo01"),
+		Visibility:       gwapitypes.VisibilityPublic,
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	_, _, err = gwClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: "org02", Visibility: gwapitypes.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	project02, _, err := gwClient.CreateProject(ctx, &gwapitypes.CreateProjectRequest{
+		Name:             "Project02",
+		ParentRef:        path.Join("org", "org02"),
+		RemoteSourceName: "gitea",
+		RepoPath:         path.Join(giteaUser01, "repo01"),
+		Visibility:       gwapitypes.VisibilityPublic,
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	userProjects, _, err := gwClient.GetUserProjects(ctx, 0, 10)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	expectedProjects := []*gwapitypes.ProjectResponse{project02, project01}
+
+	if diff := cmp.Diff(expectedProjects, userProjects); diff != "" {
+		t.Fatalf("user projects mismatch (-want +got):\n%s", diff)
+	}
+}

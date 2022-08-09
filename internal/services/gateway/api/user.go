@@ -33,6 +33,11 @@ import (
 	"github.com/rs/zerolog"
 )
 
+const (
+	DefaultProjectsLimit = 25
+	MaxProjectsLimit     = 40
+)
+
 type CreateUserHandler struct {
 	log zerolog.Logger
 	ah  *action.ActionHandler
@@ -642,4 +647,77 @@ func createUserOrgsResponse(o *csapitypes.UserOrgsResponse) *gwapitypes.UserOrgs
 	}
 
 	return userOrgs
+}
+
+type UserProjectsHandler struct {
+	log zerolog.Logger
+	ah  *action.ActionHandler
+}
+
+func NewUserProjectsHandler(log zerolog.Logger, ah *action.ActionHandler) *UserProjectsHandler {
+	return &UserProjectsHandler{log: log, ah: ah}
+}
+
+func (h *UserProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	userID := common.CurrentUserID(ctx)
+	if userID == "" {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user not authenticated")))
+		return
+	}
+
+	q := r.URL.Query()
+
+	limitS := q.Get("limit")
+	limit := DefaultProjectsLimit
+	if limitS != "" {
+		var err error
+		limit, err = strconv.Atoi(limitS)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit")))
+			return
+		}
+	}
+	if limit < 0 {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0")))
+		return
+	}
+	if limit > MaxProjectsLimit {
+		limit = MaxRunsLimit
+	}
+
+	pageS := q.Get("page")
+	page := 0
+	if pageS != "" {
+		var err error
+		page, err = strconv.Atoi(pageS)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse page")))
+			return
+		}
+	}
+	if page < 0 {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("page must be greater or equal than 0")))
+		return
+	}
+
+	userProjects, err := h.ah.GetUserProjects(ctx, &action.GetUserProjectsRequest{
+		UserRef: userID,
+		Limit:   limit,
+		Page:    page,
+	})
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	res := make([]*gwapitypes.ProjectResponse, len(userProjects))
+	for i, userProject := range userProjects {
+		res[i] = createProjectResponse(userProject)
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
 }
