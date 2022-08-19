@@ -145,6 +145,42 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*
 	return org, errors.WithStack(err)
 }
 
+type UpdateOrgRequest struct {
+	Visibility types.Visibility
+}
+
+func (h *ActionHandler) UpdateOrg(ctx context.Context, orgRef string, req *UpdateOrgRequest) (*types.Organization, error) {
+	if !types.IsValidVisibility(req.Visibility) {
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid organization visibility"))
+	}
+
+	var org *types.Organization
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		// check org existance
+		org, err = h.d.GetOrg(tx, orgRef)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if org == nil {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("org %q not exists", orgRef))
+		}
+
+		org.Visibility = req.Visibility
+
+		if err := h.d.UpdateOrganization(tx, org); err != nil {
+			return errors.WithStack(err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return org, errors.WithStack(err)
+}
+
 func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 	var org *types.Organization
 

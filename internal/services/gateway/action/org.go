@@ -117,6 +117,42 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*
 	return org, nil
 }
 
+type UpdateOrgRequest struct {
+	Visibility *cstypes.Visibility
+}
+
+func (h *ActionHandler) UpdateOrg(ctx context.Context, orgRef string, req *UpdateOrgRequest) (*cstypes.Organization, error) {
+	org, _, err := h.configstoreClient.GetOrg(ctx, orgRef)
+	if err != nil {
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
+	}
+
+	isOrgOwner, err := h.IsOrgOwner(ctx, org.ID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to determine ownership")
+	}
+	if !isOrgOwner {
+		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
+	}
+
+	if req.Visibility != nil {
+		org.Visibility = *req.Visibility
+	}
+
+	creq := &csapitypes.UpdateOrgRequest{
+		Visibility: org.Visibility,
+	}
+
+	h.log.Info().Msgf("updating organization")
+	org, _, err = h.configstoreClient.UpdateOrg(ctx, orgRef, creq)
+	if err != nil {
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to update organization"))
+	}
+	h.log.Info().Msgf("organization %s updated, ID: %s", org.Name, org.ID)
+
+	return org, nil
+}
+
 func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 	org, _, err := h.configstoreClient.GetOrg(ctx, orgRef)
 	if err != nil {

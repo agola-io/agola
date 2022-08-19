@@ -178,6 +178,7 @@ func (s *Configstore) setupDefaultRouter() http.Handler {
 	orgHandler := api.NewOrgHandler(s.log, s.d)
 	orgsHandler := api.NewOrgsHandler(s.log, s.d)
 	createOrgHandler := api.NewCreateOrgHandler(s.log, s.ah)
+	updateOrgHandler := api.NewUpdateOrgHandler(s.log, s.ah)
 	deleteOrgHandler := api.NewDeleteOrgHandler(s.log, s.ah)
 
 	orgMembersHandler := api.NewOrgMembersHandler(s.log, s.ah)
@@ -242,6 +243,7 @@ func (s *Configstore) setupDefaultRouter() http.Handler {
 	apirouter.Handle("/orgs/{orgref}", orgHandler).Methods("GET")
 	apirouter.Handle("/orgs", orgsHandler).Methods("GET")
 	apirouter.Handle("/orgs", createOrgHandler).Methods("POST")
+	apirouter.Handle("/orgs/{orgref}", updateOrgHandler).Methods("PUT")
 	apirouter.Handle("/orgs/{orgref}", deleteOrgHandler).Methods("DELETE")
 	apirouter.Handle("/orgs/{orgref}/members", orgMembersHandler).Methods("GET")
 	apirouter.Handle("/orgs/{orgref}/members/{userref}", addOrgMemberHandler).Methods("PUT")
