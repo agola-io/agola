@@ -19,6 +19,7 @@ import (
 	"path"
 
 	"agola.io/agola/internal/errors"
+	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"
@@ -49,13 +50,17 @@ func (h *ActionHandler) GetProjectGroupProjects(ctx context.Context, projectGrou
 }
 
 type CreateProjectGroupRequest struct {
-	CurrentUserID string
-	Name          string
-	ParentRef     string
-	Visibility    cstypes.Visibility
+	Name       string
+	ParentRef  string
+	Visibility cstypes.Visibility
 }
 
 func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProjectGroupRequest) (*csapitypes.ProjectGroup, error) {
+	userID := common.CurrentUserID(ctx)
+	if userID == "" {
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user not authenticated"))
+	}
+
 	if !util.ValidateName(req.Name) {
 		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid projectGroup name %q", req.Name))
 	}
@@ -73,9 +78,9 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProje
 		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
 	}
 
-	user, _, err := h.configstoreClient.GetUser(ctx, req.CurrentUserID)
+	user, _, err := h.configstoreClient.GetUser(ctx, userID)
 	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q", req.CurrentUserID))
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q", userID))
 	}
 
 	parentRef := req.ParentRef
