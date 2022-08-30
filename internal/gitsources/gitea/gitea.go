@@ -128,7 +128,7 @@ func (c *Client) oauth2Config(callbackURL string) *oauth2.Config {
 }
 
 func (c *Client) GetOauth2AuthorizationURL(callbackURL, state string) (string, error) {
-	var config = c.oauth2Config(callbackURL)
+	config := c.oauth2Config(callbackURL)
 	return config.AuthCodeURL(state), nil
 }
 
@@ -136,7 +136,7 @@ func (c *Client) RequestOauth2Token(callbackURL, code string) (*oauth2.Token, er
 	ctx := context.TODO()
 	ctx = context.WithValue(ctx, oauth2.HTTPClient, c.oauth2HTTPClient)
 
-	var config = c.oauth2Config(callbackURL)
+	config := c.oauth2Config(callbackURL)
 	token, err := config.Exchange(ctx, code)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot get oauth2 token")
@@ -148,7 +148,7 @@ func (c *Client) RefreshOauth2Token(refreshToken string) (*oauth2.Token, error) 
 	ctx := context.TODO()
 	ctx = context.WithValue(ctx, oauth2.HTTPClient, c.oauth2HTTPClient)
 
-	var config = c.oauth2Config("")
+	config := c.oauth2Config("")
 	token := &oauth2.Token{RefreshToken: refreshToken}
 	ts := config.TokenSource(ctx, token)
 	ntoken, err := ts.Token()
@@ -166,21 +166,16 @@ func (c *Client) LoginPassword(username, password, tokenName string) (string, er
 
 	tokens, resp, err := client.ListAccessTokens(gitea.ListAccessTokensOptions{})
 	if err != nil {
-		if resp != nil && resp.StatusCode == http.StatusUnauthorized {
-			return "", errors.WithStack(gitsource.ErrUnauthorized)
+		if resp != nil {
+			if resp.StatusCode == http.StatusUnauthorized {
+				return "", errors.WithStack(gitsource.ErrUnauthorized)
+			} else if resp.StatusCode/100 != 2 {
+				return "", errors.Wrapf(err, "gitea api status code %d", resp.StatusCode)
+			}
 		}
 		return "", errors.WithStack(err)
 	}
 
-	if resp.StatusCode/100 != 2 {
-		return "", errors.Errorf("gitea api status code %d", resp.StatusCode)
-	}
-	defer resp.Body.Close()
-
-	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(&tokens); err != nil {
-		return "", errors.WithStack(err)
-	}
 	for _, token := range tokens {
 		if token.Name == tokenName {
 			accessToken = token.Token
@@ -382,7 +377,6 @@ func (c *Client) ListUserRepos() ([]*gitsource.RepoInfo, error) {
 				},
 			},
 		)
-
 		if err != nil {
 			return []*gitsource.RepoInfo{}, errors.WithStack(err)
 		}
