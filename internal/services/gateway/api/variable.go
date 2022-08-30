@@ -26,7 +26,7 @@ import (
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 
 	"github.com/gorilla/mux"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 )
 
 func createVariableResponse(v *csapitypes.Variable, secrets []*csapitypes.Secret) *gwapitypes.VariableResponse {
@@ -54,12 +54,12 @@ func createVariableResponse(v *csapitypes.Variable, secrets []*csapitypes.Secret
 }
 
 type VariableHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewVariableHandler(logger *zap.Logger, ah *action.ActionHandler) *VariableHandler {
-	return &VariableHandler{log: logger.Sugar(), ah: ah}
+func NewVariableHandler(log zerolog.Logger, ah *action.ActionHandler) *VariableHandler {
+	return &VariableHandler{log: log, ah: ah}
 }
 
 func (h *VariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -69,8 +69,8 @@ func (h *VariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, removeoverridden := query["removeoverridden"]
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -81,8 +81,8 @@ func (h *VariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		RemoveOverridden: removeoverridden,
 	}
 	csvars, cssecrets, err := h.ah.GetVariables(ctx, areq)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -91,32 +91,32 @@ func (h *VariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		variables[i] = createVariableResponse(v, cssecrets)
 	}
 
-	if err := httpResponse(w, http.StatusOK, variables); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, variables); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type CreateVariableHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewCreateVariableHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateVariableHandler {
-	return &CreateVariableHandler{log: logger.Sugar(), ah: ah}
+func NewCreateVariableHandler(log zerolog.Logger, ah *action.ActionHandler) *CreateVariableHandler {
+	return &CreateVariableHandler{log: log, ah: ah}
 }
 
 func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
 	var req gwapitypes.CreateVariableRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 	areq := &action.CreateVariableRequest{
@@ -126,24 +126,24 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		Values:     fromApiVariableValues(req.Values),
 	}
 	csvar, cssecrets, err := h.ah.CreateVariable(ctx, areq)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
 	res := createVariableResponse(csvar, cssecrets)
-	if err := httpResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type UpdateVariableHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewUpdateVariableHandler(logger *zap.Logger, ah *action.ActionHandler) *UpdateVariableHandler {
-	return &UpdateVariableHandler{log: logger.Sugar(), ah: ah}
+func NewUpdateVariableHandler(log zerolog.Logger, ah *action.ActionHandler) *UpdateVariableHandler {
+	return &UpdateVariableHandler{log: log, ah: ah}
 }
 
 func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -152,15 +152,15 @@ func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	variableName := vars["variablename"]
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
 	var req gwapitypes.UpdateVariableRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
@@ -173,24 +173,24 @@ func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		Values:     fromApiVariableValues(req.Values),
 	}
 	csvar, cssecrets, err := h.ah.UpdateVariable(ctx, areq)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
 	res := createVariableResponse(csvar, cssecrets)
-	if err := httpResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type DeleteVariableHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewDeleteVariableHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteVariableHandler {
-	return &DeleteVariableHandler{log: logger.Sugar(), ah: ah}
+func NewDeleteVariableHandler(log zerolog.Logger, ah *action.ActionHandler) *DeleteVariableHandler {
+	return &DeleteVariableHandler{log: log, ah: ah}
 }
 
 func (h *DeleteVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -199,19 +199,19 @@ func (h *DeleteVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	variableName := vars["variablename"]
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
 	err = h.ah.DeleteVariable(ctx, parentType, parentRef, variableName)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 

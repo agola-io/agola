@@ -20,12 +20,13 @@ import (
 	"os"
 
 	config "agola.io/agola/internal/config"
+	"agola.io/agola/internal/errors"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/ghodss/yaml"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	errors "golang.org/x/xerrors"
 )
 
 var cmdProjectVariableCreate = &cobra.Command{
@@ -55,7 +56,7 @@ The above yaml document defines a variable that can have two different values de
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := variableCreate(cmd, "project", args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -76,13 +77,13 @@ func init() {
 	flags.StringVarP(&variableCreateOpts.file, "file", "f", "", `yaml file containing the variable definition (use "-" to read from stdin)`)
 
 	if err := cmdProjectVariableCreate.MarkFlagRequired("project"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdProjectVariableCreate.MarkFlagRequired("name"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdProjectVariableCreate.MarkFlagRequired("file"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdProjectVariable.AddCommand(cmdProjectVariableCreate)
@@ -104,18 +105,18 @@ func variableCreate(cmd *cobra.Command, ownertype string, args []string) error {
 	if variableCreateOpts.file == "-" {
 		data, err = ioutil.ReadAll(os.Stdin)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	} else {
 		data, err = ioutil.ReadFile(variableCreateOpts.file)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	}
 
 	var values []VariableValue
 	if err := yaml.Unmarshal(data, &values); err != nil {
-		log.Fatalf("failed to unmarshal values: %v", err)
+		log.Fatal().Msgf("failed to unmarshal values: %v", err)
 	}
 	rvalues := []gwapitypes.VariableValueRequest{}
 	for _, value := range values {
@@ -132,19 +133,19 @@ func variableCreate(cmd *cobra.Command, ownertype string, args []string) error {
 
 	switch ownertype {
 	case "project":
-		log.Infof("creating project variable")
+		log.Info().Msgf("creating project variable")
 		variable, _, err := gwclient.CreateProjectVariable(context.TODO(), variableCreateOpts.parentRef, req)
 		if err != nil {
-			return errors.Errorf("failed to create project variable: %w", err)
+			return errors.Wrapf(err, "failed to create project variable")
 		}
-		log.Infof("project variable %q created, ID: %q", variable.Name, variable.ID)
+		log.Info().Msgf("project variable %q created, ID: %q", variable.Name, variable.ID)
 	case "projectgroup":
-		log.Infof("creating project group variable")
+		log.Info().Msgf("creating project group variable")
 		variable, _, err := gwclient.CreateProjectGroupVariable(context.TODO(), variableCreateOpts.parentRef, req)
 		if err != nil {
-			return errors.Errorf("failed to create project group variable: %w", err)
+			return errors.Wrapf(err, "failed to create project group variable")
 		}
-		log.Infof("project group variable %q created, ID: %q", variable.Name, variable.ID)
+		log.Info().Msgf("project group variable %q created, ID: %q", variable.Name, variable.ID)
 	}
 
 	return nil

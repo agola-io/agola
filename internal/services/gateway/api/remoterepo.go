@@ -17,16 +17,16 @@ package api
 import (
 	"net/http"
 
+	"agola.io/agola/internal/errors"
 	gitsource "agola.io/agola/internal/gitsources"
 	"agola.io/agola/internal/services/gateway/action"
+	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
 	csclient "agola.io/agola/services/configstore/client"
-	cstypes "agola.io/agola/services/configstore/types"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 
 	"github.com/gorilla/mux"
-	"go.uber.org/zap"
-	errors "golang.org/x/xerrors"
+	"github.com/rs/zerolog"
 )
 
 func createRemoteRepoResponse(r *gitsource.RepoInfo) *gwapitypes.RemoteRepoResponse {
@@ -39,13 +39,13 @@ func createRemoteRepoResponse(r *gitsource.RepoInfo) *gwapitypes.RemoteRepoRespo
 }
 
 type UserRemoteReposHandler struct {
-	log               *zap.SugaredLogger
+	log               zerolog.Logger
 	ah                *action.ActionHandler
 	configstoreClient *csclient.Client
 }
 
-func NewUserRemoteReposHandler(logger *zap.Logger, ah *action.ActionHandler, configstoreClient *csclient.Client) *UserRemoteReposHandler {
-	return &UserRemoteReposHandler{log: logger.Sugar(), ah: ah, configstoreClient: configstoreClient}
+func NewUserRemoteReposHandler(log zerolog.Logger, ah *action.ActionHandler, configstoreClient *csclient.Client) *UserRemoteReposHandler {
+	return &UserRemoteReposHandler{log: log, ah: ah, configstoreClient: configstoreClient}
 }
 
 func (h *UserRemoteReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -53,51 +53,24 @@ func (h *UserRemoteReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	vars := mux.Vars(r)
 	remoteSourceRef := vars["remotesourceref"]
 
-	userIDVal := ctx.Value("userid")
-	if userIDVal == nil {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("user not authenticated")))
-		return
-	}
-	userID := userIDVal.(string)
-
-	user, resp, err := h.configstoreClient.GetUser(ctx, userID)
-	if httpErrorFromRemote(w, resp, err) {
-		h.log.Errorf("err: %+v", err)
+	userID := common.CurrentUserID(ctx)
+	if userID == "" {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user not authenticated")))
 		return
 	}
 
-	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, remoteSourceRef)
-	if httpErrorFromRemote(w, resp, err) {
-		h.log.Errorf("err: %+v", err)
-		return
-	}
-
-	var la *cstypes.LinkedAccount
-	for _, v := range user.LinkedAccounts {
-		if v.RemoteSourceID == rs.ID {
-			la = v
-			break
-		}
-	}
-	if la == nil {
-		err := util.NewErrBadRequest(errors.Errorf("user doesn't have a linked account for remote source %q", rs.Name))
-		httpError(w, err)
-		h.log.Errorf("err: %+v", err)
-		return
-	}
-
-	gitsource, err := h.ah.GetGitSource(ctx, rs, user.Name, la)
+	gitsource, _, _, err := h.ah.GetUserGitSource(ctx, remoteSourceRef, userID)
 	if err != nil {
-		httpError(w, err)
-		h.log.Errorf("err: %+v", err)
+		util.HTTPError(w, err)
+		h.log.Err(err).Send()
 		return
 	}
 
 	remoteRepos, err := gitsource.ListUserRepos()
 	if err != nil {
-		err := util.NewErrBadRequest(errors.Errorf("failed to get user repositories from git source: %w", err))
-		httpError(w, err)
-		h.log.Errorf("err: %+v", err)
+		err := util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "failed to get user repositories from git source"))
+		util.HTTPError(w, err)
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -105,7 +78,7 @@ func (h *UserRemoteReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	for i, r := range remoteRepos {
 		repos[i] = createRemoteRepoResponse(r)
 	}
-	if err := httpResponse(w, http.StatusOK, repos); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, repos); err != nil {
+		h.log.Err(err).Send()
 	}
 }

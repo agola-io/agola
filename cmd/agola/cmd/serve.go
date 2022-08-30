@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"agola.io/agola/cmd"
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/configstore"
 	"agola.io/agola/internal/services/executor"
@@ -30,9 +31,8 @@ import (
 	"agola.io/agola/internal/services/scheduler"
 	"agola.io/agola/internal/util"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"go.etcd.io/etcd/embed"
-	errors "golang.org/x/xerrors"
 )
 
 var (
@@ -57,16 +57,14 @@ var cmdServe = &cobra.Command{
 	Version: cmd.Version,
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := serve(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
 
 type serveOptions struct {
-	config              string
-	components          []string
-	embeddedEtcd        bool
-	embeddedEtcdDataDir string
+	config     string
+	components []string
 }
 
 var serveOpts serveOptions
@@ -76,38 +74,12 @@ func init() {
 
 	flags.StringVar(&serveOpts.config, "config", "./config.yml", "config file path")
 	flags.StringSliceVar(&serveOpts.components, "components", []string{}, `list of components to start. Specify "all-base" to start all base components (excluding the executor).`)
-	flags.BoolVar(&serveOpts.embeddedEtcd, "embedded-etcd", false, "start and use an embedded etcd, only for testing purpose")
-	flags.StringVar(&serveOpts.embeddedEtcdDataDir, "embedded-etcd-data-dir", "/tmp/agola/etcd", "embedded etcd data dir, only for testing purpose")
 
 	if err := cmdServe.MarkFlagRequired("components"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdAgola.AddCommand(cmdServe)
-}
-
-func embeddedEtcd(ctx context.Context) error {
-	cfg := embed.NewConfig()
-	cfg.Dir = serveOpts.embeddedEtcdDataDir
-	cfg.Logger = "zap"
-	cfg.LogOutputs = []string{"stderr"}
-
-	log.Infof("starting embedded etcd server")
-	e, err := embed.StartEtcd(cfg)
-	if err != nil {
-		return err
-	}
-
-	go func() {
-		<-e.Server.ReadyNotify()
-		log.Infof("embedded etcd server is ready")
-
-		<-ctx.Done()
-		log.Infof("stopping embedded etcd server")
-		e.Close()
-	}()
-
-	return nil
 }
 
 func isComponentEnabled(name string) bool {
@@ -131,68 +103,62 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	c, err := config.Parse(serveOpts.config, serveOpts.components)
 	if err != nil {
-		return errors.Errorf("config error: %w", err)
-	}
-
-	if serveOpts.embeddedEtcd {
-		if err := embeddedEtcd(ctx); err != nil {
-			return errors.Errorf("failed to start run service scheduler: %w", err)
-		}
+		return errors.Wrapf(err, "config error")
 	}
 
 	var rs *rsscheduler.Runservice
 	if isComponentEnabled("runservice") {
-		rs, err = rsscheduler.NewRunservice(ctx, nil, &c.Runservice)
+		rs, err = rsscheduler.NewRunservice(ctx, log.Logger, &c.Runservice)
 		if err != nil {
-			return errors.Errorf("failed to start run service scheduler: %w", err)
+			return errors.Wrapf(err, "failed to start run service scheduler")
 		}
 	}
 
 	var ex *rsexecutor.Executor
 	if isComponentEnabled("executor") {
-		ex, err = executor.NewExecutor(ctx, nil, &c.Executor)
+		ex, err = executor.NewExecutor(ctx, log.Logger, &c.Executor)
 		if err != nil {
-			return errors.Errorf("failed to start run service executor: %w", err)
+			return errors.Wrapf(err, "failed to start run service executor")
 		}
 	}
 
 	var cs *configstore.Configstore
 	if isComponentEnabled("configstore") {
-		cs, err = configstore.NewConfigstore(ctx, nil, &c.Configstore)
+		cs, err = configstore.NewConfigstore(ctx, log.Logger, &c.Configstore)
 		if err != nil {
-			return errors.Errorf("failed to start config store: %w", err)
+			return errors.Wrapf(err, "failed to start config store")
 		}
 	}
 
 	var sched *scheduler.Scheduler
 	if isComponentEnabled("scheduler") {
-		sched, err = scheduler.NewScheduler(ctx, nil, &c.Scheduler)
+		sched, err = scheduler.NewScheduler(ctx, log.Logger, &c.Scheduler)
 		if err != nil {
-			return errors.Errorf("failed to start scheduler: %w", err)
+			return errors.Wrapf(err, "failed to start scheduler")
 		}
 	}
 
 	var ns *notification.NotificationService
 	if isComponentEnabled("notification") {
-		ns, err = notification.NewNotificationService(ctx, nil, c)
+		ns, err = notification.NewNotificationService(ctx, log.Logger, c)
 		if err != nil {
-			return errors.Errorf("failed to start notification service: %w", err)
+			return errors.Wrapf(err, "failed to start notification service")
 		}
 	}
 
 	var gw *gateway.Gateway
 	if isComponentEnabled("gateway") {
-		gw, err = gateway.NewGateway(ctx, nil, c)
+		gw, err = gateway.NewGateway(ctx, log.Logger, c)
 		if err != nil {
-			return errors.Errorf("failed to start gateway: %w", err)
+			return errors.Wrapf(err, "failed to start gateway")
 		}
 	}
 
 	var gs *gitserver.Gitserver
 	if isComponentEnabled("gitserver") {
-		gs, err = gitserver.NewGitserver(ctx, nil, &c.Gitserver)
+		gs, err = gitserver.NewGitserver(ctx, log.Logger, &c.Gitserver)
 		if err != nil {
-			return errors.Errorf("failed to start git server: %w", err)
+			return errors.Wrapf(err, "failed to start git server")
 		}
 	}
 

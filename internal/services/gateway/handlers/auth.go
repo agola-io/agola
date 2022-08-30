@@ -19,31 +19,33 @@ import (
 	"net/http"
 	"strings"
 
-	"agola.io/agola/internal/services/common"
+	"agola.io/agola/internal/errors"
+	scommon "agola.io/agola/internal/services/common"
+	"agola.io/agola/internal/services/gateway/common"
+	"agola.io/agola/internal/util"
 	csclient "agola.io/agola/services/configstore/client"
 
-	jwt "github.com/dgrijalva/jwt-go"
-	jwtrequest "github.com/dgrijalva/jwt-go/request"
-	"go.uber.org/zap"
-	errors "golang.org/x/xerrors"
+	"github.com/golang-jwt/jwt/v4"
+	jwtrequest "github.com/golang-jwt/jwt/v4/request"
+	"github.com/rs/zerolog"
 )
 
 type AuthHandler struct {
-	log  *zap.SugaredLogger
+	log  zerolog.Logger
 	next http.Handler
 
 	configstoreClient *csclient.Client
 	adminToken        string
 
-	sd *common.TokenSigningData
+	sd *scommon.TokenSigningData
 
 	required bool
 }
 
-func NewAuthHandler(logger *zap.Logger, configstoreClient *csclient.Client, adminToken string, sd *common.TokenSigningData, required bool) func(http.Handler) http.Handler {
+func NewAuthHandler(log zerolog.Logger, configstoreClient *csclient.Client, adminToken string, sd *scommon.TokenSigningData, required bool) func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		return &AuthHandler{
-			log:               logger.Sugar(),
+			log:               log,
 			next:              h,
 			configstoreClient: configstoreClient,
 			adminToken:        adminToken,
@@ -59,26 +61,26 @@ func (h *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	tokenString, _ := TokenExtractor.ExtractToken(r)
 	if h.adminToken != "" && tokenString != "" {
 		if tokenString == h.adminToken {
-			ctx = context.WithValue(ctx, "admin", true)
+			ctx = context.WithValue(ctx, common.ContextKeyUserAdmin, true)
 			h.next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		} else {
-			user, resp, err := h.configstoreClient.GetUserByToken(ctx, tokenString)
-			if err != nil && resp.StatusCode == http.StatusNotFound {
-				http.Error(w, "", http.StatusUnauthorized)
-				return
-			}
+			user, _, err := h.configstoreClient.GetUserByToken(ctx, tokenString)
 			if err != nil {
+				if util.RemoteErrorIs(err, util.ErrNotExist) {
+					http.Error(w, "", http.StatusUnauthorized)
+					return
+				}
 				http.Error(w, "", http.StatusInternalServerError)
 				return
 			}
 
 			// pass userid to handlers via context
-			ctx = context.WithValue(ctx, "userid", user.ID)
-			ctx = context.WithValue(ctx, "username", user.Name)
+			ctx = context.WithValue(ctx, common.ContextKeyUserID, user.ID)
+			ctx = context.WithValue(ctx, common.ContextKeyUsername, user.Name)
 
 			if user.Admin {
-				ctx = context.WithValue(ctx, "admin", true)
+				ctx = context.WithValue(ctx, common.ContextKeyUserAdmin, true)
 			}
 
 			h.next.ServeHTTP(w, r.WithContext(ctx))
@@ -105,7 +107,7 @@ func (h *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return key, nil
 		})
 		if err != nil {
-			h.log.Errorf("err: %+v", err)
+			h.log.Err(err).Send()
 			http.Error(w, "", http.StatusUnauthorized)
 			return
 		}
@@ -117,9 +119,9 @@ func (h *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		claims := token.Claims.(jwt.MapClaims)
 		userID := claims["sub"].(string)
 
-		user, resp, err := h.configstoreClient.GetUser(ctx, userID)
+		user, _, err := h.configstoreClient.GetUser(ctx, userID)
 		if err != nil {
-			if resp != nil && resp.StatusCode == http.StatusNotFound {
+			if util.RemoteErrorIs(err, util.ErrNotExist) {
 				http.Error(w, "", http.StatusUnauthorized)
 				return
 			}
@@ -128,11 +130,11 @@ func (h *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// pass userid and username to handlers via context
-		ctx = context.WithValue(ctx, "userid", user.ID)
-		ctx = context.WithValue(ctx, "username", user.Name)
+		ctx = context.WithValue(ctx, common.ContextKeyUserID, user.ID)
+		ctx = context.WithValue(ctx, common.ContextKeyUsername, user.Name)
 
 		if user.Admin {
-			ctx = context.WithValue(ctx, "admin", true)
+			ctx = context.WithValue(ctx, common.ContextKeyUserAdmin, true)
 		}
 
 		h.next.ServeHTTP(w, r.WithContext(ctx))

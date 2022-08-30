@@ -17,10 +17,11 @@ package cmd
 import (
 	"context"
 
+	"agola.io/agola/internal/errors"
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	errors "golang.org/x/xerrors"
 )
 
 var cmdProjectDelete = &cobra.Command{
@@ -28,7 +29,7 @@ var cmdProjectDelete = &cobra.Command{
 	Short: "delete a project",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := projectDelete(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -45,7 +46,7 @@ func init() {
 	flags.StringVar(&projectDeleteOpts.ref, "ref", "", "project path or id")
 
 	if err := cmdProjectDelete.MarkFlagRequired("ref"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdProject.AddCommand(cmdProjectDelete)
@@ -54,10 +55,10 @@ func init() {
 func projectDelete(cmd *cobra.Command, args []string) error {
 	gwclient := gwclient.NewClient(gatewayURL, token)
 
-	log.Infof("deleting project")
+	log.Info().Msgf("deleting project")
 
 	if _, err := gwclient.DeleteProject(context.TODO(), projectDeleteOpts.ref); err != nil {
-		return errors.Errorf("failed to delete project: %w", err)
+		return errors.Wrapf(err, "failed to delete project")
 	}
 
 	return nil

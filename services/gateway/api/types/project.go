@@ -39,6 +39,7 @@ type ProjectResponse struct {
 	Visibility         Visibility `json:"visibility,omitempty"`
 	GlobalVisibility   string     `json:"global_visibility,omitempty"`
 	PassVarsToForkedPR bool       `json:"pass_vars_to_forked_pr,omitempty"`
+	DefaultBranch      string     `json:"default_branch,omitempty"`
 }
 
 type ProjectCreateRunRequest struct {

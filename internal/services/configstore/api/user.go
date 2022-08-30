@@ -19,25 +19,25 @@ import (
 	"net/http"
 	"strconv"
 
-	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/errors"
 	action "agola.io/agola/internal/services/configstore/action"
-	"agola.io/agola/internal/services/configstore/readdb"
+	"agola.io/agola/internal/services/configstore/db"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	"agola.io/agola/services/configstore/types"
 
 	"github.com/gorilla/mux"
-	"go.uber.org/zap"
-	errors "golang.org/x/xerrors"
+	"github.com/rs/zerolog"
 )
 
 type UserHandler struct {
-	log    *zap.SugaredLogger
-	readDB *readdb.ReadDB
+	log zerolog.Logger
+	d   *db.DB
 }
 
-func NewUserHandler(logger *zap.Logger, readDB *readdb.ReadDB) *UserHandler {
-	return &UserHandler{log: logger.Sugar(), readDB: readDB}
+func NewUserHandler(log zerolog.Logger, d *db.DB) *UserHandler {
+	return &UserHandler{log: log, d: d}
 }
 
 func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -46,34 +46,34 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	userRef := vars["userref"]
 
 	var user *types.User
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		user, err = h.readDB.GetUser(tx, userRef)
-		return err
+		user, err = h.d.GetUser(tx, userRef)
+		return errors.WithStack(err)
 	})
 	if err != nil {
-		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
+		h.log.Err(err).Send()
+		util.HTTPError(w, err)
 		return
 	}
 
 	if user == nil {
-		httpError(w, util.NewErrNotExist(errors.Errorf("user %q doesn't exist", userRef)))
+		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("user %q doesn't exist", userRef)))
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, user); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, user); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type CreateUserHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewCreateUserHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateUserHandler {
-	return &CreateUserHandler{log: logger.Sugar(), ah: ah}
+func NewCreateUserHandler(log zerolog.Logger, ah *action.ActionHandler) *CreateUserHandler {
+	return &CreateUserHandler{log: log, ah: ah}
 }
 
 func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -82,7 +82,7 @@ func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var req *csapitypes.CreateUserRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
@@ -102,23 +102,23 @@ func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user, err := h.ah.CreateUser(ctx, creq)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	if err := httpResponse(w, http.StatusCreated, user); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusCreated, user); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type UpdateUserHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewUpdateUserHandler(logger *zap.Logger, ah *action.ActionHandler) *UpdateUserHandler {
-	return &UpdateUserHandler{log: logger.Sugar(), ah: ah}
+func NewUpdateUserHandler(log zerolog.Logger, ah *action.ActionHandler) *UpdateUserHandler {
+	return &UpdateUserHandler{log: log, ah: ah}
 }
 
 func (h *UpdateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -130,7 +130,7 @@ func (h *UpdateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var req *csapitypes.UpdateUserRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
@@ -140,23 +140,23 @@ func (h *UpdateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user, err := h.ah.UpdateUser(ctx, creq)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	if err := httpResponse(w, http.StatusCreated, user); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusCreated, user); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type DeleteUserHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewDeleteUserHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteUserHandler {
-	return &DeleteUserHandler{log: logger.Sugar(), ah: ah}
+func NewDeleteUserHandler(log zerolog.Logger, ah *action.ActionHandler) *DeleteUserHandler {
+	return &DeleteUserHandler{log: log, ah: ah}
 }
 
 func (h *DeleteUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -166,11 +166,11 @@ func (h *DeleteUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	userRef := vars["userref"]
 
 	err := h.ah.DeleteUser(ctx, userRef)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 	}
-	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
@@ -180,12 +180,12 @@ const (
 )
 
 type UsersHandler struct {
-	log    *zap.SugaredLogger
-	readDB *readdb.ReadDB
+	log zerolog.Logger
+	d   *db.DB
 }
 
-func NewUsersHandler(logger *zap.Logger, readDB *readdb.ReadDB) *UsersHandler {
-	return &UsersHandler{log: logger.Sugar(), readDB: readDB}
+func NewUsersHandler(log zerolog.Logger, d *db.DB) *UsersHandler {
+	return &UsersHandler{log: log, d: d}
 }
 
 func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -198,12 +198,12 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		limit, err = strconv.Atoi(limitS)
 		if err != nil {
-			httpError(w, util.NewErrBadRequest(errors.Errorf("cannot parse limit: %w", err)))
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit")))
 			return
 		}
 	}
 	if limit < 0 {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("limit must be greater or equal than 0")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0")))
 		return
 	}
 	if limit > MaxUsersLimit {
@@ -220,88 +220,99 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	queryType := query.Get("query_type")
 
 	var users []*types.User
-	switch queryType {
-	case "bytoken":
-		token := query.Get("token")
-		var user *types.User
-		err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		switch queryType {
+		case "bytoken":
+			token := query.Get("token")
+			user, err := h.d.GetUserByTokenValue(tx, token)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			if user == nil {
+				return util.NewAPIError(util.ErrNotExist, errors.Errorf("user with required token doesn't exist"))
+			}
+			users = []*types.User{user}
+		case "bylinkedaccount":
+			linkedAccountID := query.Get("linkedaccountid")
+			user, err := h.d.GetUserByLinkedAccount(tx, linkedAccountID)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			if user == nil {
+				return util.NewAPIError(util.ErrNotExist, errors.Errorf("user with linked account %q token doesn't exist", linkedAccountID))
+			}
+			users = []*types.User{user}
+		case "byremoteuser":
+			remoteUserID := query.Get("remoteuserid")
+			remoteSourceID := query.Get("remotesourceid")
+			la, err := h.d.GetLinkedAccountByRemoteUserIDandSource(tx, remoteUserID, remoteSourceID)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			if la == nil {
+				return util.NewAPIError(util.ErrNotExist, errors.Errorf("linked account with remote user %q for remote source %q token doesn't exist", remoteUserID, remoteSourceID))
+			}
+
+			user, err := h.d.GetUser(tx, la.UserID)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			if user == nil {
+				return util.NewAPIError(util.ErrNotExist, errors.Errorf("user with remote user %q for remote source %q token doesn't exist", remoteUserID, remoteSourceID))
+			}
+			users = []*types.User{user}
+		default:
+			// default query
 			var err error
-			user, err = h.readDB.GetUserByTokenValue(tx, token)
-			return err
-		})
-		if err != nil {
-			h.log.Errorf("err: %+v", err)
-			httpError(w, err)
-			return
+			users, err = h.d.GetUsers(tx, start, limit, asc)
+			return errors.WithStack(err)
 		}
-		if user == nil {
-			httpError(w, util.NewErrNotExist(errors.Errorf("user with required token doesn't exist")))
-			return
-		}
-		users = []*types.User{user}
-	case "bylinkedaccount":
-		linkedAccountID := query.Get("linkedaccountid")
-		var user *types.User
-		err := h.readDB.Do(ctx, func(tx *db.Tx) error {
-			var err error
-			user, err = h.readDB.GetUserByLinkedAccount(tx, linkedAccountID)
-			return err
-		})
-		if err != nil {
-			h.log.Errorf("err: %+v", err)
-			httpError(w, err)
-			return
-		}
-		if user == nil {
-			httpError(w, util.NewErrNotExist(errors.Errorf("user with linked account %q token doesn't exist", linkedAccountID)))
-			return
-		}
-		users = []*types.User{user}
-	case "byremoteuser":
-		remoteUserID := query.Get("remoteuserid")
-		remoteSourceID := query.Get("remotesourceid")
-		var user *types.User
-		err := h.readDB.Do(ctx, func(tx *db.Tx) error {
-			var err error
-			user, err = h.readDB.GetUserByLinkedAccountRemoteUserIDandSource(tx, remoteUserID, remoteSourceID)
-			return err
-		})
-		if err != nil {
-			h.log.Errorf("err: %+v", err)
-			httpError(w, err)
-			return
-		}
-		if user == nil {
-			httpError(w, util.NewErrNotExist(errors.Errorf("user with remote user %q for remote source %q token doesn't exist", remoteUserID, remoteSourceID)))
-			return
-		}
-		users = []*types.User{user}
-	default:
-		// default query
-		err := h.readDB.Do(ctx, func(tx *db.Tx) error {
-			var err error
-			users, err = h.readDB.GetUsers(tx, start, limit, asc)
-			return err
-		})
-		if err != nil {
-			h.log.Errorf("err: %+v", err)
-			httpError(w, err)
-			return
-		}
+
+		return nil
+	})
+	if err != nil {
+		h.log.Err(err).Send()
+		util.HTTPError(w, err)
+		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, users); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, users); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+type UserLinkedAccountsHandler struct {
+	log zerolog.Logger
+	ah  *action.ActionHandler
+}
+
+func NewUserLinkedAccountsHandler(log zerolog.Logger, ah *action.ActionHandler) *UserLinkedAccountsHandler {
+	return &UserLinkedAccountsHandler{log: log, ah: ah}
+}
+
+func (h *UserLinkedAccountsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	userRef := vars["userref"]
+
+	linkedAccounts, err := h.ah.GetUserLinkedAccounts(ctx, userRef)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusCreated, linkedAccounts); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type CreateUserLAHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewCreateUserLAHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateUserLAHandler {
-	return &CreateUserLAHandler{log: logger.Sugar(), ah: ah}
+func NewCreateUserLAHandler(log zerolog.Logger, ah *action.ActionHandler) *CreateUserLAHandler {
+	return &CreateUserLAHandler{log: log, ah: ah}
 }
 
 func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -312,7 +323,7 @@ func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	var req csapitypes.CreateUserLARequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
@@ -327,23 +338,23 @@ func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		Oauth2AccessTokenExpiresAt: req.Oauth2AccessTokenExpiresAt,
 	}
 	user, err := h.ah.CreateUserLA(ctx, creq)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	if err := httpResponse(w, http.StatusCreated, user); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusCreated, user); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type DeleteUserLAHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewDeleteUserLAHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteUserLAHandler {
-	return &DeleteUserLAHandler{log: logger.Sugar(), ah: ah}
+func NewDeleteUserLAHandler(log zerolog.Logger, ah *action.ActionHandler) *DeleteUserLAHandler {
+	return &DeleteUserLAHandler{log: log, ah: ah}
 }
 
 func (h *DeleteUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -353,21 +364,21 @@ func (h *DeleteUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	laID := vars["laid"]
 
 	err := h.ah.DeleteUserLA(ctx, userRef, laID)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 	}
-	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type UpdateUserLAHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewUpdateUserLAHandler(logger *zap.Logger, ah *action.ActionHandler) *UpdateUserLAHandler {
-	return &UpdateUserLAHandler{log: logger.Sugar(), ah: ah}
+func NewUpdateUserLAHandler(log zerolog.Logger, ah *action.ActionHandler) *UpdateUserLAHandler {
+	return &UpdateUserLAHandler{log: log, ah: ah}
 }
 
 func (h *UpdateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -379,7 +390,7 @@ func (h *UpdateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	var req csapitypes.UpdateUserLARequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
@@ -394,23 +405,48 @@ func (h *UpdateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		Oauth2AccessTokenExpiresAt: req.Oauth2AccessTokenExpiresAt,
 	}
 	user, err := h.ah.UpdateUserLA(ctx, creq)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, user); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, user); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+type UserTokensHandler struct {
+	log zerolog.Logger
+	ah  *action.ActionHandler
+}
+
+func NewUserTokensHandler(log zerolog.Logger, ah *action.ActionHandler) *UserTokensHandler {
+	return &UserTokensHandler{log: log, ah: ah}
+}
+
+func (h *UserTokensHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	userRef := vars["userref"]
+
+	linkedAccounts, err := h.ah.GetUserTokens(ctx, userRef)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusCreated, linkedAccounts); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type CreateUserTokenHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewCreateUserTokenHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateUserTokenHandler {
-	return &CreateUserTokenHandler{log: logger.Sugar(), ah: ah}
+func NewCreateUserTokenHandler(log zerolog.Logger, ah *action.ActionHandler) *CreateUserTokenHandler {
+	return &CreateUserTokenHandler{log: log, ah: ah}
 }
 
 func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -421,31 +457,32 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	var req csapitypes.CreateUserTokenRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
 	token, err := h.ah.CreateUserToken(ctx, userRef, req.TokenName)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
 	resp := &csapitypes.CreateUserTokenResponse{
-		Token: token,
+		Name:  token.Name,
+		Token: token.Value,
 	}
-	if err := httpResponse(w, http.StatusCreated, resp); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusCreated, resp); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type DeleteUserTokenHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewDeleteUserTokenHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteUserTokenHandler {
-	return &DeleteUserTokenHandler{log: logger.Sugar(), ah: ah}
+func NewDeleteUserTokenHandler(log zerolog.Logger, ah *action.ActionHandler) *DeleteUserTokenHandler {
+	return &DeleteUserTokenHandler{log: log, ah: ah}
 }
 
 func (h *DeleteUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -455,12 +492,12 @@ func (h *DeleteUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	tokenName := vars["tokenname"]
 
 	err := h.ah.DeleteUserToken(ctx, userRef, tokenName)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
-	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
@@ -472,12 +509,12 @@ func userOrgsResponse(userOrg *action.UserOrgsResponse) *csapitypes.UserOrgsResp
 }
 
 type UserOrgsHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewUserOrgsHandler(logger *zap.Logger, ah *action.ActionHandler) *UserOrgsHandler {
-	return &UserOrgsHandler{log: logger.Sugar(), ah: ah}
+func NewUserOrgsHandler(log zerolog.Logger, ah *action.ActionHandler) *UserOrgsHandler {
+	return &UserOrgsHandler{log: log, ah: ah}
 }
 
 func (h *UserOrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -486,8 +523,8 @@ func (h *UserOrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	userRef := vars["userref"]
 
 	userOrgs, err := h.ah.GetUserOrgs(ctx, userRef)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -496,7 +533,7 @@ func (h *UserOrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		res[i] = userOrgsResponse(userOrg)
 	}
 
-	if err := httpResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
 	}
 }

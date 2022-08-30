@@ -17,10 +17,11 @@ package cmd
 import (
 	"context"
 
+	"agola.io/agola/internal/errors"
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	errors "golang.org/x/xerrors"
 )
 
 var cmdProjectGroupDelete = &cobra.Command{
@@ -28,7 +29,7 @@ var cmdProjectGroupDelete = &cobra.Command{
 	Short: "delete a project group",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := projectGroupDelete(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -45,7 +46,7 @@ func init() {
 	flags.StringVarP(&projectGroupDeleteOpts.ref, "ref", "", "", "current project group path or id")
 
 	if err := cmdProjectGroupDelete.MarkFlagRequired("ref"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdProjectGroup.AddCommand(cmdProjectGroupDelete)
@@ -54,10 +55,10 @@ func init() {
 func projectGroupDelete(cmd *cobra.Command, args []string) error {
 	gwclient := gwclient.NewClient(gatewayURL, token)
 
-	log.Infof("deleting project group")
+	log.Info().Msgf("deleting project group")
 
 	if _, err := gwclient.DeleteProjectGroup(context.TODO(), projectGroupDeleteOpts.ref); err != nil {
-		return errors.Errorf("failed to delete project group: %w", err)
+		return errors.Wrapf(err, "failed to delete project group")
 	}
 
 	return nil

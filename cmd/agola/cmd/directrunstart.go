@@ -23,22 +23,23 @@ import (
 	"strings"
 	"unicode"
 
+	"agola.io/agola/internal/errors"
 	gitsave "agola.io/agola/internal/git-save"
 	"agola.io/agola/internal/util"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/ghodss/yaml"
-	uuid "github.com/satori/go.uuid"
+	"github.com/gofrs/uuid"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	errors "golang.org/x/xerrors"
 )
 
 var cmdDirectRunStart = &cobra.Command{
 	Use: "start",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := directRunStart(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 	Short: "executes a run from a local git repository",
@@ -79,15 +80,15 @@ func parseVariable(variable string) (string, string, error) {
 	variable = strings.TrimLeftFunc(variable, unicode.IsSpace)
 	arr := strings.SplitN(variable, "=", 2)
 	if len(arr) != 2 {
-		return "", "", fmt.Errorf("invalid variable definition: %s", variable)
+		return "", "", errors.Errorf("invalid variable definition: %s", variable)
 	}
 	varname := arr[0]
 	varvalue := arr[1]
 	if varname == "" {
-		return "", "", fmt.Errorf("invalid variable definition: %s", variable)
+		return "", "", errors.Errorf("invalid variable definition: %s", variable)
 	}
 	if varvalue == "" {
-		return "", "", fmt.Errorf("invalid variable definition: %s", variable)
+		return "", "", errors.Errorf("invalid variable definition: %s", variable)
 	}
 	return varname, varvalue, nil
 }
@@ -97,7 +98,7 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 
 	for _, res := range directRunStartOpts.prRefRegexes {
 		if _, err := regexp.Compile(res); err != nil {
-			return fmt.Errorf("wrong regular expression %q: %v", res, err)
+			return errors.Wrapf(err, "wrong regular expression %q", res)
 		}
 	}
 
@@ -122,12 +123,12 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 		branch = ""
 	}
 	if set > 1 {
-		return fmt.Errorf(`only one of "--branch", "--tag" or "--ref" can be provided`)
+		return errors.Errorf(`only one of "--branch", "--tag" or "--ref" can be provided`)
 	}
 
 	user, _, err := gwclient.GetCurrentUser(context.TODO())
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	variables := map[string]string{}
@@ -141,11 +142,11 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 		var err error
 		data, err = ioutil.ReadFile(varFile)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		if err := yaml.Unmarshal(data, &variables); err != nil {
-			return errors.Errorf("failed to unmarshal values: %v", err)
+			return errors.Wrapf(err, "failed to unmarshal values")
 		}
 
 		// TODO(sgotti) validate variable name
@@ -154,7 +155,7 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 	for _, variable := range directRunStartOpts.vars {
 		varname, varvalue, err := parseVariable(variable)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		variables[varname] = varvalue
 	}
@@ -163,45 +164,45 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 	git := &util.Git{}
 	repoUUID, _ := git.ConfigGet(context.Background(), "agola.repouuid")
 	if repoUUID == "" {
-		repoUUID = uuid.NewV4().String()
+		repoUUID = uuid.Must(uuid.NewV4()).String()
 		if _, err := git.ConfigSet(context.Background(), "agola.repouuid", repoUUID); err != nil {
-			return fmt.Errorf("failed to set agola repo uid in git config: %v", err)
+			return errors.Wrapf(err, "failed to set agola repo uid in git config")
 		}
 	}
 
-	gs := gitsave.NewGitSave(logger, &gitsave.GitSaveConfig{
+	gs := gitsave.NewGitSave(log.Logger, &gitsave.GitSaveConfig{
 		AddUntracked: directRunStartOpts.untracked,
 		AddIgnored:   directRunStartOpts.ignored,
 	})
 
-	localBranch := "gitsavebranch-" + uuid.NewV4().String()
+	localBranch := "gitsavebranch-" + uuid.Must(uuid.NewV4()).String()
 	message := "agola direct run"
 
 	commitSHA, err := gs.Save(message, localBranch)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
-	log.Infof("pushing branch")
+	log.Info().Msgf("pushing branch")
 	repoPath := fmt.Sprintf("%s/%s", user.ID, repoUUID)
 	repoURL := fmt.Sprintf("%s/repos/%s/%s.git", gatewayURL, user.ID, repoUUID)
 
 	// push to a branch with default branch refs "refs/heads/branch"
 	if branch != "" {
 		if err := gitsave.GitPush("", repoURL, fmt.Sprintf("%s:refs/heads/%s", path.Join(gs.RefsPrefix(), localBranch), branch)); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	} else if tag != "" {
 		if err := gitsave.GitPush("", repoURL, fmt.Sprintf("%s:refs/tags/%s", path.Join(gs.RefsPrefix(), localBranch), tag)); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	} else if ref != "" {
 		if err := gitsave.GitPush("", repoURL, fmt.Sprintf("%s:%s", path.Join(gs.RefsPrefix(), localBranch), ref)); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	}
 
-	log.Infof("starting direct run")
+	log.Info().Msgf("starting direct run")
 	req := &gwapitypes.UserCreateRunRequest{
 		RepoUUID:              repoUUID,
 		RepoPath:              repoPath,
@@ -214,7 +215,7 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 		Variables:             variables,
 	}
 	if _, err := gwclient.UserCreateRun(context.TODO(), req); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	return nil

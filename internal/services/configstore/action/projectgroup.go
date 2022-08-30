@@ -16,32 +16,29 @@ package action
 
 import (
 	"context"
-	"encoding/json"
 	"path"
 	"strings"
 
-	"agola.io/agola/internal/datamanager"
-	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/errors"
+	"agola.io/agola/internal/sql"
+
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
-
-	uuid "github.com/satori/go.uuid"
-	errors "golang.org/x/xerrors"
 )
 
 func (h *ActionHandler) GetProjectGroup(ctx context.Context, projectGroupRef string) (*types.ProjectGroup, error) {
 	var projectGroup *types.ProjectGroup
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		projectGroup, err = h.readDB.GetProjectGroup(tx, projectGroupRef)
-		return err
+		projectGroup, err = h.d.GetProjectGroup(tx, projectGroupRef)
+		return errors.WithStack(err)
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	if projectGroup == nil {
-		return nil, util.NewErrNotExist(errors.Errorf("project group %q doesn't exist", projectGroupRef))
+		return nil, util.NewAPIError(util.ErrNotExist, errors.Errorf("project group %q doesn't exist", projectGroupRef))
 	}
 
 	return projectGroup, nil
@@ -49,22 +46,22 @@ func (h *ActionHandler) GetProjectGroup(ctx context.Context, projectGroupRef str
 
 func (h *ActionHandler) GetProjectGroupSubgroups(ctx context.Context, projectGroupRef string) ([]*types.ProjectGroup, error) {
 	var projectGroups []*types.ProjectGroup
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		projectGroup, err := h.readDB.GetProjectGroup(tx, projectGroupRef)
+		projectGroup, err := h.d.GetProjectGroup(tx, projectGroupRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		if projectGroup == nil {
-			return util.NewErrNotExist(errors.Errorf("project group %q doesn't exist", projectGroupRef))
+			return util.NewAPIError(util.ErrNotExist, errors.Errorf("project group %q doesn't exist", projectGroupRef))
 		}
 
-		projectGroups, err = h.readDB.GetProjectGroupSubgroups(tx, projectGroup.ID)
-		return err
+		projectGroups, err = h.d.GetProjectGroupSubgroups(tx, projectGroup.ID)
+		return errors.WithStack(err)
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return projectGroups, nil
@@ -72,299 +69,239 @@ func (h *ActionHandler) GetProjectGroupSubgroups(ctx context.Context, projectGro
 
 func (h *ActionHandler) GetProjectGroupProjects(ctx context.Context, projectGroupRef string) ([]*types.Project, error) {
 	var projects []*types.Project
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		projectGroup, err := h.readDB.GetProjectGroup(tx, projectGroupRef)
+		projectGroup, err := h.d.GetProjectGroup(tx, projectGroupRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		if projectGroup == nil {
-			return util.NewErrNotExist(errors.Errorf("project group %q doesn't exist", projectGroupRef))
+			return util.NewAPIError(util.ErrNotExist, errors.Errorf("project group %q doesn't exist", projectGroupRef))
 		}
 
-		projects, err = h.readDB.GetProjectGroupProjects(tx, projectGroup.ID)
-		return err
+		projects, err = h.d.GetProjectGroupProjects(tx, projectGroup.ID)
+		return errors.WithStack(err)
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	return projects, nil
 }
 
-func (h *ActionHandler) ValidateProjectGroup(ctx context.Context, projectGroup *types.ProjectGroup) error {
-	if projectGroup.Parent.Type != types.ConfigTypeProjectGroup &&
-		projectGroup.Parent.Type != types.ConfigTypeOrg &&
-		projectGroup.Parent.Type != types.ConfigTypeUser {
-		return util.NewErrBadRequest(errors.Errorf("invalid project group parent type %q", projectGroup.Parent.Type))
+func (h *ActionHandler) ValidateProjectGroupReq(ctx context.Context, req *CreateUpdateProjectGroupRequest) error {
+	if req.Parent.Kind != types.ObjectKindProjectGroup &&
+		req.Parent.Kind != types.ObjectKindOrg &&
+		req.Parent.Kind != types.ObjectKindUser {
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid project group parent kind %q", req.Parent.Kind))
 	}
-	if projectGroup.Parent.ID == "" {
-		return util.NewErrBadRequest(errors.Errorf("project group parent id required"))
+	if req.Parent.ID == "" {
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group parent id required"))
 	}
 
 	// if the project group is a root project group the name must be empty
-	if projectGroup.Parent.Type == types.ConfigTypeOrg ||
-		projectGroup.Parent.Type == types.ConfigTypeUser {
-		if projectGroup.Name != "" {
-			return util.NewErrBadRequest(errors.Errorf("project group name for root project group must be empty"))
+	if req.Parent.Kind == types.ObjectKindOrg ||
+		req.Parent.Kind == types.ObjectKindUser {
+		if req.Name != "" {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group name for root project group must be empty"))
 		}
 	} else {
-		if projectGroup.Name == "" {
-			return util.NewErrBadRequest(errors.Errorf("project group name required"))
+		if req.Name == "" {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group name required"))
 		}
-		if !util.ValidateName(projectGroup.Name) {
-			return util.NewErrBadRequest(errors.Errorf("invalid project group name %q", projectGroup.Name))
+		if !util.ValidateName(req.Name) {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid project group name %q", req.Name))
 		}
 	}
-	if !types.IsValidVisibility(projectGroup.Visibility) {
-		return util.NewErrBadRequest(errors.Errorf("invalid project group visibility"))
+	if !types.IsValidVisibility(req.Visibility) {
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid project group visibility"))
 	}
 
 	return nil
 }
 
-func (h *ActionHandler) CreateProjectGroup(ctx context.Context, projectGroup *types.ProjectGroup) (*types.ProjectGroup, error) {
-	if err := h.ValidateProjectGroup(ctx, projectGroup); err != nil {
-		return nil, err
+type CreateUpdateProjectGroupRequest struct {
+	Name       string
+	Parent     types.Parent
+	Visibility types.Visibility
+}
+
+func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateUpdateProjectGroupRequest) (*types.ProjectGroup, error) {
+	if err := h.ValidateProjectGroupReq(ctx, req); err != nil {
+		return nil, errors.WithStack(err)
 	}
 
-	if projectGroup.Parent.Type != types.ConfigTypeProjectGroup {
-		return nil, util.NewErrBadRequest(errors.Errorf("wrong project group parent type %q", projectGroup.Parent.Type))
+	// We cannot create a root project group for org/user since it's created on user/org creation
+	if req.Parent.Kind != types.ObjectKindProjectGroup {
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("wrong project group parent kind %q", req.Parent.Kind))
 	}
 
-	var cgt *datamanager.ChangeGroupsUpdateToken
-
-	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
-		parentProjectGroup, err := h.readDB.GetProjectGroup(tx, projectGroup.Parent.ID)
+	var projectGroup *types.ProjectGroup
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		parentProjectGroup, err := h.d.GetProjectGroup(tx, req.Parent.ID)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if parentProjectGroup == nil {
-			return util.NewErrBadRequest(errors.Errorf("project group with id %q doesn't exist", projectGroup.Parent.ID))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group with id %q doesn't exist", req.Parent.ID))
 		}
 		// TODO(sgotti) now we are doing a very ugly thing setting the request
 		// projectgroup parent ID that can be both an ID or a ref. Then we are fixing
 		// it to an ID here. Change the request format to avoid this.
-		projectGroup.Parent.ID = parentProjectGroup.ID
+		req.Parent.ID = parentProjectGroup.ID
 
-		groupPath, err := h.readDB.GetProjectGroupPath(tx, parentProjectGroup)
+		groupPath, err := h.d.GetProjectGroupPath(tx, parentProjectGroup)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
-		pp := path.Join(groupPath, projectGroup.Name)
-
-		// changegroup is the projectgroup path. Use "projectpath" prefix as it must
-		// cover both projects and projectgroups
-		cgNames := []string{util.EncodeSha256Hex("projectpath-" + pp)}
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
-		if err != nil {
-			return err
-		}
+		pp := path.Join(groupPath, req.Name)
 
 		// check duplicate project group name
-		pg, err := h.readDB.GetProjectGroupByName(tx, projectGroup.Parent.ID, projectGroup.Name)
+		tpg, err := h.d.GetProjectGroupByName(tx, req.Parent.ID, req.Name)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
-		if pg != nil {
-			return util.NewErrBadRequest(errors.Errorf("project group with name %q, path %q already exists", pg.Name, pp))
+		if tpg != nil {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group with name %q, path %q already exists", req.Name, pp))
 		}
+
+		projectGroup = types.NewProjectGroup()
+		projectGroup.Name = req.Name
+		projectGroup.Parent = req.Parent
+		projectGroup.Visibility = req.Visibility
+
+		if err := h.d.InsertProjectGroup(tx, projectGroup); err != nil {
+			return errors.WithStack(err)
+		}
+
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
-	projectGroup.ID = uuid.NewV4().String()
-	projectGroup.Parent.Type = types.ConfigTypeProjectGroup
-
-	pgj, err := json.Marshal(projectGroup)
-	if err != nil {
-		return nil, errors.Errorf("failed to marshal projectGroup: %w", err)
-	}
-	actions := []*datamanager.Action{
-		{
-			ActionType: datamanager.ActionTypePut,
-			DataType:   string(types.ConfigTypeProjectGroup),
-			ID:         projectGroup.ID,
-			Data:       pgj,
-		},
-	}
-
-	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return projectGroup, err
+	return projectGroup, errors.WithStack(err)
 }
 
-type UpdateProjectGroupRequest struct {
-	ProjectGroupRef string
-
-	ProjectGroup *types.ProjectGroup
-}
-
-func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, req *UpdateProjectGroupRequest) (*types.ProjectGroup, error) {
-	if err := h.ValidateProjectGroup(ctx, req.ProjectGroup); err != nil {
-		return nil, err
+func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, curProjectGroupRef string, req *CreateUpdateProjectGroupRequest) (*types.ProjectGroup, error) {
+	if err := h.ValidateProjectGroupReq(ctx, req); err != nil {
+		return nil, errors.WithStack(err)
 	}
 
-	var cgt *datamanager.ChangeGroupsUpdateToken
-
-	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	var projectGroup *types.ProjectGroup
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
 		// check project exists
-		pg, err := h.readDB.GetProjectGroup(tx, req.ProjectGroupRef)
+		projectGroup, err = h.d.GetProjectGroup(tx, curProjectGroupRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
-		if pg == nil {
-			return util.NewErrBadRequest(errors.Errorf("project group with ref %q doesn't exist", req.ProjectGroupRef))
-		}
-		// check that the project group ID matches
-		if pg.ID != req.ProjectGroup.ID {
-			return util.NewErrBadRequest(errors.Errorf("project group with ref %q has a different id", req.ProjectGroupRef))
+		if projectGroup == nil {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group with ref %q doesn't exist", curProjectGroupRef))
 		}
 
-		if pg.Parent.Type != req.ProjectGroup.Parent.Type {
-			return util.NewErrBadRequest(errors.Errorf("changing project group parent type isn't supported"))
+		if projectGroup.Parent.Kind != req.Parent.Kind {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("changing project group parent kind isn't supported"))
 		}
 
-		switch req.ProjectGroup.Parent.Type {
-		case types.ConfigTypeOrg:
+		switch projectGroup.Parent.Kind {
+		case types.ObjectKindOrg:
 			fallthrough
-		case types.ConfigTypeUser:
+		case types.ObjectKindUser:
 			// Cannot update root project group parent
-			if pg.Parent.Type != req.ProjectGroup.Parent.Type || pg.Parent.ID != req.ProjectGroup.Parent.ID {
-				return util.NewErrBadRequest(errors.Errorf("cannot change root project group parent type or id"))
+			if projectGroup.Parent.Kind != req.Parent.Kind || projectGroup.Parent.ID != req.Parent.ID {
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot change root project group parent kind or id"))
 			}
 			// if the project group is a root project group force the name to be empty
-			req.ProjectGroup.Name = ""
+			req.Name = ""
 
-		case types.ConfigTypeProjectGroup:
+		case types.ObjectKindProjectGroup:
 			// check parent exists
-			group, err := h.readDB.GetProjectGroup(tx, req.ProjectGroup.Parent.ID)
+			group, err := h.d.GetProjectGroup(tx, req.Parent.ID)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			if group == nil {
-				return util.NewErrBadRequest(errors.Errorf("project group with id %q doesn't exist", req.ProjectGroup.Parent.ID))
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group with id %q doesn't exist", req.Parent.ID))
 			}
 			// TODO(sgotti) now we are doing a very ugly thing setting the request
 			// projectgroup parent ID that can be both an ID or a ref. Then we are fixing
 			// it to an ID here. Change the request format to avoid this.
-			req.ProjectGroup.Parent.ID = group.ID
+			req.Parent.ID = group.ID
 		}
 
-		curPGParentPath, err := h.readDB.GetPath(tx, pg.Parent.Type, pg.Parent.ID)
+		curPGParentPath, err := h.d.GetPath(tx, projectGroup.Parent.Kind, projectGroup.Parent.ID)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
-		curPGP := path.Join(curPGParentPath, pg.Name)
+		curPGP := path.Join(curPGParentPath, projectGroup.Name)
 
-		pgParentPath, err := h.readDB.GetPath(tx, req.ProjectGroup.Parent.Type, req.ProjectGroup.Parent.ID)
+		pgParentPath, err := h.d.GetPath(tx, req.Parent.Kind, req.Parent.ID)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
-		pgp := path.Join(pgParentPath, req.ProjectGroup.Name)
+		pgp := path.Join(pgParentPath, req.Name)
 
-		if pg.Name != req.ProjectGroup.Name || pg.Parent.ID != req.ProjectGroup.Parent.ID {
+		if projectGroup.Name != req.Name || projectGroup.Parent.ID != req.Parent.ID {
 			// check duplicate project group name
-			ap, err := h.readDB.GetProjectGroupByName(tx, req.ProjectGroup.Parent.ID, req.ProjectGroup.Name)
+			ap, err := h.d.GetProjectGroupByName(tx, req.Parent.ID, req.Name)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			if ap != nil {
-				return util.NewErrBadRequest(errors.Errorf("project group with name %q, path %q already exists", req.ProjectGroup.Name, pgp))
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group with name %q, path %q already exists", req.Name, pgp))
 			}
 			// Cannot move inside itself or a child project group
 			if strings.HasPrefix(pgp, curPGP+"/") {
-				return util.NewErrBadRequest(errors.Errorf("cannot move project group inside itself or child project group"))
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot move project group inside itself or child project group"))
 			}
 		}
 
-		// changegroup is the project group path. Use "projectpath" prefix as it must
-		// cover both projects and projectgroups
-		cgNames := []string{util.EncodeSha256Hex("projectpath-" + pgp)}
+		// update current projectGroup
+		projectGroup.Name = req.Name
+		projectGroup.Parent = req.Parent
+		projectGroup.Visibility = req.Visibility
 
-		// add new projectpath
-		if pg.Parent.ID != req.ProjectGroup.Parent.ID {
-			cgNames = append(cgNames, util.EncodeSha256Hex("projectpath-"+pgp))
-		}
-
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
-		if err != nil {
-			return err
+		if err := h.d.UpdateProjectGroup(tx, projectGroup); err != nil {
+			return errors.WithStack(err)
 		}
 
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
-	pgj, err := json.Marshal(req.ProjectGroup)
-	if err != nil {
-		return nil, errors.Errorf("failed to marshal project: %w", err)
-	}
-	actions := []*datamanager.Action{
-		{
-			ActionType: datamanager.ActionTypePut,
-			DataType:   string(types.ConfigTypeProjectGroup),
-			ID:         req.ProjectGroup.ID,
-			Data:       pgj,
-		},
-	}
-
-	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return req.ProjectGroup, err
+	return projectGroup, errors.WithStack(err)
 }
 
 func (h *ActionHandler) DeleteProjectGroup(ctx context.Context, projectGroupRef string) error {
-	var projectGroup *types.ProjectGroup
-
-	var cgt *datamanager.ChangeGroupsUpdateToken
-
-	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
-		var err error
-
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		// check project group existance
-		projectGroup, err = h.readDB.GetProjectGroup(tx, projectGroupRef)
+		projectGroup, err := h.d.GetProjectGroup(tx, projectGroupRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if projectGroup == nil {
-			return util.NewErrBadRequest(errors.Errorf("project group %q doesn't exist", projectGroupRef))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group %q doesn't exist", projectGroupRef))
 		}
 
 		// cannot delete root project group
-		if projectGroup.Parent.Type == types.ConfigTypeOrg ||
-			projectGroup.Parent.Type == types.ConfigTypeUser {
-			return util.NewErrBadRequest(errors.Errorf("cannot delete root project group"))
+		if projectGroup.Parent.Kind == types.ObjectKindOrg ||
+			projectGroup.Parent.Kind == types.ObjectKindUser {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot delete root project group"))
 		}
 
-		// changegroup is the project group id.
-		cgNames := []string{util.EncodeSha256Hex(projectGroup.ID)}
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
-		if err != nil {
-			return err
+		// TODO(sgotti) implement childs garbage collection
+		if err := h.d.DeleteProjectGroup(tx, projectGroup.ID); err != nil {
+			return errors.WithStack(err)
 		}
 
 		return nil
 	})
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
-	// TODO(sgotti) implement childs garbage collection
-	actions := []*datamanager.Action{
-		{
-			ActionType: datamanager.ActionTypeDelete,
-			DataType:   string(types.ConfigTypeProjectGroup),
-			ID:         projectGroup.ID,
-		},
-	}
-
-	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return err
+	return errors.WithStack(err)
 }

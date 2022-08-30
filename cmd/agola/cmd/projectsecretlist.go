@@ -19,11 +19,12 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"agola.io/agola/internal/errors"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	errors "golang.org/x/xerrors"
 )
 
 var cmdProjectSecretList = &cobra.Command{
@@ -31,7 +32,7 @@ var cmdProjectSecretList = &cobra.Command{
 	Short: "list project secrets",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := secretList(cmd, "project", args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -48,7 +49,7 @@ func init() {
 	flags.StringVar(&secretListOpts.parentRef, "project", "", "project id or full path")
 
 	if err := cmdProjectSecretList.MarkFlagRequired("project"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdProjectSecret.AddCommand(cmdProjectSecretList)
@@ -56,10 +57,10 @@ func init() {
 
 func secretList(cmd *cobra.Command, ownertype string, args []string) error {
 	if err := printSecrets(ownertype, fmt.Sprintf("%s secrets", ownertype), false, false); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	if err := printSecrets(ownertype, "All secrets (local and inherited)", true, true); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	return nil
 }
@@ -78,11 +79,11 @@ func printSecrets(ownertype, description string, tree, removeoverridden bool) er
 		secrets, _, err = gwclient.GetProjectGroupSecrets(context.TODO(), secretListOpts.parentRef, tree, removeoverridden)
 	}
 	if err != nil {
-		return errors.Errorf("failed to list %s secrets: %w", ownertype, err)
+		return errors.Wrapf(err, "failed to list %s secrets", ownertype)
 	}
 	prettyJSON, err := json.MarshalIndent(secrets, "", "\t")
 	if err != nil {
-		return errors.Errorf("failed to convert %s secrets to json: %w", ownertype, err)
+		return errors.Wrapf(err, "failed to convert %s secrets to json", ownertype)
 	}
 	fmt.Printf("%s:\n%s\n", description, string(prettyJSON))
 	return nil

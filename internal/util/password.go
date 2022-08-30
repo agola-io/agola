@@ -15,20 +15,22 @@
 package util
 
 import (
+	"agola.io/agola/internal/errors"
+
 	"golang.org/x/crypto/bcrypt"
 )
 
 func PasswordHash(password string) (string, error) {
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	return string(passwordHash), err
+	return string(passwordHash), errors.WithStack(err)
 }
 
 func CompareHashAndPassword(passwordHash, password string) (bool, error) {
 	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(password)); err != nil {
-		if err == bcrypt.ErrMismatchedHashAndPassword {
+		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
 			return false, nil
 		}
-		return false, err
+		return false, errors.WithStack(err)
 	}
 	return true, nil
 }

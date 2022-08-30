@@ -21,16 +21,16 @@ import (
 	"agola.io/agola/internal/util"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 )
 
 type OAuth2CallbackHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewOAuth2CallbackHandler(logger *zap.Logger, ah *action.ActionHandler) *OAuth2CallbackHandler {
-	return &OAuth2CallbackHandler{log: logger.Sugar(), ah: ah}
+func NewOAuth2CallbackHandler(log zerolog.Logger, ah *action.ActionHandler) *OAuth2CallbackHandler {
+	return &OAuth2CallbackHandler{log: log, ah: ah}
 }
 
 func (h *OAuth2CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -41,8 +41,8 @@ func (h *OAuth2CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 	cresp, err := h.ah.HandleOauth2Callback(ctx, code, state)
 	if err != nil {
-		h.log.Errorf("err: %+v", err)
-		httpError(w, util.NewErrBadRequest(err))
+		h.log.Err(err).Send()
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
@@ -86,7 +86,7 @@ func (h *OAuth2CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		RequestType: string(cresp.RequestType),
 		Response:    response,
 	}
-	if err := httpResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
 	}
 }

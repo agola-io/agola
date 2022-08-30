@@ -23,20 +23,15 @@ import (
 	"regexp"
 	"strings"
 
+	"agola.io/agola/internal/errors"
 	handlers "agola.io/agola/internal/git-handler"
-	slog "agola.io/agola/internal/log"
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/util"
 
 	"github.com/gorilla/mux"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
-	errors "golang.org/x/xerrors"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
-
-var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
-var logger = slog.New(level)
-var log = logger.Sugar()
 
 const (
 	gitSuffix = ".git"
@@ -54,15 +49,15 @@ func repoPathIsValid(reposDir, repoPath string) (bool, error) {
 	// check that a subdirectory doesn't exists
 	reposDir, err := filepath.Abs(reposDir)
 	if err != nil {
-		return false, err
+		return false, errors.WithStack(err)
 	}
 
 	path := repoPath
 	_, err = os.Stat(path)
-	if err != nil && !os.IsNotExist(err) {
-		return false, err
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return false, errors.WithStack(err)
 	}
-	if !os.IsNotExist(err) {
+	if !errors.Is(err, os.ErrNotExist) {
 		// if it exists assume it's valid
 		return true, nil
 	}
@@ -74,14 +69,14 @@ func repoPathIsValid(reposDir, repoPath string) (bool, error) {
 		}
 
 		_, err := os.Stat(path)
-		if err != nil && !os.IsNotExist(err) {
-			return false, err
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return false, errors.WithStack(err)
 		}
 		// a parent path cannot end with .git
 		if strings.HasSuffix(path, gitSuffix) {
 			return false, nil
 		}
-		if !os.IsNotExist(err) {
+		if !errors.Is(err, os.ErrNotExist) {
 			// if a parent exists return not valid
 			return false, nil
 		}
@@ -92,16 +87,16 @@ func repoPathIsValid(reposDir, repoPath string) (bool, error) {
 
 func repoExists(repoAbsPath string) (bool, error) {
 	_, err := os.Stat(repoAbsPath)
-	if err != nil && !os.IsNotExist(err) {
-		return false, err
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return false, errors.WithStack(err)
 	}
-	return !os.IsNotExist(err), nil
+	return !errors.Is(err, os.ErrNotExist), nil
 }
 
 func repoAbsPath(reposDir, repoPath string) (string, bool, error) {
 	valid, err := repoPathIsValid(reposDir, repoPath)
 	if err != nil {
-		return "", false, err
+		return "", false, errors.WithStack(err)
 	}
 	if !valid {
 		return "", false, handlers.ErrWrongRepoPath
@@ -109,12 +104,12 @@ func repoAbsPath(reposDir, repoPath string) (string, bool, error) {
 
 	repoFSPath, err := filepath.Abs(filepath.Join(reposDir, repoPath))
 	if err != nil {
-		return "", false, err
+		return "", false, errors.WithStack(err)
 	}
 
 	exists, err := repoExists(repoFSPath)
 	if err != nil {
-		return "", false, err
+		return "", false, errors.WithStack(err)
 	}
 
 	return repoFSPath, exists, nil
@@ -127,26 +122,24 @@ func Matcher(matchRegexp *regexp.Regexp) mux.MatcherFunc {
 }
 
 type Gitserver struct {
-	c *config.Gitserver
+	log zerolog.Logger
+	c   *config.Gitserver
 }
 
-func NewGitserver(ctx context.Context, l *zap.Logger, c *config.Gitserver) (*Gitserver, error) {
-	if l != nil {
-		logger = l
-	}
+func NewGitserver(ctx context.Context, log zerolog.Logger, c *config.Gitserver) (*Gitserver, error) {
 	if c.Debug {
-		level.SetLevel(zapcore.DebugLevel)
+		log = log.Level(zerolog.DebugLevel)
 	}
-	log = logger.Sugar()
 
 	return &Gitserver{
-		c: c,
+		log: log,
+		c:   c,
 	}, nil
 }
 
 func (s *Gitserver) Run(ctx context.Context) error {
-	gitSmartHandler := handlers.NewGitSmartHandler(logger, s.c.DataDir, true, repoAbsPath, nil)
-	fetchFileHandler := handlers.NewFetchFileHandler(logger, s.c.DataDir, repoAbsPath)
+	gitSmartHandler := handlers.NewGitSmartHandler(s.log, s.c.DataDir, true, repoAbsPath, nil)
+	fetchFileHandler := handlers.NewFetchFileHandler(s.log, s.c.DataDir, repoAbsPath)
 
 	router := mux.NewRouter()
 	router.MatcherFunc(Matcher(handlers.InfoRefsRegExp)).Handler(gitSmartHandler)
@@ -159,8 +152,8 @@ func (s *Gitserver) Run(ctx context.Context) error {
 		var err error
 		tlsConfig, err = util.NewTLSConfig(s.c.Web.TLSCertFile, s.c.Web.TLSKeyFile, "", false)
 		if err != nil {
-			log.Errorf("err: %+v")
-			return err
+			s.log.Err(err).Send()
+			return errors.WithStack(err)
 		}
 	}
 
@@ -179,14 +172,17 @@ func (s *Gitserver) Run(ctx context.Context) error {
 		}
 	}()
 
+	//TODO a lock is needed or it'll cause some concurrency issues if repo cleaner runs when someone at the same time is pushing
+	go s.repoCleanerLoop(ctx)
+
 	select {
 	case <-ctx.Done():
-		log.Infof("gitserver exiting")
+		log.Info().Msgf("gitserver exiting")
 		httpServer.Close()
 	case err := <-lerrCh:
 		if err != nil {
-			log.Errorf("http server listen error: %v", err)
-			return err
+			s.log.Err(err).Msgf("http server listen error")
+			return errors.WithStack(err)
 		}
 	}
 

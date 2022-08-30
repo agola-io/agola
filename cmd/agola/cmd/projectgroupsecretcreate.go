@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
@@ -30,7 +31,7 @@ data02: secretvalue02
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := secretCreate(cmd, "projectgroup", args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -43,13 +44,13 @@ func init() {
 	flags.StringVarP(&secretCreateOpts.file, "file", "f", "", `yaml file containing the secret data (use "-" to read from stdin)`)
 
 	if err := cmdProjectGroupSecretCreate.MarkFlagRequired("projectgroup"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdProjectGroupSecretCreate.MarkFlagRequired("name"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdProjectGroupSecretCreate.MarkFlagRequired("file"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdProjectGroupSecret.AddCommand(cmdProjectGroupSecretCreate)

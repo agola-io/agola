@@ -15,7 +15,6 @@
 package driver
 
 import (
-	"bufio"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -29,9 +28,9 @@ import (
 	"strings"
 	"time"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/executor/registry"
 	"agola.io/agola/services/types"
-	errors "golang.org/x/xerrors"
 
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -41,29 +40,33 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/stdcopy"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 )
 
 type DockerDriver struct {
-	log         *zap.SugaredLogger
-	client      *client.Client
-	toolboxPath string
-	executorID  string
-	arch        types.Arch
+	log              zerolog.Logger
+	client           *client.Client
+	toolboxPath      string
+	initImage        string
+	initDockerConfig *registry.DockerConfig
+	executorID       string
+	arch             types.Arch
 }
 
-func NewDockerDriver(logger *zap.Logger, executorID, toolboxPath string) (*DockerDriver, error) {
+func NewDockerDriver(log zerolog.Logger, executorID, toolboxPath, initImage string, initDockerConfig *registry.DockerConfig) (*DockerDriver, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.26"))
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return &DockerDriver{
-		log:         logger.Sugar(),
-		client:      cli,
-		toolboxPath: toolboxPath,
-		executorID:  executorID,
-		arch:        types.ArchFromString(runtime.GOARCH),
+		log:              log,
+		client:           cli,
+		toolboxPath:      toolboxPath,
+		initImage:        initImage,
+		initDockerConfig: initDockerConfig,
+		executorID:       executorID,
+		arch:             types.ArchFromString(runtime.GOARCH),
 	}, nil
 }
 
@@ -71,17 +74,9 @@ func (d *DockerDriver) Setup(ctx context.Context) error {
 	return nil
 }
 
-func (d *DockerDriver) createToolboxVolume(ctx context.Context, podID string) (*dockertypes.Volume, error) {
-	reader, err := d.client.ImagePull(ctx, "busybox", dockertypes.ImagePullOptions{})
-	if err != nil {
-		return nil, err
-	}
-	scanner := bufio.NewScanner(reader)
-	for scanner.Scan() {
-		d.log.Infof("create toolbox volume image pull output: %s", scanner.Text())
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, err
+func (d *DockerDriver) createToolboxVolume(ctx context.Context, podID string, out io.Writer) (*dockertypes.Volume, error) {
+	if err := d.fetchImage(ctx, d.initImage, false, d.initDockerConfig, out); err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	labels := map[string]string{}
@@ -90,39 +85,39 @@ func (d *DockerDriver) createToolboxVolume(ctx context.Context, podID string) (*
 	labels[podIDKey] = podID
 	toolboxVol, err := d.client.VolumeCreate(ctx, volume.VolumeCreateBody{Driver: "local", Labels: labels})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	resp, err := d.client.ContainerCreate(ctx, &container.Config{
 		Entrypoint: []string{"cat"},
-		Image:      "busybox",
+		Image:      d.initImage,
 		Tty:        true,
 	}, &container.HostConfig{
 		Binds: []string{fmt.Sprintf("%s:%s", toolboxVol.Name, "/tmp/agola")},
 	}, nil, "")
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	containerID := resp.ID
 
 	if err := d.client.ContainerStart(ctx, containerID, dockertypes.ContainerStartOptions{}); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	toolboxExecPath, err := toolboxExecPath(d.toolboxPath, d.arch)
 	if err != nil {
-		return nil, errors.Errorf("failed to get toolbox path for arch %q: %w", d.arch, err)
+		return nil, errors.Wrapf(err, "failed to get toolbox path for arch %q", d.arch)
 	}
 	srcInfo, err := archive.CopyInfoSourcePath(toolboxExecPath, false)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	srcInfo.RebaseName = "agola-toolbox"
 
 	srcArchive, err := archive.TarResource(srcInfo)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	defer srcArchive.Close()
 
@@ -132,7 +127,7 @@ func (d *DockerDriver) createToolboxVolume(ctx context.Context, podID string) (*
 	}
 
 	if err := d.client.CopyToContainer(ctx, containerID, "/tmp/agola", srcArchive, options); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	// ignore remove error
@@ -151,16 +146,16 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 		return nil, errors.Errorf("empty container config")
 	}
 
-	toolboxVol, err := d.createToolboxVolume(ctx, podConfig.ID)
+	toolboxVol, err := d.createToolboxVolume(ctx, podConfig.ID, out)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	var mainContainerID string
 	for cindex := range podConfig.Containers {
 		resp, err := d.createContainer(ctx, cindex, podConfig, mainContainerID, toolboxVol, out)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 
 		containerID := resp.ID
@@ -170,7 +165,7 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 		}
 
 		if err := d.client.ContainerStart(ctx, containerID, dockertypes.ContainerStartOptions{}); err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 	}
 
@@ -189,7 +184,7 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 			Filters: args,
 		})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if len(containers) == 0 {
 		return nil, errors.Errorf("no container with labels %s", searchLabels)
@@ -238,10 +233,10 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 	return pod, nil
 }
 
-func (d *DockerDriver) fetchImage(ctx context.Context, image string, registryConfig *registry.DockerConfig, out io.Writer) error {
+func (d *DockerDriver) fetchImage(ctx context.Context, image string, alwaysFetch bool, registryConfig *registry.DockerConfig, out io.Writer) error {
 	regName, err := registry.GetRegistry(image)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	var registryAuth registry.DockerConfigAuth
 	if registryConfig != nil {
@@ -251,26 +246,44 @@ func (d *DockerDriver) fetchImage(ctx context.Context, image string, registryCon
 	}
 	buf, err := json.Marshal(registryAuth)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	registryAuthEnc := base64.URLEncoding.EncodeToString(buf)
 
-	// by default always try to pull the image so we are sure only authorized users can fetch them
-	// see https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#alwayspullimages
-	reader, err := d.client.ImagePull(ctx, image, dockertypes.ImagePullOptions{RegistryAuth: registryAuthEnc})
+	tag, err := registry.GetImageTagOrDigest(image)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
-	_, err = io.Copy(out, reader)
-	return err
+	args := filters.NewArgs()
+	args.Add("reference", image)
+	img, err := d.client.ImageList(ctx, dockertypes.ImageListOptions{Filters: args})
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	exists := len(img) > 0
+
+	// fetch only if forced, is latest tag or image doesn't exist
+	if alwaysFetch || tag == "latest" || !exists {
+		reader, err := d.client.ImagePull(ctx, image, dockertypes.ImagePullOptions{RegistryAuth: registryAuthEnc})
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		_, err = io.Copy(out, reader)
+		return errors.WithStack(err)
+	}
+
+	return nil
 }
 
 func (d *DockerDriver) createContainer(ctx context.Context, index int, podConfig *PodConfig, maincontainerID string, toolboxVol *dockertypes.Volume, out io.Writer) (*container.ContainerCreateCreatedBody, error) {
 	containerConfig := podConfig.Containers[index]
 
-	if err := d.fetchImage(ctx, containerConfig.Image, podConfig.DockerConfig, out); err != nil {
-		return nil, err
+	// by default always try to pull the image so we are sure only authorized users can fetch them
+	// see https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#alwayspullimages
+	if err := d.fetchImage(ctx, containerConfig.Image, true, podConfig.DockerConfig, out); err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	labels := map[string]string{}
@@ -327,7 +340,7 @@ func (d *DockerDriver) createContainer(ctx context.Context, index int, podConfig
 	}
 
 	resp, err := d.client.ContainerCreate(ctx, cliContainerConfig, cliHostConfig, nil, "")
-	return &resp, err
+	return &resp, errors.WithStack(err)
 }
 
 func (d *DockerDriver) ExecutorGroup(ctx context.Context) (string, error) {
@@ -348,12 +361,12 @@ func (d *DockerDriver) GetPods(ctx context.Context, all bool) ([]Pod, error) {
 			All:     all,
 		})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	volumes, err := d.client.VolumeList(ctx, args)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	podsMap := map[string]*DockerPod{}
@@ -536,11 +549,12 @@ type Stdin struct {
 }
 
 func (s *Stdin) Write(p []byte) (int, error) {
-	return s.hresp.Conn.Write(p)
+	n, err := s.hresp.Conn.Write(p)
+	return n, errors.WithStack(err)
 }
 
 func (s *Stdin) Close() error {
-	return s.hresp.CloseWrite()
+	return errors.WithStack(s.hresp.CloseWrite())
 }
 
 func (dp *DockerPod) Exec(ctx context.Context, execConfig *ExecConfig) (ContainerExec, error) {
@@ -551,7 +565,7 @@ func (dp *DockerPod) Exec(ctx context.Context, execConfig *ExecConfig) (Containe
 	// Use a toolbox command that will set them up and then exec the real command.
 	envj, err := json.Marshal(execConfig.Env)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	cmd := []string{filepath.Join(dp.initVolumeDir, "agola-toolbox"), "exec", "-e", string(envj), "-w", execConfig.WorkingDir, "--"}
@@ -568,7 +582,7 @@ func (dp *DockerPod) Exec(ctx context.Context, execConfig *ExecConfig) (Containe
 
 	response, err := dp.client.ContainerExecCreate(ctx, dp.containers[0].ID, dockerExecConfig)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	execStartCheck := dockertypes.ExecStartCheck{
 		Detach: dockerExecConfig.Detach,
@@ -576,7 +590,7 @@ func (dp *DockerPod) Exec(ctx context.Context, execConfig *ExecConfig) (Containe
 	}
 	hresp, err := dp.client.ContainerExecAttach(ctx, response.ID, execStartCheck)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	stdout := execConfig.Stdout
@@ -616,7 +630,7 @@ func (e *DockerContainerExec) Wait(ctx context.Context) (int, error) {
 	// ignore error, we'll use the exit code of the exec
 	select {
 	case <-ctx.Done():
-		return 0, ctx.Err()
+		return 0, errors.WithStack(ctx.Err())
 	case <-e.endCh:
 	}
 
@@ -624,7 +638,7 @@ func (e *DockerContainerExec) Wait(ctx context.Context) (int, error) {
 	for {
 		resp, err := e.client.ContainerExecInspect(ctx, e.execID)
 		if err != nil {
-			return -1, err
+			return -1, errors.WithStack(err)
 		}
 		if !resp.Running {
 			exitCode = resp.ExitCode

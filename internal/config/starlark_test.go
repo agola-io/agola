@@ -16,10 +16,10 @@ package config
 
 import (
 	"bytes"
-	"fmt"
 	"math"
 	"testing"
 
+	"agola.io/agola/internal/errors"
 	"github.com/google/go-cmp/cmp"
 	"go.starlark.net/starlark"
 )
@@ -48,7 +48,7 @@ func TestStarlarkJSON(t *testing.T) {
 				_ = s.SetKey(starlark.MakeInt(10), starlark.String("string01"))
 				return starlark.Value(s)
 			}(),
-			err: fmt.Errorf("cannot convert non-string dict key to JSON"),
+			err: errors.Errorf("cannot convert non-string dict key to JSON"),
 		},
 		{
 			name: "test list",

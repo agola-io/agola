@@ -16,18 +16,16 @@ package action
 
 import (
 	"context"
-	"net/http"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"
-
-	errors "golang.org/x/xerrors"
 )
 
 type GetSecretsRequest struct {
-	ParentType cstypes.ConfigType
+	ParentType cstypes.ObjectKind
 	ParentRef  string
 
 	Tree             bool
@@ -36,16 +34,15 @@ type GetSecretsRequest struct {
 
 func (h *ActionHandler) GetSecrets(ctx context.Context, req *GetSecretsRequest) ([]*csapitypes.Secret, error) {
 	var cssecrets []*csapitypes.Secret
-	var resp *http.Response
 	var err error
 	switch req.ParentType {
-	case cstypes.ConfigTypeProjectGroup:
-		cssecrets, resp, err = h.configstoreClient.GetProjectGroupSecrets(ctx, req.ParentRef, req.Tree)
-	case cstypes.ConfigTypeProject:
-		cssecrets, resp, err = h.configstoreClient.GetProjectSecrets(ctx, req.ParentRef, req.Tree)
+	case cstypes.ObjectKindProjectGroup:
+		cssecrets, _, err = h.configstoreClient.GetProjectGroupSecrets(ctx, req.ParentRef, req.Tree)
+	case cstypes.ObjectKindProject:
+		cssecrets, _, err = h.configstoreClient.GetProjectSecrets(ctx, req.ParentRef, req.Tree)
 	}
 	if err != nil {
-		return nil, ErrFromRemote(resp, err)
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
 
 	if req.RemoveOverridden {
@@ -59,7 +56,7 @@ func (h *ActionHandler) GetSecrets(ctx context.Context, req *GetSecretsRequest) 
 type CreateSecretRequest struct {
 	Name string
 
-	ParentType cstypes.ConfigType
+	ParentType cstypes.ObjectKind
 	ParentRef  string
 
 	Type cstypes.SecretType
@@ -75,36 +72,35 @@ type CreateSecretRequest struct {
 func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretRequest) (*csapitypes.Secret, error) {
 	isVariableOwner, err := h.IsVariableOwner(ctx, req.ParentType, req.ParentRef)
 	if err != nil {
-		return nil, errors.Errorf("failed to determine ownership: %w", err)
+		return nil, errors.Wrapf(err, "failed to determine ownership")
 	}
 	if !isVariableOwner {
-		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
 	}
 
 	if !util.ValidateName(req.Name) {
-		return nil, util.NewErrBadRequest(errors.Errorf("invalid secret name %q", req.Name))
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid secret name %q", req.Name))
 	}
 
-	s := &cstypes.Secret{
+	creq := &csapitypes.CreateUpdateSecretRequest{
 		Name: req.Name,
 		Type: req.Type,
 		Data: req.Data,
 	}
 
-	var resp *http.Response
 	var rs *csapitypes.Secret
 	switch req.ParentType {
-	case cstypes.ConfigTypeProjectGroup:
-		h.log.Infof("creating project group secret")
-		rs, resp, err = h.configstoreClient.CreateProjectGroupSecret(ctx, req.ParentRef, s)
-	case cstypes.ConfigTypeProject:
-		h.log.Infof("creating project secret")
-		rs, resp, err = h.configstoreClient.CreateProjectSecret(ctx, req.ParentRef, s)
+	case cstypes.ObjectKindProjectGroup:
+		h.log.Info().Msgf("creating project group secret")
+		rs, _, err = h.configstoreClient.CreateProjectGroupSecret(ctx, req.ParentRef, creq)
+	case cstypes.ObjectKindProject:
+		h.log.Info().Msgf("creating project secret")
+		rs, _, err = h.configstoreClient.CreateProjectSecret(ctx, req.ParentRef, creq)
 	}
 	if err != nil {
-		return nil, errors.Errorf("failed to create secret: %w", ErrFromRemote(resp, err))
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to create secret"))
 	}
-	h.log.Infof("secret %s created, ID: %s", rs.Name, rs.ID)
+	h.log.Info().Msgf("secret %s created, ID: %s", rs.Name, rs.ID)
 
 	return rs, nil
 }
@@ -114,7 +110,7 @@ type UpdateSecretRequest struct {
 
 	Name string
 
-	ParentType cstypes.ConfigType
+	ParentType cstypes.ObjectKind
 	ParentRef  string
 
 	Type cstypes.SecretType
@@ -130,60 +126,58 @@ type UpdateSecretRequest struct {
 func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretRequest) (*csapitypes.Secret, error) {
 	isVariableOwner, err := h.IsVariableOwner(ctx, req.ParentType, req.ParentRef)
 	if err != nil {
-		return nil, errors.Errorf("failed to determine ownership: %w", err)
+		return nil, errors.Wrapf(err, "failed to determine ownership")
 	}
 	if !isVariableOwner {
-		return nil, util.NewErrForbidden(errors.Errorf("user not authorized"))
+		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
 	}
 
 	if !util.ValidateName(req.Name) {
-		return nil, util.NewErrBadRequest(errors.Errorf("invalid secret name %q", req.Name))
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid secret name %q", req.Name))
 	}
 
-	s := &cstypes.Secret{
+	creq := &csapitypes.CreateUpdateSecretRequest{
 		Name: req.Name,
 		Type: req.Type,
 		Data: req.Data,
 	}
 
-	var resp *http.Response
 	var rs *csapitypes.Secret
 	switch req.ParentType {
-	case cstypes.ConfigTypeProjectGroup:
-		h.log.Infof("updating project group secret")
-		rs, resp, err = h.configstoreClient.UpdateProjectGroupSecret(ctx, req.ParentRef, req.SecretName, s)
-	case cstypes.ConfigTypeProject:
-		h.log.Infof("updating project secret")
-		rs, resp, err = h.configstoreClient.UpdateProjectSecret(ctx, req.ParentRef, req.SecretName, s)
+	case cstypes.ObjectKindProjectGroup:
+		h.log.Info().Msgf("updating project group secret")
+		rs, _, err = h.configstoreClient.UpdateProjectGroupSecret(ctx, req.ParentRef, req.SecretName, creq)
+	case cstypes.ObjectKindProject:
+		h.log.Info().Msgf("updating project secret")
+		rs, _, err = h.configstoreClient.UpdateProjectSecret(ctx, req.ParentRef, req.SecretName, creq)
 	}
 	if err != nil {
-		return nil, errors.Errorf("failed to update secret: %w", ErrFromRemote(resp, err))
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to update secret"))
 	}
-	h.log.Infof("secret %s updated, ID: %s", rs.Name, rs.ID)
+	h.log.Info().Msgf("secret %s updated, ID: %s", rs.Name, rs.ID)
 
 	return rs, nil
 }
 
-func (h *ActionHandler) DeleteSecret(ctx context.Context, parentType cstypes.ConfigType, parentRef, name string) error {
+func (h *ActionHandler) DeleteSecret(ctx context.Context, parentType cstypes.ObjectKind, parentRef, name string) error {
 	isVariableOwner, err := h.IsVariableOwner(ctx, parentType, parentRef)
 	if err != nil {
-		return errors.Errorf("failed to determine ownership: %w", err)
+		return errors.Wrapf(err, "failed to determine ownership")
 	}
 	if !isVariableOwner {
-		return util.NewErrForbidden(errors.Errorf("user not authorized"))
+		return util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
 	}
 
-	var resp *http.Response
 	switch parentType {
-	case cstypes.ConfigTypeProjectGroup:
-		h.log.Infof("deleting project group secret")
-		resp, err = h.configstoreClient.DeleteProjectGroupSecret(ctx, parentRef, name)
-	case cstypes.ConfigTypeProject:
-		h.log.Infof("deleting project secret")
-		resp, err = h.configstoreClient.DeleteProjectSecret(ctx, parentRef, name)
+	case cstypes.ObjectKindProjectGroup:
+		h.log.Info().Msgf("deleting project group secret")
+		_, err = h.configstoreClient.DeleteProjectGroupSecret(ctx, parentRef, name)
+	case cstypes.ObjectKindProject:
+		h.log.Info().Msgf("deleting project secret")
+		_, err = h.configstoreClient.DeleteProjectSecret(ctx, parentRef, name)
 	}
 	if err != nil {
-		return errors.Errorf("failed to delete secret: %w", ErrFromRemote(resp, err))
+		return util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to delete secret"))
 	}
 	return nil
 }

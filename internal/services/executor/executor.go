@@ -31,30 +31,32 @@ import (
 	"time"
 
 	"agola.io/agola/internal/common"
-	slog "agola.io/agola/internal/log"
+	"agola.io/agola/internal/errors"
+
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/executor/driver"
 	"agola.io/agola/internal/services/executor/registry"
 	"agola.io/agola/internal/util"
 	rsclient "agola.io/agola/services/runservice/client"
 	"agola.io/agola/services/runservice/types"
-	uuid "github.com/satori/go.uuid"
 
+	"github.com/gofrs/uuid"
 	"github.com/gorilla/mux"
 	sockaddr "github.com/hashicorp/go-sockaddr"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
-	errors "golang.org/x/xerrors"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
-
-var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
-var logger = slog.New(level)
-var log = logger.Sugar()
 
 const (
 	defaultShell = "/bin/sh -e"
 
 	toolboxContainerDir = "/mnt/agola"
+
+	// podCreationTimeout is the maximum time to wait for pod creation.
+	podCreationTimeout = time.Minute * 5
+
+	// tasksTimeoutCleanerInterval is the maximum time to wait for tasks timeout cleaner
+	tasksTimeoutCleanerInterval = time.Second * 2
 )
 
 var (
@@ -62,7 +64,8 @@ var (
 )
 
 func (e *Executor) getAllPods(ctx context.Context, all bool) ([]driver.Pod, error) {
-	return e.driver.GetPods(ctx, all)
+	pods, err := e.driver.GetPods(ctx, all)
+	return pods, errors.WithStack(err)
 }
 
 func stepUser(t *types.ExecutorTask) string {
@@ -89,7 +92,7 @@ func (e *Executor) createFile(ctx context.Context, pod driver.Pod, command, user
 
 	ce, err := pod.Exec(ctx, execConfig)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	stdin := ce.Stdin()
@@ -100,7 +103,7 @@ func (e *Executor) createFile(ctx context.Context, pod driver.Pod, command, user
 
 	exitCode, err := ce.Wait(ctx)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	if exitCode != 0 {
 		return "", errors.Errorf("toolbox exited with code: %d", exitCode)
@@ -111,11 +114,11 @@ func (e *Executor) createFile(ctx context.Context, pod driver.Pod, command, user
 
 func (e *Executor) doRunStep(ctx context.Context, s *types.RunStep, t *types.ExecutorTask, pod driver.Pod, logPath string) (int, error) {
 	if err := os.MkdirAll(filepath.Dir(logPath), 0770); err != nil {
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 	outf, err := os.Create(logPath)
 	if err != nil {
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 	defer outf.Close()
 
@@ -133,7 +136,7 @@ func (e *Executor) doRunStep(ctx context.Context, s *types.RunStep, t *types.Exe
 	if s.Command != "" {
 		filename, err := e.createFile(ctx, pod, s.Command, stepUser(t), outf)
 		if err != nil {
-			return -1, errors.Errorf("create file err: %v", err)
+			return -1, errors.Wrapf(err, "create file err")
 		}
 
 		args := strings.Split(shell, " ")
@@ -160,7 +163,7 @@ func (e *Executor) doRunStep(ctx context.Context, s *types.RunStep, t *types.Exe
 	workingDir, err = e.expandDir(ctx, t, pod, outf, workingDir)
 	if err != nil {
 		_, _ = outf.WriteString(fmt.Sprintf("failed to expand working dir %q. Error: %s\n", workingDir, err))
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 
 	execConfig := &driver.ExecConfig{
@@ -176,12 +179,12 @@ func (e *Executor) doRunStep(ctx context.Context, s *types.RunStep, t *types.Exe
 
 	ce, err := pod.Exec(ctx, execConfig)
 	if err != nil {
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 
 	exitCode, err := ce.Wait(ctx)
 	if err != nil {
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 
 	return exitCode, nil
@@ -191,27 +194,27 @@ func (e *Executor) doSaveToWorkspaceStep(ctx context.Context, s *types.SaveToWor
 	cmd := []string{toolboxContainerPath, "archive"}
 
 	if err := os.MkdirAll(filepath.Dir(logPath), 0770); err != nil {
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 	logf, err := os.Create(logPath)
 	if err != nil {
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 	defer logf.Close()
 
 	if err := os.MkdirAll(filepath.Dir(archivePath), 0770); err != nil {
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 	archivef, err := os.Create(archivePath)
 	if err != nil {
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 	defer archivef.Close()
 
 	workingDir, err := e.expandDir(ctx, t, pod, logf, t.Spec.WorkingDir)
 	if err != nil {
 		_, _ = logf.WriteString(fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.Spec.WorkingDir, err))
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 
 	execConfig := &driver.ExecConfig{
@@ -226,7 +229,7 @@ func (e *Executor) doSaveToWorkspaceStep(ctx context.Context, s *types.SaveToWor
 
 	ce, err := pod.Exec(ctx, execConfig)
 	if err != nil {
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 
 	type ArchiveInfo struct {
@@ -263,7 +266,7 @@ func (e *Executor) doSaveToWorkspaceStep(ctx context.Context, s *types.SaveToWor
 
 	exitCode, err := ce.Wait(ctx)
 	if err != nil {
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 
 	return exitCode, nil
@@ -287,12 +290,12 @@ func (e *Executor) expandDir(ctx context.Context, t *types.ExecutorTask, pod dri
 
 	ce, err := pod.Exec(ctx, execConfig)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	exitCode, err := ce.Wait(ctx)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	if exitCode != 0 {
 		return "", errors.Errorf("expanddir ended with exit code %d", exitCode)
@@ -316,12 +319,12 @@ func (e *Executor) mkdir(ctx context.Context, t *types.ExecutorTask, pod driver.
 
 	ce, err := pod.Exec(ctx, execConfig)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	exitCode, err := ce.Wait(ctx)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	if exitCode != 0 {
 		return errors.Errorf("mkdir ended with exit code %d", exitCode)
@@ -339,7 +342,7 @@ func (e *Executor) template(ctx context.Context, t *types.ExecutorTask, pod driv
 	workingDir, err := e.expandDir(ctx, t, pod, logf, t.Spec.WorkingDir)
 	if err != nil {
 		_, _ = io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.Spec.WorkingDir, err))
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	execConfig := &driver.ExecConfig{
@@ -354,7 +357,7 @@ func (e *Executor) template(ctx context.Context, t *types.ExecutorTask, pod driv
 
 	ce, err := pod.Exec(ctx, execConfig)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	stdin := ce.Stdin()
@@ -365,7 +368,7 @@ func (e *Executor) template(ctx context.Context, t *types.ExecutorTask, pod driv
 
 	exitCode, err := ce.Wait(ctx)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	if exitCode != 0 {
 		return "", errors.Errorf("template ended with exit code %d", exitCode)
@@ -387,7 +390,7 @@ func (e *Executor) unarchive(ctx context.Context, t *types.ExecutorTask, source 
 	workingDir, err := e.expandDir(ctx, t, pod, logf, t.Spec.WorkingDir)
 	if err != nil {
 		_, _ = io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.Spec.WorkingDir, err))
-		return err
+		return errors.WithStack(err)
 	}
 
 	execConfig := &driver.ExecConfig{
@@ -402,7 +405,7 @@ func (e *Executor) unarchive(ctx context.Context, t *types.ExecutorTask, source 
 
 	ce, err := pod.Exec(ctx, execConfig)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	stdin := ce.Stdin()
@@ -413,7 +416,7 @@ func (e *Executor) unarchive(ctx context.Context, t *types.ExecutorTask, source 
 
 	exitCode, err := ce.Wait(ctx)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	if exitCode != 0 {
 		return errors.Errorf("unarchive ended with exit code %d", exitCode)
@@ -424,26 +427,26 @@ func (e *Executor) unarchive(ctx context.Context, t *types.ExecutorTask, source 
 
 func (e *Executor) doRestoreWorkspaceStep(ctx context.Context, s *types.RestoreWorkspaceStep, t *types.ExecutorTask, pod driver.Pod, logPath string) (int, error) {
 	if err := os.MkdirAll(filepath.Dir(logPath), 0770); err != nil {
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 	logf, err := os.Create(logPath)
 	if err != nil {
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 	defer logf.Close()
 
 	for _, op := range t.Spec.WorkspaceOperations {
-		log.Debugf("unarchiving workspace for taskID: %s, step: %d", level, op.TaskID, op.Step)
+		e.log.Debug().Msgf("unarchiving workspace for taskID: %s, step: %d", op.TaskID, op.Step)
 		resp, err := e.runserviceClient.GetArchive(ctx, op.TaskID, op.Step)
 		if err != nil {
 			// TODO(sgotti) retry before giving up
 			fmt.Fprintf(logf, "error reading workspace archive: %v\n", err)
-			return -1, err
+			return -1, errors.WithStack(err)
 		}
 		archivef := resp.Body
 		if err := e.unarchive(ctx, t, archivef, pod, logf, s.DestDir, false, false); err != nil {
 			archivef.Close()
-			return -1, err
+			return -1, errors.WithStack(err)
 		}
 		archivef.Close()
 	}
@@ -455,11 +458,11 @@ func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, 
 	cmd := []string{toolboxContainerPath, "archive"}
 
 	if err := os.MkdirAll(filepath.Dir(logPath), 0770); err != nil {
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 	logf, err := os.Create(logPath)
 	if err != nil {
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 	defer logf.Close()
 
@@ -468,7 +471,7 @@ func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, 
 	// calculate key from template
 	userKey, err := e.template(ctx, t, pod, logf, s.Key)
 	if err != nil {
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 	fmt.Fprintf(logf, "cache key %q\n", userKey)
 
@@ -485,7 +488,7 @@ func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, 
 		} else {
 			// TODO(sgotti) retry before giving up
 			fmt.Fprintf(logf, "error checking for cache key %q: %v\n", userKey, err)
-			return -1, err
+			return -1, errors.WithStack(err)
 		}
 	}
 	if !save {
@@ -495,18 +498,18 @@ func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, 
 
 	fmt.Fprintf(logf, "archiving cache with key %q\n", userKey)
 	if err := os.MkdirAll(filepath.Dir(archivePath), 0770); err != nil {
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 	archivef, err := os.Create(archivePath)
 	if err != nil {
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 	defer archivef.Close()
 
 	workingDir, err := e.expandDir(ctx, t, pod, logf, t.Spec.WorkingDir)
 	if err != nil {
 		_, _ = io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.Spec.WorkingDir, err))
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 
 	execConfig := &driver.ExecConfig{
@@ -521,7 +524,7 @@ func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, 
 
 	ce, err := pod.Exec(ctx, execConfig)
 	if err != nil {
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 
 	type ArchiveInfo struct {
@@ -558,7 +561,7 @@ func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, 
 
 	exitCode, err := ce.Wait(ctx)
 	if err != nil {
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 
 	if exitCode != 0 {
@@ -567,11 +570,11 @@ func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, 
 
 	f, err := os.Open(archivePath)
 	if err != nil {
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 	fi, err := f.Stat()
 	if err != nil {
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 
 	// send cache archive to scheduler
@@ -579,7 +582,7 @@ func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, 
 		if resp != nil && resp.StatusCode == http.StatusNotModified {
 			return exitCode, nil
 		}
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 
 	return exitCode, nil
@@ -587,11 +590,11 @@ func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, 
 
 func (e *Executor) doRestoreCacheStep(ctx context.Context, s *types.RestoreCacheStep, t *types.ExecutorTask, pod driver.Pod, logPath string) (int, error) {
 	if err := os.MkdirAll(filepath.Dir(logPath), 0770); err != nil {
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 	logf, err := os.Create(logPath)
 	if err != nil {
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 	defer logf.Close()
 
@@ -600,7 +603,7 @@ func (e *Executor) doRestoreCacheStep(ctx context.Context, s *types.RestoreCache
 		// calculate key from template
 		userKey, err := e.template(ctx, t, pod, logf, key)
 		if err != nil {
-			return -1, err
+			return -1, errors.WithStack(err)
 		}
 		fmt.Fprintf(logf, "cache key %q\n", userKey)
 
@@ -616,13 +619,13 @@ func (e *Executor) doRestoreCacheStep(ctx context.Context, s *types.RestoreCache
 			}
 			// TODO(sgotti) retry before giving up
 			fmt.Fprintf(logf, "error reading cache: %v\n", err)
-			return -1, err
+			return -1, errors.WithStack(err)
 		}
 		fmt.Fprintf(logf, "restoring cache with key %q\n", userKey)
 		cachef := resp.Body
 		if err := e.unarchive(ctx, t, cachef, pod, logf, s.DestDir, false, false); err != nil {
 			cachef.Close()
-			return -1, err
+			return -1, errors.WithStack(err)
 		}
 		cachef.Close()
 
@@ -671,21 +674,21 @@ func (e *Executor) sendExecutorStatus(ctx context.Context) error {
 
 	archs, err := e.driver.Archs(ctx)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	executorGroup, err := e.driver.ExecutorGroup(ctx)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	// report all the executors that are active OR that have some owned pods not yet removed
 	activeExecutors, err := e.driver.GetExecutors(ctx)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	pods, err := e.driver.GetPods(ctx, true)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	executorsMap := map[string]struct{}{}
@@ -701,7 +704,7 @@ func (e *Executor) sendExecutorStatus(ctx context.Context) error {
 	}
 
 	executor := &types.Executor{
-		ID:                        e.id,
+		ExecutorID:                e.id,
 		Archs:                     archs,
 		AllowPrivilegedContainers: e.c.AllowPrivilegedContainers,
 		ListenURL:                 e.listenURL,
@@ -713,15 +716,15 @@ func (e *Executor) sendExecutorStatus(ctx context.Context) error {
 		SiblingsExecutors:         siblingsExecutors,
 	}
 
-	log.Debugf("send executor status: %s", util.Dump(executor))
+	e.log.Debug().Msgf("send executor status: %s", util.Dump(executor))
 	_, err = e.runserviceClient.SendExecutorStatus(ctx, executor)
-	return err
+	return errors.WithStack(err)
 }
 
 func (e *Executor) sendExecutorTaskStatus(ctx context.Context, et *types.ExecutorTask) error {
-	log.Debugf("send executor task: %s. status: %s", et.ID, et.Status.Phase)
+	e.log.Debug().Msgf("send executor task: %s. status: %s", et.ID, et.Status.Phase)
 	_, err := e.runserviceClient.SendExecutorTaskStatus(ctx, e.id, et)
-	return err
+	return errors.WithStack(err)
 }
 
 func (e *Executor) executeTask(rt *runningTask) {
@@ -740,7 +743,7 @@ func (e *Executor) executeTask(rt *runningTask) {
 		<-ctx.Done()
 		if rt.pod != nil {
 			if err := rt.pod.Stop(context.Background()); err != nil {
-				log.Errorf("error stopping the pod: %+v", err)
+				log.Err(err).Msgf("error stopping the pod: %+v", err)
 			}
 		}
 	}()
@@ -758,26 +761,30 @@ func (e *Executor) executeTask(rt *runningTask) {
 	et.Status.SetupStep.Phase = types.ExecutorTaskPhaseRunning
 	et.Status.SetupStep.StartTime = util.TimeP(time.Now())
 	if err := e.sendExecutorTaskStatus(ctx, et); err != nil {
-		log.Errorf("err: %+v", err)
+		e.log.Err(err).Send()
 	}
 
+	rt.Unlock()
 	if err := e.setupTask(ctx, rt); err != nil {
-		log.Errorf("err: %+v", err)
+		rt.Lock()
+		e.log.Err(err).Send()
 		et.Status.Phase = types.ExecutorTaskPhaseFailed
 		et.Status.EndTime = util.TimeP(time.Now())
 		et.Status.SetupStep.Phase = types.ExecutorTaskPhaseFailed
 		et.Status.SetupStep.EndTime = util.TimeP(time.Now())
 		if err := e.sendExecutorTaskStatus(ctx, et); err != nil {
-			log.Errorf("err: %+v", err)
+			e.log.Err(err).Send()
 		}
 		rt.Unlock()
 		return
 	}
 
+	rt.Lock()
+	rt.podStartTime = util.TimeP(time.Now())
 	et.Status.SetupStep.Phase = types.ExecutorTaskPhaseSuccess
 	et.Status.SetupStep.EndTime = util.TimeP(time.Now())
 	if err := e.sendExecutorTaskStatus(ctx, et); err != nil {
-		log.Errorf("err: %+v", err)
+		e.log.Err(err).Send()
 	}
 
 	rt.Unlock()
@@ -786,8 +793,11 @@ func (e *Executor) executeTask(rt *runningTask) {
 
 	rt.Lock()
 	if err != nil {
-		log.Errorf("err: %+v", err)
-		if rt.et.Spec.Stop {
+		e.log.Err(err).Send()
+		if rt.timedout {
+			et.Status.Phase = types.ExecutorTaskPhaseFailed
+			et.Status.Timedout = true
+		} else if rt.et.Spec.Stop {
 			et.Status.Phase = types.ExecutorTaskPhaseStopped
 		} else {
 			et.Status.Phase = types.ExecutorTaskPhaseFailed
@@ -799,7 +809,7 @@ func (e *Executor) executeTask(rt *runningTask) {
 	et.Status.EndTime = util.TimeP(time.Now())
 
 	if err := e.sendExecutorTaskStatus(ctx, et); err != nil {
-		log.Errorf("err: %+v", err)
+		e.log.Err(err).Send()
 	}
 	rt.Unlock()
 }
@@ -807,19 +817,19 @@ func (e *Executor) executeTask(rt *runningTask) {
 func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 	et := rt.et
 	if err := os.RemoveAll(e.taskPath(et.ID)); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	if err := os.MkdirAll(e.taskPath(et.ID), 0770); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	setupLogPath := e.setupLogPath(et.ID)
 	if err := os.MkdirAll(filepath.Dir(setupLogPath), 0770); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	outf, err := os.Create(setupLogPath)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	defer outf.Close()
 
@@ -836,17 +846,17 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 		return errors.Errorf("executor doesn't allow executing privileged containers")
 	}
 
-	log.Debugf("starting pod")
+	e.log.Debug().Msgf("starting pod")
 
 	dockerConfig, err := registry.GenDockerConfig(et.Spec.DockerRegistriesAuth, []string{et.Spec.Containers[0].Image})
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	podConfig := &driver.PodConfig{
 		// generate a random pod id (don't use task id for future ability to restart
 		// tasks failed to start and don't clash with existing pods)
-		ID:            uuid.NewV4().String(),
+		ID:            uuid.Must(uuid.NewV4()).String(),
 		TaskID:        et.ID,
 		Arch:          et.Spec.Arch,
 		InitVolumeDir: toolboxContainerDir,
@@ -886,10 +896,12 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 	}
 
 	_, _ = outf.WriteString("Starting pod.\n")
-	pod, err := e.driver.NewPod(ctx, podConfig, outf)
+	podCtx, cancel := context.WithTimeout(ctx, podCreationTimeout)
+	defer cancel()
+	pod, err := e.driver.NewPod(podCtx, podConfig, outf)
 	if err != nil {
 		_, _ = outf.WriteString(fmt.Sprintf("Pod failed to start. Error: %s\n", err))
-		return err
+		return errors.WithStack(err)
 	}
 	_, _ = outf.WriteString("Pod started.\n")
 
@@ -897,7 +909,7 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 		_, _ = outf.WriteString(fmt.Sprintf("Creating working dir %q.\n", et.Spec.WorkingDir))
 		if err := e.mkdir(ctx, et, pod, outf, et.Spec.WorkingDir); err != nil {
 			_, _ = outf.WriteString(fmt.Sprintf("Failed to create working dir %q. Error: %s\n", et.Spec.WorkingDir, err))
-			return err
+			return errors.WithStack(err)
 		}
 	}
 
@@ -911,7 +923,7 @@ func (e *Executor) executeTaskSteps(ctx context.Context, rt *runningTask, pod dr
 		rt.et.Status.Steps[i].Phase = types.ExecutorTaskPhaseRunning
 		rt.et.Status.Steps[i].StartTime = util.TimeP(time.Now())
 		if err := e.sendExecutorTaskStatus(ctx, rt.et); err != nil {
-			log.Errorf("err: %+v", err)
+			e.log.Err(err).Send()
 		}
 		rt.Unlock()
 
@@ -921,29 +933,29 @@ func (e *Executor) executeTaskSteps(ctx context.Context, rt *runningTask, pod dr
 
 		switch s := step.(type) {
 		case *types.RunStep:
-			log.Debugf("run step: %s", util.Dump(s))
+			e.log.Debug().Msgf("run step: %s", util.Dump(s))
 			stepName = s.Name
 			exitCode, err = e.doRunStep(ctx, s, rt.et, pod, e.stepLogPath(rt.et.ID, i))
 
 		case *types.SaveToWorkspaceStep:
-			log.Debugf("save to workspace step: %s", util.Dump(s))
+			e.log.Debug().Msgf("save to workspace step: %s", util.Dump(s))
 			stepName = s.Name
 			archivePath := e.archivePath(rt.et.ID, i)
 			exitCode, err = e.doSaveToWorkspaceStep(ctx, s, rt.et, pod, e.stepLogPath(rt.et.ID, i), archivePath)
 
 		case *types.RestoreWorkspaceStep:
-			log.Debugf("restore workspace step: %s", util.Dump(s))
+			e.log.Debug().Msgf("restore workspace step: %s", util.Dump(s))
 			stepName = s.Name
 			exitCode, err = e.doRestoreWorkspaceStep(ctx, s, rt.et, pod, e.stepLogPath(rt.et.ID, i))
 
 		case *types.SaveCacheStep:
-			log.Debugf("save cache step: %s", util.Dump(s))
+			e.log.Debug().Msgf("save cache step: %s", util.Dump(s))
 			stepName = s.Name
 			archivePath := e.archivePath(rt.et.ID, i)
 			exitCode, err = e.doSaveCacheStep(ctx, s, rt.et, pod, e.stepLogPath(rt.et.ID, i), archivePath)
 
 		case *types.RestoreCacheStep:
-			log.Debugf("restore cache step: %s", util.Dump(s))
+			e.log.Debug().Msgf("restore cache step: %s", util.Dump(s))
 			stepName = s.Name
 			exitCode, err = e.doRestoreCacheStep(ctx, s, rt.et, pod, e.stepLogPath(rt.et.ID, i))
 
@@ -964,7 +976,7 @@ func (e *Executor) executeTaskSteps(ctx context.Context, rt *runningTask, pod dr
 			} else {
 				rt.et.Status.Steps[i].Phase = types.ExecutorTaskPhaseFailed
 			}
-			serr = errors.Errorf("failed to execute step %s: %w", util.Dump(step), err)
+			serr = errors.Wrapf(err, "failed to execute step %s", util.Dump(step))
 		} else if exitCode != 0 {
 			if rt.et.Spec.Stop {
 				rt.et.Status.Steps[i].Phase = types.ExecutorTaskPhaseStopped
@@ -978,12 +990,12 @@ func (e *Executor) executeTaskSteps(ctx context.Context, rt *runningTask, pod dr
 		}
 
 		if err := e.sendExecutorTaskStatus(ctx, rt.et); err != nil {
-			log.Errorf("err: %+v", err)
+			e.log.Err(err).Send()
 		}
 		rt.Unlock()
 
 		if serr != nil {
-			return i, serr
+			return i, errors.WithStack(serr)
 		}
 	}
 
@@ -992,10 +1004,10 @@ func (e *Executor) executeTaskSteps(ctx context.Context, rt *runningTask, pod dr
 
 func (e *Executor) podsCleanerLoop(ctx context.Context) {
 	for {
-		log.Debugf("podsCleaner")
+		e.log.Debug().Msgf("podsCleaner")
 
 		if err := e.podsCleaner(ctx); err != nil {
-			log.Errorf("err: %+v", err)
+			e.log.Err(err).Send()
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
@@ -1010,11 +1022,11 @@ func (e *Executor) podsCleanerLoop(ctx context.Context) {
 func (e *Executor) podsCleaner(ctx context.Context) error {
 	pods, err := e.getAllPods(ctx, true)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	executors, err := e.driver.GetExecutors(ctx)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	// always add ourself to executors
 	executors = append(executors, e.id)
@@ -1024,7 +1036,7 @@ func (e *Executor) podsCleaner(ctx context.Context) error {
 		// clean our owned pods
 		if pod.ExecutorID() == e.id {
 			if _, ok := e.runningTasks.get(taskID); !ok {
-				log.Infof("removing pod %s for not running task: %s", pod.ID(), taskID)
+				e.log.Info().Msgf("removing pod %s for not running task: %s", pod.ID(), taskID)
 				_ = pod.Remove(ctx)
 			}
 		}
@@ -1038,7 +1050,7 @@ func (e *Executor) podsCleaner(ctx context.Context) error {
 			}
 		}
 		if !owned {
-			log.Infof("removing pod %s since it's not owned by any active executor", pod.ID())
+			e.log.Info().Msgf("removing pod %s since it's not owned by any active executor", pod.ID())
 			_ = pod.Remove(ctx)
 		}
 	}
@@ -1048,10 +1060,10 @@ func (e *Executor) podsCleaner(ctx context.Context) error {
 
 func (e *Executor) executorStatusSenderLoop(ctx context.Context) {
 	for {
-		log.Debugf("executorStatusSenderLoop")
+		e.log.Debug().Msgf("executorStatusSenderLoop")
 
 		if err := e.sendExecutorStatus(ctx); err != nil {
-			log.Errorf("err: %+v", err)
+			e.log.Err(err).Send()
 		}
 
 		sleepCh := time.NewTimer(2 * time.Second).C
@@ -1065,7 +1077,7 @@ func (e *Executor) executorStatusSenderLoop(ctx context.Context) {
 
 func (e *Executor) executorTasksStatusSenderLoop(ctx context.Context) {
 	for {
-		log.Debugf("executorTasksStatusSenderLoop")
+		e.log.Debug().Msgf("executorTasksStatusSenderLoop")
 
 		for _, rtID := range e.runningTasks.ids() {
 			rt, ok := e.runningTasks.get(rtID)
@@ -1075,7 +1087,7 @@ func (e *Executor) executorTasksStatusSenderLoop(ctx context.Context) {
 
 			rt.Lock()
 			if err := e.sendExecutorTaskStatus(ctx, rt.et); err != nil {
-				log.Errorf("err: %+v", err)
+				e.log.Err(err).Send()
 				rt.Unlock()
 				continue
 			}
@@ -1101,10 +1113,10 @@ func (e *Executor) executorTasksStatusSenderLoop(ctx context.Context) {
 
 func (e *Executor) tasksUpdaterLoop(ctx context.Context) {
 	for {
-		log.Debugf("tasksUpdater")
+		e.log.Debug().Msgf("tasksUpdater")
 
 		if err := e.tasksUpdater(ctx); err != nil {
-			log.Errorf("err: %+v", err)
+			e.log.Err(err).Send()
 		}
 
 		sleepCh := time.NewTimer(2 * time.Second).C
@@ -1120,12 +1132,15 @@ func (e *Executor) tasksUpdaterLoop(ctx context.Context) {
 // this is useful to catch up when some tasks submissions from the scheduler to the executor
 // APIs fails
 func (e *Executor) tasksUpdater(ctx context.Context) error {
+	e.tasksUpdaterMutex.Lock()
+	defer e.tasksUpdaterMutex.Unlock()
+
 	ets, _, err := e.runserviceClient.GetExecutorTasks(ctx, e.id)
 	if err != nil {
-		log.Warnf("err: %v", err)
-		return err
+		e.log.Warn().Err(err).Send()
+		return errors.WithStack(err)
 	}
-	log.Debugf("ets: %v", util.Dump(ets))
+	e.log.Debug().Msgf("ets: %v", util.Dump(ets))
 	for _, et := range ets {
 		e.taskUpdater(ctx, et)
 	}
@@ -1150,7 +1165,7 @@ func (e *Executor) tasksUpdater(ctx context.Context) error {
 }
 
 func (e *Executor) taskUpdater(ctx context.Context, et *types.ExecutorTask) {
-	log.Debugf("et: %v", util.Dump(et))
+	e.log.Debug().Msgf("et: %v", util.Dump(et))
 	if et.Spec.ExecutorID != e.id {
 		return
 	}
@@ -1178,13 +1193,13 @@ func (e *Executor) taskUpdater(ctx context.Context, et *types.ExecutorTask) {
 		et.Status.Phase = types.ExecutorTaskPhaseCancelled
 		go func() {
 			if err := e.sendExecutorTaskStatus(ctx, et); err != nil {
-				log.Errorf("err: %+v", err)
+				e.log.Err(err).Send()
 			}
 		}()
 	}
 
 	if et.Status.Phase == types.ExecutorTaskPhaseRunning {
-		log.Infof("marking executor task %s as failed since there's no running task", et.ID)
+		e.log.Info().Msgf("marking executor task %s as failed since there's no running task", et.ID)
 		et.Status.Phase = types.ExecutorTaskPhaseFailed
 		et.Status.EndTime = util.TimeP(time.Now())
 		// mark in progress step as failed too
@@ -1196,7 +1211,7 @@ func (e *Executor) taskUpdater(ctx context.Context, et *types.ExecutorTask) {
 		}
 		go func() {
 			if err := e.sendExecutorTaskStatus(ctx, et); err != nil {
-				log.Errorf("err: %+v", err)
+				e.log.Err(err).Send()
 			}
 		}()
 	}
@@ -1216,7 +1231,7 @@ func (e *Executor) taskUpdater(ctx context.Context, et *types.ExecutorTask) {
 		}
 
 		if !e.runningTasks.addIfNotExists(et.ID, rt) {
-			log.Warnf("task %s already running, this shouldn't happen", et.ID)
+			e.log.Warn().Msgf("task %s already running, this shouldn't happen", et.ID)
 			return
 		}
 
@@ -1226,10 +1241,10 @@ func (e *Executor) taskUpdater(ctx context.Context, et *types.ExecutorTask) {
 
 func (e *Executor) tasksDataCleanerLoop(ctx context.Context) {
 	for {
-		log.Debugf("tasksDataCleaner")
+		e.log.Debug().Msgf("tasksDataCleaner")
 
 		if err := e.tasksDataCleaner(ctx); err != nil {
-			log.Errorf("err: %+v", err)
+			e.log.Err(err).Send()
 		}
 
 		sleepCh := time.NewTimer(2 * time.Second).C
@@ -1244,7 +1259,7 @@ func (e *Executor) tasksDataCleanerLoop(ctx context.Context) {
 func (e *Executor) tasksDataCleaner(ctx context.Context) error {
 	entries, err := ioutil.ReadDir(e.tasksDir())
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	for _, entry := range entries {
@@ -1256,18 +1271,18 @@ func (e *Executor) tasksDataCleaner(ctx context.Context) error {
 		_, resp, err := e.runserviceClient.GetExecutorTask(ctx, e.id, etID)
 		if err != nil {
 			if resp == nil {
-				return err
+				return errors.WithStack(err)
 			}
 			if resp.StatusCode != http.StatusNotFound {
-				return err
+				return errors.WithStack(err)
 			}
 		}
 		if resp.StatusCode == http.StatusNotFound {
 			taskDir := e.taskPath(etID)
-			log.Infof("removing task dir %q", taskDir)
+			e.log.Info().Msgf("removing task dir %q", taskDir)
 			// remove task dir
 			if err := os.RemoveAll(taskDir); err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 		}
 	}
@@ -1288,6 +1303,12 @@ type runningTask struct {
 
 	et  *types.ExecutorTask
 	pod driver.Pod
+
+	// timedout is used to know when the task is timedout
+	timedout bool
+
+	// podStartTime is used to know when the pod is started
+	podStartTime *time.Time
 }
 
 func (r *runningTasks) get(rtID string) (*runningTask, bool) {
@@ -1331,26 +1352,29 @@ func (r *runningTasks) ids() []string {
 
 func (e *Executor) handleTasks(ctx context.Context, c <-chan *types.ExecutorTask) {
 	for et := range c {
+		e.tasksUpdaterMutex.Lock()
 		e.taskUpdater(ctx, et)
+		e.tasksUpdaterMutex.Unlock()
 	}
 }
 
 func (e *Executor) getExecutorID() (string, error) {
 	id, err := ioutil.ReadFile(e.executorIDPath())
-	if err != nil && !os.IsNotExist(err) {
-		return "", err
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return "", errors.WithStack(err)
 	}
 	return string(id), nil
 }
 
 func (e *Executor) saveExecutorID(id string) error {
 	if err := common.WriteFileAtomic(e.executorIDPath(), []byte(id), 0660); err != nil {
-		return errors.Errorf("failed to write executor id file: %w", err)
+		return errors.Wrapf(err, "failed to write executor id file")
 	}
 	return nil
 }
 
 type Executor struct {
+	log              zerolog.Logger
 	c                *config.Executor
 	runserviceClient *rsclient.Client
 	id               string
@@ -1359,24 +1383,23 @@ type Executor struct {
 	listenAddress    string
 	listenURL        string
 	dynamic          bool
+
+	tasksUpdaterMutex sync.Mutex
 }
 
-func NewExecutor(ctx context.Context, l *zap.Logger, c *config.Executor) (*Executor, error) {
-	if l != nil {
-		logger = l
-	}
+func NewExecutor(ctx context.Context, log zerolog.Logger, c *config.Executor) (*Executor, error) {
 	if c.Debug {
-		level.SetLevel(zapcore.DebugLevel)
+		log = log.Level(zerolog.DebugLevel)
 	}
-	log = logger.Sugar()
 
 	var err error
 	c.ToolboxPath, err = filepath.Abs(c.ToolboxPath)
 	if err != nil {
-		return nil, errors.Errorf("cannot determine \"agola-toolbox\" absolute path: %w", err)
+		return nil, errors.Wrapf(err, "cannot determine \"agola-toolbox\" absolute path")
 	}
 
 	e := &Executor{
+		log:              log,
 		c:                c,
 		runserviceClient: rsclient.NewClient(c.RunserviceURL),
 		runningTasks: &runningTasks{
@@ -1385,17 +1408,17 @@ func NewExecutor(ctx context.Context, l *zap.Logger, c *config.Executor) (*Execu
 	}
 
 	if err := os.MkdirAll(e.tasksDir(), 0770); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	id, err := e.getExecutorID()
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if id == "" {
-		id = uuid.NewV4().String()
+		id = uuid.Must(uuid.NewV4()).String()
 		if err := e.saveExecutorID(id); err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 	}
 
@@ -1405,7 +1428,7 @@ func NewExecutor(ctx context.Context, l *zap.Logger, c *config.Executor) (*Execu
 	// improve this to let the user define the bind and the advertize address
 	addr, err := sockaddr.GetPrivateIP()
 	if err != nil {
-		return nil, errors.Errorf("cannot discover executor listen address: %w", err)
+		return nil, errors.Wrapf(err, "cannot discover executor listen address")
 	}
 	if addr == "" {
 		return nil, errors.Errorf("cannot discover executor listen address")
@@ -1416,24 +1439,44 @@ func NewExecutor(ctx context.Context, l *zap.Logger, c *config.Executor) (*Execu
 	}
 	_, port, err := net.SplitHostPort(c.Web.ListenAddress)
 	if err != nil {
-		return nil, errors.Errorf("cannot get web listen port: %w", err)
+		return nil, errors.Wrapf(err, "cannot get web listen port")
 	}
 	u.Host = net.JoinHostPort(addr, port)
 	e.listenURL = u.String()
 
 	e.listenAddress = fmt.Sprintf(":%s", port)
 
+	var initDockerConfig *registry.DockerConfig
+
+	if e.c.InitImage.Auth != nil {
+		regName, err := registry.GetRegistry(e.c.InitImage.Image)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+		dockerAuthConfig :=
+			types.DockerRegistryAuth{
+				Type:     types.DockerRegistryAuthType(e.c.InitImage.Auth.Type),
+				Username: e.c.InitImage.Auth.Username,
+				Password: e.c.InitImage.Auth.Password,
+				Auth:     e.c.InitImage.Auth.Auth,
+			}
+		initDockerConfig, err = registry.GenDockerConfig(map[string]types.DockerRegistryAuth{regName: dockerAuthConfig}, []string{e.c.InitImage.Image})
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+	}
+
 	var d driver.Driver
 	switch c.Driver.Type {
 	case config.DriverTypeDocker:
-		d, err = driver.NewDockerDriver(logger, e.id, e.c.ToolboxPath)
+		d, err = driver.NewDockerDriver(log, e.id, e.c.ToolboxPath, e.c.InitImage.Image, initDockerConfig)
 		if err != nil {
-			return nil, errors.Errorf("failed to create docker driver: %w", err)
+			return nil, errors.Wrapf(err, "failed to create docker driver")
 		}
 	case config.DriverTypeK8s:
-		d, err = driver.NewK8sDriver(logger, e.id, c.ToolboxPath)
+		d, err = driver.NewK8sDriver(log, e.id, c.ToolboxPath, e.c.InitImage.Image, initDockerConfig)
 		if err != nil {
-			return nil, errors.Errorf("failed to create kubernetes driver: %w", err)
+			return nil, errors.Wrapf(err, "failed to create kubernetes driver")
 		}
 		e.dynamic = true
 	default:
@@ -1446,12 +1489,12 @@ func NewExecutor(ctx context.Context, l *zap.Logger, c *config.Executor) (*Execu
 
 func (e *Executor) Run(ctx context.Context) error {
 	if err := e.driver.Setup(ctx); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	ch := make(chan *types.ExecutorTask)
 	schedulerHandler := NewTaskSubmissionHandler(ch)
-	logsHandler := NewLogsHandler(logger, e)
+	logsHandler := NewLogsHandler(e.log, e)
 	archivesHandler := NewArchivesHandler(e)
 
 	router := mux.NewRouter()
@@ -1466,6 +1509,7 @@ func (e *Executor) Run(ctx context.Context) error {
 	go e.podsCleanerLoop(ctx)
 	go e.tasksUpdaterLoop(ctx)
 	go e.tasksDataCleanerLoop(ctx)
+	go e.tasksTimeoutCleanerLoop(ctx)
 
 	go e.handleTasks(ctx, ch)
 
@@ -1484,14 +1528,45 @@ func (e *Executor) Run(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		log.Infof("runservice executor exiting")
+		log.Info().Msgf("runservice executor exiting")
 		httpServer.Close()
 	case err := <-lerrCh:
 		if err != nil {
-			log.Errorf("http server listen error: %v", err)
-			return err
+			log.Err(err).Msgf("http server listen error")
+			return errors.WithStack(err)
 		}
 	}
 
 	return nil
+}
+
+func (e *Executor) tasksTimeoutCleanerLoop(ctx context.Context) {
+	for {
+		e.log.Debug().Msgf("tasksTimeoutCleaner")
+
+		e.tasksTimeoutCleaner()
+
+		sleepCh := time.NewTimer(tasksTimeoutCleanerInterval).C
+		select {
+		case <-ctx.Done():
+			return
+		case <-sleepCh:
+		}
+	}
+}
+
+func (e *Executor) tasksTimeoutCleaner() {
+	for _, rtID := range e.runningTasks.ids() {
+		rt, ok := e.runningTasks.get(rtID)
+		if !ok {
+			continue
+		}
+
+		rt.Lock()
+		if rt.et.Spec.TaskTimeoutInterval != 0 && rt.podStartTime != nil && time.Since(*rt.podStartTime) > rt.et.Spec.TaskTimeoutInterval {
+			rt.timedout = true
+			rt.cancel()
+		}
+		rt.Unlock()
+	}
 }

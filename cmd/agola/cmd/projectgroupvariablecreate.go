@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
@@ -45,7 +46,7 @@ The above yaml document defines a variable that can have two different values de
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := variableCreate(cmd, "projectgroup", args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -58,13 +59,13 @@ func init() {
 	flags.StringVarP(&variableCreateOpts.file, "file", "f", "", `yaml file containing the variable definition (use "-" to read from stdin)`)
 
 	if err := cmdProjectGroupVariableCreate.MarkFlagRequired("projectgroup"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdProjectGroupVariableCreate.MarkFlagRequired("name"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdProjectGroupVariableCreate.MarkFlagRequired("file"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdProjectGroupVariable.AddCommand(cmdProjectGroupVariableCreate)

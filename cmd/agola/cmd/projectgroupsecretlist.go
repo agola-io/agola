@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
@@ -23,7 +24,7 @@ var cmdProjectGroupSecretList = &cobra.Command{
 	Short: "list project group secrets",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := secretList(cmd, "projectgroup", args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -34,7 +35,7 @@ func init() {
 	flags.StringVar(&secretListOpts.parentRef, "projectgroup", "", "project group id or full path")
 
 	if err := cmdProjectGroupSecretList.MarkFlagRequired("projectgroup"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdProjectGroupSecret.AddCommand(cmdProjectGroupSecretList)

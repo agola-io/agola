@@ -20,9 +20,14 @@ import (
 	rstypes "agola.io/agola/services/runservice/types"
 )
 
+// TODO(sgotti) We currently don't provide a run id.
+// We could return the runservice run id but if in future we're going
+// to shard to multiple runservices we'd need a global id that should be
+// calculated considering also the related run service id (or use a global
+// sequential id generator).
+
 type RunsResponse struct {
-	ID          string            `json:"id"`
-	Counter     uint64            `json:"counter"`
+	Number      uint64            `json:"number"`
 	Name        string            `json:"name"`
 	Annotations map[string]string `json:"annotations"`
 	Phase       rstypes.RunPhase  `json:"phase"`
@@ -36,8 +41,7 @@ type RunsResponse struct {
 }
 
 type RunResponse struct {
-	ID          string            `json:"id"`
-	Counter     uint64            `json:"counter"`
+	Number      uint64            `json:"number"`
 	Name        string            `json:"name"`
 	Annotations map[string]string `json:"annotations"`
 	Phase       rstypes.RunPhase  `json:"phase"`
@@ -57,11 +61,12 @@ type RunResponse struct {
 }
 
 type RunResponseTask struct {
-	ID      string                                  `json:"id"`
-	Name    string                                  `json:"name"`
-	Status  rstypes.RunTaskStatus                   `json:"status"`
-	Level   int                                     `json:"level"`
-	Depends map[string]*rstypes.RunConfigTaskDepend `json:"depends"`
+	ID       string                                  `json:"id"`
+	Name     string                                  `json:"name"`
+	Status   rstypes.RunTaskStatus                   `json:"status"`
+	Timedout bool                                    `json:"timedout"`
+	Level    int                                     `json:"level"`
+	Depends  map[string]*rstypes.RunConfigTaskDepend `json:"depends"`
 
 	WaitingApproval     bool              `json:"waiting_approval"`
 	Approved            bool              `json:"approved"`
@@ -69,12 +74,16 @@ type RunResponseTask struct {
 
 	StartTime *time.Time `json:"start_time"`
 	EndTime   *time.Time `json:"end_time"`
+
+	TaskTimeoutInterval time.Duration `json:"task_timeout_interval"`
 }
 
 type RunTaskResponse struct {
-	ID     string                `json:"id"`
-	Name   string                `json:"name"`
-	Status rstypes.RunTaskStatus `json:"status"`
+	ID         string                     `json:"id"`
+	Name       string                     `json:"name"`
+	Status     rstypes.RunTaskStatus      `json:"status"`
+	Timedout   bool                       `json:"timedout"`
+	Containers []RunTaskResponseContainer `json:"containers"`
 
 	WaitingApproval     bool              `json:"waiting_approval"`
 	Approved            bool              `json:"approved"`
@@ -85,6 +94,12 @@ type RunTaskResponse struct {
 
 	StartTime *time.Time `json:"start_time"`
 	EndTime   *time.Time `json:"end_time"`
+
+	TaskTimeoutInterval time.Duration `json:"task_timeout_interval"`
+}
+
+type RunTaskResponseContainer struct {
+	Image string `json:"image"`
 }
 
 type RunTaskResponseSetupStep struct {

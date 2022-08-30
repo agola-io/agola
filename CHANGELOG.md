@@ -1,5 +1,36 @@
 ## Changelog
 
+### v0.7.0
+
+- runconfig: temporary enable ssh client ssh-rsa sha1 signature algorithm (@sgotti)                     [#333](https://github.com/agola-io/agola/pull/333)
+- configstore: update api and action request types (@sgotti)                                            [#329](https://github.com/agola-io/agola/pull/329)
+- *: change gateway runs api (@sgotti)                                                                  [#323](https://github.com/agola-io/agola/pull/323)
+- *: replace os errors check functions with errors.Is (@sgotti)                                         [#325](https://github.com/agola-io/agola/pull/325)
+- config: add ability to take the docker registry encoded auth from a variable (@alessandro-sorint)     [#296](https://github.com/agola-io/agola/pull/296)
+- runconfig: fix missing generation of dockerregistryauth auth field (@alessandro-sorint)               [#298](https://github.com/agola-io/agola/pull/298)
+- test: use `T.TempDir` to create temporary test directory (@Juneezee)                                  [#324](https://github.com/agola-io/agola/pull/324)
+- cmd: fix run list panic on task with nil exit status (@sgotti)                                        [#314](https://github.com/agola-io/agola/pull/314)
+- tests: don't start gitea for direct runs test (@sgotti)                                               [#312](https://github.com/agola-io/agola/pull/312)
+- *: use new errors handling library (@sgotti)                                                          [#321](https://github.com/agola-io/agola/pull/321)
+- *: use zerolog for logging (@sgotti)                                                                  [#320](https://github.com/agola-io/agola/pull/320)
+- *: Improve error handling (@sgotti)                                                                   [#313](https://github.com/agola-io/agola/pull/313)
+- *: use errors.Is/errors.As to handle wrapped error checking (@sgotti)                                 [#319](https://github.com/agola-io/agola/pull/319)
+- ci: update golangci-lint to v1.44.2 (@sgotti)                                                         [#315](https://github.com/agola-io/agola/pull/315)
+- gateway: use dedicated auth context keys type (@sgotti)                                               [#317](https://github.com/agola-io/agola/pull/317)
+- gateway: add api to get authenticated user organizations (@tulliosorintdev)                           [#299](https://github.com/agola-io/agola/pull/299)
+- go.mod: replace https://github.com/satori/go.uuid (@sgotti)                                           [#311](https://github.com/agola-io/agola/pull/311)
+- ci: update gitea to v1.15.11 (@alessandro-sorint)                                                     [#305](https://github.com/agola-io/agola/pull/305)
+- gitserver: add cleanup of old repos/branches (@alessandro-sorint)                                     [#284](https://github.com/agola-io/agola/pull/284)
+- runconfig: test task generation with on_skipped dependencies (@alessandro-sorint)                     [#302](https://github.com/agola-io/agola/pull/302)
+- runconfig: add case statement for on_skipped (@raeyulca)                                              [#290](https://github.com/agola-io/agola/pull/290)
+- config: fix executor ActiveTasksLimit yaml tag (@alessandro-sorint)                                   [#279](https://github.com/agola-io/agola/pull/279)
+- *: migrate to golang-jwt/jwt (@sgotti)                                                                [#276](https://github.com/agola-io/agola/pull/276)
+- fix: gitea fetch remote repository with pagination (@ygbillet)                                        [#273](https://github.com/agola-io/agola/pull/273)
+- executor: add init image config authentication options (@sgotti)                                      [#271](https://github.com/agola-io/agola/pull/271)
+- executor: use busybox:stable as default init image (@sgotti)                                          [#270](https://github.com/agola-io/agola/pull/270)
+- executor/docker: pull init image only when needed (@sgotti)                                           [#269](https://github.com/agola-io/agola/pull/269)
+- executor: add config option to define the init image (@sgotti)                                        [#268](https://github.com/agola-io/agola/pull/268)
+
 ### v0.6.0
 
 - *: update to go 1.16 (@sgotti)                                                             [#257](https://github.com/agola-io/agola/pull/257)

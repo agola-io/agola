@@ -21,99 +21,139 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"time"
 
-	"agola.io/agola/internal/etcd"
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/services/runservice/action"
 	"agola.io/agola/internal/services/runservice/common"
+	"agola.io/agola/internal/services/runservice/db"
 	"agola.io/agola/internal/services/runservice/store"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/runservice/types"
-	errors "golang.org/x/xerrors"
 
 	"github.com/gorilla/mux"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 )
 
 type ExecutorStatusHandler struct {
-	log *zap.SugaredLogger
-	e   *etcd.Store
+	log zerolog.Logger
+	d   *db.DB
 	ah  *action.ActionHandler
 }
 
-func NewExecutorStatusHandler(logger *zap.Logger, e *etcd.Store, ah *action.ActionHandler) *ExecutorStatusHandler {
-	return &ExecutorStatusHandler{log: logger.Sugar(), e: e, ah: ah}
+func NewExecutorStatusHandler(log zerolog.Logger, d *db.DB, ah *action.ActionHandler) *ExecutorStatusHandler {
+	return &ExecutorStatusHandler{log: log, d: d, ah: ah}
 }
 
 func (h *ExecutorStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	// TODO(sgotti) Check authorized call from executors
-	var executor *types.Executor
+	var recExecutor *types.Executor
 	d := json.NewDecoder(r.Body)
 	defer r.Body.Close()
 
-	if err := d.Decode(&executor); err != nil {
+	if err := d.Decode(&recExecutor); err != nil {
+		h.log.Err(err).Send()
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
 
-	// set last status update time
-	executor.LastStatusUpdateTime = time.Now()
+	var executor *types.Executor
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		// TODO(sgotti) validate executor sent data
+		executor, err = h.d.GetExecutorByExecutorID(tx, recExecutor.ExecutorID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
 
-	if _, err := store.PutExecutor(ctx, h.e, executor); err != nil {
-		http.Error(w, "", http.StatusInternalServerError)
+		if executor == nil {
+			executor = types.NewExecutor()
+		}
+
+		executor.ExecutorID = recExecutor.ExecutorID
+		executor.ListenURL = recExecutor.ListenURL
+		executor.Archs = recExecutor.Archs
+		executor.Labels = recExecutor.Labels
+		executor.AllowPrivilegedContainers = recExecutor.AllowPrivilegedContainers
+		executor.ActiveTasksLimit = recExecutor.ActiveTasksLimit
+		executor.ActiveTasks = recExecutor.ActiveTasks
+		executor.Dynamic = recExecutor.Dynamic
+		executor.ExecutorGroup = recExecutor.ExecutorGroup
+		executor.SiblingsExecutors = recExecutor.SiblingsExecutors
+
+		if err := h.d.InsertOrUpdateExecutor(tx, executor); err != nil {
+			return errors.WithStack(err)
+		}
+
+		return nil
+	})
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	if err := h.deleteStaleExecutors(ctx, executor); err != nil {
-		http.Error(w, "", http.StatusInternalServerError)
+	err = h.deleteStaleExecutors(ctx, executor)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 }
 
 func (h *ExecutorStatusHandler) deleteStaleExecutors(ctx context.Context, curExecutor *types.Executor) error {
-	executors, err := store.GetExecutors(ctx, h.e)
-	if err != nil {
-		return err
-	}
+	var executors []*types.Executor
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		executors, err = h.d.GetExecutors(tx)
+		if err != nil {
+			return errors.WithStack(err)
+		}
 
-	for _, executor := range executors {
-		if executor.ID == curExecutor.ID {
-			continue
-		}
-		if !executor.Dynamic {
-			continue
-		}
-		if executor.ExecutorGroup != curExecutor.ExecutorGroup {
-			continue
-		}
-		// executor is dynamic and in the same executor group
-		active := false
-		for _, seID := range curExecutor.SiblingsExecutors {
-			if executor.ID == seID {
-				active = true
-				break
+		for _, executor := range executors {
+			if executor.ExecutorID == curExecutor.ExecutorID {
+				continue
+			}
+			if !executor.Dynamic {
+				continue
+			}
+			if executor.ExecutorGroup != curExecutor.ExecutorGroup {
+				continue
+			}
+			// executor is dynamic and in the same executor group
+			active := false
+			for _, seID := range curExecutor.SiblingsExecutors {
+				if executor.ExecutorID == seID {
+					active = true
+					break
+				}
+			}
+			if active {
+				continue
+			}
+
+			if err := h.d.DeleteExecutor(tx, executor.ID); err != nil {
+				return errors.WithStack(err)
 			}
 		}
-		if !active {
-			if err := h.ah.DeleteExecutor(ctx, executor.ID); err != nil {
-				h.log.Errorf("failed to delete executor %q: %v", executor.ID, err)
-			}
-		}
+		return nil
+	})
+	if err != nil {
+		return errors.WithStack(err)
 	}
 
 	return nil
 }
 
 type ExecutorTaskStatusHandler struct {
-	e *etcd.Store
-	c chan<- *types.ExecutorTask
+	log zerolog.Logger
+	d   *db.DB
+	c   chan<- string
 }
 
-func NewExecutorTaskStatusHandler(e *etcd.Store, c chan<- *types.ExecutorTask) *ExecutorTaskStatusHandler {
-	return &ExecutorTaskStatusHandler{e: e, c: c}
+func NewExecutorTaskStatusHandler(log zerolog.Logger, d *db.DB, c chan<- string) *ExecutorTaskStatusHandler {
+	return &ExecutorTaskStatusHandler{log: log, d: d, c: c}
 }
 
 func (h *ExecutorTaskStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -129,21 +169,43 @@ func (h *ExecutorTaskStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if _, err := store.UpdateExecutorTaskStatus(ctx, h.e, et); err != nil {
-		http.Error(w, "", http.StatusBadRequest)
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		curEt, err := h.d.GetExecutorTask(tx, et.ID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		//if curET.Revision >= et.Revision {
+		//	return nil, errors.Errorf("concurrency exception")
+		//}
+
+		if curEt == nil {
+			return nil
+		}
+
+		curEt.Status = et.Status
+
+		if err := h.d.UpdateExecutorTask(tx, curEt); err != nil {
+			return errors.WithStack(err)
+		}
+
+		return nil
+	})
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	go func() { h.c <- et }()
+	go func() { h.c <- et.ID }()
 }
 
 type ExecutorTaskHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewExecutorTaskHandler(logger *zap.Logger, ah *action.ActionHandler) *ExecutorTaskHandler {
-	return &ExecutorTaskHandler{log: logger.Sugar(), ah: ah}
+func NewExecutorTaskHandler(log zerolog.Logger, ah *action.ActionHandler) *ExecutorTaskHandler {
+	return &ExecutorTaskHandler{log: log, ah: ah}
 }
 
 func (h *ExecutorTaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -153,28 +215,28 @@ func (h *ExecutorTaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	// TODO(sgotti) Check authorized call from executors
 	etID := vars["taskid"]
 	if etID == "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("taskid is empty")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("taskid is empty")))
 		return
 	}
 
 	et, err := h.ah.GetExecutorTask(ctx, etID)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, et); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, et); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type ExecutorTasksHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewExecutorTasksHandler(logger *zap.Logger, ah *action.ActionHandler) *ExecutorTasksHandler {
-	return &ExecutorTasksHandler{log: logger.Sugar(), ah: ah}
+func NewExecutorTasksHandler(log zerolog.Logger, ah *action.ActionHandler) *ExecutorTasksHandler {
+	return &ExecutorTasksHandler{log: log, ah: ah}
 }
 
 func (h *ExecutorTasksHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -201,13 +263,13 @@ func (h *ExecutorTasksHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 }
 
 type ArchivesHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ost *objectstorage.ObjStorage
 }
 
-func NewArchivesHandler(logger *zap.Logger, ost *objectstorage.ObjStorage) *ArchivesHandler {
+func NewArchivesHandler(log zerolog.Logger, ost *objectstorage.ObjStorage) *ArchivesHandler {
 	return &ArchivesHandler{
-		log: logger.Sugar(),
+		log: log,
 		ost: ost,
 	}
 }
@@ -235,7 +297,7 @@ func (h *ArchivesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.readArchive(taskID, step, w); err != nil {
 		switch {
-		case util.IsNotExist(err):
+		case util.APIErrorIs(err, util.ErrNotExist):
 			http.Error(w, err.Error(), http.StatusNotFound)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -249,26 +311,26 @@ func (h *ArchivesHandler) readArchive(rtID string, step int, w io.Writer) error 
 	f, err := h.ost.ReadObject(archivePath)
 	if err != nil {
 		if objectstorage.IsNotExist(err) {
-			return util.NewErrNotExist(err)
+			return util.NewAPIError(util.ErrNotExist, err)
 		}
-		return err
+		return errors.WithStack(err)
 	}
 	defer f.Close()
 
 	br := bufio.NewReader(f)
 
 	_, err = io.Copy(w, br)
-	return err
+	return errors.WithStack(err)
 }
 
 type CacheHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ost *objectstorage.ObjStorage
 }
 
-func NewCacheHandler(logger *zap.Logger, ost *objectstorage.ObjStorage) *CacheHandler {
+func NewCacheHandler(log zerolog.Logger, ost *objectstorage.ObjStorage) *CacheHandler {
 	return &CacheHandler{
-		log: logger.Sugar(),
+		log: log,
 		ost: ost,
 	}
 }
@@ -308,7 +370,7 @@ func (h *CacheHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.readCache(matchedKey, w); err != nil {
 		switch {
-		case util.IsNotExist(err):
+		case util.APIErrorIs(err, util.ErrNotExist):
 			http.Error(w, err.Error(), http.StatusNotFound)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -328,7 +390,7 @@ func matchCache(ost *objectstorage.ObjStorage, key string, prefix bool) (string,
 		var lastObject *objectstorage.ObjectInfo
 		for object := range ost.List(store.OSTCacheDir()+"/"+key, "", false, doneCh) {
 			if object.Err != nil {
-				return "", object.Err
+				return "", errors.WithStack(object.Err)
 			}
 
 			if (lastObject == nil) || (lastObject.LastModified.Before(object.LastModified)) {
@@ -348,7 +410,7 @@ func matchCache(ost *objectstorage.ObjStorage, key string, prefix bool) (string,
 		return "", nil
 	}
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	return key, nil
 }
@@ -358,26 +420,26 @@ func (h *CacheHandler) readCache(key string, w io.Writer) error {
 	f, err := h.ost.ReadObject(cachePath)
 	if err != nil {
 		if objectstorage.IsNotExist(err) {
-			return util.NewErrNotExist(err)
+			return util.NewAPIError(util.ErrNotExist, err)
 		}
-		return err
+		return errors.WithStack(err)
 	}
 	defer f.Close()
 
 	br := bufio.NewReader(f)
 
 	_, err = io.Copy(w, br)
-	return err
+	return errors.WithStack(err)
 }
 
 type CacheCreateHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ost *objectstorage.ObjStorage
 }
 
-func NewCacheCreateHandler(logger *zap.Logger, ost *objectstorage.ObjStorage) *CacheCreateHandler {
+func NewCacheCreateHandler(log zerolog.Logger, ost *objectstorage.ObjStorage) *CacheCreateHandler {
 	return &CacheCreateHandler{
-		log: logger.Sugar(),
+		log: log,
 		ost: ost,
 	}
 }
@@ -427,14 +489,14 @@ func (h *CacheCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type ExecutorDeleteHandler struct {
-	log *zap.SugaredLogger
-	ah  *action.ActionHandler
+	log zerolog.Logger
+	d   *db.DB
 }
 
-func NewExecutorDeleteHandler(logger *zap.Logger, ah *action.ActionHandler) *ExecutorDeleteHandler {
+func NewExecutorDeleteHandler(log zerolog.Logger, d *db.DB) *ExecutorDeleteHandler {
 	return &ExecutorDeleteHandler{
-		log: logger.Sugar(),
-		ah:  ah,
+		log: log,
+		d:   d,
 	}
 }
 
@@ -449,8 +511,23 @@ func (h *ExecutorDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := h.ah.DeleteExecutor(ctx, executorID); err != nil {
-		http.Error(w, "", http.StatusInternalServerError)
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		executor, err := h.d.GetExecutorByExecutorID(tx, executorID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if executor == nil {
+			return util.NewAPIError(util.ErrNotExist, errors.Errorf("executor with executor id %s doesn't exist", executorID))
+		}
+
+		if err := h.d.DeleteExecutor(tx, executor.ID); err != nil {
+			return errors.WithStack(err)
+		}
+
+		return nil
+	})
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 }

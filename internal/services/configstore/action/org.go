@@ -16,18 +16,12 @@ package action
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"time"
 
-	"agola.io/agola/internal/datamanager"
-	"agola.io/agola/internal/db"
-	"agola.io/agola/internal/services/configstore/readdb"
+	"agola.io/agola/internal/errors"
+	"agola.io/agola/internal/services/configstore/db"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
-
-	uuid "github.com/satori/go.uuid"
-	errors "golang.org/x/xerrors"
 )
 
 type OrgMemberResponse struct {
@@ -35,7 +29,7 @@ type OrgMemberResponse struct {
 	Role types.MemberRole
 }
 
-func orgMemberResponse(orgUser *readdb.OrgUser) *OrgMemberResponse {
+func orgMemberResponse(orgUser *db.OrgUser) *OrgMemberResponse {
 	return &OrgMemberResponse{
 		User: orgUser.User,
 		Role: orgUser.Role,
@@ -43,22 +37,22 @@ func orgMemberResponse(orgUser *readdb.OrgUser) *OrgMemberResponse {
 }
 
 func (h *ActionHandler) GetOrgMembers(ctx context.Context, orgRef string) ([]*OrgMemberResponse, error) {
-	var orgUsers []*readdb.OrgUser
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	var orgUsers []*db.OrgUser
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		org, err := h.readDB.GetOrg(tx, orgRef)
+		org, err := h.d.GetOrg(tx, orgRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if org == nil {
-			return util.NewErrNotExist(errors.Errorf("org %q doesn't exist", orgRef))
+			return util.NewAPIError(util.ErrNotExist, errors.Errorf("org %q doesn't exist", orgRef))
 		}
 
-		orgUsers, err = h.readDB.GetOrgUsers(tx, org.ID)
-		return err
+		orgUsers, err = h.d.GetOrgUsers(tx, org.ID)
+		return errors.WithStack(err)
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	res := make([]*OrgMemberResponse, len(orgUsers))
@@ -69,292 +63,212 @@ func (h *ActionHandler) GetOrgMembers(ctx context.Context, orgRef string) ([]*Or
 	return res, nil
 }
 
-func (h *ActionHandler) CreateOrg(ctx context.Context, org *types.Organization) (*types.Organization, error) {
-	if org.Name == "" {
-		return nil, util.NewErrBadRequest(errors.Errorf("organization name required"))
+type CreateOrgRequest struct {
+	Name          string
+	Visibility    types.Visibility
+	CreatorUserID string
+}
+
+func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*types.Organization, error) {
+	if req.Name == "" {
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("organization name required"))
 	}
-	if !util.ValidateName(org.Name) {
-		return nil, util.NewErrBadRequest(errors.Errorf("invalid organization name %q", org.Name))
+	if !util.ValidateName(req.Name) {
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid organization name %q", req.Name))
 	}
-	if !types.IsValidVisibility(org.Visibility) {
-		return nil, util.NewErrBadRequest(errors.Errorf("invalid organization visibility"))
+	if !types.IsValidVisibility(req.Visibility) {
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid organization visibility"))
 	}
 
-	var cgt *datamanager.ChangeGroupsUpdateToken
-	// changegroup is the org name
-	cgNames := []string{util.EncodeSha256Hex("orgname-" + org.Name)}
-
-	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	var org *types.Organization
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
-		if err != nil {
-			return err
-		}
-
 		// check duplicate org name
-		o, err := h.readDB.GetOrgByName(tx, org.Name)
+		o, err := h.d.GetOrgByName(tx, req.Name)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if o != nil {
-			return util.NewErrBadRequest(errors.Errorf("org %q already exists", o.Name))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("org %q already exists", o.Name))
+		}
+
+		if req.CreatorUserID != "" {
+			user, err := h.d.GetUser(tx, req.CreatorUserID)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			if user == nil {
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("creator user %q doesn't exist", req.CreatorUserID))
+			}
+		}
+
+		org = types.NewOrganization()
+		org.Name = req.Name
+		org.Visibility = req.Visibility
+		org.CreatorUserID = req.CreatorUserID
+
+		if err := h.d.InsertOrganization(tx, org); err != nil {
+			return errors.WithStack(err)
 		}
 
 		if org.CreatorUserID != "" {
-			user, err := h.readDB.GetUser(tx, org.CreatorUserID)
-			if err != nil {
-				return err
+			// add the creator as org member with role owner
+			orgmember := types.NewOrganizationMember()
+			orgmember.OrganizationID = org.ID
+			orgmember.UserID = org.CreatorUserID
+			orgmember.MemberRole = types.MemberRoleOwner
+
+			if err := h.d.InsertOrganizationMember(tx, orgmember); err != nil {
+				return errors.WithStack(err)
 			}
-			if user == nil {
-				return util.NewErrBadRequest(errors.Errorf("creator user %q doesn't exist", org.CreatorUserID))
-			}
+		}
+
+		// create root org project group
+		pg := types.NewProjectGroup()
+		// use same org visibility
+		pg.Visibility = org.Visibility
+		pg.Parent = types.Parent{
+			Kind: types.ObjectKindOrg,
+			ID:   org.ID,
+		}
+
+		if err := h.d.InsertProjectGroup(tx, pg); err != nil {
+			return errors.WithStack(err)
 		}
 
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
-	actions := []*datamanager.Action{}
-
-	org.ID = uuid.NewV4().String()
-	org.CreatedAt = time.Now()
-	orgj, err := json.Marshal(org)
-	if err != nil {
-		return nil, errors.Errorf("failed to marshal org: %w", err)
-	}
-	actions = append(actions, &datamanager.Action{
-		ActionType: datamanager.ActionTypePut,
-		DataType:   string(types.ConfigTypeOrg),
-		ID:         org.ID,
-		Data:       orgj,
-	})
-
-	if org.CreatorUserID != "" {
-		// add the creator as org member with role owner
-		orgmember := &types.OrganizationMember{
-			ID:             uuid.NewV4().String(),
-			OrganizationID: org.ID,
-			UserID:         org.CreatorUserID,
-			MemberRole:     types.MemberRoleOwner,
-		}
-		orgmemberj, err := json.Marshal(orgmember)
-		if err != nil {
-			return nil, errors.Errorf("failed to marshal project group: %w", err)
-		}
-		actions = append(actions, &datamanager.Action{
-			ActionType: datamanager.ActionTypePut,
-			DataType:   string(types.ConfigTypeOrgMember),
-			ID:         orgmember.ID,
-			Data:       orgmemberj,
-		})
-	}
-
-	// create root org project group
-	pg := &types.ProjectGroup{
-		ID: uuid.NewV4().String(),
-		// use same org visibility
-		Visibility: org.Visibility,
-		Parent: types.Parent{
-			Type: types.ConfigTypeOrg,
-			ID:   org.ID,
-		},
-	}
-	pgj, err := json.Marshal(pg)
-	if err != nil {
-		return nil, errors.Errorf("failed to marshal project group: %w", err)
-	}
-	actions = append(actions, &datamanager.Action{
-		ActionType: datamanager.ActionTypePut,
-		DataType:   string(types.ConfigTypeProjectGroup),
-		ID:         pg.ID,
-		Data:       pgj,
-	})
-
-	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return org, err
+	return org, errors.WithStack(err)
 }
 
 func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 	var org *types.Organization
 
-	var cgt *datamanager.ChangeGroupsUpdateToken
-	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
 		// check org existance
-		org, err = h.readDB.GetOrgByName(tx, orgRef)
+		org, err = h.d.GetOrgByName(tx, orgRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if org == nil {
-			return util.NewErrBadRequest(errors.Errorf("org %q doesn't exist", orgRef))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("org %q doesn't exist", orgRef))
 		}
 
-		// changegroup is the org id
-		cgNames := []string{util.EncodeSha256Hex("orgid-" + org.ID)}
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
-		if err != nil {
-			return err
+		// TODO(sgotti) delete all project groups, projects etc...
+		if err := h.d.DeleteOrganization(tx, org.ID); err != nil {
+			return errors.WithStack(err)
 		}
 
 		return nil
 	})
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
-	// TODO(sgotti) delete all project groups, projects etc...
-	actions := []*datamanager.Action{
-		{
-			ActionType: datamanager.ActionTypeDelete,
-			DataType:   string(types.ConfigTypeOrg),
-			ID:         org.ID,
-		},
-	}
-
-	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return err
+	return errors.WithStack(err)
 }
 
 // AddOrgMember add/updates an org member.
 // TODO(sgotti) handle invitation when implemented
 func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string, role types.MemberRole) (*types.OrganizationMember, error) {
 	if !types.IsValidMemberRole(role) {
-		return nil, util.NewErrBadRequest(errors.Errorf("invalid role %q", role))
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid role %q", role))
 	}
 
-	var org *types.Organization
-	var user *types.User
 	var orgmember *types.OrganizationMember
-	var cgt *datamanager.ChangeGroupsUpdateToken
-
-	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
-		var err error
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		// check existing org
-		org, err = h.readDB.GetOrg(tx, orgRef)
+		org, err := h.d.GetOrg(tx, orgRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if org == nil {
-			return util.NewErrBadRequest(errors.Errorf("org %q doesn't exists", orgRef))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("org %q doesn't exists", orgRef))
 		}
 		// check existing user
-		user, err = h.readDB.GetUser(tx, userRef)
+		user, err := h.d.GetUser(tx, userRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if user == nil {
-			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exists", userRef))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exists", userRef))
 		}
 
 		// fetch org member if it already exist
-		orgmember, err = h.readDB.GetOrgMemberByOrgUserID(tx, org.ID, user.ID)
+		orgmember, err = h.d.GetOrgMemberByOrgUserID(tx, org.ID, user.ID)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
-		cgNames := []string{util.EncodeSha256Hex(fmt.Sprintf("orgmember-%s-%s", org.ID, user.ID))}
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
-		if err != nil {
-			return err
+		// update if role changed
+		if orgmember != nil {
+			if orgmember.MemberRole == role {
+				return nil
+			}
+			orgmember.MemberRole = role
+		} else {
+			orgmember = types.NewOrganizationMember()
+			orgmember.OrganizationID = org.ID
+			orgmember.UserID = user.ID
+			orgmember.MemberRole = role
+		}
+
+		if err := h.d.InsertOrganizationMember(tx, orgmember); err != nil {
+			return errors.WithStack(err)
 		}
 
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
-	// update if role changed
-	if orgmember != nil {
-		if orgmember.MemberRole == role {
-			return orgmember, nil
-		}
-		orgmember.MemberRole = role
-	} else {
-		orgmember = &types.OrganizationMember{
-			ID:             uuid.NewV4().String(),
-			OrganizationID: org.ID,
-			UserID:         user.ID,
-			MemberRole:     role,
-		}
-	}
-
-	actions := []*datamanager.Action{}
-	orgmemberj, err := json.Marshal(orgmember)
-	if err != nil {
-		return nil, errors.Errorf("failed to marshal project group: %w", err)
-	}
-	actions = append(actions, &datamanager.Action{
-		ActionType: datamanager.ActionTypePut,
-		DataType:   string(types.ConfigTypeOrgMember),
-		ID:         orgmember.ID,
-		Data:       orgmemberj,
-	})
-
-	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return orgmember, err
+	return orgmember, errors.WithStack(err)
 }
 
 // RemoveOrgMember removes an org member.
 func (h *ActionHandler) RemoveOrgMember(ctx context.Context, orgRef, userRef string) error {
-	var org *types.Organization
-	var user *types.User
-	var orgmember *types.OrganizationMember
-	var cgt *datamanager.ChangeGroupsUpdateToken
-
-	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
-		var err error
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		// check existing org
-		org, err = h.readDB.GetOrg(tx, orgRef)
+		org, err := h.d.GetOrg(tx, orgRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if org == nil {
-			return util.NewErrBadRequest(errors.Errorf("org %q doesn't exists", orgRef))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("org %q doesn't exists", orgRef))
 		}
 		// check existing user
-		user, err = h.readDB.GetUser(tx, userRef)
+		user, err := h.d.GetUser(tx, userRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if user == nil {
-			return util.NewErrBadRequest(errors.Errorf("user %q doesn't exists", userRef))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exists", userRef))
 		}
 
 		// check that org member exists
-		orgmember, err = h.readDB.GetOrgMemberByOrgUserID(tx, org.ID, user.ID)
+		orgmember, err := h.d.GetOrgMemberByOrgUserID(tx, org.ID, user.ID)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if orgmember == nil {
-			return util.NewErrBadRequest(errors.Errorf("orgmember for org %q, user %q doesn't exists", orgRef, userRef))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("orgmember for org %q, user %q doesn't exists", orgRef, userRef))
 		}
 
-		cgNames := []string{util.EncodeSha256Hex(fmt.Sprintf("orgmember-%s-%s", org.ID, user.ID))}
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
-		if err != nil {
-			return err
+		if err := h.d.DeleteOrganizationMember(tx, orgmember.ID); err != nil {
+			return errors.WithStack(err)
 		}
 
 		return nil
 	})
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
-	actions := []*datamanager.Action{}
-	actions = append(actions, &datamanager.Action{
-		ActionType: datamanager.ActionTypeDelete,
-		DataType:   string(types.ConfigTypeOrgMember),
-		ID:         orgmember.ID,
-	})
-
-	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return err
+	return errors.WithStack(err)
 }

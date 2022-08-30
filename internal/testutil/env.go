@@ -16,10 +16,11 @@ package testutil
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"strings"
 	"unicode"
+
+	"agola.io/agola/internal/errors"
 )
 
 func ParseEnv(envvar string) (string, string, error) {
@@ -27,11 +28,11 @@ func ParseEnv(envvar string) (string, string, error) {
 	envvar = strings.TrimLeftFunc(envvar, unicode.IsSpace)
 	arr := strings.SplitN(envvar, "=", 2)
 	if len(arr) == 0 {
-		return "", "", fmt.Errorf("invalid environment variable definition: %s", envvar)
+		return "", "", errors.Errorf("invalid environment variable definition: %s", envvar)
 	}
 	varname := arr[0]
 	if varname == "" {
-		return "", "", fmt.Errorf("invalid environment variable definition: %s", envvar)
+		return "", "", errors.Errorf("invalid environment variable definition: %s", envvar)
 	}
 	if len(arr) == 1 {
 		return varname, "", nil
@@ -46,12 +47,12 @@ func ParseEnvs(r io.Reader) (map[string]string, error) {
 	for scanner.Scan() {
 		envname, envvalue, err := ParseEnv(scanner.Text())
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 		envs[envname] = envvalue
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return envs, nil

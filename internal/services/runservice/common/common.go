@@ -15,10 +15,10 @@
 package common
 
 import (
-	"fmt"
 	"path"
 	"sort"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/runconfig"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/runservice/types"
@@ -28,63 +28,27 @@ const (
 	MaxCacheKeyLength = 200
 )
 
-var (
-	EtcdSchedulerBaseDir = "scheduler"
-
-	EtcdRunsDir             = path.Join(EtcdSchedulerBaseDir, "runs")
-	EtcdRunSequenceKey      = path.Join(EtcdSchedulerBaseDir, "runsequence")
-	EtcdRunEventKey         = path.Join(EtcdSchedulerBaseDir, "runevents")
-	EtcdRunEventSequenceKey = path.Join(EtcdSchedulerBaseDir, "runeventsequence")
-
-	EtcdChangeGroupsDir           = path.Join(EtcdSchedulerBaseDir, "changegroups")
-	EtcdChangeGroupMinRevisionKey = path.Join(EtcdSchedulerBaseDir, "changegroupsminrev")
-
-	EtcdExecutorsDir = path.Join(EtcdSchedulerBaseDir, "executors")
-	EtcdTasksDir     = path.Join(EtcdSchedulerBaseDir, "tasks")
-
-	EtcdPingKey = path.Join(EtcdSchedulerBaseDir, "ping")
-
-	EtcdLocksDir = path.Join(EtcdSchedulerBaseDir, "locks")
-
-	EtcdCompactChangeGroupsLockKey = path.Join(EtcdLocksDir, "compactchangegroups")
-	EtcdCacheCleanerLockKey        = path.Join(EtcdLocksDir, "cachecleaner")
-	EtcdWorkspaceCleanerLockKey    = path.Join(EtcdLocksDir, "workspacecleaner")
-	EtcdTaskUpdaterLockKey         = path.Join(EtcdLocksDir, "taskupdater")
-
-	EtcdMaintenanceKey = "maintenance"
-)
-
-func EtcdRunKey(runID string) string       { return path.Join(EtcdRunsDir, runID) }
-func EtcdExecutorKey(taskID string) string { return path.Join(EtcdExecutorsDir, taskID) }
-func EtcdTaskKey(taskID string) string     { return path.Join(EtcdTasksDir, taskID) }
-func EtcdTaskFetcherLockKey(taskID string) string {
-	return path.Join(EtcdLocksDir, "taskfetcher", taskID)
-}
-
-const (
-	EtcdChangeGroupMinRevisionRange = 100
-)
-
-var (
-	StorageDataDir        = ""
-	StorageRunsDir        = path.Join(StorageDataDir, "runs")
-	StorageRunsConfigDir  = path.Join(StorageDataDir, "runsconfig")
-	StorageRunsIndexesDir = path.Join(StorageDataDir, "runsindexes")
-	StorageCountersDir    = path.Join(StorageDataDir, "counters")
-)
-
 type DataType string
 
 const (
 	DataTypeRun        DataType = "run"
 	DataTypeRunConfig  DataType = "runconfig"
 	DataTypeRunCounter DataType = "runcounter"
+
+	CacheCleanerLockKey     = "cachecleaner"
+	WorkspaceCleanerLockKey = "workspacecleaner"
+	LogCleanerLockKey       = "logcleaner"
+	TaskUpdaterLockKey      = "taskupdater"
 )
+
+func TaskFetcherLockKey(taskID string) string {
+	return path.Join("taskfetcher", taskID)
+}
 
 func OSTSubGroupsAndGroupTypes(group string) []string {
 	h := util.PathHierarchy(group)
 	if len(h)%2 != 1 {
-		panic(fmt.Errorf("wrong group path %q", group))
+		panic(errors.Errorf("wrong group path %q", group))
 	}
 
 	return h
@@ -93,7 +57,7 @@ func OSTSubGroupsAndGroupTypes(group string) []string {
 func OSTRootGroup(group string) string {
 	pl := util.PathList(group)
 	if len(pl) < 2 {
-		panic(fmt.Errorf("cannot determine root group name, wrong group path %q", group))
+		panic(errors.Errorf("cannot determine root group name, wrong group path %q", group))
 	}
 
 	return pl[1]
@@ -102,7 +66,7 @@ func OSTRootGroup(group string) string {
 func OSTSubGroups(group string) []string {
 	h := util.PathHierarchy(group)
 	if len(h)%2 != 1 {
-		panic(fmt.Errorf("wrong group path %q", group))
+		panic(errors.Errorf("wrong group path %q", group))
 	}
 
 	// remove group types
@@ -119,7 +83,7 @@ func OSTSubGroups(group string) []string {
 func OSTSubGroupTypes(group string) []string {
 	h := util.PathHierarchy(group)
 	if len(h)%2 != 1 {
-		panic(fmt.Errorf("wrong group path %q", group))
+		panic(errors.Errorf("wrong group path %q", group))
 	}
 
 	// remove group names
@@ -180,6 +144,7 @@ func GenExecutorTaskSpecData(r *types.Run, rt *types.RunTask, rc *types.RunConfi
 		Steps:                rct.Steps,
 		CachePrefix:          cachePrefix,
 		DockerRegistriesAuth: rct.DockerRegistriesAuth,
+		TaskTimeoutInterval:  rct.TaskTimeoutInterval,
 	}
 
 	// calculate workspace operations
@@ -206,21 +171,18 @@ func GenExecutorTaskSpecData(r *types.Run, rt *types.RunTask, rc *types.RunConfi
 func GenExecutorTask(r *types.Run, rt *types.RunTask, rc *types.RunConfig, executor *types.Executor) *types.ExecutorTask {
 	rct := rc.Tasks[rt.ID]
 
-	et := &types.ExecutorTask{
-		// The executorTask ID must be the same as the runTask ID so we can detect if
-		// there's already an executorTask scheduled for that run task and we can get
-		// at most once task execution
-		ID: rt.ID,
-		Spec: types.ExecutorTaskSpec{
-			ExecutorID: executor.ID,
-			RunID:      r.ID,
-			// ExecutorTaskSpecData is not saved in etcd to avoid exceeding the max etcd value
-			// size but is generated everytime the executor task is sent to the executor
-		},
-		Status: types.ExecutorTaskStatus{
-			Phase: types.ExecutorTaskPhaseNotStarted,
-			Steps: make([]*types.ExecutorTaskStepStatus, len(rct.Steps)),
-		},
+	et := types.NewExecutorTask()
+	et.Spec = types.ExecutorTaskSpec{
+		ExecutorID: executor.ExecutorID,
+		RunID:      r.ID,
+		RunTaskID:  rt.ID,
+		// ExecutorTaskSpecData is currently not saved in the database to keep
+		// size smaller but is generated everytime the executor task is sent to
+		// the executor
+	}
+	et.Status = types.ExecutorTaskStatus{
+		Phase: types.ExecutorTaskPhaseNotStarted,
+		Steps: make([]*types.ExecutorTaskStepStatus, len(rct.Steps)),
 	}
 
 	for i := range et.Status.Steps {

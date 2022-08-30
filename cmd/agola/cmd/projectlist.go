@@ -18,9 +18,11 @@ import (
 	"context"
 	"fmt"
 
+	"agola.io/agola/internal/errors"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +30,7 @@ var cmdProjectList = &cobra.Command{
 	Use: "list",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := projectList(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 	Short: "list",
@@ -46,7 +48,7 @@ func init() {
 	flags.StringVar(&projectListOpts.parentPath, "parent", "", `project group path (i.e "org/org01" for root project group in org01, "user/user01/group01/subgroub01") or project group id`)
 
 	if err := cmdProjectList.MarkFlagRequired("parent"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdProject.AddCommand(cmdProjectList)
@@ -63,7 +65,7 @@ func projectList(cmd *cobra.Command, args []string) error {
 
 	projects, _, err := gwclient.GetProjectGroupProjects(context.TODO(), projectListOpts.parentPath)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	printProjects(projects)

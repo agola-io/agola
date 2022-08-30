@@ -17,7 +17,6 @@ package cmd
 import (
 	"crypto/md5"
 	"crypto/sha256"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -27,6 +26,8 @@ import (
 	"strconv"
 	"text/template"
 	"time"
+
+	"agola.io/agola/internal/errors"
 
 	"github.com/spf13/cobra"
 )
@@ -48,20 +49,20 @@ func md5sum(filename string) (string, error) {
 
 	if info, err := os.Stat(filename); err == nil {
 		if info.Size() > 1024*1024 {
-			return "", fmt.Errorf("file %q is too big", filename)
+			return "", errors.Errorf("file %q is too big", filename)
 		}
 	} else {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	f, err := os.Open(filename)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	h := md5.New()
 	if _, err := io.Copy(h, f); err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
@@ -74,20 +75,20 @@ func sha256sum(filename string) (string, error) {
 
 	if info, err := os.Stat(filename); err == nil {
 		if info.Size() > 1024*1024 {
-			return "", fmt.Errorf("file %q is too big", filename)
+			return "", errors.Errorf("file %q is too big", filename)
 		}
 	} else {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	f, err := os.Open(filename)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	return fmt.Sprintf("%x", h.Sum(nil)), nil

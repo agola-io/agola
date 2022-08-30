@@ -19,24 +19,25 @@ import (
 	"net/http"
 	"strconv"
 
-	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/configstore/action"
-	"agola.io/agola/internal/services/configstore/readdb"
+	"agola.io/agola/internal/services/configstore/db"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
+	csapitypes "agola.io/agola/services/configstore/api/types"
 	"agola.io/agola/services/configstore/types"
 
 	"github.com/gorilla/mux"
-	"go.uber.org/zap"
-	errors "golang.org/x/xerrors"
+	"github.com/rs/zerolog"
 )
 
 type RemoteSourceHandler struct {
-	log    *zap.SugaredLogger
-	readDB *readdb.ReadDB
+	log zerolog.Logger
+	d   *db.DB
 }
 
-func NewRemoteSourceHandler(logger *zap.Logger, readDB *readdb.ReadDB) *RemoteSourceHandler {
-	return &RemoteSourceHandler{log: logger.Sugar(), readDB: readDB}
+func NewRemoteSourceHandler(log zerolog.Logger, d *db.DB) *RemoteSourceHandler {
+	return &RemoteSourceHandler{log: log, d: d}
 }
 
 func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -45,64 +46,77 @@ func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	rsRef := vars["remotesourceref"]
 
 	var remoteSource *types.RemoteSource
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		remoteSource, err = h.readDB.GetRemoteSource(tx, rsRef)
-		return err
+		remoteSource, err = h.d.GetRemoteSource(tx, rsRef)
+		return errors.WithStack(err)
 	})
 	if err != nil {
-		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
+		h.log.Err(err).Send()
+		util.HTTPError(w, err)
 		return
 	}
 
 	if remoteSource == nil {
-		httpError(w, util.NewErrNotExist(errors.Errorf("remote source %q doesn't exist", rsRef)))
+		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("remote source %q doesn't exist", rsRef)))
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, remoteSource); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, remoteSource); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type CreateRemoteSourceHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewCreateRemoteSourceHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateRemoteSourceHandler {
-	return &CreateRemoteSourceHandler{log: logger.Sugar(), ah: ah}
+func NewCreateRemoteSourceHandler(log zerolog.Logger, ah *action.ActionHandler) *CreateRemoteSourceHandler {
+	return &CreateRemoteSourceHandler{log: log, ah: ah}
 }
 
 func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var req types.RemoteSource
+	var req *csapitypes.CreateUpdateRemoteSourceRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
-	remoteSource, err := h.ah.CreateRemoteSource(ctx, &req)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	areq := &action.CreateUpdateRemoteSourceRequest{
+		Name:                req.Name,
+		APIURL:              req.APIURL,
+		SkipVerify:          req.SkipVerify,
+		Type:                req.Type,
+		AuthType:            req.AuthType,
+		Oauth2ClientID:      req.Oauth2ClientID,
+		Oauth2ClientSecret:  req.Oauth2ClientSecret,
+		SkipSSHHostKeyCheck: req.SkipSSHHostKeyCheck,
+		RegistrationEnabled: req.RegistrationEnabled,
+		LoginEnabled:        req.LoginEnabled,
+	}
+
+	remoteSource, err := h.ah.CreateRemoteSource(ctx, areq)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	if err := httpResponse(w, http.StatusCreated, remoteSource); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusCreated, remoteSource); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type UpdateRemoteSourceHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewUpdateRemoteSourceHandler(logger *zap.Logger, ah *action.ActionHandler) *UpdateRemoteSourceHandler {
-	return &UpdateRemoteSourceHandler{log: logger.Sugar(), ah: ah}
+func NewUpdateRemoteSourceHandler(log zerolog.Logger, ah *action.ActionHandler) *UpdateRemoteSourceHandler {
+	return &UpdateRemoteSourceHandler{log: log, ah: ah}
 }
 
 func (h *UpdateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -111,35 +125,44 @@ func (h *UpdateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	vars := mux.Vars(r)
 	rsRef := vars["remotesourceref"]
 
-	var remoteSource *types.RemoteSource
+	var req *csapitypes.CreateUpdateRemoteSourceRequest
 	d := json.NewDecoder(r.Body)
-	if err := d.Decode(&remoteSource); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+	if err := d.Decode(&req); err != nil {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
-	areq := &action.UpdateRemoteSourceRequest{
-		RemoteSourceRef: rsRef,
-		RemoteSource:    remoteSource,
+	areq := &action.CreateUpdateRemoteSourceRequest{
+		Name:                req.Name,
+		APIURL:              req.APIURL,
+		SkipVerify:          req.SkipVerify,
+		Type:                req.Type,
+		AuthType:            req.AuthType,
+		Oauth2ClientID:      req.Oauth2ClientID,
+		Oauth2ClientSecret:  req.Oauth2ClientSecret,
+		SkipSSHHostKeyCheck: req.SkipSSHHostKeyCheck,
+		RegistrationEnabled: req.RegistrationEnabled,
+		LoginEnabled:        req.LoginEnabled,
 	}
-	remoteSource, err := h.ah.UpdateRemoteSource(ctx, areq)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+
+	remoteSource, err := h.ah.UpdateRemoteSource(ctx, rsRef, areq)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	if err := httpResponse(w, http.StatusCreated, remoteSource); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusCreated, remoteSource); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type DeleteRemoteSourceHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewDeleteRemoteSourceHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteRemoteSourceHandler {
-	return &DeleteRemoteSourceHandler{log: logger.Sugar(), ah: ah}
+func NewDeleteRemoteSourceHandler(log zerolog.Logger, ah *action.ActionHandler) *DeleteRemoteSourceHandler {
+	return &DeleteRemoteSourceHandler{log: log, ah: ah}
 }
 
 func (h *DeleteRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -149,11 +172,11 @@ func (h *DeleteRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	rsRef := vars["remotesourceref"]
 
 	err := h.ah.DeleteRemoteSource(ctx, rsRef)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 	}
-	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
@@ -163,12 +186,12 @@ const (
 )
 
 type RemoteSourcesHandler struct {
-	log    *zap.SugaredLogger
-	readDB *readdb.ReadDB
+	log zerolog.Logger
+	d   *db.DB
 }
 
-func NewRemoteSourcesHandler(logger *zap.Logger, readDB *readdb.ReadDB) *RemoteSourcesHandler {
-	return &RemoteSourcesHandler{log: logger.Sugar(), readDB: readDB}
+func NewRemoteSourcesHandler(log zerolog.Logger, d *db.DB) *RemoteSourcesHandler {
+	return &RemoteSourcesHandler{log: log, d: d}
 }
 
 func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -181,12 +204,12 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		var err error
 		limit, err = strconv.Atoi(limitS)
 		if err != nil {
-			httpError(w, util.NewErrBadRequest(errors.Errorf("cannot parse limit: %w", err)))
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit")))
 			return
 		}
 	}
 	if limit < 0 {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("limit must be greater or equal than 0")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0")))
 		return
 	}
 	if limit > MaxRemoteSourcesLimit {
@@ -199,14 +222,19 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 
 	start := query.Get("start")
 
-	remoteSources, err := h.readDB.GetRemoteSources(ctx, start, limit, asc)
+	var remoteSources []*types.RemoteSource
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		remoteSources, err = h.d.GetRemoteSources(tx, start, limit, asc)
+		return errors.WithStack(err)
+	})
 	if err != nil {
-		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
+		h.log.Err(err).Send()
+		util.HTTPError(w, err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, remoteSources); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, remoteSources); err != nil {
+		h.log.Err(err).Send()
 	}
 }

@@ -15,18 +15,15 @@
 package action
 
 import (
-	"net/http"
-
 	"agola.io/agola/internal/services/common"
-	"agola.io/agola/internal/util"
 	csclient "agola.io/agola/services/configstore/client"
 	rsclient "agola.io/agola/services/runservice/client"
 
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 )
 
 type ActionHandler struct {
-	log               *zap.SugaredLogger
+	log               zerolog.Logger
 	sd                *common.TokenSigningData
 	configstoreClient *csclient.Client
 	runserviceClient  *rsclient.Client
@@ -35,9 +32,9 @@ type ActionHandler struct {
 	webExposedURL     string
 }
 
-func NewActionHandler(logger *zap.Logger, sd *common.TokenSigningData, configstoreClient *csclient.Client, runserviceClient *rsclient.Client, agolaID, apiExposedURL, webExposedURL string) *ActionHandler {
+func NewActionHandler(log zerolog.Logger, sd *common.TokenSigningData, configstoreClient *csclient.Client, runserviceClient *rsclient.Client, agolaID, apiExposedURL, webExposedURL string) *ActionHandler {
 	return &ActionHandler{
-		log:               logger.Sugar(),
+		log:               log,
 		sd:                sd,
 		configstoreClient: configstoreClient,
 		runserviceClient:  runserviceClient,
@@ -45,21 +42,4 @@ func NewActionHandler(logger *zap.Logger, sd *common.TokenSigningData, configsto
 		apiExposedURL:     apiExposedURL,
 		webExposedURL:     webExposedURL,
 	}
-}
-
-func ErrFromRemote(resp *http.Response, err error) error {
-	if err == nil {
-		return nil
-	}
-
-	if resp != nil {
-		switch resp.StatusCode {
-		case http.StatusBadRequest:
-			return util.NewErrBadRequest(err)
-		case http.StatusNotFound:
-			return util.NewErrNotExist(err)
-		}
-	}
-
-	return err
 }

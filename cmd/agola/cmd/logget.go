@@ -17,13 +17,15 @@ package cmd
 import (
 	"context"
 	"io"
+	"net/http"
 	"os"
 
+	"agola.io/agola/internal/errors"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	errors "golang.org/x/xerrors"
 )
 
 var cmdLogGet = &cobra.Command{
@@ -31,19 +33,21 @@ var cmdLogGet = &cobra.Command{
 	Short: "get a setup/step log",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := logGet(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
 
 type logGetOptions struct {
-	runid    string
-	taskname string
-	taskid   string
-	step     int
-	setup    bool
-	follow   bool
-	output   string
+	projectRef string
+	username   string
+	runNumber  uint64
+	taskname   string
+	taskid     string
+	step       int
+	setup      bool
+	follow     bool
+	output     string
 }
 
 var logGetOpts logGetOptions
@@ -51,7 +55,9 @@ var logGetOpts logGetOptions
 func init() {
 	flags := cmdLogGet.Flags()
 
-	flags.StringVar(&logGetOpts.runid, "runid", "", "Run Id")
+	flags.StringVar(&logGetOpts.projectRef, "project", "", "project id or full path")
+	flags.StringVar(&logGetOpts.username, "username", "", "user name for user direct runs")
+	flags.Uint64Var(&logGetOpts.runNumber, "runnumber", 0, "run number")
 	flags.StringVar(&logGetOpts.taskname, "taskname", "", "Task name")
 	flags.StringVar(&logGetOpts.taskid, "taskid", "", "Task Id")
 	flags.IntVar(&logGetOpts.step, "step", 0, "Step number")
@@ -59,18 +65,21 @@ func init() {
 	flags.BoolVar(&logGetOpts.follow, "follow", false, "Follow log stream")
 	flags.StringVar(&logGetOpts.output, "output", "", "Write output to file")
 
-	if err := cmdLogGet.MarkFlagRequired("runid"); err != nil {
-		log.Fatal(err)
+	if err := cmdLogGet.MarkFlagRequired("runnumber"); err != nil {
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdLog.AddCommand(cmdLogGet)
 }
 
 func logGet(cmd *cobra.Command, args []string) error {
-
 	var taskid string
+
 	flags := cmd.Flags()
 
+	if flags.Changed("username") && flags.Changed("project") {
+		return errors.Errorf(`only one of "--username" or "--project" can be provided`)
+	}
 	if flags.Changed("taskname") && flags.Changed("taskid") {
 		return errors.Errorf(`only one of "--taskname" or "--taskid" can be provided`)
 	}
@@ -92,6 +101,8 @@ func logGet(cmd *cobra.Command, args []string) error {
 
 	gwclient := gwclient.NewClient(gatewayURL, token)
 
+	isProject := !flags.Changed("username")
+
 	if flags.Changed("taskid") {
 		taskid = logGetOpts.taskid
 	}
@@ -99,10 +110,17 @@ func logGet(cmd *cobra.Command, args []string) error {
 		var task *gwapitypes.RunResponseTask
 		var taskfound bool
 
-		run, _, err := gwclient.GetRun(context.TODO(), logGetOpts.runid)
-		if err != nil {
-			return err
+		var run *gwapitypes.RunResponse
+		var err error
+		if isProject {
+			run, _, err = gwclient.GetProjectRun(context.TODO(), logGetOpts.projectRef, logGetOpts.runNumber)
+		} else {
+			run, _, err = gwclient.GetUserRun(context.TODO(), logGetOpts.username, logGetOpts.runNumber)
 		}
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
 		for _, t := range run.Tasks {
 			if t.Name == logGetOpts.taskname {
 				task = t
@@ -111,13 +129,20 @@ func logGet(cmd *cobra.Command, args []string) error {
 			}
 		}
 		if !taskfound {
-			return errors.Errorf("task %q not found in run %q", logGetOpts.taskname, logGetOpts.runid)
+			return errors.Errorf("task %q not found in run %q", logGetOpts.taskname, logGetOpts.runNumber)
 		}
 		taskid = task.ID
 	}
 
-	log.Infof("getting log")
-	resp, err := gwclient.GetLogs(context.TODO(), logGetOpts.runid, taskid, logGetOpts.setup, logGetOpts.step, logGetOpts.follow)
+	log.Info().Msgf("getting log")
+
+	var resp *http.Response
+	var err error
+	if isProject {
+		resp, err = gwclient.GetProjectLogs(context.TODO(), logGetOpts.projectRef, logGetOpts.runNumber, taskid, logGetOpts.setup, logGetOpts.step, logGetOpts.follow)
+	} else {
+		resp, err = gwclient.GetUserLogs(context.TODO(), logGetOpts.username, logGetOpts.runNumber, taskid, logGetOpts.setup, logGetOpts.step, logGetOpts.follow)
+	}
 	if err != nil {
 		return errors.Errorf("failed to get log: %v", err)
 	}
@@ -126,7 +151,7 @@ func logGet(cmd *cobra.Command, args []string) error {
 	if flags.Changed("output") {
 		f, err := os.Create(logGetOpts.output)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		defer f.Close()
 		if _, err := io.Copy(f, resp.Body); err != nil {

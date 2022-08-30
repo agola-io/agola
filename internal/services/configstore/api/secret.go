@@ -18,25 +18,26 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/configstore/action"
-	"agola.io/agola/internal/services/configstore/readdb"
+	"agola.io/agola/internal/services/configstore/db"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	"agola.io/agola/services/configstore/types"
 
 	"github.com/gorilla/mux"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 )
 
 type SecretHandler struct {
-	log    *zap.SugaredLogger
-	ah     *action.ActionHandler
-	readDB *readdb.ReadDB
+	log zerolog.Logger
+	ah  *action.ActionHandler
+	d   *db.DB
 }
 
-func NewSecretHandler(logger *zap.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *SecretHandler {
-	return &SecretHandler{log: logger.Sugar(), ah: ah, readDB: readDB}
+func NewSecretHandler(log zerolog.Logger, ah *action.ActionHandler, d *db.DB) *SecretHandler {
+	return &SecretHandler{log: log, ah: ah, d: d}
 }
 
 func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -45,24 +46,24 @@ func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	secretID := vars["secretid"]
 
 	secret, err := h.ah.GetSecret(ctx, secretID)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, secret); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, secret); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type SecretsHandler struct {
-	log    *zap.SugaredLogger
-	ah     *action.ActionHandler
-	readDB *readdb.ReadDB
+	log zerolog.Logger
+	ah  *action.ActionHandler
+	d   *db.DB
 }
 
-func NewSecretsHandler(logger *zap.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *SecretsHandler {
-	return &SecretsHandler{log: logger.Sugar(), ah: ah, readDB: readDB}
+func NewSecretsHandler(log zerolog.Logger, ah *action.ActionHandler, d *db.DB) *SecretsHandler {
+	return &SecretsHandler{log: log, ah: ah, d: d}
 }
 
 func (h *SecretsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -70,15 +71,15 @@ func (h *SecretsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	_, tree := query["tree"]
 
-	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	parentKind, parentRef, err := GetObjectKindRef(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	secrets, err := h.ah.GetSecrets(ctx, parentType, parentRef, tree)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	secrets, err := h.ah.GetSecrets(ctx, parentKind, parentRef, tree)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -87,73 +88,82 @@ func (h *SecretsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		resSecrets[i] = &csapitypes.Secret{Secret: s}
 	}
 
-	err = h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err = h.d.Do(ctx, func(tx *sql.Tx) error {
 		// populate parent path
 		for _, s := range resSecrets {
-			pp, err := h.readDB.GetPath(tx, s.Parent.Type, s.Parent.ID)
+			pp, err := h.d.GetPath(tx, s.Parent.Kind, s.Parent.ID)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			s.ParentPath = pp
 		}
-		return err
+		return errors.WithStack(err)
 	})
 	if err != nil {
-		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
+		h.log.Err(err).Send()
+		util.HTTPError(w, err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, resSecrets); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, resSecrets); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type CreateSecretHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewCreateSecretHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateSecretHandler {
-	return &CreateSecretHandler{log: logger.Sugar(), ah: ah}
+func NewCreateSecretHandler(log zerolog.Logger, ah *action.ActionHandler) *CreateSecretHandler {
+	return &CreateSecretHandler{log: log, ah: ah}
 }
 
 func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	parentKind, parentRef, err := GetObjectKindRef(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	var secret *types.Secret
+	var req *csapitypes.CreateUpdateSecretRequest
 	d := json.NewDecoder(r.Body)
-	if err := d.Decode(&secret); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+	if err := d.Decode(&req); err != nil {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
-	secret.Parent.Type = parentType
-	secret.Parent.ID = parentRef
+	areq := &action.CreateUpdateSecretRequest{
+		Name: req.Name,
+		Parent: types.Parent{
+			Kind: parentKind,
+			ID:   parentRef,
+		},
+		Type:             req.Type,
+		Data:             req.Data,
+		SecretProviderID: req.SecretProviderID,
+		Path:             req.Path,
+	}
 
-	secret, err = h.ah.CreateSecret(ctx, secret)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	secret, err := h.ah.CreateSecret(ctx, areq)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	if err := httpResponse(w, http.StatusCreated, secret); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusCreated, secret); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type UpdateSecretHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewUpdateSecretHandler(logger *zap.Logger, ah *action.ActionHandler) *UpdateSecretHandler {
-	return &UpdateSecretHandler{log: logger.Sugar(), ah: ah}
+func NewUpdateSecretHandler(log zerolog.Logger, ah *action.ActionHandler) *UpdateSecretHandler {
+	return &UpdateSecretHandler{log: log, ah: ah}
 }
 
 func (h *UpdateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -161,44 +171,49 @@ func (h *UpdateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	vars := mux.Vars(r)
 	secretName := vars["secretname"]
 
-	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	parentKind, parentRef, err := GetObjectKindRef(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	var secret *types.Secret
+	var req *csapitypes.CreateUpdateSecretRequest
 	d := json.NewDecoder(r.Body)
-	if err := d.Decode(&secret); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+	if err := d.Decode(&req); err != nil {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
-	secret.Parent.Type = parentType
-	secret.Parent.ID = parentRef
-
-	areq := &action.UpdateSecretRequest{
-		SecretName: secretName,
-		Secret:     secret,
+	areq := &action.CreateUpdateSecretRequest{
+		Name: req.Name,
+		Parent: types.Parent{
+			Kind: parentKind,
+			ID:   parentRef,
+		},
+		Type:             req.Type,
+		Data:             req.Data,
+		SecretProviderID: req.SecretProviderID,
+		Path:             req.Path,
 	}
-	secret, err = h.ah.UpdateSecret(ctx, areq)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+
+	secret, err := h.ah.UpdateSecret(ctx, secretName, areq)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, secret); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, secret); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type DeleteSecretHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewDeleteSecretHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteSecretHandler {
-	return &DeleteSecretHandler{log: logger.Sugar(), ah: ah}
+func NewDeleteSecretHandler(log zerolog.Logger, ah *action.ActionHandler) *DeleteSecretHandler {
+	return &DeleteSecretHandler{log: log, ah: ah}
 }
 
 func (h *DeleteSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -206,17 +221,17 @@ func (h *DeleteSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	vars := mux.Vars(r)
 	secretName := vars["secretname"]
 
-	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	parentKind, parentRef, err := GetObjectKindRef(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	err = h.ah.DeleteSecret(ctx, parentType, parentRef, secretName)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	err = h.ah.DeleteSecret(ctx, parentKind, parentRef, secretName)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 	}
-	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Err(err).Send()
 	}
 }

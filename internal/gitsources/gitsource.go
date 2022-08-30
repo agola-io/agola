@@ -15,10 +15,11 @@
 package gitsource
 
 import (
-	"errors"
 	"net/http"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/types"
+
 	"golang.org/x/oauth2"
 )
 
@@ -81,11 +82,12 @@ type Oauth2Source interface {
 }
 
 type RepoInfo struct {
-	ID           string
-	Path         string
-	HTMLURL      string
-	SSHCloneURL  string
-	HTTPCloneURL string
+	ID            string
+	Path          string
+	HTMLURL       string
+	SSHCloneURL   string
+	HTTPCloneURL  string
+	DefaultBranch string
 }
 
 type UserInfo struct {

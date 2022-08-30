@@ -17,28 +17,29 @@ package api
 import (
 	"net/http"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 	csclient "agola.io/agola/services/configstore/client"
+	cstypes "agola.io/agola/services/configstore/types"
 	rsclient "agola.io/agola/services/runservice/client"
 
-	"go.uber.org/zap"
-	errors "golang.org/x/xerrors"
+	"github.com/rs/zerolog"
 )
 
 type webhooksHandler struct {
-	log               *zap.SugaredLogger
+	log               zerolog.Logger
 	ah                *action.ActionHandler
 	configstoreClient *csclient.Client
 	runserviceClient  *rsclient.Client
 	apiExposedURL     string
 }
 
-func NewWebhooksHandler(logger *zap.Logger, ah *action.ActionHandler, configstoreClient *csclient.Client, runserviceClient *rsclient.Client, apiExposedURL string) *webhooksHandler {
+func NewWebhooksHandler(log zerolog.Logger, ah *action.ActionHandler, configstoreClient *csclient.Client, runserviceClient *rsclient.Client, apiExposedURL string) *webhooksHandler {
 	return &webhooksHandler{
-		log:               logger.Sugar(),
+		log:               log,
 		ah:                ah,
 		configstoreClient: configstoreClient,
 		runserviceClient:  runserviceClient,
@@ -48,13 +49,13 @@ func NewWebhooksHandler(logger *zap.Logger, ah *action.ActionHandler, configstor
 
 func (h *webhooksHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err := h.handleWebhook(r)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, nil); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
@@ -63,33 +64,46 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) error {
 
 	projectID := r.URL.Query().Get("projectid")
 	if projectID == "" {
-		return util.NewErrBadRequest(errors.Errorf("bad webhook url %q. Missing projectid", r.URL))
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("bad webhook url %q. Missing projectid", r.URL))
 	}
 
 	defer r.Body.Close()
 
 	csProject, _, err := h.configstoreClient.GetProject(ctx, projectID)
 	if err != nil {
-		return util.NewErrBadRequest(errors.Errorf("failed to get project %s: %w", projectID, err))
+		return util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "failed to get project %s", projectID))
 	}
 	project := csProject.Project
 
 	user, _, err := h.configstoreClient.GetUserByLinkedAccount(ctx, project.LinkedAccountID)
 	if err != nil {
-		return util.NewErrInternal(errors.Errorf("failed to get user by linked account %q: %w", project.LinkedAccountID, err))
+		return util.NewAPIError(util.ErrInternal, errors.Wrapf(err, "failed to get user by linked account %q", project.LinkedAccountID))
 	}
-	la := user.LinkedAccounts[project.LinkedAccountID]
+	linkedAccounts, _, err := h.configstoreClient.GetUserLinkedAccounts(ctx, user.ID)
+	if err != nil {
+		return util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q linked accounts", user.ID))
+	}
+
+	var la *cstypes.LinkedAccount
+	for _, v := range linkedAccounts {
+		if v.ID == project.LinkedAccountID {
+			la = v
+			break
+		}
+	}
+
 	if la == nil {
-		return util.NewErrInternal(errors.Errorf("linked account %q in user %q doesn't exist", project.LinkedAccountID, user.Name))
+		return util.NewAPIError(util.ErrInternal, errors.Errorf("linked account %q for user %q doesn't exist", project.LinkedAccountID, user.Name))
 	}
+
 	rs, _, err := h.configstoreClient.GetRemoteSource(ctx, la.RemoteSourceID)
 	if err != nil {
-		return util.NewErrInternal(errors.Errorf("failed to get remote source %q: %w", la.RemoteSourceID, err))
+		return util.NewAPIError(util.ErrInternal, errors.Wrapf(err, "failed to get remote source %q", la.RemoteSourceID))
 	}
 
 	gitSource, err := h.ah.GetGitSource(ctx, rs, user.Name, la)
 	if err != nil {
-		return util.NewErrInternal(errors.Errorf("failed to create gitea client: %w", err))
+		return util.NewAPIError(util.ErrInternal, errors.Wrapf(err, "failed to create gitea client"))
 	}
 
 	sshPrivKey := project.SSHPrivateKey
@@ -102,12 +116,12 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) error {
 
 	webhookData, err := gitSource.ParseWebhook(r, project.WebhookSecret)
 	if err != nil {
-		return util.NewErrBadRequest(errors.Errorf("failed to parse webhook: %w", err))
+		return util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "failed to parse webhook"))
 	}
 	// skip nil webhook data
 	// TODO(sgotti) report the reason of the skip
 	if webhookData == nil {
-		h.log.Infof("skipping webhook")
+		h.log.Info().Msgf("skipping webhook")
 		return nil
 	}
 
@@ -141,7 +155,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) error {
 		CompareLink:     webhookData.CompareLink,
 	}
 	if err := h.ah.CreateRuns(ctx, req); err != nil {
-		return util.NewErrInternal(errors.Errorf("failed to create run: %w", err))
+		return util.NewAPIError(util.ErrInternal, errors.Wrapf(err, "failed to create run"))
 	}
 
 	return nil

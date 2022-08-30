@@ -26,13 +26,14 @@ import (
 	"strings"
 	"time"
 
+	"agola.io/agola/internal/errors"
+	"agola.io/agola/internal/services/executor/registry"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/types"
 
 	"github.com/docker/docker/pkg/archive"
-	uuid "github.com/satori/go.uuid"
-	"go.uber.org/zap"
-	errors "golang.org/x/xerrors"
+	"github.com/gofrs/uuid"
+	"github.com/rs/zerolog"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -70,10 +71,12 @@ const (
 )
 
 type K8sDriver struct {
-	log              *zap.SugaredLogger
+	log              zerolog.Logger
 	restconfig       *restclient.Config
 	client           *kubernetes.Clientset
 	toolboxPath      string
+	initImage        string
+	initDockerConfig *registry.DockerConfig
 	namespace        string
 	executorID       string
 	executorsGroupID string
@@ -95,40 +98,42 @@ type K8sPod struct {
 	initVolumeDir string
 }
 
-func NewK8sDriver(logger *zap.Logger, executorID, toolboxPath string) (*K8sDriver, error) {
+func NewK8sDriver(log zerolog.Logger, executorID, toolboxPath, initImage string, initDockerConfig *registry.DockerConfig) (*K8sDriver, error) {
 	kubeClientConfig := NewKubeClientConfig("", "", "")
 	kubecfg, err := kubeClientConfig.ClientConfig()
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	kubecli, err := kubernetes.NewForConfig(kubecfg)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create kubernetes client: %v", err)
+		return nil, errors.Wrapf(err, "cannot create kubernetes client")
 	}
 
 	namespace, _, err := kubeClientConfig.Namespace()
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	d := &K8sDriver{
-		log:          logger.Sugar(),
-		restconfig:   kubecfg,
-		client:       kubecli,
-		toolboxPath:  toolboxPath,
-		namespace:    namespace,
-		executorID:   executorID,
-		k8sLabelArch: corev1.LabelArchStable,
+		log:              log,
+		restconfig:       kubecfg,
+		client:           kubecli,
+		toolboxPath:      toolboxPath,
+		initImage:        initImage,
+		initDockerConfig: initDockerConfig,
+		namespace:        namespace,
+		executorID:       executorID,
+		k8sLabelArch:     corev1.LabelArchStable,
 	}
 
 	serverVersion, err := d.client.Discovery().ServerVersion()
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	sv, err := parseGitVersion(serverVersion.GitVersion)
 	// if server version parsing fails just warn but ignore it
 	if err != nil {
-		d.log.Warnf("failed to parse k8s server version: %v", err)
+		d.log.Warn().Err(err).Msgf("failed to parse k8s server version")
 	}
 	if sv != nil {
 		// for k8s version < v1.14.x use old arch label
@@ -139,7 +144,7 @@ func NewK8sDriver(logger *zap.Logger, executorID, toolboxPath string) (*K8sDrive
 
 	lists, err := d.client.Discovery().ServerPreferredResources()
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	hasLeaseAPI := false
@@ -160,7 +165,7 @@ func NewK8sDriver(logger *zap.Logger, executorID, toolboxPath string) (*K8sDrive
 
 	executorsGroupID, err := d.getOrCreateExecutorsGroupID(context.TODO())
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	d.executorsGroupID = executorsGroupID
@@ -189,7 +194,7 @@ func NewK8sDriver(logger *zap.Logger, executorID, toolboxPath string) (*K8sDrive
 	go func() {
 		for {
 			if err := d.updateLease(ctx); err != nil {
-				d.log.Errorf("failed to update executor lease: %+v", err)
+				d.log.Err(err).Msgf("failed to update executor lease")
 			}
 
 			select {
@@ -205,7 +210,7 @@ func NewK8sDriver(logger *zap.Logger, executorID, toolboxPath string) (*K8sDrive
 	go func() {
 		for {
 			if err := d.cleanStaleExecutorsLease(ctx); err != nil {
-				d.log.Errorf("failed to clean stale executors lease: %+v", err)
+				d.log.Err(err).Msgf("failed to clean stale executors lease")
 			}
 
 			select {
@@ -253,7 +258,7 @@ func (d *K8sDriver) Archs(ctx context.Context) ([]types.Arch, error) {
 	// TODO(sgotti) use go client listers instead of querying every time
 	nodes, err := d.nodeLister.List(apilabels.SelectorFromSet(nil))
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	archsMap := map[types.Arch]struct{}{}
 	archs := []types.Arch{}
@@ -283,16 +288,16 @@ func (d *K8sDriver) getOrCreateExecutorsGroupID(ctx context.Context) (string, er
 	cmClient := d.client.CoreV1().ConfigMaps(d.namespace)
 
 	// pod and secret name, based on pod id
-	cm, err := cmClient.Get(configMapName, metav1.GetOptions{})
+	cm, err := cmClient.Get(ctx, configMapName, metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			return "", err
+			return "", errors.WithStack(err)
 		}
 	} else {
 		return cm.Data[executorsGroupIDConfigMapKey], nil
 	}
 
-	executorsGroupID := uuid.NewV4().String()
+	executorsGroupID := uuid.Must(uuid.NewV4()).String()
 
 	cm = &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -300,8 +305,8 @@ func (d *K8sDriver) getOrCreateExecutorsGroupID(ctx context.Context) (string, er
 		},
 		Data: map[string]string{executorsGroupIDConfigMapKey: executorsGroupID},
 	}
-	if _, err = cmClient.Create(cm); err != nil {
-		return "", err
+	if _, err = cmClient.Create(ctx, cm, metav1.CreateOptions{}); err != nil {
+		return "", errors.WithStack(err)
 	}
 
 	return executorsGroupID, nil
@@ -322,13 +327,18 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 	labels[executorIDKey] = d.executorID
 	labels[executorsGroupIDKey] = d.executorsGroupID
 
-	dockerconfigj, err := json.Marshal(podConfig.DockerConfig)
-	if err != nil {
-		return nil, err
-	}
-
 	// pod and secret name, based on pod id
 	name := podNamePrefix + podConfig.ID
+
+	dockerconfigj, err := json.Marshal(podConfig.DockerConfig)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	initDockerconfigj, err := json.Marshal(d.initDockerConfig)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
 
 	// secret that hold the docker registry auth
 	secret := &corev1.Secret{
@@ -337,14 +347,14 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 			Labels: labels,
 		},
 		Data: map[string][]byte{
-			".dockerconfigjson": dockerconfigj,
+			".dockerconfigjson": initDockerconfigj,
 		},
 		Type: corev1.SecretTypeDockerConfigJson,
 	}
 
-	_, err = secretClient.Create(secret)
+	_, err = secretClient.Create(ctx, secret, metav1.CreateOptions{})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	pod := &corev1.Pod{
@@ -361,7 +371,7 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 			InitContainers: []corev1.Container{
 				{
 					Name:  "initcontainer",
-					Image: "busybox",
+					Image: d.initImage,
 					// wait for a file named /tmp/done and then exit
 					Command: []string{"/bin/sh", "-c", "while true; do if [[ -f /tmp/done ]]; then exit; fi; sleep 1; done"},
 					Stdin:   true,
@@ -457,16 +467,16 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 		}
 	}
 
-	pod, err = podClient.Create(pod)
+	pod, err = podClient.Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
-	watcher, err := podClient.Watch(
+	watcher, err := podClient.Watch(ctx,
 		metav1.SingleObject(pod.ObjectMeta),
 	)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	// wait for init container to be ready
@@ -486,9 +496,31 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 
 	fmt.Fprintf(out, "init container ready\n")
 
+	// Remove init container docker auth so it won't be used by user defined containers
+	dur := int64(0)
+	if err := secretClient.Delete(ctx, name, metav1.DeleteOptions{GracePeriodSeconds: &dur}); err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	secret = &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+		Data: map[string][]byte{
+			".dockerconfigjson": dockerconfigj,
+		},
+		Type: corev1.SecretTypeDockerConfigJson,
+	}
+
+	_, err = secretClient.Create(ctx, secret, metav1.CreateOptions{})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
 	coreclient, err := corev1client.NewForConfig(d.restconfig)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	// get the pod arch
@@ -508,7 +540,7 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 
 	exec, err := remotecommand.NewSPDYExecutor(d.restconfig, "POST", req.URL())
 	if err != nil {
-		return nil, errors.Errorf("failed to generate k8s client spdy executor for url %q, method: POST: %w", req.URL(), err)
+		return nil, errors.Wrapf(err, "failed to generate k8s client spdy executor for url %q, method: POST", req.URL())
 	}
 
 	stdout := bytes.Buffer{}
@@ -517,7 +549,7 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 		Stderr: out,
 	})
 	if err != nil {
-		return nil, errors.Errorf("failed to execute command on initcontainer: %w", err)
+		return nil, errors.Wrapf(err, "failed to execute command on initcontainer")
 	}
 	osArch := strings.TrimSpace(stdout.String())
 
@@ -534,17 +566,17 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 	// copy the toolbox for the pod arch
 	toolboxExecPath, err := toolboxExecPath(d.toolboxPath, arch)
 	if err != nil {
-		return nil, errors.Errorf("failed to get toolbox path for arch %q: %w", arch, err)
+		return nil, errors.Wrapf(err, "failed to get toolbox path for arch %q", arch)
 	}
 	srcInfo, err := archive.CopyInfoSourcePath(toolboxExecPath, false)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	srcInfo.RebaseName = "agola-toolbox"
 
 	srcArchive, err := archive.TarResource(srcInfo)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	defer srcArchive.Close()
 
@@ -565,7 +597,7 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 
 	exec, err = remotecommand.NewSPDYExecutor(d.restconfig, "POST", req.URL())
 	if err != nil {
-		return nil, errors.Errorf("failed to generate k8s client spdy executor for url %q, method: POST: %w", req.URL(), err)
+		return nil, errors.Wrapf(err, "failed to generate k8s client spdy executor for url %q, method: POST", req.URL())
 	}
 
 	fmt.Fprintf(out, "extracting toolbox\n")
@@ -575,7 +607,7 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 		Stderr: out,
 	})
 	if err != nil {
-		return nil, errors.Errorf("failed to execute command on initcontainer: %w", err)
+		return nil, errors.Wrapf(err, "failed to execute command on initcontainer")
 	}
 	fmt.Fprintf(out, "extracting toolbox done\n")
 
@@ -595,7 +627,7 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 
 	exec, err = remotecommand.NewSPDYExecutor(d.restconfig, "POST", req.URL())
 	if err != nil {
-		return nil, errors.Errorf("failed to generate k8s client spdy executor for url %q, method: POST: %w", req.URL(), err)
+		return nil, errors.Wrapf(err, "failed to generate k8s client spdy executor for url %q, method: POST", req.URL())
 	}
 
 	err = exec.Stream(remotecommand.StreamOptions{
@@ -603,14 +635,14 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 		Stderr: out,
 	})
 	if err != nil {
-		return nil, errors.Errorf("failed to execute command on initcontainer: %w", err)
+		return nil, errors.Wrapf(err, "failed to execute command on initcontainer")
 	}
 
-	watcher, err = podClient.Watch(
+	watcher, err = podClient.Watch(ctx,
 		metav1.SingleObject(pod.ObjectMeta),
 	)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	// wait for pod to be initialized
@@ -644,7 +676,7 @@ func (d *K8sDriver) GetPods(ctx context.Context, all bool) ([]Pod, error) {
 
 	k8sPods, err := d.podLister.List(apilabels.SelectorFromSet(labels))
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	pods := make([]Pod, len(k8sPods))
@@ -683,12 +715,12 @@ func (p *K8sPod) TaskID() string {
 func (p *K8sPod) Stop(ctx context.Context) error {
 	d := int64(0)
 	secretClient := p.client.CoreV1().Secrets(p.namespace)
-	if err := secretClient.Delete(p.id, &metav1.DeleteOptions{GracePeriodSeconds: &d}); err != nil {
-		return err
+	if err := secretClient.Delete(ctx, p.id, metav1.DeleteOptions{GracePeriodSeconds: &d}); err != nil {
+		return errors.WithStack(err)
 	}
 	podClient := p.client.CoreV1().Pods(p.namespace)
-	if err := podClient.Delete(p.id, &metav1.DeleteOptions{GracePeriodSeconds: &d}); err != nil {
-		return err
+	if err := podClient.Delete(ctx, p.id, metav1.DeleteOptions{GracePeriodSeconds: &d}); err != nil {
+		return errors.WithStack(err)
 	}
 	return nil
 }
@@ -708,14 +740,14 @@ func (p *K8sPod) Exec(ctx context.Context, execConfig *ExecConfig) (ContainerExe
 
 	coreclient, err := corev1client.NewForConfig(p.restconfig)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	// k8s pod exec api doesn't let us define the workingdir and the environment.
 	// Use a toolbox command that will set them up and then exec the real command.
 	envj, err := json.Marshal(execConfig.Env)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	cmd := []string{filepath.Join(p.initVolumeDir, "agola-toolbox"), "exec", "-e", string(envj), "-w", execConfig.WorkingDir, "--"}
 	cmd = append(cmd, execConfig.Cmd...)
@@ -737,7 +769,7 @@ func (p *K8sPod) Exec(ctx context.Context, execConfig *ExecConfig) (ContainerExe
 
 	exec, err := remotecommand.NewSPDYExecutor(p.restconfig, "POST", req.URL())
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	reader, writer := io.Pipe()
@@ -768,11 +800,11 @@ func (e *K8sContainerExec) Wait(ctx context.Context) (int, error) {
 
 	var exitCode int
 	if err != nil {
-		switch err := err.(type) {
-		case utilexec.ExitError:
-			exitCode = err.ExitStatus()
-		default:
-			return -1, err
+		var verr utilexec.ExitError
+		if errors.As(err, &verr) {
+			exitCode = verr.ExitStatus()
+		} else {
+			return -1, errors.WithStack(err)
 		}
 	}
 
@@ -802,17 +834,17 @@ var gitVersionRegex = regexp.MustCompile("v([0-9]+).([0-9]+).[0-9]+.*")
 func parseGitVersion(gitVersion string) (*serverVersion, error) {
 	parsedVersion := gitVersionRegex.FindStringSubmatch(gitVersion)
 	if len(parsedVersion) != 3 {
-		return nil, fmt.Errorf("cannot parse git version %s", gitVersion)
+		return nil, errors.Errorf("cannot parse git version %s", gitVersion)
 	}
 	sv := &serverVersion{}
 	var err error
 	sv.Major, err = strconv.Atoi(parsedVersion[1])
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	sv.Minor, err = strconv.Atoi(parsedVersion[2])
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	return sv, nil
 }

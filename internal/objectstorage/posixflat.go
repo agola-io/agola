@@ -23,7 +23,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	errors "golang.org/x/xerrors"
+	"agola.io/agola/internal/errors"
 )
 
 const (
@@ -207,15 +207,15 @@ type PosixFlatStorage struct {
 
 func NewPosixFlat(baseDir string) (*PosixFlatStorage, error) {
 	if err := os.MkdirAll(baseDir, 0770); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	dataDir := filepath.Join(baseDir, dataDirName)
 	tmpDir := filepath.Join(baseDir, tmpDirName)
 	if err := os.MkdirAll(dataDir, 0770); err != nil {
-		return nil, errors.Errorf("failed to create data dir: %w", err)
+		return nil, errors.Wrapf(err, "failed to create data dir")
 	}
 	if err := os.MkdirAll(tmpDir, 0770); err != nil {
-		return nil, errors.Errorf("failed to create tmp dir: %w", err)
+		return nil, errors.Wrapf(err, "failed to create tmp dir")
 	}
 	return &PosixFlatStorage{
 		dataDir: dataDir,
@@ -233,15 +233,15 @@ func (s *PosixFlatStorage) fsPath(p string) (string, error) {
 func (s *PosixFlatStorage) Stat(p string) (*ObjectInfo, error) {
 	fspath, err := s.fsPath(p)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	fi, err := os.Stat(fspath)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			return nil, NewErrNotExist(errors.Errorf("object %q doesn't exist", p))
 		}
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return &ObjectInfo{Path: p, LastModified: fi.ModTime(), Size: fi.Size()}, nil
@@ -250,24 +250,24 @@ func (s *PosixFlatStorage) Stat(p string) (*ObjectInfo, error) {
 func (s *PosixFlatStorage) ReadObject(p string) (ReadSeekCloser, error) {
 	fspath, err := s.fsPath(p)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	f, err := os.Open(fspath)
-	if err != nil && os.IsNotExist(err) {
+	if err != nil && errors.Is(err, os.ErrNotExist) {
 		return nil, NewErrNotExist(errors.Errorf("object %q doesn't exist", p))
 	}
-	return f, err
+	return f, errors.WithStack(err)
 }
 
 func (s *PosixFlatStorage) WriteObject(p string, data io.Reader, size int64, persist bool) error {
 	fspath, err := s.fsPath(p)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	if err := os.MkdirAll(path.Dir(fspath), 0770); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	r := data
@@ -276,21 +276,21 @@ func (s *PosixFlatStorage) WriteObject(p string, data io.Reader, size int64, per
 	}
 	return writeFileAtomicFunc(fspath, s.dataDir, s.tmpDir, 0660, persist, func(f io.Writer) error {
 		_, err := io.Copy(f, r)
-		return err
+		return errors.WithStack(err)
 	})
 }
 
 func (s *PosixFlatStorage) DeleteObject(p string) error {
 	fspath, err := s.fsPath(p)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	if err := os.Remove(fspath); err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			return NewErrNotExist(errors.Errorf("object %q doesn't exist", p))
 		}
-		return err
+		return errors.WithStack(err)
 	}
 
 	// try to remove parent empty dirs
@@ -307,7 +307,7 @@ func (s *PosixFlatStorage) DeleteObject(p string) error {
 		}
 
 		_, err = f.Readdirnames(1)
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			f.Close()
 			if err := os.Remove(pdir); err != nil {
 				return nil
@@ -338,9 +338,7 @@ func (s *PosixFlatStorage) List(prefix, startWith, delimiter string, doneCh <-ch
 	recursive := delimiter == ""
 
 	// remove leading slash from prefix
-	if strings.HasPrefix(prefix, "/") {
-		prefix = strings.TrimPrefix(prefix, "/")
-	}
+	prefix = strings.TrimPrefix(prefix, "/")
 
 	fprefix := filepath.Join(s.dataDir, escape(prefix))
 	root := filepath.Dir(fprefix)
@@ -349,18 +347,16 @@ func (s *PosixFlatStorage) List(prefix, startWith, delimiter string, doneCh <-ch
 	}
 
 	// remove leading slash
-	if strings.HasPrefix(startWith, "/") {
-		startWith = strings.TrimPrefix(startWith, "/")
-	}
+	startWith = strings.TrimPrefix(startWith, "/")
 
 	go func(objectCh chan<- ObjectInfo) {
 		var prevp string
 		defer close(objectCh)
 		err := filepath.Walk(root, func(ep string, info os.FileInfo, err error) error {
-			if err != nil && !os.IsNotExist(err) {
-				return err
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
+				return errors.WithStack(err)
 			}
-			if os.IsNotExist(err) {
+			if errors.Is(err, os.ErrNotExist) {
 				return nil
 			}
 			p := ep
@@ -370,11 +366,11 @@ func (s *PosixFlatStorage) List(prefix, startWith, delimiter string, doneCh <-ch
 
 			p, err = filepath.Rel(s.dataDir, p)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			p, _, err = unescape(p)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			if !recursive && len(p) > len(prefix) {
 				rel := strings.TrimPrefix(p, prefix)
@@ -393,10 +389,10 @@ func (s *PosixFlatStorage) List(prefix, startWith, delimiter string, doneCh <-ch
 			// just be listed
 			hasFile := true
 			_, err = os.Stat(ep + ".f")
-			if err != nil && !os.IsNotExist(err) {
-				return err
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
+				return errors.WithStack(err)
 			}
-			if os.IsNotExist(err) {
+			if errors.Is(err, os.ErrNotExist) {
 				hasFile = false
 			}
 			if info.IsDir() && !hasFile {
@@ -422,7 +418,7 @@ func (s *PosixFlatStorage) List(prefix, startWith, delimiter string, doneCh <-ch
 
 			return nil
 		})
-		if err != nil && err != io.EOF {
+		if err != nil && !errors.Is(err, io.EOF) {
 			objectCh <- ObjectInfo{
 				Err: err,
 			}

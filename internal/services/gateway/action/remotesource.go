@@ -17,16 +17,17 @@ package action
 import (
 	"context"
 
+	"agola.io/agola/internal/errors"
+	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
+	csapitypes "agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"
-
-	errors "golang.org/x/xerrors"
 )
 
 func (h *ActionHandler) GetRemoteSource(ctx context.Context, rsRef string) (*cstypes.RemoteSource, error) {
-	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, rsRef)
+	rs, _, err := h.configstoreClient.GetRemoteSource(ctx, rsRef)
 	if err != nil {
-		return nil, ErrFromRemote(resp, err)
+		return nil, errors.WithStack(err)
 	}
 	return rs, nil
 }
@@ -38,9 +39,9 @@ type GetRemoteSourcesRequest struct {
 }
 
 func (h *ActionHandler) GetRemoteSources(ctx context.Context, req *GetRemoteSourcesRequest) ([]*cstypes.RemoteSource, error) {
-	remoteSources, resp, err := h.configstoreClient.GetRemoteSources(ctx, req.Start, req.Limit, req.Asc)
+	remoteSources, _, err := h.configstoreClient.GetRemoteSources(ctx, req.Start, req.Limit, req.Asc)
 	if err != nil {
-		return nil, ErrFromRemote(resp, err)
+		return nil, errors.WithStack(err)
 	}
 	return remoteSources, nil
 }
@@ -60,42 +61,42 @@ type CreateRemoteSourceRequest struct {
 }
 
 func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemoteSourceRequest) (*cstypes.RemoteSource, error) {
-	if !h.IsUserAdmin(ctx) {
+	if !common.IsUserAdmin(ctx) {
 		return nil, errors.Errorf("user not admin")
 	}
 
 	if !util.ValidateName(req.Name) {
-		return nil, util.NewErrBadRequest(errors.Errorf("invalid remotesource name %q", req.Name))
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid remotesource name %q", req.Name))
 	}
 
 	if req.Name == "" {
-		return nil, util.NewErrBadRequest(errors.Errorf("remotesource name required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource name required"))
 	}
 	if req.APIURL == "" {
-		return nil, util.NewErrBadRequest(errors.Errorf("remotesource api url required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource api url required"))
 	}
 	if req.Type == "" {
-		return nil, util.NewErrBadRequest(errors.Errorf("remotesource type required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource type required"))
 	}
 	if req.AuthType == "" {
-		return nil, util.NewErrBadRequest(errors.Errorf("remotesource auth type required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource auth type required"))
 	}
 
 	// validate if the remote source type supports the required auth type
 	if !cstypes.SourceSupportsAuthType(cstypes.RemoteSourceType(req.Type), cstypes.RemoteSourceAuthType(req.AuthType)) {
-		return nil, util.NewErrBadRequest(errors.Errorf("remotesource type %q doesn't support auth type %q", req.Type, req.AuthType))
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource type %q doesn't support auth type %q", req.Type, req.AuthType))
 	}
 
 	if req.AuthType == string(cstypes.RemoteSourceAuthTypeOauth2) {
 		if req.Oauth2ClientID == "" {
-			return nil, util.NewErrBadRequest(errors.Errorf("remotesource oauth2 clientid required"))
+			return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource oauth2 clientid required"))
 		}
 		if req.Oauth2ClientSecret == "" {
-			return nil, util.NewErrBadRequest(errors.Errorf("remotesource oauth2 client secret required"))
+			return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource oauth2 client secret required"))
 		}
 	}
 
-	rs := &cstypes.RemoteSource{
+	creq := &csapitypes.CreateUpdateRemoteSourceRequest{
 		Name:                req.Name,
 		Type:                cstypes.RemoteSourceType(req.Type),
 		AuthType:            cstypes.RemoteSourceAuthType(req.AuthType),
@@ -109,12 +110,12 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemot
 		LoginEnabled:        req.LoginEnabled,
 	}
 
-	h.log.Infof("creating remotesource")
-	rs, resp, err := h.configstoreClient.CreateRemoteSource(ctx, rs)
+	h.log.Info().Msgf("creating remotesource")
+	rs, _, err := h.configstoreClient.CreateRemoteSource(ctx, creq)
 	if err != nil {
-		return nil, errors.Errorf("failed to create remotesource: %w", ErrFromRemote(resp, err))
+		return nil, errors.Wrapf(err, "failed to create remotesource")
 	}
-	h.log.Infof("remotesource %s created, ID: %s", rs.Name, rs.ID)
+	h.log.Info().Msgf("remotesource %s created, ID: %s", rs.Name, rs.ID)
 
 	return rs, nil
 }
@@ -134,13 +135,13 @@ type UpdateRemoteSourceRequest struct {
 }
 
 func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, req *UpdateRemoteSourceRequest) (*cstypes.RemoteSource, error) {
-	if !h.IsUserAdmin(ctx) {
+	if !common.IsUserAdmin(ctx) {
 		return nil, errors.Errorf("user not admin")
 	}
 
-	rs, resp, err := h.configstoreClient.GetRemoteSource(ctx, req.RemoteSourceRef)
+	rs, _, err := h.configstoreClient.GetRemoteSource(ctx, req.RemoteSourceRef)
 	if err != nil {
-		return nil, ErrFromRemote(resp, err)
+		return nil, errors.WithStack(err)
 	}
 
 	if req.Name != nil {
@@ -171,24 +172,37 @@ func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, req *UpdateRemot
 		rs.LoginEnabled = req.LoginEnabled
 	}
 
-	h.log.Infof("updating remotesource")
-	rs, resp, err = h.configstoreClient.UpdateRemoteSource(ctx, req.RemoteSourceRef, rs)
-	if err != nil {
-		return nil, errors.Errorf("failed to update remotesource: %w", ErrFromRemote(resp, err))
+	creq := &csapitypes.CreateUpdateRemoteSourceRequest{
+		Name:                rs.Name,
+		Type:                rs.Type,
+		AuthType:            rs.AuthType,
+		APIURL:              rs.APIURL,
+		SkipVerify:          rs.SkipVerify,
+		Oauth2ClientID:      rs.Oauth2ClientID,
+		Oauth2ClientSecret:  rs.Oauth2ClientSecret,
+		SSHHostKey:          rs.SSHHostKey,
+		SkipSSHHostKeyCheck: rs.SkipSSHHostKeyCheck,
+		RegistrationEnabled: rs.RegistrationEnabled,
+		LoginEnabled:        rs.LoginEnabled,
 	}
-	h.log.Infof("remotesource %s updated", rs.Name)
+
+	h.log.Info().Msgf("updating remotesource")
+	rs, _, err = h.configstoreClient.UpdateRemoteSource(ctx, req.RemoteSourceRef, creq)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to update remotesource")
+	}
+	h.log.Info().Msgf("remotesource %s updated", rs.Name)
 
 	return rs, nil
 }
 
 func (h *ActionHandler) DeleteRemoteSource(ctx context.Context, rsRef string) error {
-	if !h.IsUserAdmin(ctx) {
+	if !common.IsUserAdmin(ctx) {
 		return errors.Errorf("user not admin")
 	}
 
-	resp, err := h.configstoreClient.DeleteRemoteSource(ctx, rsRef)
-	if err != nil {
-		return errors.Errorf("failed to delete remote source: %w", ErrFromRemote(resp, err))
+	if _, err := h.configstoreClient.DeleteRemoteSource(ctx, rsRef); err != nil {
+		return errors.Wrapf(err, "failed to delete remote source")
 	}
 	return nil
 }

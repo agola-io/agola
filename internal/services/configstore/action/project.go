@@ -16,49 +16,48 @@ package action
 
 import (
 	"context"
-	"encoding/json"
 	"path"
 
-	"agola.io/agola/internal/datamanager"
-	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/errors"
+	"agola.io/agola/internal/sql"
+
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
 
-	uuid "github.com/satori/go.uuid"
-	errors "golang.org/x/xerrors"
+	"github.com/gofrs/uuid"
 )
 
-func (h *ActionHandler) ValidateProject(ctx context.Context, project *types.Project) error {
-	if project.Name == "" {
-		return util.NewErrBadRequest(errors.Errorf("project name required"))
+func (h *ActionHandler) ValidateProjectReq(ctx context.Context, req *CreateUpdateProjectRequest) error {
+	if req.Name == "" {
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project name required"))
 	}
-	if !util.ValidateName(project.Name) {
-		return util.NewErrBadRequest(errors.Errorf("invalid project name %q", project.Name))
+	if !util.ValidateName(req.Name) {
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid project name %q", req.Name))
 	}
-	if project.Parent.ID == "" {
-		return util.NewErrBadRequest(errors.Errorf("project parent id required"))
+	if req.Parent.ID == "" {
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project parent id required"))
 	}
-	if project.Parent.Type != types.ConfigTypeProjectGroup {
-		return util.NewErrBadRequest(errors.Errorf("invalid project parent type %q", project.Parent.Type))
+	if req.Parent.Kind != types.ObjectKindProjectGroup {
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid project parent kind %q", req.Parent.Kind))
 	}
-	if !types.IsValidVisibility(project.Visibility) {
-		return util.NewErrBadRequest(errors.Errorf("invalid project visibility"))
+	if !types.IsValidVisibility(req.Visibility) {
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid project visibility"))
 	}
-	if !types.IsValidRemoteRepositoryConfigType(project.RemoteRepositoryConfigType) {
-		return util.NewErrBadRequest(errors.Errorf("invalid project remote repository config type %q", project.RemoteRepositoryConfigType))
+	if !types.IsValidRemoteRepositoryConfigType(req.RemoteRepositoryConfigType) {
+		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid project remote repository config type %q", req.RemoteRepositoryConfigType))
 	}
-	if project.RemoteRepositoryConfigType == types.RemoteRepositoryConfigTypeRemoteSource {
-		if project.RemoteSourceID == "" {
-			return util.NewErrBadRequest(errors.Errorf("empty remote source id"))
+	if req.RemoteRepositoryConfigType == types.RemoteRepositoryConfigTypeRemoteSource {
+		if req.RemoteSourceID == "" {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("empty remote source id"))
 		}
-		if project.LinkedAccountID == "" {
-			return util.NewErrBadRequest(errors.Errorf("empty linked account id"))
+		if req.LinkedAccountID == "" {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("empty linked account id"))
 		}
-		if project.RepositoryID == "" {
-			return util.NewErrBadRequest(errors.Errorf("empty remote repository id"))
+		if req.RepositoryID == "" {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("empty remote repository id"))
 		}
-		if project.RepositoryPath == "" {
-			return util.NewErrBadRequest(errors.Errorf("empty remote repository path"))
+		if req.RepositoryPath == "" {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("empty remote repository path"))
 		}
 	}
 	return nil
@@ -66,276 +65,250 @@ func (h *ActionHandler) ValidateProject(ctx context.Context, project *types.Proj
 
 func (h *ActionHandler) GetProject(ctx context.Context, projectRef string) (*types.Project, error) {
 	var project *types.Project
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		project, err = h.readDB.GetProject(tx, projectRef)
-		return err
+		project, err = h.d.GetProject(tx, projectRef)
+		return errors.WithStack(err)
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	if project == nil {
-		return nil, util.NewErrNotExist(errors.Errorf("project %q doesn't exist", projectRef))
+		return nil, util.NewAPIError(util.ErrNotExist, errors.Errorf("project %q doesn't exist", projectRef))
 	}
 
 	return project, nil
 }
 
-func (h *ActionHandler) CreateProject(ctx context.Context, project *types.Project) (*types.Project, error) {
-	if err := h.ValidateProject(ctx, project); err != nil {
-		return nil, err
+type CreateUpdateProjectRequest struct {
+	Name                       string
+	Parent                     types.Parent
+	Visibility                 types.Visibility
+	RemoteRepositoryConfigType types.RemoteRepositoryConfigType
+	RemoteSourceID             string
+	LinkedAccountID            string
+	RepositoryID               string
+	RepositoryPath             string
+	SSHPrivateKey              string
+	SkipSSHHostKeyCheck        bool
+	PassVarsToForkedPR         bool
+	DefaultBranch              string
+}
+
+func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateUpdateProjectRequest) (*types.Project, error) {
+	if err := h.ValidateProjectReq(ctx, req); err != nil {
+		return nil, errors.WithStack(err)
 	}
 
-	var cgt *datamanager.ChangeGroupsUpdateToken
-
-	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	var project *types.Project
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		group, err := h.readDB.GetProjectGroup(tx, project.Parent.ID)
+		group, err := h.d.GetProjectGroup(tx, req.Parent.ID)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if group == nil {
-			return util.NewErrBadRequest(errors.Errorf("project group with id %q doesn't exist", project.Parent.ID))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group with id %q doesn't exist", req.Parent.ID))
 		}
-		project.Parent.ID = group.ID
+		req.Parent.ID = group.ID
 
-		groupPath, err := h.readDB.GetProjectGroupPath(tx, group)
+		groupPath, err := h.d.GetProjectGroupPath(tx, group)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
-		pp := path.Join(groupPath, project.Name)
-
-		// changegroup is the project path. Use "projectpath" prefix as it must
-		// cover both projects and projectgroups
-		cgNames := []string{util.EncodeSha256Hex("projectpath-" + pp)}
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
-		if err != nil {
-			return err
-		}
+		pp := path.Join(groupPath, req.Name)
 
 		// check duplicate project name
-		p, err := h.readDB.GetProjectByName(tx, project.Parent.ID, project.Name)
+		p, err := h.d.GetProjectByName(tx, req.Parent.ID, req.Name)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if p != nil {
-			return util.NewErrBadRequest(errors.Errorf("project with name %q, path %q already exists", p.Name, pp))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project with name %q, path %q already exists", p.Name, pp))
 		}
 
-		if project.RemoteRepositoryConfigType == types.RemoteRepositoryConfigTypeRemoteSource {
-			// check that the linked account matches the remote source
-			user, err := h.readDB.GetUserByLinkedAccount(tx, project.LinkedAccountID)
+		if req.RemoteRepositoryConfigType == types.RemoteRepositoryConfigTypeRemoteSource {
+			la, err := h.d.GetLinkedAccount(tx, req.LinkedAccountID)
 			if err != nil {
-				return errors.Errorf("failed to get user with linked account id %q: %w", project.LinkedAccountID, err)
+				return errors.Wrapf(err, "failed to get user with linked account id %q", req.LinkedAccountID)
+			}
+			if la == nil {
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("linked account id %q doesn't exist", req.LinkedAccountID))
+			}
+
+			user, err := h.d.GetUserByID(tx, la.UserID)
+			if err != nil {
+				return errors.Wrapf(err, "failed to get user with linked account id %q", req.LinkedAccountID)
 			}
 			if user == nil {
-				return util.NewErrBadRequest(errors.Errorf("user for linked account %q doesn't exist", project.LinkedAccountID))
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user for linked account %q doesn't exist", req.LinkedAccountID))
 			}
-			la, ok := user.LinkedAccounts[project.LinkedAccountID]
-			if !ok {
-				return util.NewErrBadRequest(errors.Errorf("linked account id %q for user %q doesn't exist", project.LinkedAccountID, user.Name))
+
+			// check that the linked account matches the remote source
+			if la.RemoteSourceID != req.RemoteSourceID {
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("linked account id %q remote source %q different than project remote source %q", req.LinkedAccountID, la.RemoteSourceID, req.RemoteSourceID))
 			}
-			if la.RemoteSourceID != project.RemoteSourceID {
-				return util.NewErrBadRequest(errors.Errorf("linked account id %q remote source %q different than project remote source %q", project.LinkedAccountID, la.RemoteSourceID, project.RemoteSourceID))
-			}
+		}
+
+		project = types.NewProject()
+		project.Name = req.Name
+		project.Parent = req.Parent
+		project.Visibility = req.Visibility
+		project.RemoteRepositoryConfigType = req.RemoteRepositoryConfigType
+		project.RemoteSourceID = req.RemoteSourceID
+		project.LinkedAccountID = req.LinkedAccountID
+		project.RepositoryID = req.RepositoryID
+		project.RepositoryPath = req.RepositoryPath
+		project.SSHPrivateKey = req.SSHPrivateKey
+		project.SkipSSHHostKeyCheck = req.SkipSSHHostKeyCheck
+		project.PassVarsToForkedPR = req.PassVarsToForkedPR
+		project.DefaultBranch = req.DefaultBranch
+
+		// generate the Secret and the WebhookSecret
+		// TODO(sgotti) move this to the gateway?
+		project.Secret = util.EncodeSha1Hex(uuid.Must(uuid.NewV4()).String())
+		project.WebhookSecret = util.EncodeSha1Hex(uuid.Must(uuid.NewV4()).String())
+
+		if err := h.d.InsertProject(tx, project); err != nil {
+			return errors.WithStack(err)
 		}
 
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
-	project.ID = uuid.NewV4().String()
-	project.Parent.Type = types.ConfigTypeProjectGroup
-	// generate the Secret and the WebhookSecret
-	project.Secret = util.EncodeSha1Hex(uuid.NewV4().String())
-	project.WebhookSecret = util.EncodeSha1Hex(uuid.NewV4().String())
-
-	pcj, err := json.Marshal(project)
-	if err != nil {
-		return nil, errors.Errorf("failed to marshal project: %w", err)
-	}
-	actions := []*datamanager.Action{
-		{
-			ActionType: datamanager.ActionTypePut,
-			DataType:   string(types.ConfigTypeProject),
-			ID:         project.ID,
-			Data:       pcj,
-		},
-	}
-
-	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return project, err
+	return project, errors.WithStack(err)
 }
 
-type UpdateProjectRequest struct {
-	ProjectRef string
-
-	Project *types.Project
-}
-
-func (h *ActionHandler) UpdateProject(ctx context.Context, req *UpdateProjectRequest) (*types.Project, error) {
-	if err := h.ValidateProject(ctx, req.Project); err != nil {
-		return nil, err
+func (h *ActionHandler) UpdateProject(ctx context.Context, curProjectRef string, req *CreateUpdateProjectRequest) (*types.Project, error) {
+	if err := h.ValidateProjectReq(ctx, req); err != nil {
+		return nil, errors.WithStack(err)
 	}
 
-	var cgt *datamanager.ChangeGroupsUpdateToken
-
-	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	var project *types.Project
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
 		// check project exists
-		p, err := h.readDB.GetProject(tx, req.ProjectRef)
+		project, err = h.d.GetProject(tx, curProjectRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
-		if p == nil {
-			return util.NewErrBadRequest(errors.Errorf("project with ref %q doesn't exist", req.ProjectRef))
-		}
-		// check that the project.ID matches
-		if p.ID != req.Project.ID {
-			return util.NewErrBadRequest(errors.Errorf("project with ref %q has a different id", req.ProjectRef))
+		if project == nil {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project with ref %q doesn't exist", curProjectRef))
 		}
 
 		// check parent project group exists
-		group, err := h.readDB.GetProjectGroup(tx, req.Project.Parent.ID)
+		group, err := h.d.GetProjectGroup(tx, req.Parent.ID)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if group == nil {
-			return util.NewErrBadRequest(errors.Errorf("project group with id %q doesn't exist", req.Project.Parent.ID))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group with id %q doesn't exist", req.Parent.ID))
 		}
-		req.Project.Parent.ID = group.ID
+		req.Parent.ID = group.ID
 
-		groupPath, err := h.readDB.GetProjectGroupPath(tx, group)
+		groupPath, err := h.d.GetProjectGroupPath(tx, group)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
-		pp := path.Join(groupPath, req.Project.Name)
+		pp := path.Join(groupPath, req.Name)
 
-		if p.Name != req.Project.Name || p.Parent.ID != req.Project.Parent.ID {
+		if project.Name != req.Name || project.Parent.ID != req.Parent.ID {
 			// check duplicate project name
-			ap, err := h.readDB.GetProjectByName(tx, req.Project.Parent.ID, req.Project.Name)
+			ap, err := h.d.GetProjectByName(tx, req.Parent.ID, req.Name)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			if ap != nil {
-				return util.NewErrBadRequest(errors.Errorf("project with name %q, path %q already exists", req.Project.Name, pp))
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project with name %q, path %q already exists", req.Name, pp))
 			}
 		}
 
-		// changegroup is the project path. Use "projectpath" prefix as it must
-		// cover both projects and projectgroups
-		cgNames := []string{util.EncodeSha256Hex("projectpath-" + pp)}
-
-		// add new projectpath
-		if p.Parent.ID != req.Project.Parent.ID {
+		if project.Parent.ID != req.Parent.ID {
 			// get old parent project group
-			curGroup, err := h.readDB.GetProjectGroup(tx, p.Parent.ID)
+			curGroup, err := h.d.GetProjectGroup(tx, project.Parent.ID)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			if curGroup == nil {
-				return util.NewErrBadRequest(errors.Errorf("project group with id %q doesn't exist", p.Parent.ID))
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group with id %q doesn't exist", project.Parent.ID))
 			}
-			curGroupPath, err := h.readDB.GetProjectGroupPath(tx, curGroup)
-			if err != nil {
-				return err
-			}
-			pp := path.Join(curGroupPath, req.Project.Name)
-
-			cgNames = append(cgNames, util.EncodeSha256Hex("projectpath-"+pp))
 		}
 
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
-		if err != nil {
-			return err
-		}
-
-		if req.Project.RemoteRepositoryConfigType == types.RemoteRepositoryConfigTypeRemoteSource {
-			// check that the linked account matches the remote source
-			user, err := h.readDB.GetUserByLinkedAccount(tx, req.Project.LinkedAccountID)
+		if req.RemoteRepositoryConfigType == types.RemoteRepositoryConfigTypeRemoteSource {
+			la, err := h.d.GetLinkedAccount(tx, req.LinkedAccountID)
 			if err != nil {
-				return errors.Errorf("failed to get user with linked account id %q: %w", req.Project.LinkedAccountID, err)
+				return errors.Wrapf(err, "failed to get user with linked account id %q", req.LinkedAccountID)
+			}
+			if la == nil {
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("linked account id %q doesn't exist", req.LinkedAccountID))
+			}
+
+			user, err := h.d.GetUserByID(tx, la.UserID)
+			if err != nil {
+				return errors.Wrapf(err, "failed to get user with linked account id %q", req.LinkedAccountID)
 			}
 			if user == nil {
-				return util.NewErrBadRequest(errors.Errorf("user for linked account %q doesn't exist", req.Project.LinkedAccountID))
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user for linked account %q doesn't exist", req.LinkedAccountID))
 			}
-			la, ok := user.LinkedAccounts[req.Project.LinkedAccountID]
-			if !ok {
-				return util.NewErrBadRequest(errors.Errorf("linked account id %q for user %q doesn't exist", req.Project.LinkedAccountID, user.Name))
+
+			// check that the linked account matches the remote source
+			if la.RemoteSourceID != req.RemoteSourceID {
+				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("linked account id %q remote source %q different than project remote source %q", req.LinkedAccountID, la.RemoteSourceID, req.RemoteSourceID))
 			}
-			if la.RemoteSourceID != req.Project.RemoteSourceID {
-				return util.NewErrBadRequest(errors.Errorf("linked account id %q remote source %q different than project remote source %q", req.Project.LinkedAccountID, la.RemoteSourceID, req.Project.RemoteSourceID))
-			}
+		}
+
+		// TODO(sgotti) Secret and WebhookSecret are not updated
+		project.Name = req.Name
+		project.Parent = req.Parent
+		project.Visibility = req.Visibility
+		project.RemoteRepositoryConfigType = req.RemoteRepositoryConfigType
+		project.RemoteSourceID = req.RemoteSourceID
+		project.LinkedAccountID = req.LinkedAccountID
+		project.RepositoryID = req.RepositoryID
+		project.RepositoryPath = req.RepositoryPath
+		project.SSHPrivateKey = req.SSHPrivateKey
+		project.SkipSSHHostKeyCheck = req.SkipSSHHostKeyCheck
+		project.PassVarsToForkedPR = req.PassVarsToForkedPR
+		project.DefaultBranch = req.DefaultBranch
+
+		if err := h.d.UpdateProject(tx, project); err != nil {
+			return errors.WithStack(err)
 		}
 
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
-	pcj, err := json.Marshal(req.Project)
-	if err != nil {
-		return nil, errors.Errorf("failed to marshal project: %w", err)
-	}
-	actions := []*datamanager.Action{
-		{
-			ActionType: datamanager.ActionTypePut,
-			DataType:   string(types.ConfigTypeProject),
-			ID:         req.Project.ID,
-			Data:       pcj,
-		},
-	}
-
-	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return req.Project, err
+	return project, errors.WithStack(err)
 }
 
 func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) error {
-	var project *types.Project
-
-	var cgt *datamanager.ChangeGroupsUpdateToken
-
-	// must do all the checks in a single transaction to avoid concurrent changes
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
-		var err error
-
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		// check project existance
-		project, err = h.readDB.GetProject(tx, projectRef)
+		project, err := h.d.GetProject(tx, projectRef)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if project == nil {
-			return util.NewErrBadRequest(errors.Errorf("project %q doesn't exist", projectRef))
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project %q doesn't exist", projectRef))
 		}
 
-		// changegroup is the project id.
-		cgNames := []string{util.EncodeSha256Hex(project.ID)}
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, cgNames)
-		if err != nil {
-			return err
+		// TODO(sgotti) implement childs garbage collection
+		if err := h.d.DeleteProject(tx, project.ID); err != nil {
+			return errors.WithStack(err)
 		}
 
 		return nil
 	})
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
-	// TODO(sgotti) implement childs garbage collection
-	actions := []*datamanager.Action{
-		{
-			ActionType: datamanager.ActionTypeDelete,
-			DataType:   string(types.ConfigTypeProject),
-			ID:         project.ID,
-		},
-	}
-
-	_, err = h.dm.WriteWal(ctx, actions, cgt)
-	return err
+	return errors.WithStack(err)
 }

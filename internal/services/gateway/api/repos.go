@@ -19,18 +19,19 @@ import (
 	"net/http"
 	"net/url"
 
-	"go.uber.org/zap"
+	util "agola.io/agola/internal/util"
 
 	"github.com/gorilla/mux"
+	"github.com/rs/zerolog"
 )
 
 type ReposHandler struct {
-	log          *zap.SugaredLogger
+	log          zerolog.Logger
 	gitServerURL string
 }
 
-func NewReposHandler(logger *zap.Logger, gitServerURL string) *ReposHandler {
-	return &ReposHandler{log: logger.Sugar(), gitServerURL: gitServerURL}
+func NewReposHandler(log zerolog.Logger, gitServerURL string) *ReposHandler {
+	return &ReposHandler{log: log, gitServerURL: gitServerURL}
 }
 
 func (h *ReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -40,8 +41,8 @@ func (h *ReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	u, err := url.Parse(h.gitServerURL)
 	if err != nil {
-		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
+		h.log.Err(err).Send()
+		util.HTTPError(w, err)
 		return
 	}
 	u.Path = path
@@ -52,8 +53,8 @@ func (h *ReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	req, err := http.NewRequest(r.Method, u.String(), r.Body)
 	req = req.WithContext(ctx)
 	if err != nil {
-		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
+		h.log.Err(err).Send()
+		util.HTTPError(w, err)
 		return
 	}
 
@@ -66,8 +67,8 @@ func (h *ReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
+		h.log.Err(err).Send()
+		util.HTTPError(w, err)
 		return
 	}
 
@@ -83,8 +84,8 @@ func (h *ReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer resp.Body.Close()
 	// copy response body
 	if _, err := io.Copy(w, resp.Body); err != nil {
-		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
+		h.log.Err(err).Send()
+		util.HTTPError(w, err)
 		return
 	}
 }

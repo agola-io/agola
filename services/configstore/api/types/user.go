@@ -54,10 +54,20 @@ type CreateUserTokenRequest struct {
 }
 
 type CreateUserTokenResponse struct {
+	Name  string `json:"name"`
 	Token string `json:"token"`
 }
 
 type UserOrgsResponse struct {
 	Organization *cstypes.Organization
 	Role         cstypes.MemberRole
+}
+
+// User augments cstypes.User with the user tokens and linked accouts
+type User struct {
+	*cstypes.User
+
+	// dynamic data
+	Tokens         []*cstypes.UserToken
+	LinkedAccounts []*cstypes.LinkedAccount
 }

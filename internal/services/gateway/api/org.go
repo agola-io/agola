@@ -19,38 +19,35 @@ import (
 	"net/http"
 	"strconv"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/gateway/action"
+	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
 	cstypes "agola.io/agola/services/configstore/types"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
-	"go.uber.org/zap"
-	errors "golang.org/x/xerrors"
 
 	"github.com/gorilla/mux"
+	"github.com/rs/zerolog"
 )
 
 type CreateOrgHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewCreateOrgHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateOrgHandler {
-	return &CreateOrgHandler{log: logger.Sugar(), ah: ah}
+func NewCreateOrgHandler(log zerolog.Logger, ah *action.ActionHandler) *CreateOrgHandler {
+	return &CreateOrgHandler{log: log, ah: ah}
 }
 
 func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var userID string
-	userIDVal := ctx.Value("userid")
-	if userIDVal != nil {
-		userID = userIDVal.(string)
-	}
+	userID := common.CurrentUserID(ctx)
 
 	var req gwapitypes.CreateOrgRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
@@ -61,24 +58,24 @@ func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	org, err := h.ah.CreateOrg(ctx, creq)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
 	res := createOrgResponse(org)
-	if err := httpResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type DeleteOrgHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewDeleteOrgHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteOrgHandler {
-	return &DeleteOrgHandler{log: logger.Sugar(), ah: ah}
+func NewDeleteOrgHandler(log zerolog.Logger, ah *action.ActionHandler) *DeleteOrgHandler {
+	return &DeleteOrgHandler{log: log, ah: ah}
 }
 
 func (h *DeleteOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -87,23 +84,23 @@ func (h *DeleteOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	orgRef := vars["orgref"]
 
 	err := h.ah.DeleteOrg(ctx, orgRef)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type OrgHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewOrgHandler(logger *zap.Logger, ah *action.ActionHandler) *OrgHandler {
-	return &OrgHandler{log: logger.Sugar(), ah: ah}
+func NewOrgHandler(log zerolog.Logger, ah *action.ActionHandler) *OrgHandler {
+	return &OrgHandler{log: log, ah: ah}
 }
 
 func (h *OrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -112,14 +109,14 @@ func (h *OrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	orgRef := vars["orgref"]
 
 	org, err := h.ah.GetOrg(ctx, orgRef)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
 	res := createOrgResponse(org)
-	if err := httpResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
@@ -133,12 +130,12 @@ func createOrgResponse(o *cstypes.Organization) *gwapitypes.OrgResponse {
 }
 
 type OrgsHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewOrgsHandler(logger *zap.Logger, ah *action.ActionHandler) *OrgsHandler {
-	return &OrgsHandler{log: logger.Sugar(), ah: ah}
+func NewOrgsHandler(log zerolog.Logger, ah *action.ActionHandler) *OrgsHandler {
+	return &OrgsHandler{log: log, ah: ah}
 }
 
 func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -151,12 +148,12 @@ func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		limit, err = strconv.Atoi(limitS)
 		if err != nil {
-			httpError(w, util.NewErrBadRequest(errors.Errorf("cannot parse limit: %w", err)))
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit")))
 			return
 		}
 	}
 	if limit < 0 {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("limit must be greater or equal than 0")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0")))
 		return
 	}
 	if limit > MaxRunsLimit {
@@ -175,8 +172,8 @@ func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Asc:   asc,
 	}
 	csorgs, err := h.ah.GetOrgs(ctx, areq)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -184,8 +181,8 @@ func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for i, p := range csorgs {
 		orgs[i] = createOrgResponse(p)
 	}
-	if err := httpResponse(w, http.StatusOK, orgs); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, orgs); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
@@ -197,12 +194,12 @@ func createOrgMemberResponse(user *cstypes.User, role cstypes.MemberRole) *gwapi
 }
 
 type OrgMembersHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewOrgMembersHandler(logger *zap.Logger, ah *action.ActionHandler) *OrgMembersHandler {
-	return &OrgMembersHandler{log: logger.Sugar(), ah: ah}
+func NewOrgMembersHandler(log zerolog.Logger, ah *action.ActionHandler) *OrgMembersHandler {
+	return &OrgMembersHandler{log: log, ah: ah}
 }
 
 func (h *OrgMembersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -212,8 +209,8 @@ func (h *OrgMembersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	orgRef := vars["orgref"]
 
 	ares, err := h.ah.GetOrgMembers(ctx, orgRef)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -224,8 +221,8 @@ func (h *OrgMembersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for i, m := range ares.Members {
 		res.Members[i] = createOrgMemberResponse(m.User, m.Role)
 	}
-	if err := httpResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
@@ -240,12 +237,12 @@ func createAddOrgMemberResponse(org *cstypes.Organization, user *cstypes.User, r
 }
 
 type AddOrgMemberHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewAddOrgMemberHandler(logger *zap.Logger, ah *action.ActionHandler) *AddOrgMemberHandler {
-	return &AddOrgMemberHandler{log: logger.Sugar(), ah: ah}
+func NewAddOrgMemberHandler(log zerolog.Logger, ah *action.ActionHandler) *AddOrgMemberHandler {
+	return &AddOrgMemberHandler{log: log, ah: ah}
 }
 
 func (h *AddOrgMemberHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -258,29 +255,29 @@ func (h *AddOrgMemberHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	var req gwapitypes.AddOrgMemberRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
 	ares, err := h.ah.AddOrgMember(ctx, orgRef, userRef, cstypes.MemberRole(req.Role))
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
 	res := createAddOrgMemberResponse(ares.Org, ares.User, ares.OrganizationMember.MemberRole)
-	if err := httpResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type RemoveOrgMemberHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewRemoveOrgMemberHandler(logger *zap.Logger, ah *action.ActionHandler) *RemoveOrgMemberHandler {
-	return &RemoveOrgMemberHandler{log: logger.Sugar(), ah: ah}
+func NewRemoveOrgMemberHandler(log zerolog.Logger, ah *action.ActionHandler) *RemoveOrgMemberHandler {
+	return &RemoveOrgMemberHandler{log: log, ah: ah}
 }
 
 func (h *RemoveOrgMemberHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -291,12 +288,12 @@ func (h *RemoveOrgMemberHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	userRef := vars["userref"]
 
 	err := h.ah.RemoveOrgMember(ctx, orgRef, userRef)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Err(err).Send()
 	}
 }

@@ -17,21 +17,29 @@ package cmd
 import (
 	"net/url"
 	"os"
+	"time"
 
 	"agola.io/agola/cmd"
-	slog "agola.io/agola/internal/log"
+	"agola.io/agola/internal/errors"
 
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
-	errors "golang.org/x/xerrors"
 )
 
-var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
-var logger = slog.New(level)
-var log = logger.Sugar()
-
 var token string
+
+func init() {
+	cw := zerolog.ConsoleWriter{
+		Out:                 os.Stderr,
+		TimeFormat:          time.RFC3339Nano,
+		FormatErrFieldValue: errors.FormatErrFieldValue,
+	}
+
+	zerolog.TimeFieldFormat = time.RFC3339Nano
+
+	log.Logger = log.With().Stack().Caller().Logger().Level(zerolog.InfoLevel).Output(cw)
+}
 
 var cmdAgola = &cobra.Command{
 	Use:     "agola",
@@ -40,23 +48,27 @@ var cmdAgola = &cobra.Command{
 	// just defined to make --version work
 	PersistentPreRun: func(c *cobra.Command, args []string) {
 		if err := parseGatewayURL(); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 
 		if agolaOpts.debug {
-			level.SetLevel(zapcore.DebugLevel)
+			log.Logger = log.Level(zerolog.DebugLevel)
+		}
+		if agolaOpts.detailedErrors {
+			zerolog.ErrorMarshalFunc = errors.ErrorMarshalFunc
 		}
 	},
 	Run: func(c *cobra.Command, args []string) {
 		if err := c.Help(); err != nil {
-			log.Fatal(err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
 
 type agolaOptions struct {
-	gatewayURL string
-	debug      bool
+	gatewayURL     string
+	debug          bool
+	detailedErrors bool
 }
 
 var agolaOpts agolaOptions
@@ -77,6 +89,7 @@ func init() {
 	flags.StringVarP(&agolaOpts.gatewayURL, "gateway-url", "u", gatewayURL, "agola gateway exposed url")
 	flags.StringVar(&token, "token", token, "api token")
 	flags.BoolVarP(&agolaOpts.debug, "debug", "d", false, "debug")
+	flags.BoolVar(&agolaOpts.detailedErrors, "detailed-errors", false, "enabled detailed errors logging")
 }
 
 func Execute() {

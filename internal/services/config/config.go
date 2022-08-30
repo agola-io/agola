@@ -18,9 +18,10 @@ import (
 	"io/ioutil"
 	"time"
 
+	"agola.io/agola/internal/errors"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
 
-	errors "golang.org/x/xerrors"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -58,7 +59,6 @@ type Gateway struct {
 	GitserverURL   string `yaml:"gitserverURL"`
 
 	Web           Web           `yaml:"web"`
-	Etcd          Etcd          `yaml:"etcd"`
 	ObjectStorage ObjectStorage `yaml:"objectStorage"`
 
 	TokenSigning TokenSigning `yaml:"tokenSigning"`
@@ -82,19 +82,23 @@ type Notification struct {
 	RunserviceURL  string `yaml:"runserviceURL"`
 	ConfigstoreURL string `yaml:"configstoreURL"`
 
-	Etcd Etcd `yaml:"etcd"`
+	DB DB `yaml:"db"`
 }
 
 type Runservice struct {
 	Debug bool `yaml:"debug"`
 
-	DataDir       string        `yaml:"dataDir"`
-	Web           Web           `yaml:"web"`
-	Etcd          Etcd          `yaml:"etcd"`
+	DataDir string `yaml:"dataDir"`
+
+	DB DB `yaml:"db"`
+
+	Web Web `yaml:"web"`
+
 	ObjectStorage ObjectStorage `yaml:"objectStorage"`
 
 	RunCacheExpireInterval     time.Duration `yaml:"runCacheExpireInterval"`
 	RunWorkspaceExpireInterval time.Duration `yaml:"runWorkspaceExpireInterval"`
+	RunLogExpireInterval       time.Duration `yaml:"runLogExpireInterval"`
 }
 
 type Executor struct {
@@ -109,11 +113,39 @@ type Executor struct {
 
 	Driver Driver `yaml:"driver"`
 
+	InitImage InitImage `yaml:"initImage"`
+
 	Labels map[string]string `yaml:"labels"`
 	// ActiveTasksLimit is the max number of concurrent active tasks
-	ActiveTasksLimit int `yaml:"active_tasks_limit"`
+	ActiveTasksLimit int `yaml:"activeTasksLimit"`
 
 	AllowPrivilegedContainers bool `yaml:"allowPrivilegedContainers"`
+}
+
+type InitImage struct {
+	Image string `yaml:"image"`
+
+	Auth *DockerRegistryAuth `yaml:"auth"`
+}
+
+type DockerRegistryAuthType string
+
+const (
+	DockerRegistryAuthTypeBasic       DockerRegistryAuthType = "basic"
+	DockerRegistryAuthTypeEncodedAuth DockerRegistryAuthType = "encodedauth"
+)
+
+type DockerRegistryAuth struct {
+	Type DockerRegistryAuthType `yaml:"type"`
+
+	// basic auth
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+
+	// encoded auth string
+	Auth string `yaml:"auth"`
+
+	// future auths like aws ecr auth
 }
 
 type Configstore struct {
@@ -121,8 +153,9 @@ type Configstore struct {
 
 	DataDir string `yaml:"dataDir"`
 
+	DB DB `yaml:"db"`
+
 	Web           Web           `yaml:"web"`
-	Etcd          Etcd          `yaml:"etcd"`
 	ObjectStorage ObjectStorage `yaml:"objectStorage"`
 }
 
@@ -132,8 +165,10 @@ type Gitserver struct {
 	DataDir string `yaml:"dataDir"`
 
 	Web           Web           `yaml:"web"`
-	Etcd          Etcd          `yaml:"etcd"`
 	ObjectStorage ObjectStorage `yaml:"objectStorage"`
+
+	RepositoryCleanupInterval    time.Duration `yaml:"repositoryCleanupInterval"`
+	RepositoryRefsExpireInterval time.Duration `yaml:"repositoryRefsExpireInterval"`
 }
 
 type Web struct {
@@ -153,6 +188,11 @@ type Web struct {
 
 	// CORS allowed origins
 	AllowedOrigins []string `yaml:"allowedOrigins"`
+}
+
+type DB struct {
+	Type       sql.Type `yaml:"type"`
+	ConnString string   `yaml:"connString"`
 }
 
 type ObjectStorageType string
@@ -175,16 +215,6 @@ type ObjectStorage struct {
 	AccessKey       string `yaml:"accessKey"`
 	SecretAccessKey string `yaml:"secretAccessKey"`
 	DisableTLS      bool   `yaml:"disableTLS"`
-}
-
-type Etcd struct {
-	Endpoints string `yaml:"endpoints"`
-
-	// TODO(sgotti) support encrypted private keys (add a private key password config entry)
-	TLSCertFile   string `yaml:"tlsCertFile"`
-	TLSKeyFile    string `yaml:"tlsKeyFile"`
-	TLSCAFile     string `yaml:"tlsCAFile"`
-	TLSSkipVerify bool   `yaml:"tlsSkipVerify"`
 }
 
 type DriverType string
@@ -226,24 +256,50 @@ var defaultConfig = Config{
 	Runservice: Runservice{
 		RunCacheExpireInterval:     7 * 24 * time.Hour,
 		RunWorkspaceExpireInterval: 7 * 24 * time.Hour,
+		RunLogExpireInterval:       30 * 24 * time.Hour,
 	},
 	Executor: Executor{
+		InitImage: InitImage{
+			Image: "busybox:stable",
+		},
 		ActiveTasksLimit: 2,
+	},
+	Gitserver: Gitserver{
+		RepositoryCleanupInterval:    24 * time.Hour,
+		RepositoryRefsExpireInterval: 30 * 24 * time.Hour,
 	},
 }
 
 func Parse(configFile string, componentsNames []string) (*Config, error) {
 	configData, err := ioutil.ReadFile(configFile)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	c := &defaultConfig
 	if err := yaml.Unmarshal(configData, &c); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return c, Validate(c, componentsNames)
+}
+
+func validateDB(db *DB) error {
+	switch db.Type {
+	case sql.Sqlite3:
+	case sql.Postgres:
+	default:
+		if db.Type == "" {
+			return errors.Errorf("type is not defined")
+		}
+		return errors.Errorf("unknown type %q", db.Type)
+	}
+
+	if db.ConnString == "" {
+		return errors.Errorf("db connection string undefined")
+	}
+
+	return nil
 }
 
 func validateWeb(w *Web) error {
@@ -258,6 +314,14 @@ func validateWeb(w *Web) error {
 		if w.TLSCertFile == "" {
 			return errors.Errorf("no tls cert file specified")
 		}
+	}
+
+	return nil
+}
+
+func validateInitImage(i *InitImage) error {
+	if i.Image == "" {
+		return errors.Errorf("image is empty")
 	}
 
 	return nil
@@ -287,27 +351,33 @@ func Validate(c *Config, componentsNames []string) error {
 			return errors.Errorf("gateway runserviceURL is empty")
 		}
 		if err := validateWeb(&c.Gateway.Web); err != nil {
-			return errors.Errorf("gateway web configuration error: %w", err)
+			return errors.Wrapf(err, "gateway web configuration error")
 		}
 	}
 
 	// Configstore
 	if isComponentEnabled(componentsNames, "configstore") {
+		if err := validateDB(&c.Runservice.DB); err != nil {
+			return errors.Wrapf(err, "db configuration error")
+		}
 		if c.Configstore.DataDir == "" {
 			return errors.Errorf("configstore dataDir is empty")
 		}
 		if err := validateWeb(&c.Configstore.Web); err != nil {
-			return errors.Errorf("configstore web configuration error: %w", err)
+			return errors.Wrapf(err, "configstore web configuration error")
 		}
 	}
 
 	// Runservice
 	if isComponentEnabled(componentsNames, "runservice") {
+		if err := validateDB(&c.Runservice.DB); err != nil {
+			return errors.Wrapf(err, "db configuration error")
+		}
 		if c.Runservice.DataDir == "" {
 			return errors.Errorf("runservice dataDir is empty")
 		}
 		if err := validateWeb(&c.Runservice.Web); err != nil {
-			return errors.Errorf("runservice web configuration error: %w", err)
+			return errors.Wrapf(err, "runservice web configuration error")
 		}
 	}
 
@@ -330,6 +400,10 @@ func Validate(c *Config, componentsNames []string) error {
 		case DriverTypeK8s:
 		default:
 			return errors.Errorf("executor driver type %q unknown", c.Executor.Driver.Type)
+		}
+
+		if err := validateInitImage(&c.Executor.InitImage); err != nil {
+			return errors.Wrapf(err, "executor initImage configuration error")
 		}
 	}
 

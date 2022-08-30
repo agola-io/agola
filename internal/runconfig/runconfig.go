@@ -19,12 +19,11 @@ import (
 	"strings"
 
 	"agola.io/agola/internal/config"
+	"agola.io/agola/internal/errors"
 	itypes "agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 	rstypes "agola.io/agola/services/runservice/types"
 	"agola.io/agola/services/types"
-
-	errors "golang.org/x/xerrors"
 )
 
 const (
@@ -110,6 +109,10 @@ Host $AGOLA_GIT_HOST
 	Port $AGOLA_GIT_PORT
 	StrictHostKeyChecking ${STRICT_HOST_KEY_CHECKING}
 	PasswordAuthentication no
+
+	IgnoreUnknown PubkeyAcceptedKeyTypes,PubkeyAcceptedAlgorithms
+	PubkeyAcceptedKeyTypes +ssh-rsa
+	PubkeyAcceptedAlgorithms +ssh-rsa
 EOF
 )
 
@@ -192,7 +195,7 @@ fi
 		return rws
 
 	default:
-		panic(fmt.Errorf("unknown config step type: %s", util.Dump(cs)))
+		panic(errors.Errorf("unknown config step type: %s", util.Dump(cs)))
 	}
 }
 
@@ -238,6 +241,7 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string
 					Type:     rstypes.DockerRegistryAuthType(auth.Type),
 					Username: genValue(auth.Username, variables),
 					Password: genValue(auth.Password, variables),
+					Auth:     genValue(auth.Auth, variables),
 				}
 			}
 		}
@@ -249,6 +253,7 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string
 					Type:     rstypes.DockerRegistryAuthType(auth.Type),
 					Username: genValue(auth.Username, variables),
 					Password: genValue(auth.Password, variables),
+					Auth:     genValue(auth.Auth, variables),
 				}
 			}
 		}
@@ -260,8 +265,23 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string
 					Type:     rstypes.DockerRegistryAuthType(auth.Type),
 					Username: genValue(auth.Username, variables),
 					Password: genValue(auth.Password, variables),
+					Auth:     genValue(auth.Auth, variables),
 				}
 			}
+		}
+
+		if c.TaskTimeoutInterval != nil {
+			t.TaskTimeoutInterval = c.TaskTimeoutInterval.Duration
+		}
+
+		// override with per run task timeout
+		if cr.TaskTimeoutInterval != nil {
+			t.TaskTimeoutInterval = cr.TaskTimeoutInterval.Duration
+		}
+
+		// override with per task timeout
+		if ct.TaskTimeoutInterval != nil {
+			t.TaskTimeoutInterval = ct.TaskTimeoutInterval.Duration
 		}
 
 		rcts[t.ID] = t
@@ -285,6 +305,8 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string
 						condition = rstypes.RunConfigTaskDependConditionOnSuccess
 					case config.DependConditionOnFailure:
 						condition = rstypes.RunConfigTaskDependConditionOnFailure
+					case config.DependConditionOnSkipped:
+						condition = rstypes.RunConfigTaskDependConditionOnSkipped
 					}
 					conditions[ic] = condition
 				}
@@ -459,7 +481,7 @@ func genValue(val config.Value, variables map[string]string) string {
 	case config.ValueTypeFromVariable:
 		return variables[val.Value]
 	default:
-		panic(fmt.Errorf("wrong value type: %q", val.Value))
+		panic(errors.Errorf("wrong value type: %q", val.Value))
 	}
 }
 

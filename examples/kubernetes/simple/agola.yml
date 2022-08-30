@@ -11,7 +11,6 @@ spec:
   storageClassName: standard
 
 ---
-
 # The client service. It's a node port for easier testing on minikube. Change
 # it to become a LoadBalancer if needed.
 apiVersion: v1
@@ -28,7 +27,6 @@ spec:
   type: NodePort
 
 ---
-
 # The service for internal components communication.
 # We are using an headless service since some k8s deployment doesn't have
 # hairpin mode enabled and pods cannot communicate with themself via a
@@ -52,7 +50,6 @@ spec:
   clusterIP: None
 
 ---
-
 # The agola config
 
 apiVersion: v1
@@ -91,13 +88,15 @@ data:
       webExposedURL: "http://192.168.39.188:30002"
       runserviceURL: "http://agola-internal:4000"
       configstoreURL: "http://agola-internal:4002"
-      etcd:
-        endpoints: "http://localhost:2379"
+      db:
+        type: sqlite3
+        connString: "/opt/agola/notification/db/db.db"
 
     configstore:
       dataDir: /mnt/agola/local/configstore
-      etcd:
-        endpoints: "http://localhost:2379"
+      db:
+        type: sqlite3
+        connString: "/opt/agola/configstore/db/db.db"
       objectStorage:
         type: posix
         path: /mnt/agola/objectstorage/configstore/ost
@@ -107,8 +106,9 @@ data:
     runservice:
       #debug: true
       dataDir: /mnt/agola/local/runservice
-      etcd:
-        endpoints: "http://localhost:2379"
+      db:
+        type: sqlite3
+        connString: "/opt/agola/runservice/db/db.db"
       objectStorage:
         type: posix
         path: /mnt/agola/objectstorage/runservice/ost
@@ -132,15 +132,13 @@ data:
       web:
         listenAddress: ":4003"
 ---
-
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: agola
 spec:
   # Do not increase replica count or everything will break since every pod will
-  # have its own etcd instance
+  # have its own database
   replicas: 1
   selector:
     matchLabels:
@@ -151,35 +149,34 @@ spec:
         app: agola
     spec:
       containers:
-      - name: agola
-        image: agola
-        command:
-          - /bin/agola
-          - serve
-          - --embedded-etcd
-          - "--config"
-          - /mnt/agola/config/config.yml
-          - "--components"
-          - all-base,executor
-        env:
-        ports:
-          - containerPort: 8000
-          - containerPort: 4000
-          - containerPort: 4002
-          - containerPort: 4003
-        volumeMounts:
-          - name: config-volume
-            mountPath: /mnt/agola/config
-          - name: agola-localdata
-            mountPath: /mnt/agola/local
-          - name: agola-objectstorage
-            mountPath: /mnt/agola/objectstorage
+        - name: agola
+          image: agola
+          command:
+            - /bin/agola
+            - serve
+            - "--config"
+            - /mnt/agola/config/config.yml
+            - "--components"
+            - all-base,executor
+          env:
+          ports:
+            - containerPort: 8000
+            - containerPort: 4000
+            - containerPort: 4002
+            - containerPort: 4003
+          volumeMounts:
+            - name: config-volume
+              mountPath: /mnt/agola/config
+            - name: agola-localdata
+              mountPath: /mnt/agola/local
+            - name: agola-objectstorage
+              mountPath: /mnt/agola/objectstorage
       volumes:
-          - name: config-volume
-            configMap:
-              name: agola
-          - name: agola-localdata
-            emptyDir: {}
-          - name: agola-objectstorage
-            persistentVolumeClaim:
-              claimName: agola-vol
+        - name: config-volume
+          configMap:
+            name: agola
+        - name: agola-localdata
+          emptyDir: {}
+        - name: agola-objectstorage
+          persistentVolumeClaim:
+            claimName: agola-vol

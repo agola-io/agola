@@ -17,54 +17,60 @@ package notification
 import (
 	"context"
 
-	"agola.io/agola/internal/common"
-	"agola.io/agola/internal/etcd"
-	slog "agola.io/agola/internal/log"
+	"agola.io/agola/internal/errors"
+	"agola.io/agola/internal/lock"
 	"agola.io/agola/internal/services/config"
+	"agola.io/agola/internal/sql"
 	csclient "agola.io/agola/services/configstore/client"
 	rsclient "agola.io/agola/services/runservice/client"
 
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
+	"github.com/rs/zerolog"
 )
 
-var level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
-var logger = slog.New(level)
-var log = logger.Sugar()
-
 type NotificationService struct {
-	gc *config.Config
-	c  *config.Notification
+	log zerolog.Logger
+	gc  *config.Config
+	c   *config.Notification
 
-	e *etcd.Store
+	lf lock.LockFactory
 
 	runserviceClient  *rsclient.Client
 	configstoreClient *csclient.Client
 }
 
-func NewNotificationService(ctx context.Context, l *zap.Logger, gc *config.Config) (*NotificationService, error) {
+func NewNotificationService(ctx context.Context, log zerolog.Logger, gc *config.Config) (*NotificationService, error) {
 	c := &gc.Notification
 
-	if l != nil {
-		logger = l
-	}
 	if c.Debug {
-		level.SetLevel(zapcore.DebugLevel)
+		log = log.Level(zerolog.DebugLevel)
 	}
-	log = logger.Sugar()
 
-	e, err := common.NewEtcd(&c.Etcd, logger, "notification")
+	sdb, err := sql.NewDB(c.DB.Type, c.DB.ConnString)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "new db error")
+	}
+
+	// We are currently using the db only for locking. No tables are created.
+
+	var lf lock.LockFactory
+	switch c.DB.Type {
+	case sql.Sqlite3:
+		ll := lock.NewLocalLocks()
+		lf = lock.NewLocalLockFactory(ll)
+	case sql.Postgres:
+		lf = lock.NewPGLockFactory(sdb)
+	default:
+		return nil, errors.Errorf("unknown type %q", c.DB.Type)
 	}
 
 	configstoreClient := csclient.NewClient(c.ConfigstoreURL)
 	runserviceClient := rsclient.NewClient(c.RunserviceURL)
 
 	return &NotificationService{
+		log:               log,
 		gc:                gc,
 		c:                 c,
-		e:                 e,
+		lf:                lf,
 		runserviceClient:  runserviceClient,
 		configstoreClient: configstoreClient,
 	}, nil
@@ -74,7 +80,7 @@ func (n *NotificationService) Run(ctx context.Context) error {
 	go n.runEventsHandlerLoop(ctx)
 
 	<-ctx.Done()
-	log.Infof("notification service exiting")
+	n.log.Info().Msgf("notification service exiting")
 
 	return nil
 }

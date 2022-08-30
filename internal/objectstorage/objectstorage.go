@@ -18,7 +18,7 @@ import (
 	"io"
 	"time"
 
-	errors "golang.org/x/xerrors"
+	"agola.io/agola/internal/errors"
 )
 
 type Storage interface {
@@ -36,23 +36,25 @@ type Storage interface {
 
 type ErrNotExist struct {
 	err error
+
+	*errors.Stack
 }
 
 func NewErrNotExist(err error) error {
-	return &ErrNotExist{err: err}
+	return &ErrNotExist{err: err, Stack: errors.Callers(0)}
 }
 
 func (e *ErrNotExist) Error() string {
 	return e.err.Error()
 }
 
-func (*ErrNotExist) Is(err error) bool {
-	_, ok := err.(*ErrNotExist)
-	return ok
+func (e *ErrNotExist) Unwrap() error {
+	return e.err
 }
 
 func IsNotExist(err error) bool {
-	return errors.Is(err, &ErrNotExist{})
+	var e *ErrNotExist
+	return errors.As(err, &e)
 }
 
 type ReadSeekCloser interface {

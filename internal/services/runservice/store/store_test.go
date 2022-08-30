@@ -15,8 +15,9 @@
 package store
 
 import (
-	"fmt"
 	"testing"
+
+	"agola.io/agola/internal/errors"
 )
 
 func TestOSTRunTaskIDFromArchivePath(t *testing.T) {
@@ -29,17 +30,17 @@ func TestOSTRunTaskIDFromArchivePath(t *testing.T) {
 		{
 			name:        "test no runs 1",
 			archivePath: "aaaa",
-			err:         fmt.Errorf("wrong archive path %q", "aaaa"),
+			err:         errors.Errorf("wrong archive path %q", "aaaa"),
 		},
 		{
 			name:        "test no runs 1",
 			archivePath: "workspacearchives",
-			err:         fmt.Errorf("wrong archive path %q", "workspacearchives"),
+			err:         errors.Errorf("wrong archive path %q", "workspacearchives"),
 		},
 		{
 			name:        "test no runs 1",
 			archivePath: "/workspacearchives/",
-			err:         fmt.Errorf("wrong archive path %q", "/workspacearchives/"),
+			err:         errors.Errorf("wrong archive path %q", "/workspacearchives/"),
 		},
 		{
 			name:        "test no runs 1",

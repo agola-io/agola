@@ -25,9 +25,7 @@ import (
 
 	"agola.io/agola/internal/testutil"
 
-	uuid "github.com/satori/go.uuid"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zaptest"
+	"github.com/gofrs/uuid"
 )
 
 func TestK8sPod(t *testing.T) {
@@ -39,9 +37,11 @@ func TestK8sPod(t *testing.T) {
 		t.Fatalf("env var AGOLA_TOOLBOX_PATH is undefined")
 	}
 
-	logger := zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))
+	log := testutil.NewLogger(t)
 
-	d, err := NewK8sDriver(logger, "executorid01", toolboxPath)
+	initImage := "busybox:stable"
+
+	d, err := NewK8sDriver(log, "executorid01", toolboxPath, initImage, nil)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -54,8 +54,8 @@ func TestK8sPod(t *testing.T) {
 
 	t.Run("create a pod with one container", func(t *testing.T) {
 		pod, err := d.NewPod(ctx, &PodConfig{
-			ID:     uuid.NewV4().String(),
-			TaskID: uuid.NewV4().String(),
+			ID:     uuid.Must(uuid.NewV4()).String(),
+			TaskID: uuid.Must(uuid.NewV4()).String(),
 			Containers: []*ContainerConfig{
 				&ContainerConfig{
 					Cmd:   []string{"cat"},
@@ -72,8 +72,8 @@ func TestK8sPod(t *testing.T) {
 
 	t.Run("execute a command inside a pod", func(t *testing.T) {
 		pod, err := d.NewPod(ctx, &PodConfig{
-			ID:     uuid.NewV4().String(),
-			TaskID: uuid.NewV4().String(),
+			ID:     uuid.Must(uuid.NewV4()).String(),
+			TaskID: uuid.Must(uuid.NewV4()).String(),
 			Containers: []*ContainerConfig{
 				&ContainerConfig{
 					Cmd:   []string{"cat"},
@@ -112,8 +112,8 @@ func TestK8sPod(t *testing.T) {
 		}
 
 		pod, err := d.NewPod(ctx, &PodConfig{
-			ID:     uuid.NewV4().String(),
-			TaskID: uuid.NewV4().String(),
+			ID:     uuid.Must(uuid.NewV4()).String(),
+			TaskID: uuid.Must(uuid.NewV4()).String(),
 			Containers: []*ContainerConfig{
 				&ContainerConfig{
 					Cmd:   []string{"cat"},
@@ -164,8 +164,8 @@ func TestK8sPod(t *testing.T) {
 
 	t.Run("create a pod with two containers", func(t *testing.T) {
 		pod, err := d.NewPod(ctx, &PodConfig{
-			ID:     uuid.NewV4().String(),
-			TaskID: uuid.NewV4().String(),
+			ID:     uuid.Must(uuid.NewV4()).String(),
+			TaskID: uuid.Must(uuid.NewV4()).String(),
 			Containers: []*ContainerConfig{
 				&ContainerConfig{
 					Cmd:   []string{"cat"},
@@ -185,8 +185,8 @@ func TestK8sPod(t *testing.T) {
 
 	t.Run("test communication between two containers", func(t *testing.T) {
 		pod, err := d.NewPod(ctx, &PodConfig{
-			ID:     uuid.NewV4().String(),
-			TaskID: uuid.NewV4().String(),
+			ID:     uuid.Must(uuid.NewV4()).String(),
+			TaskID: uuid.Must(uuid.NewV4()).String(),
 			Containers: []*ContainerConfig{
 				&ContainerConfig{
 					Cmd:   []string{"cat"},
@@ -226,8 +226,8 @@ func TestK8sPod(t *testing.T) {
 
 	t.Run("test get pods", func(t *testing.T) {
 		pod, err := d.NewPod(ctx, &PodConfig{
-			ID:     uuid.NewV4().String(),
-			TaskID: uuid.NewV4().String(),
+			ID:     uuid.Must(uuid.NewV4()).String(),
+			TaskID: uuid.Must(uuid.NewV4()).String(),
 			Containers: []*ContainerConfig{
 				&ContainerConfig{
 					Cmd:   []string{"cat"},
@@ -259,8 +259,8 @@ func TestK8sPod(t *testing.T) {
 
 	t.Run("test pod with a tmpfs volume", func(t *testing.T) {
 		pod, err := d.NewPod(ctx, &PodConfig{
-			ID:     uuid.NewV4().String(),
-			TaskID: uuid.NewV4().String(),
+			ID:     uuid.Must(uuid.NewV4()).String(),
+			TaskID: uuid.Must(uuid.NewV4()).String(),
 			Containers: []*ContainerConfig{
 				&ContainerConfig{
 					Cmd:   []string{"cat"},
@@ -303,8 +303,8 @@ func TestK8sPod(t *testing.T) {
 
 	t.Run("test pod with two tmpfs volumes", func(t *testing.T) {
 		pod, err := d.NewPod(ctx, &PodConfig{
-			ID:     uuid.NewV4().String(),
-			TaskID: uuid.NewV4().String(),
+			ID:     uuid.Must(uuid.NewV4()).String(),
+			TaskID: uuid.Must(uuid.NewV4()).String(),
 			Containers: []*ContainerConfig{
 				&ContainerConfig{
 					Cmd:   []string{"cat"},

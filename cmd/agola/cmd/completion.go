@@ -17,6 +17,7 @@ package cmd
 import (
 	"os"
 
+	"agola.io/agola/internal/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -33,11 +34,11 @@ func completionShell(cmd *cobra.Command, args []string, shell string) error {
 	switch shell {
 	case "bash":
 		if err := cmdAgola.GenBashCompletion(os.Stdout); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	case "zsh":
 		if err := cmdAgola.GenZshCompletion(os.Stdout); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	}
 	return nil

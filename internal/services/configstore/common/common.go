@@ -18,11 +18,8 @@ import (
 	"net/url"
 	"strings"
 
-	uuid "github.com/satori/go.uuid"
-)
-
-const (
-	EtcdMaintenanceKey = "maintenance"
+	"agola.io/agola/internal/errors"
+	"github.com/gofrs/uuid"
 )
 
 type RefType int
@@ -38,7 +35,7 @@ const (
 func ParsePathRef(ref string) (RefType, error) {
 	ref, err := url.PathUnescape(ref)
 	if err != nil {
-		return -1, err
+		return -1, errors.WithStack(err)
 	}
 	if strings.Contains(ref, "/") {
 		return RefTypePath, nil

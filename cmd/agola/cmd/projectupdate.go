@@ -17,11 +17,12 @@ package cmd
 import (
 	"context"
 
+	"agola.io/agola/internal/errors"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	errors "golang.org/x/xerrors"
 )
 
 var cmdProjectUpdate = &cobra.Command{
@@ -29,7 +30,7 @@ var cmdProjectUpdate = &cobra.Command{
 	Short: "update a project",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := projectUpdate(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -55,7 +56,7 @@ func init() {
 	flags.BoolVar(&projectUpdateOpts.passVarsToForkedPR, "pass-vars-to-forked-pr", false, `pass variables to run even if triggered by PR from forked repo`)
 
 	if err := cmdProjectUpdate.MarkFlagRequired("ref"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdProject.AddCommand(cmdProjectUpdate)
@@ -84,12 +85,12 @@ func projectUpdate(cmd *cobra.Command, args []string) error {
 		req.PassVarsToForkedPR = &projectUpdateOpts.passVarsToForkedPR
 	}
 
-	log.Infof("updating project")
+	log.Info().Msgf("updating project")
 	project, _, err := gwclient.UpdateProject(context.TODO(), projectUpdateOpts.ref, req)
 	if err != nil {
-		return errors.Errorf("failed to update project: %w", err)
+		return errors.Wrapf(err, "failed to update project")
 	}
-	log.Infof("project %s update, ID: %s", project.Name, project.ID)
+	log.Info().Msgf("project %s update, ID: %s", project.Name, project.ID)
 
 	return nil
 }

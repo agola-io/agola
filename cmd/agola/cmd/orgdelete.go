@@ -17,10 +17,11 @@ package cmd
 import (
 	"context"
 
+	"agola.io/agola/internal/errors"
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	errors "golang.org/x/xerrors"
 )
 
 var cmdOrgDelete = &cobra.Command{
@@ -28,7 +29,7 @@ var cmdOrgDelete = &cobra.Command{
 	Short: "delete an organization",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := orgDelete(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -45,7 +46,7 @@ func init() {
 	flags.StringVarP(&orgDeleteOpts.name, "name", "n", "", "organization name")
 
 	if err := cmdOrgDelete.MarkFlagRequired("name"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdOrg.AddCommand(cmdOrgDelete)
@@ -54,9 +55,9 @@ func init() {
 func orgDelete(cmd *cobra.Command, args []string) error {
 	gwclient := gwclient.NewClient(gatewayURL, token)
 
-	log.Infof("deleting organization %q", orgDeleteOpts.name)
+	log.Info().Msgf("deleting organization %q", orgDeleteOpts.name)
 	if _, err := gwclient.DeleteOrg(context.TODO(), orgDeleteOpts.name); err != nil {
-		return errors.Errorf("failed to delete organization: %w", err)
+		return errors.Wrapf(err, "failed to delete organization")
 	}
 
 	return nil

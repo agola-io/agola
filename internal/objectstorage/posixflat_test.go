@@ -16,10 +16,11 @@ package objectstorage
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"agola.io/agola/internal/errors"
 )
 
 func TestEscapeUnescape(t *testing.T) {
@@ -64,7 +65,7 @@ func TestEscapeUnescape(t *testing.T) {
 		if err != nil {
 			if tt.err == nil {
 				t.Errorf("%d: unescape: expected no error got %v", i, err)
-			} else if tt.err != err {
+			} else if !errors.Is(tt.err, err) {
 				t.Errorf("%d: unescape: expected error %v got %v", i, tt.err, err)
 			}
 		} else {
@@ -80,11 +81,7 @@ func TestEscapeUnescape(t *testing.T) {
 func TestPosixFlatDeleteObject(t *testing.T) {
 	objects := []string{"/", "//", "☺☺☺☺a☺☺☺☺☺☺b☺☺☺☺", "s3/is/nota/fil.fa", "s3/is/not/a/file///system/fi%l%%e01"}
 
-	dir, err := ioutil.TempDir("", "objectstorage")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	//defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	ls, err := NewPosixFlat(dir)
 	if err != nil {

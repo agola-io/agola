@@ -17,11 +17,12 @@ package cmd
 import (
 	"context"
 
+	"agola.io/agola/internal/errors"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	errors "golang.org/x/xerrors"
 )
 
 var cmdLogDelete = &cobra.Command{
@@ -29,17 +30,19 @@ var cmdLogDelete = &cobra.Command{
 	Short: "delete a setup/step log",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := logDelete(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
 
 type logDeleteOptions struct {
-	runid    string
-	taskname string
-	taskid   string
-	step     int
-	setup    bool
+	projectRef string
+	username   string
+	runNumber  uint64
+	taskname   string
+	taskid     string
+	step       int
+	setup      bool
 }
 
 var logDeleteOpts logDeleteOptions
@@ -47,24 +50,29 @@ var logDeleteOpts logDeleteOptions
 func init() {
 	flags := cmdLogDelete.Flags()
 
-	flags.StringVar(&logDeleteOpts.runid, "runid", "", "Run Id")
+	flags.StringVar(&logDeleteOpts.projectRef, "project", "", "project id or full path")
+	flags.StringVar(&logDeleteOpts.username, "username", "", "user name for user direct runs")
+	flags.Uint64Var(&logDeleteOpts.runNumber, "runnumber", 0, "run number")
 	flags.StringVar(&logDeleteOpts.taskname, "taskname", "", "Task name")
 	flags.StringVar(&logDeleteOpts.taskid, "taskid", "", "Task Id")
 	flags.IntVar(&logDeleteOpts.step, "step", 0, "Step number")
 	flags.BoolVar(&logDeleteOpts.setup, "setup", false, "Setup step")
 
-	if err := cmdLogDelete.MarkFlagRequired("runid"); err != nil {
-		log.Fatal(err)
+	if err := cmdLogDelete.MarkFlagRequired("runnumber"); err != nil {
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdLog.AddCommand(cmdLogDelete)
 }
 
 func logDelete(cmd *cobra.Command, args []string) error {
-
 	var taskid string
+
 	flags := cmd.Flags()
 
+	if flags.Changed("username") && flags.Changed("project") {
+		return errors.Errorf(`only one of "--username" or "--project" can be provided`)
+	}
 	if flags.Changed("taskname") && flags.Changed("taskid") {
 		return errors.Errorf(`only one of "--taskname" or "--taskid" can be provided`)
 	}
@@ -83,6 +91,8 @@ func logDelete(cmd *cobra.Command, args []string) error {
 
 	gwclient := gwclient.NewClient(gatewayURL, token)
 
+	isProject := !flags.Changed("username")
+
 	if flags.Changed("taskid") {
 		taskid = logDeleteOpts.taskid
 	}
@@ -90,9 +100,15 @@ func logDelete(cmd *cobra.Command, args []string) error {
 		var task *gwapitypes.RunResponseTask
 		var taskfound bool
 
-		run, _, err := gwclient.GetRun(context.TODO(), logDeleteOpts.runid)
+		var run *gwapitypes.RunResponse
+		var err error
+		if isProject {
+			run, _, err = gwclient.GetProjectRun(context.TODO(), logDeleteOpts.projectRef, logDeleteOpts.runNumber)
+		} else {
+			run, _, err = gwclient.GetUserRun(context.TODO(), logDeleteOpts.username, logDeleteOpts.runNumber)
+		}
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		for _, t := range run.Tasks {
 			if t.Name == logDeleteOpts.taskname {
@@ -102,12 +118,21 @@ func logDelete(cmd *cobra.Command, args []string) error {
 			}
 		}
 		if !taskfound {
-			return errors.Errorf("task %q not found in run %q", logDeleteOpts.taskname, logDeleteOpts.runid)
+			return errors.Errorf("task %q not found in run %q", logDeleteOpts.taskname, logDeleteOpts.runNumber)
 		}
 		taskid = task.ID
 	}
-	log.Infof("deleting log")
-	if _, err := gwclient.DeleteLogs(context.TODO(), logDeleteOpts.runid, taskid, logDeleteOpts.setup, logDeleteOpts.step); err != nil {
+
+	log.Info().Msgf("deleting log")
+
+	var err error
+	if isProject {
+		_, err = gwclient.DeleteProjectLogs(context.TODO(), logDeleteOpts.projectRef, logDeleteOpts.runNumber, taskid, logDeleteOpts.setup, logDeleteOpts.step)
+	} else {
+		_, err = gwclient.DeleteUserLogs(context.TODO(), logDeleteOpts.username, logDeleteOpts.runNumber, taskid, logDeleteOpts.setup, logDeleteOpts.step)
+	}
+
+	if err != nil {
 		return errors.Errorf("failed to delete log: %v", err)
 	}
 

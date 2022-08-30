@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"errors"
 	"os"
 	"os/signal"
 	"syscall"
@@ -41,7 +42,7 @@ func childsReaper() {
 		for range sigs {
 			for {
 				var wstatus syscall.WaitStatus
-				if _, err := syscall.Wait4(-1, &wstatus, syscall.WNOHANG|syscall.WUNTRACED|syscall.WCONTINUED, nil); err == syscall.EINTR {
+				if _, err := syscall.Wait4(-1, &wstatus, syscall.WNOHANG|syscall.WUNTRACED|syscall.WCONTINUED, nil); errors.Is(err, syscall.EINTR) {
 					continue
 				}
 				break

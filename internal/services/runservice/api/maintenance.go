@@ -17,20 +17,19 @@ package api
 import (
 	"net/http"
 
-	"agola.io/agola/internal/etcd"
 	"agola.io/agola/internal/services/runservice/action"
+	"agola.io/agola/internal/util"
 
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 )
 
 type MaintenanceModeHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
-	e   *etcd.Store
 }
 
-func NewMaintenanceModeHandler(logger *zap.Logger, ah *action.ActionHandler, e *etcd.Store) *MaintenanceModeHandler {
-	return &MaintenanceModeHandler{log: logger.Sugar(), ah: ah, e: e}
+func NewMaintenanceModeHandler(log zerolog.Logger, ah *action.ActionHandler) *MaintenanceModeHandler {
+	return &MaintenanceModeHandler{log: log, ah: ah}
 }
 
 func (h *MaintenanceModeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -46,24 +45,23 @@ func (h *MaintenanceModeHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 
 	err := h.ah.MaintenanceMode(ctx, enable)
 	if err != nil {
-		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
+		h.log.Err(err).Send()
+		util.HTTPError(w, err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, nil); err != nil {
+		h.log.Err(err).Send()
 	}
-
 }
 
 type ExportHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewExportHandler(logger *zap.Logger, ah *action.ActionHandler) *ExportHandler {
-	return &ExportHandler{log: logger.Sugar(), ah: ah}
+func NewExportHandler(log zerolog.Logger, ah *action.ActionHandler) *ExportHandler {
+	return &ExportHandler{log: log, ah: ah}
 }
 
 func (h *ExportHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -71,7 +69,7 @@ func (h *ExportHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	err := h.ah.Export(ctx, w)
 	if err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		// since we already answered with a 200 we cannot return another error code
 		// So abort the connection and the client will detect the missing ending chunk
 		// and consider this an error
@@ -82,12 +80,12 @@ func (h *ExportHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type ImportHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewImportHandler(logger *zap.Logger, ah *action.ActionHandler) *ImportHandler {
-	return &ImportHandler{log: logger.Sugar(), ah: ah}
+func NewImportHandler(log zerolog.Logger, ah *action.ActionHandler) *ImportHandler {
+	return &ImportHandler{log: log, ah: ah}
 }
 
 func (h *ImportHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -95,13 +93,13 @@ func (h *ImportHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	err := h.ah.Import(ctx, r.Body)
 	if err != nil {
-		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
+		h.log.Err(err).Send()
+		util.HTTPError(w, err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, nil); err != nil {
+		h.log.Err(err).Send()
 	}
 
 }

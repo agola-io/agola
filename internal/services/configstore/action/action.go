@@ -15,31 +15,59 @@
 package action
 
 import (
-	"agola.io/agola/internal/datamanager"
-	"agola.io/agola/internal/etcd"
-	"agola.io/agola/internal/services/configstore/readdb"
+	"agola.io/agola/internal/errors"
+	"agola.io/agola/internal/lock"
+	"agola.io/agola/internal/services/configstore/db"
+	"agola.io/agola/internal/sql"
+	"agola.io/agola/internal/util"
+	"agola.io/agola/services/configstore/types"
 
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 )
 
 type ActionHandler struct {
-	log             *zap.SugaredLogger
-	readDB          *readdb.ReadDB
-	dm              *datamanager.DataManager
-	e               *etcd.Store
+	log             zerolog.Logger
+	d               *db.DB
+	lf              lock.LockFactory
 	maintenanceMode bool
 }
 
-func NewActionHandler(logger *zap.Logger, readDB *readdb.ReadDB, dm *datamanager.DataManager, e *etcd.Store) *ActionHandler {
+func NewActionHandler(log zerolog.Logger, d *db.DB, lf lock.LockFactory) *ActionHandler {
 	return &ActionHandler{
-		log:             logger.Sugar(),
-		readDB:          readDB,
-		dm:              dm,
-		e:               e,
+		log:             log,
+		d:               d,
+		lf:              lf,
 		maintenanceMode: false,
 	}
 }
 
 func (h *ActionHandler) SetMaintenanceMode(maintenanceMode bool) {
 	h.maintenanceMode = maintenanceMode
+}
+
+func (h *ActionHandler) ResolveObjectID(tx *sql.Tx, objectKind types.ObjectKind, ref string) (string, error) {
+	switch objectKind {
+	case types.ObjectKindProjectGroup:
+		group, err := h.d.GetProjectGroup(tx, ref)
+		if err != nil {
+			return "", errors.WithStack(err)
+		}
+		if group == nil {
+			return "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("group with ref %q doesn't exists", ref))
+		}
+		return group.ID, nil
+
+	case types.ObjectKindProject:
+		project, err := h.d.GetProject(tx, ref)
+		if err != nil {
+			return "", errors.WithStack(err)
+		}
+		if project == nil {
+			return "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("project with ref %q doesn't exists", ref))
+		}
+		return project.ID, nil
+
+	default:
+		return "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("unknown object kind %q", objectKind))
+	}
 }

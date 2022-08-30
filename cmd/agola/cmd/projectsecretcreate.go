@@ -19,12 +19,13 @@ import (
 	"io/ioutil"
 	"os"
 
+	"agola.io/agola/internal/errors"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 
 	"github.com/ghodss/yaml"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	errors "golang.org/x/xerrors"
 )
 
 var cmdProjectSecretCreate = &cobra.Command{
@@ -39,7 +40,7 @@ data02: secretvalue02
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := secretCreate(cmd, "project", args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -60,13 +61,13 @@ func init() {
 	flags.StringVarP(&secretCreateOpts.file, "file", "f", "", `yaml file containing the secret data (use "-" to read from stdin)`)
 
 	if err := cmdProjectSecretCreate.MarkFlagRequired("project"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdProjectSecretCreate.MarkFlagRequired("name"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 	if err := cmdProjectSecretCreate.MarkFlagRequired("file"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdProjectSecret.AddCommand(cmdProjectSecretCreate)
@@ -81,18 +82,18 @@ func secretCreate(cmd *cobra.Command, ownertype string, args []string) error {
 	if secretCreateOpts.file == "-" {
 		data, err = ioutil.ReadAll(os.Stdin)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	} else {
 		data, err = ioutil.ReadFile(secretCreateOpts.file)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	}
 
 	var secretData map[string]string
 	if err := yaml.Unmarshal(data, &secretData); err != nil {
-		log.Fatalf("failed to unmarshal secret: %v", err)
+		log.Fatal().Msgf("failed to unmarshal secret: %v", err)
 	}
 	req := &gwapitypes.CreateSecretRequest{
 		Name: secretCreateOpts.name,
@@ -102,19 +103,19 @@ func secretCreate(cmd *cobra.Command, ownertype string, args []string) error {
 
 	switch ownertype {
 	case "project":
-		log.Infof("creating project secret")
+		log.Info().Msgf("creating project secret")
 		secret, _, err := gwclient.CreateProjectSecret(context.TODO(), secretCreateOpts.parentRef, req)
 		if err != nil {
-			return errors.Errorf("failed to create project secret: %w", err)
+			return errors.Wrapf(err, "failed to create project secret")
 		}
-		log.Infof("project secret %q created, ID: %q", secret.Name, secret.ID)
+		log.Info().Msgf("project secret %q created, ID: %q", secret.Name, secret.ID)
 	case "projectgroup":
-		log.Infof("creating project group secret")
+		log.Info().Msgf("creating project group secret")
 		secret, _, err := gwclient.CreateProjectGroupSecret(context.TODO(), secretCreateOpts.parentRef, req)
 		if err != nil {
-			return errors.Errorf("failed to create project group secret: %w", err)
+			return errors.Wrapf(err, "failed to create project group secret")
 		}
-		log.Infof("project group secret %q created, ID: %q", secret.Name, secret.ID)
+		log.Info().Msgf("project group secret %q created, ID: %q", secret.Name, secret.ID)
 	}
 
 	return nil

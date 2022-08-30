@@ -21,23 +21,25 @@ import (
 	"sort"
 	"strconv"
 
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/gateway/action"
+	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
+	csapitypes "agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 
 	"github.com/gorilla/mux"
-	"go.uber.org/zap"
-	errors "golang.org/x/xerrors"
+	"github.com/rs/zerolog"
 )
 
 type CreateUserHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewCreateUserHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateUserHandler {
-	return &CreateUserHandler{log: logger.Sugar(), ah: ah}
+func NewCreateUserHandler(log zerolog.Logger, ah *action.ActionHandler) *CreateUserHandler {
+	return &CreateUserHandler{log: log, ah: ah}
 }
 
 func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -46,7 +48,7 @@ func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var req gwapitypes.CreateUserRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
@@ -55,24 +57,24 @@ func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	u, err := h.ah.CreateUser(ctx, creq)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
 	res := createUserResponse(u)
-	if err := httpResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type DeleteUserHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewDeleteUserHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteUserHandler {
-	return &DeleteUserHandler{log: logger.Sugar(), ah: ah}
+func NewDeleteUserHandler(log zerolog.Logger, ah *action.ActionHandler) *DeleteUserHandler {
+	return &DeleteUserHandler{log: log, ah: ah}
 }
 
 func (h *DeleteUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -81,54 +83,53 @@ func (h *DeleteUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	userRef := vars["userref"]
 
 	err := h.ah.DeleteUser(ctx, userRef)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type CurrentUserHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewCurrentUserHandler(logger *zap.Logger, ah *action.ActionHandler) *CurrentUserHandler {
-	return &CurrentUserHandler{log: logger.Sugar(), ah: ah}
+func NewCurrentUserHandler(log zerolog.Logger, ah *action.ActionHandler) *CurrentUserHandler {
+	return &CurrentUserHandler{log: log, ah: ah}
 }
 
 func (h *CurrentUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	userIDVal := ctx.Value("userid")
-	if userIDVal == nil {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("user not authenticated")))
-		return
-	}
-	userID := userIDVal.(string)
-
-	user, err := h.ah.GetUser(ctx, userID)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	userID := common.CurrentUserID(ctx)
+	if userID == "" {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user not authenticated")))
 		return
 	}
 
-	res := createUserResponse(user)
-	if err := httpResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+	user, tokens, linkedAccounts, err := h.ah.GetCurrentUser(ctx, userID)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	res := createPrivateUserResponse(user, tokens, linkedAccounts)
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type UserHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewUserHandler(logger *zap.Logger, ah *action.ActionHandler) *UserHandler {
-	return &UserHandler{log: logger.Sugar(), ah: ah}
+func NewUserHandler(log zerolog.Logger, ah *action.ActionHandler) *UserHandler {
+	return &UserHandler{log: log, ah: ah}
 }
 
 func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -137,30 +138,30 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	userRef := vars["userref"]
 
 	user, err := h.ah.GetUser(ctx, userRef)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
 	res := createUserResponse(user)
-	if err := httpResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
-func createUserResponse(u *cstypes.User) *gwapitypes.UserResponse {
-	user := &gwapitypes.UserResponse{
+func createPrivateUserResponse(u *cstypes.User, tokens []*cstypes.UserToken, linkedAccounts []*cstypes.LinkedAccount) *gwapitypes.PrivateUserResponse {
+	user := &gwapitypes.PrivateUserResponse{
 		ID:             u.ID,
 		UserName:       u.Name,
-		Tokens:         make([]string, 0, len(u.Tokens)),
-		LinkedAccounts: make([]*gwapitypes.LinkedAccountResponse, 0, len(u.LinkedAccounts)),
+		Tokens:         make([]string, 0, len(tokens)),
+		LinkedAccounts: make([]*gwapitypes.LinkedAccountResponse, 0, len(linkedAccounts)),
 	}
-	for tokenName := range u.Tokens {
-		user.Tokens = append(user.Tokens, tokenName)
+	for _, token := range tokens {
+		user.Tokens = append(user.Tokens, token.Name)
 	}
 	sort.Strings(user.Tokens)
 
-	for _, la := range u.LinkedAccounts {
+	for _, la := range linkedAccounts {
 		user.LinkedAccounts = append(user.LinkedAccounts, &gwapitypes.LinkedAccountResponse{
 			ID:                  la.ID,
 			RemoteSourceID:      la.RemoteSourceID,
@@ -172,13 +173,22 @@ func createUserResponse(u *cstypes.User) *gwapitypes.UserResponse {
 	return user
 }
 
+func createUserResponse(u *cstypes.User) *gwapitypes.UserResponse {
+	user := &gwapitypes.UserResponse{
+		ID:       u.ID,
+		UserName: u.Name,
+	}
+
+	return user
+}
+
 type UsersHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewUsersHandler(logger *zap.Logger, ah *action.ActionHandler) *UsersHandler {
-	return &UsersHandler{log: logger.Sugar(), ah: ah}
+func NewUsersHandler(log zerolog.Logger, ah *action.ActionHandler) *UsersHandler {
+	return &UsersHandler{log: log, ah: ah}
 }
 
 func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -192,12 +202,12 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		limit, err = strconv.Atoi(limitS)
 		if err != nil {
-			httpError(w, util.NewErrBadRequest(errors.Errorf("cannot parse limit: %w", err)))
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit")))
 			return
 		}
 	}
 	if limit < 0 {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("limit must be greater or equal than 0")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0")))
 		return
 	}
 	if limit > MaxRunsLimit {
@@ -216,8 +226,8 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Asc:   asc,
 	}
 	csusers, err := h.ah.GetUsers(ctx, areq)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -226,18 +236,18 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		users[i] = createUserResponse(p)
 	}
 
-	if err := httpResponse(w, http.StatusOK, users); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, users); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type CreateUserLAHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewCreateUserLAHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateUserLAHandler {
-	return &CreateUserLAHandler{log: logger.Sugar(), ah: ah}
+func NewCreateUserLAHandler(log zerolog.Logger, ah *action.ActionHandler) *CreateUserLAHandler {
+	return &CreateUserLAHandler{log: log, ah: ah}
 }
 
 func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -248,18 +258,18 @@ func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	var req *gwapitypes.CreateUserLARequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
 	res, err := h.createUserLA(ctx, userRef, req)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	if err := httpResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
@@ -269,10 +279,10 @@ func (h *CreateUserLAHandler) createUserLA(ctx context.Context, userRef string, 
 		RemoteSourceName: req.RemoteSourceName,
 	}
 
-	h.log.Infof("creating linked account")
+	h.log.Info().Msgf("creating linked account")
 	cresp, err := h.ah.HandleRemoteSourceAuth(ctx, req.RemoteSourceName, req.RemoteSourceLoginName, req.RemoteSourceLoginPassword, action.RemoteSourceRequestTypeCreateUserLA, creq)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if cresp.Oauth2Redirect != "" {
 		return &gwapitypes.CreateUserLAResponse{
@@ -290,17 +300,17 @@ func (h *CreateUserLAHandler) createUserLA(ctx context.Context, userRef string, 
 			RemoteSourceID:      authresp.LinkedAccount.RemoteUserID,
 		},
 	}
-	h.log.Infof("linked account %q for user %q created", resp.LinkedAccount.ID, userRef)
+	h.log.Info().Msgf("linked account %q for user %q created", resp.LinkedAccount.ID, userRef)
 	return resp, nil
 }
 
 type DeleteUserLAHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewDeleteUserLAHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteUserLAHandler {
-	return &DeleteUserLAHandler{log: logger.Sugar(), ah: ah}
+func NewDeleteUserLAHandler(log zerolog.Logger, ah *action.ActionHandler) *DeleteUserLAHandler {
+	return &DeleteUserLAHandler{log: log, ah: ah}
 }
 
 func (h *DeleteUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -310,23 +320,23 @@ func (h *DeleteUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	laID := vars["laid"]
 
 	err := h.ah.DeleteUserLA(ctx, userRef, laID)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type CreateUserTokenHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewCreateUserTokenHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateUserTokenHandler {
-	return &CreateUserTokenHandler{log: logger.Sugar(), ah: ah}
+func NewCreateUserTokenHandler(log zerolog.Logger, ah *action.ActionHandler) *CreateUserTokenHandler {
+	return &CreateUserTokenHandler{log: log, ah: ah}
 }
 
 func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -337,7 +347,7 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	var req gwapitypes.CreateUserTokenRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
@@ -345,10 +355,10 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		UserRef:   userRef,
 		TokenName: req.TokenName,
 	}
-	h.log.Infof("creating user %q token", userRef)
+	h.log.Info().Msgf("creating user %q token", userRef)
 	token, err := h.ah.CreateUserToken(ctx, creq)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -356,18 +366,18 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		Token: token,
 	}
 
-	if err := httpResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type DeleteUserTokenHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewDeleteUserTokenHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteUserTokenHandler {
-	return &DeleteUserTokenHandler{log: logger.Sugar(), ah: ah}
+func NewDeleteUserTokenHandler(log zerolog.Logger, ah *action.ActionHandler) *DeleteUserTokenHandler {
+	return &DeleteUserTokenHandler{log: log, ah: ah}
 }
 
 func (h *DeleteUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -376,25 +386,25 @@ func (h *DeleteUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	userRef := vars["userref"]
 	tokenName := vars["tokenname"]
 
-	h.log.Infof("deleting user %q token %q", userRef, tokenName)
+	h.log.Info().Msgf("deleting user %q token %q", userRef, tokenName)
 	err := h.ah.DeleteUserToken(ctx, userRef, tokenName)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type RegisterUserHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewRegisterUserHandler(logger *zap.Logger, ah *action.ActionHandler) *RegisterUserHandler {
-	return &RegisterUserHandler{log: logger.Sugar(), ah: ah}
+func NewRegisterUserHandler(log zerolog.Logger, ah *action.ActionHandler) *RegisterUserHandler {
+	return &RegisterUserHandler{log: log, ah: ah}
 }
 
 func (h *RegisterUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -403,18 +413,18 @@ func (h *RegisterUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	var req *gwapitypes.RegisterUserRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
 	res, err := h.registerUser(ctx, req)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	if err := httpResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
@@ -426,7 +436,7 @@ func (h *RegisterUserHandler) registerUser(ctx context.Context, req *gwapitypes.
 
 	cresp, err := h.ah.HandleRemoteSourceAuth(ctx, req.CreateUserLARequest.RemoteSourceName, req.CreateUserLARequest.RemoteSourceLoginName, req.CreateUserLARequest.RemoteSourceLoginPassword, action.RemoteSourceRequestTypeRegisterUser, creq)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if cresp.Oauth2Redirect != "" {
 		return &gwapitypes.RegisterUserResponse{
@@ -440,12 +450,12 @@ func (h *RegisterUserHandler) registerUser(ctx context.Context, req *gwapitypes.
 }
 
 type AuthorizeHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewAuthorizeHandler(logger *zap.Logger, ah *action.ActionHandler) *AuthorizeHandler {
-	return &AuthorizeHandler{log: logger.Sugar(), ah: ah}
+func NewAuthorizeHandler(log zerolog.Logger, ah *action.ActionHandler) *AuthorizeHandler {
+	return &AuthorizeHandler{log: log, ah: ah}
 }
 
 func (h *AuthorizeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -454,18 +464,18 @@ func (h *AuthorizeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var req *gwapitypes.LoginUserRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
 	res, err := h.authorize(ctx, req)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	if err := httpResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
@@ -476,7 +486,7 @@ func (h *AuthorizeHandler) authorize(ctx context.Context, req *gwapitypes.LoginU
 
 	cresp, err := h.ah.HandleRemoteSourceAuth(ctx, req.RemoteSourceName, req.LoginName, req.LoginPassword, action.RemoteSourceRequestTypeAuthorize, creq)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if cresp.Oauth2Redirect != "" {
 		return &gwapitypes.AuthorizeResponse{
@@ -497,12 +507,12 @@ func (h *AuthorizeHandler) authorize(ctx context.Context, req *gwapitypes.LoginU
 }
 
 type LoginUserHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewLoginUserHandler(logger *zap.Logger, ah *action.ActionHandler) *LoginUserHandler {
-	return &LoginUserHandler{log: logger.Sugar(), ah: ah}
+func NewLoginUserHandler(log zerolog.Logger, ah *action.ActionHandler) *LoginUserHandler {
+	return &LoginUserHandler{log: log, ah: ah}
 }
 
 func (h *LoginUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -511,18 +521,18 @@ func (h *LoginUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var req *gwapitypes.LoginUserRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
 	res, err := h.loginUser(ctx, req)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	if err := httpResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
@@ -531,10 +541,10 @@ func (h *LoginUserHandler) loginUser(ctx context.Context, req *gwapitypes.LoginU
 		RemoteSourceName: req.RemoteSourceName,
 	}
 
-	h.log.Infof("logging in user")
+	h.log.Info().Msgf("logging in user")
 	cresp, err := h.ah.HandleRemoteSourceAuth(ctx, req.RemoteSourceName, req.LoginName, req.LoginPassword, action.RemoteSourceRequestTypeLoginUser, creq)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if cresp.Oauth2Redirect != "" {
 		return &gwapitypes.LoginUserResponse{
@@ -551,12 +561,12 @@ func (h *LoginUserHandler) loginUser(ctx context.Context, req *gwapitypes.LoginU
 }
 
 type UserCreateRunHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewUserCreateRunHandler(logger *zap.Logger, ah *action.ActionHandler) *UserCreateRunHandler {
-	return &UserCreateRunHandler{log: logger.Sugar(), ah: ah}
+func NewUserCreateRunHandler(log zerolog.Logger, ah *action.ActionHandler) *UserCreateRunHandler {
+	return &UserCreateRunHandler{log: log, ah: ah}
 }
 
 func (h *UserCreateRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -565,7 +575,7 @@ func (h *UserCreateRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	var req gwapitypes.UserCreateRunRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
@@ -581,12 +591,55 @@ func (h *UserCreateRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		Variables:             req.Variables,
 	}
 	err := h.ah.UserCreateRun(ctx, creq)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	if err := httpResponse(w, http.StatusCreated, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusCreated, nil); err != nil {
+		h.log.Err(err).Send()
 	}
+}
+
+type UserOrgsHandler struct {
+	log zerolog.Logger
+	ah  *action.ActionHandler
+}
+
+func NewUserOrgsHandler(log zerolog.Logger, ah *action.ActionHandler) *UserOrgsHandler {
+	return &UserOrgsHandler{log: log, ah: ah}
+}
+
+func (h *UserOrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	userID := common.CurrentUserID(ctx)
+	if userID == "" {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user not authenticated")))
+		return
+	}
+
+	userOrgs, err := h.ah.GetUserOrgs(ctx, userID)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	res := make([]*gwapitypes.UserOrgsResponse, len(userOrgs))
+	for i, userOrg := range userOrgs {
+		res[i] = createUserOrgsResponse(userOrg)
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func createUserOrgsResponse(o *csapitypes.UserOrgsResponse) *gwapitypes.UserOrgsResponse {
+	userOrgs := &gwapitypes.UserOrgsResponse{
+		Organization: createOrgResponse(o.Organization),
+		Role:         gwapitypes.MemberRole(o.Role),
+	}
+
+	return userOrgs
 }

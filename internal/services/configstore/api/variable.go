@@ -18,25 +18,26 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"agola.io/agola/internal/db"
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/configstore/action"
-	"agola.io/agola/internal/services/configstore/readdb"
+	"agola.io/agola/internal/services/configstore/db"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	"agola.io/agola/services/configstore/types"
 
 	"github.com/gorilla/mux"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 )
 
 type VariablesHandler struct {
-	log    *zap.SugaredLogger
-	ah     *action.ActionHandler
-	readDB *readdb.ReadDB
+	log zerolog.Logger
+	ah  *action.ActionHandler
+	d   *db.DB
 }
 
-func NewVariablesHandler(logger *zap.Logger, ah *action.ActionHandler, readDB *readdb.ReadDB) *VariablesHandler {
-	return &VariablesHandler{log: logger.Sugar(), ah: ah, readDB: readDB}
+func NewVariablesHandler(log zerolog.Logger, ah *action.ActionHandler, d *db.DB) *VariablesHandler {
+	return &VariablesHandler{log: log, ah: ah, d: d}
 }
 
 func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -44,15 +45,15 @@ func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	_, tree := query["tree"]
 
-	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	parentKind, parentRef, err := GetObjectKindRef(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	variables, err := h.ah.GetVariables(ctx, parentType, parentRef, tree)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	variables, err := h.ah.GetVariables(ctx, parentKind, parentRef, tree)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -60,73 +61,79 @@ func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for i, v := range variables {
 		resVariables[i] = &csapitypes.Variable{Variable: v}
 	}
-	err = h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err = h.d.Do(ctx, func(tx *sql.Tx) error {
 		// populate parent path
 		for _, v := range resVariables {
-			pp, err := h.readDB.GetPath(tx, v.Parent.Type, v.Parent.ID)
+			pp, err := h.d.GetPath(tx, v.Parent.Kind, v.Parent.ID)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			v.ParentPath = pp
 		}
-		return err
+		return errors.WithStack(err)
 	})
 	if err != nil {
-		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
+		h.log.Err(err).Send()
+		util.HTTPError(w, err)
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, resVariables); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, resVariables); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type CreateVariableHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewCreateVariableHandler(logger *zap.Logger, ah *action.ActionHandler) *CreateVariableHandler {
-	return &CreateVariableHandler{log: logger.Sugar(), ah: ah}
+func NewCreateVariableHandler(log zerolog.Logger, ah *action.ActionHandler) *CreateVariableHandler {
+	return &CreateVariableHandler{log: log, ah: ah}
 }
 
 func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	parentKind, parentRef, err := GetObjectKindRef(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	var variable *types.Variable
+	var req *csapitypes.CreateUpdateVariableRequest
 	d := json.NewDecoder(r.Body)
-	if err := d.Decode(&variable); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+	if err := d.Decode(&req); err != nil {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
-	variable.Parent.Type = parentType
-	variable.Parent.ID = parentRef
+	areq := &action.CreateUpdateVariableRequest{
+		Name: req.Name,
+		Parent: types.Parent{
+			Kind: parentKind,
+			ID:   parentRef,
+		},
+		Values: req.Values,
+	}
 
-	variable, err = h.ah.CreateVariable(ctx, variable)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	variable, err := h.ah.CreateVariable(ctx, areq)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	if err := httpResponse(w, http.StatusCreated, variable); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusCreated, variable); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type UpdateVariableHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewUpdateVariableHandler(logger *zap.Logger, ah *action.ActionHandler) *UpdateVariableHandler {
-	return &UpdateVariableHandler{log: logger.Sugar(), ah: ah}
+func NewUpdateVariableHandler(log zerolog.Logger, ah *action.ActionHandler) *UpdateVariableHandler {
+	return &UpdateVariableHandler{log: log, ah: ah}
 }
 
 func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -134,44 +141,46 @@ func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	vars := mux.Vars(r)
 	variableName := vars["variablename"]
 
-	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	parentKind, parentRef, err := GetObjectKindRef(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	var variable *types.Variable
+	var req *csapitypes.CreateUpdateVariableRequest
 	d := json.NewDecoder(r.Body)
-	if err := d.Decode(&variable); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+	if err := d.Decode(&req); err != nil {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
-	variable.Parent.Type = parentType
-	variable.Parent.ID = parentRef
-
-	areq := &action.UpdateVariableRequest{
-		VariableName: variableName,
-		Variable:     variable,
+	areq := &action.CreateUpdateVariableRequest{
+		Name: req.Name,
+		Parent: types.Parent{
+			Kind: parentKind,
+			ID:   parentRef,
+		},
+		Values: req.Values,
 	}
-	variable, err = h.ah.UpdateVariable(ctx, areq)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+
+	variable, err := h.ah.UpdateVariable(ctx, variableName, areq)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, variable); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, variable); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type DeleteVariableHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewDeleteVariableHandler(logger *zap.Logger, ah *action.ActionHandler) *DeleteVariableHandler {
-	return &DeleteVariableHandler{log: logger.Sugar(), ah: ah}
+func NewDeleteVariableHandler(log zerolog.Logger, ah *action.ActionHandler) *DeleteVariableHandler {
+	return &DeleteVariableHandler{log: log, ah: ah}
 }
 
 func (h *DeleteVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -179,17 +188,17 @@ func (h *DeleteVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	vars := mux.Vars(r)
 	variableName := vars["variablename"]
 
-	parentType, parentRef, err := GetConfigTypeRef(r)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	parentKind, parentRef, err := GetObjectKindRef(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
-	err = h.ah.DeleteVariable(ctx, parentType, parentRef, variableName)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	err = h.ah.DeleteVariable(ctx, parentKind, parentRef, variableName)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 	}
-	if err := httpResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Err(err).Send()
 	}
 }

@@ -20,131 +20,35 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
+	"time"
 
-	"agola.io/agola/internal/datamanager"
-	"agola.io/agola/internal/db"
-	"agola.io/agola/internal/etcd"
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/services/runservice/action"
-	"agola.io/agola/internal/services/runservice/common"
-	"agola.io/agola/internal/services/runservice/readdb"
+	"agola.io/agola/internal/services/runservice/db"
 	"agola.io/agola/internal/services/runservice/store"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
 	rsapitypes "agola.io/agola/services/runservice/api/types"
 	"agola.io/agola/services/runservice/types"
 
 	"github.com/gorilla/mux"
-	etcdclientv3 "go.etcd.io/etcd/clientv3"
-	etcdclientv3rpc "go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
-	"go.etcd.io/etcd/mvcc/mvccpb"
-	"go.uber.org/zap"
-	errors "golang.org/x/xerrors"
+	"github.com/rs/zerolog"
 )
 
-type ErrorResponse struct {
-	Message string `json:"message"`
-}
-
-func ErrorResponseFromError(err error) *ErrorResponse {
-	var aerr error
-	// use inner errors if of these types
-	switch {
-	case util.IsBadRequest(err):
-		var cerr *util.ErrBadRequest
-		errors.As(err, &cerr)
-		aerr = cerr
-	case util.IsNotExist(err):
-		var cerr *util.ErrNotExist
-		errors.As(err, &cerr)
-		aerr = cerr
-	case util.IsForbidden(err):
-		var cerr *util.ErrForbidden
-		errors.As(err, &cerr)
-		aerr = cerr
-	case util.IsUnauthorized(err):
-		var cerr *util.ErrUnauthorized
-		errors.As(err, &cerr)
-		aerr = cerr
-	case util.IsInternal(err):
-		var cerr *util.ErrInternal
-		errors.As(err, &cerr)
-		aerr = cerr
-	}
-
-	if aerr != nil {
-		return &ErrorResponse{Message: aerr.Error()}
-	}
-
-	// on generic error return an generic message to not leak the real error
-	return &ErrorResponse{Message: "internal server error"}
-}
-
-func httpError(w http.ResponseWriter, err error) bool {
-	if err == nil {
-		return false
-	}
-
-	response := ErrorResponseFromError(err)
-	resj, merr := json.Marshal(response)
-	if merr != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return true
-	}
-	switch {
-	case util.IsBadRequest(err):
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write(resj)
-	case util.IsNotExist(err):
-		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write(resj)
-	case util.IsForbidden(err):
-		w.WriteHeader(http.StatusForbidden)
-		_, _ = w.Write(resj)
-	case util.IsUnauthorized(err):
-		w.WriteHeader(http.StatusUnauthorized)
-		_, _ = w.Write(resj)
-	case util.IsInternal(err):
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(resj)
-	default:
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(resj)
-	}
-	return true
-}
-
-func httpResponse(w http.ResponseWriter, code int, res interface{}) error {
-	w.Header().Set("Content-Type", "application/json")
-
-	if res != nil {
-		resj, err := json.Marshal(res)
-		if err != nil {
-			httpError(w, err)
-			return err
-		}
-		w.WriteHeader(code)
-		_, err = w.Write(resj)
-		return err
-	}
-
-	w.WriteHeader(code)
-	return nil
-}
-
 type LogsHandler struct {
-	log *zap.SugaredLogger
-	e   *etcd.Store
+	log zerolog.Logger
+	d   *db.DB
 	ost *objectstorage.ObjStorage
-	dm  *datamanager.DataManager
 }
 
-func NewLogsHandler(logger *zap.Logger, e *etcd.Store, ost *objectstorage.ObjStorage, dm *datamanager.DataManager) *LogsHandler {
+func NewLogsHandler(log zerolog.Logger, d *db.DB, ost *objectstorage.ObjStorage) *LogsHandler {
 	return &LogsHandler{
-		log: logger.Sugar(),
-		e:   e,
+		log: log,
+		d:   d,
 		ost: ost,
-		dm:  dm,
 	}
 }
 
@@ -190,34 +94,43 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		follow = true
 	}
 
-	if err, sendError := h.readTaskLogs(ctx, runID, taskID, setup, step, w, follow); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if sendError, err := h.readTaskLogs(ctx, runID, taskID, setup, step, w, follow); err != nil {
+		h.log.Err(err).Send()
 		if sendError {
 			switch {
-			case util.IsNotExist(err):
-				httpError(w, util.NewErrNotExist(errors.Errorf("log doesn't exist: %w", err)))
+			case util.APIErrorIs(err, util.ErrNotExist):
+				util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Wrapf(err, "log doesn't exist")))
 			default:
-				httpError(w, err)
+				util.HTTPError(w, err)
 			}
 		}
 	}
 }
 
-func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, setup bool, step int, w http.ResponseWriter, follow bool) (error, bool) {
-	r, err := store.GetRunEtcdOrOST(ctx, h.e, h.dm, runID)
+func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, setup bool, step int, w http.ResponseWriter, follow bool) (bool, error) {
+	var r *types.Run
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		r, err = h.d.GetRun(tx, runID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		return nil
+	})
 	if err != nil {
-		return err, true
+		return true, errors.WithStack(err)
 	}
+
 	if r == nil {
-		return util.NewErrNotExist(errors.Errorf("no such run with id: %s", runID)), true
+		return true, util.NewAPIError(util.ErrNotExist, errors.Errorf("no such run with id: %s", runID))
 	}
 
 	task, ok := r.Tasks[taskID]
 	if !ok {
-		return util.NewErrNotExist(errors.Errorf("no such task with ID %s in run %s", taskID, runID)), true
+		return true, util.NewAPIError(util.ErrNotExist, errors.Errorf("no such task with ID %s in run %s", taskID, runID))
 	}
 	if len(task.Steps) <= step {
-		return util.NewErrNotExist(errors.Errorf("no such step for task %s in run %s", taskID, runID)), true
+		return true, util.NewAPIError(util.ErrNotExist, errors.Errorf("no such step for task %s in run %s", taskID, runID))
 	}
 
 	// if the log has been already fetched use it, otherwise fetch it from the executor
@@ -231,48 +144,60 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 		f, err := h.ost.ReadObject(logPath)
 		if err != nil {
 			if objectstorage.IsNotExist(err) {
-				return util.NewErrNotExist(err), true
+				return true, util.NewAPIError(util.ErrNotExist, err)
 			}
-			return err, true
+			return true, errors.WithStack(err)
 		}
 		defer f.Close()
-		return sendLogs(w, f), false
+		return false, sendLogs(w, f)
 	}
 
-	et, err := store.GetExecutorTask(ctx, h.e, task.ID)
-	if err != nil {
-		if err == etcd.ErrKeyNotFound {
-			return util.NewErrNotExist(errors.Errorf("executor task with id %q doesn't exist", task.ID)), true
+	var et *types.ExecutorTask
+	var executor *types.Executor
+	err = h.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+
+		et, err = h.d.GetExecutorTaskByRunTask(tx, runID, task.ID)
+		if err != nil {
+			return errors.WithStack(err)
 		}
-		return err, true
-	}
-	executor, err := store.GetExecutor(ctx, h.e, et.Spec.ExecutorID)
-	if err != nil {
-		if err == etcd.ErrKeyNotFound {
-			return util.NewErrNotExist(errors.Errorf("executor with id %q doesn't exist", et.Spec.ExecutorID)), true
+		if et == nil {
+			return util.NewAPIError(util.ErrNotExist, errors.Errorf("executor task for run task with id %q doesn't exist", task.ID))
 		}
-		return err, true
+
+		executor, err = h.d.GetExecutorByExecutorID(tx, et.Spec.ExecutorID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if executor == nil {
+			return util.NewAPIError(util.ErrNotExist, errors.Errorf("executor with id %q doesn't exist", et.Spec.ExecutorID))
+		}
+
+		return nil
+	})
+	if err != nil {
+		return true, errors.WithStack(err)
 	}
 
 	var url string
 	if setup {
-		url = fmt.Sprintf("%s/api/v1alpha/executor/logs?taskid=%s&setup", executor.ListenURL, taskID)
+		url = fmt.Sprintf("%s/api/v1alpha/executor/logs?taskid=%s&setup", executor.ListenURL, et.ID)
 	} else {
-		url = fmt.Sprintf("%s/api/v1alpha/executor/logs?taskid=%s&step=%d", executor.ListenURL, taskID, step)
+		url = fmt.Sprintf("%s/api/v1alpha/executor/logs?taskid=%s&step=%d", executor.ListenURL, et.ID, step)
 	}
 	if follow {
 		url += "&follow"
 	}
 	req, err := http.Get(url)
 	if err != nil {
-		return err, true
+		return true, errors.WithStack(err)
 	}
 	defer req.Body.Close()
 	if req.StatusCode != http.StatusOK {
 		if req.StatusCode == http.StatusNotFound {
-			return util.NewErrNotExist(errors.New("no log on executor")), true
+			return true, util.NewAPIError(util.ErrNotExist, errors.New("no log on executor"))
 		}
-		return errors.Errorf("received http status: %d", req.StatusCode), true
+		return true, errors.Errorf("received http status: %d", req.StatusCode)
 	}
 
 	// write and flush the headers so the client will receive the response
@@ -288,7 +213,7 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 		flusher.Flush()
 	}
 
-	return sendLogs(w, req.Body), false
+	return false, sendLogs(w, req.Body)
 }
 
 func sendLogs(w http.ResponseWriter, r io.Reader) error {
@@ -307,7 +232,7 @@ func sendLogs(w http.ResponseWriter, r io.Reader) error {
 		//data, err := br.ReadBytes('\n')
 		if err != nil {
 			if err != io.EOF {
-				return err
+				return errors.WithStack(err)
 			}
 			if n == 0 {
 				return nil
@@ -315,7 +240,7 @@ func sendLogs(w http.ResponseWriter, r io.Reader) error {
 			stop = true
 		}
 		if _, err := w.Write(buf[:n]); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if flusher != nil {
 			flusher.Flush()
@@ -324,18 +249,16 @@ func sendLogs(w http.ResponseWriter, r io.Reader) error {
 }
 
 type LogsDeleteHandler struct {
-	log *zap.SugaredLogger
-	e   *etcd.Store
+	log zerolog.Logger
+	d   *db.DB
 	ost *objectstorage.ObjStorage
-	dm  *datamanager.DataManager
 }
 
-func NewLogsDeleteHandler(logger *zap.Logger, e *etcd.Store, ost *objectstorage.ObjStorage, dm *datamanager.DataManager) *LogsDeleteHandler {
+func NewLogsDeleteHandler(log zerolog.Logger, d *db.DB, ost *objectstorage.ObjStorage) *LogsDeleteHandler {
 	return &LogsDeleteHandler{
-		log: logger.Sugar(),
-		e:   e,
+		log: log,
+		d:   d,
 		ost: ost,
-		dm:  dm,
 	}
 }
 
@@ -346,23 +269,23 @@ func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	runID := q.Get("runid")
 	if runID == "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("runid is empty")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("runid is empty")))
 		return
 	}
 	taskID := q.Get("taskid")
 	if taskID == "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("taskid is empty")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("taskid is empty")))
 		return
 	}
 
 	_, setup := q["setup"]
 	stepStr := q.Get("step")
 	if !setup && stepStr == "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("setup is false and step is empty")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("setup is false and step is empty")))
 		return
 	}
 	if setup && stepStr != "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("setup is true and step is %s", stepStr)))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("setup is true and step is %s", stepStr)))
 		return
 	}
 
@@ -371,37 +294,46 @@ func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		step, err = strconv.Atoi(stepStr)
 		if err != nil {
-			httpError(w, util.NewErrBadRequest(errors.Errorf("step %s is not a valid number", stepStr)))
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("step %s is not a valid number", stepStr)))
 			return
 		}
 	}
 
 	if err := h.deleteTaskLogs(ctx, runID, taskID, setup, step, w); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		switch {
-		case util.IsNotExist(err):
-			httpError(w, util.NewErrNotExist(errors.Errorf("log doesn't exist: %w", err)))
+		case util.APIErrorIs(err, util.ErrNotExist):
+			util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Wrapf(err, "log doesn't exist")))
 		default:
-			httpError(w, err)
+			util.HTTPError(w, err)
 		}
 	}
 }
 
 func (h *LogsDeleteHandler) deleteTaskLogs(ctx context.Context, runID, taskID string, setup bool, step int, w http.ResponseWriter) error {
-	r, err := store.GetRunEtcdOrOST(ctx, h.e, h.dm, runID)
+	var r *types.Run
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		r, err = h.d.GetRun(tx, runID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		return nil
+	})
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
+
 	if r == nil {
-		return util.NewErrNotExist(errors.Errorf("no such run with id: %s", runID))
+		return util.NewAPIError(util.ErrNotExist, errors.Errorf("no such run with id: %s", runID))
 	}
 
 	task, ok := r.Tasks[taskID]
 	if !ok {
-		return util.NewErrNotExist(errors.Errorf("no such task with ID %s in run %s", taskID, runID))
+		return util.NewAPIError(util.ErrNotExist, errors.Errorf("no such task with ID %s in run %s", taskID, runID))
 	}
 	if len(task.Steps) <= step {
-		return util.NewErrNotExist(errors.Errorf("no such step for task %s in run %s", taskID, runID))
+		return util.NewAPIError(util.ErrNotExist, errors.Errorf("no such step for task %s in run %s", taskID, runID))
 	}
 
 	if task.Steps[step].LogPhase == types.RunTaskFetchPhaseFinished {
@@ -414,24 +346,26 @@ func (h *LogsDeleteHandler) deleteTaskLogs(ctx context.Context, runID, taskID st
 		err := h.ost.DeleteObject(logPath)
 		if err != nil {
 			if objectstorage.IsNotExist(err) {
-				return util.NewErrNotExist(err)
+				return util.NewAPIError(util.ErrNotExist, err)
 			}
-			return err
+			return errors.WithStack(err)
 		}
 		return nil
 	}
-	return util.NewErrBadRequest(errors.Errorf("Log for task %s in run %s is not yet archived", taskID, runID))
+	return util.NewAPIError(util.ErrBadRequest, errors.Errorf("Log for task %s in run %s is not yet archived", taskID, runID))
 }
 
 type ChangeGroupsUpdateTokensHandler struct {
-	log    *zap.SugaredLogger
-	readDB *readdb.ReadDB
+	log zerolog.Logger
+	d   *db.DB
+	ah  *action.ActionHandler
 }
 
-func NewChangeGroupsUpdateTokensHandler(logger *zap.Logger, readDB *readdb.ReadDB) *ChangeGroupsUpdateTokensHandler {
+func NewChangeGroupsUpdateTokensHandler(log zerolog.Logger, d *db.DB, ah *action.ActionHandler) *ChangeGroupsUpdateTokensHandler {
 	return &ChangeGroupsUpdateTokensHandler{
-		log:    logger.Sugar(),
-		readDB: readDB,
+		log: log,
+		d:   d,
+		ah:  ah,
 	}
 }
 
@@ -442,10 +376,10 @@ func (h *ChangeGroupsUpdateTokensHandler) ServeHTTP(w http.ResponseWriter, r *ht
 
 	var cgt *types.ChangeGroupsUpdateToken
 
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, groups)
-		return err
+		cgt, err = h.ah.GetChangeGroupsUpdateTokens(tx, groups)
+		return errors.WithStack(err)
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -458,65 +392,71 @@ func (h *ChangeGroupsUpdateTokensHandler) ServeHTTP(w http.ResponseWriter, r *ht
 		return
 	}
 
-	if err := httpResponse(w, http.StatusOK, cgts); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, cgts); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type RunHandler struct {
-	log    *zap.SugaredLogger
-	e      *etcd.Store
-	dm     *datamanager.DataManager
-	readDB *readdb.ReadDB
+	log zerolog.Logger
+	d   *db.DB
+	ah  *action.ActionHandler
 }
 
-func NewRunHandler(logger *zap.Logger, e *etcd.Store, dm *datamanager.DataManager, readDB *readdb.ReadDB) *RunHandler {
+func NewRunHandler(log zerolog.Logger, d *db.DB, ah *action.ActionHandler) *RunHandler {
 	return &RunHandler{
-		log:    logger.Sugar(),
-		e:      e,
-		dm:     dm,
-		readDB: readDB,
+		log: log,
+		d:   d,
+		ah:  ah,
 	}
 }
 
 func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	runID := vars["runid"]
+	runRef := vars["runid"]
 
 	query := r.URL.Query()
 	changeGroups := query["changegroup"]
 
 	var run *types.Run
+	var rc *types.RunConfig
 	var cgt *types.ChangeGroupsUpdateToken
 
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		run, err = h.readDB.GetRun(tx, runID)
+		run, err = h.d.GetRun(tx, runRef)
 		if err != nil {
-			h.log.Errorf("err: %+v", err)
-			return err
+			return errors.WithStack(err)
 		}
 
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, changeGroups)
-		return err
+		if run == nil {
+			return nil
+		}
+
+		rc, err = h.d.GetRunConfig(tx, run.RunConfigID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		cgt, err = h.ah.GetChangeGroupsUpdateTokens(tx, changeGroups)
+		return errors.WithStack(err)
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if run == nil {
-		httpError(w, util.NewErrNotExist(errors.Errorf("run %q doesn't exist", runID)))
+		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("run with id %q doesn't exist", runRef)))
+		return
+	}
+
+	if rc == nil {
+		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("run config for run with id %q doesn't exist", runRef)))
 		return
 	}
 
 	cgts, err := types.MarshalChangeGroupsUpdateToken(cgt)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	rc, err := store.OSTGetRunConfig(h.dm, run.ID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -528,25 +468,126 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ChangeGroupsUpdateToken: cgts,
 	}
 
-	if err := httpResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
+type RunByGroupHandler struct {
+	log zerolog.Logger
+	d   *db.DB
+	ah  *action.ActionHandler
+}
+
+func NewRunByGroupHandler(log zerolog.Logger, d *db.DB, ah *action.ActionHandler) *RunByGroupHandler {
+	return &RunByGroupHandler{
+		log: log,
+		d:   d,
+		ah:  ah,
+	}
+}
+
+func (h *RunByGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+
+	query := r.URL.Query()
+	changeGroups := query["changegroup"]
+
+	group, err := url.PathUnescape(vars["group"])
+	if err != nil {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("group is empty")))
+		return
+	}
+
+	runCounterStr := vars["runcounter"]
+
+	var runCounter uint64
+	if runCounterStr == "" {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("runcounter is empty")))
+	}
+	if runCounterStr != "" {
+		var err error
+		runCounter, err = strconv.ParseUint(runCounterStr, 10, 64)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse runcounter")))
+			return
+		}
+	}
+
+	var run *types.Run
+	var rc *types.RunConfig
+	var cgt *types.ChangeGroupsUpdateToken
+
+	err = h.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		run, err = h.d.GetRunByGroup(tx, group, runCounter)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		if run == nil {
+			return nil
+		}
+
+		rc, err = h.d.GetRunConfig(tx, run.RunConfigID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		cgt, err = h.ah.GetChangeGroupsUpdateTokens(tx, changeGroups)
+		return errors.WithStack(err)
+	})
+	if err != nil {
+		h.log.Err(err).Send()
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if run == nil {
+		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("run for group %q with counter %d doesn't exist", group, runCounter)))
+	}
+
+	if rc == nil {
+		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("run config for run with id %q doesn't exist", run.ID)))
+		return
+	}
+
+	cgts, err := types.MarshalChangeGroupsUpdateToken(cgt)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	res := &rsapitypes.RunResponse{
+		Run:                     run,
+		RunConfig:               rc,
+		ChangeGroupsUpdateToken: cgts,
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+
+}
+
 const (
-	DefaultRunsLimit = 25
-	MaxRunsLimit     = 40
+	DefaultRunsLimit  = 25
+	MaxRunsLimit      = 40
+	MaxRunEventsLimit = 40
 )
 
 type RunsHandler struct {
-	log    *zap.SugaredLogger
-	readDB *readdb.ReadDB
+	log zerolog.Logger
+	d   *db.DB
+
+	ah *action.ActionHandler
 }
 
-func NewRunsHandler(logger *zap.Logger, readDB *readdb.ReadDB) *RunsHandler {
+func NewRunsHandler(log zerolog.Logger, d *db.DB, ah *action.ActionHandler) *RunsHandler {
 	return &RunsHandler{
-		log:    logger.Sugar(),
-		readDB: readDB,
+		log: log,
+		d:   d,
+		ah:  ah,
 	}
 }
 
@@ -582,21 +623,127 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		sortOrder = types.SortOrderAsc
 	}
 
-	start := query.Get("start")
+	var startRunSequence uint64
+	startRunSequenceStr := query.Get("start")
+	if startRunSequenceStr != "" {
+		var err error
+		startRunSequence, err = strconv.ParseUint(startRunSequenceStr, 10, 64)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse run sequence")))
+			return
+		}
+	}
 
 	var runs []*types.Run
 	var cgt *types.ChangeGroupsUpdateToken
 
-	err := h.readDB.Do(ctx, func(tx *db.Tx) error {
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		runs, err = h.readDB.GetRuns(tx, groups, lastRun, phaseFilter, resultFilter, start, limit, sortOrder)
+		runs, err = h.d.GetRuns(tx, groups, lastRun, phaseFilter, resultFilter, startRunSequence, limit, sortOrder)
 		if err != nil {
-			h.log.Errorf("err: %+v", err)
-			return err
+			return errors.WithStack(err)
 		}
 
-		cgt, err = h.readDB.GetChangeGroupsUpdateTokens(tx, changeGroups)
-		return err
+		cgt, err = h.ah.GetChangeGroupsUpdateTokens(tx, changeGroups)
+		return errors.WithStack(err)
+	})
+	if err != nil {
+		h.log.Err(err).Send()
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	cgts, err := types.MarshalChangeGroupsUpdateToken(cgt)
+	if err != nil {
+		h.log.Err(err).Send()
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	res := &rsapitypes.GetRunsResponse{
+		Runs:                    runs,
+		ChangeGroupsUpdateToken: cgts,
+	}
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+type RunsByGroupHandler struct {
+	log zerolog.Logger
+	d   *db.DB
+	ah  *action.ActionHandler
+}
+
+func NewRunsByGroupHandler(log zerolog.Logger, d *db.DB, ah *action.ActionHandler) *RunsByGroupHandler {
+	return &RunsByGroupHandler{
+		log: log,
+		d:   d,
+		ah:  ah,
+	}
+}
+
+func (h *RunsByGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	query := r.URL.Query()
+	phaseFilter := types.RunPhaseFromStringSlice(query["phase"])
+	resultFilter := types.RunResultFromStringSlice(query["result"])
+
+	changeGroups := query["changegroup"]
+
+	group, err := url.PathUnescape(vars["group"])
+	if err != nil {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("group is empty")))
+		return
+	}
+
+	limitS := query.Get("limit")
+	limit := DefaultRunsLimit
+	if limitS != "" {
+		var err error
+		limit, err = strconv.Atoi(limitS)
+		if err != nil {
+			http.Error(w, "", http.StatusBadRequest)
+			return
+		}
+	}
+	if limit < 0 {
+		http.Error(w, "limit must be greater or equal than 0", http.StatusBadRequest)
+		return
+	}
+	if limit > MaxRunsLimit {
+		limit = MaxRunsLimit
+	}
+	sortOrder := types.SortOrderDesc
+	if _, ok := query["asc"]; ok {
+		sortOrder = types.SortOrderAsc
+	}
+
+	var startRunCounter uint64
+	startRunCounterStr := query.Get("start")
+	if startRunCounterStr != "" {
+		var err error
+		startRunCounter, err = strconv.ParseUint(startRunCounterStr, 10, 64)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse runcounter")))
+			return
+		}
+	}
+
+	var runs []*types.Run
+	var cgt *types.ChangeGroupsUpdateToken
+
+	err = h.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		runs, err = h.d.GetGroupRuns(tx, group, phaseFilter, resultFilter, startRunCounter, limit, sortOrder)
+		if err != nil {
+			h.log.Err(err).Send()
+			return errors.WithStack(err)
+		}
+
+		cgt, err = h.ah.GetChangeGroupsUpdateTokens(tx, changeGroups)
+		return errors.WithStack(err)
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -613,19 +760,19 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Runs:                    runs,
 		ChangeGroupsUpdateToken: cgts,
 	}
-	if err := httpResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type RunCreateHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewRunCreateHandler(logger *zap.Logger, ah *action.ActionHandler) *RunCreateHandler {
+func NewRunCreateHandler(log zerolog.Logger, ah *action.ActionHandler) *RunCreateHandler {
 	return &RunCreateHandler{
-		log: logger.Sugar(),
+		log: log,
 		ah:  ah,
 	}
 }
@@ -658,8 +805,8 @@ func (h *RunCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	rb, err := h.ah.CreateRun(ctx, creq)
 	if err != nil {
-		h.log.Errorf("err: %+v", err)
-		httpError(w, err)
+		h.log.Err(err).Send()
+		util.HTTPError(w, err)
 		return
 	}
 
@@ -668,19 +815,19 @@ func (h *RunCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		RunConfig: rb.Rc,
 	}
 
-	if err := httpResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type RunActionsHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewRunActionsHandler(logger *zap.Logger, ah *action.ActionHandler) *RunActionsHandler {
+func NewRunActionsHandler(log zerolog.Logger, ah *action.ActionHandler) *RunActionsHandler {
 	return &RunActionsHandler{
-		log: logger.Sugar(),
+		log: log,
 		ah:  ah,
 	}
 }
@@ -705,8 +852,8 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			ChangeGroupsUpdateToken: req.ChangeGroupsUpdateToken,
 		}
 		if err := h.ah.ChangeRunPhase(ctx, creq); err != nil {
-			h.log.Errorf("err: %+v", err)
-			httpError(w, err)
+			h.log.Err(err).Send()
+			util.HTTPError(w, err)
 			return
 		}
 	case rsapitypes.RunActionTypeStop:
@@ -715,8 +862,8 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			ChangeGroupsUpdateToken: req.ChangeGroupsUpdateToken,
 		}
 		if err := h.ah.StopRun(ctx, creq); err != nil {
-			h.log.Errorf("err: %+v", err)
-			httpError(w, err)
+			h.log.Err(err).Send()
+			util.HTTPError(w, err)
 			return
 		}
 	default:
@@ -726,13 +873,13 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type RunTaskActionsHandler struct {
-	log *zap.SugaredLogger
+	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewRunTaskActionsHandler(logger *zap.Logger, ah *action.ActionHandler) *RunTaskActionsHandler {
+func NewRunTaskActionsHandler(log zerolog.Logger, ah *action.ActionHandler) *RunTaskActionsHandler {
 	return &RunTaskActionsHandler{
-		log: logger.Sugar(),
+		log: log,
 		ah:  ah,
 	}
 }
@@ -759,8 +906,8 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 			ChangeGroupsUpdateToken: req.ChangeGroupsUpdateToken,
 		}
 		if err := h.ah.RunTaskSetAnnotations(ctx, creq); err != nil {
-			h.log.Errorf("err: %+v", err)
-			httpError(w, err)
+			h.log.Err(err).Send()
+			util.HTTPError(w, err)
 			return
 		}
 
@@ -771,8 +918,8 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 			ChangeGroupsUpdateToken: req.ChangeGroupsUpdateToken,
 		}
 		if err := h.ah.ApproveRunTask(ctx, creq); err != nil {
-			h.log.Errorf("err: %+v", err)
-			httpError(w, err)
+			h.log.Err(err).Send()
+			util.HTTPError(w, err)
 			return
 		}
 
@@ -783,18 +930,16 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 }
 
 type RunEventsHandler struct {
-	log *zap.SugaredLogger
-	e   *etcd.Store
+	log zerolog.Logger
+	d   *db.DB
 	ost *objectstorage.ObjStorage
-	dm  *datamanager.DataManager
 }
 
-func NewRunEventsHandler(logger *zap.Logger, e *etcd.Store, ost *objectstorage.ObjStorage, dm *datamanager.DataManager) *RunEventsHandler {
+func NewRunEventsHandler(log zerolog.Logger, d *db.DB, ost *objectstorage.ObjStorage) *RunEventsHandler {
 	return &RunEventsHandler{
-		log: logger.Sugar(),
-		e:   e,
+		log: log,
+		d:   d,
 		ost: ost,
-		dm:  dm,
 	}
 }
 
@@ -805,14 +950,23 @@ func (h *RunEventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
 	// TODO(sgotti) handle additional events filtering (by type, etc...)
-	startRunEventID := q.Get("startruneventid")
+	var startRunEventSequence uint64
+	startRunEventSequenceStr := q.Get("startsequence")
+	if startRunEventSequenceStr != "" {
+		var err error
+		startRunEventSequence, err = strconv.ParseUint(startRunEventSequenceStr, 10, 64)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse startsequence")))
+			return
+		}
+	}
 
-	if err := h.sendRunEvents(ctx, startRunEventID, w); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := h.sendRunEvents(ctx, startRunEventSequence, w); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
-func (h *RunEventsHandler) sendRunEvents(ctx context.Context, startRunEventID string, w http.ResponseWriter) error {
+func (h *RunEventsHandler) sendRunEvents(ctx context.Context, startRunEventSequence uint64, w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -822,38 +976,66 @@ func (h *RunEventsHandler) sendRunEvents(ctx context.Context, startRunEventID st
 		flusher = fl
 	}
 
-	// TODO(sgotti) fetch from previous events (handle startRunEventID).
-	// Use the readdb instead of etcd
+	// TODO(sgotti) use a notify system instead of polling the database
 
-	wctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	wctx = etcdclientv3.WithRequireLeader(wctx)
-	wch := h.e.WatchKey(wctx, common.EtcdRunEventKey, 0)
-	for wresp := range wch {
-		if wresp.Canceled {
-			err := wresp.Err()
-			if err == etcdclientv3rpc.ErrCompacted {
-				h.log.Errorf("required events already compacted")
-			}
-			return errors.Errorf("watch error: %w", err)
-		}
+	curEventSequence := startRunEventSequence
 
-		for _, ev := range wresp.Events {
-			switch ev.Type {
-			case mvccpb.PUT:
-				var runEvent *types.RunEvent
-				if err := json.Unmarshal(ev.Kv.Value, &runEvent); err != nil {
-					return errors.Errorf("failed to unmarshal run: %w", err)
-				}
-				if _, err := w.Write([]byte(fmt.Sprintf("data: %s\n\n", ev.Kv.Value))); err != nil {
-					return err
-				}
+	if startRunEventSequence == 0 {
+		err := h.d.Do(ctx, func(tx *sql.Tx) error {
+			// start from last event
+			runEvent, err := h.d.GetLastRunEvent(tx)
+			if err != nil {
+				return errors.WithStack(err)
 			}
-		}
-		if flusher != nil {
-			flusher.Flush()
+			if runEvent == nil {
+				return nil
+			}
+
+			curEventSequence = runEvent.Sequence
+
+			return nil
+		})
+		if err != nil {
+			return errors.WithStack(err)
 		}
 	}
 
-	return nil
+	for {
+		var runEvents []*types.RunEvent
+		err := h.d.Do(ctx, func(tx *sql.Tx) error {
+			var err error
+			runEvents, err = h.d.GetRunEventsFromSequence(tx, curEventSequence, MaxRunEventsLimit)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+
+			return nil
+		})
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		for _, runEvent := range runEvents {
+			curEventSequence = runEvent.Sequence
+
+			runEventj, err := json.Marshal(runEvent)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+
+			if _, err := w.Write([]byte(fmt.Sprintf("data: %s\n\n", runEventj))); err != nil {
+				return errors.WithStack(err)
+			}
+
+			curEventSequence = runEvent.Sequence
+		}
+
+		if flusher != nil {
+			flusher.Flush()
+		}
+
+		if len(runEvents) < MaxRunEventsLimit {
+			time.Sleep(1 * time.Second)
+		}
+	}
 }

@@ -17,10 +17,11 @@ package cmd
 import (
 	"context"
 
+	"agola.io/agola/internal/errors"
 	gwclient "agola.io/agola/services/gateway/client"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	errors "golang.org/x/xerrors"
 )
 
 var cmdProjectReconfig = &cobra.Command{
@@ -28,7 +29,7 @@ var cmdProjectReconfig = &cobra.Command{
 	Short: "reconfigures a project remote (reinstalls ssh deploy key and webhooks)",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := projectReconfig(cmd, args); err != nil {
-			log.Fatalf("err: %v", err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }
@@ -45,7 +46,7 @@ func init() {
 	flags.StringVarP(&projectReconfigOpts.name, "name", "n", "", "project name")
 
 	if err := cmdProjectReconfig.MarkFlagRequired("name"); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 
 	cmdProject.AddCommand(cmdProjectReconfig)
@@ -54,11 +55,11 @@ func init() {
 func projectReconfig(cmd *cobra.Command, args []string) error {
 	gwclient := gwclient.NewClient(gatewayURL, token)
 
-	log.Infof("reconfiguring remote project")
+	log.Info().Msgf("reconfiguring remote project")
 	if _, err := gwclient.ReconfigProject(context.TODO(), projectReconfigOpts.name); err != nil {
-		return errors.Errorf("failed to reconfigure remote project: %w", err)
+		return errors.Wrapf(err, "failed to reconfigure remote project")
 	}
-	log.Infof("project reconfigured")
+	log.Info().Msgf("project reconfigured")
 
 	return nil
 }

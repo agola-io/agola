@@ -18,12 +18,18 @@ import (
 	cstypes "agola.io/agola/services/configstore/types"
 )
 
+type CreateUpdateProjectGroupRequest struct {
+	Name       string
+	Parent     cstypes.Parent
+	Visibility cstypes.Visibility
+}
+
 // ProjectGroup augments cstypes.ProjectGroup with dynamic data
 type ProjectGroup struct {
 	*cstypes.ProjectGroup
 
 	// dynamic data
-	OwnerType        cstypes.ConfigType
+	OwnerType        cstypes.ObjectKind
 	OwnerID          string
 	Path             string
 	ParentPath       string

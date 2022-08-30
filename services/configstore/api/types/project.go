@@ -18,12 +18,27 @@ import (
 	cstypes "agola.io/agola/services/configstore/types"
 )
 
+type CreateUpdateProjectRequest struct {
+	Name                       string
+	Parent                     cstypes.Parent
+	Visibility                 cstypes.Visibility
+	RemoteRepositoryConfigType cstypes.RemoteRepositoryConfigType
+	RemoteSourceID             string
+	LinkedAccountID            string
+	RepositoryID               string
+	RepositoryPath             string
+	SSHPrivateKey              string
+	SkipSSHHostKeyCheck        bool
+	PassVarsToForkedPR         bool
+	DefaultBranch              string
+}
+
 // Project augments cstypes.Project with dynamic data
 type Project struct {
 	*cstypes.Project
 
 	// dynamic data
-	OwnerType        cstypes.ConfigType
+	OwnerType        cstypes.ObjectKind
 	OwnerID          string
 	Path             string
 	ParentPath       string

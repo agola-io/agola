@@ -19,7 +19,7 @@ import (
 	"encoding/json"
 	"time"
 
-	errors "golang.org/x/xerrors"
+	"agola.io/agola/internal/errors"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -49,10 +49,10 @@ func (d *K8sDriver) updateLease(ctx context.Context) error {
 
 		leaseClient := d.client.CoordinationV1().Leases(d.namespace)
 		found := false
-		lease, err := leaseClient.Get(name, metav1.GetOptions{})
+		lease, err := leaseClient.Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			if !apierrors.IsNotFound(err) {
-				return err
+				return errors.WithStack(err)
 			}
 		} else {
 			found = true
@@ -60,8 +60,8 @@ func (d *K8sDriver) updateLease(ctx context.Context) error {
 
 		if found {
 			lease.Spec.RenewTime = &now
-			_, err := leaseClient.Update(lease)
-			return err
+			_, err := leaseClient.Update(ctx, lease, metav1.UpdateOptions{})
+			return errors.WithStack(err)
 		}
 
 		lease = &coordinationv1.Lease{
@@ -76,15 +76,15 @@ func (d *K8sDriver) updateLease(ctx context.Context) error {
 				RenewTime:            &now,
 			},
 		}
-		_, err = leaseClient.Create(lease)
-		return err
+		_, err = leaseClient.Create(ctx, lease, metav1.CreateOptions{})
+		return errors.WithStack(err)
 	} else {
 		cmClient := d.client.CoreV1().ConfigMaps(d.namespace)
 		found := false
-		cm, err := cmClient.Get(name, metav1.GetOptions{})
+		cm, err := cmClient.Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			if !apierrors.IsNotFound(err) {
-				return err
+				return errors.WithStack(err)
 			}
 		} else {
 			found = true
@@ -103,22 +103,22 @@ func (d *K8sDriver) updateLease(ctx context.Context) error {
 			}
 			if recordBytes, found := cm.Annotations[cmLeaseKey]; found {
 				if err := json.Unmarshal([]byte(recordBytes), &ld); err != nil {
-					return err
+					return errors.WithStack(err)
 				}
 			}
 			ld.RenewTime = now
 			ldj, err := json.Marshal(ld)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			cm.Annotations[cmLeaseKey] = string(ldj)
-			_, err = cmClient.Update(cm)
-			return err
+			_, err = cmClient.Update(ctx, cm, metav1.UpdateOptions{})
+			return errors.WithStack(err)
 		}
 
 		ldj, err := json.Marshal(ld)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		cm = &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
@@ -128,8 +128,8 @@ func (d *K8sDriver) updateLease(ctx context.Context) error {
 			},
 		}
 		cm.Annotations[cmLeaseKey] = string(ldj)
-		_, err = cmClient.Create(cm)
-		return err
+		_, err = cmClient.Create(ctx, cm, metav1.CreateOptions{})
+		return errors.WithStack(err)
 	}
 }
 
@@ -142,9 +142,9 @@ func (d *K8sDriver) getLeases(ctx context.Context) ([]string, error) {
 	if d.useLeaseAPI {
 		leaseClient := d.client.CoordinationV1().Leases(d.namespace)
 
-		leases, err := leaseClient.List(metav1.ListOptions{LabelSelector: apilabels.SelectorFromSet(labels).String()})
+		leases, err := leaseClient.List(ctx, metav1.ListOptions{LabelSelector: apilabels.SelectorFromSet(labels).String()})
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 		for _, lease := range leases.Items {
 			if v, ok := lease.Labels[executorIDKey]; ok {
@@ -154,9 +154,9 @@ func (d *K8sDriver) getLeases(ctx context.Context) ([]string, error) {
 	} else {
 		cmClient := d.client.CoreV1().ConfigMaps(d.namespace)
 
-		cms, err := cmClient.List(metav1.ListOptions{LabelSelector: apilabels.SelectorFromSet(labels).String()})
+		cms, err := cmClient.List(ctx, metav1.ListOptions{LabelSelector: apilabels.SelectorFromSet(labels).String()})
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 		for _, cm := range cms.Items {
 			if v, ok := cm.Labels[executorIDKey]; ok {
@@ -177,11 +177,11 @@ func (d *K8sDriver) cleanStaleExecutorsLease(ctx context.Context) error {
 
 		leases, err := d.leaseLister.List(apilabels.SelectorFromSet(labels))
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		for _, lease := range leases {
 			if lease.Spec.HolderIdentity == nil {
-				d.log.Warnf("missing holder identity for lease %q", lease.Name)
+				d.log.Warn().Msgf("missing holder identity for lease %q", lease.Name)
 				continue
 			}
 			// skip our lease
@@ -189,13 +189,13 @@ func (d *K8sDriver) cleanStaleExecutorsLease(ctx context.Context) error {
 				continue
 			}
 			if lease.Spec.RenewTime == nil {
-				d.log.Warnf("missing renew time for lease %q", lease.Name)
+				d.log.Warn().Msgf("missing renew time for lease %q", lease.Name)
 				continue
 			}
 			if lease.Spec.RenewTime.Add(staleExecutorLeaseInterval).Before(time.Now()) {
-				d.log.Infof("deleting stale lease %q", lease.Name)
-				if err := leaseClient.Delete(lease.Name, nil); err != nil {
-					d.log.Errorf("failed to delete stale lease %q, err: %v", lease.Name, err)
+				d.log.Info().Msgf("deleting stale lease %q", lease.Name)
+				if err := leaseClient.Delete(ctx, lease.Name, metav1.DeleteOptions{}); err != nil {
+					d.log.Err(err).Msgf("failed to delete stale lease %q", lease.Name)
 				}
 			}
 		}
@@ -204,18 +204,18 @@ func (d *K8sDriver) cleanStaleExecutorsLease(ctx context.Context) error {
 
 		cms, err := d.cmLister.List(apilabels.SelectorFromSet(labels))
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		for _, cm := range cms {
 			var ld *LeaseData
 			if cm.Annotations == nil {
 				// this shouldn't happen
-				d.log.Warnf("missing configmap lease annotations for configmap %q", cm.Name)
+				d.log.Warn().Msgf("missing configmap lease annotations for configmap %q", cm.Name)
 				continue
 			}
 			if recordBytes, found := cm.Annotations[cmLeaseKey]; found {
 				if err := json.Unmarshal([]byte(recordBytes), &ld); err != nil {
-					return err
+					return errors.WithStack(err)
 				}
 			}
 			// skip our lease
@@ -223,9 +223,9 @@ func (d *K8sDriver) cleanStaleExecutorsLease(ctx context.Context) error {
 				continue
 			}
 			if ld.RenewTime.Add(staleExecutorLeaseInterval).Before(time.Now()) {
-				d.log.Infof("deleting stale configmap lease %q", cm.Name)
-				if err := cmClient.Delete(cm.Name, nil); err != nil {
-					d.log.Errorf("failed to delete stale configmap lease %q, err: %v", cm.Name, err)
+				d.log.Info().Msgf("deleting stale configmap lease %q", cm.Name)
+				if err := cmClient.Delete(ctx, cm.Name, metav1.DeleteOptions{}); err != nil {
+					d.log.Err(err).Msgf("failed to delete stale configmap lease %q", cm.Name)
 				}
 			}
 		}

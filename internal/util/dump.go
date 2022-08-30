@@ -24,7 +24,7 @@ import (
 // direct call to litter.Sdump.
 // In this way litter.Sdump will be executed only when really needed without
 // consuming CPU when not required.
-// I.E. if logging with zap using log.Debugf("dumped value: ", util.Dump(value)),
+// I.E. if logging with zerolog using log.Debug().Msgf("dumped value: ", util.Dump(value)),
 // the formatting (and so the call to litter.Sdump) won't happen if the log
 // level is less than debug.
 type dump struct {

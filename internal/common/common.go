@@ -21,11 +21,9 @@ import (
 	"os"
 	"path"
 
-	"agola.io/agola/internal/etcd"
+	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/services/config"
-	"go.uber.org/zap"
-	errors "golang.org/x/xerrors"
 )
 
 const (
@@ -42,7 +40,7 @@ func WriteFileAtomicFunc(filename string, perm os.FileMode, writeFunc func(f io.
 	dir, name := path.Split(filename)
 	f, err := ioutil.TempFile(dir, name)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	err = writeFunc(f)
 	if err == nil {
@@ -61,7 +59,7 @@ func WriteFileAtomicFunc(filename string, perm os.FileMode, writeFunc func(f io.
 	if err != nil {
 		os.Remove(f.Name())
 	}
-	return err
+	return errors.WithStack(err)
 }
 
 // WriteFileAtomic atomically writes a file
@@ -69,7 +67,7 @@ func WriteFileAtomic(filename string, data []byte, perm os.FileMode) error {
 	return WriteFileAtomicFunc(filename, perm,
 		func(f io.Writer) error {
 			_, err := f.Write(data)
-			return err
+			return errors.WithStack(err)
 		})
 }
 
@@ -83,7 +81,7 @@ func NewObjectStorage(c *config.ObjectStorage) (*objectstorage.ObjStorage, error
 	case config.ObjectStorageTypePosix:
 		ost, err = objectstorage.NewPosix(c.Path)
 		if err != nil {
-			return nil, errors.Errorf("failed to create posix object storage: %w", err)
+			return nil, errors.Wrapf(err, "failed to create posix object storage")
 		}
 	case config.ObjectStorageTypeS3:
 		// minio golang client doesn't accept an url as an endpoint
@@ -102,26 +100,9 @@ func NewObjectStorage(c *config.ObjectStorage) (*objectstorage.ObjStorage, error
 		}
 		ost, err = objectstorage.NewS3(c.Bucket, c.Location, endpoint, c.AccessKey, c.SecretAccessKey, secure)
 		if err != nil {
-			return nil, errors.Errorf("failed to create s3 object storage: %w", err)
+			return nil, errors.Wrapf(err, "failed to create s3 object storage")
 		}
 	}
 
 	return objectstorage.NewObjStorage(ost, "/"), nil
-}
-
-func NewEtcd(c *config.Etcd, logger *zap.Logger, prefix string) (*etcd.Store, error) {
-	e, err := etcd.New(etcd.Config{
-		Logger:        logger,
-		Endpoints:     c.Endpoints,
-		Prefix:        prefix,
-		CertFile:      c.TLSCertFile,
-		KeyFile:       c.TLSKeyFile,
-		CAFile:        c.TLSCAFile,
-		SkipTLSVerify: c.TLSSkipVerify,
-	})
-	if err != nil {
-		return nil, errors.Errorf("failed to create etcd store: %w", err)
-	}
-
-	return e, nil
 }

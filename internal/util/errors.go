@@ -15,9 +15,10 @@
 package util
 
 import (
+	"fmt"
 	"strings"
 
-	errors "golang.org/x/xerrors"
+	"agola.io/agola/internal/errors"
 )
 
 // Errors is an error that contains multiple errors
@@ -47,7 +48,8 @@ func (e *Errors) Equal(e2 error) bool {
 	for _, err := range e.Errs {
 		errs1 = append(errs1, err.Error())
 	}
-	if es2, ok := e2.(*Errors); ok {
+	var es2 *Errors
+	if errors.As(e2, &es2) {
 		for _, err := range es2.Errs {
 			errs2 = append(errs2, err.Error())
 		}
@@ -58,116 +60,132 @@ func (e *Errors) Equal(e2 error) bool {
 	return CompareStringSliceNoOrder(errs1, errs2)
 }
 
-// ErrBadRequest represent an error caused by a bad command request
-// it's used to differentiate an internal error from an user error
-type ErrBadRequest struct {
-	Err error
+type ErrorKind int
+type ErrorCode string
+
+const (
+	ErrBadRequest ErrorKind = iota
+	ErrNotExist
+	ErrForbidden
+	ErrUnauthorized
+	ErrInternal
+)
+
+func (k ErrorKind) String() string {
+	switch k {
+	case ErrBadRequest:
+		return "badrequest"
+	case ErrNotExist:
+		return "notexist"
+	case ErrForbidden:
+		return "forbidden"
+	case ErrUnauthorized:
+		return "unauthorized"
+	case ErrInternal:
+		return "internal"
+	}
+
+	return "unknown"
 }
 
-func (e *ErrBadRequest) Error() string {
-	return e.Err.Error()
+type APIError struct {
+	err     error
+	Kind    ErrorKind
+	Code    ErrorCode
+	Message string
+
+	*errors.Stack
 }
 
-func NewErrBadRequest(err error) *ErrBadRequest {
-	return &ErrBadRequest{Err: err}
+func NewAPIError(kind ErrorKind, err error, options ...APIErrorOption) error {
+	derr := &APIError{err: err, Kind: kind, Stack: errors.Callers(0)}
+
+	for _, opt := range options {
+		opt(derr)
+	}
+
+	return derr
 }
 
-func (*ErrBadRequest) Is(err error) bool {
-	_, ok := err.(*ErrBadRequest)
-	return ok
+func (e *APIError) Error() string {
+	return e.err.Error()
 }
 
-func IsBadRequest(err error) bool {
-	return errors.Is(err, &ErrBadRequest{})
+func (e *APIError) Unwrap() error {
+	return e.err
 }
 
-// ErrNotExist represent a not exist error
-// it's used to differentiate an internal error from an user error
-type ErrNotExist struct {
-	Err error
+type APIErrorOption func(e *APIError)
+
+func WithCode(code ErrorCode) APIErrorOption {
+	return func(e *APIError) {
+		e.Code = code
+	}
 }
 
-func (e *ErrNotExist) Error() string {
-	return e.Err.Error()
+func WithMessage(message string) APIErrorOption {
+	return func(e *APIError) {
+		e.Message = message
+	}
 }
 
-func NewErrNotExist(err error) *ErrNotExist {
-	return &ErrNotExist{Err: err}
+func AsAPIError(err error) (*APIError, bool) {
+	var derr *APIError
+	return derr, errors.As(err, &derr)
 }
 
-func (*ErrNotExist) Is(err error) bool {
-	_, ok := err.(*ErrNotExist)
-	return ok
+func APIErrorIs(err error, kind ErrorKind) bool {
+	if derr, ok := AsAPIError(err); ok && derr.Kind == kind {
+		return true
+	}
+
+	return false
 }
 
-func IsNotExist(err error) bool {
-	return errors.Is(err, &ErrNotExist{})
+// RemoteError is an error received from a remote call. It's similar to
+// APIError but with another type so it can be distinguished and won't be
+// propagated to the api response.
+type RemoteError struct {
+	Kind    ErrorKind
+	Code    string
+	Message string
 }
 
-// ErrForbidden represent an error caused by an forbidden operation
-// it's used to differentiate an internal error from an user error
-type ErrForbidden struct {
-	Err error
+func NewRemoteError(kind ErrorKind, code string, message string) error {
+	return &RemoteError{Kind: kind, Code: code, Message: message}
 }
 
-func (e *ErrForbidden) Error() string {
-	return e.Err.Error()
+func (e *RemoteError) Error() string {
+	code := e.Code
+	message := e.Message
+	errStr := fmt.Sprintf("remote error %s", e.Kind)
+	if code != "" {
+		errStr += fmt.Sprintf(" (code: %s)", code)
+	}
+	if message != "" {
+		errStr += fmt.Sprintf(" (message: %s)", message)
+	}
+
+	return errStr
 }
 
-func NewErrForbidden(err error) *ErrForbidden {
-	return &ErrForbidden{Err: err}
+func AsRemoteError(err error) (*RemoteError, bool) {
+	var rerr *RemoteError
+	return rerr, errors.As(err, &rerr)
 }
 
-func (*ErrForbidden) Is(err error) bool {
-	_, ok := err.(*ErrForbidden)
-	return ok
+func RemoteErrorIs(err error, kind ErrorKind) bool {
+	if rerr, ok := AsRemoteError(err); ok && rerr.Kind == kind {
+		return true
+	}
+
+	return false
 }
 
-func IsForbidden(err error) bool {
-	return errors.Is(err, &ErrForbidden{})
-}
+func KindFromRemoteError(err error) ErrorKind {
+	if rerr, ok := AsRemoteError(err); ok {
+		return rerr.Kind
+	}
 
-// ErrUnauthorized represent an error caused by an unauthorized request
-// it's used to differentiate an internal error from an user error
-type ErrUnauthorized struct {
-	Err error
-}
-
-func (e *ErrUnauthorized) Error() string {
-	return e.Err.Error()
-}
-
-func NewErrUnauthorized(err error) *ErrUnauthorized {
-	return &ErrUnauthorized{Err: err}
-}
-
-func (*ErrUnauthorized) Is(err error) bool {
-	_, ok := err.(*ErrUnauthorized)
-	return ok
-}
-
-func IsUnauthorized(err error) bool {
-	return errors.Is(err, &ErrUnauthorized{})
-}
-
-type ErrInternal struct {
-	Err error
-}
-
-// ErrInternal represent an internal error that should be returned to the user
-func (e *ErrInternal) Error() string {
-	return e.Err.Error()
-}
-
-func NewErrInternal(err error) *ErrInternal {
-	return &ErrInternal{Err: err}
-}
-
-func (*ErrInternal) Is(err error) bool {
-	_, ok := err.(*ErrInternal)
-	return ok
-}
-
-func IsInternal(err error) bool {
-	return errors.Is(err, &ErrInternal{})
+	return ErrInternal
 }

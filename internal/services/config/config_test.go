@@ -16,11 +16,10 @@ package config
 
 import (
 	"io/ioutil"
-	"os"
 	"path"
 	"testing"
 
-	errors "golang.org/x/xerrors"
+	"agola.io/agola/internal/errors"
 )
 
 func TestParseConfig(t *testing.T) {
@@ -55,13 +54,12 @@ notification:
   webExposedURL: "http://localhost:8000"
   runserviceURL: "http://localhost:4000"
   configstoreURL: "http://localhost:4002"
-  etcd:
-    endpoints: "http://localhost:2379"
 
 configstore:
   dataDir: /data/agola/configstore
-  etcd:
-    endpoints: "http://localhost:2379"
+  db:
+    type: sqlite3
+    connString: /opt/data/agola/configstore/db
   objectStorage:
     type: posix
     path: /agola/configstore/ost
@@ -71,8 +69,9 @@ configstore:
 runservice:
   #debug: true
   dataDir: /opt/data/agola/runservice
-  etcd:
-    endpoints: "http://localhost:2379"
+  db:
+    type: sqlite3
+    connString: /opt/data/agola/runservice/db
   objectStorage:
     type: posix
     path: /agola/runservice/ost
@@ -121,13 +120,12 @@ notification:
   webExposedURL: "http://localhost:8000"
   runserviceURL: "http://localhost:4000"
   configstoreURL: "http://localhost:4002"
-  etcd:
-    endpoints: "http://localhost:2379"
 
 configstore:
   dataDir: /data/agola/configstore
-  etcd:
-    endpoints: "http://localhost:2379"
+  db:
+    type: sqlite3
+    connString: /opt/data/agola/configstore/db
   objectStorage:
     type: posix
     path: /agola/configstore/ost
@@ -136,8 +134,9 @@ configstore:
 
 runservice:
   dataDir: /data/agola/runservice
-  etcd:
-    endpoints: "http://localhost:2379"
+  db:
+    type: sqlite3
+    connString: /opt/data/agola/runservice/db
   objectStorage:
     type: posix
     path: /agola/runservice/ost
@@ -175,8 +174,6 @@ notification:
   webExposedURL: "http://localhost:8000"
   runserviceURL: "http://localhost:4000"
   configstoreURL: "http://localhost:4002"
-  etcd:
-    endpoints: "http://localhost:2379"
 
 configstore:
   dataDir: 
@@ -212,8 +209,6 @@ notification:
   webExposedURL: "http://localhost:8000"
   runserviceURL: "http://localhost:4000"
   configstoreURL: "http://localhost:4002"
-  etcd:
-    endpoints: "http://localhost:2379"
 
 configstore:
   dataDir:
@@ -229,14 +224,10 @@ gitserver:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dir, err := ioutil.TempDir("", "ParseConfig")
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
-			defer os.RemoveAll(dir)
+			dir := t.TempDir()
 
 			content := []byte(tt.in)
-			err = ioutil.WriteFile(path.Join(dir, "config.yml"), content, 0644)
+			err := ioutil.WriteFile(path.Join(dir, "config.yml"), content, 0644)
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}

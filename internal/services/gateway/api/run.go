@@ -18,22 +18,23 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 
+	"agola.io/agola/internal/errors"
+	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	rstypes "agola.io/agola/services/runservice/types"
 
 	"github.com/gorilla/mux"
-	"go.uber.org/zap"
-	errors "golang.org/x/xerrors"
+	"github.com/rs/zerolog"
 )
 
 func createRunResponse(r *rstypes.Run, rc *rstypes.RunConfig) *gwapitypes.RunResponse {
 	run := &gwapitypes.RunResponse{
-		ID:          r.ID,
-		Counter:     r.Counter,
+		Number:      r.Counter,
 		Name:        r.Name,
 		Annotations: r.Annotations,
 		Phase:       r.Phase,
@@ -62,9 +63,10 @@ func createRunResponse(r *rstypes.Run, rc *rstypes.RunConfig) *gwapitypes.RunRes
 
 func createRunResponseTask(r *rstypes.Run, rt *rstypes.RunTask, rct *rstypes.RunConfigTask) *gwapitypes.RunResponseTask {
 	t := &gwapitypes.RunResponseTask{
-		ID:     rt.ID,
-		Name:   rct.Name,
-		Status: rt.Status,
+		ID:       rt.ID,
+		Name:     rct.Name,
+		Status:   rt.Status,
+		Timedout: rt.Timedout,
 
 		StartTime: rt.StartTime,
 		EndTime:   rt.EndTime,
@@ -75,6 +77,8 @@ func createRunResponseTask(r *rstypes.Run, rt *rstypes.RunTask, rct *rstypes.Run
 
 		Level:   rct.Level,
 		Depends: rct.Depends,
+
+		TaskTimeoutInterval: rct.TaskTimeoutInterval,
 	}
 
 	return t
@@ -82,9 +86,11 @@ func createRunResponseTask(r *rstypes.Run, rt *rstypes.RunTask, rct *rstypes.Run
 
 func createRunTaskResponse(rt *rstypes.RunTask, rct *rstypes.RunConfigTask) *gwapitypes.RunTaskResponse {
 	t := &gwapitypes.RunTaskResponse{
-		ID:     rt.ID,
-		Name:   rct.Name,
-		Status: rt.Status,
+		ID:         rt.ID,
+		Name:       rct.Name,
+		Status:     rt.Status,
+		Timedout:   rt.Timedout,
+		Containers: []gwapitypes.RunTaskResponseContainer{},
 
 		WaitingApproval:     rt.WaitingApproval,
 		Approved:            rt.Approved,
@@ -94,6 +100,8 @@ func createRunTaskResponse(rt *rstypes.RunTask, rct *rstypes.RunConfigTask) *gwa
 
 		StartTime: rt.StartTime,
 		EndTime:   rt.EndTime,
+
+		TaskTimeoutInterval: rct.TaskTimeoutInterval,
 	}
 
 	t.SetupStep = &gwapitypes.RunTaskResponseSetupStep{
@@ -101,6 +109,16 @@ func createRunTaskResponse(rt *rstypes.RunTask, rct *rstypes.RunConfigTask) *gwa
 		Phase:     rt.SetupStep.Phase,
 		StartTime: rt.SetupStep.StartTime,
 		EndTime:   rt.SetupStep.EndTime,
+	}
+
+	if rct.Runtime != nil {
+		for _, rctContainer := range rct.Runtime.Containers {
+			container := gwapitypes.RunTaskResponseContainer{}
+			if rctContainer != nil {
+				container.Image = rctContainer.Image
+			}
+			t.Containers = append(t.Containers, container)
+		}
 	}
 
 	for i := 0; i < len(t.Steps); i++ {
@@ -150,49 +168,100 @@ func createRunTaskResponse(rt *rstypes.RunTask, rct *rstypes.RunConfigTask) *gwa
 }
 
 type RunHandler struct {
-	log *zap.SugaredLogger
-	ah  *action.ActionHandler
+	log       zerolog.Logger
+	ah        *action.ActionHandler
+	groupType common.GroupType
 }
 
-func NewRunHandler(logger *zap.Logger, ah *action.ActionHandler) *RunHandler {
-	return &RunHandler{log: logger.Sugar(), ah: ah}
+func NewRunHandler(log zerolog.Logger, ah *action.ActionHandler, groupType common.GroupType) *RunHandler {
+	return &RunHandler{log: log, ah: ah, groupType: groupType}
 }
 
 func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	runID := vars["runid"]
 
-	runResp, err := h.ah.GetRun(ctx, runID)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	var err error
+	var ref string
+	switch h.groupType {
+	case common.GroupTypeProject:
+		ref, err = url.PathUnescape(vars["projectref"])
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("projectref is empty")))
+			return
+		}
+	case common.GroupTypeUser:
+		ref = vars["userref"]
+	}
+
+	runNumberStr := vars["runnumber"]
+
+	var runNumber uint64
+	if runNumberStr != "" {
+		var err error
+		runNumber, err = strconv.ParseUint(runNumberStr, 10, 64)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse run number")))
+			return
+		}
+	}
+
+	runResp, err := h.ah.GetRun(ctx, h.groupType, ref, runNumber)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
 	res := createRunResponse(runResp.Run, runResp.RunConfig)
-	if err := httpResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type RuntaskHandler struct {
-	log *zap.SugaredLogger
-	ah  *action.ActionHandler
+	log       zerolog.Logger
+	ah        *action.ActionHandler
+	groupType common.GroupType
 }
 
-func NewRuntaskHandler(logger *zap.Logger, ah *action.ActionHandler) *RuntaskHandler {
-	return &RuntaskHandler{log: logger.Sugar(), ah: ah}
+func NewRuntaskHandler(log zerolog.Logger, ah *action.ActionHandler, groupType common.GroupType) *RuntaskHandler {
+	return &RuntaskHandler{log: log, ah: ah, groupType: groupType}
 }
 
 func (h *RuntaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	runID := vars["runid"]
+
+	var err error
+	var ref string
+	switch h.groupType {
+	case common.GroupTypeProject:
+		ref, err = url.PathUnescape(vars["projectref"])
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("projectref is empty")))
+			return
+		}
+	case common.GroupTypeUser:
+		ref = vars["userref"]
+	}
+
+	runNumberStr := vars["runnumber"]
+
+	var runNumber uint64
+	if runNumberStr != "" {
+		var err error
+		runNumber, err = strconv.ParseUint(runNumberStr, 10, 64)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse run number")))
+			return
+		}
+	}
+
 	taskID := vars["taskid"]
 
-	runResp, err := h.ah.GetRun(ctx, runID)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	runResp, err := h.ah.GetRun(ctx, h.groupType, ref, runNumber)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -201,14 +270,14 @@ func (h *RuntaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	rt, ok := run.Tasks[taskID]
 	if !ok {
-		httpError(w, util.NewErrNotExist(errors.Errorf("run %q task %q not found", runID, taskID)))
+		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("run %q task %q not found", runNumber, taskID)))
 		return
 	}
 	rct := rc.Tasks[rt.ID]
 
 	res := createRunTaskResponse(rt, rct)
-	if err := httpResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
@@ -219,8 +288,7 @@ const (
 
 func createRunsResponse(r *rstypes.Run) *gwapitypes.RunsResponse {
 	run := &gwapitypes.RunsResponse{
-		ID:          r.ID,
-		Counter:     r.Counter,
+		Number:      r.Counter,
 		Name:        r.Name,
 		Annotations: r.Annotations,
 		Phase:       r.Phase,
@@ -237,31 +305,36 @@ func createRunsResponse(r *rstypes.Run) *gwapitypes.RunsResponse {
 }
 
 type RunsHandler struct {
-	log *zap.SugaredLogger
-	ah  *action.ActionHandler
+	log       zerolog.Logger
+	ah        *action.ActionHandler
+	groupType common.GroupType
 }
 
-func NewRunsHandler(logger *zap.Logger, ah *action.ActionHandler) *RunsHandler {
-	return &RunsHandler{log: logger.Sugar(), ah: ah}
+func NewRunsHandler(log zerolog.Logger, ah *action.ActionHandler, groupType common.GroupType) *RunsHandler {
+	return &RunsHandler{log: log, ah: ah, groupType: groupType}
 }
 
 func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-
+	vars := mux.Vars(r)
 	q := r.URL.Query()
 
-	// we currently accept only one group
-	group := q.Get("group")
-	// we require that groups are specified to not return all runs
-	if group == "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("no groups specified")))
-		return
+	var err error
+	var ref string
+	switch h.groupType {
+	case common.GroupTypeProject:
+		ref, err = url.PathUnescape(vars["projectref"])
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("projectref is empty")))
+			return
+		}
+	case common.GroupTypeUser:
+		ref = vars["userref"]
 	}
 
+	subGroup := q.Get("subgroup")
 	phaseFilter := q["phase"]
 	resultFilter := q["result"]
-	changeGroups := q["changegroup"]
-	_, lastRun := q["lastrun"]
 
 	limitS := q.Get("limit")
 	limit := DefaultRunsLimit
@@ -269,12 +342,12 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		limit, err = strconv.Atoi(limitS)
 		if err != nil {
-			httpError(w, util.NewErrBadRequest(errors.Errorf("cannot parse limit: %w", err)))
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit")))
 			return
 		}
 	}
 	if limit < 0 {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("limit must be greater or equal than 0")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0")))
 		return
 	}
 	if limit > MaxRunsLimit {
@@ -285,21 +358,31 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		asc = true
 	}
 
-	start := q.Get("start")
+	startRunNumberStr := q.Get("start")
+
+	var startRunNumber uint64
+	if startRunNumberStr != "" {
+		var err error
+		startRunNumber, err = strconv.ParseUint(startRunNumberStr, 10, 64)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse run number")))
+			return
+		}
+	}
 
 	areq := &action.GetRunsRequest{
-		PhaseFilter:  phaseFilter,
-		ResultFilter: resultFilter,
-		Group:        group,
-		LastRun:      lastRun,
-		ChangeGroups: changeGroups,
-		StartRunID:   start,
-		Limit:        limit,
-		Asc:          asc,
+		GroupType:       h.groupType,
+		Ref:             ref,
+		SubGroup:        subGroup,
+		PhaseFilter:     phaseFilter,
+		ResultFilter:    resultFilter,
+		StartRunCounter: startRunNumber,
+		Limit:           limit,
+		Asc:             asc,
 	}
 	runsResp, err := h.ah.GetRuns(ctx, areq)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -307,118 +390,190 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for i, r := range runsResp.Runs {
 		runs[i] = createRunsResponse(r)
 	}
-	if err := httpResponse(w, http.StatusOK, runs); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, runs); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type RunActionsHandler struct {
-	log *zap.SugaredLogger
-	ah  *action.ActionHandler
+	log       zerolog.Logger
+	ah        *action.ActionHandler
+	groupType common.GroupType
 }
 
-func NewRunActionsHandler(logger *zap.Logger, ah *action.ActionHandler) *RunActionsHandler {
-	return &RunActionsHandler{log: logger.Sugar(), ah: ah}
+func NewRunActionsHandler(log zerolog.Logger, ah *action.ActionHandler, groupType common.GroupType) *RunActionsHandler {
+	return &RunActionsHandler{log: log, ah: ah, groupType: groupType}
 }
 
 func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	runID := vars["runid"]
+
+	var err error
+	var ref string
+	switch h.groupType {
+	case common.GroupTypeProject:
+		ref, err = url.PathUnescape(vars["projectref"])
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("projectref is empty")))
+			return
+		}
+	case common.GroupTypeUser:
+		ref = vars["userref"]
+	}
+
+	runNumberStr := vars["runnumber"]
+
+	var runNumber uint64
+	if runNumberStr != "" {
+		var err error
+		runNumber, err = strconv.ParseUint(runNumberStr, 10, 64)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse run number")))
+			return
+		}
+	}
 
 	var req gwapitypes.RunActionsRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
 	areq := &action.RunActionsRequest{
-		RunID:      runID,
+		GroupType:  h.groupType,
+		Ref:        ref,
+		RunNumber:  runNumber,
 		ActionType: action.RunActionType(req.ActionType),
 		FromStart:  req.FromStart,
 	}
 
 	runResp, err := h.ah.RunAction(ctx, areq)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
 	res := createRunResponse(runResp.Run, runResp.RunConfig)
-	if err := httpResponse(w, http.StatusOK, res); err != nil {
-		h.log.Errorf("err: %+v", err)
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
 	}
 }
 
 type RunTaskActionsHandler struct {
-	log *zap.SugaredLogger
-	ah  *action.ActionHandler
+	log       zerolog.Logger
+	ah        *action.ActionHandler
+	groupType common.GroupType
 }
 
-func NewRunTaskActionsHandler(logger *zap.Logger, ah *action.ActionHandler) *RunTaskActionsHandler {
-	return &RunTaskActionsHandler{log: logger.Sugar(), ah: ah}
+func NewRunTaskActionsHandler(log zerolog.Logger, ah *action.ActionHandler, groupType common.GroupType) *RunTaskActionsHandler {
+	return &RunTaskActionsHandler{log: log, ah: ah, groupType: groupType}
 }
 
 func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
-	runID := vars["runid"]
+
+	var err error
+	var ref string
+	switch h.groupType {
+	case common.GroupTypeProject:
+		ref, err = url.PathUnescape(vars["projectref"])
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("projectref is empty")))
+			return
+		}
+	case common.GroupTypeUser:
+		ref = vars["userref"]
+	}
+
+	runNumberStr := vars["runnumber"]
+
+	var runNumber uint64
+	if runNumberStr != "" {
+		var err error
+		runNumber, err = strconv.ParseUint(runNumberStr, 10, 64)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse run number")))
+			return
+		}
+	}
 	taskID := vars["taskid"]
 
 	var req gwapitypes.RunTaskActionsRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		httpError(w, util.NewErrBadRequest(err))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
 	areq := &action.RunTaskActionsRequest{
-		RunID:      runID,
+		GroupType:  h.groupType,
+		Ref:        ref,
+		RunNumber:  runNumber,
 		TaskID:     taskID,
 		ActionType: action.RunTaskActionType(req.ActionType),
 	}
 
-	err := h.ah.RunTaskAction(ctx, areq)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	err = h.ah.RunTaskAction(ctx, areq)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 }
 
 type LogsHandler struct {
-	log *zap.SugaredLogger
-	ah  *action.ActionHandler
+	log       zerolog.Logger
+	ah        *action.ActionHandler
+	groupType common.GroupType
 }
 
-func NewLogsHandler(logger *zap.Logger, ah *action.ActionHandler) *LogsHandler {
-	return &LogsHandler{log: logger.Sugar(), ah: ah}
+func NewLogsHandler(log zerolog.Logger, ah *action.ActionHandler, groupType common.GroupType) *LogsHandler {
+	return &LogsHandler{log: log, ah: ah, groupType: groupType}
 }
 
 func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	vars := mux.Vars(r)
 
 	q := r.URL.Query()
 
-	runID := q.Get("runID")
-	if runID == "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("empty run id")))
-		return
+	var err error
+	var ref string
+	switch h.groupType {
+	case common.GroupTypeProject:
+		ref, err = url.PathUnescape(vars["projectref"])
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("projectref is empty")))
+			return
+		}
+	case common.GroupTypeUser:
+		ref = vars["userref"]
 	}
-	taskID := q.Get("taskID")
-	if taskID == "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("empty task id")))
-		return
+
+	runNumberStr := vars["runnumber"]
+
+	var runNumber uint64
+	if runNumberStr != "" {
+		var err error
+		runNumber, err = strconv.ParseUint(runNumberStr, 10, 64)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse run number")))
+			return
+		}
 	}
+
+	taskID := vars["taskid"]
 
 	_, setup := q["setup"]
 	stepStr := q.Get("step")
 	if !setup && stepStr == "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("no setup or step number provided")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("no setup or step number provided")))
 		return
 	}
 	if setup && stepStr != "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("both setup and step number provided")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("both setup and step number provided")))
 		return
 	}
 
@@ -427,7 +582,7 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		step, err = strconv.Atoi(stepStr)
 		if err != nil {
-			httpError(w, util.NewErrBadRequest(errors.Errorf("cannot parse step number: %w", err)))
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse step number")))
 			return
 		}
 	}
@@ -438,16 +593,18 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	areq := &action.GetLogsRequest{
-		RunID:  runID,
-		TaskID: taskID,
-		Setup:  setup,
-		Step:   step,
-		Follow: follow,
+		GroupType: h.groupType,
+		Ref:       ref,
+		RunNumber: runNumber,
+		TaskID:    taskID,
+		Setup:     setup,
+		Step:      step,
+		Follow:    follow,
 	}
 
 	resp, err := h.ah.GetLogs(ctx, areq)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 
@@ -466,7 +623,7 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	defer resp.Body.Close()
 	if err := sendLogs(w, resp.Body); err != nil {
-		h.log.Errorf("err: %+v", err)
+		h.log.Err(err).Send()
 		return
 	}
 }
@@ -487,7 +644,7 @@ func sendLogs(w io.Writer, r io.Reader) error {
 		n, err := r.Read(buf)
 		if err != nil {
 			if err != io.EOF {
-				return err
+				return errors.WithStack(err)
 			}
 			if n == 0 {
 				return nil
@@ -495,7 +652,7 @@ func sendLogs(w io.Writer, r io.Reader) error {
 			stop = true
 		}
 		if _, err := w.Write(buf[:n]); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if flusher != nil {
 			flusher.Flush()
@@ -504,38 +661,56 @@ func sendLogs(w io.Writer, r io.Reader) error {
 }
 
 type LogsDeleteHandler struct {
-	log *zap.SugaredLogger
-	ah  *action.ActionHandler
+	log       zerolog.Logger
+	ah        *action.ActionHandler
+	groupType common.GroupType
 }
 
-func NewLogsDeleteHandler(logger *zap.Logger, ah *action.ActionHandler) *LogsDeleteHandler {
-	return &LogsDeleteHandler{log: logger.Sugar(), ah: ah}
+func NewLogsDeleteHandler(log zerolog.Logger, ah *action.ActionHandler, groupType common.GroupType) *LogsDeleteHandler {
+	return &LogsDeleteHandler{log: log, ah: ah, groupType: groupType}
 }
 
 func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	vars := mux.Vars(r)
 
 	q := r.URL.Query()
 
-	runID := q.Get("runID")
-	if runID == "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("empty run id")))
-		return
+	var err error
+	var ref string
+	switch h.groupType {
+	case common.GroupTypeProject:
+		ref, err = url.PathUnescape(vars["projectref"])
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("projectref is empty")))
+			return
+		}
+	case common.GroupTypeUser:
+		ref = vars["userref"]
 	}
-	taskID := q.Get("taskID")
-	if taskID == "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("empty task id")))
-		return
+
+	runNumberStr := vars["runnumber"]
+
+	var runNumber uint64
+	if runNumberStr != "" {
+		var err error
+		runNumber, err = strconv.ParseUint(runNumberStr, 10, 64)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse run number")))
+			return
+		}
 	}
+
+	taskID := vars["taskid"]
 
 	_, setup := q["setup"]
 	stepStr := q.Get("step")
 	if !setup && stepStr == "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("no setup or step number provided")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("no setup or step number provided")))
 		return
 	}
 	if setup && stepStr != "" {
-		httpError(w, util.NewErrBadRequest(errors.Errorf("both setup and step number provided")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("both setup and step number provided")))
 		return
 	}
 
@@ -544,21 +719,23 @@ func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		step, err = strconv.Atoi(stepStr)
 		if err != nil {
-			httpError(w, util.NewErrBadRequest(errors.Errorf("cannot parse step number: %w", err)))
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse step number")))
 			return
 		}
 	}
 
 	areq := &action.DeleteLogsRequest{
-		RunID:  runID,
-		TaskID: taskID,
-		Setup:  setup,
-		Step:   step,
+		GroupType: h.groupType,
+		Ref:       ref,
+		RunNumber: runNumber,
+		TaskID:    taskID,
+		Setup:     setup,
+		Step:      step,
 	}
 
-	err := h.ah.DeleteLogs(ctx, areq)
-	if httpError(w, err) {
-		h.log.Errorf("err: %+v", err)
+	err = h.ah.DeleteLogs(ctx, areq)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
 		return
 	}
 }
