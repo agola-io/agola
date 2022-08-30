@@ -102,7 +102,7 @@ func New(opts Opts) (*Client, error) {
 
 	client, err := gitea.NewClient(opts.APIURL, gitea.SetToken(opts.Token), gitea.SetHTTPClient(httpClient))
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return &Client{

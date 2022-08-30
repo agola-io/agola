@@ -2243,7 +2243,10 @@ func TestRefreshRemoteRepositoryInfo(t *testing.T) {
 
 	giteaToken, token := createLinkedAccount(ctx, t, tgitea, c)
 
-	giteaClient := gitea.NewClient(giteaAPIURL, giteaToken)
+	giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+	if err != nil {
+		t.Fatalf("could not create gitea client: %v", err)
+	}
 	gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, token)
 
 	giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)
@@ -2252,7 +2255,7 @@ func TestRefreshRemoteRepositoryInfo(t *testing.T) {
 		t.Fatalf("expected DefaultBranch master got: %s", project.DefaultBranch)
 	}
 
-	_, err = giteaClient.EditRepo(giteaRepo.Owner.UserName, giteaRepo.Name, gitea.EditRepoOption{DefaultBranch: util.StringP("testbranch")})
+	_, _, err = giteaClient.EditRepo(giteaRepo.Owner.UserName, giteaRepo.Name, gitea.EditRepoOption{DefaultBranch: util.StringP("testbranch")})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
