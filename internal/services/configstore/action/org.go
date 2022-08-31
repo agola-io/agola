@@ -218,7 +218,7 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 			orgmember.MemberRole = role
 		}
 
-		if err := h.d.InsertOrganizationMember(tx, orgmember); err != nil {
+		if err := h.d.InsertOrUpdateOrganizationMember(tx, orgmember); err != nil {
 			return errors.WithStack(err)
 		}
 
