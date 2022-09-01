@@ -2252,3 +2252,75 @@ func TestRefreshRemoteRepositoryInfo(t *testing.T) {
 		t.Fatalf("projects mismatch (-expected +got):\n%s", diff)
 	}
 }
+
+func TestAddUpdateOrgUserMembers(t *testing.T) {
+	dir, err := ioutil.TempDir("", "agola")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	_, c := setup(ctx, t, dir, false)
+
+	gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, c.Gateway.AdminToken)
+
+	user, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	_, _, err = gwClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: "org01", Visibility: gwapitypes.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	//test add org member role member
+	_, _, err = gwClient.AddOrgMember(ctx, "org01", agolaUser01, gwapitypes.MemberRoleMember)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	expectedOrgMember := gwapitypes.OrgMemberResponse{
+		User: &gwapitypes.UserResponse{ID: user.ID, UserName: user.UserName},
+		Role: gwapitypes.MemberRoleMember,
+	}
+
+	orgMembers, _, err := gwClient.GetOrgMembers(ctx, "org01")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if orgMembers == nil {
+		t.Fatal("unexpected members nil")
+	}
+	if len(orgMembers.Members) != 1 {
+		t.Fatalf("expected Members len 1, got: %d", len(orgMembers.Members))
+	}
+	if diff := cmp.Diff(*orgMembers.Members[0], expectedOrgMember); diff != "" {
+		t.Fatalf("org member mismatch (-expected +got):\n%s", diff)
+	}
+
+	//test update org member role owner
+	_, _, err = gwClient.AddOrgMember(ctx, "org01", agolaUser01, gwapitypes.MemberRoleOwner)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	expectedOrgMember.Role = gwapitypes.MemberRoleOwner
+
+	orgMembers, _, err = gwClient.GetOrgMembers(ctx, "org01")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if orgMembers == nil {
+		t.Fatal("unexpected members nil")
+	}
+	if len(orgMembers.Members) != 1 {
+		t.Fatalf("expected Members len 1, got: %d", len(orgMembers.Members))
+	}
+	if diff := cmp.Diff(*orgMembers.Members[0], expectedOrgMember); diff != "" {
+		t.Fatalf("org member mismatch (-expected +got):\n%s", diff)
+	}
+}
