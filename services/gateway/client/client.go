@@ -587,6 +587,12 @@ func (c *Client) DeleteRemoteSource(ctx context.Context, rsRef string) (*http.Re
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/remotesources/%s", rsRef), nil, jsonContent, nil)
 }
 
+func (c *Client) GetOrg(ctx context.Context, orgRef string) (*gwapitypes.OrgResponse, *http.Response, error) {
+	res := &gwapitypes.OrgResponse{}
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s", orgRef), nil, jsonContent, nil, &res)
+	return res, resp, errors.WithStack(err)
+}
+
 func (c *Client) CreateOrg(ctx context.Context, req *gwapitypes.CreateOrgRequest) (*gwapitypes.OrgResponse, *http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
@@ -600,6 +606,17 @@ func (c *Client) CreateOrg(ctx context.Context, req *gwapitypes.CreateOrgRequest
 
 func (c *Client) DeleteOrg(ctx context.Context, orgRef string) (*http.Response, error) {
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/orgs/%s", orgRef), nil, jsonContent, nil)
+}
+
+func (c *Client) UpdateOrg(ctx context.Context, orgRef string, req *gwapitypes.UpdateOrgRequest) (*gwapitypes.OrgResponse, *http.Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+
+	org := new(gwapitypes.OrgResponse)
+	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/orgs/%s", orgRef), nil, jsonContent, bytes.NewReader(reqj), org)
+	return org, resp, errors.WithStack(err)
 }
 
 func (c *Client) AddOrgMember(ctx context.Context, orgRef, userRef string, role gwapitypes.MemberRole) (*gwapitypes.AddOrgMemberResponse, *http.Response, error) {

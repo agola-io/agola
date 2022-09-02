@@ -103,6 +103,42 @@ func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type UpdateOrgHandler struct {
+	log zerolog.Logger
+	ah  *action.ActionHandler
+}
+
+func NewUpdateOrgHandler(log zerolog.Logger, ah *action.ActionHandler) *UpdateOrgHandler {
+	return &UpdateOrgHandler{log: log, ah: ah}
+}
+
+func (h *UpdateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	orgRef := vars["orgref"]
+
+	var req *csapitypes.UpdateOrgRequest
+	d := json.NewDecoder(r.Body)
+	if err := d.Decode(&req); err != nil {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		return
+	}
+
+	creq := &action.UpdateOrgRequest{
+		Visibility: req.Visibility,
+	}
+
+	org, err := h.ah.UpdateOrg(ctx, orgRef, creq)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, org); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
 type DeleteOrgHandler struct {
 	log zerolog.Logger
 	ah  *action.ActionHandler

@@ -2324,3 +2324,80 @@ func TestAddUpdateOrgUserMembers(t *testing.T) {
 		t.Fatalf("org member mismatch (-expected +got):\n%s", diff)
 	}
 }
+
+func TestUpdateOrganization(t *testing.T) {
+	dir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	_, c := setup(ctx, t, dir, false)
+
+	gwAdminClient := gwclient.NewClient(c.Gateway.APIExposedURL, c.Gateway.AdminToken)
+
+	//create user01 and user02
+	_, _, err := gwAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	tokenUser01, _, err := gwAdminClient.CreateUserToken(ctx, agolaUser01, &gwapitypes.CreateUserTokenRequest{TokenName: "test"})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	gwClientUser01 := gwclient.NewClient(c.Gateway.APIExposedURL, tokenUser01.Token)
+
+	_, _, err = gwAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: "user02"})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	tokenUser02, _, err := gwAdminClient.CreateUserToken(ctx, "user02", &gwapitypes.CreateUserTokenRequest{TokenName: "test"})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	gwClientUser02 := gwclient.NewClient(c.Gateway.APIExposedURL, tokenUser02.Token)
+
+	//create org
+	org, _, err := gwClientUser01.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: "org01", Visibility: gwapitypes.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	//user owner update org
+	expectedOrgResponse := &gwapitypes.OrgResponse{ID: org.ID, Name: "org01", Visibility: gwapitypes.VisibilityPrivate}
+
+	visibility := gwapitypes.VisibilityPrivate
+	updatedOrg, _, err := gwClientUser01.UpdateOrg(ctx, "org01", &gwapitypes.UpdateOrgRequest{Visibility: &visibility})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if diff := cmp.Diff(updatedOrg, expectedOrgResponse); diff != "" {
+		t.Fatalf("org mismatch (-want +got):\n%s", diff)
+	}
+
+	org, _, err = gwClientUser01.GetOrg(ctx, "org01")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if diff := cmp.Diff(expectedOrgResponse, org); diff != "" {
+		t.Fatalf("org mismatch (-want +got):\n%s", diff)
+	}
+
+	//user member update org
+	visibility = gwapitypes.VisibilityPrivate
+	_, _, err = gwClientUser02.UpdateOrg(ctx, "org01", &gwapitypes.UpdateOrgRequest{Visibility: &visibility})
+	expectedErr := "remote error forbidden"
+	if err == nil {
+		t.Fatalf("expected error %v, got nil err", expectedErr)
+	}
+	if err.Error() != expectedErr {
+		t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+	}
+
+	org, _, err = gwClientUser01.GetOrg(ctx, "org01")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if diff := cmp.Diff(expectedOrgResponse, org); diff != "" {
+		t.Fatalf("org mismatch (-want +got):\n%s", diff)
+	}
+}

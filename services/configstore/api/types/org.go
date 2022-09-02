@@ -32,3 +32,7 @@ type OrgMemberResponse struct {
 	User *cstypes.User
 	Role cstypes.MemberRole
 }
+
+type UpdateOrgRequest struct {
+	Visibility cstypes.Visibility
+}

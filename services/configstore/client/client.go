@@ -533,6 +533,17 @@ func (c *Client) DeleteOrg(ctx context.Context, orgRef string) (*http.Response, 
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/orgs/%s", orgRef), nil, jsonContent, nil)
 }
 
+func (c *Client) UpdateOrg(ctx context.Context, orgRef string, req *csapitypes.UpdateOrgRequest) (*cstypes.Organization, *http.Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+
+	org := new(cstypes.Organization)
+	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/orgs/%s", orgRef), nil, jsonContent, bytes.NewReader(reqj), org)
+	return org, resp, errors.WithStack(err)
+}
+
 func (c *Client) AddOrgMember(ctx context.Context, orgRef, userRef string, role cstypes.MemberRole) (*cstypes.OrganizationMember, *http.Response, error) {
 	req := &csapitypes.AddOrgMemberRequest{
 		Role: role,
