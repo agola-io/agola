@@ -433,6 +433,31 @@ func TestUser(t *testing.T) {
 			t.Fatalf("expected %d users, got %d", len(prevUsers)+1, len(users))
 		}
 	})
+
+	t.Run("delete user", func(t *testing.T) {
+		_, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user03"})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		err = cs.ah.DeleteUser(ctx, "user03")
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		var user *types.User
+		err = cs.d.Do(ctx, func(tx *sql.Tx) error {
+			var err error
+			user, err = cs.d.GetUser(tx, "user03")
+			return errors.WithStack(err)
+		})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if user != nil {
+			t.Fatalf("expected user nil, got: %v", user)
+		}
+	})
 }
 
 func TestProjectGroupsAndProjectsCreate(t *testing.T) {

@@ -150,7 +150,7 @@ func (d *DB) deleteRemoteSourceQ(tx *sql.Tx, id string) error {
 func (d *DB) insertUserQ(tx *sql.Tx, user *types.User, data []byte) error {
 	q := userQInsert(user.ID, user.Revision, user.Name, data)
 	if _, err := d.exec(tx, q); err != nil {
-		return errors.Wrapf(err, "failed to insert user_q")
+		return errors.Wrapf(err, "failed to insert user_t_q")
 	}
 
 	return nil
@@ -159,15 +159,15 @@ func (d *DB) insertUserQ(tx *sql.Tx, user *types.User, data []byte) error {
 func (d *DB) updateUserQ(tx *sql.Tx, user *types.User, data []byte) error {
 	q := userQUpdate(user.ID, user.Revision, user.Name, data)
 	if _, err := d.exec(tx, q); err != nil {
-		return errors.Wrapf(err, "failed to insert user_q")
+		return errors.Wrapf(err, "failed to insert user_t_q")
 	}
 
 	return nil
 }
 
 func (d *DB) deleteUserQ(tx *sql.Tx, id string) error {
-	if _, err := tx.Exec("delete from user_q where id = $1", id); err != nil {
-		return errors.Wrapf(err, "failed to delete user_q")
+	if _, err := tx.Exec("delete from user_t_q where id = $1", id); err != nil {
+		return errors.Wrapf(err, "failed to delete user_t_q")
 	}
 
 	return nil
