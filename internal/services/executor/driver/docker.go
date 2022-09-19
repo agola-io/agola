@@ -249,6 +249,8 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 			}
 		}
 
+		sort.Sort(MountSlice(container.Mounts))
+
 		seenIndexes[cIndex] = struct{}{}
 		count++
 	}
@@ -468,7 +470,7 @@ func (d *DockerDriver) GetPods(ctx context.Context, all bool) ([]Pod, error) {
 			}
 		}
 
-		// overwrite containers with the right order
+		sort.Sort(MountSlice(container.Mounts))
 
 		// add labels from the container with index 0
 		if cIndex == 0 {
@@ -736,3 +738,11 @@ func makeEnvSlice(env map[string]string) []string {
 
 	return envList
 }
+
+type MountSlice []dockertypes.MountPoint
+
+func (p MountSlice) Len() int { return len(p) }
+func (p MountSlice) Less(i, j int) bool {
+	return strings.Compare(p[i].Destination, p[j].Destination) < 0
+}
+func (p MountSlice) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
