@@ -38,7 +38,12 @@ const (
 	podIDKey      = labelPrefix + "podid"
 	taskIDKey     = labelPrefix + "taskid"
 
+	volumeNameKey     = labelPrefix + "name"
+	toolboxVolumeName = "toolbox"
+	projectVolumeName = "project"
+
 	containerIndexKey = labelPrefix + "containerindex"
+	containerNameKey  = labelPrefix + "name"
 )
 
 // Driver is a generic interface around the pod concept (a group of "containers"
@@ -88,6 +93,7 @@ type PodConfig struct {
 }
 
 type ContainerConfig struct {
+	Name       string
 	Cmd        []string
 	Env        map[string]string
 	WorkingDir string
@@ -116,6 +122,7 @@ type ExecConfig struct {
 	Stdout      io.Writer
 	Stderr      io.Writer
 	Tty         bool
+	Container   string
 }
 
 func toolboxExecPath(toolboxDir string, arch types.Arch) (string, error) {

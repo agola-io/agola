@@ -35,6 +35,7 @@ func genRuntime(c *config.Config, ce *config.Runtime, variables map[string]strin
 	for _, cc := range ce.Containers {
 		env := genEnv(cc.Environment, variables)
 		container := &rstypes.Container{
+			Name:        cc.Name,
 			Image:       cc.Image,
 			Environment: env,
 			User:        cc.User,
@@ -126,6 +127,12 @@ else
 fi
 `, genCloneOptions(cs))
 
+		if cs.Container == "" {
+			rs.Container = "clone"
+		} else {
+			rs.Container = cs.Container
+		}
+
 		return rs
 
 	case *config.RunStep:
@@ -140,6 +147,7 @@ fi
 		rs.WorkingDir = cs.WorkingDir
 		rs.Shell = cs.Shell
 		rs.Tty = cs.Tty
+		rs.Container = cs.Container
 		return rs
 
 	case *config.SaveToWorkspaceStep:
@@ -209,9 +217,18 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string
 	for _, ct := range cr.Tasks {
 		include := types.MatchWhen(ct.When.ToWhen(), refType, branch, tag, ref)
 
+		needCloneContainer := false
+
 		steps := make(rstypes.Steps, len(ct.Steps))
 		for i, cpts := range ct.Steps {
 			steps[i] = stepFromConfigStep(cpts, variables)
+
+			switch cs := cpts.(type) {
+			case *config.CloneStep:
+				if cs.Container == "" {
+					needCloneContainer = true
+				}
+			}
 		}
 
 		tEnv := genEnv(ct.Environment, variables)
@@ -285,6 +302,20 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string
 		}
 
 		rcts[t.ID] = t
+
+		if needCloneContainer {
+			haveClone := false
+			for _, c := range t.Runtime.Containers {
+				if c.Name == "clone" {
+					haveClone = true
+					break
+				}
+			}
+
+			if !haveClone {
+				t.Runtime.Containers = append(t.Runtime.Containers, &rstypes.Container{Name: "clone", Image: "alpine/git"})
+			}
+		}
 	}
 
 	// populate depends, needs to be done after having created all the tasks so we can resolve their id
