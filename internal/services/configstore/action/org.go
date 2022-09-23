@@ -187,7 +187,7 @@ func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
 		// check org existance
-		org, err = h.d.GetOrgByName(tx, orgRef)
+		org, err = h.d.GetOrg(tx, orgRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
