@@ -1191,3 +1191,79 @@ func TestRemoteSource(t *testing.T) {
 		})
 	}
 }
+
+func TestDeleteOrg(t *testing.T) {
+	dir := t.TempDir()
+	log := testutil.NewLogger(t)
+
+	tests := []struct {
+		name string
+		f    func(ctx context.Context, t *testing.T, cs *Configstore)
+	}{
+		{
+			name: "test delete org by id",
+			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
+				orgs, err := getOrgs(ctx, cs)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				if err := cs.ah.DeleteOrg(ctx, orgs[0].ID); err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				orgs, err = getOrgs(ctx, cs)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				if len(orgs) != 0 {
+					t.Fatalf("expected 0 orgs, got %d orgs", len(orgs))
+				}
+			},
+		},
+		{
+			name: "test delete org by name",
+			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
+				orgs, err := getOrgs(ctx, cs)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				if err := cs.ah.DeleteOrg(ctx, orgs[0].Name); err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				orgs, err = getOrgs(ctx, cs)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				if len(orgs) != 0 {
+					t.Fatalf("expected 0 orgs, got %d orgs", len(orgs))
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir, err := ioutil.TempDir(dir, "agola")
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			ctx := context.Background()
+
+			cs := setupConfigstore(ctx, t, log, dir)
+
+			t.Logf("starting cs")
+
+			_, err = cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: "org01", Visibility: types.VisibilityPublic})
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			go func() { _ = cs.Run(ctx) }()
+
+			tt.f(ctx, t, cs)
+		})
+	}
+}
