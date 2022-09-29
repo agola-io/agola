@@ -856,12 +856,13 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 	podConfig := &driver.PodConfig{
 		// generate a random pod id (don't use task id for future ability to restart
 		// tasks failed to start and don't clash with existing pods)
-		ID:            uuid.Must(uuid.NewV4()).String(),
-		TaskID:        et.ID,
-		Arch:          et.Spec.Arch,
-		InitVolumeDir: toolboxContainerDir,
-		DockerConfig:  dockerConfig,
-		Containers:    make([]*driver.ContainerConfig, len(et.Spec.Containers)),
+		ID:                 uuid.Must(uuid.NewV4()).String(),
+		TaskID:             et.ID,
+		Arch:               et.Spec.Arch,
+		InitVolumeDir:      toolboxContainerDir,
+		DockerConfig:       dockerConfig,
+		ServiceAccountName: et.Spec.ServiceAccountName,
+		Containers:         make([]*driver.ContainerConfig, len(et.Spec.Containers)),
 	}
 	for i, c := range et.Spec.Containers {
 		var cmd []string

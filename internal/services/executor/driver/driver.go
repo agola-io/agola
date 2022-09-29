@@ -82,6 +82,10 @@ type PodConfig struct {
 	TaskID     string
 	Containers []*ContainerConfig
 	Arch       types.Arch
+
+	// Service account to use for the build pod
+	ServiceAccountName string
+
 	// The container dir where the init volume will be mounted
 	InitVolumeDir string
 	DockerConfig  *registry.DockerConfig

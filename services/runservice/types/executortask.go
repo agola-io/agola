@@ -81,6 +81,8 @@ type ExecutorTaskSpecData struct {
 	Steps Steps `json:"steps,omitempty"`
 
 	TaskTimeoutInterval time.Duration `json:"task_timeout_interval"`
+
+	ServiceAccountName string `json:"service_account_name,omitempty"`
 }
 
 type ExecutorTaskStatus struct {

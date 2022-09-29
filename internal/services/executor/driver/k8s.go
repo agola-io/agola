@@ -357,6 +357,8 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 		return nil, errors.WithStack(err)
 	}
 
+	d.log.Debug().Str("ServiceAccount", podConfig.ServiceAccountName)
+
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: d.namespace,
@@ -365,9 +367,9 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 		},
 		Spec: corev1.PodSpec{
 			ImagePullSecrets: []corev1.LocalObjectReference{{Name: name}},
-			// don't mount service account secrets or pods will be able to talk with k8s
-			// api
-			AutomountServiceAccountToken: util.BoolP(false),
+			// only mount service account secrets if there's an explicit service account configured
+			AutomountServiceAccountToken: util.BoolP(podConfig.ServiceAccountName != ""),
+			ServiceAccountName:           podConfig.ServiceAccountName,
 			InitContainers: []corev1.Container{
 				{
 					Name:  "initcontainer",

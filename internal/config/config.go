@@ -131,6 +131,7 @@ type Task struct {
 	When                 *When                          `json:"when"`
 	DockerRegistriesAuth map[string]*DockerRegistryAuth `json:"docker_registries_auth"`
 	TaskTimeoutInterval  *types.Duration                `json:"task_timeout_interval"`
+	ServiceAccountName   string                         `json:"service_account_name,omitempty"`
 }
 
 type DependCondition string

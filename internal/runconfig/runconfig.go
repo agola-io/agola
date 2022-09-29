@@ -229,6 +229,7 @@ func GenRunConfigTasks(uuid util.UUIDGenerator, c *config.Config, runName string
 			Skip:                 !include,
 			NeedsApproval:        ct.Approval,
 			DockerRegistriesAuth: make(map[string]rstypes.DockerRegistryAuth),
+			ServiceAccountName:   ct.ServiceAccountName,
 		}
 
 		if t.Shell == "" {

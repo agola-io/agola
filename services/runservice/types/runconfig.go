@@ -82,6 +82,7 @@ type RunConfigTask struct {
 	Skip                 bool                            `json:"skip,omitempty"`
 	DockerRegistriesAuth map[string]DockerRegistryAuth   `json:"docker_registries_auth"`
 	TaskTimeoutInterval  time.Duration                   `json:"task_timeout_interval"`
+	ServiceAccountName   string                          `json:"service_account_name,omitempty"`
 }
 
 func (rct *RunConfigTask) DeepCopy() *RunConfigTask {
