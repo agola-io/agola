@@ -24,6 +24,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -120,63 +121,110 @@ func setupGitea(t *testing.T, dir, dockerBridgeAddress string) *testutil.TestGit
 	return tgitea
 }
 
-func shutdownGitea(tgitea *testutil.TestGitea) {
-	tgitea.Kill()
+type testAgola struct {
+	wg *sync.WaitGroup
+
+	errCh <-chan error
+
+	cancel context.CancelFunc
 }
 
-func startAgola(ctx context.Context, t *testing.T, log zerolog.Logger, dir string, c *config.Config) (<-chan error, error) {
+func startAgola(pctx context.Context, t *testing.T, log zerolog.Logger, dir string, c *config.Config) (*testAgola, error) {
+	ctx, cancel := context.WithCancel(pctx)
+	wg := &sync.WaitGroup{}
+
 	rs, err := rsscheduler.NewRunservice(ctx, log, &c.Runservice)
 	if err != nil {
+		cancel()
 		return nil, errors.Wrapf(err, "failed to start run service scheduler")
 	}
 
 	ex, err := executor.NewExecutor(ctx, log, &c.Executor)
 	if err != nil {
+		cancel()
 		return nil, errors.Wrapf(err, "failed to start run service executor")
 	}
 
 	cs, err := configstore.NewConfigstore(ctx, log, &c.Configstore)
 	if err != nil {
+		cancel()
 		return nil, errors.Wrapf(err, "failed to start config store")
 	}
 
 	sched, err := scheduler.NewScheduler(ctx, log, &c.Scheduler)
 	if err != nil {
+		cancel()
 		return nil, errors.Wrapf(err, "failed to start scheduler")
 	}
 
 	ns, err := notification.NewNotificationService(ctx, log, c)
 	if err != nil {
+		cancel()
 		return nil, errors.Wrapf(err, "failed to start notification service")
 	}
 
 	gw, err := gateway.NewGateway(ctx, log, c)
 	if err != nil {
+		cancel()
 		return nil, errors.Wrapf(err, "failed to start gateway")
 	}
 
 	gs, err := gitserver.NewGitserver(ctx, log, &c.Gitserver)
 	if err != nil {
+		cancel()
 		return nil, errors.Wrapf(err, "failed to start git server")
 	}
 
-	errCh := make(chan error)
+	wg.Add(7)
+	errCh := make(chan error, 7)
 
-	go func() { errCh <- rs.Run(ctx) }()
-	go func() { errCh <- ex.Run(ctx) }()
-	go func() { errCh <- cs.Run(ctx) }()
-	go func() { errCh <- sched.Run(ctx) }()
-	go func() { errCh <- ns.Run(ctx) }()
-	go func() { errCh <- gw.Run(ctx) }()
-	go func() { errCh <- gs.Run(ctx) }()
+	go func() { errCh <- rs.Run(ctx); wg.Done() }()
+	go func() { errCh <- ex.Run(ctx); wg.Done() }()
+	go func() { errCh <- cs.Run(ctx); wg.Done() }()
+	go func() { errCh <- sched.Run(ctx); wg.Done() }()
+	go func() { errCh <- ns.Run(ctx); wg.Done() }()
+	go func() { errCh <- gw.Run(ctx); wg.Done() }()
+	go func() { errCh <- gs.Run(ctx); wg.Done() }()
 
 	// TODO(sgotti) find a better way to test that all is ready instead of sleeping
 	time.Sleep(5 * time.Second)
 
-	return errCh, nil
+	return &testAgola{
+		wg:     wg,
+		errCh:  errCh,
+		cancel: cancel,
+	}, nil
 }
 
-func setup(ctx context.Context, t *testing.T, dir string, gitea bool) (*testutil.TestGitea, *config.Config) {
+func (ta *testAgola) stop() {
+	ta.cancel()
+	ta.wg.Wait()
+}
+
+type setupContext struct {
+	ctx context.Context
+	t   *testing.T
+	dir string
+	log zerolog.Logger
+
+	config    *config.Config
+	withGitea bool
+
+	agola *testAgola
+	gitea *testutil.TestGitea
+
+	mu sync.Mutex
+}
+
+type setupOption func(*setupContext)
+
+func withGitea(gitea bool) func(*setupContext) {
+	return func(s *setupContext) {
+		s.withGitea = gitea
+	}
+}
+
+func setup(ctx context.Context, t *testing.T, dir string, opts ...setupOption) *setupContext {
 	log := testutil.NewLogger(t)
 
 	dockerBridgeAddress := os.Getenv("DOCKER_BRIDGE_ADDRESS")
@@ -188,7 +236,9 @@ func setup(ctx context.Context, t *testing.T, dir string, gitea bool) (*testutil
 		t.Fatalf("env var AGOLA_BIN_DIR is undefined")
 	}
 
-	c := &config.Config{
+	sc := &setupContext{ctx: ctx, t: t, dir: dir, log: log}
+
+	sc.config = &config.Config{
 		ID: "agola",
 		Gateway: config.Gateway{
 			Debug:          false,
@@ -284,9 +334,12 @@ func setup(ctx context.Context, t *testing.T, dir string, gitea bool) (*testutil
 		},
 	}
 
-	var tgitea *testutil.TestGitea
-	if gitea {
-		tgitea = setupGitea(t, dir, dockerBridgeAddress)
+	for _, o := range opts {
+		o(sc)
+	}
+
+	if sc.withGitea {
+		sc.gitea = setupGitea(t, dir, dockerBridgeAddress)
 	}
 
 	_, gwPort, err := testutil.GetFreePort(true, false)
@@ -315,38 +368,103 @@ func setup(ctx context.Context, t *testing.T, dir string, gitea bool) (*testutil
 	rsURL := fmt.Sprintf("http://%s:%s", listenAddress, rsPort)
 	gitServerURL := fmt.Sprintf("http://%s:%s", dockerBridgeAddress, gitServerPort)
 
-	c.Gateway.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, gwPort)
-	c.Configstore.Web.ListenAddress = fmt.Sprintf("%s:%s", listenAddress, csPort)
-	c.Runservice.Web.ListenAddress = fmt.Sprintf("%s:%s", listenAddress, rsPort)
-	c.Executor.Web.ListenAddress = fmt.Sprintf("%s:%s", listenAddress, exPort)
-	c.Gitserver.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, gitServerPort)
+	sc.config.Gateway.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, gwPort)
+	sc.config.Configstore.Web.ListenAddress = fmt.Sprintf("%s:%s", listenAddress, csPort)
+	sc.config.Runservice.Web.ListenAddress = fmt.Sprintf("%s:%s", listenAddress, rsPort)
+	sc.config.Executor.Web.ListenAddress = fmt.Sprintf("%s:%s", listenAddress, exPort)
+	sc.config.Gitserver.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, gitServerPort)
 
-	c.Gateway.APIExposedURL = gwURL
-	c.Gateway.WebExposedURL = gwURL
-	c.Gateway.RunserviceURL = rsURL
-	c.Gateway.ConfigstoreURL = csURL
-	c.Gateway.GitserverURL = gitServerURL
+	sc.config.Gateway.APIExposedURL = gwURL
+	sc.config.Gateway.WebExposedURL = gwURL
+	sc.config.Gateway.RunserviceURL = rsURL
+	sc.config.Gateway.ConfigstoreURL = csURL
+	sc.config.Gateway.GitserverURL = gitServerURL
 
-	c.Scheduler.RunserviceURL = rsURL
+	sc.config.Scheduler.RunserviceURL = rsURL
 
-	c.Notification.WebExposedURL = gwURL
-	c.Notification.RunserviceURL = rsURL
-	c.Notification.ConfigstoreURL = csURL
+	sc.config.Notification.WebExposedURL = gwURL
+	sc.config.Notification.RunserviceURL = rsURL
+	sc.config.Notification.ConfigstoreURL = csURL
 
-	c.Executor.RunserviceURL = rsURL
+	sc.config.Executor.RunserviceURL = rsURL
 
-	errCh, err := startAgola(ctx, t, log, dir, c)
-	if err != nil {
+	if err := sc.startAgola(); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
+
 	go func() {
-		err := <-errCh
+		<-ctx.Done()
+
+		sc.stop()
+	}()
+
+	return sc
+}
+
+func (sc *setupContext) startAgola() error {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+
+	if sc.agola != nil {
+		return fmt.Errorf("agola already started")
+	}
+	tagola, err := startAgola(sc.ctx, sc.t, sc.log, sc.dir, sc.config)
+	if err != nil {
+		return err
+	}
+	go func() {
+		err := <-tagola.errCh
 		if err != nil {
 			panic(errors.Wrap(err, "agola component returned error: %w"))
 		}
 	}()
 
-	return tgitea, c
+	sc.agola = tagola
+
+	return nil
+}
+
+//nolint:unused
+func (sc *setupContext) stopAgola() error {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+
+	if sc.agola == nil {
+		return fmt.Errorf("agola not started")
+	}
+
+	sc.agola.stop()
+	sc.agola = nil
+
+	return nil
+}
+
+//nolint:unused
+func (sc *setupContext) restartAgola() error {
+	if err := sc.stopAgola(); err != nil {
+		return err
+	}
+
+	if err := sc.startAgola(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (sc *setupContext) stop() {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+
+	if sc.gitea != nil {
+		sc.gitea.Kill()
+		sc.gitea = nil
+	}
+
+	if sc.agola != nil {
+		sc.agola.stop()
+		sc.agola = nil
+	}
 }
 
 func TestCreateLinkedAccount(t *testing.T) {
@@ -355,10 +473,10 @@ func TestCreateLinkedAccount(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	tgitea, c := setup(ctx, t, dir, true)
-	defer shutdownGitea(tgitea)
+	sc := setup(ctx, t, dir, withGitea(true))
+	defer sc.stop()
 
-	createLinkedAccount(ctx, t, tgitea, c)
+	createLinkedAccount(ctx, t, sc.gitea, sc.config)
 }
 
 func createAgolaUserToken(ctx context.Context, t *testing.T, c *config.Config) string {
@@ -426,15 +544,15 @@ func TestCreateProject(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	tgitea, c := setup(ctx, t, dir, true)
-	defer shutdownGitea(tgitea)
+	sc := setup(ctx, t, dir, withGitea(true))
+	defer sc.stop()
 
-	giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
+	giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
 
-	giteaToken, token := createLinkedAccount(ctx, t, tgitea, c)
+	giteaToken, token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
 
 	giteaClient := gitea.NewClient(giteaAPIURL, giteaToken)
-	gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, token)
+	gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
 
 	createProject(ctx, t, giteaClient, gwClient)
 }
@@ -467,15 +585,15 @@ func TestUpdateProject(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		tgitea, c := setup(ctx, t, dir, true)
-		defer shutdownGitea(tgitea)
+		sc := setup(ctx, t, dir, withGitea(true))
+		defer sc.stop()
 
-		giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
+		giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
 
-		giteaToken, token := createLinkedAccount(ctx, t, tgitea, c)
+		giteaToken, token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
 
 		giteaClient := gitea.NewClient(giteaAPIURL, giteaToken)
-		gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, token)
+		gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
 
 		_, project := createProject(ctx, t, giteaClient, gwClient)
 		if project.PassVarsToForkedPR != tt.expected_pre {
@@ -768,15 +886,15 @@ func TestPush(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			tgitea, c := setup(ctx, t, dir, true)
-			defer shutdownGitea(tgitea)
+			sc := setup(ctx, t, dir, withGitea(true))
+			defer sc.stop()
 
-			giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
+			giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
 
-			giteaToken, token := createLinkedAccount(ctx, t, tgitea, c)
+			giteaToken, token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
 
 			giteaClient := gitea.NewClient(giteaAPIURL, giteaToken)
-			gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, token)
+			gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
 
 			giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)
 
@@ -954,21 +1072,22 @@ func TestDirectRun(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			_, c := setup(ctx, t, dir, false)
+			sc := setup(ctx, t, dir, withGitea(true))
+			defer sc.stop()
 
-			gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
+			gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, "admintoken")
 			user, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
 			t.Logf("created agola user: %s", user.UserName)
 
-			token := createAgolaUserToken(ctx, t, c)
+			token := createAgolaUserToken(ctx, t, sc.config)
 
 			// From now use the user token
-			gwClient = gwclient.NewClient(c.Gateway.APIExposedURL, token)
+			gwClient = gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
 
-			directRun(t, dir, config, ConfigFormatJsonnet, c.Gateway.APIExposedURL, token, tt.args...)
+			directRun(t, dir, config, ConfigFormatJsonnet, sc.config.Gateway.APIExposedURL, token, tt.args...)
 
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
 				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
@@ -1101,21 +1220,22 @@ func TestDirectRunVariables(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			_, c := setup(ctx, t, dir, false)
+			sc := setup(ctx, t, dir, withGitea(true))
+			defer sc.stop()
 
-			gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
+			gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, "admintoken")
 			user, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
 			t.Logf("created agola user: %s", user.UserName)
 
-			token := createAgolaUserToken(ctx, t, c)
+			token := createAgolaUserToken(ctx, t, sc.config)
 
 			// From now use the user token
-			gwClient = gwclient.NewClient(c.Gateway.APIExposedURL, token)
+			gwClient = gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
 
-			directRun(t, dir, config, ConfigFormatJsonnet, c.Gateway.APIExposedURL, token, tt.args...)
+			directRun(t, dir, config, ConfigFormatJsonnet, sc.config.Gateway.APIExposedURL, token, tt.args...)
 
 			// TODO(sgotti) add an util to wait for a run phase
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
@@ -1266,21 +1386,22 @@ func TestDirectRunLogs(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			_, c := setup(ctx, t, dir, false)
+			sc := setup(ctx, t, dir, withGitea(true))
+			defer sc.stop()
 
-			gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
+			gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, "admintoken")
 			user, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
 			t.Logf("created agola user: %s", user.UserName)
 
-			token := createAgolaUserToken(ctx, t, c)
+			token := createAgolaUserToken(ctx, t, sc.config)
 
 			// From now use the user token
-			gwClient = gwclient.NewClient(c.Gateway.APIExposedURL, token)
+			gwClient = gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
 
-			directRun(t, dir, config, ConfigFormatJsonnet, c.Gateway.APIExposedURL, token)
+			directRun(t, dir, config, ConfigFormatJsonnet, sc.config.Gateway.APIExposedURL, token)
 
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
 				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
@@ -1440,15 +1561,15 @@ func TestPullRequest(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			tgitea, c := setup(ctx, t, dir, true)
-			defer shutdownGitea(tgitea)
+			sc := setup(ctx, t, dir, withGitea(true))
+			defer sc.stop()
 
-			giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
+			giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
 
-			giteaToken, token := createLinkedAccount(ctx, t, tgitea, c)
+			giteaToken, token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
 
 			giteaClient := gitea.NewClient(giteaAPIURL, giteaToken)
-			gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, token)
+			gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
 
 			giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)
 			project = updateProject(ctx, t, giteaClient, gwClient, project.ID, tt.passVarsToForkedPR)
@@ -1774,21 +1895,22 @@ def main(ctx):
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				_, c := setup(ctx, t, dir, false)
+				sc := setup(ctx, t, dir, withGitea(true))
+				defer sc.stop()
 
-				gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
+				gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, "admintoken")
 				user, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
 				if err != nil {
 					t.Fatalf("unexpected err: %v", err)
 				}
 				t.Logf("created agola user: %s", user.UserName)
 
-				token := createAgolaUserToken(ctx, t, c)
+				token := createAgolaUserToken(ctx, t, sc.config)
 
 				// From now use the user token
-				gwClient = gwclient.NewClient(c.Gateway.APIExposedURL, token)
+				gwClient = gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
 
-				directRun(t, dir, config, configFormat, c.Gateway.APIExposedURL, token, tt.args...)
+				directRun(t, dir, config, configFormat, sc.config.Gateway.APIExposedURL, token, tt.args...)
 
 				// TODO(sgotti) add an util to wait for a run phase
 				_ = testutil.Wait(30*time.Second, func() (bool, error) {
@@ -1877,10 +1999,10 @@ func TestUserOrgs(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	tgitea, c := setup(ctx, t, dir, true)
-	defer shutdownGitea(tgitea)
+	sc := setup(ctx, t, dir, withGitea(true))
+	defer sc.stop()
 
-	gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
+	gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, "admintoken")
 
 	org01, _, err := gwClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: "org01", Visibility: gwapitypes.VisibilityPublic})
 	if err != nil {
@@ -1895,7 +2017,7 @@ func TestUserOrgs(t *testing.T) {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	_, token := createLinkedAccount(ctx, t, tgitea, c)
+	_, token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
 
 	_, _, err = gwClient.AddOrgMember(ctx, "org01", giteaUser01, gwapitypes.MemberRoleMember)
 	if err != nil {
@@ -1906,7 +2028,7 @@ func TestUserOrgs(t *testing.T) {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	gwClientNew := gwclient.NewClient(c.Gateway.APIExposedURL, token)
+	gwClientNew := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
 
 	orgs, _, err := gwClientNew.GetUserOrgs(ctx)
 	if err != nil {
@@ -2139,21 +2261,22 @@ func TestTaskTimeout(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			_, c := setup(ctx, t, dir, false)
+			sc := setup(ctx, t, dir, withGitea(true))
+			defer sc.stop()
 
-			gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
+			gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, "admintoken")
 			user, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
 			t.Logf("created agola user: %s", user.UserName)
 
-			token := createAgolaUserToken(ctx, t, c)
+			token := createAgolaUserToken(ctx, t, sc.config)
 
 			// From now use the user token
-			gwClient = gwclient.NewClient(c.Gateway.APIExposedURL, token)
+			gwClient = gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
 
-			directRun(t, dir, tt.config, ConfigFormatJsonnet, c.Gateway.APIExposedURL, token)
+			directRun(t, dir, tt.config, ConfigFormatJsonnet, sc.config.Gateway.APIExposedURL, token)
 
 			time.Sleep(30 * time.Second)
 
@@ -2215,15 +2338,15 @@ func TestRefreshRemoteRepositoryInfo(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	tgitea, c := setup(ctx, t, dir, true)
-	defer shutdownGitea(tgitea)
+	sc := setup(ctx, t, dir, withGitea(true))
+	defer sc.stop()
 
-	giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
+	giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
 
-	giteaToken, token := createLinkedAccount(ctx, t, tgitea, c)
+	giteaToken, token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
 
 	giteaClient := gitea.NewClient(giteaAPIURL, giteaToken)
-	gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, token)
+	gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
 
 	giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)
 
@@ -2263,9 +2386,10 @@ func TestAddUpdateOrgUserMembers(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	_, c := setup(ctx, t, dir, false)
+	sc := setup(ctx, t, dir, withGitea(true))
+	defer sc.stop()
 
-	gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, c.Gateway.AdminToken)
+	gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
 
 	user, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
 	if err != nil {
@@ -2331,9 +2455,10 @@ func TestUpdateOrganization(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	_, c := setup(ctx, t, dir, false)
+	sc := setup(ctx, t, dir, withGitea(true))
+	defer sc.stop()
 
-	gwAdminClient := gwclient.NewClient(c.Gateway.APIExposedURL, c.Gateway.AdminToken)
+	gwAdminClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
 
 	//create user01 and user02
 	_, _, err := gwAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
@@ -2344,7 +2469,7 @@ func TestUpdateOrganization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	gwClientUser01 := gwclient.NewClient(c.Gateway.APIExposedURL, tokenUser01.Token)
+	gwClientUser01 := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01.Token)
 
 	_, _, err = gwAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: "user02"})
 	if err != nil {
@@ -2354,7 +2479,7 @@ func TestUpdateOrganization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	gwClientUser02 := gwclient.NewClient(c.Gateway.APIExposedURL, tokenUser02.Token)
+	gwClientUser02 := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser02.Token)
 
 	//create org
 	org, _, err := gwClientUser01.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: "org01", Visibility: gwapitypes.VisibilityPublic})
