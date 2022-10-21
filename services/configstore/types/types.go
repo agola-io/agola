@@ -17,14 +17,15 @@ package types
 type ObjectKind string
 
 const (
-	ObjectKindUser         ObjectKind = "user"
-	ObjectKindOrg          ObjectKind = "org"
-	ObjectKindOrgMember    ObjectKind = "orgmember"
-	ObjectKindProjectGroup ObjectKind = "projectgroup"
-	ObjectKindProject      ObjectKind = "project"
-	ObjectKindRemoteSource ObjectKind = "remotesource"
-	ObjectKindSecret       ObjectKind = "secret"
-	ObjectKindVariable     ObjectKind = "variable"
+	ObjectKindUser          ObjectKind = "user"
+	ObjectKindOrg           ObjectKind = "org"
+	ObjectKindOrgMember     ObjectKind = "orgmember"
+	ObjectKindProjectGroup  ObjectKind = "projectgroup"
+	ObjectKindProject       ObjectKind = "project"
+	ObjectKindRemoteSource  ObjectKind = "remotesource"
+	ObjectKindSecret        ObjectKind = "secret"
+	ObjectKindVariable      ObjectKind = "variable"
+	ObjectKindOrgInvitation ObjectKind = "orginvitation"
 )
 
 type Visibility string

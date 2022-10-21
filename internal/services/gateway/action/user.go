@@ -1027,3 +1027,25 @@ func (h *ActionHandler) GetUserGitSource(ctx context.Context, remoteSourceRef, u
 
 	return gitSource, rs, la, nil
 }
+
+func (h *ActionHandler) GetUserOrgInvitations(ctx context.Context, userRef string, limit int) ([]*OrgInvitationResponse, error) {
+	cOrgInvitations, _, err := h.configstoreClient.GetUserOrgInvitations(ctx, userRef, limit)
+	if err != nil {
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
+	}
+
+	res := make([]*OrgInvitationResponse, len(cOrgInvitations))
+	for i, r := range cOrgInvitations {
+		org, _, err := h.configstoreClient.GetOrg(ctx, r.OrganizationID)
+		if err != nil {
+			return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
+		}
+
+		res[i] = &OrgInvitationResponse{
+			OrgInvitation: r,
+			Organization:  org,
+		}
+	}
+
+	return res, nil
+}

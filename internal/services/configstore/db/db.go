@@ -38,6 +38,7 @@ var dstmts = []string{
 	"create table if not exists project (id varchar, revision bigint, data bytea, PRIMARY KEY (id))",
 	"create table if not exists secret (id varchar, revision bigint, data bytea, PRIMARY KEY (id))",
 	"create table if not exists variable (id varchar, revision bigint, data bytea, PRIMARY KEY (id))",
+	"create table if not exists orginvitation (id varchar, revision bigint, data bytea, PRIMARY KEY (id))",
 }
 
 var qstmts = []string{
@@ -52,6 +53,7 @@ var qstmts = []string{
 	"create table if not exists project_q (id varchar, revision bigint, name varchar, parent_id varchar, parent_kind varchar, data bytea, PRIMARY KEY (id))",
 	"create table if not exists secret_q (id varchar, revision bigint, name varchar, parent_id varchar, parent_kind varchar, data bytea, PRIMARY KEY (id))",
 	"create table if not exists variable_q (id varchar, revision bigint, name varchar, parent_id varchar, parent_kind varchar, data bytea, PRIMARY KEY (id))",
+	"create table if not exists orginvitation_q (id varchar, revision bigint, user_id varchar, org_id varchar, data bytea, PRIMARY KEY (id))",
 }
 
 // denormalized tables for querying, can be rebuilt by query tables.
@@ -149,6 +151,8 @@ func (d *DB) UnmarshalObject(data []byte) (stypes.Object, error) {
 		obj = &types.Secret{}
 	case types.VariableKind:
 		obj = &types.Variable{}
+	case types.OrgInvitationKind:
+		obj = &types.OrgInvitation{}
 	default:
 		panic(errors.Errorf("unknown object kind %q", om.Kind))
 	}
@@ -181,6 +185,8 @@ func (d *DB) InsertRawObject(tx *sql.Tx, obj stypes.Object) ([]byte, error) {
 		return d.insertRawSecretData(tx, obj.(*types.Secret))
 	case types.VariableKind:
 		return d.insertRawVariableData(tx, obj.(*types.Variable))
+	case types.OrgInvitationKind:
+		return d.insertRawOrgInvitationData(tx, obj.(*types.OrgInvitation))
 	default:
 		panic(errors.Errorf("unknown object kind %q", obj.GetKind()))
 	}
@@ -1221,4 +1227,46 @@ func (d *DB) GetAllVariables(tx *sql.Tx) ([]*types.Variable, error) {
 	variables, _, err := d.fetchVariables(tx, q)
 
 	return variables, errors.WithStack(err)
+}
+
+func (d *DB) GetOrgInvitations(tx *sql.Tx, orgID string) ([]*types.OrgInvitation, error) {
+	q := orgInvitationQSelect.Where(sq.Eq{"org_id": orgID})
+
+	orgInvitations, _, err := d.fetchOrgInvitations(tx, q)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	if len(orgInvitations) > 1 {
+		return nil, errors.Errorf("too many rows returned")
+	}
+	if len(orgInvitations) == 0 {
+		return nil, errors.WithStack(err)
+	}
+	return orgInvitations, errors.WithStack(err)
+}
+
+func (d *DB) GetOrgInvitationByOrgUserID(tx *sql.Tx, orgID, userID string) (*types.OrgInvitation, error) {
+	q := orgInvitationQSelect.Where(sq.Eq{"org_id": orgID, "user_id": userID})
+
+	orgInvitations, _, err := d.fetchOrgInvitations(tx, q)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	if len(orgInvitations) > 1 {
+		return nil, errors.Errorf("too many rows returned")
+	}
+	if len(orgInvitations) == 0 {
+		return nil, nil
+	}
+	return orgInvitations[0], nil
+}
+
+func (d *DB) GetOrgInvitationByUserID(tx *sql.Tx, userID string) ([]*types.OrgInvitation, error) {
+	q := orgInvitationQSelect.Where(sq.Eq{"user_id": userID})
+
+	orgInvitations, _, err := d.fetchOrgInvitations(tx, q)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return orgInvitations, errors.WithStack(err)
 }

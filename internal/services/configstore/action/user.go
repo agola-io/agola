@@ -131,6 +131,17 @@ func (h *ActionHandler) DeleteUser(ctx context.Context, userRef string) error {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", userRef))
 		}
 
+		userOrgInvitations, err := h.d.GetOrgInvitationByUserID(tx, user.ID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		for _, orgInvitation := range userOrgInvitations {
+			err = h.d.DeleteOrgInvitation(tx, orgInvitation.ID)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+		}
+
 		if err := h.d.DeleteUser(tx, user.ID); err != nil {
 			return errors.WithStack(err)
 		}
@@ -552,4 +563,29 @@ func (h *ActionHandler) GetUserOrgs(ctx context.Context, userRef string) ([]*Use
 	}
 
 	return res, nil
+}
+
+func (h *ActionHandler) GetUserOrgInvitations(ctx context.Context, userRef string) ([]*types.OrgInvitation, error) {
+	var orgInvitations []*types.OrgInvitation
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		user, err := h.d.GetUser(tx, userRef)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if user == nil {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", userRef))
+		}
+
+		orgInvitations, err = h.d.GetOrgInvitationByUserID(tx, user.ID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		return errors.WithStack(err)
+	})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return orgInvitations, errors.WithStack(err)
 }

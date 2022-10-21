@@ -643,3 +643,63 @@ func createUserOrgsResponse(o *csapitypes.UserOrgsResponse) *gwapitypes.UserOrgs
 
 	return userOrgs
 }
+
+type UserOrgInvitationsHandler struct {
+	log zerolog.Logger
+	ah  *action.ActionHandler
+}
+
+func NewUserOrgInvitationsHandler(log zerolog.Logger, ah *action.ActionHandler) *UserOrgInvitationsHandler {
+	return &UserOrgInvitationsHandler{log: log, ah: ah}
+}
+
+func (h *UserOrgInvitationsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	userID := common.CurrentUserID(ctx)
+	if userID == "" {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user not authenticated")))
+		return
+	}
+
+	user, err := h.ah.GetUser(ctx, userID)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	query := r.URL.Query()
+
+	limitS := query.Get("limit")
+	limit := DefaultOrgInvitationsLimit
+	if limitS != "" {
+		var err error
+		limit, err = strconv.Atoi(limitS)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit")))
+			return
+		}
+	}
+	if limit < 0 {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0")))
+		return
+	}
+	if limit > MaxOrgInvitationsLimit {
+		limit = MaxOrgInvitationsLimit
+	}
+
+	userInvitations, err := h.ah.GetUserOrgInvitations(ctx, user.ID, limit)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	orgInvitations := make([]*gwapitypes.OrgInvitationResponse, len(userInvitations))
+	for i, p := range userInvitations {
+		orgInvitations[i] = createOrgInvitationResponse(p.OrgInvitation, p.Organization)
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, orgInvitations); err != nil {
+		h.log.Err(err).Send()
+	}
+}

@@ -23,23 +23,32 @@ import (
 )
 
 type ActionHandler struct {
-	log               zerolog.Logger
-	sd                *common.TokenSigningData
-	configstoreClient *csclient.Client
-	runserviceClient  *rsclient.Client
-	agolaID           string
-	apiExposedURL     string
-	webExposedURL     string
+	log                          zerolog.Logger
+	sd                           *common.TokenSigningData
+	configstoreClient            *csclient.Client
+	runserviceClient             *rsclient.Client
+	agolaID                      string
+	apiExposedURL                string
+	webExposedURL                string
+	organizationMemberAddingMode OrganizationMemberAddingMode
 }
 
-func NewActionHandler(log zerolog.Logger, sd *common.TokenSigningData, configstoreClient *csclient.Client, runserviceClient *rsclient.Client, agolaID, apiExposedURL, webExposedURL string) *ActionHandler {
+type OrganizationMemberAddingMode string
+
+const (
+	OrganizationMemberAddingModeDirect     OrganizationMemberAddingMode = "direct"
+	OrganizationMemberAddingModeInvitation OrganizationMemberAddingMode = "invitation"
+)
+
+func NewActionHandler(log zerolog.Logger, sd *common.TokenSigningData, configstoreClient *csclient.Client, runserviceClient *rsclient.Client, agolaID, apiExposedURL, webExposedURL string, organizationMemberAddingMode OrganizationMemberAddingMode) *ActionHandler {
 	return &ActionHandler{
-		log:               log,
-		sd:                sd,
-		configstoreClient: configstoreClient,
-		runserviceClient:  runserviceClient,
-		agolaID:           agolaID,
-		apiExposedURL:     apiExposedURL,
-		webExposedURL:     webExposedURL,
+		log:                          log,
+		sd:                           sd,
+		configstoreClient:            configstoreClient,
+		runserviceClient:             runserviceClient,
+		agolaID:                      agolaID,
+		apiExposedURL:                apiExposedURL,
+		webExposedURL:                webExposedURL,
+		organizationMemberAddingMode: organizationMemberAddingMode,
 	}
 }

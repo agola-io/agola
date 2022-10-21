@@ -26,7 +26,8 @@ import (
 )
 
 const (
-	maxIDLength = 20
+	maxIDLength                         = 20
+	defaultOrganizationMemberAddingMode = OrganizationMemberAddingModeDirect
 )
 
 type Config struct {
@@ -64,6 +65,8 @@ type Gateway struct {
 	TokenSigning TokenSigning `yaml:"tokenSigning"`
 
 	AdminToken string `yaml:"adminToken"`
+
+	OrganizationMemberAddingMode OrganizationMemberAddingMode `yaml:"organizationMemberAddingMode"`
 }
 
 type Scheduler struct {
@@ -246,12 +249,28 @@ type TokenSigning struct {
 	PublicKeyPath string `yaml:"publicKeyPath"`
 }
 
+type OrganizationMemberAddingMode string
+
+const (
+	OrganizationMemberAddingModeDirect     OrganizationMemberAddingMode = "direct"
+	OrganizationMemberAddingModeInvitation OrganizationMemberAddingMode = "invitation"
+)
+
+func (vt OrganizationMemberAddingMode) IsValid() bool {
+	switch vt {
+	case OrganizationMemberAddingModeDirect, OrganizationMemberAddingModeInvitation:
+		return true
+	}
+	return false
+}
+
 var defaultConfig = Config{
 	ID: "agola",
 	Gateway: Gateway{
 		TokenSigning: TokenSigning{
 			Duration: 12 * time.Hour,
 		},
+		OrganizationMemberAddingMode: defaultOrganizationMemberAddingMode,
 	},
 	Runservice: Runservice{
 		RunCacheExpireInterval:     7 * 24 * time.Hour,
@@ -352,6 +371,9 @@ func Validate(c *Config, componentsNames []string) error {
 		}
 		if err := validateWeb(&c.Gateway.Web); err != nil {
 			return errors.Wrapf(err, "gateway web configuration error")
+		}
+		if !c.Gateway.OrganizationMemberAddingMode.IsValid() {
+			return errors.Errorf("gateway organizationMemberAddingMode is not valid")
 		}
 	}
 

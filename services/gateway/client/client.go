@@ -660,3 +660,47 @@ func (c *Client) RefreshRemoteRepo(ctx context.Context, projectRef string) (*gwa
 	resp, err := c.getParsedResponse(ctx, "POST", path.Join("/projects", url.PathEscape(projectRef), "/refreshremoterepo"), nil, jsonContent, nil, project)
 	return project, resp, err
 }
+
+func (c *Client) GetOrgInvitations(ctx context.Context, orgRef string) ([]*gwapitypes.OrgInvitationResponse, *http.Response, error) {
+	orgInvitations := []*gwapitypes.OrgInvitationResponse{}
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s/invitations", orgRef), nil, jsonContent, nil, &orgInvitations)
+	return orgInvitations, resp, errors.WithStack(err)
+}
+
+func (c *Client) GetUserOrgInvitations(ctx context.Context) ([]*gwapitypes.OrgInvitationResponse, *http.Response, error) {
+	orgInvitations := []*gwapitypes.OrgInvitationResponse{}
+	resp, err := c.getParsedResponse(ctx, "GET", "/user/org_invitations", nil, jsonContent, nil, &orgInvitations)
+	return orgInvitations, resp, errors.WithStack(err)
+}
+
+func (c *Client) GetOrgInvitation(ctx context.Context, orgRef, userRef string) (*gwapitypes.OrgInvitationResponse, *http.Response, error) {
+	orgInvitation := new(gwapitypes.OrgInvitationResponse)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s/invitations/%s", orgRef, userRef), nil, jsonContent, nil, orgInvitation)
+	return orgInvitation, resp, errors.WithStack(err)
+}
+
+func (c *Client) CreateOrgInvitation(ctx context.Context, orgRef string, req *gwapitypes.CreateOrgInvitationRequest) (*gwapitypes.OrgInvitationResponse, *http.Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+
+	orgInvitation := new(gwapitypes.OrgInvitationResponse)
+	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/orgs/%s/invitations", orgRef), nil, jsonContent, bytes.NewReader(reqj), orgInvitation)
+	return orgInvitation, resp, errors.WithStack(err)
+}
+
+func (c *Client) DeleteOrgInvitation(ctx context.Context, orgRef string, userRef string) (*http.Response, error) {
+	resp, err := c.getResponse(ctx, "DELETE", fmt.Sprintf("/orgs/%s/invitations/%s", orgRef, userRef), nil, jsonContent, nil)
+	return resp, errors.WithStack(err)
+}
+
+func (c *Client) UserOrgInvitationAction(ctx context.Context, orgRef string, req *gwapitypes.OrgInvitationActionRequest) (*http.Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	resp, err := c.getResponse(ctx, "PUT", fmt.Sprintf("/user/org_invitations/%s/actions", orgRef), nil, jsonContent, bytes.NewReader(reqj))
+	return resp, errors.WithStack(err)
+}

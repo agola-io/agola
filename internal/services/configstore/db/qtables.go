@@ -91,6 +91,14 @@ var (
 	variableQUpdate = func(id string, revision uint64, name, parentID string, parentKind types.ObjectKind, data []byte) sq.UpdateBuilder {
 		return sb.Update("variable_q").SetMap(map[string]interface{}{"id": id, "revision": revision, "name": name, "parent_id": parentID, "parent_kind": parentKind, "data": data}).Where(sq.Eq{"id": id})
 	}
+
+	orgInvitationQSelect = sb.Select("orginvitation_q.id", "orginvitation_q.revision", "orginvitation_q.data").From("orginvitation_q")
+	orgInvitationQInsert = func(id string, revision uint64, userID string, orgID string, data []byte) sq.InsertBuilder {
+		return sb.Insert("orginvitation_q").Columns("id", "revision", "user_id", "org_id", "data").Values(id, revision, userID, orgID, data)
+	}
+	orgInvitationQUpdate = func(id string, revision uint64, userID, orgID string, data []byte) sq.UpdateBuilder {
+		return sb.Update("orginvitation_q").SetMap(map[string]interface{}{"id": id, "revision": revision, "user_id": userID, "org_id": orgID, "data": data}).Where(sq.Eq{"id": id})
+	}
 )
 
 func (d *DB) InsertObjectQ(tx *sql.Tx, obj stypes.Object, data []byte) error {
@@ -115,6 +123,8 @@ func (d *DB) InsertObjectQ(tx *sql.Tx, obj stypes.Object, data []byte) error {
 		return d.insertSecretQ(tx, obj.(*types.Secret), data)
 	case types.VariableKind:
 		return d.insertVariableQ(tx, obj.(*types.Variable), data)
+	case types.OrgInvitationKind:
+		return d.insertOrgInvitationQ(tx, obj.(*types.OrgInvitation), data)
 
 	default:
 		panic(errors.Errorf("unknown object kind %q", obj.GetKind()))
@@ -376,6 +386,32 @@ func (d *DB) updateVariableQ(tx *sql.Tx, variable *types.Variable, data []byte) 
 func (d *DB) deleteVariableQ(tx *sql.Tx, id string) error {
 	if _, err := tx.Exec("delete from variable_q where id = $1", id); err != nil {
 		return errors.Wrapf(err, "failed to delete variable_q")
+	}
+
+	return nil
+}
+
+func (d *DB) insertOrgInvitationQ(tx *sql.Tx, orgInvitation *types.OrgInvitation, data []byte) error {
+	q := orgInvitationQInsert(orgInvitation.ID, orgInvitation.Revision, orgInvitation.UserID, orgInvitation.OrganizationID, data)
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrapf(err, "failed to insert orginvitation_q")
+	}
+
+	return nil
+}
+
+func (d *DB) updateOrgInvitationQ(tx *sql.Tx, orgInvitation *types.OrgInvitation, data []byte) error {
+	q := orgInvitationQUpdate(orgInvitation.ID, orgInvitation.Revision, orgInvitation.UserID, orgInvitation.OrganizationID, data)
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrapf(err, "failed to update orginvitation_q")
+	}
+
+	return nil
+}
+
+func (d *DB) deleteOrgInvitationQ(tx *sql.Tx, id string) error {
+	if _, err := tx.Exec("delete from orginvitation_q where id = $1", id); err != nil {
+		return errors.Wrapf(err, "failed to delete orginvitation_q")
 	}
 
 	return nil

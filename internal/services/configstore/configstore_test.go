@@ -76,6 +76,42 @@ func setupConfigstore(ctx context.Context, t *testing.T, log zerolog.Logger, dir
 	return cs
 }
 
+func setupUsers(t *testing.T, ctx context.Context, cs *Configstore) {
+	i := 1
+	for i < 5 {
+		req := &action.CreateUserRequest{
+			UserName: "UserTest" + fmt.Sprint(i),
+		}
+		_, err := cs.ah.CreateUser(ctx, req)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		i++
+	}
+}
+
+func setupOrgs(t *testing.T, ctx context.Context, cs *Configstore, userMemberID string) {
+	i := 1
+	for i < 5 {
+		req := &action.CreateOrgRequest{
+			Name:       "OrgTest" + fmt.Sprint(i),
+			Visibility: "public",
+		}
+		org, err := cs.ah.CreateOrg(ctx, req)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		_, err = cs.ah.AddOrgMember(ctx, org.ID, userMemberID, types.MemberRoleOwner)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		i++
+	}
+}
+
 func getRemoteSources(ctx context.Context, cs *Configstore) ([]*types.RemoteSource, error) {
 	var users []*types.RemoteSource
 	err := cs.d.Do(ctx, func(tx *sql.Tx) error {
@@ -1261,6 +1297,230 @@ func TestDeleteOrg(t *testing.T) {
 				t.Fatalf("unexpected err: %v", err)
 			}
 
+			go func() { _ = cs.Run(ctx) }()
+
+			tt.f(ctx, t, cs)
+		})
+	}
+}
+
+func TestOrgInvitation(t *testing.T) {
+	dir := t.TempDir()
+	log := testutil.NewLogger(t)
+
+	tests := []struct {
+		name string
+		f    func(ctx context.Context, t *testing.T, cs *Configstore)
+	}{
+		{
+			name: "test create org invitation",
+			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
+				setupUsers(t, ctx, cs)
+				users, err := getUsers(ctx, cs)
+				if err != nil {
+					t.Fatalf("err: %v", err)
+				}
+				userOwner := users[0]
+				userInvitation := users[1]
+
+				setupOrgs(t, ctx, cs, userOwner.ID)
+				orgs, err := getOrgs(ctx, cs)
+				if err != nil {
+					t.Fatalf("err: %v", err)
+				}
+				org := orgs[0]
+
+				rs := &action.CreateOrgInvitationRequest{
+					UserRef:         userInvitation.ID,
+					OrganizationRef: org.ID,
+					Role:            types.MemberRoleMember,
+				}
+				_, err = cs.ah.CreateOrgInvitation(ctx, rs)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				fmt.Println("err:", err)
+			},
+		},
+		{
+			name: "test user org invitation creation with already existing invitation",
+			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
+				setupUsers(t, ctx, cs)
+				users, err := getUsers(ctx, cs)
+				if err != nil {
+					t.Fatalf("err: %v", err)
+				}
+
+				userOwner := users[0]
+				userInvitation := users[1]
+
+				setupOrgs(t, ctx, cs, userOwner.ID)
+				orgs, err := getOrgs(ctx, cs)
+				if err != nil {
+					t.Fatalf("err: %v", err)
+				}
+				if len(users) == 0 {
+					t.Fatalf("err: users empty")
+				}
+				org := orgs[0]
+
+				rs := &action.CreateOrgInvitationRequest{
+					UserRef:         userInvitation.ID,
+					OrganizationRef: org.ID,
+					Role:            types.MemberRoleMember,
+				}
+				_, err = cs.ah.CreateOrgInvitation(ctx, rs)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				expectedError := util.NewAPIError(util.ErrBadRequest, errors.Errorf("invitation already exists"))
+				_, err = cs.ah.CreateOrgInvitation(ctx, rs)
+				if err.Error() != expectedError.Error() {
+					t.Fatalf("expected err: %v, got err: %v", expectedError.Error(), err.Error())
+				}
+			},
+		},
+		{
+			name: "test org deletion with existing org invitations",
+			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
+				setupUsers(t, ctx, cs)
+				users, err := getUsers(ctx, cs)
+				if err != nil {
+					t.Fatalf("err: %v", err)
+				}
+				userOwner := users[0]
+				userInvitation := users[1]
+
+				setupOrgs(t, ctx, cs, userOwner.ID)
+				orgs, err := getOrgs(ctx, cs)
+				if err != nil {
+					t.Fatalf("err: %v", err)
+				}
+				org := orgs[0]
+
+				rs := &action.CreateOrgInvitationRequest{
+					UserRef:         userInvitation.ID,
+					OrganizationRef: org.ID,
+					Role:            types.MemberRoleMember,
+				}
+				_, err = cs.ah.CreateOrgInvitation(ctx, rs)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				err = cs.ah.DeleteOrg(ctx, org.ID)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				orgInvitations, err := cs.ah.GetUserOrgInvitations(ctx, userInvitation.ID)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				if len(orgInvitations) != 0 {
+					t.Fatalf("expected 0 orgInvitations, got %d orgInvitations", len(orgInvitations))
+				}
+
+			},
+		},
+		{
+			name: "test user deletion with existing org invitations",
+			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
+				setupUsers(t, ctx, cs)
+				users, err := getUsers(ctx, cs)
+				if err != nil {
+					t.Fatalf("err: %v", err)
+				}
+				userOwner := users[0]
+				userInvitation := users[1]
+
+				setupOrgs(t, ctx, cs, userOwner.ID)
+				orgs, err := getOrgs(ctx, cs)
+				if err != nil {
+					t.Fatalf("err: %v", err)
+				}
+				org := orgs[0]
+
+				rs := &action.CreateOrgInvitationRequest{
+					UserRef:         userInvitation.ID,
+					OrganizationRef: org.ID,
+					Role:            types.MemberRoleMember,
+				}
+				_, err = cs.ah.CreateOrgInvitation(ctx, rs)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				err = cs.ah.DeleteUser(ctx, userInvitation.ID)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				orgInvitations, err := cs.ah.GetOrgInvitations(ctx, org.ID)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				if len(orgInvitations) != 0 {
+					t.Fatalf("expected 0 orgInvitations, got %d orgInvitations", len(orgInvitations))
+				}
+			},
+		},
+		{
+			name: "test add org member with an existing org invitation",
+			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
+				setupUsers(t, ctx, cs)
+				users, err := getUsers(ctx, cs)
+				if err != nil {
+					t.Fatalf("err: %v", err)
+				}
+				userOwner := users[0]
+				userInvitation := users[1]
+
+				setupOrgs(t, ctx, cs, userOwner.ID)
+				orgs, err := getOrgs(ctx, cs)
+				if err != nil {
+					t.Fatalf("err: %v", err)
+				}
+				org := orgs[0]
+
+				rs := &action.CreateOrgInvitationRequest{
+					UserRef:         userInvitation.ID,
+					OrganizationRef: org.ID,
+					Role:            types.MemberRoleMember,
+				}
+				_, err = cs.ah.CreateOrgInvitation(ctx, rs)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				_, err = cs.ah.AddOrgMember(ctx, org.ID, userInvitation.ID, types.MemberRoleMember)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				orgInvitations, err := cs.ah.GetOrgInvitations(ctx, org.ID)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				if len(orgInvitations) != 0 {
+					t.Fatalf("expected 0 orgInvitations, got %d orgInvitations", len(orgInvitations))
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir, err := ioutil.TempDir(dir, "agola")
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			ctx := context.Background()
+
+			cs := setupConfigstore(ctx, t, log, dir)
+
+			t.Logf("starting cs")
 			go func() { _ = cs.Run(ctx) }()
 
 			tt.f(ctx, t, cs)
