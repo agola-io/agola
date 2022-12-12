@@ -111,13 +111,13 @@ func (h *CurrentUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, tokens, linkedAccounts, err := h.ah.GetCurrentUser(ctx, userID)
+	user, err := h.ah.GetCurrentUser(ctx, userID)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	res := createPrivateUserResponse(user, tokens, linkedAccounts)
+	res := createPrivateUserResponse(user.User, user.Tokens, user.LinkedAccounts)
 	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
 		h.log.Err(err).Send()
 	}
@@ -219,21 +219,40 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	start := query.Get("start")
+	queryType := query.Get("query_type")
 
-	areq := &action.GetUsersRequest{
-		Start: start,
-		Limit: limit,
-		Asc:   asc,
-	}
-	csusers, err := h.ah.GetUsers(ctx, areq)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
+	var ausers []*action.PrivateUserResponse
+	var err error
+	switch queryType {
+	case "byremoteuser":
+		remoteUserID := query.Get("remoteuserid")
+		rsRef := query.Get("remotesourceref")
+
+		user, err := h.ah.GetUserByLinkedAccountRemoteUserAndSource(ctx, remoteUserID, rsRef)
+		if util.HTTPError(w, err) {
+			h.log.Err(err).Send()
+			return
+		}
+		ausers = []*action.PrivateUserResponse{user}
+	case "":
+		areq := &action.GetUsersRequest{
+			Start: start,
+			Limit: limit,
+			Asc:   asc,
+		}
+		ausers, err = h.ah.GetUsers(ctx, areq)
+		if util.HTTPError(w, err) {
+			h.log.Err(err).Send()
+			return
+		}
+	default:
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("unknown query_type: %q", queryType)))
 		return
 	}
 
-	users := make([]*gwapitypes.UserResponse, len(csusers))
-	for i, p := range csusers {
-		users[i] = createUserResponse(p)
+	users := make([]*gwapitypes.PrivateUserResponse, len(ausers))
+	for i, p := range ausers {
+		users[i] = createPrivateUserResponse(p.User, p.Tokens, p.LinkedAccounts)
 	}
 
 	if err := util.HTTPResponse(w, http.StatusOK, users); err != nil {

@@ -357,7 +357,7 @@ func (c *Client) GetUser(ctx context.Context, userRef string) (*gwapitypes.UserR
 	return user, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetUsers(ctx context.Context, start string, limit int, asc bool) ([]*gwapitypes.UserResponse, *http.Response, error) {
+func (c *Client) GetUsers(ctx context.Context, start string, limit int, asc bool) ([]*gwapitypes.PrivateUserResponse, *http.Response, error) {
 	q := url.Values{}
 	if start != "" {
 		q.Add("start", start)
@@ -369,9 +369,23 @@ func (c *Client) GetUsers(ctx context.Context, start string, limit int, asc bool
 		q.Add("asc", "")
 	}
 
-	users := []*gwapitypes.UserResponse{}
+	users := []*gwapitypes.PrivateUserResponse{}
 	resp, err := c.getParsedResponse(ctx, "GET", "/users", q, jsonContent, nil, &users)
 	return users, resp, errors.WithStack(err)
+}
+
+func (c *Client) GetUserByLinkedAccountRemoteUserAndSource(ctx context.Context, remoteUserID, remoteSourceRef string) (*gwapitypes.PrivateUserResponse, *http.Response, error) {
+	q := url.Values{}
+	q.Add("query_type", "byremoteuser")
+	q.Add("remoteuserid", remoteUserID)
+	q.Add("remotesourceref", remoteSourceRef)
+
+	users := []*gwapitypes.PrivateUserResponse{}
+	resp, err := c.getParsedResponse(ctx, "GET", "/users", q, jsonContent, nil, &users)
+	if err != nil {
+		return nil, resp, errors.WithStack(err)
+	}
+	return users[0], resp, errors.WithStack(err)
 }
 
 func (c *Client) CreateUser(ctx context.Context, req *gwapitypes.CreateUserRequest) (*gwapitypes.UserResponse, *http.Response, error) {
