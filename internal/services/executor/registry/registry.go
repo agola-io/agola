@@ -20,7 +20,6 @@ import (
 	"strings"
 
 	"agola.io/agola/internal/errors"
-	"agola.io/agola/services/runservice/types"
 
 	"github.com/google/go-containerregistry/pkg/name"
 )
@@ -46,6 +45,20 @@ import (
 //		return "", errors.Errorf("unsupported registry auth type %q", auth.Type)
 //	}
 //}
+
+type DockerRegistryAuthType string
+
+const (
+	DockerRegistryAuthTypeBasic       DockerRegistryAuthType = "basic"
+	DockerRegistryAuthTypeEncodedAuth DockerRegistryAuthType = "encodedauth"
+)
+
+type DockerRegistryAuth struct {
+	Type     DockerRegistryAuthType
+	Username string
+	Password string
+	Auth     string
+}
 
 // Docker config represents the docker config.json format. We only consider the "auths" part
 type DockerConfig struct {
@@ -94,12 +107,12 @@ func GetRegistry(image string) (string, error) {
 }
 
 // ResolveAuth resolves the auth username and password for the provided registry name
-func ResolveAuth(auths map[string]types.DockerRegistryAuth, regname string) (string, string, error) {
+func ResolveAuth(auths map[string]DockerRegistryAuth, regname string) (string, string, error) {
 	if auths != nil {
 		for _, form := range domainForms {
 			if auth, ok := auths[fmt.Sprintf(form, regname)]; ok {
 				switch auth.Type {
-				case types.DockerRegistryAuthTypeEncodedAuth:
+				case DockerRegistryAuthTypeEncodedAuth:
 					decoded, err := base64.StdEncoding.DecodeString(auth.Auth)
 					if err != nil {
 						return "", "", errors.Wrapf(err, "failed to decode docker auth")
@@ -109,7 +122,7 @@ func ResolveAuth(auths map[string]types.DockerRegistryAuth, regname string) (str
 						return "", "", errors.Wrapf(err, "wrong docker auth")
 					}
 					return parts[0], parts[1], nil
-				case types.DockerRegistryAuthTypeBasic:
+				case DockerRegistryAuthTypeBasic:
 					return auth.Username, auth.Password, nil
 				default:
 					return "", "", errors.Errorf("unsupported auth type %q", auth.Type)
@@ -121,7 +134,7 @@ func ResolveAuth(auths map[string]types.DockerRegistryAuth, regname string) (str
 	return "", "", nil
 }
 
-func GenDockerConfig(auths map[string]types.DockerRegistryAuth, images []string) (*DockerConfig, error) {
+func GenDockerConfig(auths map[string]DockerRegistryAuth, images []string) (*DockerConfig, error) {
 	dockerConfig := &DockerConfig{Auths: make(map[string]DockerConfigAuth)}
 	for _, image := range images {
 		ref, err := name.ParseReference(image, name.WeakValidation)

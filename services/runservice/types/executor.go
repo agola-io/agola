@@ -1,6 +1,7 @@
 package types
 
 import (
+	"agola.io/agola/internal/sql"
 	stypes "agola.io/agola/services/types"
 
 	"github.com/gofrs/uuid"
@@ -49,14 +50,15 @@ func (e *Executor) DeepCopy() *Executor {
 	return ne.(*Executor)
 }
 
-func NewExecutor() *Executor {
+func NewExecutor(tx *sql.Tx) *Executor {
 	return &Executor{
 		TypeMeta: stypes.TypeMeta{
 			Kind:    ExecutorKind,
 			Version: ExecutorVersion,
 		},
 		ObjectMeta: stypes.ObjectMeta{
-			ID: uuid.Must(uuid.NewV4()).String(),
+			ID:   uuid.Must(uuid.NewV4()).String(),
+			TxID: tx.ID(),
 		},
 	}
 }

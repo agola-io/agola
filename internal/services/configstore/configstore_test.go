@@ -33,8 +33,10 @@ import (
 	"agola.io/agola/internal/testutil"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
+	stypes "agola.io/agola/services/types"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/rs/zerolog"
 )
 
@@ -188,12 +190,8 @@ func getVariables(ctx context.Context, cs *Configstore) ([]*types.Variable, erro
 	return variables, errors.WithStack(err)
 }
 
-func compareObjects(u1, u2 interface{}) bool {
-	if diff := cmp.Diff(u1, u2); diff != "" {
-		return false
-	}
-
-	return true
+func cmpDiffObject(x, y interface{}) string {
+	return cmp.Diff(x, y, cmpopts.IgnoreFields(stypes.ObjectMeta{}, "TxID"))
 }
 
 func TestExportImport(t *testing.T) {
@@ -392,26 +390,26 @@ func TestExportImport(t *testing.T) {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	if !compareObjects(remoteSources, newRemoteSources) {
-		t.Fatalf("remoteSources are different between before and after import")
+	if diff := cmpDiffObject(remoteSources, newRemoteSources); diff != "" {
+		t.Fatalf("remoteSources mismatch (-want +got):\n%s", diff)
 	}
-	if !compareObjects(users, newUsers) {
-		t.Fatalf("users are different between before and after import")
+	if diff := cmpDiffObject(users, newUsers); diff != "" {
+		t.Fatalf("users mismatch (-want +got):\n%s", diff)
 	}
-	if !compareObjects(orgs, newOrgs) {
-		t.Fatalf("orgs are different between before and after import")
+	if diff := cmpDiffObject(orgs, newOrgs); diff != "" {
+		t.Fatalf("orgs mismatch (-want +got):\n%s", diff)
 	}
-	if !compareObjects(projectGroups, newProjectGroups) {
-		t.Fatalf("projectGroups are different between before and after import")
+	if diff := cmpDiffObject(projectGroups, newProjectGroups); diff != "" {
+		t.Fatalf("projectGroups mismatch (-want +got):\n%s", diff)
 	}
-	if !compareObjects(projects, newProjects) {
-		t.Fatalf("projects are different between before and after import")
+	if diff := cmpDiffObject(projects, newProjects); diff != "" {
+		t.Fatalf("projects mismatch (-want +got):\n%s", diff)
 	}
-	if !compareObjects(secrets, newSecrets) {
-		t.Fatalf("secrets are different between before and after import")
+	if diff := cmpDiffObject(secrets, newSecrets); diff != "" {
+		t.Fatalf("secrets mismatch (-want +got):\n%s", diff)
 	}
-	if !compareObjects(variables, newVariables) {
-		t.Fatalf("variables are different between before and after import")
+	if diff := cmpDiffObject(variables, newVariables); diff != "" {
+		t.Fatalf("variables mismatch (-want +got):\n%s", diff)
 	}
 }
 
@@ -965,8 +963,8 @@ func TestProjectGroupDeleteDontSeeOldChildObjects(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	if diff := cmp.Diff(projects, []*types.Project{project}); diff != "" {
-		t.Error(diff)
+	if diff := cmpDiffObject(projects, []*types.Project{project}); diff != "" {
+		t.Fatalf("mismatch (-want +got):\n%s", diff)
 	}
 
 	// Get by projectgroup path
@@ -974,40 +972,40 @@ func TestProjectGroupDeleteDontSeeOldChildObjects(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	if diff := cmp.Diff(projects, []*types.Project{project}); diff != "" {
-		t.Error(diff)
+	if diff := cmpDiffObject(projects, []*types.Project{project}); diff != "" {
+		t.Fatalf("mismatch (-want +got):\n%s", diff)
 	}
 
 	secrets, err := cs.ah.GetSecrets(ctx, types.ObjectKindProject, project.ID, false)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	if diff := cmp.Diff(secrets, []*types.Secret{secret}); diff != "" {
-		t.Error(diff)
+	if diff := cmpDiffObject(secrets, []*types.Secret{secret}); diff != "" {
+		t.Fatalf("mismatch (-want +got):\n%s", diff)
 	}
 
 	secrets, err = cs.ah.GetSecrets(ctx, types.ObjectKindProject, path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name), false)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	if diff := cmp.Diff(secrets, []*types.Secret{secret}); diff != "" {
-		t.Error(diff)
+	if diff := cmpDiffObject(secrets, []*types.Secret{secret}); diff != "" {
+		t.Fatalf("mismatch (-want +got):\n%s", diff)
 	}
 
 	variables, err := cs.ah.GetVariables(ctx, types.ObjectKindProject, project.ID, false)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	if diff := cmp.Diff(variables, []*types.Variable{variable}); diff != "" {
-		t.Error(diff)
+	if diff := cmpDiffObject(variables, []*types.Variable{variable}); diff != "" {
+		t.Fatalf("mismatch (-want +got):\n%s", diff)
 	}
 
 	variables, err = cs.ah.GetVariables(ctx, types.ObjectKindProject, path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name), false)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	if diff := cmp.Diff(variables, []*types.Variable{variable}); diff != "" {
-		t.Error(diff)
+	if diff := cmpDiffObject(variables, []*types.Variable{variable}); diff != "" {
+		t.Fatalf("mismatch (-want +got):\n%s", diff)
 	}
 }
 
@@ -1041,8 +1039,8 @@ func TestOrgMembers(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
-		if diff := cmp.Diff(res, expectedResponse); diff != "" {
-			t.Error(diff)
+		if diff := cmpDiffObject(res, expectedResponse); diff != "" {
+			t.Fatalf("mismatch (-want +got):\n%s", diff)
 		}
 	})
 
@@ -1079,8 +1077,8 @@ func TestOrgMembers(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
-		if diff := cmp.Diff(res, expectedResponse); diff != "" {
-			t.Error(diff)
+		if diff := cmpDiffObject(res, expectedResponse); diff != "" {
+			t.Fatalf("mismatch (-want +got):\n%s", diff)
 		}
 	})
 }

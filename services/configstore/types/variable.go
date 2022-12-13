@@ -15,6 +15,7 @@
 package types
 
 import (
+	"agola.io/agola/internal/sql"
 	stypes "agola.io/agola/services/types"
 
 	"github.com/gofrs/uuid"
@@ -43,14 +44,15 @@ type Variable struct {
 	Values []VariableValue `json:"values,omitempty"`
 }
 
-func NewVariable() *Variable {
+func NewVariable(tx *sql.Tx) *Variable {
 	return &Variable{
 		TypeMeta: stypes.TypeMeta{
 			Kind:    VariableKind,
 			Version: VariableVersion,
 		},
 		ObjectMeta: stypes.ObjectMeta{
-			ID: uuid.Must(uuid.NewV4()).String(),
+			ID:   uuid.Must(uuid.NewV4()).String(),
+			TxID: tx.ID(),
 		},
 	}
 }

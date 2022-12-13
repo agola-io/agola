@@ -262,9 +262,6 @@ func (s *Runservice) submitRunTasks(ctx context.Context, r *types.Run, rc *types
 			return nil
 		}
 
-		executorTask = common.GenExecutorTask(r, rt, rc, executor)
-		s.log.Debug().Msgf("et: %s", util.Dump(executorTask))
-
 		// check again that the executorTask for this runTask id wasn't already scheduled
 		// if not existing, save and submit it
 		var shouldSend bool
@@ -277,6 +274,9 @@ func (s *Runservice) submitRunTasks(ctx context.Context, r *types.Run, rc *types
 			if curExecutorTask != nil {
 				return nil
 			}
+
+			executorTask = common.GenExecutorTask(tx, r, rt, rc, executor)
+			s.log.Debug().Msgf("et: %s", util.Dump(executorTask))
 
 			if err := s.d.InsertExecutorTask(tx, executorTask); err != nil {
 				return errors.WithStack(err)
@@ -550,11 +550,19 @@ func (s *Runservice) scheduleRun(ctx context.Context, runID string) error {
 		return errors.WithStack(err)
 	}
 
+	curRunRevision := r.Revision
+	curScheduledExecutorTasksRevisions := map[string]uint64{}
+	for _, et := range scheduledExecutorTasks {
+		curScheduledExecutorTasksRevisions[et.ID] = et.Revision
+	}
 	err = s.d.Do(ctx, func(tx *sql.Tx) error {
 		// if the run is set to stop, stop all active tasks
 		if r.Stop {
 			for _, et := range scheduledExecutorTasks {
 				et.Spec.Stop = true
+
+				et.TxID = tx.ID()
+				et.Revision = curScheduledExecutorTasksRevisions[et.ID]
 				if err := s.d.UpdateExecutorTask(tx, et); err != nil {
 					return errors.WithStack(err)
 				}
@@ -571,6 +579,9 @@ func (s *Runservice) scheduleRun(ctx context.Context, runID string) error {
 
 			shouldSubmitRunTasks = true
 		}
+
+		r.TxID = tx.ID()
+		r.Revision = curRunRevision
 
 		if err := s.d.UpdateRun(tx, r); err != nil {
 			return errors.WithStack(err)

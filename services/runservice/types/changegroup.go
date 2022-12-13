@@ -1,6 +1,7 @@
 package types
 
 import (
+	"agola.io/agola/internal/sql"
 	stypes "agola.io/agola/services/types"
 
 	"github.com/gofrs/uuid"
@@ -26,14 +27,15 @@ type ChangeGroup struct {
 	Value string `json:"value"`
 }
 
-func NewChangeGroup() *ChangeGroup {
+func NewChangeGroup(tx *sql.Tx) *ChangeGroup {
 	return &ChangeGroup{
 		TypeMeta: stypes.TypeMeta{
 			Kind:    ChangeGroupKind,
 			Version: ChangeGroupVersion,
 		},
 		ObjectMeta: stypes.ObjectMeta{
-			ID: uuid.Must(uuid.NewV4()).String(),
+			ID:   uuid.Must(uuid.NewV4()).String(),
+			TxID: tx.ID(),
 		},
 	}
 }

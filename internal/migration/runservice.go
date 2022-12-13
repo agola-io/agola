@@ -89,7 +89,7 @@ func MigrateRunService(ctx context.Context, r io.Reader, w io.Writer) error {
 
 			curNewRunSequence++
 
-			run := types.NewRun()
+			run := types.NewRun(newTx)
 			run.Sequence = curNewRunSequence
 			run.Name = oldRun.Name
 			run.Counter = oldRun.Counter
@@ -133,7 +133,7 @@ func MigrateRunService(ctx context.Context, r io.Reader, w io.Writer) error {
 			oldRunConfigj, _ := json.Marshal(oldRunConfig)
 			log.Debug().Msgf("oldRunConfig: %s", oldRunConfigj)
 
-			runConfig := types.NewRunConfig()
+			runConfig := types.NewRunConfig(newTx)
 			runConfig.Name = oldRunConfig.Name
 			runConfig.Group = oldRunConfig.Group
 			runConfig.SetupErrors = oldRunConfig.SetupErrors
@@ -175,7 +175,7 @@ func MigrateRunService(ctx context.Context, r io.Reader, w io.Writer) error {
 
 			log.Debug().Msgf("oldRunCounter: %d", oldRunCounter)
 
-			runCounter := types.NewRunCounter(de.ID)
+			runCounter := types.NewRunCounter(newTx, de.ID)
 			runCounter.Value = oldRunCounter
 
 			if err := newd.InsertRunCounter(newTx, runCounter); err != nil {
@@ -188,7 +188,7 @@ func MigrateRunService(ctx context.Context, r io.Reader, w io.Writer) error {
 	}
 
 	// Generate run sequence
-	runSequence := types.NewSequence(types.SequenceTypeRun)
+	runSequence := types.NewSequence(newTx, types.SequenceTypeRun)
 	runSequence.Value = curNewRunSequence
 	if err := newd.InsertSequence(newTx, runSequence); err != nil {
 		return errors.WithStack(err)

@@ -3,6 +3,7 @@ package types
 import (
 	"time"
 
+	"agola.io/agola/internal/sql"
 	stypes "agola.io/agola/services/types"
 
 	"github.com/gofrs/uuid"
@@ -113,14 +114,15 @@ type WorkspaceOperation struct {
 	Overwrite bool   `json:"overwrite,omitempty"`
 }
 
-func NewExecutorTask() *ExecutorTask {
+func NewExecutorTask(tx *sql.Tx) *ExecutorTask {
 	return &ExecutorTask{
 		TypeMeta: stypes.TypeMeta{
 			Kind:    ExecutorTaskKind,
 			Version: ExecutorTaskVersion,
 		},
 		ObjectMeta: stypes.ObjectMeta{
-			ID: uuid.Must(uuid.NewV4()).String(),
+			ID:   uuid.Must(uuid.NewV4()).String(),
+			TxID: tx.ID(),
 		},
 	}
 }

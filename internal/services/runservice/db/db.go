@@ -203,7 +203,7 @@ func (d *DB) NextSequence(tx *sql.Tx, sequenceType types.SequenceType) (uint64, 
 		return 0, errors.WithStack(err)
 	}
 	if seq == nil {
-		seq = types.NewSequence(sequenceType)
+		seq = types.NewSequence(tx, sequenceType)
 	}
 
 	seq.Value++
@@ -433,7 +433,7 @@ func (d *DB) NextRunCounter(tx *sql.Tx, groupID string) (uint64, error) {
 		return 0, errors.WithStack(err)
 	}
 	if runCounter == nil {
-		runCounter = types.NewRunCounter(groupID)
+		runCounter = types.NewRunCounter(tx, groupID)
 	}
 
 	runCounter.Value++

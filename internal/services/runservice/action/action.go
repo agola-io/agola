@@ -90,7 +90,7 @@ func (h *ActionHandler) GetChangeGroupsUpdateTokens(tx *sql.Tx, changeGroupsName
 
 		// create and insert non existing changegroup
 		if !found {
-			newChangeGroup := types.NewChangeGroup()
+			newChangeGroup := types.NewChangeGroup(tx)
 			newChangeGroup.Name = changeGroupName
 			newChangeGroup.Value = uuid.Must(uuid.NewV4()).String()
 
@@ -303,7 +303,7 @@ func (h *ActionHandler) newRun(ctx context.Context, req *RunCreateRequest) (*typ
 		}
 	}
 
-	rc := types.NewRunConfig()
+	rc := types.NewRunConfig(nil)
 	rc.Name = req.Name
 	rc.Group = req.Group
 	rc.SetupErrors = setupErrors
@@ -508,6 +508,13 @@ func (h *ActionHandler) saveRun(ctx context.Context, rb *types.RunBundle, runcgt
 	err = h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
 
+		// set objects tx id, revision since they were created outside the transaction
+		run.TxID = tx.ID()
+		run.Revision = 0
+
+		rc.TxID = tx.ID()
+		rc.Revision = 0
+
 		if err := h.UpdateChangeGroups(tx, runcgt); err != nil {
 			return errors.WithStack(err)
 		}
@@ -589,7 +596,7 @@ func genRunTask(rct *types.RunConfigTask) *types.RunTask {
 }
 
 func genRun(rc *types.RunConfig) *types.Run {
-	r := types.NewRun()
+	r := types.NewRun(nil)
 	r.RunConfigID = rc.ID
 	r.Name = rc.Name
 	r.Group = rc.Group

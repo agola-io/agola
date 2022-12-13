@@ -15,6 +15,7 @@
 package types
 
 import (
+	"agola.io/agola/internal/sql"
 	stypes "agola.io/agola/services/types"
 	"github.com/gofrs/uuid"
 )
@@ -33,14 +34,15 @@ type OrgInvitation struct {
 	Role           MemberRole `json:"role,omitempty"`
 }
 
-func NewOrgInvitation() *OrgInvitation {
+func NewOrgInvitation(tx *sql.Tx) *OrgInvitation {
 	return &OrgInvitation{
 		TypeMeta: stypes.TypeMeta{
 			Kind:    OrgInvitationKind,
 			Version: OrgInvitationVersion,
 		},
 		ObjectMeta: stypes.ObjectMeta{
-			ID: uuid.Must(uuid.NewV4()).String(),
+			ID:   uuid.Must(uuid.NewV4()).String(),
+			TxID: tx.ID(),
 		},
 	}
 }

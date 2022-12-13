@@ -151,7 +151,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateUpdateProj
 			}
 		}
 
-		project = types.NewProject()
+		project = types.NewProject(tx)
 		project.Name = req.Name
 		project.Parent = req.Parent
 		project.Visibility = req.Visibility

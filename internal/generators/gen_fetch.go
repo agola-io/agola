@@ -62,7 +62,7 @@ func (d *DB) fetch{{ $oi.Name }}s(tx *sql.Tx, q sq.Sqlizer) ([]*types.{{ $oi.Nam
 	}
 	defer rows.Close()
 
-	return d.scan{{ $oi.Name }}s(rows)
+	return d.scan{{ $oi.Name }}s(rows, tx.ID())
 }
 
 func (d *DB) scan{{ $oi.Name }}(rows *stdsql.Rows, additionalFields []interface{}) (*types.{{ $oi.Name }}, string, error) {
@@ -85,7 +85,7 @@ func (d *DB) scan{{ $oi.Name }}(rows *stdsql.Rows, additionalFields []interface{
 	return &v, id, nil
 }
 
-func (d *DB) scan{{ $oi.Name }}s(rows *stdsql.Rows) ([]*types.{{ $oi.Name }}, []string, error) {
+func (d *DB) scan{{ $oi.Name }}s(rows *stdsql.Rows, txID string) ([]*types.{{ $oi.Name }}, []string, error) {
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -112,6 +112,7 @@ func (d *DB) scan{{ $oi.Name }}s(rows *stdsql.Rows) ([]*types.{{ $oi.Name }}, []
 			rows.Close()
 			return nil, nil, errors.WithStack(err)
 		}
+		v.TxID = txID
 		vs = append(vs, v)
 		ids = append(ids, id)
 	}

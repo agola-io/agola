@@ -19,7 +19,7 @@ func (d *DB) fetchSequences(tx *sql.Tx, q sq.Sqlizer) ([]*types.Sequence, []stri
 	}
 	defer rows.Close()
 
-	return d.scanSequences(rows)
+	return d.scanSequences(rows, tx.ID())
 }
 
 func (d *DB) scanSequence(rows *stdsql.Rows, additionalFields []interface{}) (*types.Sequence, string, error) {
@@ -42,7 +42,7 @@ func (d *DB) scanSequence(rows *stdsql.Rows, additionalFields []interface{}) (*t
 	return &v, id, nil
 }
 
-func (d *DB) scanSequences(rows *stdsql.Rows) ([]*types.Sequence, []string, error) {
+func (d *DB) scanSequences(rows *stdsql.Rows, txID string) ([]*types.Sequence, []string, error) {
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -69,6 +69,7 @@ func (d *DB) scanSequences(rows *stdsql.Rows) ([]*types.Sequence, []string, erro
 			rows.Close()
 			return nil, nil, errors.WithStack(err)
 		}
+		v.TxID = txID
 		vs = append(vs, v)
 		ids = append(ids, id)
 	}
@@ -85,7 +86,7 @@ func (d *DB) fetchChangeGroups(tx *sql.Tx, q sq.Sqlizer) ([]*types.ChangeGroup, 
 	}
 	defer rows.Close()
 
-	return d.scanChangeGroups(rows)
+	return d.scanChangeGroups(rows, tx.ID())
 }
 
 func (d *DB) scanChangeGroup(rows *stdsql.Rows, additionalFields []interface{}) (*types.ChangeGroup, string, error) {
@@ -108,7 +109,7 @@ func (d *DB) scanChangeGroup(rows *stdsql.Rows, additionalFields []interface{}) 
 	return &v, id, nil
 }
 
-func (d *DB) scanChangeGroups(rows *stdsql.Rows) ([]*types.ChangeGroup, []string, error) {
+func (d *DB) scanChangeGroups(rows *stdsql.Rows, txID string) ([]*types.ChangeGroup, []string, error) {
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -135,6 +136,7 @@ func (d *DB) scanChangeGroups(rows *stdsql.Rows) ([]*types.ChangeGroup, []string
 			rows.Close()
 			return nil, nil, errors.WithStack(err)
 		}
+		v.TxID = txID
 		vs = append(vs, v)
 		ids = append(ids, id)
 	}
@@ -151,7 +153,7 @@ func (d *DB) fetchRuns(tx *sql.Tx, q sq.Sqlizer) ([]*types.Run, []string, error)
 	}
 	defer rows.Close()
 
-	return d.scanRuns(rows)
+	return d.scanRuns(rows, tx.ID())
 }
 
 func (d *DB) scanRun(rows *stdsql.Rows, additionalFields []interface{}) (*types.Run, string, error) {
@@ -174,7 +176,7 @@ func (d *DB) scanRun(rows *stdsql.Rows, additionalFields []interface{}) (*types.
 	return &v, id, nil
 }
 
-func (d *DB) scanRuns(rows *stdsql.Rows) ([]*types.Run, []string, error) {
+func (d *DB) scanRuns(rows *stdsql.Rows, txID string) ([]*types.Run, []string, error) {
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -201,6 +203,7 @@ func (d *DB) scanRuns(rows *stdsql.Rows) ([]*types.Run, []string, error) {
 			rows.Close()
 			return nil, nil, errors.WithStack(err)
 		}
+		v.TxID = txID
 		vs = append(vs, v)
 		ids = append(ids, id)
 	}
@@ -217,7 +220,7 @@ func (d *DB) fetchRunConfigs(tx *sql.Tx, q sq.Sqlizer) ([]*types.RunConfig, []st
 	}
 	defer rows.Close()
 
-	return d.scanRunConfigs(rows)
+	return d.scanRunConfigs(rows, tx.ID())
 }
 
 func (d *DB) scanRunConfig(rows *stdsql.Rows, additionalFields []interface{}) (*types.RunConfig, string, error) {
@@ -240,7 +243,7 @@ func (d *DB) scanRunConfig(rows *stdsql.Rows, additionalFields []interface{}) (*
 	return &v, id, nil
 }
 
-func (d *DB) scanRunConfigs(rows *stdsql.Rows) ([]*types.RunConfig, []string, error) {
+func (d *DB) scanRunConfigs(rows *stdsql.Rows, txID string) ([]*types.RunConfig, []string, error) {
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -267,6 +270,7 @@ func (d *DB) scanRunConfigs(rows *stdsql.Rows) ([]*types.RunConfig, []string, er
 			rows.Close()
 			return nil, nil, errors.WithStack(err)
 		}
+		v.TxID = txID
 		vs = append(vs, v)
 		ids = append(ids, id)
 	}
@@ -283,7 +287,7 @@ func (d *DB) fetchRunCounters(tx *sql.Tx, q sq.Sqlizer) ([]*types.RunCounter, []
 	}
 	defer rows.Close()
 
-	return d.scanRunCounters(rows)
+	return d.scanRunCounters(rows, tx.ID())
 }
 
 func (d *DB) scanRunCounter(rows *stdsql.Rows, additionalFields []interface{}) (*types.RunCounter, string, error) {
@@ -306,7 +310,7 @@ func (d *DB) scanRunCounter(rows *stdsql.Rows, additionalFields []interface{}) (
 	return &v, id, nil
 }
 
-func (d *DB) scanRunCounters(rows *stdsql.Rows) ([]*types.RunCounter, []string, error) {
+func (d *DB) scanRunCounters(rows *stdsql.Rows, txID string) ([]*types.RunCounter, []string, error) {
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -333,6 +337,7 @@ func (d *DB) scanRunCounters(rows *stdsql.Rows) ([]*types.RunCounter, []string, 
 			rows.Close()
 			return nil, nil, errors.WithStack(err)
 		}
+		v.TxID = txID
 		vs = append(vs, v)
 		ids = append(ids, id)
 	}
@@ -349,7 +354,7 @@ func (d *DB) fetchRunEvents(tx *sql.Tx, q sq.Sqlizer) ([]*types.RunEvent, []stri
 	}
 	defer rows.Close()
 
-	return d.scanRunEvents(rows)
+	return d.scanRunEvents(rows, tx.ID())
 }
 
 func (d *DB) scanRunEvent(rows *stdsql.Rows, additionalFields []interface{}) (*types.RunEvent, string, error) {
@@ -372,7 +377,7 @@ func (d *DB) scanRunEvent(rows *stdsql.Rows, additionalFields []interface{}) (*t
 	return &v, id, nil
 }
 
-func (d *DB) scanRunEvents(rows *stdsql.Rows) ([]*types.RunEvent, []string, error) {
+func (d *DB) scanRunEvents(rows *stdsql.Rows, txID string) ([]*types.RunEvent, []string, error) {
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -399,6 +404,7 @@ func (d *DB) scanRunEvents(rows *stdsql.Rows) ([]*types.RunEvent, []string, erro
 			rows.Close()
 			return nil, nil, errors.WithStack(err)
 		}
+		v.TxID = txID
 		vs = append(vs, v)
 		ids = append(ids, id)
 	}
@@ -415,7 +421,7 @@ func (d *DB) fetchExecutors(tx *sql.Tx, q sq.Sqlizer) ([]*types.Executor, []stri
 	}
 	defer rows.Close()
 
-	return d.scanExecutors(rows)
+	return d.scanExecutors(rows, tx.ID())
 }
 
 func (d *DB) scanExecutor(rows *stdsql.Rows, additionalFields []interface{}) (*types.Executor, string, error) {
@@ -438,7 +444,7 @@ func (d *DB) scanExecutor(rows *stdsql.Rows, additionalFields []interface{}) (*t
 	return &v, id, nil
 }
 
-func (d *DB) scanExecutors(rows *stdsql.Rows) ([]*types.Executor, []string, error) {
+func (d *DB) scanExecutors(rows *stdsql.Rows, txID string) ([]*types.Executor, []string, error) {
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -465,6 +471,7 @@ func (d *DB) scanExecutors(rows *stdsql.Rows) ([]*types.Executor, []string, erro
 			rows.Close()
 			return nil, nil, errors.WithStack(err)
 		}
+		v.TxID = txID
 		vs = append(vs, v)
 		ids = append(ids, id)
 	}
@@ -481,7 +488,7 @@ func (d *DB) fetchExecutorTasks(tx *sql.Tx, q sq.Sqlizer) ([]*types.ExecutorTask
 	}
 	defer rows.Close()
 
-	return d.scanExecutorTasks(rows)
+	return d.scanExecutorTasks(rows, tx.ID())
 }
 
 func (d *DB) scanExecutorTask(rows *stdsql.Rows, additionalFields []interface{}) (*types.ExecutorTask, string, error) {
@@ -504,7 +511,7 @@ func (d *DB) scanExecutorTask(rows *stdsql.Rows, additionalFields []interface{})
 	return &v, id, nil
 }
 
-func (d *DB) scanExecutorTasks(rows *stdsql.Rows) ([]*types.ExecutorTask, []string, error) {
+func (d *DB) scanExecutorTasks(rows *stdsql.Rows, txID string) ([]*types.ExecutorTask, []string, error) {
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -531,6 +538,7 @@ func (d *DB) scanExecutorTasks(rows *stdsql.Rows) ([]*types.ExecutorTask, []stri
 			rows.Close()
 			return nil, nil, errors.WithStack(err)
 		}
+		v.TxID = txID
 		vs = append(vs, v)
 		ids = append(ids, id)
 	}

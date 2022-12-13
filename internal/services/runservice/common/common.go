@@ -20,6 +20,7 @@ import (
 
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/runconfig"
+	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/runservice/types"
 )
@@ -168,10 +169,10 @@ func GenExecutorTaskSpecData(r *types.Run, rt *types.RunTask, rc *types.RunConfi
 	return data
 }
 
-func GenExecutorTask(r *types.Run, rt *types.RunTask, rc *types.RunConfig, executor *types.Executor) *types.ExecutorTask {
+func GenExecutorTask(tx *sql.Tx, r *types.Run, rt *types.RunTask, rc *types.RunConfig, executor *types.Executor) *types.ExecutorTask {
 	rct := rc.Tasks[rt.ID]
 
-	et := types.NewExecutorTask()
+	et := types.NewExecutorTask(tx)
 	et.Spec = types.ExecutorTaskSpec{
 		ExecutorID: executor.ExecutorID,
 		RunID:      r.ID,

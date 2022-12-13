@@ -1,6 +1,7 @@
 package types
 
 import (
+	"agola.io/agola/internal/sql"
 	stypes "agola.io/agola/services/types"
 
 	"github.com/gofrs/uuid"
@@ -22,14 +23,15 @@ type RunEvent struct {
 	Result RunResult
 }
 
-func NewRunEvent() *RunEvent {
+func NewRunEvent(tx *sql.Tx) *RunEvent {
 	return &RunEvent{
 		TypeMeta: stypes.TypeMeta{
 			Kind:    RunEventKind,
 			Version: RunEventVersion,
 		},
 		ObjectMeta: stypes.ObjectMeta{
-			ID: uuid.Must(uuid.NewV4()).String(),
+			ID:   uuid.Must(uuid.NewV4()).String(),
+			TxID: tx.ID(),
 		},
 	}
 }

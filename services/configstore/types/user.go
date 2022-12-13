@@ -17,6 +17,7 @@ package types
 import (
 	"time"
 
+	"agola.io/agola/internal/sql"
 	stypes "agola.io/agola/services/types"
 
 	"github.com/gofrs/uuid"
@@ -41,14 +42,15 @@ type User struct {
 	Admin bool `json:"admin,omitempty"`
 }
 
-func NewUser() *User {
+func NewUser(tx *sql.Tx) *User {
 	return &User{
 		TypeMeta: stypes.TypeMeta{
 			Kind:    UserKind,
 			Version: UserVersion,
 		},
 		ObjectMeta: stypes.ObjectMeta{
-			ID: uuid.Must(uuid.NewV4()).String(),
+			ID:   uuid.Must(uuid.NewV4()).String(),
+			TxID: tx.ID(),
 		},
 	}
 }
@@ -68,14 +70,15 @@ type UserToken struct {
 	UserID string `json:"user_id,omitempty"`
 }
 
-func NewUserToken() *UserToken {
+func NewUserToken(tx *sql.Tx) *UserToken {
 	return &UserToken{
 		TypeMeta: stypes.TypeMeta{
 			Kind:    UserTokenKind,
 			Version: UserTokenVersion,
 		},
 		ObjectMeta: stypes.ObjectMeta{
-			ID: uuid.Must(uuid.NewV4()).String(),
+			ID:   uuid.Must(uuid.NewV4()).String(),
+			TxID: tx.ID(),
 		},
 	}
 }
@@ -104,14 +107,15 @@ type LinkedAccount struct {
 	Oauth2AccessTokenExpiresAt time.Time `json:"oauth_2_access_token_expires_at,omitempty"`
 }
 
-func NewLinkedAccount() *LinkedAccount {
+func NewLinkedAccount(tx *sql.Tx) *LinkedAccount {
 	return &LinkedAccount{
 		TypeMeta: stypes.TypeMeta{
 			Kind:    LinkedAccountKind,
 			Version: LinkedAccountVersion,
 		},
 		ObjectMeta: stypes.ObjectMeta{
-			ID: uuid.Must(uuid.NewV4()).String(),
+			ID:   uuid.Must(uuid.NewV4()).String(),
+			TxID: tx.ID(),
 		},
 	}
 }
