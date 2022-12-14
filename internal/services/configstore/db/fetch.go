@@ -19,7 +19,7 @@ func (d *DB) fetchRemoteSources(tx *sql.Tx, q sq.Sqlizer) ([]*types.RemoteSource
 	}
 	defer rows.Close()
 
-	return d.scanRemoteSources(rows)
+	return d.scanRemoteSources(rows, tx.ID())
 }
 
 func (d *DB) scanRemoteSource(rows *stdsql.Rows, additionalFields []interface{}) (*types.RemoteSource, string, error) {
@@ -42,7 +42,7 @@ func (d *DB) scanRemoteSource(rows *stdsql.Rows, additionalFields []interface{})
 	return &v, id, nil
 }
 
-func (d *DB) scanRemoteSources(rows *stdsql.Rows) ([]*types.RemoteSource, []string, error) {
+func (d *DB) scanRemoteSources(rows *stdsql.Rows, txID string) ([]*types.RemoteSource, []string, error) {
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -69,6 +69,7 @@ func (d *DB) scanRemoteSources(rows *stdsql.Rows) ([]*types.RemoteSource, []stri
 			rows.Close()
 			return nil, nil, errors.WithStack(err)
 		}
+		v.TxID = txID
 		vs = append(vs, v)
 		ids = append(ids, id)
 	}
@@ -85,7 +86,7 @@ func (d *DB) fetchUsers(tx *sql.Tx, q sq.Sqlizer) ([]*types.User, []string, erro
 	}
 	defer rows.Close()
 
-	return d.scanUsers(rows)
+	return d.scanUsers(rows, tx.ID())
 }
 
 func (d *DB) scanUser(rows *stdsql.Rows, additionalFields []interface{}) (*types.User, string, error) {
@@ -108,7 +109,7 @@ func (d *DB) scanUser(rows *stdsql.Rows, additionalFields []interface{}) (*types
 	return &v, id, nil
 }
 
-func (d *DB) scanUsers(rows *stdsql.Rows) ([]*types.User, []string, error) {
+func (d *DB) scanUsers(rows *stdsql.Rows, txID string) ([]*types.User, []string, error) {
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -135,6 +136,7 @@ func (d *DB) scanUsers(rows *stdsql.Rows) ([]*types.User, []string, error) {
 			rows.Close()
 			return nil, nil, errors.WithStack(err)
 		}
+		v.TxID = txID
 		vs = append(vs, v)
 		ids = append(ids, id)
 	}
@@ -151,7 +153,7 @@ func (d *DB) fetchUserTokens(tx *sql.Tx, q sq.Sqlizer) ([]*types.UserToken, []st
 	}
 	defer rows.Close()
 
-	return d.scanUserTokens(rows)
+	return d.scanUserTokens(rows, tx.ID())
 }
 
 func (d *DB) scanUserToken(rows *stdsql.Rows, additionalFields []interface{}) (*types.UserToken, string, error) {
@@ -174,7 +176,7 @@ func (d *DB) scanUserToken(rows *stdsql.Rows, additionalFields []interface{}) (*
 	return &v, id, nil
 }
 
-func (d *DB) scanUserTokens(rows *stdsql.Rows) ([]*types.UserToken, []string, error) {
+func (d *DB) scanUserTokens(rows *stdsql.Rows, txID string) ([]*types.UserToken, []string, error) {
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -201,6 +203,7 @@ func (d *DB) scanUserTokens(rows *stdsql.Rows) ([]*types.UserToken, []string, er
 			rows.Close()
 			return nil, nil, errors.WithStack(err)
 		}
+		v.TxID = txID
 		vs = append(vs, v)
 		ids = append(ids, id)
 	}
@@ -217,7 +220,7 @@ func (d *DB) fetchLinkedAccounts(tx *sql.Tx, q sq.Sqlizer) ([]*types.LinkedAccou
 	}
 	defer rows.Close()
 
-	return d.scanLinkedAccounts(rows)
+	return d.scanLinkedAccounts(rows, tx.ID())
 }
 
 func (d *DB) scanLinkedAccount(rows *stdsql.Rows, additionalFields []interface{}) (*types.LinkedAccount, string, error) {
@@ -240,7 +243,7 @@ func (d *DB) scanLinkedAccount(rows *stdsql.Rows, additionalFields []interface{}
 	return &v, id, nil
 }
 
-func (d *DB) scanLinkedAccounts(rows *stdsql.Rows) ([]*types.LinkedAccount, []string, error) {
+func (d *DB) scanLinkedAccounts(rows *stdsql.Rows, txID string) ([]*types.LinkedAccount, []string, error) {
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -267,6 +270,7 @@ func (d *DB) scanLinkedAccounts(rows *stdsql.Rows) ([]*types.LinkedAccount, []st
 			rows.Close()
 			return nil, nil, errors.WithStack(err)
 		}
+		v.TxID = txID
 		vs = append(vs, v)
 		ids = append(ids, id)
 	}
@@ -283,7 +287,7 @@ func (d *DB) fetchOrganizations(tx *sql.Tx, q sq.Sqlizer) ([]*types.Organization
 	}
 	defer rows.Close()
 
-	return d.scanOrganizations(rows)
+	return d.scanOrganizations(rows, tx.ID())
 }
 
 func (d *DB) scanOrganization(rows *stdsql.Rows, additionalFields []interface{}) (*types.Organization, string, error) {
@@ -306,7 +310,7 @@ func (d *DB) scanOrganization(rows *stdsql.Rows, additionalFields []interface{})
 	return &v, id, nil
 }
 
-func (d *DB) scanOrganizations(rows *stdsql.Rows) ([]*types.Organization, []string, error) {
+func (d *DB) scanOrganizations(rows *stdsql.Rows, txID string) ([]*types.Organization, []string, error) {
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -333,6 +337,7 @@ func (d *DB) scanOrganizations(rows *stdsql.Rows) ([]*types.Organization, []stri
 			rows.Close()
 			return nil, nil, errors.WithStack(err)
 		}
+		v.TxID = txID
 		vs = append(vs, v)
 		ids = append(ids, id)
 	}
@@ -349,7 +354,7 @@ func (d *DB) fetchOrganizationMembers(tx *sql.Tx, q sq.Sqlizer) ([]*types.Organi
 	}
 	defer rows.Close()
 
-	return d.scanOrganizationMembers(rows)
+	return d.scanOrganizationMembers(rows, tx.ID())
 }
 
 func (d *DB) scanOrganizationMember(rows *stdsql.Rows, additionalFields []interface{}) (*types.OrganizationMember, string, error) {
@@ -372,7 +377,7 @@ func (d *DB) scanOrganizationMember(rows *stdsql.Rows, additionalFields []interf
 	return &v, id, nil
 }
 
-func (d *DB) scanOrganizationMembers(rows *stdsql.Rows) ([]*types.OrganizationMember, []string, error) {
+func (d *DB) scanOrganizationMembers(rows *stdsql.Rows, txID string) ([]*types.OrganizationMember, []string, error) {
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -399,6 +404,7 @@ func (d *DB) scanOrganizationMembers(rows *stdsql.Rows) ([]*types.OrganizationMe
 			rows.Close()
 			return nil, nil, errors.WithStack(err)
 		}
+		v.TxID = txID
 		vs = append(vs, v)
 		ids = append(ids, id)
 	}
@@ -415,7 +421,7 @@ func (d *DB) fetchProjectGroups(tx *sql.Tx, q sq.Sqlizer) ([]*types.ProjectGroup
 	}
 	defer rows.Close()
 
-	return d.scanProjectGroups(rows)
+	return d.scanProjectGroups(rows, tx.ID())
 }
 
 func (d *DB) scanProjectGroup(rows *stdsql.Rows, additionalFields []interface{}) (*types.ProjectGroup, string, error) {
@@ -438,7 +444,7 @@ func (d *DB) scanProjectGroup(rows *stdsql.Rows, additionalFields []interface{})
 	return &v, id, nil
 }
 
-func (d *DB) scanProjectGroups(rows *stdsql.Rows) ([]*types.ProjectGroup, []string, error) {
+func (d *DB) scanProjectGroups(rows *stdsql.Rows, txID string) ([]*types.ProjectGroup, []string, error) {
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -465,6 +471,7 @@ func (d *DB) scanProjectGroups(rows *stdsql.Rows) ([]*types.ProjectGroup, []stri
 			rows.Close()
 			return nil, nil, errors.WithStack(err)
 		}
+		v.TxID = txID
 		vs = append(vs, v)
 		ids = append(ids, id)
 	}
@@ -481,7 +488,7 @@ func (d *DB) fetchProjects(tx *sql.Tx, q sq.Sqlizer) ([]*types.Project, []string
 	}
 	defer rows.Close()
 
-	return d.scanProjects(rows)
+	return d.scanProjects(rows, tx.ID())
 }
 
 func (d *DB) scanProject(rows *stdsql.Rows, additionalFields []interface{}) (*types.Project, string, error) {
@@ -504,7 +511,7 @@ func (d *DB) scanProject(rows *stdsql.Rows, additionalFields []interface{}) (*ty
 	return &v, id, nil
 }
 
-func (d *DB) scanProjects(rows *stdsql.Rows) ([]*types.Project, []string, error) {
+func (d *DB) scanProjects(rows *stdsql.Rows, txID string) ([]*types.Project, []string, error) {
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -531,6 +538,7 @@ func (d *DB) scanProjects(rows *stdsql.Rows) ([]*types.Project, []string, error)
 			rows.Close()
 			return nil, nil, errors.WithStack(err)
 		}
+		v.TxID = txID
 		vs = append(vs, v)
 		ids = append(ids, id)
 	}
@@ -547,7 +555,7 @@ func (d *DB) fetchSecrets(tx *sql.Tx, q sq.Sqlizer) ([]*types.Secret, []string, 
 	}
 	defer rows.Close()
 
-	return d.scanSecrets(rows)
+	return d.scanSecrets(rows, tx.ID())
 }
 
 func (d *DB) scanSecret(rows *stdsql.Rows, additionalFields []interface{}) (*types.Secret, string, error) {
@@ -570,7 +578,7 @@ func (d *DB) scanSecret(rows *stdsql.Rows, additionalFields []interface{}) (*typ
 	return &v, id, nil
 }
 
-func (d *DB) scanSecrets(rows *stdsql.Rows) ([]*types.Secret, []string, error) {
+func (d *DB) scanSecrets(rows *stdsql.Rows, txID string) ([]*types.Secret, []string, error) {
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -597,6 +605,7 @@ func (d *DB) scanSecrets(rows *stdsql.Rows) ([]*types.Secret, []string, error) {
 			rows.Close()
 			return nil, nil, errors.WithStack(err)
 		}
+		v.TxID = txID
 		vs = append(vs, v)
 		ids = append(ids, id)
 	}
@@ -613,7 +622,7 @@ func (d *DB) fetchVariables(tx *sql.Tx, q sq.Sqlizer) ([]*types.Variable, []stri
 	}
 	defer rows.Close()
 
-	return d.scanVariables(rows)
+	return d.scanVariables(rows, tx.ID())
 }
 
 func (d *DB) scanVariable(rows *stdsql.Rows, additionalFields []interface{}) (*types.Variable, string, error) {
@@ -636,7 +645,7 @@ func (d *DB) scanVariable(rows *stdsql.Rows, additionalFields []interface{}) (*t
 	return &v, id, nil
 }
 
-func (d *DB) scanVariables(rows *stdsql.Rows) ([]*types.Variable, []string, error) {
+func (d *DB) scanVariables(rows *stdsql.Rows, txID string) ([]*types.Variable, []string, error) {
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -663,6 +672,7 @@ func (d *DB) scanVariables(rows *stdsql.Rows) ([]*types.Variable, []string, erro
 			rows.Close()
 			return nil, nil, errors.WithStack(err)
 		}
+		v.TxID = txID
 		vs = append(vs, v)
 		ids = append(ids, id)
 	}
@@ -679,7 +689,7 @@ func (d *DB) fetchOrgInvitations(tx *sql.Tx, q sq.Sqlizer) ([]*types.OrgInvitati
 	}
 	defer rows.Close()
 
-	return d.scanOrgInvitations(rows)
+	return d.scanOrgInvitations(rows, tx.ID())
 }
 
 func (d *DB) scanOrgInvitation(rows *stdsql.Rows, additionalFields []interface{}) (*types.OrgInvitation, string, error) {
@@ -702,7 +712,7 @@ func (d *DB) scanOrgInvitation(rows *stdsql.Rows, additionalFields []interface{}
 	return &v, id, nil
 }
 
-func (d *DB) scanOrgInvitations(rows *stdsql.Rows) ([]*types.OrgInvitation, []string, error) {
+func (d *DB) scanOrgInvitations(rows *stdsql.Rows, txID string) ([]*types.OrgInvitation, []string, error) {
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -729,6 +739,7 @@ func (d *DB) scanOrgInvitations(rows *stdsql.Rows) ([]*types.OrgInvitation, []st
 			rows.Close()
 			return nil, nil, errors.WithStack(err)
 		}
+		v.TxID = txID
 		vs = append(vs, v)
 		ids = append(ids, id)
 	}

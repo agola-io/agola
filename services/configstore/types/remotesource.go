@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 
 	"agola.io/agola/internal/errors"
+	"agola.io/agola/internal/sql"
 	stypes "agola.io/agola/services/types"
 	"agola.io/agola/util"
 
@@ -68,14 +69,15 @@ type RemoteSource struct {
 	LoginEnabled        *bool `json:"login_enabled,omitempty"`
 }
 
-func NewRemoteSource() *RemoteSource {
+func NewRemoteSource(tx *sql.Tx) *RemoteSource {
 	return &RemoteSource{
 		TypeMeta: stypes.TypeMeta{
 			Kind:    RemoteSourceKind,
 			Version: RemoteSourceVersion,
 		},
 		ObjectMeta: stypes.ObjectMeta{
-			ID: uuid.Must(uuid.NewV4()).String(),
+			ID:   uuid.Must(uuid.NewV4()).String(),
+			TxID: tx.ID(),
 		},
 	}
 }

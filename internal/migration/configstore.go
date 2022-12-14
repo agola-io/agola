@@ -77,7 +77,7 @@ func MigrateConfigStore(ctx context.Context, r io.Reader, w io.Writer) error {
 			oldUserj, _ := json.Marshal(oldUser)
 			log.Debug().Msgf("oldUser: %s", oldUserj)
 
-			user := types.NewUser()
+			user := types.NewUser(newTx)
 			user.ID = oldUser.ID
 			user.Name = oldUser.Name
 			user.Secret = oldUser.Secret
@@ -90,7 +90,7 @@ func MigrateConfigStore(ctx context.Context, r io.Reader, w io.Writer) error {
 			}
 
 			for _, oldLA := range oldUser.LinkedAccounts {
-				la := types.NewLinkedAccount()
+				la := types.NewLinkedAccount(newTx)
 				// reuse old linked account id since it's referenced by project
 				la.ID = oldLA.ID
 				la.UserID = user.ID
@@ -110,7 +110,7 @@ func MigrateConfigStore(ctx context.Context, r io.Reader, w io.Writer) error {
 			}
 
 			for oldTokenName, oldTokenValue := range oldUser.Tokens {
-				userToken := types.NewUserToken()
+				userToken := types.NewUserToken(newTx)
 				// reuse old linked account id since it's referenced by project
 				userToken.UserID = user.ID
 				userToken.Name = oldTokenName
@@ -131,7 +131,7 @@ func MigrateConfigStore(ctx context.Context, r io.Reader, w io.Writer) error {
 			oldOrgj, _ := json.Marshal(oldOrg)
 			log.Debug().Msgf("oldOrg: %s", oldOrgj)
 
-			org := types.NewOrganization()
+			org := types.NewOrganization(newTx)
 			org.ID = oldOrg.ID
 			org.Name = oldOrg.Name
 			org.Visibility = types.Visibility(oldOrg.Visibility)
@@ -152,7 +152,7 @@ func MigrateConfigStore(ctx context.Context, r io.Reader, w io.Writer) error {
 			oldOrgMemberj, _ := json.Marshal(oldOrgMember)
 			log.Debug().Msgf("oldOrgMember: %s", oldOrgMemberj)
 
-			orgMember := types.NewOrganizationMember()
+			orgMember := types.NewOrganizationMember(newTx)
 			orgMember.ID = oldOrgMember.ID
 			orgMember.OrganizationID = oldOrgMember.OrganizationID
 			orgMember.UserID = oldOrgMember.UserID
@@ -172,7 +172,7 @@ func MigrateConfigStore(ctx context.Context, r io.Reader, w io.Writer) error {
 			oldProjectGroupj, _ := json.Marshal(oldProjectGroup)
 			log.Debug().Msgf("oldProjectGroup: %s", oldProjectGroupj)
 
-			projectGroup := types.NewProjectGroup()
+			projectGroup := types.NewProjectGroup(newTx)
 			projectGroup.ID = oldProjectGroup.ID
 			projectGroup.Name = oldProjectGroup.Name
 			projectGroup.Parent = types.Parent{
@@ -195,7 +195,7 @@ func MigrateConfigStore(ctx context.Context, r io.Reader, w io.Writer) error {
 			oldProjectj, _ := json.Marshal(oldProject)
 			log.Debug().Msgf("oldProject: %s", oldProjectj)
 
-			project := types.NewProject()
+			project := types.NewProject(newTx)
 			project.ID = oldProject.ID
 			project.Name = oldProject.Name
 			project.Parent = types.Parent{
@@ -229,7 +229,7 @@ func MigrateConfigStore(ctx context.Context, r io.Reader, w io.Writer) error {
 			oldRemoteSourcej, _ := json.Marshal(oldRemoteSource)
 			log.Debug().Msgf("oldRemoteSource: %s", oldRemoteSourcej)
 
-			remoteSource := types.NewRemoteSource()
+			remoteSource := types.NewRemoteSource(newTx)
 			remoteSource.ID = oldRemoteSource.ID
 			remoteSource.Name = oldRemoteSource.Name
 			remoteSource.APIURL = oldRemoteSource.APIURL
@@ -257,7 +257,7 @@ func MigrateConfigStore(ctx context.Context, r io.Reader, w io.Writer) error {
 			oldSecretj, _ := json.Marshal(oldSecret)
 			log.Debug().Msgf("oldSecret: %s", oldSecretj)
 
-			secret := types.NewSecret()
+			secret := types.NewSecret(newTx)
 			secret.ID = oldSecret.ID
 			secret.Name = oldSecret.Name
 			secret.Parent = types.Parent{
@@ -283,7 +283,7 @@ func MigrateConfigStore(ctx context.Context, r io.Reader, w io.Writer) error {
 			oldVariablej, _ := json.Marshal(oldVariable)
 			log.Debug().Msgf("oldVariable: %s", oldVariablej)
 
-			variable := types.NewVariable()
+			variable := types.NewVariable(newTx)
 			variable.ID = oldVariable.ID
 			variable.Name = oldVariable.Name
 			variable.Parent = types.Parent{

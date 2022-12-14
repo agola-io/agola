@@ -1,6 +1,7 @@
 package types
 
 import (
+	"agola.io/agola/internal/sql"
 	stypes "agola.io/agola/services/types"
 
 	"github.com/gofrs/uuid"
@@ -27,14 +28,15 @@ type Sequence struct {
 	SequenceType SequenceType `json:"sequence_type"`
 }
 
-func NewSequence(sequenceType SequenceType) *Sequence {
+func NewSequence(tx *sql.Tx, sequenceType SequenceType) *Sequence {
 	return &Sequence{
 		TypeMeta: stypes.TypeMeta{
 			Kind:    SequenceKind,
 			Version: SequenceVersion,
 		},
 		ObjectMeta: stypes.ObjectMeta{
-			ID: uuid.Must(uuid.NewV4()).String(),
+			ID:   uuid.Must(uuid.NewV4()).String(),
+			TxID: tx.ID(),
 		},
 		SequenceType: sequenceType,
 	}

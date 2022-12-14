@@ -96,7 +96,7 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateUpdateVar
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("variable with name %q for %s with id %q already exists", req.Name, req.Parent.Kind, req.Parent.ID))
 		}
 
-		variable = types.NewVariable()
+		variable = types.NewVariable(tx)
 		variable.Name = req.Name
 		variable.Parent = req.Parent
 		variable.Values = req.Values

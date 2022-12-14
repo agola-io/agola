@@ -29,6 +29,10 @@ func (d *DB) InsertRemoteSource(tx *sql.Tx, v *types.RemoteSource) error {
 		return errors.Errorf("expected revision 0 got %d", v.Revision)
 	}
 
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not created by this transaction")
+	}
+
 	data, err := d.insertRemoteSourceData(tx, v)
 	if err != nil {
 		return errors.WithStack(err)
@@ -93,6 +97,10 @@ func (d *DB) updateRemoteSourceData(tx *sql.Tx, v *types.RemoteSource) ([]byte, 
 		return nil, errors.Errorf("expected revision > 0 got %d", v.Revision)
 	}
 
+	if v.TxID != tx.ID() {
+		return nil, errors.Errorf("object was not fetched by this transaction")
+	}
+
 	curRevision := v.Revision
 	v.Revision++
 
@@ -154,6 +162,10 @@ func (d *DB) InsertOrUpdateUser(tx *sql.Tx, v *types.User) error {
 func (d *DB) InsertUser(tx *sql.Tx, v *types.User) error {
 	if v.Revision != 0 {
 		return errors.Errorf("expected revision 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not created by this transaction")
 	}
 
 	data, err := d.insertUserData(tx, v)
@@ -220,6 +232,10 @@ func (d *DB) updateUserData(tx *sql.Tx, v *types.User) ([]byte, error) {
 		return nil, errors.Errorf("expected revision > 0 got %d", v.Revision)
 	}
 
+	if v.TxID != tx.ID() {
+		return nil, errors.Errorf("object was not fetched by this transaction")
+	}
+
 	curRevision := v.Revision
 	v.Revision++
 
@@ -281,6 +297,10 @@ func (d *DB) InsertOrUpdateUserToken(tx *sql.Tx, v *types.UserToken) error {
 func (d *DB) InsertUserToken(tx *sql.Tx, v *types.UserToken) error {
 	if v.Revision != 0 {
 		return errors.Errorf("expected revision 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not created by this transaction")
 	}
 
 	data, err := d.insertUserTokenData(tx, v)
@@ -347,6 +367,10 @@ func (d *DB) updateUserTokenData(tx *sql.Tx, v *types.UserToken) ([]byte, error)
 		return nil, errors.Errorf("expected revision > 0 got %d", v.Revision)
 	}
 
+	if v.TxID != tx.ID() {
+		return nil, errors.Errorf("object was not fetched by this transaction")
+	}
+
 	curRevision := v.Revision
 	v.Revision++
 
@@ -408,6 +432,10 @@ func (d *DB) InsertOrUpdateLinkedAccount(tx *sql.Tx, v *types.LinkedAccount) err
 func (d *DB) InsertLinkedAccount(tx *sql.Tx, v *types.LinkedAccount) error {
 	if v.Revision != 0 {
 		return errors.Errorf("expected revision 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not created by this transaction")
 	}
 
 	data, err := d.insertLinkedAccountData(tx, v)
@@ -474,6 +502,10 @@ func (d *DB) updateLinkedAccountData(tx *sql.Tx, v *types.LinkedAccount) ([]byte
 		return nil, errors.Errorf("expected revision > 0 got %d", v.Revision)
 	}
 
+	if v.TxID != tx.ID() {
+		return nil, errors.Errorf("object was not fetched by this transaction")
+	}
+
 	curRevision := v.Revision
 	v.Revision++
 
@@ -535,6 +567,10 @@ func (d *DB) InsertOrUpdateOrganization(tx *sql.Tx, v *types.Organization) error
 func (d *DB) InsertOrganization(tx *sql.Tx, v *types.Organization) error {
 	if v.Revision != 0 {
 		return errors.Errorf("expected revision 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not created by this transaction")
 	}
 
 	data, err := d.insertOrganizationData(tx, v)
@@ -601,6 +637,10 @@ func (d *DB) updateOrganizationData(tx *sql.Tx, v *types.Organization) ([]byte, 
 		return nil, errors.Errorf("expected revision > 0 got %d", v.Revision)
 	}
 
+	if v.TxID != tx.ID() {
+		return nil, errors.Errorf("object was not fetched by this transaction")
+	}
+
 	curRevision := v.Revision
 	v.Revision++
 
@@ -662,6 +702,10 @@ func (d *DB) InsertOrUpdateOrganizationMember(tx *sql.Tx, v *types.OrganizationM
 func (d *DB) InsertOrganizationMember(tx *sql.Tx, v *types.OrganizationMember) error {
 	if v.Revision != 0 {
 		return errors.Errorf("expected revision 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not created by this transaction")
 	}
 
 	data, err := d.insertOrganizationMemberData(tx, v)
@@ -728,6 +772,10 @@ func (d *DB) updateOrganizationMemberData(tx *sql.Tx, v *types.OrganizationMembe
 		return nil, errors.Errorf("expected revision > 0 got %d", v.Revision)
 	}
 
+	if v.TxID != tx.ID() {
+		return nil, errors.Errorf("object was not fetched by this transaction")
+	}
+
 	curRevision := v.Revision
 	v.Revision++
 
@@ -789,6 +837,10 @@ func (d *DB) InsertOrUpdateProjectGroup(tx *sql.Tx, v *types.ProjectGroup) error
 func (d *DB) InsertProjectGroup(tx *sql.Tx, v *types.ProjectGroup) error {
 	if v.Revision != 0 {
 		return errors.Errorf("expected revision 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not created by this transaction")
 	}
 
 	data, err := d.insertProjectGroupData(tx, v)
@@ -855,6 +907,10 @@ func (d *DB) updateProjectGroupData(tx *sql.Tx, v *types.ProjectGroup) ([]byte, 
 		return nil, errors.Errorf("expected revision > 0 got %d", v.Revision)
 	}
 
+	if v.TxID != tx.ID() {
+		return nil, errors.Errorf("object was not fetched by this transaction")
+	}
+
 	curRevision := v.Revision
 	v.Revision++
 
@@ -916,6 +972,10 @@ func (d *DB) InsertOrUpdateProject(tx *sql.Tx, v *types.Project) error {
 func (d *DB) InsertProject(tx *sql.Tx, v *types.Project) error {
 	if v.Revision != 0 {
 		return errors.Errorf("expected revision 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not created by this transaction")
 	}
 
 	data, err := d.insertProjectData(tx, v)
@@ -982,6 +1042,10 @@ func (d *DB) updateProjectData(tx *sql.Tx, v *types.Project) ([]byte, error) {
 		return nil, errors.Errorf("expected revision > 0 got %d", v.Revision)
 	}
 
+	if v.TxID != tx.ID() {
+		return nil, errors.Errorf("object was not fetched by this transaction")
+	}
+
 	curRevision := v.Revision
 	v.Revision++
 
@@ -1043,6 +1107,10 @@ func (d *DB) InsertOrUpdateSecret(tx *sql.Tx, v *types.Secret) error {
 func (d *DB) InsertSecret(tx *sql.Tx, v *types.Secret) error {
 	if v.Revision != 0 {
 		return errors.Errorf("expected revision 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not created by this transaction")
 	}
 
 	data, err := d.insertSecretData(tx, v)
@@ -1109,6 +1177,10 @@ func (d *DB) updateSecretData(tx *sql.Tx, v *types.Secret) ([]byte, error) {
 		return nil, errors.Errorf("expected revision > 0 got %d", v.Revision)
 	}
 
+	if v.TxID != tx.ID() {
+		return nil, errors.Errorf("object was not fetched by this transaction")
+	}
+
 	curRevision := v.Revision
 	v.Revision++
 
@@ -1170,6 +1242,10 @@ func (d *DB) InsertOrUpdateVariable(tx *sql.Tx, v *types.Variable) error {
 func (d *DB) InsertVariable(tx *sql.Tx, v *types.Variable) error {
 	if v.Revision != 0 {
 		return errors.Errorf("expected revision 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not created by this transaction")
 	}
 
 	data, err := d.insertVariableData(tx, v)
@@ -1236,6 +1312,10 @@ func (d *DB) updateVariableData(tx *sql.Tx, v *types.Variable) ([]byte, error) {
 		return nil, errors.Errorf("expected revision > 0 got %d", v.Revision)
 	}
 
+	if v.TxID != tx.ID() {
+		return nil, errors.Errorf("object was not fetched by this transaction")
+	}
+
 	curRevision := v.Revision
 	v.Revision++
 
@@ -1297,6 +1377,10 @@ func (d *DB) InsertOrUpdateOrgInvitation(tx *sql.Tx, v *types.OrgInvitation) err
 func (d *DB) InsertOrgInvitation(tx *sql.Tx, v *types.OrgInvitation) error {
 	if v.Revision != 0 {
 		return errors.Errorf("expected revision 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not created by this transaction")
 	}
 
 	data, err := d.insertOrgInvitationData(tx, v)
@@ -1361,6 +1445,10 @@ func (d *DB) UpdateOrgInvitation(tx *sql.Tx, v *types.OrgInvitation) error {
 func (d *DB) updateOrgInvitationData(tx *sql.Tx, v *types.OrgInvitation) ([]byte, error) {
 	if v.Revision < 1 {
 		return nil, errors.Errorf("expected revision > 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return nil, errors.Errorf("object was not fetched by this transaction")
 	}
 
 	curRevision := v.Revision

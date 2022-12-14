@@ -91,7 +91,7 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateUpdat
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource %q already exists", req.Name))
 		}
 
-		remoteSource = types.NewRemoteSource()
+		remoteSource = types.NewRemoteSource(tx)
 		remoteSource.Name = req.Name
 		remoteSource.APIURL = req.APIURL
 		remoteSource.SkipVerify = req.SkipVerify

@@ -15,6 +15,7 @@
 package types
 
 import (
+	"agola.io/agola/internal/sql"
 	stypes "agola.io/agola/services/types"
 
 	"github.com/gofrs/uuid"
@@ -58,14 +59,15 @@ type Secret struct {
 	Path             string `json:"path,omitempty"`
 }
 
-func NewSecret() *Secret {
+func NewSecret(tx *sql.Tx) *Secret {
 	return &Secret{
 		TypeMeta: stypes.TypeMeta{
 			Kind:    SecretKind,
 			Version: SecretVersion,
 		},
 		ObjectMeta: stypes.ObjectMeta{
-			ID: uuid.Must(uuid.NewV4()).String(),
+			ID:   uuid.Must(uuid.NewV4()).String(),
+			TxID: tx.ID(),
 		},
 	}
 }

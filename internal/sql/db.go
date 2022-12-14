@@ -8,6 +8,7 @@ import (
 
 	"agola.io/agola/internal/errors"
 
+	"github.com/gofrs/uuid"
 	"github.com/lib/pq"
 	"github.com/mattn/go-sqlite3"
 )
@@ -136,6 +137,7 @@ func (db *DB) Type() Type {
 // * Setup the transaction (set isolation levels etc...)
 // * Apply some statement mutations before executing it
 type Tx struct {
+	id  string
 	db  *DB
 	tx  *sql.Tx
 	ctx context.Context
@@ -152,6 +154,7 @@ func (db *DB) Conn(ctx context.Context) (*sql.Conn, error) {
 
 func (db *DB) NewUnstartedTx() *Tx {
 	return &Tx{
+		id: uuid.Must(uuid.NewV4()).String(),
 		db: db,
 	}
 }
@@ -215,6 +218,14 @@ func (db *DB) do(ctx context.Context, f func(tx *Tx) error) error {
 		return errors.WithStack(err)
 	}
 	return tx.Commit()
+}
+
+func (tx *Tx) ID() string {
+	if tx == nil {
+		return ""
+	}
+
+	return tx.id
 }
 
 func (tx *Tx) DBType() Type {

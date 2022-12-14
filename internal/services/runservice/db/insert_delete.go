@@ -29,6 +29,10 @@ func (d *DB) InsertSequence(tx *sql.Tx, v *types.Sequence) error {
 		return errors.Errorf("expected revision 0 got %d", v.Revision)
 	}
 
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not created by this transaction")
+	}
+
 	data, err := d.insertSequenceData(tx, v)
 	if err != nil {
 		return errors.WithStack(err)
@@ -93,6 +97,10 @@ func (d *DB) updateSequenceData(tx *sql.Tx, v *types.Sequence) ([]byte, error) {
 		return nil, errors.Errorf("expected revision > 0 got %d", v.Revision)
 	}
 
+	if v.TxID != tx.ID() {
+		return nil, errors.Errorf("object was not fetched by this transaction")
+	}
+
 	curRevision := v.Revision
 	v.Revision++
 
@@ -154,6 +162,10 @@ func (d *DB) InsertOrUpdateChangeGroup(tx *sql.Tx, v *types.ChangeGroup) error {
 func (d *DB) InsertChangeGroup(tx *sql.Tx, v *types.ChangeGroup) error {
 	if v.Revision != 0 {
 		return errors.Errorf("expected revision 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not created by this transaction")
 	}
 
 	data, err := d.insertChangeGroupData(tx, v)
@@ -220,6 +232,10 @@ func (d *DB) updateChangeGroupData(tx *sql.Tx, v *types.ChangeGroup) ([]byte, er
 		return nil, errors.Errorf("expected revision > 0 got %d", v.Revision)
 	}
 
+	if v.TxID != tx.ID() {
+		return nil, errors.Errorf("object was not fetched by this transaction")
+	}
+
 	curRevision := v.Revision
 	v.Revision++
 
@@ -281,6 +297,10 @@ func (d *DB) InsertOrUpdateRun(tx *sql.Tx, v *types.Run) error {
 func (d *DB) InsertRun(tx *sql.Tx, v *types.Run) error {
 	if v.Revision != 0 {
 		return errors.Errorf("expected revision 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not created by this transaction")
 	}
 
 	data, err := d.insertRunData(tx, v)
@@ -347,6 +367,10 @@ func (d *DB) updateRunData(tx *sql.Tx, v *types.Run) ([]byte, error) {
 		return nil, errors.Errorf("expected revision > 0 got %d", v.Revision)
 	}
 
+	if v.TxID != tx.ID() {
+		return nil, errors.Errorf("object was not fetched by this transaction")
+	}
+
 	curRevision := v.Revision
 	v.Revision++
 
@@ -408,6 +432,10 @@ func (d *DB) InsertOrUpdateRunConfig(tx *sql.Tx, v *types.RunConfig) error {
 func (d *DB) InsertRunConfig(tx *sql.Tx, v *types.RunConfig) error {
 	if v.Revision != 0 {
 		return errors.Errorf("expected revision 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not created by this transaction")
 	}
 
 	data, err := d.insertRunConfigData(tx, v)
@@ -474,6 +502,10 @@ func (d *DB) updateRunConfigData(tx *sql.Tx, v *types.RunConfig) ([]byte, error)
 		return nil, errors.Errorf("expected revision > 0 got %d", v.Revision)
 	}
 
+	if v.TxID != tx.ID() {
+		return nil, errors.Errorf("object was not fetched by this transaction")
+	}
+
 	curRevision := v.Revision
 	v.Revision++
 
@@ -535,6 +567,10 @@ func (d *DB) InsertOrUpdateRunCounter(tx *sql.Tx, v *types.RunCounter) error {
 func (d *DB) InsertRunCounter(tx *sql.Tx, v *types.RunCounter) error {
 	if v.Revision != 0 {
 		return errors.Errorf("expected revision 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not created by this transaction")
 	}
 
 	data, err := d.insertRunCounterData(tx, v)
@@ -601,6 +637,10 @@ func (d *DB) updateRunCounterData(tx *sql.Tx, v *types.RunCounter) ([]byte, erro
 		return nil, errors.Errorf("expected revision > 0 got %d", v.Revision)
 	}
 
+	if v.TxID != tx.ID() {
+		return nil, errors.Errorf("object was not fetched by this transaction")
+	}
+
 	curRevision := v.Revision
 	v.Revision++
 
@@ -662,6 +702,10 @@ func (d *DB) InsertOrUpdateRunEvent(tx *sql.Tx, v *types.RunEvent) error {
 func (d *DB) InsertRunEvent(tx *sql.Tx, v *types.RunEvent) error {
 	if v.Revision != 0 {
 		return errors.Errorf("expected revision 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not created by this transaction")
 	}
 
 	data, err := d.insertRunEventData(tx, v)
@@ -728,6 +772,10 @@ func (d *DB) updateRunEventData(tx *sql.Tx, v *types.RunEvent) ([]byte, error) {
 		return nil, errors.Errorf("expected revision > 0 got %d", v.Revision)
 	}
 
+	if v.TxID != tx.ID() {
+		return nil, errors.Errorf("object was not fetched by this transaction")
+	}
+
 	curRevision := v.Revision
 	v.Revision++
 
@@ -789,6 +837,10 @@ func (d *DB) InsertOrUpdateExecutor(tx *sql.Tx, v *types.Executor) error {
 func (d *DB) InsertExecutor(tx *sql.Tx, v *types.Executor) error {
 	if v.Revision != 0 {
 		return errors.Errorf("expected revision 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not created by this transaction")
 	}
 
 	data, err := d.insertExecutorData(tx, v)
@@ -855,6 +907,10 @@ func (d *DB) updateExecutorData(tx *sql.Tx, v *types.Executor) ([]byte, error) {
 		return nil, errors.Errorf("expected revision > 0 got %d", v.Revision)
 	}
 
+	if v.TxID != tx.ID() {
+		return nil, errors.Errorf("object was not fetched by this transaction")
+	}
+
 	curRevision := v.Revision
 	v.Revision++
 
@@ -916,6 +972,10 @@ func (d *DB) InsertOrUpdateExecutorTask(tx *sql.Tx, v *types.ExecutorTask) error
 func (d *DB) InsertExecutorTask(tx *sql.Tx, v *types.ExecutorTask) error {
 	if v.Revision != 0 {
 		return errors.Errorf("expected revision 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not created by this transaction")
 	}
 
 	data, err := d.insertExecutorTaskData(tx, v)
@@ -980,6 +1040,10 @@ func (d *DB) UpdateExecutorTask(tx *sql.Tx, v *types.ExecutorTask) error {
 func (d *DB) updateExecutorTaskData(tx *sql.Tx, v *types.ExecutorTask) ([]byte, error) {
 	if v.Revision < 1 {
 		return nil, errors.Errorf("expected revision > 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return nil, errors.Errorf("object was not fetched by this transaction")
 	}
 
 	curRevision := v.Revision

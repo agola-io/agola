@@ -72,6 +72,10 @@ func (d *DB) Insert{{ $oi.Name }}(tx *sql.Tx, v *types.{{ $oi.Name }}) error {
 		return errors.Errorf("expected revision 0 got %d", v.Revision)
 	}
 
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not created by this transaction")
+	}
+
 	data, err := d.insert{{ $oi.Name }}Data(tx, v)
 	if err != nil {
 		return errors.WithStack(err)
@@ -134,6 +138,10 @@ func (d *DB) Update{{ $oi.Name }}(tx *sql.Tx, v *types.{{ $oi.Name }}) error {
 func (d *DB) update{{ $oi.Name }}Data(tx *sql.Tx, v *types.{{ $oi.Name }}) ([]byte, error) {
 	if v.Revision < 1 {
 		return nil, errors.Errorf("expected revision > 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return nil, errors.Errorf("object was not fetched by this transaction")
 	}
 
 	curRevision := v.Revision

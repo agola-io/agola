@@ -15,6 +15,7 @@
 package types
 
 import (
+	"agola.io/agola/internal/sql"
 	stypes "agola.io/agola/services/types"
 
 	"github.com/gofrs/uuid"
@@ -36,14 +37,15 @@ type ProjectGroup struct {
 	Visibility Visibility `json:"visibility,omitempty"`
 }
 
-func NewProjectGroup() *ProjectGroup {
+func NewProjectGroup(tx *sql.Tx) *ProjectGroup {
 	return &ProjectGroup{
 		TypeMeta: stypes.TypeMeta{
 			Kind:    ProjectGroupKind,
 			Version: ProjectGroupVersion,
 		},
 		ObjectMeta: stypes.ObjectMeta{
-			ID: uuid.Must(uuid.NewV4()).String(),
+			ID:   uuid.Must(uuid.NewV4()).String(),
+			TxID: tx.ID(),
 		},
 	}
 }

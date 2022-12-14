@@ -848,7 +848,17 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 
 	e.log.Debug().Msgf("starting pod")
 
-	dockerConfig, err := registry.GenDockerConfig(et.Spec.DockerRegistriesAuth, []string{et.Spec.Containers[0].Image})
+	dockerRegistriesAuth := map[string]registry.DockerRegistryAuth{}
+	for n, v := range et.Spec.DockerRegistriesAuth {
+		dockerRegistriesAuth[n] = registry.DockerRegistryAuth{
+			Type:     registry.DockerRegistryAuthType(v.Type),
+			Username: v.Username,
+			Password: v.Password,
+			Auth:     v.Auth,
+		}
+	}
+
+	dockerConfig, err := registry.GenDockerConfig(dockerRegistriesAuth, []string{et.Spec.Containers[0].Image})
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -1454,13 +1464,13 @@ func NewExecutor(ctx context.Context, log zerolog.Logger, c *config.Executor) (*
 			return nil, errors.WithStack(err)
 		}
 		dockerAuthConfig :=
-			types.DockerRegistryAuth{
-				Type:     types.DockerRegistryAuthType(e.c.InitImage.Auth.Type),
+			registry.DockerRegistryAuth{
+				Type:     registry.DockerRegistryAuthType(e.c.InitImage.Auth.Type),
 				Username: e.c.InitImage.Auth.Username,
 				Password: e.c.InitImage.Auth.Password,
 				Auth:     e.c.InitImage.Auth.Auth,
 			}
-		initDockerConfig, err = registry.GenDockerConfig(map[string]types.DockerRegistryAuth{regName: dockerAuthConfig}, []string{e.c.InitImage.Image})
+		initDockerConfig, err = registry.GenDockerConfig(map[string]registry.DockerRegistryAuth{regName: dockerAuthConfig}, []string{e.c.InitImage.Image})
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}

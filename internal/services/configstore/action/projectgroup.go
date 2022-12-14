@@ -165,7 +165,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateUpdat
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group with name %q, path %q already exists", req.Name, pp))
 		}
 
-		projectGroup = types.NewProjectGroup()
+		projectGroup = types.NewProjectGroup(tx)
 		projectGroup.Name = req.Name
 		projectGroup.Parent = req.Parent
 		projectGroup.Visibility = req.Visibility

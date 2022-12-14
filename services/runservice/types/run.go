@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"agola.io/agola/internal/sql"
 	stypes "agola.io/agola/services/types"
 	"agola.io/agola/util"
 
@@ -261,14 +262,15 @@ type RunTaskStep struct {
 	EndTime   *time.Time `json:"end_time,omitempty"`
 }
 
-func NewRun() *Run {
+func NewRun(tx *sql.Tx) *Run {
 	return &Run{
 		TypeMeta: stypes.TypeMeta{
 			Kind:    RunKind,
 			Version: RunVersion,
 		},
 		ObjectMeta: stypes.ObjectMeta{
-			ID: uuid.Must(uuid.NewV4()).String(),
+			ID:   uuid.Must(uuid.NewV4()).String(),
+			TxID: tx.ID(),
 		},
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"agola.io/agola/internal/errors"
+	"agola.io/agola/internal/sql"
 	stypes "agola.io/agola/services/types"
 	"agola.io/agola/util"
 
@@ -258,14 +259,15 @@ func (et *Steps) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func NewRunConfig() *RunConfig {
+func NewRunConfig(tx *sql.Tx) *RunConfig {
 	return &RunConfig{
 		TypeMeta: stypes.TypeMeta{
 			Kind:    RunConfigKind,
 			Version: RunConfigVersion,
 		},
 		ObjectMeta: stypes.ObjectMeta{
-			ID: uuid.Must(uuid.NewV4()).String(),
+			ID:   uuid.Must(uuid.NewV4()).String(),
+			TxID: tx.ID(),
 		},
 	}
 }

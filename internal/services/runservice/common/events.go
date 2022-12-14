@@ -22,7 +22,7 @@ import (
 )
 
 func NewRunEvent(d *db.DB, tx *sql.Tx, runID string, phase types.RunPhase, result types.RunResult) (*types.RunEvent, error) {
-	runEvent := types.NewRunEvent()
+	runEvent := types.NewRunEvent(tx)
 	runEvent.RunID = runID
 	runEvent.Phase = phase
 	runEvent.Result = result

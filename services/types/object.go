@@ -42,6 +42,9 @@ type ObjectMeta struct {
 	// Revision is the object revision, it's not saved in the object but
 	// populated by the fetch from the database
 	Revision uint64 `json:"-"`
+
+	// TxID is the current transaction id, used internally and must not be saved in the object
+	TxID string `json:"-"`
 }
 
 func (m *ObjectMeta) GetID() string {

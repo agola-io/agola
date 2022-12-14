@@ -103,7 +103,7 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*
 			}
 		}
 
-		org = types.NewOrganization()
+		org = types.NewOrganization(tx)
 		org.Name = req.Name
 		org.Visibility = req.Visibility
 		org.CreatorUserID = req.CreatorUserID
@@ -114,7 +114,7 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*
 
 		if org.CreatorUserID != "" {
 			// add the creator as org member with role owner
-			orgmember := types.NewOrganizationMember()
+			orgmember := types.NewOrganizationMember(tx)
 			orgmember.OrganizationID = org.ID
 			orgmember.UserID = org.CreatorUserID
 			orgmember.MemberRole = types.MemberRoleOwner
@@ -125,7 +125,7 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*
 		}
 
 		// create root org project group
-		pg := types.NewProjectGroup()
+		pg := types.NewProjectGroup(tx)
 		// use same org visibility
 		pg.Visibility = org.Visibility
 		pg.Parent = types.Parent{
@@ -283,7 +283,7 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 			}
 			orgmember.MemberRole = role
 		} else {
-			orgmember = types.NewOrganizationMember()
+			orgmember = types.NewOrganizationMember(tx)
 			orgmember.OrganizationID = org.ID
 			orgmember.UserID = user.ID
 			orgmember.MemberRole = role
@@ -461,7 +461,7 @@ func (h *ActionHandler) CreateOrgInvitation(ctx context.Context, req *CreateOrgI
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("invitation already exists"))
 		}
 
-		orgInvitation = types.NewOrgInvitation()
+		orgInvitation = types.NewOrgInvitation(tx)
 		orgInvitation.UserID = user.ID
 		orgInvitation.OrganizationID = org.ID
 		orgInvitation.Role = req.Role
@@ -557,7 +557,7 @@ func (h *ActionHandler) OrgInvitationAction(ctx context.Context, req *OrgInvitat
 		}
 
 		if req.Action == csapitypes.Accept {
-			orgMember := types.NewOrganizationMember()
+			orgMember := types.NewOrganizationMember(tx)
 			orgMember.OrganizationID = orgInvitation.OrganizationID
 			orgMember.UserID = orgInvitation.UserID
 			orgMember.MemberRole = orgInvitation.Role

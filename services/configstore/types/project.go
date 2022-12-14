@@ -15,6 +15,7 @@
 package types
 
 import (
+	"agola.io/agola/internal/sql"
 	stypes "agola.io/agola/services/types"
 
 	"github.com/gofrs/uuid"
@@ -90,14 +91,15 @@ type Project struct {
 	DefaultBranch string `json:"default_branch,omitempty"`
 }
 
-func NewProject() *Project {
+func NewProject(tx *sql.Tx) *Project {
 	return &Project{
 		TypeMeta: stypes.TypeMeta{
 			Kind:    ProjectKind,
 			Version: ProjectVersion,
 		},
 		ObjectMeta: stypes.ObjectMeta{
-			ID: uuid.Must(uuid.NewV4()).String(),
+			ID:   uuid.Must(uuid.NewV4()).String(),
+			TxID: tx.ID(),
 		},
 	}
 }

@@ -70,7 +70,7 @@ func (h *ExecutorStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		}
 
 		if executor == nil {
-			executor = types.NewExecutor()
+			executor = types.NewExecutor(tx)
 		}
 
 		executor.ExecutorID = recExecutor.ExecutorID

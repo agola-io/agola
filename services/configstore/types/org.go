@@ -15,6 +15,7 @@
 package types
 
 import (
+	"agola.io/agola/internal/sql"
 	stypes "agola.io/agola/services/types"
 
 	"github.com/gofrs/uuid"
@@ -38,14 +39,15 @@ type Organization struct {
 	CreatorUserID string `json:"creator_user_id,omitempty"`
 }
 
-func NewOrganization() *Organization {
+func NewOrganization(tx *sql.Tx) *Organization {
 	return &Organization{
 		TypeMeta: stypes.TypeMeta{
 			Kind:    OrganizationKind,
 			Version: OrganizationVersion,
 		},
 		ObjectMeta: stypes.ObjectMeta{
-			ID: uuid.Must(uuid.NewV4()).String(),
+			ID:   uuid.Must(uuid.NewV4()).String(),
+			TxID: tx.ID(),
 		},
 	}
 }
@@ -65,14 +67,15 @@ type OrganizationMember struct {
 	MemberRole MemberRole `json:"member_role,omitempty"`
 }
 
-func NewOrganizationMember() *OrganizationMember {
+func NewOrganizationMember(tx *sql.Tx) *OrganizationMember {
 	return &OrganizationMember{
 		TypeMeta: stypes.TypeMeta{
 			Kind:    OrganizationMemberKind,
 			Version: OrganizationMemberVersion,
 		},
 		ObjectMeta: stypes.ObjectMeta{
-			ID: uuid.Must(uuid.NewV4()).String(),
+			ID:   uuid.Must(uuid.NewV4()).String(),
+			TxID: tx.ID(),
 		},
 	}
 }
