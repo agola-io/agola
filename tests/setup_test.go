@@ -3025,3 +3025,102 @@ func TestOrgInvitation(t *testing.T) {
 		})
 	}
 }
+
+func TestGetUsers(t *testing.T) {
+	tests := []struct {
+		name string
+		f    func(ctx context.Context, t *testing.T, sc *setupContext)
+	}{
+		{
+			name: "test admin get user by remoteuserid and remotesourceref",
+			f: func(ctx context.Context, t *testing.T, sc *setupContext) {
+				createLinkedAccount(ctx, t, sc.gitea, sc.config)
+
+				gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
+
+				user, _, err := gwClient.GetUserByLinkedAccountRemoteUserAndSource(ctx, "1", "gitea")
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				if user.UserName != giteaUser01 {
+					t.Fatalf("expected username %s, got %s", giteaUser01, user.UserName)
+				}
+			},
+		},
+		{
+			name: "test user get user by remoteuserid and remotesourceref",
+			f: func(ctx context.Context, t *testing.T, sc *setupContext) {
+				_, user01Token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+
+				gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, user01Token)
+
+				_, _, err := gwClient.GetUserByLinkedAccountRemoteUserAndSource(ctx, "1", "gitea")
+				expectedErr := "remote error unauthorized"
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", expectedErr)
+				}
+				if err.Error() != expectedErr {
+					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+				}
+			},
+		},
+		{
+			name: "test admin get users",
+			f: func(ctx context.Context, t *testing.T, sc *setupContext) {
+				gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
+
+				user01, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: "user01"})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				user02, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: "user02"})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				expectedUsers := []*gwapitypes.PrivateUserResponse{
+					{ID: user01.ID, UserName: user01.UserName, Tokens: []string{}, LinkedAccounts: []*gwapitypes.LinkedAccountResponse{}},
+					{ID: user02.ID, UserName: user02.UserName, Tokens: []string{}, LinkedAccounts: []*gwapitypes.LinkedAccountResponse{}},
+				}
+				users, _, err := gwClient.GetUsers(ctx, "", 0, true)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				if diff := cmp.Diff(expectedUsers, users); diff != "" {
+					t.Fatalf("users mismatch (-want +got):\n%s", diff)
+				}
+			},
+		},
+		{
+			name: "test user get users",
+			f: func(ctx context.Context, t *testing.T, sc *setupContext) {
+				_, user01Token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+
+				gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, user01Token)
+
+				_, _, err := gwClient.GetUsers(ctx, "", 0, true)
+				expectedErr := "remote error unauthorized"
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", expectedErr)
+				}
+				if err.Error() != expectedErr {
+					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			sc := setup(ctx, t, dir, withGitea(true))
+			defer sc.stop()
+
+			tt.f(ctx, t, sc)
+		})
+	}
+}

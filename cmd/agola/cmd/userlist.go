@@ -52,7 +52,7 @@ func init() {
 	cmdUser.AddCommand(cmdUserList)
 }
 
-func printUsers(users []*gwapitypes.UserResponse) {
+func printUsers(users []*gwapitypes.PrivateUserResponse) {
 	for _, user := range users {
 		fmt.Printf("%s: Name: %s\n", user.ID, user.UserName)
 	}

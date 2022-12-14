@@ -46,27 +46,33 @@ func isAccessTokenExpired(expiresAt time.Time) bool {
 	return expiresAt.Add(-expireTimeRange).Before(time.Now())
 }
 
-func (h *ActionHandler) GetCurrentUser(ctx context.Context, userRef string) (*cstypes.User, []*cstypes.UserToken, []*cstypes.LinkedAccount, error) {
+type PrivateUserResponse struct {
+	User           *cstypes.User
+	Tokens         []*cstypes.UserToken
+	LinkedAccounts []*cstypes.LinkedAccount
+}
+
+func (h *ActionHandler) GetCurrentUser(ctx context.Context, userRef string) (*PrivateUserResponse, error) {
 	if !common.IsUserLoggedOrAdmin(ctx) {
-		return nil, nil, nil, errors.Errorf("user not logged in")
+		return nil, errors.Errorf("user not logged in")
 	}
 
 	user, _, err := h.configstoreClient.GetUser(ctx, userRef)
 	if err != nil {
-		return nil, nil, nil, util.NewAPIError(util.KindFromRemoteError(err), err)
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
 
 	tokens, _, err := h.configstoreClient.GetUserTokens(ctx, user.ID)
 	if err != nil {
-		return nil, nil, nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q tokens", user.ID))
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q tokens", user.ID))
 	}
 
 	linkedAccounts, _, err := h.configstoreClient.GetUserLinkedAccounts(ctx, user.ID)
 	if err != nil {
-		return nil, nil, nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q linked accounts", user.ID))
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q linked accounts", user.ID))
 	}
 
-	return user, tokens, linkedAccounts, nil
+	return &PrivateUserResponse{User: user, Tokens: tokens, LinkedAccounts: linkedAccounts}, nil
 }
 
 func (h *ActionHandler) GetUser(ctx context.Context, userRef string) (*cstypes.User, error) {
@@ -99,15 +105,31 @@ type GetUsersRequest struct {
 	Asc   bool
 }
 
-func (h *ActionHandler) GetUsers(ctx context.Context, req *GetUsersRequest) ([]*cstypes.User, error) {
+func (h *ActionHandler) GetUsers(ctx context.Context, req *GetUsersRequest) ([]*PrivateUserResponse, error) {
 	if !common.IsUserAdmin(ctx) {
-		return nil, errors.Errorf("user not logged in")
+		return nil, util.NewAPIError(util.ErrUnauthorized, errors.Errorf("user not admin"))
 	}
 
-	users, _, err := h.configstoreClient.GetUsers(ctx, req.Start, req.Limit, req.Asc)
+	csusers, _, err := h.configstoreClient.GetUsers(ctx, req.Start, req.Limit, req.Asc)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
+
+	users := make([]*PrivateUserResponse, len(csusers))
+	for i, user := range csusers {
+		tokens, _, err := h.configstoreClient.GetUserTokens(ctx, user.ID)
+		if err != nil {
+			return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q tokens", user.ID))
+		}
+
+		linkedAccounts, _, err := h.configstoreClient.GetUserLinkedAccounts(ctx, user.ID)
+		if err != nil {
+			return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q linked accounts", user.ID))
+		}
+
+		users[i] = &PrivateUserResponse{User: user, Tokens: tokens, LinkedAccounts: linkedAccounts}
+	}
+
 	return users, nil
 }
 
@@ -1048,4 +1070,32 @@ func (h *ActionHandler) GetUserOrgInvitations(ctx context.Context, userRef strin
 	}
 
 	return res, nil
+}
+
+func (h *ActionHandler) GetUserByLinkedAccountRemoteUserAndSource(ctx context.Context, remoteUserID string, remoteSourceRef string) (*PrivateUserResponse, error) {
+	if !common.IsUserAdmin(ctx) {
+		return nil, util.NewAPIError(util.ErrUnauthorized, errors.Errorf("user not admin"))
+	}
+
+	rs, _, err := h.configstoreClient.GetRemoteSource(ctx, remoteSourceRef)
+	if err != nil {
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
+	}
+
+	user, _, err := h.configstoreClient.GetUserByLinkedAccountRemoteUserAndSource(ctx, remoteUserID, rs.ID)
+	if err != nil {
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
+	}
+
+	tokens, _, err := h.configstoreClient.GetUserTokens(ctx, user.ID)
+	if err != nil {
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q tokens", user.ID))
+	}
+
+	linkedAccounts, _, err := h.configstoreClient.GetUserLinkedAccounts(ctx, user.ID)
+	if err != nil {
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q linked accounts", user.ID))
+	}
+
+	return &PrivateUserResponse{User: user, Tokens: tokens, LinkedAccounts: linkedAccounts}, nil
 }
