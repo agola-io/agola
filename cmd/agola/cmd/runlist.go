@@ -133,9 +133,9 @@ func runList(cmd *cobra.Command, args []string) error {
 		for _, task := range run.Tasks {
 			var runTaskResponse *gwapitypes.RunTaskResponse
 			if isProject {
-				runTaskResponse, _, err = gwclient.GetUserRunTask(context.TODO(), runListOpts.projectRef, run.Number, task.ID)
+				runTaskResponse, _, err = gwclient.GetProjectRunTask(context.TODO(), runListOpts.projectRef, run.Number, task.ID)
 			} else {
-				runTaskResponse, _, err = gwclient.GetProjectRunTask(context.TODO(), runListOpts.username, run.Number, task.ID)
+				runTaskResponse, _, err = gwclient.GetUserRunTask(context.TODO(), runListOpts.username, run.Number, task.ID)
 			}
 			t := &taskDetails{
 				name:            task.Name,
