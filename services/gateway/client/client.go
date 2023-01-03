@@ -607,6 +607,23 @@ func (c *Client) GetOrg(ctx context.Context, orgRef string) (*gwapitypes.OrgResp
 	return res, resp, errors.WithStack(err)
 }
 
+func (c *Client) GetOrgs(ctx context.Context, start string, limit int, asc bool) ([]*gwapitypes.OrgResponse, *http.Response, error) {
+	q := url.Values{}
+	if start != "" {
+		q.Add("start", start)
+	}
+	if limit > 0 {
+		q.Add("limit", strconv.Itoa(limit))
+	}
+	if asc {
+		q.Add("asc", "")
+	}
+
+	orgs := []*gwapitypes.OrgResponse{}
+	resp, err := c.getParsedResponse(ctx, "GET", "/orgs", q, jsonContent, nil, &orgs)
+	return orgs, resp, errors.WithStack(err)
+}
+
 func (c *Client) CreateOrg(ctx context.Context, req *gwapitypes.CreateOrgRequest) (*gwapitypes.OrgResponse, *http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
