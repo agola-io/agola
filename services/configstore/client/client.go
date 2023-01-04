@@ -644,3 +644,25 @@ func (c *Client) UserOrgInvitationAction(ctx context.Context, userRef string, or
 	resp, err := c.getResponse(ctx, "PUT", fmt.Sprintf("/orgs/%s/invitations/%s/actions", orgRef, userRef), nil, jsonContent, bytes.NewReader(reqj))
 	return resp, errors.WithStack(err)
 }
+
+func (c *Client) GetMaintenanceStatus(ctx context.Context) (*csapitypes.MaintenanceStatusResponse, *http.Response, error) {
+	maintenanceStatus := new(csapitypes.MaintenanceStatusResponse)
+	resp, err := c.getParsedResponse(ctx, "GET", "/maintenance", nil, jsonContent, nil, maintenanceStatus)
+	return maintenanceStatus, resp, errors.WithStack(err)
+}
+
+func (c *Client) EnableMaintenance(ctx context.Context) (*http.Response, error) {
+	return c.getResponse(ctx, "PUT", "/maintenance", nil, jsonContent, nil)
+}
+
+func (c *Client) DisableMaintenance(ctx context.Context) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", "/maintenance", nil, jsonContent, nil)
+}
+
+func (c *Client) Export(ctx context.Context) (*http.Response, error) {
+	return c.getResponse(ctx, "GET", "/export", nil, jsonContent, nil)
+}
+
+func (c *Client) Import(ctx context.Context, r io.Reader) (*http.Response, error) {
+	return c.getResponse(ctx, "POST", "/import", nil, jsonContent, r)
+}

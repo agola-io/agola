@@ -131,6 +131,7 @@ func NewRunservice(ctx context.Context, log zerolog.Logger, c *config.Runservice
 }
 
 func (s *Runservice) setupDefaultRouter(etCh chan string) http.Handler {
+	maintenanceStatusHandler := api.NewMaintenanceStatusHandler(s.log, s.ah, false)
 	maintenanceModeHandler := api.NewMaintenanceModeHandler(s.log, s.ah)
 	exportHandler := api.NewExportHandler(s.log, s.ah)
 	importHandler := api.NewImportHandler(s.log, s.ah)
@@ -193,6 +194,7 @@ func (s *Runservice) setupDefaultRouter(etCh chan string) http.Handler {
 
 	apirouter.Handle("/changegroups", changeGroupsUpdateTokensHandler).Methods("GET")
 
+	apirouter.Handle("/maintenance", maintenanceStatusHandler).Methods("GET")
 	apirouter.Handle("/maintenance", maintenanceModeHandler).Methods("PUT", "DELETE")
 
 	apirouter.Handle("/export", exportHandler).Methods("GET")
@@ -208,6 +210,7 @@ func (s *Runservice) setupDefaultRouter(etCh chan string) http.Handler {
 }
 
 func (s *Runservice) setupMaintenanceRouter() http.Handler {
+	maintenanceStatusHandler := api.NewMaintenanceStatusHandler(s.log, s.ah, true)
 	maintenanceModeHandler := api.NewMaintenanceModeHandler(s.log, s.ah)
 	exportHandler := api.NewExportHandler(s.log, s.ah)
 	importHandler := api.NewImportHandler(s.log, s.ah)
@@ -215,6 +218,7 @@ func (s *Runservice) setupMaintenanceRouter() http.Handler {
 	router := mux.NewRouter()
 	apirouter := router.PathPrefix("/api/v1alpha").Subrouter().UseEncodedPath()
 
+	apirouter.Handle("/maintenance", maintenanceStatusHandler).Methods("GET")
 	apirouter.Handle("/maintenance", maintenanceModeHandler).Methods("PUT", "DELETE")
 
 	apirouter.Handle("/export", exportHandler).Methods("GET")

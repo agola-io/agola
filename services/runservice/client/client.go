@@ -353,3 +353,25 @@ func (c *Client) GetRunEvents(ctx context.Context, startRunEventID string) (*htt
 
 	return c.getResponse(ctx, "GET", "/runs/events", q, -1, nil, nil)
 }
+
+func (c *Client) GetMaintenanceStatus(ctx context.Context) (*rsapitypes.MaintenanceStatusResponse, *http.Response, error) {
+	maintenanceStatus := new(rsapitypes.MaintenanceStatusResponse)
+	resp, err := c.getParsedResponse(ctx, "GET", "/maintenance", nil, jsonContent, nil, maintenanceStatus)
+	return maintenanceStatus, resp, errors.WithStack(err)
+}
+
+func (c *Client) EnableMaintenance(ctx context.Context) (*http.Response, error) {
+	return c.getResponse(ctx, "PUT", "/maintenance", nil, -1, nil, nil)
+}
+
+func (c *Client) DisableMaintenance(ctx context.Context) (*http.Response, error) {
+	return c.getResponse(ctx, "DELETE", "/maintenance", nil, -1, nil, nil)
+}
+
+func (c *Client) Export(ctx context.Context) (*http.Response, error) {
+	return c.getResponse(ctx, "GET", "/export", nil, -1, nil, nil)
+}
+
+func (c *Client) Import(ctx context.Context, r io.Reader) (*http.Response, error) {
+	return c.getResponse(ctx, "POST", "/import", nil, -1, nil, r)
+}

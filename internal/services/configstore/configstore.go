@@ -132,6 +132,7 @@ func NewConfigstore(ctx context.Context, log zerolog.Logger, c *config.Configsto
 }
 
 func (s *Configstore) setupDefaultRouter() http.Handler {
+	maintenanceStatusHandler := api.NewMaintenanceStatusHandler(s.log, s.ah, false)
 	maintenanceModeHandler := api.NewMaintenanceModeHandler(s.log, s.ah)
 	exportHandler := api.NewExportHandler(s.log, s.ah)
 	importHandler := api.NewImportHandler(s.log, s.ah)
@@ -268,6 +269,7 @@ func (s *Configstore) setupDefaultRouter() http.Handler {
 	apirouter.Handle("/remotesources/{remotesourceref}", updateRemoteSourceHandler).Methods("PUT")
 	apirouter.Handle("/remotesources/{remotesourceref}", deleteRemoteSourceHandler).Methods("DELETE")
 
+	apirouter.Handle("/maintenance", maintenanceStatusHandler).Methods("GET")
 	apirouter.Handle("/maintenance", maintenanceModeHandler).Methods("PUT", "DELETE")
 
 	apirouter.Handle("/export", exportHandler).Methods("GET")
@@ -280,6 +282,7 @@ func (s *Configstore) setupDefaultRouter() http.Handler {
 }
 
 func (s *Configstore) setupMaintenanceRouter() http.Handler {
+	maintenanceStatusHandler := api.NewMaintenanceStatusHandler(s.log, s.ah, true)
 	maintenanceModeHandler := api.NewMaintenanceModeHandler(s.log, s.ah)
 	exportHandler := api.NewExportHandler(s.log, s.ah)
 	importHandler := api.NewImportHandler(s.log, s.ah)
@@ -287,6 +290,7 @@ func (s *Configstore) setupMaintenanceRouter() http.Handler {
 	router := mux.NewRouter()
 	apirouter := router.PathPrefix("/api/v1alpha").Subrouter().UseEncodedPath()
 
+	apirouter.Handle("/maintenance", maintenanceStatusHandler).Methods("GET")
 	apirouter.Handle("/maintenance", maintenanceModeHandler).Methods("PUT", "DELETE")
 
 	apirouter.Handle("/export", exportHandler).Methods("GET")
