@@ -558,7 +558,7 @@ func (d *DB) insertRawRunCounter(tx *sql.Tx, v *types.RunCounter) error {
 
 var (
 	runEventSelectColumns = func(additionalCols ...string) []string {
-		columns := []string{"runevent.id", "runevent.revision", "runevent.creation_time", "runevent.update_time", "runevent.sequence", "runevent.run_id", "runevent.phase", "runevent.result"}
+		columns := []string{"runevent.id", "runevent.revision", "runevent.creation_time", "runevent.update_time", "runevent.sequence", "runevent.run_event_type", "runevent.run_id", "runevent.phase", "runevent.result", "runevent.data", "runevent.data_version"}
 		columns = append(columns, additionalCols...)
 
 		return columns

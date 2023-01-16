@@ -282,23 +282,27 @@ func (d *DB) insertRawRunCounterSqlite3(tx *sql.Tx, runcounter *types.RunCounter
 	return nil
 }
 var (
-	runEventInsertSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inRunID string, inPhase types.RunPhase, inResult types.RunResult) *sq.InsertBuilder {
+	runEventInsertSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inRunEventType types.RunEventType, inRunID string, inPhase types.RunPhase, inResult types.RunResult, inData []byte, inDataVersion uint64) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("runevent").Cols("id", "revision", "creation_time", "update_time", "sequence", "run_id", "phase", "result").Values(inId, inRevision, inCreationTime, inUpdateTime, inSequence, inRunID, inPhase, inResult)
+		return ib.InsertInto("runevent").Cols("id", "revision", "creation_time", "update_time", "sequence", "run_event_type", "run_id", "phase", "result", "data", "data_version").Values(inId, inRevision, inCreationTime, inUpdateTime, inSequence, inRunEventType, inRunID, inPhase, inResult, inData, inDataVersion)
 	}
-	runEventUpdateSqlite3 = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inRunID string, inPhase types.RunPhase, inResult types.RunResult) *sq.UpdateBuilder {
+	runEventUpdateSqlite3 = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inRunEventType types.RunEventType, inRunID string, inPhase types.RunPhase, inResult types.RunResult, inData []byte, inDataVersion uint64) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("runevent").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("run_id", inRunID), ub.Assign("phase", inPhase), ub.Assign("result", inResult)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("runevent").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("run_event_type", inRunEventType), ub.Assign("run_id", inRunID), ub.Assign("phase", inPhase), ub.Assign("result", inResult), ub.Assign("data", inData), ub.Assign("data_version", inDataVersion)).Where(ub.E("id", inId), ub.E("revision", curRevision))
 	}
 
-	runEventInsertRawSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inRunID string, inPhase types.RunPhase, inResult types.RunResult) *sq.InsertBuilder {
+	runEventInsertRawSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inRunEventType types.RunEventType, inRunID string, inPhase types.RunPhase, inResult types.RunResult, inData []byte, inDataVersion uint64) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("runevent").Cols("id", "revision", "creation_time", "update_time", "sequence", "run_id", "phase", "result").SQL("").Values(inId, inRevision, inCreationTime, inUpdateTime, inSequence, inRunID, inPhase, inResult)
+		return ib.InsertInto("runevent").Cols("id", "revision", "creation_time", "update_time", "sequence", "run_event_type", "run_id", "phase", "result", "data", "data_version").SQL("").Values(inId, inRevision, inCreationTime, inUpdateTime, inSequence, inRunEventType, inRunID, inPhase, inResult, inData, inDataVersion)
 	}
 )
 
 func (d *DB) insertRunEventSqlite3(tx *sql.Tx, runevent *types.RunEvent) error {
-	q := runEventInsertSqlite3(runevent.ID, runevent.Revision, runevent.CreationTime, runevent.UpdateTime, runevent.Sequence, runevent.RunID, runevent.Phase, runevent.Result)
+	inDataJSON, err := json.Marshal(runevent.Data)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal runevent.Data")
+	}
+	q := runEventInsertSqlite3(runevent.ID, runevent.Revision, runevent.CreationTime, runevent.UpdateTime, runevent.Sequence, runevent.RunEventType, runevent.RunID, runevent.Phase, runevent.Result, inDataJSON, runevent.DataVersion)
 
 	if _, err := d.exec(tx, q); err != nil {
 		return errors.Wrap(err, "failed to insert runEvent")
@@ -308,7 +312,11 @@ func (d *DB) insertRunEventSqlite3(tx *sql.Tx, runevent *types.RunEvent) error {
 }
 
 func (d *DB) updateRunEventSqlite3(tx *sql.Tx, curRevision uint64, runevent *types.RunEvent) (stdsql.Result, error) {
-	q := runEventUpdateSqlite3(curRevision, runevent.ID, runevent.Revision, runevent.CreationTime, runevent.UpdateTime, runevent.RunID, runevent.Phase, runevent.Result)
+	inDataJSON, err := json.Marshal(runevent.Data)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal runevent.Data")
+	}
+	q := runEventUpdateSqlite3(curRevision, runevent.ID, runevent.Revision, runevent.CreationTime, runevent.UpdateTime, runevent.RunEventType, runevent.RunID, runevent.Phase, runevent.Result, inDataJSON, runevent.DataVersion)
 
 	res, err := d.exec(tx, q)
 	if err != nil {
@@ -319,7 +327,11 @@ func (d *DB) updateRunEventSqlite3(tx *sql.Tx, curRevision uint64, runevent *typ
 }
 
 func (d *DB) insertRawRunEventSqlite3(tx *sql.Tx, runevent *types.RunEvent) error {
-	q := runEventInsertRawSqlite3(runevent.ID, runevent.Revision, runevent.CreationTime, runevent.UpdateTime, runevent.Sequence, runevent.RunID, runevent.Phase, runevent.Result)
+	inDataJSON, err := json.Marshal(runevent.Data)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal runevent.Data")
+	}
+	q := runEventInsertRawSqlite3(runevent.ID, runevent.Revision, runevent.CreationTime, runevent.UpdateTime, runevent.Sequence, runevent.RunEventType, runevent.RunID, runevent.Phase, runevent.Result, inDataJSON, runevent.DataVersion)
 
 	if _, err := d.exec(tx, q); err != nil {
 		return errors.Wrap(err, "failed to insert runEvent")

@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	Version = uint(1)
+	Version = uint(2)
 )
 
 const TypesImport = "agola.io/agola/services/runservice/types"
@@ -67,9 +67,12 @@ var ObjectsInfo = []sqlg.ObjectInfo{
 	{Name: "RunEvent", Table: "runevent",
 		Fields: []sqlg.ObjectField{
 			{Name: "Sequence", Type: "uint64", Sequence: true},
+			{Name: "RunEventType", Type: "types.RunEventType", BaseType: "string"},
 			{Name: "RunID", Type: "string"},
 			{Name: "Phase", Type: "types.RunPhase", BaseType: "string"},
 			{Name: "Result", Type: "types.RunResult", BaseType: "string"},
+			{Name: "Data", Type: "any", JSON: true},
+			{Name: "DataVersion", Type: "uint64"},
 		},
 	},
 	{Name: "Executor", Table: "executor",
