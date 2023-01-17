@@ -2951,7 +2951,17 @@ func TestOrgInvitation(t *testing.T) {
 			name:                 "test user owner get org invitations",
 			orgInvitationEnabled: true,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
-				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser02, Role: cstypes.MemberRoleMember})
+				_, _, err := tc.gwAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser03})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				_, _, err = tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser02, Role: cstypes.MemberRoleMember})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				_, _, err = tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser03, Role: cstypes.MemberRoleMember})
 				if err != nil {
 					t.Fatalf("unexpected err: %v", err)
 				}
@@ -2960,7 +2970,7 @@ func TestOrgInvitation(t *testing.T) {
 				if err != nil {
 					t.Fatalf("unexpected err: %v", err)
 				}
-				if len(orgInvitations) != 1 {
+				if len(orgInvitations) != 2 {
 					t.Fatalf("expected org invitations len 1, found: %d", len(orgInvitations))
 				}
 
