@@ -3238,27 +3238,33 @@ func TestMaintenance(t *testing.T) {
 				if err != nil {
 					t.Fatalf("unexpected err: %v", err)
 				}
-				if err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
 
 				_, err = gwClient.EnableMaintenance(ctx, runserviceService)
 				if err != nil {
 					t.Fatalf("unexpected err: %v", err)
 				}
 
-				expectedErr := "remote error badrequest"
 				_ = testutil.Wait(30*time.Second, func() (bool, error) {
-					_, err = gwClient.EnableMaintenance(ctx, configstoreService)
-					if err == nil {
+					maintenanceStatus, _, err := gwClient.GetMaintenanceStatus(ctx, configstoreService)
+					if err != nil {
 						return false, nil
 					}
-					if err.Error() != expectedErr {
+					if !maintenanceStatus.CurrentStatus {
+						return false, nil
+					}
+
+					maintenanceStatus, _, err = gwClient.GetMaintenanceStatus(ctx, runserviceService)
+					if err != nil {
+						return false, nil
+					}
+					if !maintenanceStatus.CurrentStatus {
 						return false, nil
 					}
 
 					return true, nil
 				})
+
+				expectedErr := "remote error badrequest"
 				_, err = gwClient.EnableMaintenance(ctx, configstoreService)
 				if err == nil {
 					t.Fatalf("expected error %v, got nil err", expectedErr)
@@ -3267,17 +3273,6 @@ func TestMaintenance(t *testing.T) {
 					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 				}
 
-				_ = testutil.Wait(30*time.Second, func() (bool, error) {
-					_, err = gwClient.EnableMaintenance(ctx, runserviceService)
-					if err == nil {
-						return false, nil
-					}
-					if err.Error() != expectedErr {
-						return false, nil
-					}
-
-					return true, nil
-				})
 				_, err = gwClient.EnableMaintenance(ctx, runserviceService)
 				if err == nil {
 					t.Fatalf("expected error %v, got nil err", expectedErr)
@@ -3297,6 +3292,18 @@ func TestMaintenance(t *testing.T) {
 					t.Fatalf("unexpected err: %v", err)
 				}
 
+				_ = testutil.Wait(30*time.Second, func() (bool, error) {
+					maintenanceStatus, _, err := gwClient.GetMaintenanceStatus(ctx, configstoreService)
+					if err != nil {
+						return false, nil
+					}
+					if !maintenanceStatus.CurrentStatus {
+						return false, nil
+					}
+
+					return true, nil
+				})
+
 				_, err = gwClient.DisableMaintenance(ctx, configstoreService)
 				if err != nil {
 					t.Fatalf("unexpected err: %v", err)
@@ -3306,6 +3313,18 @@ func TestMaintenance(t *testing.T) {
 				if err != nil {
 					t.Fatalf("unexpected err: %v", err)
 				}
+
+				_ = testutil.Wait(30*time.Second, func() (bool, error) {
+					maintenanceStatus, _, err := gwClient.GetMaintenanceStatus(ctx, runserviceService)
+					if err != nil {
+						return false, nil
+					}
+					if !maintenanceStatus.CurrentStatus {
+						return false, nil
+					}
+
+					return true, nil
+				})
 
 				_, err = gwClient.DisableMaintenance(ctx, runserviceService)
 				if err != nil {
