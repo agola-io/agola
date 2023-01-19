@@ -94,17 +94,21 @@ type APIError struct {
 	Code    ErrorCode
 	Message string
 
-	*errors.Stack
+	stack *errors.Stack
 }
 
 func NewAPIError(kind ErrorKind, err error, options ...APIErrorOption) error {
-	derr := &APIError{err: err, Kind: kind, Stack: errors.Callers(0)}
+	derr := &APIError{err: err, Kind: kind, stack: errors.Callers(0)}
 
 	for _, opt := range options {
 		opt(derr)
 	}
 
 	return derr
+}
+
+func (e *APIError) StackTrace() errors.StackTrace {
+	return e.stack.StackTrace()
 }
 
 func (e *APIError) Error() string {
