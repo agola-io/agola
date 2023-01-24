@@ -1231,17 +1231,8 @@ func (d *DB) GetAllVariables(tx *sql.Tx) ([]*types.Variable, error) {
 
 func (d *DB) GetOrgInvitations(tx *sql.Tx, orgID string) ([]*types.OrgInvitation, error) {
 	q := orgInvitationQSelect.Where(sq.Eq{"org_id": orgID})
-
 	orgInvitations, _, err := d.fetchOrgInvitations(tx, q)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	if len(orgInvitations) > 1 {
-		return nil, errors.Errorf("too many rows returned")
-	}
-	if len(orgInvitations) == 0 {
-		return nil, errors.WithStack(err)
-	}
+
 	return orgInvitations, errors.WithStack(err)
 }
 
