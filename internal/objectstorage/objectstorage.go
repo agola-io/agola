@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"agola.io/agola/internal/errors"
+	"agola.io/agola/internal/util"
 )
 
 type Storage interface {
@@ -35,21 +36,13 @@ type Storage interface {
 }
 
 type ErrNotExist struct {
-	err error
-
-	*errors.Stack
+	*util.WrapperError
 }
 
-func NewErrNotExist(err error) error {
-	return &ErrNotExist{err: err, Stack: errors.Callers(0)}
-}
-
-func (e *ErrNotExist) Error() string {
-	return e.err.Error()
-}
-
-func (e *ErrNotExist) Unwrap() error {
-	return e.err
+func NewErrNotExist(err error, format string, args ...interface{}) error {
+	return &ErrNotExist{
+		util.NewWrapperError(err, format, args...),
+	}
 }
 
 func IsNotExist(err error) bool {

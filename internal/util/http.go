@@ -37,9 +37,9 @@ func ErrorResponseFromError(err error) *ErrorResponse {
 		return nil
 	}
 
-	var derr *APIError
-	if errors.As(err, &derr) {
-		return &ErrorResponse{Code: string(derr.Code), Message: derr.Message}
+	var aerr *APIError
+	if errors.As(err, &aerr) {
+		return &ErrorResponse{Code: string(aerr.Code), Message: aerr.Message}
 	}
 
 	// on generic error return an error response without any code
@@ -60,9 +60,9 @@ func HTTPError(w http.ResponseWriter, err error) bool {
 
 	code := http.StatusInternalServerError
 
-	var derr *APIError
-	if errors.As(err, &derr) {
-		switch derr.Kind {
+	var aerr *APIError
+	if errors.As(err, &aerr) {
+		switch aerr.Kind {
 		case ErrBadRequest:
 			code = http.StatusBadRequest
 		case ErrNotExist:

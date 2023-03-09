@@ -64,7 +64,7 @@ func (s *S3Storage) Stat(p string) (*ObjectInfo, error) {
 	if err != nil {
 		merr := minio.ToErrorResponse(err)
 		if merr.StatusCode == http.StatusNotFound {
-			return nil, NewErrNotExist(errors.Errorf("object %q doesn't exist", p))
+			return nil, NewErrNotExist(err, "object %q doesn't exist", p)
 		}
 		return nil, errors.WithStack(merr)
 	}
@@ -76,7 +76,7 @@ func (s *S3Storage) ReadObject(filepath string) (ReadSeekCloser, error) {
 	if _, err := s.minioClient.StatObject(s.bucket, filepath, minio.StatObjectOptions{}); err != nil {
 		merr := minio.ToErrorResponse(err)
 		if merr.StatusCode == http.StatusNotFound {
-			return nil, NewErrNotExist(errors.Errorf("object %q doesn't exist", filepath))
+			return nil, NewErrNotExist(err, "object %q doesn't exist", filepath)
 		}
 		return nil, errors.WithStack(merr)
 	}
