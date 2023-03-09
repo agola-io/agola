@@ -3,7 +3,7 @@ package util
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"agola.io/agola/internal/errors"
@@ -94,13 +94,13 @@ func ErrFromRemote(resp *http.Response) error {
 
 	defer resp.Body.Close()
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
 	// Re-populate error response body so it can be parsed by the caller if needed
-	resp.Body = ioutil.NopCloser(bytes.NewBuffer(data))
+	resp.Body = io.NopCloser(bytes.NewBuffer(data))
 
 	if err := json.Unmarshal(data, &response); err != nil {
 		return errors.Errorf("unknown api error (status: %d)", resp.StatusCode)

@@ -16,7 +16,6 @@ package objectstorage
 
 import (
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
@@ -100,7 +99,7 @@ func (s *S3Storage) WriteObject(filepath string, data io.Reader, size int64, per
 
 	// hack to know the real file size or minio will do this in memory with big memory usage since s3 doesn't support real streaming of unknown sizes
 	// TODO(sgotti) wait for minio client to expose an api to provide the max object size so we can remove this
-	tmpfile, err := ioutil.TempFile(os.TempDir(), "s3")
+	tmpfile, err := os.CreateTemp(os.TempDir(), "s3")
 	if err != nil {
 		return errors.WithStack(err)
 	}

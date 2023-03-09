@@ -17,7 +17,7 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path"
 	"regexp"
 	"strings"
@@ -140,7 +140,7 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 		// "github.com/ghodss/yaml" doesn't provide a streaming decoder
 		var data []byte
 		var err error
-		data, err = ioutil.ReadFile(varFile)
+		data, err = os.ReadFile(varFile)
 		if err != nil {
 			return errors.WithStack(err)
 		}

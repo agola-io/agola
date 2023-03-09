@@ -15,7 +15,7 @@
 package config
 
 import (
-	"io/ioutil"
+	"os"
 	"path"
 	"testing"
 
@@ -176,10 +176,10 @@ notification:
   configstoreURL: "http://localhost:4002"
 
 configstore:
-  dataDir: 
+  dataDir:
 
 runservice:
-  dataDir: 
+  dataDir:
 
 gitserver:
   dataDir:`,
@@ -227,7 +227,7 @@ gitserver:
 			dir := t.TempDir()
 
 			content := []byte(tt.in)
-			err := ioutil.WriteFile(path.Join(dir, "config.yml"), content, 0644)
+			err := os.WriteFile(path.Join(dir, "config.yml"), content, 0644)
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}

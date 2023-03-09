@@ -17,8 +17,9 @@ package runservice
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"io"
 	"net"
+	"os"
 	"path/filepath"
 	"reflect"
 	"sync"
@@ -45,11 +46,11 @@ func setupRunservice(ctx context.Context, t *testing.T, log zerolog.Logger, dir 
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	ostDir, err := ioutil.TempDir(dir, "ost")
+	ostDir, err := os.MkdirTemp(dir, "ost")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	rsDir, err := ioutil.TempDir(dir, "rs")
+	rsDir, err := os.MkdirTemp(dir, "rs")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -292,7 +293,7 @@ func TestLogleaner(t *testing.T) {
 	rs := setupRunservice(ctx, t, log, dir)
 	rs.c.RunCacheExpireInterval = 604800000000000
 
-	body := ioutil.NopCloser(bytes.NewBufferString("log test"))
+	body := io.NopCloser(bytes.NewBufferString("log test"))
 	logPath := store.OSTRunTaskStepLogPath("task01", 0)
 
 	err := rs.ost.WriteObject(logPath, body, -1, false)

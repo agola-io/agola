@@ -17,8 +17,8 @@ package gateway
 import (
 	"context"
 	"crypto/tls"
-	"io/ioutil"
 	"net/http"
+	"os"
 
 	scommon "agola.io/agola/internal/common"
 	"agola.io/agola/internal/errors"
@@ -91,7 +91,7 @@ func NewGateway(ctx context.Context, log zerolog.Logger, gc *config.Config) (*Ga
 		}
 
 		sd.Method = jwt.SigningMethodRS256
-		privateKeyData, err := ioutil.ReadFile(c.TokenSigning.PrivateKeyPath)
+		privateKeyData, err := os.ReadFile(c.TokenSigning.PrivateKeyPath)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error reading token signing private key")
 		}
@@ -99,7 +99,7 @@ func NewGateway(ctx context.Context, log zerolog.Logger, gc *config.Config) (*Ga
 		if err != nil {
 			return nil, errors.Wrapf(err, "error parsing token signing private key")
 		}
-		publicKeyData, err := ioutil.ReadFile(c.TokenSigning.PublicKeyPath)
+		publicKeyData, err := os.ReadFile(c.TokenSigning.PublicKeyPath)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error reading token signing public key")
 		}

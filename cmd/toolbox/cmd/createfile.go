@@ -17,7 +17,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 
@@ -52,7 +51,7 @@ func createFile(r io.Reader) (string, error) {
 		return "", errors.Errorf("failed to create tmp dir %q", tmpDir)
 	}
 
-	file, err := ioutil.TempFile("", "")
+	file, err := os.CreateTemp("", "")
 	if err != nil {
 		return "", errors.WithStack(err)
 	}

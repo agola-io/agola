@@ -16,7 +16,7 @@ package cmd
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"os"
 
 	config "agola.io/agola/internal/config"
@@ -103,12 +103,12 @@ func variableCreate(cmd *cobra.Command, ownertype string, args []string) error {
 	var data []byte
 	var err error
 	if variableCreateOpts.file == "-" {
-		data, err = ioutil.ReadAll(os.Stdin)
+		data, err = io.ReadAll(os.Stdin)
 		if err != nil {
 			return errors.WithStack(err)
 		}
 	} else {
-		data, err = ioutil.ReadFile(variableCreateOpts.file)
+		data, err = os.ReadFile(variableCreateOpts.file)
 		if err != nil {
 			return errors.WithStack(err)
 		}

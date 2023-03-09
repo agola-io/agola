@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -25,7 +24,7 @@ func MigrateConfigStore(ctx context.Context, r io.Reader, w io.Writer) error {
 	ll := lock.NewLocalLocks()
 	lf := lock.NewLocalLockFactory(ll)
 
-	dir, err := ioutil.TempDir("", "agolamigration")
+	dir, err := os.MkdirTemp("", "agolamigration")
 	if err != nil {
 		return errors.Wrap(err, "new db error")
 	}

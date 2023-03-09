@@ -16,7 +16,7 @@ package cmd
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"os"
 
 	"agola.io/agola/internal/errors"
@@ -82,12 +82,12 @@ func secretUpdate(cmd *cobra.Command, ownertype string, args []string) error {
 	var data []byte
 	var err error
 	if secretUpdateOpts.file == "-" {
-		data, err = ioutil.ReadAll(os.Stdin)
+		data, err = io.ReadAll(os.Stdin)
 		if err != nil {
 			return errors.WithStack(err)
 		}
 	} else {
-		data, err = ioutil.ReadFile(secretUpdateOpts.file)
+		data, err = os.ReadFile(secretUpdateOpts.file)
 		if err != nil {
 			return errors.WithStack(err)
 		}
