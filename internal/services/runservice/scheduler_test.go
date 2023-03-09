@@ -31,7 +31,7 @@ func TestAdvanceRunTasks(t *testing.T) {
 	// a global run config for all tests
 	rc := &types.RunConfig{
 		Tasks: map[string]*types.RunConfigTask{
-			"task01": &types.RunConfigTask{
+			"task01": {
 				ID:      "task01",
 				Name:    "task01",
 				Depends: map[string]*types.RunConfigTaskDepend{},
@@ -42,11 +42,11 @@ func TestAdvanceRunTasks(t *testing.T) {
 				Steps:       types.Steps{},
 				Skip:        false,
 			},
-			"task02": &types.RunConfigTask{
+			"task02": {
 				ID:   "task02",
 				Name: "task02",
 				Depends: map[string]*types.RunConfigTaskDepend{
-					"task01": &types.RunConfigTaskDepend{TaskID: "task01", Conditions: []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnSuccess}},
+					"task01": {TaskID: "task01", Conditions: []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnSuccess}},
 				},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},
@@ -55,7 +55,7 @@ func TestAdvanceRunTasks(t *testing.T) {
 				Steps:       types.Steps{},
 				Skip:        false,
 			},
-			"task03": &types.RunConfigTask{
+			"task03": {
 				ID:      "task03",
 				Name:    "task03",
 				Depends: map[string]*types.RunConfigTaskDepend{},
@@ -66,7 +66,7 @@ func TestAdvanceRunTasks(t *testing.T) {
 				Steps:       types.Steps{},
 				Skip:        false,
 			},
-			"task04": &types.RunConfigTask{
+			"task04": {
 				ID:      "task04",
 				Name:    "task04",
 				Depends: map[string]*types.RunConfigTaskDepend{},
@@ -77,12 +77,12 @@ func TestAdvanceRunTasks(t *testing.T) {
 				Steps:       types.Steps{},
 				Skip:        false,
 			},
-			"task05": &types.RunConfigTask{
+			"task05": {
 				ID:   "task05",
 				Name: "task05",
 				Depends: map[string]*types.RunConfigTaskDepend{
-					"task03": &types.RunConfigTaskDepend{TaskID: "task03", Conditions: []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnSuccess}},
-					"task04": &types.RunConfigTaskDepend{TaskID: "task04", Conditions: []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnSuccess}},
+					"task03": {TaskID: "task03", Conditions: []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnSuccess}},
+					"task04": {TaskID: "task04", Conditions: []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnSuccess}},
 				},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},
@@ -103,23 +103,23 @@ func TestAdvanceRunTasks(t *testing.T) {
 		Phase:  types.RunPhaseRunning,
 		Result: types.RunResultUnknown,
 		Tasks: map[string]*types.RunTask{
-			"task01": &types.RunTask{
+			"task01": {
 				ID:     "task01",
 				Status: types.RunTaskStatusNotStarted,
 			},
-			"task02": &types.RunTask{
+			"task02": {
 				ID:     "task02",
 				Status: types.RunTaskStatusNotStarted,
 			},
-			"task03": &types.RunTask{
+			"task03": {
 				ID:     "task03",
 				Status: types.RunTaskStatusNotStarted,
 			},
-			"task04": &types.RunTask{
+			"task04": {
 				ID:     "task04",
 				Status: types.RunTaskStatusNotStarted,
 			},
-			"task05": &types.RunTask{
+			"task05": {
 				ID:     "task05",
 				Status: types.RunTaskStatusNotStarted,
 			},
@@ -418,7 +418,7 @@ func TestGetTasksToRun(t *testing.T) {
 	// a global run config for all tests
 	rc := &types.RunConfig{
 		Tasks: map[string]*types.RunConfigTask{
-			"task01": &types.RunConfigTask{
+			"task01": {
 				ID:      "task01",
 				Name:    "task01",
 				Depends: map[string]*types.RunConfigTaskDepend{},
@@ -429,11 +429,11 @@ func TestGetTasksToRun(t *testing.T) {
 				Steps:       types.Steps{},
 				Skip:        false,
 			},
-			"task02": &types.RunConfigTask{
+			"task02": {
 				ID:   "task02",
 				Name: "task02",
 				Depends: map[string]*types.RunConfigTaskDepend{
-					"task01": &types.RunConfigTaskDepend{TaskID: "task01", Conditions: []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnSuccess}},
+					"task01": {TaskID: "task01", Conditions: []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnSuccess}},
 				},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},
@@ -442,7 +442,7 @@ func TestGetTasksToRun(t *testing.T) {
 				Steps:       types.Steps{},
 				Skip:        false,
 			},
-			"task03": &types.RunConfigTask{
+			"task03": {
 				ID:      "task03",
 				Name:    "task03",
 				Depends: map[string]*types.RunConfigTaskDepend{},
@@ -453,7 +453,7 @@ func TestGetTasksToRun(t *testing.T) {
 				Steps:       types.Steps{},
 				Skip:        false,
 			},
-			"task04": &types.RunConfigTask{
+			"task04": {
 				ID:   "task04",
 				Name: "task04",
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
@@ -463,12 +463,12 @@ func TestGetTasksToRun(t *testing.T) {
 				Steps:       types.Steps{},
 				Skip:        false,
 			},
-			"task05": &types.RunConfigTask{
+			"task05": {
 				ID:   "task05",
 				Name: "task05",
 				Depends: map[string]*types.RunConfigTaskDepend{
-					"task03": &types.RunConfigTaskDepend{TaskID: "task03", Conditions: []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnSuccess}},
-					"task04": &types.RunConfigTaskDepend{TaskID: "task04", Conditions: []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnSuccess}},
+					"task03": {TaskID: "task03", Conditions: []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnSuccess}},
+					"task04": {TaskID: "task04", Conditions: []types.RunConfigTaskDependCondition{types.RunConfigTaskDependConditionOnSuccess}},
 				},
 				Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
 					Containers: []*types.Container{{Image: "image01"}},
@@ -485,23 +485,23 @@ func TestGetTasksToRun(t *testing.T) {
 	// generated by command.genRun()
 	run := &types.Run{
 		Tasks: map[string]*types.RunTask{
-			"task01": &types.RunTask{
+			"task01": {
 				ID:     "task01",
 				Status: types.RunTaskStatusNotStarted,
 			},
-			"task02": &types.RunTask{
+			"task02": {
 				ID:     "task02",
 				Status: types.RunTaskStatusNotStarted,
 			},
-			"task03": &types.RunTask{
+			"task03": {
 				ID:     "task03",
 				Status: types.RunTaskStatusNotStarted,
 			},
-			"task04": &types.RunTask{
+			"task04": {
 				ID:     "task04",
 				Status: types.RunTaskStatusNotStarted,
 			},
-			"task05": &types.RunTask{
+			"task05": {
 				ID:     "task05",
 				Status: types.RunTaskStatusNotStarted,
 			},

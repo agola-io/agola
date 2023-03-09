@@ -433,7 +433,7 @@ func (sc *setupContext) startAgola() error {
 	go func() {
 		err := <-tagola.errCh
 		if err != nil {
-			panic(errors.Wrap(err, "agola component returned error: %w"))
+			panic(errors.Wrap(err, "agola component returned error"))
 		}
 	}()
 
@@ -1602,7 +1602,7 @@ func TestPullRequest(t *testing.T) {
 
 			secret, _, err := gwClient.CreateProjectSecret(context.TODO(), project.ID, sreq)
 			if err != nil {
-				t.Fatal("failed to create project secret: %w", err)
+				t.Fatalf("failed to create project secret: %v", err)
 			}
 
 			// create project variable
@@ -1619,7 +1619,7 @@ func TestPullRequest(t *testing.T) {
 
 			_, _, err = gwClient.CreateProjectVariable(context.TODO(), project.ID, vreq)
 			if err != nil {
-				t.Fatal("failed to create project variable: %w", err)
+				t.Fatalf("failed to create project variable: %v", err)
 			}
 
 			if tt.prFromSameRepo {
@@ -1633,7 +1633,7 @@ func TestPullRequest(t *testing.T) {
 				}
 				_, err = giteaClient.CreatePullRequest(giteaUser01, "repo01", prOpts)
 				if err != nil {
-					t.Fatal("failed to create pull request: %w", err)
+					t.Fatalf("failed to create pull request: %v", err)
 				}
 			} else {
 				// create PR from forked repo
@@ -1647,7 +1647,7 @@ func TestPullRequest(t *testing.T) {
 				}
 				_, err := giteaClient.AdminCreateUser(userOpts)
 				if err != nil {
-					t.Fatal("failed to create user02: %w", err)
+					t.Fatalf("failed to create user02: %v", err)
 				}
 
 				giteaClient.SetBasicAuth(giteaUser02, "password")
@@ -1659,7 +1659,7 @@ func TestPullRequest(t *testing.T) {
 				giteaUser02Client := gitea.NewClient(giteaAPIURL, giteaUser02Token.Token)
 				giteaForkedRepo, err := giteaUser02Client.CreateFork(giteaUser01, "repo01", gitea.CreateForkOption{})
 				if err != nil {
-					t.Fatal("failed to fork repo01: %w", err)
+					t.Fatalf("failed to fork repo01: %v", err)
 				}
 
 				gitfs := memfs.New()
@@ -1719,7 +1719,7 @@ func TestPullRequest(t *testing.T) {
 				}
 				_, err = giteaUser02Client.CreatePullRequest(giteaUser01, "repo01", prOpts)
 				if err != nil {
-					t.Fatal("failed to create pull request: %w", err)
+					t.Fatalf("failed to create pull request: %v", err)
 				}
 			}
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
