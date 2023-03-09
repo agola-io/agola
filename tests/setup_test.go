@@ -1546,7 +1546,7 @@ func TestPullRequest(t *testing.T) {
 		expected           string
 	}{
 		{
-			name:               "test PR from same repowith PassVarsToForkedPR set to false",
+			name:               "test PR from same repo with PassVarsToForkedPR set to false",
 			passVarsToForkedPR: false,
 			prFromSameRepo:     true,
 			expected:           "mysupersecretpassword",
@@ -1626,12 +1626,27 @@ func TestPullRequest(t *testing.T) {
 				// create PR from branch on same repo
 				push(t, config, giteaRepo.CloneURL, giteaToken, "commit", true)
 
+				// Looks like there're some async handlings in gitea when pushing and then instantly creating a pull request that could fail with a 404 Not found
+				// We tried with a wait, before pr creation, to check that the branch exists but this always returns true also if the pr creation then fails.
+				// So retry the creation for some time on 404
+
 				prOpts := gitea.CreatePullRequestOption{
 					Head:  "new-branch",
 					Base:  "master",
 					Title: "add file1 from new-branch on same repo",
 				}
-				_, err = giteaClient.CreatePullRequest(giteaUser01, "repo01", prOpts)
+
+				err := testutil.Wait(10*time.Second, func() (bool, error) {
+					_, err = giteaClient.CreatePullRequest(giteaUser01, "repo01", prOpts)
+					if err != nil {
+						if err.Error() == "404 Not Found" {
+							return false, nil
+						}
+						return false, errors.WithStack(err)
+					}
+
+					return true, nil
+				})
 				if err != nil {
 					t.Fatalf("failed to create pull request: %v", err)
 				}
