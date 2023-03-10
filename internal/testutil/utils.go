@@ -18,7 +18,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
@@ -286,7 +285,7 @@ func NewTestGitea(t *testing.T, dir, dockerBridgeAddress string, a ...string) (*
 		return nil, errors.WithStack(err)
 	}
 	configPath := filepath.Join(dir, "gitea", "conf", "app.ini")
-	if err := ioutil.WriteFile(configPath, conf.Bytes(), 0664); err != nil {
+	if err := os.WriteFile(configPath, conf.Bytes(), 0664); err != nil {
 		return nil, errors.WithStack(err)
 	}
 

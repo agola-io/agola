@@ -16,7 +16,6 @@ package common
 
 import (
 	"io"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"path"
@@ -34,11 +33,13 @@ const (
 // temporary file and then moving it. writeFunc is the func that will write
 // data to the file.
 // This function is taken from
-//   https://github.com/youtube/vitess/blob/master/go/ioutil2/ioutil.go
+//
+//	https://github.com/youtube/vitess/blob/master/go/ioutil2/ioutil.go
+//
 // Copyright 2012, Google Inc. BSD-license, see licenses/LICENSE-BSD-3-Clause
 func WriteFileAtomicFunc(filename string, perm os.FileMode, writeFunc func(f io.Writer) error) error {
 	dir, name := path.Split(filename)
-	f, err := ioutil.TempFile(dir, name)
+	f, err := os.CreateTemp(dir, name)
 	if err != nil {
 		return errors.WithStack(err)
 	}

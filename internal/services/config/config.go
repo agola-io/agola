@@ -15,7 +15,7 @@
 package config
 
 import (
-	"io/ioutil"
+	"os"
 	"time"
 
 	"agola.io/agola/internal/errors"
@@ -290,7 +290,7 @@ var defaultConfig = Config{
 }
 
 func Parse(configFile string, componentsNames []string) (*Config, error) {
-	configData, err := ioutil.ReadFile(configFile)
+	configData, err := os.ReadFile(configFile)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"path"
 	"strconv"
@@ -45,7 +44,7 @@ const (
 )
 
 func (c *Client) ParseWebhook(r *http.Request, secret string) (*types.WebhookData, error) {
-	data, err := ioutil.ReadAll(io.LimitReader(r.Body, 10*1024*1024))
+	data, err := io.ReadAll(io.LimitReader(r.Body, 10*1024*1024))
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

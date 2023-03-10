@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -1267,7 +1266,7 @@ func (e *Executor) tasksDataCleanerLoop(ctx context.Context) {
 }
 
 func (e *Executor) tasksDataCleaner(ctx context.Context) error {
-	entries, err := ioutil.ReadDir(e.tasksDir())
+	entries, err := os.ReadDir(e.tasksDir())
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -1276,7 +1275,7 @@ func (e *Executor) tasksDataCleaner(ctx context.Context) error {
 		if !entry.IsDir() {
 			continue
 		}
-		etID := filepath.Base(entry.Name())
+		etID := entry.Name()
 
 		_, resp, err := e.runserviceClient.GetExecutorTask(ctx, e.id, etID)
 		if err != nil {
@@ -1369,7 +1368,7 @@ func (e *Executor) handleTasks(ctx context.Context, c <-chan *types.ExecutorTask
 }
 
 func (e *Executor) getExecutorID() (string, error) {
-	id, err := ioutil.ReadFile(e.executorIDPath())
+	id, err := os.ReadFile(e.executorIDPath())
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return "", errors.WithStack(err)
 	}

@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -596,10 +595,10 @@ func (dp *DockerPod) Exec(ctx context.Context, execConfig *ExecConfig) (Containe
 	stdout := execConfig.Stdout
 	stderr := execConfig.Stderr
 	if execConfig.Stdout == nil {
-		stdout = ioutil.Discard
+		stdout = io.Discard
 	}
 	if execConfig.Stderr == nil {
-		stderr = ioutil.Discard
+		stderr = io.Discard
 	}
 
 	// copy both stdout and stderr to out file

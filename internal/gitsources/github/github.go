@@ -18,7 +18,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -243,7 +243,7 @@ func (c *Client) GetFile(repopath, commit, file string) ([]byte, error) {
 	}
 	defer r.Close()
 
-	d, err := ioutil.ReadAll(r)
+	d, err := io.ReadAll(r)
 	return d, errors.WithStack(err)
 }
 

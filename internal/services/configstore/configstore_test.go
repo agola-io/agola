@@ -18,8 +18,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
+	"os"
 	"path"
 	"path/filepath"
 	"sync"
@@ -46,11 +46,11 @@ func setupConfigstore(ctx context.Context, t *testing.T, log zerolog.Logger, dir
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	ostDir, err := ioutil.TempDir(dir, "ost")
+	ostDir, err := os.MkdirTemp(dir, "ost")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	csDir, err := ioutil.TempDir(dir, "cs")
+	csDir, err := os.MkdirTemp(dir, "cs")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -1084,7 +1084,6 @@ func TestOrgMembers(t *testing.T) {
 }
 
 func TestRemoteSource(t *testing.T) {
-	dir := t.TempDir()
 	log := testutil.NewLogger(t)
 
 	tests := []struct {
@@ -1210,10 +1209,8 @@ func TestRemoteSource(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dir, err := ioutil.TempDir(dir, "agola")
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			dir := t.TempDir()
+
 			ctx := context.Background()
 
 			cs := setupConfigstore(ctx, t, log, dir)
@@ -1227,7 +1224,6 @@ func TestRemoteSource(t *testing.T) {
 }
 
 func TestDeleteOrg(t *testing.T) {
-	dir := t.TempDir()
 	log := testutil.NewLogger(t)
 
 	tests := []struct {
@@ -1280,17 +1276,15 @@ func TestDeleteOrg(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dir, err := ioutil.TempDir(dir, "agola")
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			dir := t.TempDir()
+
 			ctx := context.Background()
 
 			cs := setupConfigstore(ctx, t, log, dir)
 
 			t.Logf("starting cs")
 
-			_, err = cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: "org01", Visibility: types.VisibilityPublic})
+			_, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: "org01", Visibility: types.VisibilityPublic})
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
@@ -1303,7 +1297,6 @@ func TestDeleteOrg(t *testing.T) {
 }
 
 func TestOrgInvitation(t *testing.T) {
-	dir := t.TempDir()
 	log := testutil.NewLogger(t)
 
 	tests := []struct {
@@ -1510,10 +1503,8 @@ func TestOrgInvitation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dir, err := ioutil.TempDir(dir, "agola")
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			dir := t.TempDir()
+
 			ctx := context.Background()
 
 			cs := setupConfigstore(ctx, t, log, dir)

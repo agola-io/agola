@@ -2,7 +2,6 @@ package gitserver
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -29,7 +28,7 @@ func (s *Gitserver) repoCleanerLoop(ctx context.Context) {
 func (s *Gitserver) scanRepos(ctx context.Context) error {
 	s.log.Info().Msgf("repoCleaner scanRepos start")
 
-	usersDir, err := ioutil.ReadDir(s.c.DataDir)
+	usersDir, err := os.ReadDir(s.c.DataDir)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -39,7 +38,7 @@ func (s *Gitserver) scanRepos(ctx context.Context) error {
 			continue
 		}
 
-		reposDir, _ := ioutil.ReadDir(filepath.Join(s.c.DataDir, u.Name()))
+		reposDir, _ := os.ReadDir(filepath.Join(s.c.DataDir, u.Name()))
 		for _, r := range reposDir {
 			if !r.IsDir() {
 				continue

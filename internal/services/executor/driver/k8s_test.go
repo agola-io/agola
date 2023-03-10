@@ -17,7 +17,7 @@ package driver
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"io"
 	"os"
 	"reflect"
 	"testing"
@@ -63,7 +63,7 @@ func TestK8sPod(t *testing.T) {
 				},
 			},
 			InitVolumeDir: "/tmp/agola",
-		}, ioutil.Discard)
+		}, io.Discard)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -81,7 +81,7 @@ func TestK8sPod(t *testing.T) {
 				},
 			},
 			InitVolumeDir: "/tmp/agola",
-		}, ioutil.Discard)
+		}, io.Discard)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -122,7 +122,7 @@ func TestK8sPod(t *testing.T) {
 				},
 			},
 			InitVolumeDir: "/tmp/agola",
-		}, ioutil.Discard)
+		}, io.Discard)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -176,7 +176,7 @@ func TestK8sPod(t *testing.T) {
 				},
 			},
 			InitVolumeDir: "/tmp/agola",
-		}, ioutil.Discard)
+		}, io.Discard)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -197,7 +197,7 @@ func TestK8sPod(t *testing.T) {
 				},
 			},
 			InitVolumeDir: "/tmp/agola",
-		}, ioutil.Discard)
+		}, io.Discard)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -235,7 +235,7 @@ func TestK8sPod(t *testing.T) {
 				},
 			},
 			InitVolumeDir: "/tmp/agola",
-		}, ioutil.Discard)
+		}, io.Discard)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -276,7 +276,7 @@ func TestK8sPod(t *testing.T) {
 				},
 			},
 			InitVolumeDir: "/tmp/agola",
-		}, ioutil.Discard)
+		}, io.Discard)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -326,7 +326,7 @@ func TestK8sPod(t *testing.T) {
 				},
 			},
 			InitVolumeDir: "/tmp/agola",
-		}, ioutil.Discard)
+		}, io.Discard)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}

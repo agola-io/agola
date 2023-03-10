@@ -19,7 +19,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -975,7 +974,7 @@ func directRun(t *testing.T, dir, config string, configFormat ConfigFormat, gate
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	repoDir, err := ioutil.TempDir(dir, "repo")
+	repoDir, err := os.MkdirTemp(dir, "repo")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -1231,7 +1230,7 @@ func TestDirectRunVariables(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := t.TempDir()
 
-			if err := ioutil.WriteFile(filepath.Join(dir, "varfile01.yml"), []byte(varfile01), 0644); err != nil {
+			if err := os.WriteFile(filepath.Join(dir, "varfile01.yml"), []byte(varfile01), 0644); err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
 
@@ -1310,7 +1309,7 @@ func TestDirectRunVariables(t *testing.T) {
 			}
 			defer resp.Body.Close()
 
-			logs, err := ioutil.ReadAll(resp.Body)
+			logs, err := io.ReadAll(resp.Body)
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
@@ -1788,7 +1787,7 @@ func TestPullRequest(t *testing.T) {
 				}
 				defer resp.Body.Close()
 
-				mypassword, err := ioutil.ReadAll(resp.Body)
+				mypassword, err := io.ReadAll(resp.Body)
 				if err != nil {
 					t.Fatalf("failed to read log: %v", err)
 				}
@@ -2000,7 +1999,7 @@ def main(ctx):
 				}
 				defer resp.Body.Close()
 
-				logs, err := ioutil.ReadAll(resp.Body)
+				logs, err := io.ReadAll(resp.Body)
 				if err != nil {
 					t.Fatalf("unexpected err: %v", err)
 				}
@@ -2362,11 +2361,7 @@ func TestTaskTimeout(t *testing.T) {
 }
 
 func TestRefreshRemoteRepositoryInfo(t *testing.T) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -2387,7 +2382,7 @@ func TestRefreshRemoteRepositoryInfo(t *testing.T) {
 		t.Fatalf("expected DefaultBranch master got: %s", project.DefaultBranch)
 	}
 
-	_, err = giteaClient.EditRepo(giteaRepo.Owner.UserName, giteaRepo.Name, gitea.EditRepoOption{DefaultBranch: util.StringP("testbranch")})
+	_, err := giteaClient.EditRepo(giteaRepo.Owner.UserName, giteaRepo.Name, gitea.EditRepoOption{DefaultBranch: util.StringP("testbranch")})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -2410,11 +2405,7 @@ func TestRefreshRemoteRepositoryInfo(t *testing.T) {
 }
 
 func TestAddUpdateOrgUserMembers(t *testing.T) {
-	dir, err := ioutil.TempDir("", "agola")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

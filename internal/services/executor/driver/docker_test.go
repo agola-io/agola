@@ -17,7 +17,7 @@ package driver
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"io"
 	"os"
 	"testing"
 	"time"
@@ -64,7 +64,7 @@ func TestDockerPod(t *testing.T) {
 				},
 			},
 			InitVolumeDir: "/tmp/agola",
-		}, ioutil.Discard)
+		}, io.Discard)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -82,7 +82,7 @@ func TestDockerPod(t *testing.T) {
 				},
 			},
 			InitVolumeDir: "/tmp/agola",
-		}, ioutil.Discard)
+		}, io.Discard)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -121,7 +121,7 @@ func TestDockerPod(t *testing.T) {
 				},
 			},
 			InitVolumeDir: "/tmp/agola",
-		}, ioutil.Discard)
+		}, io.Discard)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -175,7 +175,7 @@ func TestDockerPod(t *testing.T) {
 				},
 			},
 			InitVolumeDir: "/tmp/agola",
-		}, ioutil.Discard)
+		}, io.Discard)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -196,7 +196,7 @@ func TestDockerPod(t *testing.T) {
 				},
 			},
 			InitVolumeDir: "/tmp/agola",
-		}, ioutil.Discard)
+		}, io.Discard)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -232,7 +232,7 @@ func TestDockerPod(t *testing.T) {
 				},
 			},
 			InitVolumeDir: "/tmp/agola",
-		}, ioutil.Discard)
+		}, io.Discard)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -278,7 +278,7 @@ func TestDockerPod(t *testing.T) {
 				},
 			},
 			InitVolumeDir: "/tmp/agola",
-		}, ioutil.Discard)
+		}, io.Discard)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -324,7 +324,7 @@ func TestDockerPod(t *testing.T) {
 				},
 			},
 			InitVolumeDir: "/tmp/agola",
-		}, ioutil.Discard)
+		}, io.Discard)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -382,7 +382,7 @@ func TestDockerPod(t *testing.T) {
 				},
 			},
 			InitVolumeDir: "/tmp/agola",
-		}, ioutil.Discard)
+		}, io.Discard)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -421,7 +421,7 @@ func TestDockerPod(t *testing.T) {
 				},
 			},
 			InitVolumeDir: "/tmp/agola",
-		}, ioutil.Discard)
+		}, io.Discard)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -468,7 +468,7 @@ func TestDockerPod(t *testing.T) {
 				},
 			},
 			InitVolumeDir: "/tmp/agola",
-		}, ioutil.Discard)
+		}, io.Discard)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -513,7 +513,7 @@ func TestDockerPod(t *testing.T) {
 				},
 			},
 			InitVolumeDir: "/tmp/agola",
-		}, ioutil.Discard)
+		}, io.Discard)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
