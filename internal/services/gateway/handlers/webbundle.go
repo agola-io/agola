@@ -30,8 +30,8 @@ import (
 
 const configTplText = `
 const CONFIG = {
-  API_URL: '{{.ApiURL}}',
-  API_BASE_PATH: '{{.ApiBasePath}}',
+  API_URL: '{{.APIURL}}',
+  API_BASE_PATH: '{{.APIBasePath}}',
 }
 
 window.CONFIG = CONFIG
@@ -45,8 +45,8 @@ func NewWebBundleHandlerFunc(gatewayURL string) func(w http.ResponseWriter, r *h
 	}
 
 	configTplData := struct {
-		ApiURL      string
-		ApiBasePath string
+		APIURL      string
+		APIBasePath string
 	}{
 		gatewayURL,
 		"/api/v1alpha",

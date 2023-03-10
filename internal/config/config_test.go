@@ -357,7 +357,7 @@ func TestParseOutput(t *testing.T) {
           `,
 			out: &Config{
 				Runs: []*Run{
-					&Run{
+					{
 						Name: "run01",
 						DockerRegistriesAuth: map[string]*DockerRegistryAuth{
 							"index.docker.io": {
@@ -367,7 +367,7 @@ func TestParseOutput(t *testing.T) {
 							},
 						},
 						Tasks: []*Task{
-							&Task{
+							{
 								Name: "task01",
 								DockerRegistriesAuth: map[string]*DockerRegistryAuth{
 									"index.docker.io": {
@@ -380,19 +380,19 @@ func TestParseOutput(t *testing.T) {
 									Type: "pod",
 									Arch: "",
 									Containers: []*Container{
-										&Container{
+										{
 											Image: "image01",
 											Environment: map[string]Value{
-												"ENV01":             Value{Type: ValueTypeString, Value: "ENV01"},
-												"ENVFROMVARIABLE01": Value{Type: ValueTypeFromVariable, Value: "variable01"},
+												"ENV01":             {Type: ValueTypeString, Value: "ENV01"},
+												"ENVFROMVARIABLE01": {Type: ValueTypeFromVariable, Value: "variable01"},
 											},
 											User: "",
 										},
 									},
 								},
 								Environment: map[string]Value{
-									"ENV01":             Value{Type: ValueTypeString, Value: "ENV01"},
-									"ENVFROMVARIABLE01": Value{Type: ValueTypeFromVariable, Value: "variable01"},
+									"ENV01":             {Type: ValueTypeString, Value: "ENV01"},
+									"ENVFROMVARIABLE01": {Type: ValueTypeFromVariable, Value: "variable01"},
 								},
 								WorkingDir: defaultWorkingDir,
 								Shell:      "",
@@ -422,15 +422,15 @@ func TestParseOutput(t *testing.T) {
 										},
 										Command: "command03",
 										Environment: map[string]Value{
-											"ENV01":             Value{Type: ValueTypeString, Value: "ENV01"},
-											"ENVFROMVARIABLE01": Value{Type: ValueTypeFromVariable, Value: "variable01"},
+											"ENV01":             {Type: ValueTypeString, Value: "ENV01"},
+											"ENVFROMVARIABLE01": {Type: ValueTypeFromVariable, Value: "variable01"},
 										},
 										Tty: util.BoolP(true),
 									},
 									&SaveCacheStep{
 										BaseStep: BaseStep{Type: "save_cache"},
 										Key:      "cache-{{ arch }}",
-										Contents: []*SaveContent{&SaveContent{SourceDir: "/go/pkg/mod/cache", Paths: []string{"**"}}},
+										Contents: []*SaveContent{{SourceDir: "/go/pkg/mod/cache", Paths: []string{"**"}}},
 									},
 									&CloneStep{BaseStep: BaseStep{Type: "clone"}},
 									&RunStep{
@@ -456,15 +456,15 @@ func TestParseOutput(t *testing.T) {
 										},
 										Command: "command03",
 										Environment: map[string]Value{
-											"ENV01":             Value{Type: ValueTypeString, Value: "ENV01"},
-											"ENVFROMVARIABLE01": Value{Type: ValueTypeFromVariable, Value: "variable01"},
+											"ENV01":             {Type: ValueTypeString, Value: "ENV01"},
+											"ENVFROMVARIABLE01": {Type: ValueTypeFromVariable, Value: "variable01"},
 										},
 										Tty: util.BoolP(true),
 									},
 									&SaveCacheStep{
 										BaseStep: BaseStep{Type: "save_cache"},
 										Key:      "cache-{{ arch }}",
-										Contents: []*SaveContent{&SaveContent{SourceDir: "/go/pkg/mod/cache", Paths: []string{"**"}}},
+										Contents: []*SaveContent{{SourceDir: "/go/pkg/mod/cache", Paths: []string{"**"}}},
 									},
 								},
 								IgnoreFailure: false,
@@ -492,18 +492,18 @@ func TestParseOutput(t *testing.T) {
 									},
 								},
 								Depends: []*Depend{
-									&Depend{TaskName: "task02", Conditions: []DependCondition{DependConditionOnSuccess, DependConditionOnFailure}},
-									&Depend{TaskName: "task03", Conditions: nil},
-									&Depend{TaskName: "task04", Conditions: []DependCondition{DependConditionOnSuccess}},
+									{TaskName: "task02", Conditions: []DependCondition{DependConditionOnSuccess, DependConditionOnFailure}},
+									{TaskName: "task03", Conditions: nil},
+									{TaskName: "task04", Conditions: []DependCondition{DependConditionOnSuccess}},
 								},
 							},
-							&Task{
+							{
 								Name: "task02",
 								Runtime: &Runtime{
 									Type: "pod",
 									Arch: "",
 									Containers: []*Container{
-										&Container{
+										{
 											Image: "image01",
 										},
 									},
@@ -512,13 +512,13 @@ func TestParseOutput(t *testing.T) {
 								Steps:      nil,
 								Depends:    nil,
 							},
-							&Task{
+							{
 								Name: "task03",
 								Runtime: &Runtime{
 									Type: "pod",
 									Arch: "",
 									Containers: []*Container{
-										&Container{
+										{
 											Image:   "image01",
 											Volumes: []Volume{{Path: "/mnt/tmpfs", TmpFS: &VolumeTmpFS{Size: resource.NewQuantity(1024*1024*1024, resource.BinarySI)}}},
 										},
@@ -528,13 +528,13 @@ func TestParseOutput(t *testing.T) {
 								Steps:      nil,
 								Depends:    nil,
 							},
-							&Task{
+							{
 								Name: "task04",
 								Runtime: &Runtime{
 									Type: "pod",
 									Arch: "",
 									Containers: []*Container{
-										&Container{
+										{
 											Image:   "image01",
 											Volumes: []Volume{{Path: "/mnt/tmpfs", TmpFS: &VolumeTmpFS{}}},
 										},
@@ -544,13 +544,13 @@ func TestParseOutput(t *testing.T) {
 								Steps:      nil,
 								Depends:    nil,
 							},
-							&Task{
+							{
 								Name: "task05",
 								Runtime: &Runtime{
 									Type: "pod",
 									Arch: "",
 									Containers: []*Container{
-										&Container{
+										{
 											Image: "image01",
 										},
 									},

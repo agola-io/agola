@@ -44,7 +44,6 @@ import (
 	cstypes "agola.io/agola/services/configstore/types"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
-	"agola.io/agola/services/runservice/types"
 	rstypes "agola.io/agola/services/runservice/types"
 
 	"code.gitea.io/sdk/gitea"
@@ -579,20 +578,20 @@ func TestUpdateProject(t *testing.T) {
 	tests := []struct {
 		name               string
 		passVarsToForkedPR bool
-		expected_pre       bool
-		expected_post      bool
+		expectedPre        bool
+		expectedPost       bool
 	}{
 		{
 			name:               "test project update with pass-vars-to-forked-pr true",
 			passVarsToForkedPR: true,
-			expected_pre:       false,
-			expected_post:      true,
+			expectedPre:        false,
+			expectedPost:       true,
 		},
 		{
 			name:               "test project update with pass-vars-to-forked-pr false",
 			passVarsToForkedPR: false,
-			expected_pre:       false,
-			expected_post:      false,
+			expectedPre:        false,
+			expectedPost:       false,
 		},
 	}
 
@@ -613,12 +612,12 @@ func TestUpdateProject(t *testing.T) {
 		gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
 
 		_, project := createProject(ctx, t, giteaClient, gwClient)
-		if project.PassVarsToForkedPR != tt.expected_pre {
-			t.Fatalf("expected PassVarsToForkedPR %v, got %v (pre-update)", tt.expected_pre, project.PassVarsToForkedPR)
+		if project.PassVarsToForkedPR != tt.expectedPre {
+			t.Fatalf("expected PassVarsToForkedPR %v, got %v (pre-update)", tt.expectedPre, project.PassVarsToForkedPR)
 		}
 		project = updateProject(ctx, t, giteaClient, gwClient, project.ID, tt.passVarsToForkedPR)
-		if project.PassVarsToForkedPR != tt.expected_post {
-			t.Fatalf("expected PassVarsToForkedPR %v, got %v (port-update)", tt.expected_post, project.PassVarsToForkedPR)
+		if project.PassVarsToForkedPR != tt.expectedPost {
+			t.Fatalf("expected PassVarsToForkedPR %v, got %v (port-update)", tt.expectedPost, project.PassVarsToForkedPR)
 		}
 	}
 }
@@ -2093,7 +2092,7 @@ func TestTaskTimeout(t *testing.T) {
 	}{
 		{
 			name:                 "test timeout string value",
-			tasksResultExpected:  map[string]rstypes.RunTaskStatus{"task01": types.RunTaskStatusFailed},
+			tasksResultExpected:  map[string]rstypes.RunTaskStatus{"task01": rstypes.RunTaskStatusFailed},
 			taskTimedoutExpected: map[string]bool{"task01": true},
 			config: `
 			{
@@ -2123,7 +2122,7 @@ func TestTaskTimeout(t *testing.T) {
 		},
 		{
 			name:                 "test timeout int value",
-			tasksResultExpected:  map[string]rstypes.RunTaskStatus{"task01": types.RunTaskStatusFailed},
+			tasksResultExpected:  map[string]rstypes.RunTaskStatus{"task01": rstypes.RunTaskStatusFailed},
 			taskTimedoutExpected: map[string]bool{"task01": true},
 			config: `
 			{
@@ -2153,7 +2152,7 @@ func TestTaskTimeout(t *testing.T) {
 		},
 		{
 			name:                 "test timeout child timeout",
-			tasksResultExpected:  map[string]rstypes.RunTaskStatus{"task01": types.RunTaskStatusSuccess, "task02": types.RunTaskStatusFailed},
+			tasksResultExpected:  map[string]rstypes.RunTaskStatus{"task01": rstypes.RunTaskStatusSuccess, "task02": rstypes.RunTaskStatusFailed},
 			taskTimedoutExpected: map[string]bool{"task01": false, "task02": true},
 			config: `
 			{
@@ -2197,7 +2196,7 @@ func TestTaskTimeout(t *testing.T) {
 		},
 		{
 			name:                 "test timeout parent timeout",
-			tasksResultExpected:  map[string]rstypes.RunTaskStatus{"task01": types.RunTaskStatusFailed, "task02": types.RunTaskStatusSkipped},
+			tasksResultExpected:  map[string]rstypes.RunTaskStatus{"task01": rstypes.RunTaskStatusFailed, "task02": rstypes.RunTaskStatusSkipped},
 			taskTimedoutExpected: map[string]bool{"task01": true, "task02": false},
 			config: `
 			{
@@ -2241,7 +2240,7 @@ func TestTaskTimeout(t *testing.T) {
 		},
 		{
 			name:                 "test timeout parent and child timeout",
-			tasksResultExpected:  map[string]rstypes.RunTaskStatus{"task01": types.RunTaskStatusFailed, "task02": types.RunTaskStatusSkipped},
+			tasksResultExpected:  map[string]rstypes.RunTaskStatus{"task01": rstypes.RunTaskStatusFailed, "task02": rstypes.RunTaskStatusSkipped},
 			taskTimedoutExpected: map[string]bool{"task01": true, "task02": false},
 			config: `
 			{

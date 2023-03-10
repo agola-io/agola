@@ -23,11 +23,10 @@ import (
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/configstore"
 	"agola.io/agola/internal/services/executor"
-	rsexecutor "agola.io/agola/internal/services/executor"
 	"agola.io/agola/internal/services/gateway"
 	"agola.io/agola/internal/services/gitserver"
 	"agola.io/agola/internal/services/notification"
-	rsscheduler "agola.io/agola/internal/services/runservice"
+	"agola.io/agola/internal/services/runservice"
 	"agola.io/agola/internal/services/scheduler"
 	"agola.io/agola/internal/util"
 
@@ -106,15 +105,15 @@ func serve(cmd *cobra.Command, args []string) error {
 		return errors.Wrapf(err, "config error")
 	}
 
-	var rs *rsscheduler.Runservice
+	var rs *runservice.Runservice
 	if isComponentEnabled("runservice") {
-		rs, err = rsscheduler.NewRunservice(ctx, log.Logger, &c.Runservice)
+		rs, err = runservice.NewRunservice(ctx, log.Logger, &c.Runservice)
 		if err != nil {
 			return errors.Wrapf(err, "failed to start run service scheduler")
 		}
 	}
 
-	var ex *rsexecutor.Executor
+	var ex *executor.Executor
 	if isComponentEnabled("executor") {
 		ex, err = executor.NewExecutor(ctx, log.Logger, &c.Executor)
 		if err != nil {
