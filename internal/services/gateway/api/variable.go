@@ -123,7 +123,7 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		Name:       req.Name,
 		ParentType: parentType,
 		ParentRef:  parentRef,
-		Values:     fromApiVariableValues(req.Values),
+		Values:     fromAPIVariableValues(req.Values),
 	}
 	csvar, cssecrets, err := h.ah.CreateVariable(ctx, areq)
 	if util.HTTPError(w, err) {
@@ -170,7 +170,7 @@ func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		Name:       req.Name,
 		ParentType: parentType,
 		ParentRef:  parentRef,
-		Values:     fromApiVariableValues(req.Values),
+		Values:     fromAPIVariableValues(req.Values),
 	}
 	csvar, cssecrets, err := h.ah.UpdateVariable(ctx, areq)
 	if util.HTTPError(w, err) {
@@ -215,7 +215,7 @@ func (h *DeleteVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func fromApiVariableValues(apivalues []gwapitypes.VariableValueRequest) []cstypes.VariableValue {
+func fromAPIVariableValues(apivalues []gwapitypes.VariableValueRequest) []cstypes.VariableValue {
 	values := make([]cstypes.VariableValue, len(apivalues))
 	for i, v := range apivalues {
 		values[i] = cstypes.VariableValue{

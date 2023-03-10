@@ -41,9 +41,6 @@ var DefaultBackoff = Backoff{
 	Jitter:   0.1,
 }
 
-// DefaultBackoff is the recommended backoff for a conflict where a client
-// may be attempting to make an unrelated modification to a resource under
-// active management by one or more controllers.
 var FetchFileBackoff = Backoff{
 	Steps:    4,
 	Duration: 500 * time.Millisecond,

@@ -58,7 +58,7 @@ func TestDockerPod(t *testing.T) {
 			ID:     uuid.Must(uuid.NewV4()).String(),
 			TaskID: uuid.Must(uuid.NewV4()).String(),
 			Containers: []*ContainerConfig{
-				&ContainerConfig{
+				{
 					Cmd:   []string{"cat"},
 					Image: "busybox",
 				},
@@ -76,7 +76,7 @@ func TestDockerPod(t *testing.T) {
 			ID:     uuid.Must(uuid.NewV4()).String(),
 			TaskID: uuid.Must(uuid.NewV4()).String(),
 			Containers: []*ContainerConfig{
-				&ContainerConfig{
+				{
 					Cmd:   []string{"cat"},
 					Image: "busybox",
 				},
@@ -114,7 +114,7 @@ func TestDockerPod(t *testing.T) {
 			ID:     uuid.Must(uuid.NewV4()).String(),
 			TaskID: uuid.Must(uuid.NewV4()).String(),
 			Containers: []*ContainerConfig{
-				&ContainerConfig{
+				{
 					Cmd:   []string{"cat"},
 					Image: "busybox",
 					Env:   env,
@@ -166,11 +166,11 @@ func TestDockerPod(t *testing.T) {
 			ID:     uuid.Must(uuid.NewV4()).String(),
 			TaskID: uuid.Must(uuid.NewV4()).String(),
 			Containers: []*ContainerConfig{
-				&ContainerConfig{
+				{
 					Cmd:   []string{"cat"},
 					Image: "busybox",
 				},
-				&ContainerConfig{
+				{
 					Image: "nginx:1.16",
 				},
 			},
@@ -187,11 +187,11 @@ func TestDockerPod(t *testing.T) {
 			ID:     uuid.Must(uuid.NewV4()).String(),
 			TaskID: uuid.Must(uuid.NewV4()).String(),
 			Containers: []*ContainerConfig{
-				&ContainerConfig{
+				{
 					Cmd:   []string{"cat"},
 					Image: "busybox",
 				},
-				&ContainerConfig{
+				{
 					Image: "nginx:1.16",
 				},
 			},
@@ -226,7 +226,7 @@ func TestDockerPod(t *testing.T) {
 			ID:     uuid.Must(uuid.NewV4()).String(),
 			TaskID: uuid.Must(uuid.NewV4()).String(),
 			Containers: []*ContainerConfig{
-				&ContainerConfig{
+				{
 					Cmd:   []string{"cat"},
 					Image: "busybox",
 				},
@@ -269,11 +269,11 @@ func TestDockerPod(t *testing.T) {
 			ID:     uuid.Must(uuid.NewV4()).String(),
 			TaskID: uuid.Must(uuid.NewV4()).String(),
 			Containers: []*ContainerConfig{
-				&ContainerConfig{
+				{
 					Cmd:   []string{"cat"},
 					Image: "busybox",
 				},
-				&ContainerConfig{
+				{
 					Image: "nginx:1.16",
 				},
 			},
@@ -315,11 +315,11 @@ func TestDockerPod(t *testing.T) {
 			ID:     uuid.Must(uuid.NewV4()).String(),
 			TaskID: uuid.Must(uuid.NewV4()).String(),
 			Containers: []*ContainerConfig{
-				&ContainerConfig{
+				{
 					Cmd:   []string{"cat"},
 					Image: "busybox",
 				},
-				&ContainerConfig{
+				{
 					Image: "nginx:1.16",
 				},
 			},
@@ -368,7 +368,7 @@ func TestDockerPod(t *testing.T) {
 			ID:     uuid.Must(uuid.NewV4()).String(),
 			TaskID: uuid.Must(uuid.NewV4()).String(),
 			Containers: []*ContainerConfig{
-				&ContainerConfig{
+				{
 					Cmd:   []string{"cat"},
 					Image: "busybox",
 					Volumes: []Volume{
@@ -409,7 +409,7 @@ func TestDockerPod(t *testing.T) {
 			ID:     uuid.Must(uuid.NewV4()).String(),
 			TaskID: uuid.Must(uuid.NewV4()).String(),
 			Containers: []*ContainerConfig{
-				&ContainerConfig{
+				{
 					Cmd:   []string{"cat"},
 					Image: "busybox",
 					Volumes: []Volume{
@@ -448,7 +448,7 @@ func TestDockerPod(t *testing.T) {
 			ID:     uuid.Must(uuid.NewV4()).String(),
 			TaskID: uuid.Must(uuid.NewV4()).String(),
 			Containers: []*ContainerConfig{
-				&ContainerConfig{
+				{
 					Cmd:   []string{"cat"},
 					Image: "busybox",
 					Volumes: []Volume{
@@ -495,7 +495,7 @@ func TestDockerPod(t *testing.T) {
 			ID:     uuid.Must(uuid.NewV4()).String(),
 			TaskID: uuid.Must(uuid.NewV4()).String(),
 			Containers: []*ContainerConfig{
-				&ContainerConfig{
+				{
 					Cmd:   []string{"cat"},
 					Image: "busybox",
 					Volumes: []Volume{

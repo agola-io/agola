@@ -28,7 +28,6 @@ import (
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
-	"agola.io/agola/services/configstore/types"
 	cstypes "agola.io/agola/services/configstore/types"
 )
 
@@ -614,13 +613,13 @@ func (c *Client) GetOrgInvitations(ctx context.Context, orgRef string, limit int
 	return orgInvitations, resp, err
 }
 
-func (c *Client) CreateOrgInvitation(ctx context.Context, orgRef string, req *csapitypes.CreateOrgInvitationRequest) (*types.OrgInvitation, *http.Response, error) {
+func (c *Client) CreateOrgInvitation(ctx context.Context, orgRef string, req *csapitypes.CreateOrgInvitationRequest) (*cstypes.OrgInvitation, *http.Response, error) {
 	oj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	orgInvitation := new(types.OrgInvitation)
+	orgInvitation := new(cstypes.OrgInvitation)
 	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/orgs/%s/invitations", orgRef), nil, jsonContent, bytes.NewReader(oj), orgInvitation)
 	return orgInvitation, resp, err
 }
