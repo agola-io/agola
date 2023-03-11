@@ -77,7 +77,7 @@ func stepUser(t *types.ExecutorTask) string {
 	return user
 }
 
-func (e *Executor) createFile(ctx context.Context, pod driver.Pod, command, user string, outf io.Writer) (string, error) {
+func (e *Executor) createFile(ctx context.Context, pod driver.Pod, command, user string, container string, outf io.Writer) (string, error) {
 	cmd := []string{toolboxContainerPath, "createfile"}
 
 	var buf bytes.Buffer
@@ -87,6 +87,7 @@ func (e *Executor) createFile(ctx context.Context, pod driver.Pod, command, user
 		AttachStdin: true,
 		Stdout:      &buf,
 		Stderr:      outf,
+		Container:   container,
 	}
 
 	ce, err := pod.Exec(ctx, execConfig)
@@ -133,7 +134,7 @@ func (e *Executor) doRunStep(ctx context.Context, s *types.RunStep, t *types.Exe
 
 	var cmd []string
 	if s.Command != "" {
-		filename, err := e.createFile(ctx, pod, s.Command, stepUser(t), outf)
+		filename, err := e.createFile(ctx, pod, s.Command, stepUser(t), s.Container, outf)
 		if err != nil {
 			return -1, errors.Wrapf(err, "create file err")
 		}
@@ -174,6 +175,7 @@ func (e *Executor) doRunStep(ctx context.Context, s *types.RunStep, t *types.Exe
 		Stdout:      outf,
 		Stderr:      outf,
 		Tty:         *s.Tty,
+		Container:   s.Container,
 	}
 
 	ce, err := pod.Exec(ctx, execConfig)
@@ -874,7 +876,7 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 	}
 	for i, c := range et.Spec.Containers {
 		var cmd []string
-		if i == 0 {
+		if i == 0 || c.Name != "" {
 			cmd = []string{toolboxContainerPath, "sleeper"}
 		}
 		if c.Entrypoint != "" {
@@ -882,6 +884,7 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 		}
 
 		containerConfig := &driver.ContainerConfig{
+			Name:       c.Name,
 			Image:      c.Image,
 			Cmd:        cmd,
 			Env:        c.Environment,

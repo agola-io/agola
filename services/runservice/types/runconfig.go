@@ -139,6 +139,7 @@ type Runtime struct {
 }
 
 type Container struct {
+	Name        string            `json:"name,omitempty"`
 	Image       string            `json:"image,omitempty"`
 	Environment map[string]string `json:"environment,omitempty"`
 	User        string            `json:"user,omitempty"`
@@ -173,6 +174,7 @@ type RunStep struct {
 	WorkingDir  string            `json:"working_dir,omitempty"`
 	Shell       string            `json:"shell,omitempty"`
 	Tty         *bool             `json:"tty,omitempty"`
+	Container   string            `json:"container,omitempty"`
 }
 
 type SaveContent struct {

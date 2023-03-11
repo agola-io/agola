@@ -391,17 +391,25 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 						EmptyDir: &corev1.EmptyDirVolumeSource{},
 					},
 				},
+				{
+					Name: "projectvolume",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				},
 			},
 		},
 	}
 
 	// define containers
 	for cIndex, containerConfig := range podConfig.Containers {
-		var containerName string
-		if cIndex == 0 {
-			containerName = mainContainerName
-		} else {
-			containerName = fmt.Sprintf("service%d", cIndex)
+		containerName := containerConfig.Name
+		if containerName == "" {
+			if cIndex == 0 {
+				containerName = mainContainerName
+			} else {
+				containerName = fmt.Sprintf("service%d", cIndex)
+			}
 		}
 		c := corev1.Container{
 			Name:       containerName,
@@ -417,13 +425,17 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 				Privileged: &containerConfig.Privileged,
 			},
 		}
-		if cIndex == 0 {
+		if cIndex == 0 || containerConfig.Name != "" {
 			// main container requires the initvolume containing the toolbox
 			c.VolumeMounts = []corev1.VolumeMount{
 				{
 					Name:      "agolavolume",
 					MountPath: podConfig.InitVolumeDir,
 					ReadOnly:  true,
+				},
+				{
+					Name:      "projectvolume",
+					MountPath: "/root", // TODO this may depend on container's default user, cause we're using ~/project as working dir
 				},
 			}
 		}
@@ -752,6 +764,11 @@ func (p *K8sPod) Exec(ctx context.Context, execConfig *ExecConfig) (ContainerExe
 	cmd := []string{filepath.Join(p.initVolumeDir, "agola-toolbox"), "exec", "-e", string(envj), "-w", execConfig.WorkingDir, "--"}
 	cmd = append(cmd, execConfig.Cmd...)
 
+	containerName := execConfig.Container
+	if containerName == "" {
+		containerName = mainContainerName
+	}
+
 	req := coreclient.RESTClient().
 		Post().
 		Namespace(p.namespace).
@@ -759,7 +776,7 @@ func (p *K8sPod) Exec(ctx context.Context, execConfig *ExecConfig) (ContainerExe
 		Name(p.id).
 		SubResource("exec").
 		VersionedParams(&corev1.PodExecOptions{
-			Container: mainContainerName,
+			Container: containerName,
 			Command:   cmd,
 			Stdin:     execConfig.AttachStdin,
 			Stdout:    execConfig.Stdout != nil,

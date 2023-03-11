@@ -91,6 +91,7 @@ type Runtime struct {
 }
 
 type Container struct {
+	Name        string           `json:"name,omitempty"`
 	Image       string           `json:"image,omitempty"`
 	Environment map[string]Value `json:"environment,omitempty"`
 	User        string           `json:"user"`
@@ -160,8 +161,9 @@ type BaseStep struct {
 
 type CloneStep struct {
 	BaseStep          `json:",inline"`
-	Depth             *int `json:"depth"`
-	RecurseSubmodules bool `json:"recurse_submodules"`
+	Depth             *int   `json:"depth"`
+	RecurseSubmodules bool   `json:"recurse_submodules"`
+	Container         string `json:"container"`
 }
 
 type RunStep struct {
@@ -171,6 +173,7 @@ type RunStep struct {
 	WorkingDir  string           `json:"working_dir"`
 	Shell       string           `json:"shell"`
 	Tty         *bool            `json:"tty"`
+	Container   string           `json:"container"`
 }
 
 type SaveToWorkspaceStep struct {

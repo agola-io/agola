@@ -73,6 +73,21 @@ func (d *DockerDriver) Setup(ctx context.Context) error {
 	return nil
 }
 
+func (d *DockerDriver) createProjectVolume(ctx context.Context, podID string, out io.Writer) (*dockertypes.Volume, error) {
+	labels := map[string]string{}
+	labels[agolaLabelKey] = agolaLabelValue
+	labels[executorIDKey] = d.executorID
+	labels[podIDKey] = podID
+	labels[volumeNameKey] = projectVolumeName
+
+	projectVol, err := d.client.VolumeCreate(ctx, volume.VolumeCreateBody{Driver: "local", Labels: labels})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return &projectVol, nil
+}
+
 func (d *DockerDriver) createToolboxVolume(ctx context.Context, podID string, out io.Writer) (*dockertypes.Volume, error) {
 	if err := d.fetchImage(ctx, d.initImage, false, d.initDockerConfig, out); err != nil {
 		return nil, errors.WithStack(err)
@@ -82,6 +97,7 @@ func (d *DockerDriver) createToolboxVolume(ctx context.Context, podID string, ou
 	labels[agolaLabelKey] = agolaLabelValue
 	labels[executorIDKey] = d.executorID
 	labels[podIDKey] = podID
+	labels[volumeNameKey] = toolboxVolumeName
 	toolboxVol, err := d.client.VolumeCreate(ctx, volume.VolumeCreateBody{Driver: "local", Labels: labels})
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -150,9 +166,14 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 		return nil, errors.WithStack(err)
 	}
 
+	projectVol, err := d.createProjectVolume(ctx, podConfig.ID, out)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
 	var mainContainerID string
 	for cindex := range podConfig.Containers {
-		resp, err := d.createContainer(ctx, cindex, podConfig, mainContainerID, toolboxVol, out)
+		resp, err := d.createContainer(ctx, cindex, podConfig, mainContainerID, toolboxVol, projectVol, out)
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
@@ -194,7 +215,9 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 		client:            d.client,
 		executorID:        d.executorID,
 		containers:        []*DockerContainer{},
+		containersMap:     map[string]*DockerContainer{},
 		toolboxVolumeName: toolboxVol.Name,
+		projectVolumeName: projectVol.Name,
 		initVolumeDir:     podConfig.InitVolumeDir,
 	}
 
@@ -219,6 +242,14 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 			Container: container,
 		}
 		pod.containers = append(pod.containers, dContainer)
+
+		if name, ok := container.Labels[containerNameKey]; ok {
+			if name != "" {
+				pod.containersMap[name] = dContainer
+			}
+		}
+
+		sort.Sort(MountSlice(container.Mounts))
 
 		seenIndexes[cIndex] = struct{}{}
 		count++
@@ -276,7 +307,7 @@ func (d *DockerDriver) fetchImage(ctx context.Context, image string, alwaysFetch
 	return nil
 }
 
-func (d *DockerDriver) createContainer(ctx context.Context, index int, podConfig *PodConfig, maincontainerID string, toolboxVol *dockertypes.Volume, out io.Writer) (*container.ContainerCreateCreatedBody, error) {
+func (d *DockerDriver) createContainer(ctx context.Context, index int, podConfig *PodConfig, maincontainerID string, toolboxVol *dockertypes.Volume, projectVol *dockertypes.Volume, out io.Writer) (*container.ContainerCreateCreatedBody, error) {
 	containerConfig := podConfig.Containers[index]
 
 	// by default always try to pull the image so we are sure only authorized users can fetch them
@@ -285,17 +316,18 @@ func (d *DockerDriver) createContainer(ctx context.Context, index int, podConfig
 		return nil, errors.WithStack(err)
 	}
 
+	name := containerConfig.Name
+	if name == "" && index == 0 {
+		name = mainContainerName
+	}
+
 	labels := map[string]string{}
 	labels[agolaLabelKey] = agolaLabelValue
 	labels[executorIDKey] = d.executorID
 	labels[podIDKey] = podConfig.ID
 	labels[taskIDKey] = podConfig.TaskID
-
-	containerLabels := map[string]string{}
-	for k, v := range labels {
-		containerLabels[k] = v
-	}
-	containerLabels[containerIndexKey] = strconv.Itoa(index)
+	labels[containerIndexKey] = strconv.Itoa(index)
+	labels[containerNameKey] = name
 
 	cliContainerConfig := &container.Config{
 		Entrypoint: containerConfig.Cmd,
@@ -303,23 +335,33 @@ func (d *DockerDriver) createContainer(ctx context.Context, index int, podConfig
 		WorkingDir: containerConfig.WorkingDir,
 		Image:      containerConfig.Image,
 		Tty:        true,
-		Labels:     containerLabels,
+		Labels:     labels,
 	}
 
 	cliHostConfig := &container.HostConfig{
 		Privileged: containerConfig.Privileged,
 	}
-	if index == 0 {
-		// main container requires the initvolume containing the toolbox
-		// TODO(sgotti) migrate this to cliHostConfig.Mounts
-		cliHostConfig.Binds = []string{fmt.Sprintf("%s:%s", toolboxVol.Name, podConfig.InitVolumeDir)}
-		cliHostConfig.ReadonlyPaths = []string{fmt.Sprintf("%s:%s", toolboxVol.Name, podConfig.InitVolumeDir)}
-	} else {
+
+	if index != 0 {
 		// attach other containers to maincontainer network
 		cliHostConfig.NetworkMode = container.NetworkMode(fmt.Sprintf("container:%s", maincontainerID))
 	}
 
 	var mounts []mount.Mount
+
+	if name != "" {
+		mounts = append(mounts, mount.Mount{
+			Type:     mount.TypeVolume,
+			Source:   toolboxVol.Name,
+			Target:   podConfig.InitVolumeDir,
+			ReadOnly: true,
+		})
+		mounts = append(mounts, mount.Mount{
+			Type:   mount.TypeVolume,
+			Source: projectVol.Name,
+			Target: "/root",
+		})
+	}
 
 	for _, vol := range containerConfig.Volumes {
 		if vol.TmpFS != nil {
@@ -382,10 +424,11 @@ func (d *DockerDriver) GetPods(ctx context.Context, all bool) ([]Pod, error) {
 		}
 		if _, ok := podsMap[podID]; !ok {
 			pod := &DockerPod{
-				id:         podID,
-				client:     d.client,
-				executorID: d.executorID,
-				containers: []*DockerContainer{},
+				id:            podID,
+				client:        d.client,
+				executorID:    d.executorID,
+				containers:    []*DockerContainer{},
+				containersMap: map[string]*DockerContainer{},
 				// TODO(sgotti) initvolumeDir isn't set
 			}
 			podsMap[podID] = pod
@@ -421,14 +464,20 @@ func (d *DockerDriver) GetPods(ctx context.Context, all bool) ([]Pod, error) {
 		}
 		pod.containers = append(pod.containers, dContainer)
 
-		// overwrite containers with the right order
+		if name, ok := container.Labels[containerNameKey]; ok {
+			if name != "" {
+				pod.containersMap[name] = dContainer
+			}
+		}
+
+		sort.Sort(MountSlice(container.Mounts))
 
 		// add labels from the container with index 0
 		if cIndex == 0 {
 			podLabels := map[string]string{}
 			// keep only labels starting with our prefix
 			for labelName, labelValue := range container.Labels {
-				if strings.HasPrefix(labelName, labelPrefix) {
+				if strings.HasPrefix(labelName, labelPrefix) && labelName != containerNameKey {
 					podLabels[labelName] = labelValue
 				}
 			}
@@ -454,7 +503,14 @@ func (d *DockerDriver) GetPods(ctx context.Context, all bool) ([]Pod, error) {
 			continue
 		}
 
-		pod.toolboxVolumeName = vol.Name
+		if name, ok := vol.Labels[volumeNameKey]; ok {
+			switch name {
+			case toolboxVolumeName:
+				pod.toolboxVolumeName = vol.Name
+			case projectVolumeName:
+				pod.projectVolumeName = vol.Name
+			}
+		}
 	}
 
 	pods := make([]Pod, 0, len(podsMap))
@@ -471,7 +527,9 @@ type DockerPod struct {
 	client            *client.Client
 	labels            map[string]string
 	containers        []*DockerContainer
+	containersMap     map[string]*DockerContainer
 	toolboxVolumeName string
+	projectVolumeName string
 	executorID        string
 
 	initVolumeDir string
@@ -526,6 +584,13 @@ func (dp *DockerPod) Remove(ctx context.Context) error {
 			errs = append(errs, err)
 		}
 	}
+
+	if dp.projectVolumeName != "" {
+		if err := dp.client.VolumeRemove(ctx, dp.projectVolumeName, true); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
 	if len(errs) != 0 {
 		return errors.Errorf("remove errors: %v", errs)
 	}
@@ -579,7 +644,17 @@ func (dp *DockerPod) Exec(ctx context.Context, execConfig *ExecConfig) (Containe
 		User:         execConfig.User,
 	}
 
-	response, err := dp.client.ContainerExecCreate(ctx, dp.containers[0].ID, dockerExecConfig)
+	containerName := execConfig.Container
+	if containerName == "" {
+		containerName = mainContainerName
+	}
+
+	targetContainer, ok := dp.containersMap[containerName]
+	if !ok {
+		return nil, errors.Errorf("Container %v not found", containerName)
+	}
+
+	response, err := dp.client.ContainerExecCreate(ctx, targetContainer.ID, dockerExecConfig)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -663,3 +738,11 @@ func makeEnvSlice(env map[string]string) []string {
 
 	return envList
 }
+
+type MountSlice []dockertypes.MountPoint
+
+func (p MountSlice) Len() int { return len(p) }
+func (p MountSlice) Less(i, j int) bool {
+	return strings.Compare(p[i].Destination, p[j].Destination) < 0
+}
+func (p MountSlice) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
