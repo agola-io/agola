@@ -104,7 +104,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("project %q already exists", projectPath))
 	}
 
-	gitSource, rs, la, err := h.GetUserGitSource(ctx, req.RemoteSourceName, curUserID)
+	gitSource, rs, la, err := h.GetUserGitSource(ctx, req.RemoteSourceName)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create gitsource client")
 	}
@@ -225,8 +225,6 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, projectRef string, re
 }
 
 func (h *ActionHandler) ProjectUpdateRepoLinkedAccount(ctx context.Context, projectRef string) (*csapitypes.Project, error) {
-	curUserID := common.CurrentUserID(ctx)
-
 	p, _, err := h.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get project %q", projectRef))
@@ -240,7 +238,7 @@ func (h *ActionHandler) ProjectUpdateRepoLinkedAccount(ctx context.Context, proj
 		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
 	}
 
-	gitsource, _, la, err := h.GetUserGitSource(ctx, p.RemoteSourceID, curUserID)
+	gitsource, _, la, err := h.GetUserGitSource(ctx, p.RemoteSourceID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create gitsource client")
 	}
@@ -420,8 +418,6 @@ func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) er
 }
 
 func (h *ActionHandler) ProjectCreateRun(ctx context.Context, projectRef, branch, tag, refName, commitSHA string) error {
-	curUserID := common.CurrentUserID(ctx)
-
 	p, _, err := h.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
 		return util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get project %q", projectRef))
@@ -435,7 +431,7 @@ func (h *ActionHandler) ProjectCreateRun(ctx context.Context, projectRef, branch
 		return util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
 	}
 
-	gitSource, rs, _, err := h.GetUserGitSource(ctx, p.RemoteSourceID, curUserID)
+	gitSource, rs, _, err := h.GetUserGitSource(ctx, p.RemoteSourceID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create gitsource client")
 	}
@@ -602,7 +598,7 @@ func (h *ActionHandler) RefreshRemoteRepositoryInfo(ctx context.Context, project
 		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
 	}
 
-	gitSource, _, _, err := h.GetUserGitSource(ctx, p.RemoteSourceID, common.CurrentUserID(ctx))
+	gitSource, _, _, err := h.GetUserGitSource(ctx, p.RemoteSourceID)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get remote source %q", p.RemoteSourceID))
 	}

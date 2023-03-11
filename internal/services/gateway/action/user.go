@@ -57,7 +57,7 @@ func (h *ActionHandler) GetCurrentUser(ctx context.Context, userRef string) (*Pr
 		return nil, errors.Errorf("user not logged in")
 	}
 
-	user, _, err := h.configstoreClient.GetUser(ctx, userRef)
+	user, _, err := h.configstoreClient.GetUser(ctx, common.CurrentUserID(ctx))
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
@@ -87,12 +87,13 @@ func (h *ActionHandler) GetUser(ctx context.Context, userRef string) (*cstypes.U
 	return user, nil
 }
 
-func (h *ActionHandler) GetUserOrgs(ctx context.Context, userRef string) ([]*csapitypes.UserOrgsResponse, error) {
-	if !common.IsUserLogged(ctx) {
-		return nil, errors.Errorf("user not logged in")
+func (h *ActionHandler) GetUserOrgs(ctx context.Context) ([]*csapitypes.UserOrgsResponse, error) {
+	userID := common.CurrentUserID(ctx)
+	if userID == "" {
+		return nil, errors.Errorf("user not authenticated")
 	}
 
-	orgs, _, err := h.configstoreClient.GetUserOrgs(ctx, userRef)
+	orgs, _, err := h.configstoreClient.GetUserOrgs(ctx, userID)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
@@ -1020,15 +1021,20 @@ func (h *ActionHandler) UserCreateRun(ctx context.Context, req *UserCreateRunReq
 	return h.CreateRuns(ctx, creq)
 }
 
-func (h *ActionHandler) GetUserGitSource(ctx context.Context, remoteSourceRef, userRef string) (gitsource.GitSource, *cstypes.RemoteSource, *cstypes.LinkedAccount, error) {
+func (h *ActionHandler) GetUserGitSource(ctx context.Context, remoteSourceRef string) (gitsource.GitSource, *cstypes.RemoteSource, *cstypes.LinkedAccount, error) {
+	userID := common.CurrentUserID(ctx)
+	if userID == "" {
+		return nil, nil, nil, errors.Errorf("user not authenticated")
+	}
+
 	rs, _, err := h.configstoreClient.GetRemoteSource(ctx, remoteSourceRef)
 	if err != nil {
 		return nil, nil, nil, errors.Wrapf(err, "failed to get remote source %q", remoteSourceRef)
 	}
 
-	linkedAccounts, _, err := h.configstoreClient.GetUserLinkedAccounts(ctx, userRef)
+	linkedAccounts, _, err := h.configstoreClient.GetUserLinkedAccounts(ctx, userID)
 	if err != nil {
-		return nil, nil, nil, errors.Wrapf(err, "failed to get user %q linked accounts", userRef)
+		return nil, nil, nil, errors.Wrapf(err, "failed to get user %q linked accounts", userID)
 	}
 
 	var la *cstypes.LinkedAccount

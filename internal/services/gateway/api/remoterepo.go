@@ -20,7 +20,6 @@ import (
 	"agola.io/agola/internal/errors"
 	gitsource "agola.io/agola/internal/gitsources"
 	"agola.io/agola/internal/services/gateway/action"
-	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
 	csclient "agola.io/agola/services/configstore/client"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
@@ -53,13 +52,7 @@ func (h *UserRemoteReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	vars := mux.Vars(r)
 	remoteSourceRef := vars["remotesourceref"]
 
-	userID := common.CurrentUserID(ctx)
-	if userID == "" {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user not authenticated")))
-		return
-	}
-
-	gitsource, _, _, err := h.ah.GetUserGitSource(ctx, remoteSourceRef, userID)
+	gitsource, _, _, err := h.ah.GetUserGitSource(ctx, remoteSourceRef)
 	if err != nil {
 		util.HTTPError(w, err)
 		h.log.Err(err).Send()

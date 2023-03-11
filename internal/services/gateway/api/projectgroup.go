@@ -19,9 +19,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/gateway/action"
-	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"
@@ -50,17 +48,10 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	userID := common.CurrentUserID(ctx)
-	if userID == "" {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user not authenticated")))
-		return
-	}
-
 	creq := &action.CreateProjectGroupRequest{
-		Name:          req.Name,
-		ParentRef:     req.ParentRef,
-		Visibility:    cstypes.Visibility(req.Visibility),
-		CurrentUserID: userID,
+		Name:       req.Name,
+		ParentRef:  req.ParentRef,
+		Visibility: cstypes.Visibility(req.Visibility),
 	}
 
 	projectGroup, err := h.ah.CreateProjectGroup(ctx, creq)
