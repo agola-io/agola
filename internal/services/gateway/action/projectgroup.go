@@ -19,6 +19,7 @@ import (
 	"path"
 
 	"agola.io/agola/internal/errors"
+	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"
@@ -56,6 +57,11 @@ type CreateProjectGroupRequest struct {
 }
 
 func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProjectGroupRequest) (*csapitypes.ProjectGroup, error) {
+	userID := common.CurrentUserID(ctx)
+	if userID == "" {
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user not authenticated"))
+	}
+	req.CurrentUserID = userID
 	if !util.ValidateName(req.Name) {
 		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid projectGroup name %q", req.Name))
 	}
