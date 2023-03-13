@@ -126,12 +126,15 @@ func setupGitea(t *testing.T, dir, dockerBridgeAddress string) *testutil.TestGit
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	giteaClient := gitea.NewClient(giteaAPIURL, "")
+	giteaClient, err := gitea.NewClient(giteaAPIURL)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 
-	// Wait for gitea api to be ready
+	// Wait for gitea api to be ready using gitea client
 	err = testutil.Wait(30*time.Second, func() (bool, error) {
 		giteaClient.SetBasicAuth(giteaUser01, "password")
-		if _, err := giteaClient.ListAccessTokens(gitea.ListAccessTokensOptions{}); err != nil {
+		if _, _, err := giteaClient.ListAccessTokens(gitea.ListAccessTokensOptions{}); err != nil {
 			return false, nil
 		}
 		return true, nil
@@ -522,10 +525,13 @@ func createAgolaUserToken(ctx context.Context, t *testing.T, c *config.Config) s
 
 func createLinkedAccount(ctx context.Context, t *testing.T, tgitea *testutil.TestGitea, c *config.Config) (string, string) {
 	giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
-	giteaClient := gitea.NewClient(giteaAPIURL, "")
+	giteaClient, err := gitea.NewClient(giteaAPIURL)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 
 	giteaClient.SetBasicAuth(giteaUser01, "password")
-	giteaToken, err := giteaClient.CreateAccessToken(gitea.CreateAccessTokenOption{Name: "token01"})
+	giteaToken, _, err := giteaClient.CreateAccessToken(gitea.CreateAccessTokenOption{Name: "token01"})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -583,7 +589,11 @@ func TestCreateProject(t *testing.T) {
 
 	giteaToken, token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
 
-	giteaClient := gitea.NewClient(giteaAPIURL, giteaToken)
+	giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
 	gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
 
 	createProject(ctx, t, giteaClient, gwClient)
@@ -625,7 +635,11 @@ func TestUpdateProject(t *testing.T) {
 
 		giteaToken, token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
 
-		giteaClient := gitea.NewClient(giteaAPIURL, giteaToken)
+		giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
 		gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
 
 		_, project := createProject(ctx, t, giteaClient, gwClient)
@@ -640,7 +654,7 @@ func TestUpdateProject(t *testing.T) {
 }
 
 func createProject(ctx context.Context, t *testing.T, giteaClient *gitea.Client, gwClient *gwclient.Client) (*gitea.Repository, *gwapitypes.ProjectResponse) {
-	giteaRepo, err := giteaClient.CreateRepo(gitea.CreateRepoOption{
+	giteaRepo, _, err := giteaClient.CreateRepo(gitea.CreateRepoOption{
 		Name:    "repo01",
 		Private: false,
 	})
@@ -930,7 +944,11 @@ func TestPush(t *testing.T) {
 
 			giteaToken, token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
 
-			giteaClient := gitea.NewClient(giteaAPIURL, giteaToken)
+			giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
 			gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
 
 			giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)
@@ -1642,7 +1660,11 @@ func TestPullRequest(t *testing.T) {
 
 			giteaToken, token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
 
-			giteaClient := gitea.NewClient(giteaAPIURL, giteaToken)
+			giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
 			gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
 
 			giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)
@@ -1693,9 +1715,9 @@ func TestPullRequest(t *testing.T) {
 				}
 
 				err := testutil.Wait(10*time.Second, func() (bool, error) {
-					_, err = giteaClient.CreatePullRequest(giteaUser01, "repo01", prOpts)
+					_, resp, err := giteaClient.CreatePullRequest(giteaUser01, "repo01", prOpts)
 					if err != nil {
-						if err.Error() == "404 Not Found" {
+						if resp.StatusCode == http.StatusNotFound {
 							return false, nil
 						}
 						return false, errors.WithStack(err)
@@ -1716,19 +1738,22 @@ func TestPullRequest(t *testing.T) {
 					Email:              "user02@example.com",
 					MustChangePassword: util.BoolP(false),
 				}
-				_, err := giteaClient.AdminCreateUser(userOpts)
+				_, _, err := giteaClient.AdminCreateUser(userOpts)
 				if err != nil {
 					t.Fatalf("failed to create user02: %v", err)
 				}
 
 				giteaClient.SetBasicAuth(giteaUser02, "password")
-				giteaUser02Token, err := giteaClient.CreateAccessToken(gitea.CreateAccessTokenOption{Name: "token01"})
+				giteaUser02Token, _, err := giteaClient.CreateAccessToken(gitea.CreateAccessTokenOption{Name: "token01"})
 				if err != nil {
 					t.Fatalf("failed to create token for user02: %v", err)
 				}
 
-				giteaUser02Client := gitea.NewClient(giteaAPIURL, giteaUser02Token.Token)
-				giteaForkedRepo, err := giteaUser02Client.CreateFork(giteaUser01, "repo01", gitea.CreateForkOption{})
+				giteaUser02Client, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaUser02Token.Token))
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				giteaForkedRepo, _, err := giteaUser02Client.CreateFork(giteaUser01, "repo01", gitea.CreateForkOption{})
 				if err != nil {
 					t.Fatalf("failed to fork repo01: %v", err)
 				}
@@ -1788,7 +1813,7 @@ func TestPullRequest(t *testing.T) {
 					Base:  "master",
 					Title: "add file1 from master on forked repo",
 				}
-				_, err = giteaUser02Client.CreatePullRequest(giteaUser01, "repo01", prOpts)
+				_, _, err = giteaUser02Client.CreatePullRequest(giteaUser01, "repo01", prOpts)
 				if err != nil {
 					t.Fatalf("failed to create pull request: %v", err)
 				}
@@ -2445,7 +2470,11 @@ func TestRefreshRemoteRepositoryInfo(t *testing.T) {
 
 	giteaToken, token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
 
-	giteaClient := gitea.NewClient(giteaAPIURL, giteaToken)
+	giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
 	gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
 
 	giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)
@@ -2454,7 +2483,7 @@ func TestRefreshRemoteRepositoryInfo(t *testing.T) {
 		t.Fatalf("expected DefaultBranch master got: %s", project.DefaultBranch)
 	}
 
-	_, err := giteaClient.EditRepo(giteaRepo.Owner.UserName, giteaRepo.Name, gitea.EditRepoOption{DefaultBranch: util.StringP("testbranch")})
+	_, _, err = giteaClient.EditRepo(giteaRepo.Owner.UserName, giteaRepo.Name, gitea.EditRepoOption{DefaultBranch: util.StringP("testbranch")})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -3515,7 +3544,11 @@ func TestExportImport(t *testing.T) {
 
 	giteaToken, token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
 
-	giteaClient := gitea.NewClient(giteaAPIURL, giteaToken)
+	giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
 	gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
 
 	giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)

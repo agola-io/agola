@@ -31,7 +31,7 @@ import (
 	"agola.io/agola/internal/errors"
 	gitsource "agola.io/agola/internal/gitsources"
 
-	"github.com/google/go-github/v29/github"
+	"github.com/google/go-github/v50/github"
 	"golang.org/x/oauth2"
 )
 
@@ -237,7 +237,7 @@ func (c *Client) GetFile(repopath, commit, file string) ([]byte, error) {
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	r, err := c.client.Repositories.DownloadContents(context.TODO(), owner, reponame, file, &github.RepositoryContentGetOptions{Ref: commit})
+	r, _, err := c.client.Repositories.DownloadContents(context.TODO(), owner, reponame, file, &github.RepositoryContentGetOptions{Ref: commit})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -411,7 +411,7 @@ func (c *Client) ListUserRepos() ([]*gitsource.RepoInfo, error) {
 	for _, rr := range remoteRepos {
 		// keep only repos with admin permissions
 		if rr.Permissions != nil {
-			if !(*rr.Permissions)["admin"] {
+			if !rr.Permissions["admin"] {
 				continue
 			}
 			repos = append(repos, fromGithubRepo(rr))

@@ -73,7 +73,7 @@ func (d *DockerDriver) Setup(ctx context.Context) error {
 	return nil
 }
 
-func (d *DockerDriver) createToolboxVolume(ctx context.Context, podID string, out io.Writer) (*dockertypes.Volume, error) {
+func (d *DockerDriver) createToolboxVolume(ctx context.Context, podID string, out io.Writer) (*volume.Volume, error) {
 	if err := d.fetchImage(ctx, d.initImage, false, d.initDockerConfig, out); err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -82,7 +82,7 @@ func (d *DockerDriver) createToolboxVolume(ctx context.Context, podID string, ou
 	labels[agolaLabelKey] = agolaLabelValue
 	labels[executorIDKey] = d.executorID
 	labels[podIDKey] = podID
-	toolboxVol, err := d.client.VolumeCreate(ctx, volume.VolumeCreateBody{Driver: "local", Labels: labels})
+	toolboxVol, err := d.client.VolumeCreate(ctx, volume.CreateOptions{Driver: "local", Labels: labels})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -93,7 +93,7 @@ func (d *DockerDriver) createToolboxVolume(ctx context.Context, podID string, ou
 		Tty:        true,
 	}, &container.HostConfig{
 		Binds: []string{fmt.Sprintf("%s:%s", toolboxVol.Name, "/tmp/agola")},
-	}, nil, "")
+	}, nil, nil, "")
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -276,7 +276,7 @@ func (d *DockerDriver) fetchImage(ctx context.Context, image string, alwaysFetch
 	return nil
 }
 
-func (d *DockerDriver) createContainer(ctx context.Context, index int, podConfig *PodConfig, maincontainerID string, toolboxVol *dockertypes.Volume, out io.Writer) (*container.ContainerCreateCreatedBody, error) {
+func (d *DockerDriver) createContainer(ctx context.Context, index int, podConfig *PodConfig, maincontainerID string, toolboxVol *volume.Volume, out io.Writer) (*container.CreateResponse, error) {
 	containerConfig := podConfig.Containers[index]
 
 	// by default always try to pull the image so we are sure only authorized users can fetch them
@@ -338,7 +338,7 @@ func (d *DockerDriver) createContainer(ctx context.Context, index int, podConfig
 		cliHostConfig.Mounts = mounts
 	}
 
-	resp, err := d.client.ContainerCreate(ctx, cliContainerConfig, cliHostConfig, nil, "")
+	resp, err := d.client.ContainerCreate(ctx, cliContainerConfig, cliHostConfig, nil, nil, "")
 	return &resp, errors.WithStack(err)
 }
 
@@ -501,10 +501,10 @@ func (dp *DockerPod) TaskID() string {
 }
 
 func (dp *DockerPod) Stop(ctx context.Context) error {
-	d := 1 * time.Second
+	timeout := 1
 	errs := []error{}
-	for _, container := range dp.containers {
-		if err := dp.client.ContainerStop(ctx, container.ID, &d); err != nil {
+	for _, c := range dp.containers {
+		if err := dp.client.ContainerStop(ctx, c.ID, container.StopOptions{Timeout: &timeout}); err != nil {
 			errs = append(errs, err)
 		}
 	}
