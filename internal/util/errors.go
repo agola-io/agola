@@ -60,6 +60,70 @@ func (e *Errors) Equal(e2 error) bool {
 	return CompareStringSliceNoOrder(errs1, errs2)
 }
 
+// Wrapper error is an helper error type that (optionally) wrap an error and add stack information starting at the frame where the error has been created
+// It's meant to be embedded in custom errors to avoid the need to redefine the Error, Unwrap and StackTrace methods.
+//
+// Example usage:
+//
+//	type CustomError struct {
+//		*WrapperError
+//	}
+//
+//	func NewCustomError(err error) error {
+//		return &CustomError{
+//			util.NewWrapperError(err, "connection error"),
+//		}
+//	}
+//
+// Create the error
+//
+//	if err != nil {
+//		return NewCustomError(err)
+//	}
+//
+// Create the error without wrapping another error
+//
+//	return NewCustomError(nil)
+//
+// Detect error type
+//
+//	var werr *CustomError
+//	if errors.As(err, &werr) {
+//		fmt.Println("this is a CustomError")
+//	}
+type WrapperError struct {
+	err error
+	msg string
+
+	stack *errors.Stack
+}
+
+func NewWrapperError(err error, format string, args ...interface{}) *WrapperError {
+	return &WrapperError{
+		err: err,
+		msg: fmt.Sprintf(format, args...),
+		// skip one frame by default if the error is used as in the example
+		stack: errors.Callers(1),
+	}
+}
+
+func (w *WrapperError) Error() string {
+	if w.err == nil {
+		return w.msg
+	}
+	if w.msg != "" {
+		return w.msg + ": " + w.err.Error()
+	} else {
+		return w.err.Error()
+	}
+}
+
+func (w *WrapperError) Unwrap() error { return w.err }
+
+func (w *WrapperError) StackTrace() errors.StackTrace {
+	return w.stack.StackTrace()
+}
+
 type ErrorKind int
 type ErrorCode string
 
@@ -89,34 +153,32 @@ func (k ErrorKind) String() string {
 }
 
 type APIError struct {
-	err     error
+	*WrapperError
+
 	Kind    ErrorKind
 	Code    ErrorCode
 	Message string
-
-	stack *errors.Stack
 }
 
 func NewAPIError(kind ErrorKind, err error, options ...APIErrorOption) error {
-	derr := &APIError{err: err, Kind: kind, stack: errors.Callers(0)}
+	aerr := &APIError{Kind: kind}
 
 	for _, opt := range options {
-		opt(derr)
+		opt(aerr)
 	}
 
-	return derr
-}
+	msg := fmt.Sprintf("apiError (kind: %s", kind)
+	if aerr.Code != "" {
+		msg += fmt.Sprintf(", code: %s", aerr.Code)
+	}
+	if aerr.Message != "" {
+		msg += fmt.Sprintf(", message: %s", aerr.Message)
+	}
+	msg += ")"
 
-func (e *APIError) StackTrace() errors.StackTrace {
-	return e.stack.StackTrace()
-}
+	aerr.WrapperError = NewWrapperError(err, msg)
 
-func (e *APIError) Error() string {
-	return e.err.Error()
-}
-
-func (e *APIError) Unwrap() error {
-	return e.err
+	return aerr
 }
 
 type APIErrorOption func(e *APIError)
@@ -134,12 +196,12 @@ func WithMessage(message string) APIErrorOption {
 }
 
 func AsAPIError(err error) (*APIError, bool) {
-	var derr *APIError
-	return derr, errors.As(err, &derr)
+	var aerr *APIError
+	return aerr, errors.As(err, &aerr)
 }
 
 func APIErrorIs(err error, kind ErrorKind) bool {
-	if derr, ok := AsAPIError(err); ok && derr.Kind == kind {
+	if aerr, ok := AsAPIError(err); ok && aerr.Kind == kind {
 		return true
 	}
 
