@@ -24,7 +24,7 @@ import (
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/types"
 
-	"github.com/google/go-github/v29/github"
+	"github.com/google/go-github/v50/github"
 )
 
 const (

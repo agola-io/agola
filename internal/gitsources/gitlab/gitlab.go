@@ -91,9 +91,9 @@ func New(opts Opts) (*Client, error) {
 	}
 	httpClient := &http.Client{Transport: transport}
 
-	client := gitlab.NewOAuthClient(httpClient, opts.Token)
-	if err := client.SetBaseURL(opts.APIURL); err != nil {
-		return nil, errors.Wrapf(err, "failed to set gitlab client base url")
+	client, err := gitlab.NewOAuthClient(opts.Token, gitlab.WithHTTPClient(httpClient), gitlab.WithBaseURL(opts.APIURL))
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create gitlab client")
 	}
 
 	return &Client{

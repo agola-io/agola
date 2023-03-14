@@ -29,7 +29,7 @@ func execJsonnet(configData []byte, configContext *ConfigContext) ([]byte, error
 	}
 
 	vm.TLACode("ctx", string(cj))
-	out, err := vm.EvaluateSnippet("", string(configData))
+	out, err := vm.EvaluateAnonymousSnippet("", string(configData))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to evaluate jsonnet config")
 	}
