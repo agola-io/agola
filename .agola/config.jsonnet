@@ -13,7 +13,7 @@ local dind_runtime(arch) = {
   arch: arch,
   containers: [
     {
-      image: 'docker:stable-dind',
+      image: 'docker:23.0.1-dind',
       privileged: true,
       entrypoint: 'dockerd --bip 172.18.0.1/16',
     },
@@ -68,7 +68,7 @@ local task_build_push_images(name, target, push) =
       arch: 'amd64',
       containers: [
         {
-          image: 'gcr.io/kaniko-project/executor:debug-v0.11.0',
+          image: 'gcr.io/kaniko-project/executor:v1.9.1-debug',
         },
       ],
     },
@@ -132,8 +132,9 @@ local task_build_push_images(name, target, push) =
               command: |||
                 apk --no-cache add ca-certificates wget
                 wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub
-                wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.29-r0/glibc-2.29-r0.apk
-                apk add glibc-2.29-r0.apk
+                wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.34-r0/glibc-2.34-r0.apk
+                apk del libc6-compat
+                apk add --force-overwrite glibc-2.34-r0.apk
               |||,
             },
             { type: 'restore_workspace', dest_dir: '.' },
