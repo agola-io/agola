@@ -50,6 +50,7 @@ type Process struct {
 	uid  string
 	name string
 	args []string
+	env  []string
 	Cmd  *gexpect.ExpectSubprocess
 	bin  string
 }
@@ -59,6 +60,8 @@ func (p *Process) start() error {
 		panic(errors.Errorf("%s: cmd not cleanly stopped", p.uid))
 	}
 	cmd := exec.Command(p.bin, p.args...)
+	cmd.Env = p.env
+
 	pr, pw, err := os.Pipe()
 	if err != nil {
 		return errors.WithStack(err)
@@ -150,12 +153,14 @@ TEMP_PATH = {{ .Data }}/gitea/uploads
 
 [server]
 APP_DATA_PATH    = {{ .Data }}/gitea
-SSH_DOMAIN       = {{ .SSHListenAddress }}
+HTTP_ADDR        = {{ .HTTPListenAddress }}
 HTTP_PORT        = {{ .HTTPPort }}
 ROOT_URL         = http://{{ .HTTPListenAddress }}:{{ .HTTPPort }}/
 DISABLE_SSH      = false
 # Use built-in ssh server
 START_SSH_SERVER = true
+SSH_DOMAIN       = {{ .SSHListenAddress }}
+SSH_LISTEN_HOST  = {{ .SSHListenAddress }}
 SSH_PORT         = {{ .SSHPort }}
 LFS_CONTENT_PATH = {{ .Data }}/git/lfs
 DOMAIN           = localhost
@@ -245,18 +250,39 @@ func NewTestGitea(t *testing.T, dir, dockerBridgeAddress string, a ...string) (*
 		t.Fatalf("env var GITEA_PATH is undefined")
 	}
 
+	giteaDir := filepath.Join(dir, "gitea")
+
+	if err := os.MkdirAll(giteaDir, 0775); err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	// override default gitconfig file to make it unique for gitea instance.
+	// We have to override the HOME env var since GIT_CONFIG env is ignored.
+	//
+	// keep current env
+	env := os.Environ()
+	env = append(env, "HOME="+giteaDir)
+
+	// setup $HOME/.gitconfig
+	gitConfigData := `
+[user]
+    name = TestGitea
+    email = testgitea@example.com
+`
+	if err := os.WriteFile(filepath.Join(giteaDir, ".gitconfig"), []byte(gitConfigData), 0644); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
 	curUser, err := user.Current()
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	giteaDir := filepath.Join(dir, "gitea")
-
-	_, httpPort, err := GetFreePort(true, false)
+	httpPort, err := GetFreePort(dockerBridgeAddress, true, false)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	listenAddress, sshPort, err := GetFreePort(true, false)
+	sshPort, err := GetFreePort(dockerBridgeAddress, true, false)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -264,7 +290,7 @@ func NewTestGitea(t *testing.T, dir, dockerBridgeAddress string, a ...string) (*
 	giteaConfig := &GiteaConfig{
 		Data:              giteaDir,
 		User:              curUser.Username,
-		HTTPListenAddress: listenAddress,
+		HTTPListenAddress: dockerBridgeAddress,
 		SSHListenAddress:  dockerBridgeAddress,
 		HTTPPort:          httpPort,
 		SSHPort:           sshPort,
@@ -278,13 +304,13 @@ func NewTestGitea(t *testing.T, dir, dockerBridgeAddress string, a ...string) (*
 		return nil, errors.WithStack(err)
 	}
 
-	if err := os.MkdirAll(filepath.Join(dir, "gitea", "conf"), 0775); err != nil {
+	if err := os.MkdirAll(filepath.Join(giteaDir, "conf"), 0775); err != nil {
 		return nil, errors.WithStack(err)
 	}
-	if err := os.MkdirAll(filepath.Join(dir, "gitea", "log"), 0775); err != nil {
+	if err := os.MkdirAll(filepath.Join(giteaDir, "log"), 0775); err != nil {
 		return nil, errors.WithStack(err)
 	}
-	configPath := filepath.Join(dir, "gitea", "conf", "app.ini")
+	configPath := filepath.Join(giteaDir, "conf", "app.ini")
 	if err := os.WriteFile(configPath, conf.Bytes(), 0664); err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -299,10 +325,11 @@ func NewTestGitea(t *testing.T, dir, dockerBridgeAddress string, a ...string) (*
 			name: "gitea",
 			bin:  giteaPath,
 			args: args,
+			env:  env,
 		},
 		GiteaPath:         giteaPath,
 		ConfigPath:        configPath,
-		HTTPListenAddress: listenAddress,
+		HTTPListenAddress: dockerBridgeAddress,
 		HTTPPort:          httpPort,
 		SSHListenAddress:  dockerBridgeAddress,
 		SSHPort:           sshPort,
@@ -328,8 +355,8 @@ func Wait(timeout time.Duration, f CheckFunc) error {
 	return errors.Errorf("timeout")
 }
 
-func testFreeTCPPort(port int) error {
-	ln, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
+func testFreeTCPPort(host string, port int) error {
+	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", host, port))
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -337,8 +364,8 @@ func testFreeTCPPort(port int) error {
 	return nil
 }
 
-func testFreeUDPPort(port int) error {
-	ln, err := net.ListenPacket("udp", fmt.Sprintf("localhost:%d", port))
+func testFreeUDPPort(host string, port int) error {
+	ln, err := net.ListenPacket("udp", fmt.Sprintf("%s:%d", host, port))
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -347,32 +374,28 @@ func testFreeUDPPort(port int) error {
 }
 
 // Hack to find a free tcp and udp port
-func GetFreePort(tcp bool, udp bool) (string, string, error) {
+func GetFreePort(host string, tcp bool, udp bool) (string, error) {
 	portMutex.Lock()
 	defer portMutex.Unlock()
 
 	if !tcp && !udp {
-		return "", "", errors.Errorf("at least one of tcp or udp port shuld be required")
-	}
-	localhostIP, err := net.ResolveIPAddr("ip", "localhost")
-	if err != nil {
-		return "", "", errors.Wrapf(err, "failed to resolve ip addr")
+		return "", errors.Errorf("at least one of tcp or udp port shuld be required")
 	}
 	for {
 		curPort++
 		if curPort > MaxPort {
-			return "", "", errors.Errorf("all available ports to test have been exausted")
+			return "", errors.Errorf("all available ports to test have been exausted")
 		}
 		if tcp {
-			if err := testFreeTCPPort(curPort); err != nil {
+			if err := testFreeTCPPort(host, curPort); err != nil {
 				continue
 			}
 		}
 		if udp {
-			if err := testFreeUDPPort(curPort); err != nil {
+			if err := testFreeUDPPort(host, curPort); err != nil {
 				continue
 			}
 		}
-		return localhostIP.IP.String(), strconv.Itoa(curPort), nil
+		return strconv.Itoa(curPort), nil
 	}
 }

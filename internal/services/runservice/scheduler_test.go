@@ -26,6 +26,8 @@ import (
 )
 
 func TestAdvanceRunTasks(t *testing.T) {
+	t.Parallel()
+
 	log := testutil.NewLogger(t)
 
 	// a global run config for all tests
@@ -400,7 +402,10 @@ func TestAdvanceRunTasks(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			r, err := advanceRunTasks(log, tt.r, tt.rc, tt.scheduledExecutorTasks)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -413,6 +418,8 @@ func TestAdvanceRunTasks(t *testing.T) {
 }
 
 func TestGetTasksToRun(t *testing.T) {
+	t.Parallel()
+
 	log := testutil.NewLogger(t)
 
 	// a global run config for all tests
@@ -562,7 +569,10 @@ func TestGetTasksToRun(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			tasks, err := getTasksToRun(log, tt.r, tt.rc)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -582,6 +592,8 @@ func TestGetTasksToRun(t *testing.T) {
 }
 
 func TestChooseExecutor(t *testing.T) {
+	t.Parallel()
+
 	executorOK := &types.Executor{
 		ExecutorID:       "executorOK",
 		Archs:            []ctypes.Arch{ctypes.ArchAMD64},
@@ -699,7 +711,10 @@ func TestChooseExecutor(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			e := chooseExecutor(tt.executors, map[string]int{}, tt.rct)
 			if e == nil && tt.out == nil {
 				return

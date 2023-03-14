@@ -26,6 +26,8 @@ import (
 )
 
 func TestParseConfig(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		in   string
@@ -201,7 +203,10 @@ func TestParseConfig(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			if _, err := ParseConfig([]byte(tt.in), ConfigFormatJSON, &ConfigContext{}); err != nil {
 				if tt.err == nil {
 					t.Fatalf("got error: %v, expected no error", err)
@@ -226,6 +231,8 @@ func TestParseConfig(t *testing.T) {
 }
 
 func TestParseOutput(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		in   string
@@ -592,7 +599,10 @@ func TestParseOutput(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			out, err := ParseConfig([]byte(tt.in), ConfigFormatJSON, &ConfigContext{})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)

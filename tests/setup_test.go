@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path"
@@ -56,7 +57,7 @@ import (
 	"gopkg.in/src-d/go-git.v4/plumbing"
 	"gopkg.in/src-d/go-git.v4/plumbing/cache"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
-	"gopkg.in/src-d/go-git.v4/plumbing/transport/http"
+	githttp "gopkg.in/src-d/go-git.v4/plumbing/transport/http"
 	"gopkg.in/src-d/go-git.v4/storage/filesystem"
 	"gopkg.in/src-d/go-git.v4/storage/memory"
 )
@@ -100,7 +101,19 @@ func setupGitea(t *testing.T, dir, dockerBridgeAddress string) *testutil.TestGit
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	// wait for gitea ready
+	giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
+
+	// Wait for gitea api to be ready
+	err = testutil.Wait(60*time.Second, func() (bool, error) {
+		if _, err := http.Get(giteaAPIURL); err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
 	err = testutil.Wait(30*time.Second, func() (bool, error) {
 		cmd := exec.Command(tgitea.GiteaPath, "admin", "user", "create", "--name", giteaUser01, "--email", giteaUser01+"@example.com", "--password", "password", "--admin", "--config", tgitea.ConfigPath)
 		// just retry until no error
@@ -113,7 +126,6 @@ func setupGitea(t *testing.T, dir, dockerBridgeAddress string) *testutil.TestGit
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	giteaAPIURL := fmt.Sprintf("http://%s:%s", tgitea.HTTPListenAddress, tgitea.HTTPPort)
 	giteaClient := gitea.NewClient(giteaAPIURL, "")
 
 	// Wait for gitea api to be ready
@@ -358,36 +370,36 @@ func setup(ctx context.Context, t *testing.T, dir string, opts ...setupOption) *
 		sc.gitea = setupGitea(t, dir, dockerBridgeAddress)
 	}
 
-	_, gwPort, err := testutil.GetFreePort(true, false)
+	gwPort, err := testutil.GetFreePort(dockerBridgeAddress, true, false)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	_, csPort, err := testutil.GetFreePort(true, false)
+	csPort, err := testutil.GetFreePort(dockerBridgeAddress, true, false)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	_, rsPort, err := testutil.GetFreePort(true, false)
+	rsPort, err := testutil.GetFreePort(dockerBridgeAddress, true, false)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	_, exPort, err := testutil.GetFreePort(true, false)
+	exPort, err := testutil.GetFreePort(dockerBridgeAddress, true, false)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	listenAddress, gitServerPort, err := testutil.GetFreePort(true, false)
+	gitServerPort, err := testutil.GetFreePort(dockerBridgeAddress, true, false)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
 	gwURL := fmt.Sprintf("http://%s:%s", dockerBridgeAddress, gwPort)
-	csURL := fmt.Sprintf("http://%s:%s", listenAddress, csPort)
-	rsURL := fmt.Sprintf("http://%s:%s", listenAddress, rsPort)
+	csURL := fmt.Sprintf("http://%s:%s", dockerBridgeAddress, csPort)
+	rsURL := fmt.Sprintf("http://%s:%s", dockerBridgeAddress, rsPort)
 	gitServerURL := fmt.Sprintf("http://%s:%s", dockerBridgeAddress, gitServerPort)
 
 	sc.config.Gateway.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, gwPort)
-	sc.config.Configstore.Web.ListenAddress = fmt.Sprintf("%s:%s", listenAddress, csPort)
-	sc.config.Runservice.Web.ListenAddress = fmt.Sprintf("%s:%s", listenAddress, rsPort)
-	sc.config.Executor.Web.ListenAddress = fmt.Sprintf("%s:%s", listenAddress, exPort)
+	sc.config.Configstore.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, csPort)
+	sc.config.Runservice.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, rsPort)
+	sc.config.Executor.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, exPort)
 	sc.config.Gitserver.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, gitServerPort)
 
 	sc.config.Gateway.APIExposedURL = gwURL
@@ -484,6 +496,8 @@ func (sc *setupContext) stop() {
 }
 
 func TestCreateLinkedAccount(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -555,6 +569,8 @@ func createLinkedAccount(ctx context.Context, t *testing.T, tgitea *testutil.Tes
 }
 
 func TestCreateProject(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -574,6 +590,7 @@ func TestCreateProject(t *testing.T) {
 }
 
 func TestUpdateProject(t *testing.T) {
+	t.Parallel()
 
 	tests := []struct {
 		name               string
@@ -700,7 +717,7 @@ func push(t *testing.T, config, cloneURL, remoteToken, message string, pushNewBr
 	t.Logf("sshurl: %s", cloneURL)
 	if err := r.Push(&git.PushOptions{
 		RemoteName: "origin",
-		Auth: &http.BasicAuth{
+		Auth: &githttp.BasicAuth{
 			Username: giteaUser01,
 			Password: remoteToken,
 		},
@@ -746,7 +763,7 @@ func push(t *testing.T, config, cloneURL, remoteToken, message string, pushNewBr
 			RefSpecs: []gitconfig.RefSpec{
 				gitconfig.RefSpec("refs/heads/new-branch:refs/heads/new-branch"),
 			},
-			Auth: &http.BasicAuth{
+			Auth: &githttp.BasicAuth{
 				Username: giteaUser01,
 				Password: remoteToken,
 			},
@@ -757,6 +774,8 @@ func push(t *testing.T, config, cloneURL, remoteToken, message string, pushNewBr
 }
 
 func TestPush(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name        string
 		config      string
@@ -895,7 +914,9 @@ func TestPush(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
 			dir := t.TempDir()
 
@@ -1002,9 +1023,27 @@ func directRun(t *testing.T, dir, config string, configFormat ConfigFormat, gate
 		t.Fatalf("unexpected err: %v", err)
 	}
 
+	// override default gitconfig file to make it unique for test instance.
+	// We have to override the HOME env var since GIT_CONFIG env is ignored.
+	//
+	// keep current env
+	env := os.Environ()
+	env = append(env, "HOME="+dir)
+
+	// setup $HOME/.gitconfig
+	gitConfigData := `
+[user]
+    name = TestGitea
+    email = testgitea@example.com
+`
+	if err := os.WriteFile(filepath.Join(dir, ".gitconfig"), []byte(gitConfigData), 0644); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
 	args = append([]string{"--gateway-url", gatewayURL, "--token", token, "directrun", "start", "--untracked", "false"}, args...)
 	cmd := exec.Command(filepath.Join(agolaBinDir, "agola"), args...)
 	cmd.Dir = repoDir
+	cmd.Env = env
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("unexpected err: %v, out: %s", err, out)
@@ -1013,6 +1052,8 @@ func directRun(t *testing.T, dir, config string, configFormat ConfigFormat, gate
 }
 
 func TestDirectRun(t *testing.T) {
+	t.Parallel()
+
 	config := `
       {
         runs: [
@@ -1082,7 +1123,10 @@ func TestDirectRun(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			dir := t.TempDir()
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -1151,6 +1195,8 @@ func TestDirectRun(t *testing.T) {
 }
 
 func TestDirectRunVariables(t *testing.T) {
+	t.Parallel()
+
 	config := `
       {
         runs: [
@@ -1226,7 +1272,10 @@ func TestDirectRunVariables(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			dir := t.TempDir()
 
 			if err := os.WriteFile(filepath.Join(dir, "varfile01.yml"), []byte(varfile01), 0644); err != nil {
@@ -1331,6 +1380,8 @@ func TestDirectRunVariables(t *testing.T) {
 }
 
 func TestDirectRunLogs(t *testing.T) {
+	t.Parallel()
+
 	config := `
       {
         runs: [
@@ -1396,7 +1447,10 @@ func TestDirectRunLogs(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			dir := t.TempDir()
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -1505,6 +1559,8 @@ func TestDirectRunLogs(t *testing.T) {
 }
 
 func TestPullRequest(t *testing.T) {
+	t.Parallel()
+
 	config := `
        {
          runs: [
@@ -1570,7 +1626,9 @@ func TestPullRequest(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
 			dir := t.TempDir()
 
@@ -1677,7 +1735,7 @@ func TestPullRequest(t *testing.T) {
 
 				gitfs := memfs.New()
 				r, err := git.Clone(memory.NewStorage(), gitfs, &git.CloneOptions{
-					Auth: &http.BasicAuth{
+					Auth: &githttp.BasicAuth{
 						Username: giteaUser02,
 						Password: giteaUser02Token.Token,
 					},
@@ -1717,7 +1775,7 @@ func TestPullRequest(t *testing.T) {
 					RefSpecs: []gitconfig.RefSpec{
 						gitconfig.RefSpec("refs/heads/master:refs/heads/master"),
 					},
-					Auth: &http.BasicAuth{
+					Auth: &githttp.BasicAuth{
 						Username: giteaUser02,
 						Password: giteaUser02Token.Token,
 					},
@@ -1799,6 +1857,8 @@ func TestPullRequest(t *testing.T) {
 }
 
 func TestConfigContext(t *testing.T) {
+	t.Parallel()
+
 	jsonnetConfig := `
 function(ctx) {
   runs: [
@@ -1911,8 +1971,12 @@ def main(ctx):
 	}
 
 	for _, configFormat := range []ConfigFormat{ConfigFormatJsonnet, ConfigFormatStarlark} {
+		configFormat := configFormat
 		for _, tt := range tests {
+			tt := tt
 			t.Run(fmt.Sprintf("%s with %s config", tt.name, configFormat), func(t *testing.T) {
+				t.Parallel()
+
 				var config string
 				switch configFormat {
 				case ConfigFormatJsonnet:
@@ -2025,6 +2089,8 @@ def main(ctx):
 }
 
 func TestUserOrgs(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -2084,6 +2150,8 @@ func TestUserOrgs(t *testing.T) {
 }
 
 func TestTaskTimeout(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name                 string
 		config               string
@@ -2286,7 +2354,10 @@ func TestTaskTimeout(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			dir := t.TempDir()
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -2360,6 +2431,8 @@ func TestTaskTimeout(t *testing.T) {
 }
 
 func TestRefreshRemoteRepositoryInfo(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -2404,6 +2477,8 @@ func TestRefreshRemoteRepositoryInfo(t *testing.T) {
 }
 
 func TestAddUpdateOrgUserMembers(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -2473,6 +2548,8 @@ func TestAddUpdateOrgUserMembers(t *testing.T) {
 }
 
 func TestUpdateOrganization(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -2560,6 +2637,8 @@ type testOrgInvitationConfig struct {
 }
 
 func TestOrgInvitation(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name                 string
 		orgInvitationEnabled bool
@@ -2992,7 +3071,10 @@ func TestOrgInvitation(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			dir := t.TempDir()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -3052,6 +3134,8 @@ func TestOrgInvitation(t *testing.T) {
 }
 
 func TestGetUsers(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		f    func(ctx context.Context, t *testing.T, sc *setupContext)
@@ -3137,7 +3221,10 @@ func TestGetUsers(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			dir := t.TempDir()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -3151,6 +3238,8 @@ func TestGetUsers(t *testing.T) {
 }
 
 func TestMaintenance(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		f    func(ctx context.Context, t *testing.T, sc *setupContext)
@@ -3396,7 +3485,10 @@ func TestMaintenance(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			dir := t.TempDir()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -3410,6 +3502,8 @@ func TestMaintenance(t *testing.T) {
 }
 
 func TestExportImport(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

@@ -41,7 +41,7 @@ import (
 )
 
 func setupConfigstore(ctx context.Context, t *testing.T, log zerolog.Logger, dir string) *Configstore {
-	listenAddress, port, err := testutil.GetFreePort(true, false)
+	port, err := testutil.GetFreePort("localhost", true, false)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -68,7 +68,7 @@ func setupConfigstore(ctx context.Context, t *testing.T, log zerolog.Logger, dir
 	}
 	csConfig := baseConfig
 	csConfig.DataDir = csDir
-	csConfig.Web.ListenAddress = net.JoinHostPort(listenAddress, port)
+	csConfig.Web.ListenAddress = net.JoinHostPort("localhost", port)
 
 	cs, err := NewConfigstore(ctx, log, &csConfig)
 	if err != nil {
@@ -195,6 +195,8 @@ func cmpDiffObject(x, y interface{}) string {
 }
 
 func TestExportImport(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	ctx := context.Background()
 	log := testutil.NewLogger(t)
@@ -414,6 +416,8 @@ func TestExportImport(t *testing.T) {
 }
 
 func TestUser(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	ctx := context.Background()
 	log := testutil.NewLogger(t)
@@ -495,6 +499,8 @@ func TestUser(t *testing.T) {
 }
 
 func TestProjectGroupsAndProjectsCreate(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	ctx := context.Background()
 	log := testutil.NewLogger(t)
@@ -629,6 +635,8 @@ func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 }
 
 func TestProjectUpdate(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	ctx := context.Background()
 	log := testutil.NewLogger(t)
@@ -690,6 +698,8 @@ func TestProjectUpdate(t *testing.T) {
 }
 
 func TestProjectGroupUpdate(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	ctx := context.Background()
 	log := testutil.NewLogger(t)
@@ -844,6 +854,8 @@ func TestProjectGroupUpdate(t *testing.T) {
 }
 
 func TestProjectGroupDelete(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	ctx := context.Background()
 	log := testutil.NewLogger(t)
@@ -888,6 +900,8 @@ func TestProjectGroupDelete(t *testing.T) {
 }
 
 func TestProjectGroupDeleteDontSeeOldChildObjects(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	ctx := context.Background()
 	log := testutil.NewLogger(t)
@@ -1010,6 +1024,8 @@ func TestProjectGroupDeleteDontSeeOldChildObjects(t *testing.T) {
 }
 
 func TestOrgMembers(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	ctx := context.Background()
 	log := testutil.NewLogger(t)
@@ -1084,6 +1100,8 @@ func TestOrgMembers(t *testing.T) {
 }
 
 func TestRemoteSource(t *testing.T) {
+	t.Parallel()
+
 	log := testutil.NewLogger(t)
 
 	tests := []struct {
@@ -1224,6 +1242,8 @@ func TestRemoteSource(t *testing.T) {
 }
 
 func TestDeleteOrg(t *testing.T) {
+	t.Parallel()
+
 	log := testutil.NewLogger(t)
 
 	tests := []struct {
@@ -1297,6 +1317,8 @@ func TestDeleteOrg(t *testing.T) {
 }
 
 func TestOrgInvitation(t *testing.T) {
+	t.Parallel()
+
 	log := testutil.NewLogger(t)
 
 	tests := []struct {

@@ -41,7 +41,7 @@ import (
 )
 
 func setupRunservice(ctx context.Context, t *testing.T, log zerolog.Logger, dir string) *Runservice {
-	listenAddress, port, err := testutil.GetFreePort(true, false)
+	port, err := testutil.GetFreePort("localhost", true, false)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -68,7 +68,7 @@ func setupRunservice(ctx context.Context, t *testing.T, log zerolog.Logger, dir 
 	}
 	rsConfig := baseConfig
 	rsConfig.DataDir = rsDir
-	rsConfig.Web.ListenAddress = net.JoinHostPort(listenAddress, port)
+	rsConfig.Web.ListenAddress = net.JoinHostPort("localhost", port)
 
 	rs, err := NewRunservice(ctx, log, &rsConfig)
 	if err != nil {
@@ -104,6 +104,8 @@ func compareRuns(r1, r2 []*types.Run) bool {
 }
 
 func TestExportImport(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	ctx := context.Background()
 	log := testutil.NewLogger(t)
@@ -177,6 +179,8 @@ func TestExportImport(t *testing.T) {
 }
 
 func TestConcurrentRunCreation(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	ctx := context.Background()
 	log := testutil.NewLogger(t)
@@ -231,6 +235,8 @@ func TestConcurrentRunCreation(t *testing.T) {
 }
 
 func TestGetRunsLastRun(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	ctx := context.Background()
 	log := testutil.NewLogger(t)
@@ -286,6 +292,8 @@ func TestGetRunsLastRun(t *testing.T) {
 }
 
 func TestLogleaner(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	ctx := context.Background()
 	log := testutil.NewLogger(t)

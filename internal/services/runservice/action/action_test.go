@@ -25,6 +25,7 @@ import (
 )
 
 func TestRecreateRun(t *testing.T) {
+	t.Parallel()
 
 	inuuid := func(s string) string {
 		u := &util.TestPrefixUUIDGenerator{Prefix: "in"}

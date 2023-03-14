@@ -3,6 +3,7 @@ linters:
     - stylecheck
     - errorlint
     - wrapcheck
+    - paralleltest
 
 linters-settings:
   wrapcheck:
@@ -24,3 +25,6 @@ linters-settings:
     ignorePackageGlobs:
       - encoding/*
       - github.com/pkg/*
+
+  paralleltest:
+    ignore-missing: true
