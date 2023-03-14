@@ -88,7 +88,7 @@ func variableUpdate(cmd *cobra.Command, ownertype string, args []string) error {
 
 	var values []VariableValue
 	if err := yaml.Unmarshal(data, &values); err != nil {
-		log.Fatal().Msgf("failed to unmarshall values: %v", err)
+		return errors.Wrapf(err, "failed to unmarshall values")
 	}
 	rvalues := []gwapitypes.VariableValueRequest{}
 	for _, value := range values {

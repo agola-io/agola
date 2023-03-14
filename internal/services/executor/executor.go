@@ -1149,7 +1149,7 @@ func (e *Executor) tasksUpdater(ctx context.Context) error {
 		e.log.Warn().Err(err).Send()
 		return errors.WithStack(err)
 	}
-	e.log.Debug().Msgf("ets: %v", util.Dump(ets))
+	e.log.Debug().Msgf("ets: %s", util.Dump(ets))
 	for _, et := range ets {
 		e.taskUpdater(ctx, et)
 	}
@@ -1174,7 +1174,7 @@ func (e *Executor) tasksUpdater(ctx context.Context) error {
 }
 
 func (e *Executor) taskUpdater(ctx context.Context, et *types.ExecutorTask) {
-	e.log.Debug().Msgf("et: %v", util.Dump(et))
+	e.log.Debug().Msgf("et: %s", util.Dump(et))
 	if et.Spec.ExecutorID != e.id {
 		return
 	}

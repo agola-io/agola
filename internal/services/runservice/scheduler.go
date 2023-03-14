@@ -832,7 +832,7 @@ func (s *Runservice) executorTaskUpdateHandler(ctx context.Context, c <-chan str
 				if err := s.handleExecutorTaskUpdate(ctx, etID); err != nil {
 					// TODO(sgotti) improve logging to not return "run modified errors" since
 					// they are normal
-					s.log.Warn().Msgf("err: %+v", err)
+					s.log.Warn().Err(err).Send()
 				}
 			}()
 		}
@@ -1591,7 +1591,7 @@ func (s *Runservice) cacheCleaner(ctx context.Context, cacheExpireInterval time.
 		if object.LastModified.Add(cacheExpireInterval).Before(time.Now()) {
 			if err := s.ost.DeleteObject(object.Path); err != nil {
 				if !objectstorage.IsNotExist(err) {
-					s.log.Warn().Msgf("failed to delete cache object %q: %v", object.Path, err)
+					s.log.Warn().Err(err).Msgf("failed to delete cache object %q", object.Path)
 				}
 			}
 		}
@@ -1620,7 +1620,7 @@ func (s *Runservice) logCleanerLoop(ctx context.Context, logExpireInterval time.
 
 	for {
 		if err := s.objectsCleaner(ctx, store.OSTLogsBaseDir(), common.LogCleanerLockKey, logExpireInterval); err != nil {
-			s.log.Warn().Msgf("objectsCleaner error: %v", err)
+			s.log.Warn().Err(err).Msgf("objectsCleaner error")
 		}
 
 		sleepCh := time.NewTimer(logCleanerInterval).C
@@ -1650,7 +1650,7 @@ func (s *Runservice) objectsCleaner(ctx context.Context, prefix string, etcdLock
 		if object.LastModified.Add(objectExpireInterval).Before(time.Now()) {
 			if err := s.ost.DeleteObject(object.Path); err != nil {
 				if !objectstorage.IsNotExist(err) {
-					s.log.Warn().Msgf("failed to delete object %q: %v", object.Path, err)
+					s.log.Warn().Err(err).Msgf("failed to delete object %q", object.Path)
 				}
 			}
 		}

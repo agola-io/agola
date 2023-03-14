@@ -116,7 +116,7 @@ func variableCreate(cmd *cobra.Command, ownertype string, args []string) error {
 
 	var values []VariableValue
 	if err := yaml.Unmarshal(data, &values); err != nil {
-		log.Fatal().Msgf("failed to unmarshal values: %v", err)
+		return errors.Wrapf(err, "failed to unmarshal secret")
 	}
 	rvalues := []gwapitypes.VariableValueRequest{}
 	for _, value := range values {
