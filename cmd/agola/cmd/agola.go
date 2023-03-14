@@ -78,7 +78,7 @@ func parseGatewayURL() error {
 		gatewayURL = agolaOpts.gatewayURL
 	}
 	if _, err := url.Parse(gatewayURL); err != nil {
-		return errors.Errorf("cannot parse exposed gateway URL %q: %v", gatewayURL, err)
+		return errors.Wrapf(err, "cannot parse exposed gateway URL %q", gatewayURL)
 	}
 	return nil
 }

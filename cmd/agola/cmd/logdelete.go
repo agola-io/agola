@@ -133,7 +133,7 @@ func logDelete(cmd *cobra.Command, args []string) error {
 	}
 
 	if err != nil {
-		return errors.Errorf("failed to delete log: %v", err)
+		return errors.Wrapf(err, "failed to delete log")
 	}
 
 	return nil

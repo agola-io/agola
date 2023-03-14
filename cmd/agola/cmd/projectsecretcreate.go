@@ -93,7 +93,7 @@ func secretCreate(cmd *cobra.Command, ownertype string, args []string) error {
 
 	var secretData map[string]string
 	if err := yaml.Unmarshal(data, &secretData); err != nil {
-		log.Fatal().Msgf("failed to unmarshal secret: %v", err)
+		return errors.Wrapf(err, "failed to unmarshal secret")
 	}
 	req := &gwapitypes.CreateSecretRequest{
 		Name: secretCreateOpts.name,
