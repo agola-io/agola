@@ -238,3 +238,50 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		h.log.Err(err).Send()
 	}
 }
+
+type LinkedAccountsHandler struct {
+	log zerolog.Logger
+	d   *db.DB
+}
+
+func NewLinkedAccountsHandler(log zerolog.Logger, d *db.DB) *LinkedAccountsHandler {
+	return &LinkedAccountsHandler{log: log, d: d}
+}
+
+func (h *LinkedAccountsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	query := r.URL.Query()
+
+	queryType := query.Get("query_type")
+
+	var linkedAccounts []*types.LinkedAccount
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		switch queryType {
+		case "byremoteuser":
+			remoteUserID := query.Get("remoteuserid")
+			remoteSourceID := query.Get("remotesourceid")
+			la, err := h.d.GetLinkedAccountByRemoteUserIDandSource(tx, remoteUserID, remoteSourceID)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			if la == nil {
+				return util.NewAPIError(util.ErrNotExist, errors.Errorf("linked account with remote user %q for remote source %q token doesn't exist", remoteUserID, remoteSourceID))
+			}
+
+			linkedAccounts = []*types.LinkedAccount{la}
+		default:
+			return errors.Errorf("unknown query_type: %q", queryType)
+		}
+
+		return nil
+	})
+	if err != nil {
+		h.log.Err(err).Send()
+		util.HTTPError(w, err)
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, linkedAccounts); err != nil {
+		h.log.Err(err).Send()
+	}
+}

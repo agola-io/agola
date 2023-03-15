@@ -141,6 +141,26 @@ func (h *ActionHandler) DeleteUser(ctx context.Context, userRef string) error {
 			}
 		}
 
+		linkedAccounts, err := h.d.GetUserLinkedAccounts(tx, user.ID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		for _, la := range linkedAccounts {
+			if err := h.d.DeleteLinkedAccount(tx, la.ID); err != nil {
+				return errors.WithStack(err)
+			}
+		}
+
+		userTokens, err := h.d.GetUserTokens(tx, user.ID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		for _, userToken := range userTokens {
+			if err := h.d.DeleteUserToken(tx, userToken.ID); err != nil {
+				return errors.WithStack(err)
+			}
+		}
+
 		if err := h.d.DeleteUser(tx, user.ID); err != nil {
 			return errors.WithStack(err)
 		}

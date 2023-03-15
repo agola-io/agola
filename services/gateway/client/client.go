@@ -427,6 +427,17 @@ func (c *Client) DeleteUserLA(ctx context.Context, userRef, laID string) (*http.
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/users/%s/linkedaccounts/%s", userRef, laID), nil, jsonContent, nil)
 }
 
+func (c *Client) Login(ctx context.Context, req *gwapitypes.LoginUserRequest) (*gwapitypes.LoginUserResponse, *http.Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+
+	loginResponse := new(gwapitypes.LoginUserResponse)
+	resp, err := c.getParsedResponse(ctx, "POST", "/auth/login", nil, jsonContent, bytes.NewReader(reqj), loginResponse)
+	return loginResponse, resp, errors.WithStack(err)
+}
+
 func (c *Client) RegisterUser(ctx context.Context, req *gwapitypes.RegisterUserRequest) (*gwapitypes.RegisterUserResponse, *http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
@@ -684,6 +695,12 @@ func (c *Client) GetUserOrgs(ctx context.Context) ([]*gwapitypes.UserOrgsRespons
 	userOrgs := []*gwapitypes.UserOrgsResponse{}
 	resp, err := c.getParsedResponse(ctx, "GET", "/user/orgs", nil, jsonContent, nil, &userOrgs)
 	return userOrgs, resp, errors.WithStack(err)
+}
+
+func (c *Client) GetUserRemoteRepos(ctx context.Context, rsRef string) ([]*gwapitypes.RemoteRepoResponse, *http.Response, error) {
+	remoteRepos := []*gwapitypes.RemoteRepoResponse{}
+	resp, err := c.getParsedResponse(ctx, "GET", path.Join("/user/remoterepos", url.PathEscape(rsRef)), nil, jsonContent, nil, &remoteRepos)
+	return remoteRepos, resp, err
 }
 
 func (c *Client) RefreshRemoteRepo(ctx context.Context, projectRef string) (*gwapitypes.ProjectResponse, *http.Response, error) {

@@ -45,6 +45,8 @@ var (
 
 type Opts struct {
 	APIURL         string
+	UserName       string
+	Password       string
 	Token          string
 	SkipVerify     bool
 	Oauth2ClientID string
@@ -83,7 +85,7 @@ func parseRepoPath(repopath string) (string, string, error) {
 	return parts[0], parts[1], nil
 }
 
-func New(opts Opts) (*Client, error) {
+func newHTTPClient(opts Opts) *http.Client {
 	// copied from net/http until it has a clone function: https://github.com/golang/go/issues/26013
 	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
@@ -98,9 +100,31 @@ func New(opts Opts) (*Client, error) {
 		ExpectContinueTimeout: 1 * time.Second,
 		TLSClientConfig:       &tls.Config{InsecureSkipVerify: opts.SkipVerify},
 	}
-	httpClient := &http.Client{Transport: transport}
+
+	return &http.Client{Transport: transport}
+}
+
+func New(opts Opts) (*Client, error) {
+	httpClient := newHTTPClient(opts)
 
 	client, err := gitea.NewClient(opts.APIURL, gitea.SetToken(opts.Token), gitea.SetHTTPClient(httpClient))
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create gitea client")
+	}
+
+	return &Client{
+		client:           client,
+		oauth2HTTPClient: httpClient,
+		APIURL:           opts.APIURL,
+		oauth2ClientID:   opts.Oauth2ClientID,
+		oauth2Secret:     opts.Oauth2Secret,
+	}, nil
+}
+
+func NewWithBasicAuth(opts Opts) (*Client, error) {
+	httpClient := newHTTPClient(opts)
+
+	client, err := gitea.NewClient(opts.APIURL, gitea.SetBasicAuth(opts.UserName, opts.Password), gitea.SetHTTPClient(httpClient))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create gitea client")
 	}
@@ -156,47 +180,52 @@ func (c *Client) RefreshOauth2Token(refreshToken string) (*oauth2.Token, error) 
 	return ntoken, errors.WithStack(err)
 }
 
-func (c *Client) LoginPassword(username, password, tokenName string) (string, error) {
-	c.client.SetBasicAuth(username, password)
-
+func (c *Client) CreateAccessToken(tokenName string) (string, error) {
 	// try to get agola access token if it already exists
-	var accessToken string
+	var hasAccessToken bool
 
 	tokens, resp, err := c.client.ListAccessTokens(gitea.ListAccessTokensOptions{})
 	if err != nil {
+		if resp.StatusCode == http.StatusUnauthorized {
+			return "", errors.WithStack(gitsource.ErrUnauthorized)
+		}
 		return "", errors.WithStack(err)
-	}
-
-	if resp.StatusCode == http.StatusUnauthorized {
-		return "", errors.WithStack(gitsource.ErrUnauthorized)
 	}
 
 	for _, token := range tokens {
 		if token.Name == tokenName {
-			accessToken = token.Token
+			hasAccessToken = true
 			break
 		}
 	}
 
-	// create access token
-	if accessToken == "" {
-		token, _, terr := c.client.CreateAccessToken(
-			gitea.CreateAccessTokenOption{Name: tokenName},
-		)
-		if terr != nil {
-			return "", errors.WithStack(terr)
+	// remove existing access token
+	if hasAccessToken {
+		if _, err := c.client.DeleteAccessToken(tokenName); err != nil {
+			return "", errors.WithStack(err)
 		}
-		accessToken = token.Token
 	}
+
+	token, _, terr := c.client.CreateAccessToken(
+		gitea.CreateAccessTokenOption{Name: tokenName},
+	)
+	if terr != nil {
+		return "", errors.WithStack(terr)
+	}
+	accessToken := token.Token
 
 	return accessToken, nil
 }
 
 func (c *Client) GetUserInfo() (*gitsource.UserInfo, error) {
-	user, _, err := c.client.GetMyUserInfo()
+	user, resp, err := c.client.GetMyUserInfo()
 	if err != nil {
+		if resp.StatusCode == http.StatusUnauthorized {
+			return nil, errors.WithStack(gitsource.ErrUnauthorized)
+		}
 		return nil, errors.WithStack(err)
 	}
+
 	return &gitsource.UserInfo{
 		ID:        strconv.FormatInt(user.ID, 10),
 		LoginName: user.UserName,
