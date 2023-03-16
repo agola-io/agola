@@ -450,6 +450,8 @@ func (h *RegisterUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 func (h *RegisterUserHandler) registerUser(ctx context.Context, req *gwapitypes.RegisterUserRequest) (*gwapitypes.RegisterUserResponse, error) {
 	creq := &action.RegisterUserRequest{
 		UserName:         req.CreateUserRequest.UserName,
+		RemoteUserName:   req.CreateUserLARequest.RemoteSourceLoginName,
+		RemotePassword:   req.CreateUserLARequest.RemoteSourceLoginPassword,
 		RemoteSourceName: req.CreateUserLARequest.RemoteSourceName,
 	}
 

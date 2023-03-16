@@ -215,8 +215,11 @@ func (h *ActionHandler) CreateUserToken(ctx context.Context, req *CreateUserToke
 type CreateUserLARequest struct {
 	UserRef string
 
-	RemoteSourceName           string
-	UserAccessToken            string
+	RemoteSourceName string
+
+	RemoteUserName string
+	RemotePassword string
+
 	Oauth2AccessToken          string
 	Oauth2RefreshToken         string
 	Oauth2AccessTokenExpiresAt time.Time
@@ -244,11 +247,7 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q already have a linked account for remote source %q", userRef, rs.Name))
 	}
 
-	accessToken, err := scommon.GetAccessToken(rs, req.UserAccessToken, req.Oauth2AccessToken)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	userSource, err := scommon.GetUserSource(rs, accessToken)
+	userSource, err := scommon.GetUserSource(rs, req.RemoteUserName, req.RemotePassword, req.Oauth2AccessToken)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -261,11 +260,25 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 		return nil, errors.Errorf("empty remote user id for remote source %q", rs.ID)
 	}
 
+	var userAccessToken string
+	if rs.AuthType == cstypes.RemoteSourceAuthTypePassword {
+		passwordSource, err := scommon.GetPasswordSource(rs, req.RemoteUserName, req.RemotePassword)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		tokenName := "agola-" + h.agolaID
+		userAccessToken, err = passwordSource.CreateAccessToken(tokenName)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to create access token %q", rs.ID)
+		}
+	}
+
 	creq := &csapitypes.CreateUserLARequest{
 		RemoteSourceName:           req.RemoteSourceName,
 		RemoteUserID:               remoteUserInfo.ID,
 		RemoteUserName:             remoteUserInfo.LoginName,
-		UserAccessToken:            req.UserAccessToken,
+		UserAccessToken:            userAccessToken,
 		Oauth2AccessToken:          req.Oauth2AccessToken,
 		Oauth2RefreshToken:         req.Oauth2RefreshToken,
 		Oauth2AccessTokenExpiresAt: req.Oauth2AccessTokenExpiresAt,
@@ -358,9 +371,13 @@ func (h *ActionHandler) GetGitSource(ctx context.Context, rs *cstypes.RemoteSour
 }
 
 type RegisterUserRequest struct {
-	UserName                   string
-	RemoteSourceName           string
-	UserAccessToken            string
+	UserName string
+
+	RemoteSourceName string
+
+	RemoteUserName string
+	RemotePassword string
+
 	Oauth2AccessToken          string
 	Oauth2RefreshToken         string
 	Oauth2AccessTokenExpiresAt time.Time
@@ -382,11 +399,7 @@ func (h *ActionHandler) RegisterUser(ctx context.Context, req *RegisterUserReque
 		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("remote source user registration is disabled"))
 	}
 
-	accessToken, err := scommon.GetAccessToken(rs, req.UserAccessToken, req.Oauth2AccessToken)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	userSource, err := scommon.GetUserSource(rs, accessToken)
+	userSource, err := scommon.GetUserSource(rs, req.RemoteUserName, req.RemotePassword, req.Oauth2AccessToken)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -399,13 +412,35 @@ func (h *ActionHandler) RegisterUser(ctx context.Context, req *RegisterUserReque
 		return nil, errors.Errorf("empty remote user id for remote source %q", rs.ID)
 	}
 
+	if _, _, err := h.configstoreClient.GetLinkedAccountByRemoteUserAndSource(ctx, remoteUserInfo.ID, rs.ID); err != nil {
+		if !util.RemoteErrorIs(err, util.ErrNotExist) {
+			return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get linked account for remote user id %q and remote source %q", remoteUserInfo.ID, rs.ID))
+		}
+	} else {
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("linked account for remote user id %q for remote source %q already exists", remoteUserInfo.ID, rs.ID))
+	}
+
+	var userAccessToken string
+	if rs.AuthType == cstypes.RemoteSourceAuthTypePassword {
+		passwordSource, err := scommon.GetPasswordSource(rs, req.RemoteUserName, req.RemotePassword)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		tokenName := "agola-" + h.agolaID
+		userAccessToken, err = passwordSource.CreateAccessToken(tokenName)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to create access token %q", rs.ID)
+		}
+	}
+
 	creq := &csapitypes.CreateUserRequest{
 		UserName: req.UserName,
 		CreateUserLARequest: &csapitypes.CreateUserLARequest{
 			RemoteSourceName:           req.RemoteSourceName,
 			RemoteUserID:               remoteUserInfo.ID,
 			RemoteUserName:             remoteUserInfo.LoginName,
-			UserAccessToken:            req.UserAccessToken,
+			UserAccessToken:            userAccessToken,
 			Oauth2AccessToken:          req.Oauth2AccessToken,
 			Oauth2RefreshToken:         req.Oauth2RefreshToken,
 			Oauth2AccessTokenExpiresAt: req.Oauth2AccessTokenExpiresAt,
@@ -423,8 +458,11 @@ func (h *ActionHandler) RegisterUser(ctx context.Context, req *RegisterUserReque
 }
 
 type LoginUserRequest struct {
-	RemoteSourceName           string
-	UserAccessToken            string
+	RemoteSourceName string
+
+	RemoteUserName string
+	RemotePassword string
+
 	Oauth2AccessToken          string
 	Oauth2RefreshToken         string
 	Oauth2AccessTokenExpiresAt time.Time
@@ -444,11 +482,7 @@ func (h *ActionHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (*
 		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("remote source user login is disabled"))
 	}
 
-	accessToken, err := scommon.GetAccessToken(rs, req.UserAccessToken, req.Oauth2AccessToken)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	userSource, err := scommon.GetUserSource(rs, accessToken)
+	userSource, err := scommon.GetUserSource(rs, req.RemoteUserName, req.RemotePassword, req.Oauth2AccessToken)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -482,19 +516,51 @@ func (h *ActionHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (*
 		return nil, errors.Errorf("linked account for user %q for remote source %q doesn't exist", user.Name, rs.Name)
 	}
 
-	// Update oauth tokens if they have changed since the getuserinfo request may have updated them
+	userAccessToken := la.UserAccessToken
+	if rs.AuthType == cstypes.RemoteSourceAuthTypePassword {
+		tokenSource, err := scommon.GetAccessTokenUserSource(rs, userAccessToken)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		// test linked account userAccessToken and recreate if not working
+		var recreateUserAccessToken bool
+		if _, err := tokenSource.GetUserInfo(); err != nil {
+			if errors.Is(err, gitsource.ErrUnauthorized) {
+				h.log.Info().Msgf("current access token for user %q, remote source %q is invalid, recreating", user.Name, rs.Name)
+				recreateUserAccessToken = true
+			} else {
+				return nil, errors.Wrapf(err, "failed to retrieve remote user info for remote source %q", rs.ID)
+			}
+		}
+
+		if recreateUserAccessToken {
+			passwordSource, err := scommon.GetPasswordSource(rs, req.RemoteUserName, req.RemotePassword)
+			if err != nil {
+				return nil, errors.WithStack(err)
+			}
+
+			tokenName := "agola-" + h.agolaID
+			userAccessToken, err = passwordSource.CreateAccessToken(tokenName)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to create access token %q", rs.ID)
+			}
+		}
+	}
+
+	// Update oauth tokens if they have changed since the login flow may have updated them
 	if la.Oauth2AccessToken != req.Oauth2AccessToken ||
 		la.Oauth2RefreshToken != req.Oauth2RefreshToken ||
-		la.UserAccessToken != req.UserAccessToken {
+		la.UserAccessToken != userAccessToken {
 
 		la.Oauth2AccessToken = req.Oauth2AccessToken
 		la.Oauth2RefreshToken = req.Oauth2RefreshToken
-		la.UserAccessToken = req.UserAccessToken
+		la.UserAccessToken = userAccessToken
 
 		creq := &csapitypes.UpdateUserLARequest{
 			RemoteUserID:               la.RemoteUserID,
 			RemoteUserName:             la.RemoteUserName,
-			UserAccessToken:            req.UserAccessToken,
+			UserAccessToken:            userAccessToken,
 			Oauth2AccessToken:          req.Oauth2AccessToken,
 			Oauth2RefreshToken:         req.Oauth2RefreshToken,
 			Oauth2AccessTokenExpiresAt: req.Oauth2AccessTokenExpiresAt,
@@ -503,7 +569,7 @@ func (h *ActionHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (*
 		h.log.Info().Msgf("updating user %q linked account", user.Name)
 		la, _, err = h.configstoreClient.UpdateUserLA(ctx, user.Name, la.ID, creq)
 		if err != nil {
-			return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to update user"))
+			return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to update user linked account"))
 		}
 		h.log.Info().Msgf("linked account %q for user %q updated", la.ID, user.Name)
 	}
@@ -520,8 +586,11 @@ func (h *ActionHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (*
 }
 
 type AuthorizeRequest struct {
-	RemoteSourceName           string
-	UserAccessToken            string
+	RemoteSourceName string
+
+	RemoteUserName string
+	RemotePassword string
+
 	Oauth2AccessToken          string
 	Oauth2RefreshToken         string
 	Oauth2AccessTokenExpiresAt time.Time
@@ -538,11 +607,7 @@ func (h *ActionHandler) Authorize(ctx context.Context, req *AuthorizeRequest) (*
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get remote source %q", req.RemoteSourceName))
 	}
 
-	accessToken, err := scommon.GetAccessToken(rs, req.UserAccessToken, req.Oauth2AccessToken)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	userSource, err := scommon.GetUserSource(rs, accessToken)
+	userSource, err := scommon.GetUserSource(rs, req.RemoteUserName, req.RemotePassword, req.Oauth2AccessToken)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -566,7 +631,7 @@ type RemoteSourceAuthResponse struct {
 	Response       interface{}
 }
 
-func (h *ActionHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSourceName, loginName, loginPassword string, requestType RemoteSourceRequestType, req interface{}) (*RemoteSourceAuthResponse, error) {
+func (h *ActionHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSourceName, remoteUsername, remotePassword string, requestType RemoteSourceRequestType, req interface{}) (*RemoteSourceAuthResponse, error) {
 	rs, _, err := h.configstoreClient.GetRemoteSource(ctx, remoteSourceName)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get remote source %q", remoteSourceName))
@@ -635,23 +700,25 @@ func (h *ActionHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSource
 		}, nil
 
 	case cstypes.RemoteSourceAuthTypePassword:
-		passwordSource, err := scommon.GetPasswordSource(rs, "")
+		passwordSource, err := scommon.GetPasswordSource(rs, remoteUsername, remotePassword)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create git source")
 		}
-		tokenName := "agola-" + h.agolaID
-		accessToken, err := passwordSource.LoginPassword(loginName, loginPassword, tokenName)
+
+		// get user info using basic auth
+		remoteUserInfo, err := passwordSource.GetUserInfo()
 		if err != nil {
-			if errors.Is(err, gitsource.ErrUnauthorized) {
-				return nil, util.NewAPIError(util.ErrUnauthorized, errors.Wrapf(err, "failed to login to remotesource %q", remoteSourceName))
-			}
-			return nil, errors.Wrapf(err, "failed to login to remote source %q with login name %q", rs.Name, loginName)
+			return nil, errors.Wrapf(err, "failed to retrieve remote user info for remote source %q", rs.ID)
 		}
+		if remoteUserInfo.ID == "" {
+			return nil, errors.Errorf("empty remote user id for remote source %q", rs.ID)
+		}
+
 		requestj, err := json.Marshal(req)
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
-		cres, err := h.HandleRemoteSourceAuthRequest(ctx, requestType, string(requestj), accessToken, "", "", time.Time{})
+		cres, err := h.HandleRemoteSourceAuthRequest(ctx, requestType, string(requestj), remoteUsername, remotePassword, "", "", time.Time{})
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
@@ -682,7 +749,7 @@ type CreateUserLAResponse struct {
 	LinkedAccount *cstypes.LinkedAccount
 }
 
-func (h *ActionHandler) HandleRemoteSourceAuthRequest(ctx context.Context, requestType RemoteSourceRequestType, requestString string, userAccessToken, oauth2AccessToken, oauth2RefreshToken string, oauth2AccessTokenExpiresAt time.Time) (*RemoteSourceAuthResult, error) {
+func (h *ActionHandler) HandleRemoteSourceAuthRequest(ctx context.Context, requestType RemoteSourceRequestType, requestString string, remoteUserName, remotePassword, oauth2AccessToken, oauth2RefreshToken string, oauth2AccessTokenExpiresAt time.Time) (*RemoteSourceAuthResult, error) {
 	switch requestType {
 	case RemoteSourceRequestTypeCreateUserLA:
 		var req *CreateUserLARequest
@@ -693,7 +760,8 @@ func (h *ActionHandler) HandleRemoteSourceAuthRequest(ctx context.Context, reque
 		creq := &CreateUserLARequest{
 			UserRef:                    req.UserRef,
 			RemoteSourceName:           req.RemoteSourceName,
-			UserAccessToken:            userAccessToken,
+			RemoteUserName:             remoteUserName,
+			RemotePassword:             remotePassword,
 			Oauth2AccessToken:          oauth2AccessToken,
 			Oauth2RefreshToken:         oauth2RefreshToken,
 			Oauth2AccessTokenExpiresAt: oauth2AccessTokenExpiresAt,
@@ -718,7 +786,8 @@ func (h *ActionHandler) HandleRemoteSourceAuthRequest(ctx context.Context, reque
 		creq := &RegisterUserRequest{
 			UserName:                   req.UserName,
 			RemoteSourceName:           req.RemoteSourceName,
-			UserAccessToken:            userAccessToken,
+			RemoteUserName:             remoteUserName,
+			RemotePassword:             remotePassword,
 			Oauth2AccessToken:          oauth2AccessToken,
 			Oauth2RefreshToken:         oauth2RefreshToken,
 			Oauth2AccessTokenExpiresAt: oauth2AccessTokenExpiresAt,
@@ -740,7 +809,8 @@ func (h *ActionHandler) HandleRemoteSourceAuthRequest(ctx context.Context, reque
 
 		creq := &LoginUserRequest{
 			RemoteSourceName:           req.RemoteSourceName,
-			UserAccessToken:            userAccessToken,
+			RemoteUserName:             remoteUserName,
+			RemotePassword:             remotePassword,
 			Oauth2AccessToken:          oauth2AccessToken,
 			Oauth2RefreshToken:         oauth2RefreshToken,
 			Oauth2AccessTokenExpiresAt: oauth2AccessTokenExpiresAt,
@@ -762,7 +832,8 @@ func (h *ActionHandler) HandleRemoteSourceAuthRequest(ctx context.Context, reque
 
 		creq := &AuthorizeRequest{
 			RemoteSourceName:           req.RemoteSourceName,
-			UserAccessToken:            userAccessToken,
+			RemoteUserName:             remoteUserName,
+			RemotePassword:             remotePassword,
 			Oauth2AccessToken:          oauth2AccessToken,
 			Oauth2RefreshToken:         oauth2RefreshToken,
 			Oauth2AccessTokenExpiresAt: oauth2AccessTokenExpiresAt,
@@ -824,7 +895,7 @@ func (h *ActionHandler) HandleOauth2Callback(ctx context.Context, code, state st
 		return nil, errors.WithStack(err)
 	}
 
-	return h.HandleRemoteSourceAuthRequest(ctx, requestType, requestString, "", oauth2Token.AccessToken, oauth2Token.RefreshToken, oauth2Token.Expiry)
+	return h.HandleRemoteSourceAuthRequest(ctx, requestType, requestString, "", "", oauth2Token.AccessToken, oauth2Token.RefreshToken, oauth2Token.Expiry)
 }
 
 func (h *ActionHandler) DeleteUser(ctx context.Context, userRef string) error {

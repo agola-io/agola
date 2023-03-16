@@ -195,6 +195,8 @@ func (s *Configstore) setupDefaultRouter() http.Handler {
 	updateRemoteSourceHandler := api.NewUpdateRemoteSourceHandler(s.log, s.ah)
 	deleteRemoteSourceHandler := api.NewDeleteRemoteSourceHandler(s.log, s.ah)
 
+	linkedAccountsHandler := api.NewLinkedAccountsHandler(s.log, s.d)
+
 	createOrgInvitationHandler := api.NewCreateOrgInvitationHandler(s.log, s.ah)
 	deleteOrgInvitationHandler := api.NewDeleteOrgInvitationHandler(s.log, s.ah)
 	orgInvitationHandler := api.NewOrgInvitationHandler(s.log, s.ah)
@@ -268,6 +270,8 @@ func (s *Configstore) setupDefaultRouter() http.Handler {
 	apirouter.Handle("/remotesources", createRemoteSourceHandler).Methods("POST")
 	apirouter.Handle("/remotesources/{remotesourceref}", updateRemoteSourceHandler).Methods("PUT")
 	apirouter.Handle("/remotesources/{remotesourceref}", deleteRemoteSourceHandler).Methods("DELETE")
+
+	apirouter.Handle("/linkedaccounts", linkedAccountsHandler).Methods("GET")
 
 	apirouter.Handle("/maintenance", maintenanceStatusHandler).Methods("GET")
 	apirouter.Handle("/maintenance", maintenanceModeHandler).Methods("PUT", "DELETE")

@@ -63,8 +63,10 @@ import (
 )
 
 const (
-	giteaUser01 = "user01"
-	giteaUser02 = "user02"
+	giteaUser01         = "user01"
+	giteaUser01Password = "user01password"
+	giteaUser02         = "user02"
+	giteaUser02Password = "user02password"
 
 	agolaUser01 = "user01"
 	agolaUser02 = "user02"
@@ -115,7 +117,7 @@ func setupGitea(t *testing.T, dir, dockerBridgeAddress string) *testutil.TestGit
 	}
 
 	err = testutil.Wait(30*time.Second, func() (bool, error) {
-		cmd := exec.Command(tgitea.GiteaPath, "admin", "user", "create", "--name", giteaUser01, "--email", giteaUser01+"@example.com", "--password", "password", "--admin", "--config", tgitea.ConfigPath)
+		cmd := exec.Command(tgitea.GiteaPath, "admin", "user", "create", "--name", giteaUser01, "--email", giteaUser01+"@example.com", "--password", giteaUser01Password, "--admin", "--config", tgitea.ConfigPath)
 		// just retry until no error
 		if err := cmd.Run(); err != nil {
 			return false, nil
@@ -133,7 +135,7 @@ func setupGitea(t *testing.T, dir, dockerBridgeAddress string) *testutil.TestGit
 
 	// Wait for gitea api to be ready using gitea client
 	err = testutil.Wait(30*time.Second, func() (bool, error) {
-		giteaClient.SetBasicAuth(giteaUser01, "password")
+		giteaClient.SetBasicAuth(giteaUser01, giteaUser01Password)
 		if _, _, err := giteaClient.ListAccessTokens(gitea.ListAccessTokensOptions{}); err != nil {
 			return false, nil
 		}
@@ -498,6 +500,209 @@ func (sc *setupContext) stop() {
 	}
 }
 
+func TestPasswordRegisterUser(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sc := setup(ctx, t, dir, withGitea(true))
+	defer sc.stop()
+
+	giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+
+	adminGWClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, "admintoken")
+
+	rs, _, err := adminGWClient.CreateRemoteSource(ctx, &gwapitypes.CreateRemoteSourceRequest{
+		Name:                "gitea",
+		APIURL:              giteaAPIURL,
+		Type:                "gitea",
+		AuthType:            "password",
+		SkipSSHHostKeyCheck: true,
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	t.Logf("created agola remote source: %s", rs.Name)
+
+	loginGWClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, "")
+
+	_, _, err = loginGWClient.RegisterUser(ctx, &gwapitypes.RegisterUserRequest{
+		CreateUserRequest: gwapitypes.CreateUserRequest{
+			UserName: agolaUser01,
+		},
+		CreateUserLARequest: gwapitypes.CreateUserLARequest{
+			RemoteSourceName:          "gitea",
+			RemoteSourceLoginName:     giteaUser01,
+			RemoteSourceLoginPassword: giteaUser01Password,
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	t.Logf("created agola user")
+
+	loginUserResponse, _, err := loginGWClient.Login(ctx, &gwapitypes.LoginUserRequest{
+		RemoteSourceName: "gitea",
+		LoginName:        giteaUser01,
+		LoginPassword:    giteaUser01Password,
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// Register again. Should fail.
+	_, _, err = loginGWClient.RegisterUser(ctx, &gwapitypes.RegisterUserRequest{
+		CreateUserRequest: gwapitypes.CreateUserRequest{
+			UserName: agolaUser01,
+		},
+		CreateUserLARequest: gwapitypes.CreateUserLARequest{
+			RemoteSourceName:          "gitea",
+			RemoteSourceLoginName:     giteaUser01,
+			RemoteSourceLoginPassword: giteaUser01Password,
+		},
+	})
+	expectedErr := "remote error badrequest"
+	if err == nil {
+		t.Fatalf("expected error %v, got nil err", expectedErr)
+	}
+	if err.Error() != expectedErr {
+		t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+	}
+
+	// Remove user
+	if _, err := adminGWClient.DeleteUser(ctx, loginUserResponse.User.ID); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// Register again. Should work and recreate remote gitea user access token.
+	_, _, err = loginGWClient.RegisterUser(ctx, &gwapitypes.RegisterUserRequest{
+		CreateUserRequest: gwapitypes.CreateUserRequest{
+			UserName: agolaUser01,
+		},
+		CreateUserLARequest: gwapitypes.CreateUserLARequest{
+			RemoteSourceName:          "gitea",
+			RemoteSourceLoginName:     giteaUser01,
+			RemoteSourceLoginPassword: giteaUser01Password,
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	token := createAgolaUserToken(ctx, t, sc.config)
+	tokenGWClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
+
+	// Do an agola call that will use the linkedAccount userAccessToken to call gitea api
+	// should work
+	if _, _, err := tokenGWClient.GetUserRemoteRepos(ctx, rs.ID); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+}
+
+func TestPasswordLogin(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sc := setup(ctx, t, dir, withGitea(true))
+	defer sc.stop()
+
+	giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+
+	adminGWClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, "admintoken")
+
+	rs, _, err := adminGWClient.CreateRemoteSource(ctx, &gwapitypes.CreateRemoteSourceRequest{
+		Name:                "gitea",
+		APIURL:              giteaAPIURL,
+		Type:                "gitea",
+		AuthType:            "password",
+		SkipSSHHostKeyCheck: true,
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	t.Logf("created agola remote source: %s", rs.Name)
+
+	loginGWClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, "")
+
+	_, _, err = loginGWClient.RegisterUser(ctx, &gwapitypes.RegisterUserRequest{
+		CreateUserRequest: gwapitypes.CreateUserRequest{
+			UserName: agolaUser01,
+		},
+		CreateUserLARequest: gwapitypes.CreateUserLARequest{
+			RemoteSourceName:          "gitea",
+			RemoteSourceLoginName:     giteaUser01,
+			RemoteSourceLoginPassword: giteaUser01Password,
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	t.Logf("created agola user")
+
+	_, _, err = loginGWClient.Login(ctx, &gwapitypes.LoginUserRequest{
+		RemoteSourceName: "gitea",
+		LoginName:        giteaUser01,
+		LoginPassword:    giteaUser01Password,
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	token := createAgolaUserToken(ctx, t, sc.config)
+	tokenGWClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
+
+	// Test userAccessToken recreation on login
+	giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetBasicAuth(giteaUser01, giteaUser01Password))
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	giteaTokens, _, err := giteaClient.ListAccessTokens(gitea.ListAccessTokensOptions{})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	for _, giteaToken := range giteaTokens {
+		if _, err := giteaClient.DeleteAccessToken(giteaToken.Name); err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+	}
+
+	// Do an agola call that will use the linkedAccount userAccessToken to call gitea api
+	// should fails since the registered token has been removed
+	_, _, err = tokenGWClient.GetUserRemoteRepos(ctx, rs.ID)
+	expectedErr := "remote error badrequest"
+	if err == nil {
+		t.Fatalf("expected error %v, got nil err", expectedErr)
+	}
+	if err.Error() != expectedErr {
+		t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+	}
+
+	// redo login. Should create a new gitea user access token
+	_, _, err = loginGWClient.Login(ctx, &gwapitypes.LoginUserRequest{
+		RemoteSourceName: "gitea",
+		LoginName:        giteaUser01,
+		LoginPassword:    giteaUser01Password,
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// Do an agola call that will use the linkedAccount userAccessToken to call gitea api
+	// should work
+	if _, _, err := tokenGWClient.GetUserRemoteRepos(ctx, rs.ID); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+}
+
 func TestCreateLinkedAccount(t *testing.T) {
 	t.Parallel()
 
@@ -530,15 +735,15 @@ func createLinkedAccount(ctx context.Context, t *testing.T, tgitea *testutil.Tes
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	giteaClient.SetBasicAuth(giteaUser01, "password")
+	giteaClient.SetBasicAuth(giteaUser01, giteaUser01Password)
 	giteaToken, _, err := giteaClient.CreateAccessToken(gitea.CreateAccessTokenOption{Name: "token01"})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	t.Logf("created gitea user token: %s", giteaToken.Token)
 
-	gwClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
-	user, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
+	adminGWClient := gwclient.NewClient(c.Gateway.APIExposedURL, "admintoken")
+	user, _, err := adminGWClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -546,7 +751,7 @@ func createLinkedAccount(ctx context.Context, t *testing.T, tgitea *testutil.Tes
 
 	token := createAgolaUserToken(ctx, t, c)
 
-	rs, _, err := gwClient.CreateRemoteSource(ctx, &gwapitypes.CreateRemoteSourceRequest{
+	rs, _, err := adminGWClient.CreateRemoteSource(ctx, &gwapitypes.CreateRemoteSourceRequest{
 		Name:                "gitea",
 		APIURL:              giteaAPIURL,
 		Type:                "gitea",
@@ -558,13 +763,12 @@ func createLinkedAccount(ctx context.Context, t *testing.T, tgitea *testutil.Tes
 	}
 	t.Logf("created agola remote source: %s", rs.Name)
 
-	// From now use the user token
-	gwClient = gwclient.NewClient(c.Gateway.APIExposedURL, token)
+	tokenGWClient := gwclient.NewClient(c.Gateway.APIExposedURL, token)
 
-	la, _, err := gwClient.CreateUserLA(ctx, agolaUser01, &gwapitypes.CreateUserLARequest{
+	la, _, err := tokenGWClient.CreateUserLA(ctx, agolaUser01, &gwapitypes.CreateUserLARequest{
 		RemoteSourceName:          "gitea",
 		RemoteSourceLoginName:     giteaUser01,
-		RemoteSourceLoginPassword: "password",
+		RemoteSourceLoginPassword: giteaUser01Password,
 	})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -1734,7 +1938,7 @@ func TestPullRequest(t *testing.T) {
 
 				userOpts := gitea.CreateUserOption{
 					Username:           giteaUser02,
-					Password:           "password",
+					Password:           giteaUser02Password,
 					Email:              "user02@example.com",
 					MustChangePassword: util.BoolP(false),
 				}
@@ -1743,7 +1947,7 @@ func TestPullRequest(t *testing.T) {
 					t.Fatalf("failed to create user02: %v", err)
 				}
 
-				giteaClient.SetBasicAuth(giteaUser02, "password")
+				giteaClient.SetBasicAuth(giteaUser02, giteaUser02Password)
 				giteaUser02Token, _, err := giteaClient.CreateAccessToken(gitea.CreateAccessTokenOption{Name: "token01"})
 				if err != nil {
 					t.Fatalf("failed to create token for user02: %v", err)

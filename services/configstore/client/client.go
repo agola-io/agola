@@ -518,6 +518,20 @@ func (c *Client) DeleteRemoteSource(ctx context.Context, rsRef string) (*http.Re
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/remotesources/%s", rsRef), nil, jsonContent, nil)
 }
 
+func (c *Client) GetLinkedAccountByRemoteUserAndSource(ctx context.Context, remoteUserID, remoteSourceID string) (*cstypes.LinkedAccount, *http.Response, error) {
+	q := url.Values{}
+	q.Add("query_type", "byremoteuser")
+	q.Add("remoteuserid", remoteUserID)
+	q.Add("remotesourceid", remoteSourceID)
+
+	linkedAccounts := []*cstypes.LinkedAccount{}
+	resp, err := c.getParsedResponse(ctx, "GET", "/linkedaccounts", q, jsonContent, nil, &linkedAccounts)
+	if err != nil {
+		return nil, resp, errors.WithStack(err)
+	}
+	return linkedAccounts[0], resp, errors.WithStack(err)
+}
+
 func (c *Client) CreateOrg(ctx context.Context, req *csapitypes.CreateOrgRequest) (*cstypes.Organization, *http.Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
