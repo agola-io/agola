@@ -34,6 +34,7 @@ import (
 	"agola.io/agola/internal/services/configstore"
 	"agola.io/agola/internal/services/executor"
 	"agola.io/agola/internal/services/gateway"
+	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/services/gitserver"
 	"agola.io/agola/internal/services/notification"
 	rsscheduler "agola.io/agola/internal/services/runservice"
@@ -287,6 +288,10 @@ func setup(ctx context.Context, t *testing.T, dir string, opts ...setupOption) *
 			TokenSigning: config.TokenSigning{
 				Duration: 12 * time.Hour,
 				Method:   "hmac",
+				Key:      "supersecretsigningkey",
+			},
+			CookieSigning: config.CookieSigning{
+				Duration: 12 * time.Hour,
 				Key:      "supersecretsigningkey",
 			},
 			AdminToken: "admintoken",
@@ -700,6 +705,76 @@ func TestPasswordLogin(t *testing.T) {
 	// should work
 	if _, _, err := tokenGWClient.GetUserRemoteRepos(ctx, rs.ID); err != nil {
 		t.Fatalf("unexpected err: %v", err)
+	}
+}
+
+func TestCookieAuth(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sc := setup(ctx, t, dir, withGitea(true))
+	defer sc.stop()
+
+	_, _ = createLinkedAccount(ctx, t, sc.gitea, sc.config)
+
+	gwCookieClient := newCookieClient(sc.config.Gateway.APIExposedURL)
+
+	_, resp, err := gwCookieClient.Login(ctx, &gwapitypes.LoginUserRequest{
+		RemoteSourceName: "gitea",
+		LoginName:        giteaUser01,
+		LoginPassword:    giteaUser01Password,
+	}, nil)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// Test auth passing recevied login response cookies
+	authCookieName := common.AuthCookieName(false)
+	secondaryAuthCookieName := common.SecondaryAuthCookieName()
+	cookies := resp.Cookies()
+	_, _, err = gwCookieClient.GetCurrentUser(ctx, cookies)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// Don't send  authcookie
+	cookies = []*http.Cookie{}
+	for _, c := range resp.Cookies() {
+		if c.Name == authCookieName {
+			continue
+		}
+		cookies = append(cookies, c)
+	}
+
+	_, _, err = gwCookieClient.GetCurrentUser(ctx, cookies)
+	expectedErr := "remote error unauthorized"
+	if err == nil {
+		t.Fatalf("expected error %v, got nil err", expectedErr)
+	}
+	if err.Error() != expectedErr {
+		t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+	}
+
+	// Don't send secondary authcookie
+	cookies = []*http.Cookie{}
+	for _, c := range resp.Cookies() {
+		if c.Name == secondaryAuthCookieName {
+			continue
+		}
+		cookies = append(cookies, c)
+	}
+
+	_, _, err = gwCookieClient.GetCurrentUser(ctx, cookies)
+	expectedErr = "remote error unauthorized"
+	if err == nil {
+		t.Fatalf("expected error %v, got nil err", expectedErr)
+	}
+	if err.Error() != expectedErr {
+		t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 	}
 }
 

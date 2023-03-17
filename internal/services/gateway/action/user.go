@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"regexp"
 	"strings"
 	"time"
@@ -469,8 +470,10 @@ type LoginUserRequest struct {
 }
 
 type LoginUserResponse struct {
-	Token string
-	User  *cstypes.User
+	Cookie          *http.Cookie
+	SecondaryCookie *http.Cookie
+
+	User *cstypes.User
 }
 
 func (h *ActionHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (*LoginUserResponse, error) {
@@ -574,14 +577,16 @@ func (h *ActionHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (*
 		h.log.Info().Msgf("linked account %q for user %q updated", la.ID, user.Name)
 	}
 
-	// generate jwt token
-	token, err := scommon.GenerateLoginJWTToken(h.sd, user.ID)
+	// generate auth cookies
+	cookie, secondaryCookie, err := common.GenerateAuthCookies(user.ID, h.sc, h.unsecureCookies)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
+
 	return &LoginUserResponse{
-		Token: token,
-		User:  user,
+		Cookie:          cookie,
+		SecondaryCookie: secondaryCookie,
+		User:            user,
 	}, nil
 }
 

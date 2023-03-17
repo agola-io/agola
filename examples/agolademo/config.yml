@@ -17,6 +17,11 @@ gateway:
     #publicKeyPath: /path/to/public.pem
   adminToken: "admintoken"
 
+  cookieSigning:
+    key: supersecretsigningkey
+
+  unsecureCookies: true
+
 scheduler:
   runserviceURL: "http://localhost:4000"
 

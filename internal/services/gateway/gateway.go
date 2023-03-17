@@ -17,22 +17,25 @@ package gateway
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net/http"
 	"os"
 
-	scommon "agola.io/agola/internal/common"
+	icommon "agola.io/agola/internal/common"
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/objectstorage"
-	"agola.io/agola/internal/services/common"
+	scommon "agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/services/gateway/api"
+	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/services/gateway/handlers"
 	"agola.io/agola/internal/util"
 	csclient "agola.io/agola/services/configstore/client"
 	rsclient "agola.io/agola/services/runservice/client"
 
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/gorilla/csrf"
 	ghandlers "github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
@@ -51,7 +54,8 @@ type Gateway struct {
 	runserviceClient  *rsclient.Client
 	configstoreClient *csclient.Client
 	ah                *action.ActionHandler
-	sd                *common.TokenSigningData
+	sd                *scommon.TokenSigningData
+	sc                *scommon.CookieSigningData
 }
 
 func NewGateway(ctx context.Context, log zerolog.Logger, gc *config.Config) (*Gateway, error) {
@@ -74,7 +78,7 @@ func NewGateway(ctx context.Context, log zerolog.Logger, gc *config.Config) (*Ga
 		}
 	}
 
-	sd := &common.TokenSigningData{Duration: c.TokenSigning.Duration}
+	sd := &scommon.TokenSigningData{Duration: c.TokenSigning.Duration}
 	switch c.TokenSigning.Method {
 	case "hmac":
 		sd.Method = jwt.SigningMethodHS256
@@ -113,7 +117,12 @@ func NewGateway(ctx context.Context, log zerolog.Logger, gc *config.Config) (*Ga
 		return nil, errors.Errorf("unknown token signing method: %q", c.TokenSigning.Method)
 	}
 
-	ost, err := scommon.NewObjectStorage(&c.ObjectStorage)
+	sc := scommon.NewCookieSigningData(&scommon.CookieSigningConfig{
+		Duration: c.CookieSigning.Duration,
+		Key:      c.CookieSigning.Key,
+	})
+
+	ost, err := icommon.NewObjectStorage(&c.ObjectStorage)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -121,7 +130,7 @@ func NewGateway(ctx context.Context, log zerolog.Logger, gc *config.Config) (*Ga
 	configstoreClient := csclient.NewClient(c.ConfigstoreURL)
 	runserviceClient := rsclient.NewClient(c.RunserviceURL)
 
-	ah := action.NewActionHandler(log, sd, configstoreClient, runserviceClient, gc.ID, c.APIExposedURL, c.WebExposedURL, action.OrganizationMemberAddingMode(c.OrganizationMemberAddingMode))
+	ah := action.NewActionHandler(log, sd, sc, configstoreClient, runserviceClient, gc.ID, c.APIExposedURL, c.WebExposedURL, c.UnsecureCookies, action.OrganizationMemberAddingMode(c.OrganizationMemberAddingMode))
 
 	return &Gateway{
 		log:               log,
@@ -131,6 +140,7 @@ func NewGateway(ctx context.Context, log zerolog.Logger, gc *config.Config) (*Ga
 		configstoreClient: configstoreClient,
 		ah:                ah,
 		sd:                sd,
+		sc:                sc,
 	}, nil
 }
 
@@ -142,9 +152,30 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	if len(g.c.Web.AllowedOrigins) > 0 {
 		corsAllowedMethodsOptions := ghandlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "DELETE"})
-		corsAllowedHeadersOptions := ghandlers.AllowedHeaders([]string{"Accept", "Accept-Encoding", "Authorization", "Content-Length", "Content-Type", "X-CSRF-Token", "Authorization"})
+		corsAllowedHeadersOptions := ghandlers.AllowedHeaders([]string{"Accept", "Accept-Encoding", "Content-Length", "Content-Type", "Content-Range", "X-Csrf-Token", "Authorization"})
 		corsAllowedOriginsOptions := ghandlers.AllowedOrigins(g.c.Web.AllowedOrigins)
-		corsHandler = ghandlers.CORS(corsAllowedMethodsOptions, corsAllowedHeadersOptions, corsAllowedOriginsOptions)
+		corsExposeHeadersOptions := ghandlers.ExposedHeaders([]string{"X-Csrf-Token"})
+		corsHandler = ghandlers.CORS(corsAllowedMethodsOptions, corsAllowedHeadersOptions, corsAllowedOriginsOptions, corsExposeHeadersOptions, ghandlers.AllowCredentials())
+	}
+
+	csrfCookieName := common.CSRFCookieName(g.c.UnsecureCookies)
+	// make the csrf cookie max age 0 so it'll be a session cookie and won't expire.
+	csrfCookieMaxAge := 0
+
+	protectCSRF := csrf.Protect([]byte(g.c.CookieSigning.Key), csrf.Path("/"), csrf.CookieName(csrfCookieName), csrf.MaxAge(csrfCookieMaxAge), csrf.Secure(!g.c.UnsecureCookies), csrf.ErrorHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// on failed csrf return a csrf token so next request will have it
+		w.Header().Set("X-Csrf-Token", csrf.Token(r))
+
+		http.Error(w, fmt.Sprintf("%s - %s",
+			http.StatusText(http.StatusForbidden), csrf.FailureReason(r)),
+			http.StatusForbidden)
+	})))
+
+	skipCSRFOnToken := handlers.NewSkipCSRFOnToken(g.log)
+	setCSRFHeader := handlers.NewSetCSRFHeader(g.log)
+
+	CSRF := func(h http.Handler) http.Handler {
+		return skipCSRFOnToken(protectCSRF(setCSRFHeader(h)))
 	}
 
 	webhooksHandler := api.NewWebhooksHandler(g.log, g.ah, g.configstoreClient, g.runserviceClient, g.c.APIExposedURL)
@@ -210,21 +241,21 @@ func (g *Gateway) Run(ctx context.Context) error {
 	addOrgMemberHandler := api.NewAddOrgMemberHandler(g.log, g.ah)
 	removeOrgMemberHandler := api.NewRemoveOrgMemberHandler(g.log, g.ah)
 
-	projectRunsHandler := api.NewRunsHandler(g.log, g.ah, common.GroupTypeProject)
-	projectRunHandler := api.NewRunHandler(g.log, g.ah, common.GroupTypeProject)
-	projectRuntaskHandler := api.NewRuntaskHandler(g.log, g.ah, common.GroupTypeProject)
-	projectRunActionsHandler := api.NewRunActionsHandler(g.log, g.ah, common.GroupTypeProject)
-	projectRunTaskActionsHandler := api.NewRunTaskActionsHandler(g.log, g.ah, common.GroupTypeProject)
-	projectRunLogsHandler := api.NewLogsHandler(g.log, g.ah, common.GroupTypeProject)
-	projectRunLogsDeleteHandler := api.NewLogsDeleteHandler(g.log, g.ah, common.GroupTypeProject)
+	projectRunsHandler := api.NewRunsHandler(g.log, g.ah, scommon.GroupTypeProject)
+	projectRunHandler := api.NewRunHandler(g.log, g.ah, scommon.GroupTypeProject)
+	projectRuntaskHandler := api.NewRuntaskHandler(g.log, g.ah, scommon.GroupTypeProject)
+	projectRunActionsHandler := api.NewRunActionsHandler(g.log, g.ah, scommon.GroupTypeProject)
+	projectRunTaskActionsHandler := api.NewRunTaskActionsHandler(g.log, g.ah, scommon.GroupTypeProject)
+	projectRunLogsHandler := api.NewLogsHandler(g.log, g.ah, scommon.GroupTypeProject)
+	projectRunLogsDeleteHandler := api.NewLogsDeleteHandler(g.log, g.ah, scommon.GroupTypeProject)
 
-	userRunsHandler := api.NewRunsHandler(g.log, g.ah, common.GroupTypeUser)
-	userRunHandler := api.NewRunHandler(g.log, g.ah, common.GroupTypeUser)
-	userRuntaskHandler := api.NewRuntaskHandler(g.log, g.ah, common.GroupTypeUser)
-	userRunActionsHandler := api.NewRunActionsHandler(g.log, g.ah, common.GroupTypeUser)
-	userRunTaskActionsHandler := api.NewRunTaskActionsHandler(g.log, g.ah, common.GroupTypeUser)
-	userRunLogsHandler := api.NewLogsHandler(g.log, g.ah, common.GroupTypeUser)
-	userRunLogsDeleteHandler := api.NewLogsDeleteHandler(g.log, g.ah, common.GroupTypeUser)
+	userRunsHandler := api.NewRunsHandler(g.log, g.ah, scommon.GroupTypeUser)
+	userRunHandler := api.NewRunHandler(g.log, g.ah, scommon.GroupTypeUser)
+	userRuntaskHandler := api.NewRuntaskHandler(g.log, g.ah, scommon.GroupTypeUser)
+	userRunActionsHandler := api.NewRunActionsHandler(g.log, g.ah, scommon.GroupTypeUser)
+	userRunTaskActionsHandler := api.NewRunTaskActionsHandler(g.log, g.ah, scommon.GroupTypeUser)
+	userRunLogsHandler := api.NewLogsHandler(g.log, g.ah, scommon.GroupTypeUser)
+	userRunLogsDeleteHandler := api.NewLogsDeleteHandler(g.log, g.ah, scommon.GroupTypeUser)
 
 	userRemoteReposHandler := api.NewUserRemoteReposHandler(g.log, g.ah, g.configstoreClient)
 
@@ -249,8 +280,12 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	apirouter := mux.NewRouter().PathPrefix("/api/v1alpha").Subrouter().UseEncodedPath()
 
-	authForcedHandler := handlers.NewAuthHandler(g.log, g.configstoreClient, g.c.AdminToken, g.sd, true)
-	authOptionalHandler := handlers.NewAuthHandler(g.log, g.configstoreClient, g.c.AdminToken, g.sd, false)
+	authForcedHandler := func(h http.Handler) http.Handler {
+		return CSRF(handlers.NewAuthChecker(g.log, g.configstoreClient, handlers.WithTokenChecker(g.c.AdminToken), handlers.WithCookieChecker(g.sc, g.c.UnsecureCookies), handlers.WithRequired(true))(h))
+	}
+	authOptionalHandler := func(h http.Handler) http.Handler {
+		return CSRF(handlers.NewAuthChecker(g.log, g.configstoreClient, handlers.WithTokenChecker(g.c.AdminToken), handlers.WithCookieChecker(g.sc, g.c.UnsecureCookies), handlers.WithRequired(false))(h))
+	}
 
 	router.PathPrefix("/api/v1alpha").Handler(apirouter)
 
@@ -322,7 +357,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/remotesources/{remotesourceref}", authForcedHandler(remoteSourceHandler)).Methods("GET")
 	apirouter.Handle("/remotesources", authForcedHandler(createRemoteSourceHandler)).Methods("POST")
 	apirouter.Handle("/remotesources/{remotesourceref}", authForcedHandler(updateRemoteSourceHandler)).Methods("PUT")
-	apirouter.Handle("/remotesources", authOptionalHandler(remoteSourcesHandler)).Methods("GET")
+	apirouter.Handle("/remotesources", remoteSourcesHandler).Methods("GET")
 	apirouter.Handle("/remotesources/{remotesourceref}", authForcedHandler(deleteRemoteSourceHandler)).Methods("DELETE")
 
 	apirouter.Handle("/orgs/{orgref}", authForcedHandler(orgHandler)).Methods("GET")
@@ -349,7 +384,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/auth/register", registerHandler).Methods("POST")
 	apirouter.Handle("/auth/oauth2/callback", oauth2callbackHandler).Methods("GET")
 
-	apirouter.Handle("/maintenance/{servicename}", maintenanceStatusHandler).Methods("GET")
+	apirouter.Handle("/maintenance/{servicename}", authForcedHandler(maintenanceStatusHandler)).Methods("GET")
 	apirouter.Handle("/maintenance/{servicename}", authForcedHandler(maintenanceModeHandler)).Methods("PUT", "DELETE")
 	apirouter.Handle("/export/{servicename}", authForcedHandler(exportHandler)).Methods("GET")
 	apirouter.Handle("/import/{servicename}", authForcedHandler(importHandler)).Methods("POST")
@@ -364,7 +399,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	mainrouter := mux.NewRouter()
 	mainrouter.PathPrefix("/repos/").Handler(corsHandler(reposRouter))
-	mainrouter.PathPrefix("/").Handler(corsHandler(maxBytesHandler))
+	mainrouter.PathPrefix("/").Handler(ghandlers.RecoveryHandler(ghandlers.PrintRecoveryStack(true))(corsHandler(maxBytesHandler)))
 
 	var tlsConfig *tls.Config
 	if g.c.Web.TLS {

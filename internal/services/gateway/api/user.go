@@ -546,7 +546,7 @@ func (h *LoginUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := h.loginUser(ctx, req)
+	res, err := h.loginUser(ctx, w, req)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
@@ -557,7 +557,7 @@ func (h *LoginUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *LoginUserHandler) loginUser(ctx context.Context, req *gwapitypes.LoginUserRequest) (*gwapitypes.LoginUserResponse, error) {
+func (h *LoginUserHandler) loginUser(ctx context.Context, w http.ResponseWriter, req *gwapitypes.LoginUserRequest) (*gwapitypes.LoginUserResponse, error) {
 	creq := &action.LoginUserRequest{
 		RemoteSourceName: req.RemoteSourceName,
 	}
@@ -575,9 +575,12 @@ func (h *LoginUserHandler) loginUser(ctx context.Context, req *gwapitypes.LoginU
 	authresp := cresp.Response.(*action.LoginUserResponse)
 
 	resp := &gwapitypes.LoginUserResponse{
-		Token: authresp.Token,
-		User:  createUserResponse(authresp.User),
+		User: createUserResponse(authresp.User),
 	}
+
+	http.SetCookie(w, authresp.Cookie)
+	http.SetCookie(w, authresp.SecondaryCookie)
+
 	return resp, nil
 }
 
