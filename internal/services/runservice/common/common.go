@@ -21,7 +21,7 @@ import (
 	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/runconfig"
-	"agola.io/agola/internal/sql"
+	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/runservice/types"
 )
@@ -174,21 +174,15 @@ func GenExecutorTask(tx *sql.Tx, r *types.Run, rt *types.RunTask, rc *types.RunC
 	rct := rc.Tasks[rt.ID]
 
 	et := types.NewExecutorTask(tx)
-	et.Spec = types.ExecutorTaskSpec{
-		ExecutorID: executor.ExecutorID,
-		RunID:      r.ID,
-		RunTaskID:  rt.ID,
-		// ExecutorTaskSpecData is currently not saved in the database to keep
-		// size smaller but is generated everytime the executor task is sent to
-		// the executor
-	}
-	et.Status = types.ExecutorTaskStatus{
-		Phase: types.ExecutorTaskPhaseNotStarted,
-		Steps: make([]*types.ExecutorTaskStepStatus, len(rct.Steps)),
-	}
 
-	for i := range et.Status.Steps {
-		et.Status.Steps[i] = &types.ExecutorTaskStepStatus{
+	et.ExecutorID = executor.ExecutorID
+	et.RunID = r.ID
+	et.RunTaskID = rt.ID
+	et.Phase = types.ExecutorTaskPhaseNotStarted
+	et.Steps = make([]*types.ExecutorTaskStepStatus, len(rct.Steps))
+
+	for i := range et.Steps {
+		et.Steps[i] = &types.ExecutorTaskStepStatus{
 			Phase: types.ExecutorTaskPhaseNotStarted,
 		}
 	}

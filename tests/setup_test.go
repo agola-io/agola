@@ -53,7 +53,6 @@ import (
 	"agola.io/agola/internal/services/notification"
 	rsscheduler "agola.io/agola/internal/services/runservice"
 	"agola.io/agola/internal/services/scheduler"
-	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/testutil"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
@@ -270,6 +269,11 @@ func setup(ctx context.Context, t *testing.T, dir string, opts ...setupOption) *
 		t.Fatalf("env var AGOLA_BIN_DIR is undefined")
 	}
 
+	dbType := testutil.DBType(t)
+	_, _, rsDBConnString := testutil.CreateDB(t, log, ctx, dir)
+	_, _, csDBConnString := testutil.CreateDB(t, log, ctx, dir)
+	_, _, notificationDBConnString := testutil.CreateDB(t, log, ctx, dir)
+
 	sc := &setupContext{ctx: ctx, t: t, dir: dir, log: log}
 
 	sc.config = &config.Config{
@@ -306,16 +310,16 @@ func setup(ctx context.Context, t *testing.T, dir string, opts ...setupOption) *
 			RunserviceURL:  "",
 			ConfigstoreURL: "",
 			DB: config.DB{
-				Type:       sql.Sqlite3,
-				ConnString: filepath.Join(dir, "notification", "db"),
+				Type:       dbType,
+				ConnString: notificationDBConnString,
 			},
 		},
 		Runservice: config.Runservice{
 			Debug:   false,
 			DataDir: filepath.Join(dir, "runservice"),
 			DB: config.DB{
-				Type:       sql.Sqlite3,
-				ConnString: filepath.Join(dir, "runservice", "db"),
+				Type:       dbType,
+				ConnString: rsDBConnString,
 			},
 			Web: config.Web{
 				ListenAddress: ":4000",
@@ -349,8 +353,8 @@ func setup(ctx context.Context, t *testing.T, dir string, opts ...setupOption) *
 			Debug:   false,
 			DataDir: filepath.Join(dir, "configstore"),
 			DB: config.DB{
-				Type:       sql.Sqlite3,
-				ConnString: filepath.Join(dir, "configstore", "db"),
+				Type:       dbType,
+				ConnString: csDBConnString,
 			},
 			Web: config.Web{
 				ListenAddress: ":4002",

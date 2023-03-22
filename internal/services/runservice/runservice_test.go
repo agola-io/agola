@@ -20,7 +20,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"path/filepath"
 	"reflect"
 	"sync"
 	"testing"
@@ -34,7 +33,7 @@ import (
 	"agola.io/agola/internal/services/runservice/action"
 	"agola.io/agola/internal/services/runservice/common"
 	"agola.io/agola/internal/services/runservice/store"
-	"agola.io/agola/internal/sql"
+	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/internal/testutil"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/runservice/types"
@@ -55,10 +54,13 @@ func setupRunservice(ctx context.Context, t *testing.T, log zerolog.Logger, dir 
 		t.Fatalf("unexpected err: %v", err)
 	}
 
+	dbType := testutil.DBType(t)
+	_, _, dbConnString := testutil.CreateDB(t, log, ctx, dir)
+
 	baseConfig := config.Runservice{
 		DB: config.DB{
-			Type:       sql.Sqlite3,
-			ConnString: filepath.Join(dir, "db"),
+			Type:       dbType,
+			ConnString: dbConnString,
 		},
 		ObjectStorage: config.ObjectStorage{
 			Type: config.ObjectStorageTypePosix,
@@ -181,6 +183,25 @@ func TestExportImport(t *testing.T) {
 func TestConcurrentRunCreation(t *testing.T) {
 	t.Parallel()
 
+	// TODO(sgotti) Postgres currently (as of v15) returns unique constraint
+	// errors hiding serializable errors also if we check for the existance
+	// before the insert.
+	// If we have a not existing runcounter for groupid and multiple concurrent
+	// transactions try to insert the new runcounter only one will succeed and
+	// the others will receive a unique constraint violation error instead of a
+	// serialization error and won't by retried
+	// During an update of an already existing runcounter instead a serialiation
+	// error will be returned.
+	//
+	// This is probably related to this issue with multiple unique indexes
+	// https://www.postgresql.org/message-id/flat/CAGPCyEZG76zjv7S31v_xPeLNRuzj-m%3DY2GOY7PEzu7vhB%3DyQog%40mail.gmail.com
+	//
+	// for now skip this test on posgres
+	dbType := testutil.DBType(t)
+	if dbType == sql.Postgres {
+		t.SkipNow()
+	}
+
 	dir := t.TempDir()
 	ctx := context.Background()
 	log := testutil.NewLogger(t)
@@ -282,11 +303,11 @@ func TestGetRunsLastRun(t *testing.T) {
 	for i, er := range expectedRuns {
 		r := runs[i]
 		if r.Group != er.Group {
-			t.Fatalf("expected run group %q runs, got %q", r.Group, er.Group)
+			t.Fatalf("expected run group %q, got %q", r.Group, er.Group)
 		}
 
 		if r.Sequence != er.Sequence {
-			t.Fatalf("expected run sequence %d runs, got %d", er.Sequence, r.Sequence)
+			t.Fatalf("expected run sequence %d, got %d", er.Sequence, r.Sequence)
 		}
 	}
 }

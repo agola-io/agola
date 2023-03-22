@@ -15,10 +15,8 @@
 package types
 
 import (
-	"github.com/gofrs/uuid"
-
-	"agola.io/agola/internal/sql"
-	stypes "agola.io/agola/services/types"
+	"agola.io/agola/internal/sqlg"
+	"agola.io/agola/internal/sqlg/sql"
 )
 
 type SecretType string
@@ -36,14 +34,8 @@ const (
 	SecretProviderVault SecretProviderType = "vault"
 )
 
-const (
-	SecretKind    = "secret"
-	SecretVersion = "v0.1.0"
-)
-
 type Secret struct {
-	stypes.TypeMeta
-	stypes.ObjectMeta
+	sqlg.ObjectMeta
 
 	Name string `json:"name,omitempty"`
 
@@ -61,13 +53,6 @@ type Secret struct {
 
 func NewSecret(tx *sql.Tx) *Secret {
 	return &Secret{
-		TypeMeta: stypes.TypeMeta{
-			Kind:    SecretKind,
-			Version: SecretVersion,
-		},
-		ObjectMeta: stypes.ObjectMeta{
-			ID:   uuid.Must(uuid.NewV4()).String(),
-			TxID: tx.ID(),
-		},
+		ObjectMeta: sqlg.NewObjectMeta(tx),
 	}
 }

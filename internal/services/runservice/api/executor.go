@@ -31,7 +31,7 @@ import (
 	"agola.io/agola/internal/services/runservice/common"
 	"agola.io/agola/internal/services/runservice/db"
 	"agola.io/agola/internal/services/runservice/store"
-	"agola.io/agola/internal/sql"
+	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/internal/util"
 	rsapitypes "agola.io/agola/services/runservice/api/types"
 	"agola.io/agola/services/runservice/types"
@@ -40,30 +40,30 @@ import (
 func GenExecutorTaskResponse(et *types.ExecutorTask, etSpecData *types.ExecutorTaskSpecData) *rsapitypes.ExecutorTask {
 	apiet := &rsapitypes.ExecutorTask{
 		ID:         et.ID,
-		ExecutorID: et.Spec.ExecutorID,
+		ExecutorID: et.ExecutorID,
 
-		Stop: et.Spec.Stop,
+		Stop: et.Stop,
 
 		Status: &rsapitypes.ExecutorTaskStatus{
-			Phase:     et.Status.Phase,
-			Timedout:  et.Status.Timedout,
-			FailError: et.Status.FailError,
-			Steps:     make([]*rsapitypes.ExecutorTaskStepStatus, len(et.Status.Steps)),
-			StartTime: et.Status.StartTime,
-			EndTime:   et.Status.EndTime,
+			Phase:     et.Phase,
+			Timedout:  et.Timedout,
+			FailError: et.FailError,
+			Steps:     make([]*rsapitypes.ExecutorTaskStepStatus, len(et.Steps)),
+			StartTime: et.StartTime,
+			EndTime:   et.EndTime,
 		},
 
 		Spec: (*rsapitypes.ExecutorTaskSpecData)(etSpecData),
 	}
 
 	apiet.Status.SetupStep = rsapitypes.ExecutorTaskStepStatus{
-		Phase:      et.Status.SetupStep.Phase,
-		StartTime:  et.Status.SetupStep.StartTime,
-		EndTime:    et.Status.SetupStep.EndTime,
-		ExitStatus: et.Status.SetupStep.ExitStatus,
+		Phase:      et.SetupStep.Phase,
+		StartTime:  et.SetupStep.StartTime,
+		EndTime:    et.SetupStep.EndTime,
+		ExitStatus: et.SetupStep.ExitStatus,
 	}
 
-	for i, s := range et.Status.Steps {
+	for i, s := range et.Steps {
 		apiet.Status.Steps[i] = &rsapitypes.ExecutorTaskStepStatus{
 			Phase:      s.Phase,
 			StartTime:  s.StartTime,
@@ -204,11 +204,11 @@ func (h *ExecutorTaskStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	etID := vars["taskid"]
 
 	// TODO(sgotti) Check authorized call from executors
-	var et *rsapitypes.ExecutorTaskStatus
+	var etStatus *rsapitypes.ExecutorTaskStatus
 	d := json.NewDecoder(r.Body)
 	defer r.Body.Close()
 
-	if err := d.Decode(&et); err != nil {
+	if err := d.Decode(&etStatus); err != nil {
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
@@ -223,21 +223,21 @@ func (h *ExecutorTaskStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 			return nil
 		}
 
-		curEt.Status.Phase = et.Phase
-		curEt.Status.Timedout = et.Timedout
-		curEt.Status.FailError = et.FailError
-		curEt.Status.Steps = make([]*types.ExecutorTaskStepStatus, len(et.Steps))
-		curEt.Status.StartTime = et.StartTime
-		curEt.Status.EndTime = et.EndTime
+		curEt.Phase = etStatus.Phase
+		curEt.Timedout = etStatus.Timedout
+		curEt.FailError = etStatus.FailError
+		curEt.Steps = make([]*types.ExecutorTaskStepStatus, len(etStatus.Steps))
+		curEt.StartTime = etStatus.StartTime
+		curEt.EndTime = etStatus.EndTime
 
-		curEt.Status.SetupStep = types.ExecutorTaskStepStatus{
-			Phase:      et.SetupStep.Phase,
-			StartTime:  et.SetupStep.StartTime,
-			EndTime:    et.SetupStep.EndTime,
-			ExitStatus: et.SetupStep.ExitStatus,
+		curEt.SetupStep = types.ExecutorTaskStepStatus{
+			Phase:      etStatus.SetupStep.Phase,
+			StartTime:  etStatus.SetupStep.StartTime,
+			EndTime:    etStatus.SetupStep.EndTime,
+			ExitStatus: etStatus.SetupStep.ExitStatus,
 		}
-		for i, s := range et.Steps {
-			curEt.Status.Steps[i] = &types.ExecutorTaskStepStatus{
+		for i, s := range etStatus.Steps {
+			curEt.Steps[i] = &types.ExecutorTaskStepStatus{
 				Phase:      s.Phase,
 				StartTime:  s.StartTime,
 				EndTime:    s.EndTime,

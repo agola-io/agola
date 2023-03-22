@@ -20,9 +20,9 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/sorintlab/errors"
 
-	"agola.io/agola/internal/lock"
 	"agola.io/agola/internal/services/config"
-	"agola.io/agola/internal/sql"
+	"agola.io/agola/internal/sqlg/lock"
+	"agola.io/agola/internal/sqlg/sql"
 	csclient "agola.io/agola/services/configstore/client"
 	rsclient "agola.io/agola/services/runservice/client"
 )

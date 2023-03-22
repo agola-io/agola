@@ -396,7 +396,7 @@ func (h *ActionHandler) RegisterUser(ctx context.Context, req *RegisterUserReque
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get remote source %q", req.RemoteSourceName))
 	}
-	if !*rs.RegistrationEnabled {
+	if !rs.RegistrationEnabled {
 		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("remote source user registration is disabled"))
 	}
 
@@ -481,7 +481,7 @@ func (h *ActionHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (*
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get remote source %q", req.RemoteSourceName))
 	}
-	if !*rs.LoginEnabled {
+	if !rs.LoginEnabled {
 		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("remote source user login is disabled"))
 	}
 

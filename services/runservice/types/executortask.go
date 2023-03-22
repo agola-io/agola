@@ -3,16 +3,11 @@ package types
 import (
 	"time"
 
-	"github.com/gofrs/uuid"
 	"github.com/mitchellh/copystructure"
 
-	"agola.io/agola/internal/sql"
+	"agola.io/agola/internal/sqlg"
+	"agola.io/agola/internal/sqlg/sql"
 	stypes "agola.io/agola/services/types"
-)
-
-const (
-	ExecutorTaskKind    = "executortask"
-	ExecutorTaskVersion = "v0.1.0"
 )
 
 type ExecutorTaskPhase string
@@ -31,12 +26,25 @@ func (s ExecutorTaskPhase) IsFinished() bool {
 }
 
 type ExecutorTask struct {
-	stypes.TypeMeta
-	stypes.ObjectMeta
+	sqlg.ObjectMeta
 
-	Status ExecutorTaskStatus `json:"status,omitempty"`
+	ExecutorID string `json:"executor_id,omitempty"`
+	RunID      string `json:"run_id,omitempty"`
+	RunTaskID  string `json:"run_task_id,omitempty"`
 
-	Spec ExecutorTaskSpec `json:"spec,omitempty"`
+	// Stop is used to signal from the scheduler when the task must be stopped
+	Stop bool `json:"stop,omitempty"`
+
+	Phase    ExecutorTaskPhase `json:"phase,omitempty"`
+	Timedout bool              `json:"timedout,omitempty"`
+
+	FailError string `json:"fail_error,omitempty"`
+
+	SetupStep ExecutorTaskStepStatus    `json:"setup_step,omitempty"`
+	Steps     []*ExecutorTaskStepStatus `json:"steps,omitempty"`
+
+	StartTime *time.Time `json:"start_time,omitempty"`
+	EndTime   *time.Time `json:"end_time,omitempty"`
 }
 
 func (et *ExecutorTask) DeepCopy() *ExecutorTask {
@@ -45,15 +53,6 @@ func (et *ExecutorTask) DeepCopy() *ExecutorTask {
 		panic(err)
 	}
 	return net.(*ExecutorTask)
-}
-
-type ExecutorTaskSpec struct {
-	ExecutorID string `json:"executor_id,omitempty"`
-	RunID      string `json:"run_id,omitempty"`
-	RunTaskID  string `json:"run_task_id,omitempty"`
-
-	// Stop is used to signal from the scheduler when the task must be stopped
-	Stop bool `json:"stop,omitempty"`
 }
 
 // ExecutorTaskSpecData defines the task data required to execute the tasks.
@@ -82,21 +81,6 @@ type ExecutorTaskSpecData struct {
 	TaskTimeoutInterval time.Duration `json:"task_timeout_interval"`
 }
 
-type ExecutorTaskStatus struct {
-	ID string `json:"id,omitempty"`
-
-	Phase    ExecutorTaskPhase `json:"phase,omitempty"`
-	Timedout bool              `json:"timedout,omitempty"`
-
-	FailError string `json:"fail_error,omitempty"`
-
-	SetupStep ExecutorTaskStepStatus    `json:"setup_step,omitempty"`
-	Steps     []*ExecutorTaskStepStatus `json:"steps,omitempty"`
-
-	StartTime *time.Time `json:"start_time,omitempty"`
-	EndTime   *time.Time `json:"end_time,omitempty"`
-}
-
 type ExecutorTaskStepStatus struct {
 	Phase ExecutorTaskPhase `json:"phase,omitempty"`
 
@@ -114,13 +98,6 @@ type WorkspaceOperation struct {
 
 func NewExecutorTask(tx *sql.Tx) *ExecutorTask {
 	return &ExecutorTask{
-		TypeMeta: stypes.TypeMeta{
-			Kind:    ExecutorTaskKind,
-			Version: ExecutorTaskVersion,
-		},
-		ObjectMeta: stypes.ObjectMeta{
-			ID:   uuid.Must(uuid.NewV4()).String(),
-			TxID: tx.ID(),
-		},
+		ObjectMeta: sqlg.NewObjectMeta(tx),
 	}
 }

@@ -25,7 +25,7 @@ import (
 
 	"github.com/sorintlab/errors"
 
-	"agola.io/agola/internal/lock"
+	"agola.io/agola/internal/sqlg/lock"
 	rstypes "agola.io/agola/services/runservice/types"
 )
 

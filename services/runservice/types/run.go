@@ -4,17 +4,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gofrs/uuid"
 	"github.com/mitchellh/copystructure"
 
-	"agola.io/agola/internal/sql"
-	stypes "agola.io/agola/services/types"
+	"agola.io/agola/internal/sqlg"
+	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/util"
-)
-
-const (
-	RunKind    = "run"
-	RunVersion = "v0.1.0"
 )
 
 type RunPhase string
@@ -63,8 +57,7 @@ func RunResultFromStringSlice(slice []string) []RunResult {
 // Run is the run status of a RUN. It should containt the status of the current
 // run. The run definition must live in the RunConfig and not here.
 type Run struct {
-	stypes.TypeMeta
-	stypes.ObjectMeta
+	sqlg.ObjectMeta
 
 	// Sequence is an unique per runservice increasing sequence number
 	Sequence uint64 `json:"sequence"`
@@ -264,13 +257,6 @@ type RunTaskStep struct {
 
 func NewRun(tx *sql.Tx) *Run {
 	return &Run{
-		TypeMeta: stypes.TypeMeta{
-			Kind:    RunKind,
-			Version: RunVersion,
-		},
-		ObjectMeta: stypes.ObjectMeta{
-			ID:   uuid.Must(uuid.NewV4()).String(),
-			TxID: tx.ID(),
-		},
+		ObjectMeta: sqlg.NewObjectMeta(tx),
 	}
 }

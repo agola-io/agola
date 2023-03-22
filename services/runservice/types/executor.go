@@ -1,21 +1,15 @@
 package types
 
 import (
-	"github.com/gofrs/uuid"
 	"github.com/mitchellh/copystructure"
 
-	"agola.io/agola/internal/sql"
+	"agola.io/agola/internal/sqlg"
+	"agola.io/agola/internal/sqlg/sql"
 	stypes "agola.io/agola/services/types"
 )
 
-const (
-	ExecutorKind    = "executor"
-	ExecutorVersion = "v0.1.0"
-)
-
 type Executor struct {
-	stypes.TypeMeta
-	stypes.ObjectMeta
+	sqlg.ObjectMeta
 
 	// ExecutorID is the Executor unique id
 	ExecutorID string `json:"executor_id,omitempty"`
@@ -52,13 +46,6 @@ func (e *Executor) DeepCopy() *Executor {
 
 func NewExecutor(tx *sql.Tx) *Executor {
 	return &Executor{
-		TypeMeta: stypes.TypeMeta{
-			Kind:    ExecutorKind,
-			Version: ExecutorVersion,
-		},
-		ObjectMeta: stypes.ObjectMeta{
-			ID:   uuid.Must(uuid.NewV4()).String(),
-			TxID: tx.ID(),
-		},
+		ObjectMeta: sqlg.NewObjectMeta(tx),
 	}
 }

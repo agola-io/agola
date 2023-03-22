@@ -17,20 +17,12 @@ package types
 import (
 	"time"
 
-	"github.com/gofrs/uuid"
-
-	"agola.io/agola/internal/sql"
-	stypes "agola.io/agola/services/types"
-)
-
-const (
-	UserKind    = "user"
-	UserVersion = "v0.1.0"
+	"agola.io/agola/internal/sqlg"
+	"agola.io/agola/internal/sqlg/sql"
 )
 
 type User struct {
-	stypes.TypeMeta
-	stypes.ObjectMeta
+	sqlg.ObjectMeta
 
 	Name string `json:"name,omitempty"`
 
@@ -44,25 +36,12 @@ type User struct {
 
 func NewUser(tx *sql.Tx) *User {
 	return &User{
-		TypeMeta: stypes.TypeMeta{
-			Kind:    UserKind,
-			Version: UserVersion,
-		},
-		ObjectMeta: stypes.ObjectMeta{
-			ID:   uuid.Must(uuid.NewV4()).String(),
-			TxID: tx.ID(),
-		},
+		ObjectMeta: sqlg.NewObjectMeta(tx),
 	}
 }
 
-const (
-	UserTokenKind    = "usertoken"
-	UserTokenVersion = "v0.1.0"
-)
-
 type UserToken struct {
-	stypes.TypeMeta
-	stypes.ObjectMeta
+	sqlg.ObjectMeta
 
 	Name  string `json:"name,omitempty"`
 	Value string `json:"value,omitempty"`
@@ -72,25 +51,12 @@ type UserToken struct {
 
 func NewUserToken(tx *sql.Tx) *UserToken {
 	return &UserToken{
-		TypeMeta: stypes.TypeMeta{
-			Kind:    UserTokenKind,
-			Version: UserTokenVersion,
-		},
-		ObjectMeta: stypes.ObjectMeta{
-			ID:   uuid.Must(uuid.NewV4()).String(),
-			TxID: tx.ID(),
-		},
+		ObjectMeta: sqlg.NewObjectMeta(tx),
 	}
 }
 
-const (
-	LinkedAccountKind    = "linkedaccount"
-	LinkedAccountVersion = "v0.1.0"
-)
-
 type LinkedAccount struct {
-	stypes.TypeMeta
-	stypes.ObjectMeta
+	sqlg.ObjectMeta
 
 	UserID string `json:"user_id,omitempty"`
 
@@ -109,13 +75,6 @@ type LinkedAccount struct {
 
 func NewLinkedAccount(tx *sql.Tx) *LinkedAccount {
 	return &LinkedAccount{
-		TypeMeta: stypes.TypeMeta{
-			Kind:    LinkedAccountKind,
-			Version: LinkedAccountVersion,
-		},
-		ObjectMeta: stypes.ObjectMeta{
-			ID:   uuid.Must(uuid.NewV4()).String(),
-			TxID: tx.ID(),
-		},
+		ObjectMeta: sqlg.NewObjectMeta(tx),
 	}
 }

@@ -4,29 +4,22 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/gofrs/uuid"
 	"github.com/mitchellh/copystructure"
 	"github.com/sorintlab/errors"
 
-	"agola.io/agola/internal/sql"
+	"agola.io/agola/internal/sqlg"
+	"agola.io/agola/internal/sqlg/sql"
 	stypes "agola.io/agola/services/types"
 	"agola.io/agola/util"
-)
-
-const (
-	RunConfigKind    = "runconfig"
-	RunConfigVersion = "v0.1.0"
 )
 
 // RunConfig
 
 // RunConfig is the run configuration.
 // It contains everything that isn't a state (that is contained in a Run) and
-// that may use a lot of space. It lives in the storage. There is a RunConfig
-// for every Run.
+// that may use a lot of space. There is a RunConfig for every Run.
 type RunConfig struct {
-	stypes.TypeMeta
-	stypes.ObjectMeta
+	sqlg.ObjectMeta
 
 	Name string `json:"name,omitempty"`
 
@@ -261,13 +254,6 @@ func (et *Steps) UnmarshalJSON(b []byte) error {
 
 func NewRunConfig(tx *sql.Tx) *RunConfig {
 	return &RunConfig{
-		TypeMeta: stypes.TypeMeta{
-			Kind:    RunConfigKind,
-			Version: RunConfigVersion,
-		},
-		ObjectMeta: stypes.ObjectMeta{
-			ID:   uuid.Must(uuid.NewV4()).String(),
-			TxID: tx.ID(),
-		},
+		ObjectMeta: sqlg.NewObjectMeta(tx),
 	}
 }

@@ -26,14 +26,14 @@ import (
 	"github.com/sorintlab/errors"
 
 	scommon "agola.io/agola/internal/common"
-	idb "agola.io/agola/internal/db"
-	"agola.io/agola/internal/lock"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/runservice/action"
 	"agola.io/agola/internal/services/runservice/api"
 	"agola.io/agola/internal/services/runservice/db"
-	"agola.io/agola/internal/sql"
+	"agola.io/agola/internal/sqlg/lock"
+	"agola.io/agola/internal/sqlg/manager"
+	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/internal/util"
 )
 
@@ -116,12 +116,50 @@ func NewRunservice(ctx context.Context, log zerolog.Logger, c *config.Runservice
 	case sql.Postgres:
 		lf = lock.NewPGLockFactory(sdb)
 	default:
-		return nil, errors.Errorf("unknown type %q", c.DB.Type)
+		return nil, errors.Errorf("unknown db type %q", c.DB.Type)
 	}
 	s.lf = lf
 
-	if err := idb.Setup(ctx, log, d, lf); err != nil {
-		return nil, errors.Wrapf(err, "create db error")
+	dbm := manager.NewDBManager(log, d, lf)
+
+	setupDB := func() error {
+		if err := dbm.Lock(ctx); err != nil {
+			return errors.WithStack(err)
+		}
+		defer func() { _ = dbm.Unlock() }()
+
+		if err := dbm.Setup(ctx); err != nil {
+			return errors.Wrap(err, "setup db error")
+		}
+
+		curDBVersion, err := dbm.GetVersion(ctx)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		if err := dbm.CheckVersion(curDBVersion, d.Version()); err != nil {
+			return errors.WithStack(err)
+		}
+
+		if curDBVersion == 0 {
+			if err := dbm.Create(ctx, d.DDL(), d.Version()); err != nil {
+				return errors.Wrap(err, "create db error")
+			}
+		} else {
+			migrationRequired, err := dbm.CheckMigrationRequired(curDBVersion, d.Version())
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			if migrationRequired {
+				return errors.Errorf("db requires migration, current version: %d, wanted version: %d", curDBVersion, d.Version())
+			}
+		}
+
+		return nil
+	}
+
+	if err := setupDB(); err != nil {
+		return nil, errors.Wrap(err, "failed to setup db")
 	}
 
 	ah := action.NewActionHandler(log, d, ost, lf)

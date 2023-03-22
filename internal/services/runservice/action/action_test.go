@@ -19,9 +19,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"agola.io/agola/internal/sqlg"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/runservice/types"
-	stypes "agola.io/agola/services/types"
 )
 
 func TestRecreateRun(t *testing.T) {
@@ -39,7 +39,7 @@ func TestRecreateRun(t *testing.T) {
 
 	// a global run config for all tests
 	rc := &types.RunConfig{
-		ObjectMeta: stypes.ObjectMeta{
+		ObjectMeta: sqlg.ObjectMeta{
 			ID: inuuid("oldrunconfig"),
 		},
 		Tasks: map[string]*types.RunConfigTask{
@@ -106,7 +106,7 @@ func TestRecreateRun(t *testing.T) {
 	}
 
 	outrc := &types.RunConfig{
-		ObjectMeta: stypes.ObjectMeta{
+		ObjectMeta: sqlg.ObjectMeta{
 			ID: outuuid("newrunconfig"),
 		},
 		Tasks: map[string]*types.RunConfigTask{

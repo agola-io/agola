@@ -19,7 +19,7 @@ import (
 
 	"github.com/sorintlab/errors"
 
-	"agola.io/agola/internal/sql"
+	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
 )
@@ -71,8 +71,8 @@ type CreateUpdateRemoteSourceRequest struct {
 	Oauth2ClientSecret  string
 	SSHHostKey          string
 	SkipSSHHostKeyCheck bool
-	RegistrationEnabled *bool
-	LoginEnabled        *bool
+	RegistrationEnabled bool
+	LoginEnabled        bool
 }
 
 func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateUpdateRemoteSourceRequest) (*types.RemoteSource, error) {

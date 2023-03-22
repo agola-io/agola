@@ -27,7 +27,7 @@ import (
 
 	"agola.io/agola/internal/services/configstore/action"
 	"agola.io/agola/internal/services/configstore/db"
-	"agola.io/agola/internal/sql"
+	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	"agola.io/agola/services/configstore/types"
