@@ -18,6 +18,8 @@ const (
 	ContextKeyUserID ContextKey = iota
 	ContextKeyUsername
 	ContextKeyUserAdmin
+
+	ContextKeyTokenAuth
 )
 
 func CurrentUserID(ctx context.Context) string {

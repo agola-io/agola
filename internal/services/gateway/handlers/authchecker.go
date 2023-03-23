@@ -28,21 +28,22 @@ import (
 	"github.com/rs/zerolog"
 )
 
-type SkipCSRFOnToken struct {
+type SkipCSRFOnTokenAuth struct {
 	log  zerolog.Logger
 	next http.Handler
 }
 
-func NewSkipCSRFOnToken(log zerolog.Logger) func(http.Handler) http.Handler {
+func NewSkipCSRFOnTokenAuth(log zerolog.Logger) func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
-		return &SkipCSRFOnToken{log, h}
+		return &SkipCSRFOnTokenAuth{log, h}
 	}
 }
 
-func (h *SkipCSRFOnToken) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// skip csrf test if the request contains an Authorization header of Token type
-	tokenString := common.ExtractToken(r.Header, "Authorization", "Token")
-	if tokenString != "" {
+func (h *SkipCSRFOnTokenAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// skip csrf test if the request was a successful token auth
+	ctx := r.Context()
+	tokenAuth := ctx.Value(common.ContextKeyTokenAuth)
+	if tokenAuth != nil && tokenAuth.(bool) {
 		r = csrf.UnsafeSkipCheck(r)
 	}
 
@@ -70,7 +71,13 @@ type checkerResponse struct {
 	ctxValues map[interface{}]interface{}
 	cookies   []*http.Cookie
 
+	// authErr is the auth error. Checkers should populate this instead of returning an error when it's a checker error and not an internal error
+	// when authErr is nil the authentication was successful
+	// when authErr is not nil the authentication will continue with other checkers (unless failAuth is true)
 	authErr error
+
+	// failAuth will fail the authentication without continuing with other checkers
+	failAuth bool
 }
 
 type checker interface {
@@ -155,7 +162,12 @@ func (h *AuthChecker) do(ctx context.Context, w http.ResponseWriter, r *http.Req
 			return errors.WithStack(err)
 		}
 
-		if h.checkAuthResponse(checker.Name(), res) {
+		hasAuth, err := h.checkAuthResponse(checker.Name(), res)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		if hasAuth {
 			for key, value := range res.ctxValues {
 				ctx = context.WithValue(ctx, key, value)
 			}
@@ -177,16 +189,23 @@ func (h *AuthChecker) do(ctx context.Context, w http.ResponseWriter, r *http.Req
 	return nil
 }
 
-func (h *AuthChecker) checkAuthResponse(name string, res *checkerResponse) bool {
+func (h *AuthChecker) checkAuthResponse(name string, res *checkerResponse) (bool, error) {
 	var hasAuth bool
 
+	if res.failAuth {
+		if res.authErr != nil {
+			return false, util.NewAPIError(util.ErrUnauthorized, errors.Wrapf(res.authErr, "checker %s: auth failed", name))
+		}
+		return false, util.NewAPIError(util.ErrUnauthorized, errors.Errorf("checker %s: auth failed (no auth err reported by checker)", name))
+	}
+
 	if res.authErr != nil {
-		h.log.Trace().Msgf("%s auth err: %+v", name, res.authErr)
+		h.log.Trace().Err(res.authErr).Msgf("checker %s: auth err: %+v", name, res.authErr)
 	} else {
 		hasAuth = true
 	}
 
-	return hasAuth
+	return hasAuth, nil
 }
 
 func (h *AuthChecker) doNext(ctx context.Context, w http.ResponseWriter, r *http.Request) {
@@ -211,19 +230,26 @@ func (c *tokenChecker) DoAuth(ctx context.Context, r *http.Request) (*checkerRes
 
 	if c.adminToken != "" {
 		if tokenString == c.adminToken {
-			ctxValues := map[interface{}]interface{}{common.ContextKeyUserAdmin: true}
+			ctxValues := map[interface{}]interface{}{
+				common.ContextKeyTokenAuth: true,
+				common.ContextKeyUserAdmin: true,
+			}
 			return &checkerResponse{ctxValues: ctxValues}, nil
 		}
 	}
 	user, _, err := c.configstoreClient.GetUserByToken(ctx, tokenString)
 	if err != nil {
 		if util.RemoteErrorIs(err, util.ErrNotExist) {
-			return nil, errors.Errorf("user for token doesn't exist")
+			return &checkerResponse{authErr: errors.Errorf("user for token doesn't exist"), failAuth: true}, nil
 		}
 		return nil, errors.WithStack(err)
 	}
 
-	ctxValues := map[interface{}]interface{}{common.ContextKeyUserID: user.ID, common.ContextKeyUsername: user.Name}
+	ctxValues := map[interface{}]interface{}{
+		common.ContextKeyTokenAuth: true,
+		common.ContextKeyUserID:    user.ID,
+		common.ContextKeyUsername:  user.Name,
+	}
 
 	if user.Admin {
 		ctxValues[common.ContextKeyUserAdmin] = true
@@ -288,7 +314,7 @@ func (c *cookieChecker) DoAuth(ctx context.Context, r *http.Request) (*checkerRe
 	user, _, err := c.configstoreClient.GetUser(ctx, userID)
 	if err != nil {
 		if util.RemoteErrorIs(err, util.ErrNotExist) {
-			return nil, errors.Errorf("user doesn't exist")
+			return &checkerResponse{authErr: errors.Errorf("user doesn't exist"), failAuth: true}, nil
 		}
 		return nil, errors.WithStack(err)
 	}

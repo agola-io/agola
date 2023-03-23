@@ -778,6 +778,95 @@ func TestCookieAuth(t *testing.T) {
 	}
 }
 
+func TestCSRF(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sc := setup(ctx, t, dir, withGitea(true))
+	defer sc.stop()
+
+	_, _ = createLinkedAccount(ctx, t, sc.gitea, sc.config)
+
+	gwCookieClient := newCookieClient(sc.config.Gateway.APIExposedURL)
+
+	_, resp, err := gwCookieClient.Login(ctx, &gwapitypes.LoginUserRequest{
+		RemoteSourceName: "gitea",
+		LoginName:        giteaUser01,
+		LoginPassword:    giteaUser01Password,
+	}, nil)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	loginCookies := resp.Cookies()
+
+	// Do an initial request to fetch the csrf cookies and token
+	_, resp, err = gwCookieClient.GetCurrentUser(ctx, loginCookies)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	t.Logf("resp.Header: %v", resp.Header)
+	cookies := append(loginCookies, resp.Cookies()...)
+	csrfToken := resp.Header.Get("X-Csrf-Token")
+	header := http.Header{}
+	header.Set("X-Csrf-Token", csrfToken)
+
+	// Create an org. Should work
+	if _, _, err := gwCookieClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg01, Visibility: gwapitypes.VisibilityPublic}, header, cookies); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// Don't send csrf token in request headers. Should return 403 (forbidden)
+	_, _, err = gwCookieClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg02, Visibility: gwapitypes.VisibilityPublic}, http.Header{}, cookies)
+	expectedErr := "unknown api error (status: 403)"
+	if err == nil {
+		t.Fatalf("expected error %v, got nil err", expectedErr)
+	}
+	if err.Error() != expectedErr {
+		t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+	}
+
+	csrfCookieName := common.CSRFCookieName(false)
+	noCSRFCookies := []*http.Cookie{}
+	for _, c := range cookies {
+		if c.Name == csrfCookieName {
+			continue
+		}
+		noCSRFCookies = append(noCSRFCookies, c)
+	}
+
+	// Don't send csrf cookie. Should return 403 (forbidden)
+	_, _, err = gwCookieClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg02, Visibility: gwapitypes.VisibilityPublic}, header, noCSRFCookies)
+	expectedErr = "unknown api error (status: 403)"
+	if err == nil {
+		t.Fatalf("expected error %v, got nil err", expectedErr)
+	}
+	if err.Error() != expectedErr {
+		t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+	}
+
+	// Send also an Authorization token that won't match to check that csrf check is done
+	header.Set("Authorization", "Token unexistenttoken")
+
+	_, _, err = gwCookieClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg02, Visibility: gwapitypes.VisibilityPublic}, header, noCSRFCookies)
+	// Now we enforce and auth error if an Authorization token is provided and
+	// the user for the token doesn't exist. In future we could add ways to
+	// continue other auth checkers. The error should then be the commented one.
+	// expectedErr = "unknown api error (status: 403)"
+	expectedErr = "remote error unauthorized"
+	if err == nil {
+		t.Fatalf("expected error %v, got nil err", expectedErr)
+	}
+	if err.Error() != expectedErr {
+		t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+	}
+}
+
 func TestCreateLinkedAccount(t *testing.T) {
 	t.Parallel()
 
