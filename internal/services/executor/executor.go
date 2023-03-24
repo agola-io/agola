@@ -252,7 +252,6 @@ func (e *Executor) doSaveToWorkspaceStep(ctx context.Context, s *types.SaveToWor
 			DestDir:   c.DestDir,
 			Paths:     c.Paths,
 		}
-
 	}
 
 	stdin := ce.Stdin()
@@ -454,8 +453,6 @@ func (e *Executor) doRestoreWorkspaceStep(ctx context.Context, s *types.RestoreW
 }
 
 func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, t *types.ExecutorTask, pod driver.Pod, logPath string, archivePath string) (int, error) {
-	cmd := []string{toolboxContainerPath, "archive"}
-
 	if err := os.MkdirAll(filepath.Dir(logPath), 0770); err != nil {
 		return -1, errors.WithStack(err)
 	}
@@ -468,34 +465,47 @@ func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, 
 	save := false
 
 	// calculate key from template
-	userKey, err := e.template(ctx, t, pod, logf, s.Key)
+	cacheKey, err := e.template(ctx, t, pod, logf, s.Key)
 	if err != nil {
 		return -1, errors.WithStack(err)
 	}
-	fmt.Fprintf(logf, "cache key %q\n", userKey)
+	fmt.Fprintf(logf, "cache key %q\n", cacheKey)
 
 	// append cache prefix
-	key := t.Spec.CachePrefix + "-" + userKey
+	fullCacheKey := t.Spec.CachePrefix + "-" + cacheKey
 
 	// check that the cache key doesn't already exists
-	resp, err := e.runserviceClient.CheckCache(ctx, key, false)
+	resp, err := e.runserviceClient.CheckCache(ctx, fullCacheKey, false)
 	if err != nil {
 		// ignore 404 errors since they means that the cache key doesn't exists
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			fmt.Fprintf(logf, "no cache available for key %q. Saving.\n", userKey)
+			fmt.Fprintf(logf, "no cache available for key %q. Saving.\n", cacheKey)
 			save = true
 		} else {
 			// TODO(sgotti) retry before giving up
-			fmt.Fprintf(logf, "error checking for cache key %q: %v\n", userKey, err)
+			fmt.Fprintf(logf, "error checking for cache key %q: %v\n", cacheKey, err)
 			return -1, errors.WithStack(err)
 		}
 	}
 	if !save {
-		fmt.Fprintf(logf, "cache for key %q already exists\n", userKey)
+		fmt.Fprintf(logf, "cache for key %q already exists\n", cacheKey)
 		return 0, nil
 	}
 
-	fmt.Fprintf(logf, "archiving cache with key %q\n", userKey)
+	fmt.Fprintf(logf, "archiving cache with key %q\n", cacheKey)
+	exitCode, err := e.archiveCache(ctx, s, t, pod, logf, archivePath)
+	if err != nil {
+		return exitCode, err
+	}
+
+	if err := e.SendCache(ctx, fullCacheKey, archivePath); err != nil {
+		return exitCode, errors.WithStack(err)
+	}
+
+	return exitCode, nil
+}
+
+func (e *Executor) archiveCache(ctx context.Context, s *types.SaveCacheStep, t *types.ExecutorTask, pod driver.Pod, logf io.Writer, archivePath string) (int, error) {
 	if err := os.MkdirAll(filepath.Dir(archivePath), 0770); err != nil {
 		return -1, errors.WithStack(err)
 	}
@@ -510,6 +520,8 @@ func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, 
 		_, _ = io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.Spec.WorkingDir, err))
 		return -1, errors.WithStack(err)
 	}
+
+	cmd := []string{toolboxContainerPath, "archive"}
 
 	execConfig := &driver.ExecConfig{
 		Cmd:         cmd,
@@ -547,7 +559,6 @@ func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, 
 			DestDir:   c.DestDir,
 			Paths:     c.Paths,
 		}
-
 	}
 
 	stdin := ce.Stdin()
@@ -567,24 +578,29 @@ func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, 
 		return exitCode, errors.Errorf("save cache archiving command ended with exit code %d", exitCode)
 	}
 
-	f, err := os.Open(archivePath)
+	return exitCode, nil
+}
+
+func (e *Executor) SendCache(ctx context.Context, fullCacheKey, cacheArchivePath string) error {
+	f, err := os.Open(cacheArchivePath)
 	if err != nil {
-		return -1, errors.WithStack(err)
+		return errors.WithStack(err)
 	}
+	defer f.Close()
+
 	fi, err := f.Stat()
 	if err != nil {
-		return -1, errors.WithStack(err)
+		return errors.WithStack(err)
 	}
 
 	// send cache archive to scheduler
-	if resp, err := e.runserviceClient.PutCache(ctx, key, fi.Size(), f); err != nil {
-		if resp != nil && resp.StatusCode == http.StatusNotModified {
-			return exitCode, nil
+	if resp, err := e.runserviceClient.PutCache(ctx, fullCacheKey, fi.Size(), f); err != nil {
+		if resp == nil || (resp != nil && resp.StatusCode != http.StatusNotModified) {
+			return errors.WithStack(err)
 		}
-		return -1, errors.WithStack(err)
 	}
 
-	return exitCode, nil
+	return nil
 }
 
 func (e *Executor) doRestoreCacheStep(ctx context.Context, s *types.RestoreCacheStep, t *types.ExecutorTask, pod driver.Pod, logPath string) (int, error) {
@@ -598,29 +614,29 @@ func (e *Executor) doRestoreCacheStep(ctx context.Context, s *types.RestoreCache
 	defer logf.Close()
 
 	fmt.Fprintf(logf, "restoring cache: %s\n", util.Dump(s))
-	for _, key := range s.Keys {
+	for _, cacheKeyTemplate := range s.Keys {
 		// calculate key from template
-		userKey, err := e.template(ctx, t, pod, logf, key)
+		cacheKey, err := e.template(ctx, t, pod, logf, cacheKeyTemplate)
 		if err != nil {
 			return -1, errors.WithStack(err)
 		}
-		fmt.Fprintf(logf, "cache key %q\n", userKey)
+		fmt.Fprintf(logf, "cache key %q\n", cacheKey)
 
 		// append cache prefix
-		key := t.Spec.CachePrefix + "-" + userKey
+		fullCacheKey := t.Spec.CachePrefix + "-" + cacheKey
 
-		resp, err := e.runserviceClient.GetCache(ctx, key, true)
+		resp, err := e.runserviceClient.GetCache(ctx, fullCacheKey, true)
 		if err != nil {
 			// ignore 404 errors since they means that the cache key doesn't exists
 			if resp != nil && resp.StatusCode == http.StatusNotFound {
-				fmt.Fprintf(logf, "no cache available for key %q\n", userKey)
+				fmt.Fprintf(logf, "no cache available for key %q\n", cacheKey)
 				continue
 			}
 			// TODO(sgotti) retry before giving up
 			fmt.Fprintf(logf, "error reading cache: %v\n", err)
 			return -1, errors.WithStack(err)
 		}
-		fmt.Fprintf(logf, "restoring cache with key %q\n", userKey)
+		fmt.Fprintf(logf, "restoring cache with key %q\n", cacheKey)
 		cachef := resp.Body
 		if err := e.unarchive(ctx, t, cachef, pod, logf, s.DestDir, false, false); err != nil {
 			cachef.Close()
