@@ -25,7 +25,8 @@ import (
 	"strconv"
 	"strings"
 
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
+
 	"agola.io/agola/internal/util"
 	rsapitypes "agola.io/agola/services/runservice/api/types"
 	rstypes "agola.io/agola/services/runservice/types"

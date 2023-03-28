@@ -19,9 +19,9 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog/log"
+	"github.com/sorintlab/errors"
 	"github.com/spf13/cobra"
 
-	"agola.io/agola/internal/errors"
 	gwclient "agola.io/agola/services/gateway/client"
 )
 

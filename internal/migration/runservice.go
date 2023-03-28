@@ -10,9 +10,9 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/rs/zerolog/log"
+	"github.com/sorintlab/errors"
 
 	idb "agola.io/agola/internal/db"
-	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/lock"
 	oldrstypes "agola.io/agola/internal/migration/runservice/types"
 	ndb "agola.io/agola/internal/services/runservice/db"

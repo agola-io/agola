@@ -18,7 +18,8 @@ import (
 	"net/url"
 	"path"
 
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
+
 	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 )

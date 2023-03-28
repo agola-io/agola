@@ -19,8 +19,8 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid"
+	"github.com/sorintlab/errors"
 
-	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/configstore/db"
 	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"

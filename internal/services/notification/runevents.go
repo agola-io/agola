@@ -23,7 +23,8 @@ import (
 	"net/http"
 	"time"
 
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
+
 	"agola.io/agola/internal/lock"
 	rstypes "agola.io/agola/services/runservice/types"
 )

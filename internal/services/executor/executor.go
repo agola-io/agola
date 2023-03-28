@@ -34,9 +34,9 @@ import (
 	sockaddr "github.com/hashicorp/go-sockaddr"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/common"
-	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/executor/driver"
 	"agola.io/agola/internal/services/executor/registry"

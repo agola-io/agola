@@ -21,8 +21,9 @@ import (
 	"path"
 	"regexp"
 
+	"github.com/sorintlab/errors"
+
 	"agola.io/agola/internal/config"
-	"agola.io/agola/internal/errors"
 	gitsource "agola.io/agola/internal/gitsources"
 	"agola.io/agola/internal/runconfig"
 	scommon "agola.io/agola/internal/services/common"

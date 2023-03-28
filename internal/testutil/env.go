@@ -20,7 +20,7 @@ import (
 	"strings"
 	"unicode"
 
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
 )
 
 func ParseEnv(envvar string) (string, string, error) {

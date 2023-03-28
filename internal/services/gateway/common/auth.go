@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid"
+	"github.com/sorintlab/errors"
 
-	"agola.io/agola/internal/errors"
 	scommon "agola.io/agola/internal/services/common"
 )
 

@@ -32,6 +32,7 @@ import (
 	"code.gitea.io/sdk/gitea"
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/zerolog"
+	"github.com/sorintlab/errors"
 	"gopkg.in/src-d/go-billy.v4/memfs"
 	"gopkg.in/src-d/go-billy.v4/osfs"
 	"gopkg.in/src-d/go-git.v4"
@@ -43,7 +44,6 @@ import (
 	"gopkg.in/src-d/go-git.v4/storage/filesystem"
 	"gopkg.in/src-d/go-git.v4/storage/memory"
 
-	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/configstore"
 	"agola.io/agola/internal/services/executor"

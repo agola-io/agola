@@ -20,7 +20,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
 )
 
 // writeFileAtomicFunc atomically writes a file, it achieves this by creating a

@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
 )
 
 const (

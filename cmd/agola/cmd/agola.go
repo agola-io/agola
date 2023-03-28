@@ -21,10 +21,10 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/sorintlab/errors"
 	"github.com/spf13/cobra"
 
 	"agola.io/agola/cmd"
-	"agola.io/agola/internal/errors"
 )
 
 var token string

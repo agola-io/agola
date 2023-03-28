@@ -18,7 +18,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
 )
 
 const (

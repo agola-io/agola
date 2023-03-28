@@ -20,8 +20,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
-
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
 )
 
 type TokenSigningData struct {

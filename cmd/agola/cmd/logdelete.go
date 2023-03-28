@@ -18,9 +18,9 @@ import (
 	"context"
 
 	"github.com/rs/zerolog/log"
+	"github.com/sorintlab/errors"
 	"github.com/spf13/cobra"
 
-	"agola.io/agola/internal/errors"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 )

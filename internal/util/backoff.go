@@ -19,7 +19,7 @@ import (
 	"math/rand"
 	"time"
 
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
 )
 
 // DefaultRetry is the recommended retry for a conflict where multiple clients

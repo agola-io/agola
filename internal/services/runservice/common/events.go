@@ -15,7 +15,8 @@
 package common
 
 import (
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
+
 	"agola.io/agola/internal/services/runservice/db"
 	"agola.io/agola/internal/sql"
 	"agola.io/agola/services/runservice/types"

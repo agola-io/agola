@@ -9,8 +9,7 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/lib/pq"
 	"github.com/mattn/go-sqlite3"
-
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
 )
 
 type Type string

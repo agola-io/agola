@@ -18,9 +18,9 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/sorintlab/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/types"
 )

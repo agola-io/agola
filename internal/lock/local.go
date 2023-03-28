@@ -4,9 +4,8 @@ import (
 	"context"
 	"sync"
 
+	"github.com/sorintlab/errors"
 	"golang.org/x/sync/semaphore"
-
-	"agola.io/agola/internal/errors"
 )
 
 type LocalLocks struct {

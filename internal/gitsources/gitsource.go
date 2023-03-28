@@ -17,9 +17,9 @@ package gitsource
 import (
 	"net/http"
 
+	"github.com/sorintlab/errors"
 	"golang.org/x/oauth2"
 
-	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/types"
 )
 

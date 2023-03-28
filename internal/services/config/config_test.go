@@ -19,7 +19,7 @@ import (
 	"path"
 	"testing"
 
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
 )
 
 func TestParseConfig(t *testing.T) {

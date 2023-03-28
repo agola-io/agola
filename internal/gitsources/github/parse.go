@@ -22,8 +22,8 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v50/github"
+	"github.com/sorintlab/errors"
 
-	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/types"
 )
 

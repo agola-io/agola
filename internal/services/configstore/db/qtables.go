@@ -2,8 +2,8 @@ package db
 
 import (
 	sq "github.com/Masterminds/squirrel"
+	"github.com/sorintlab/errors"
 
-	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/sql"
 	"agola.io/agola/services/configstore/types"
 	stypes "agola.io/agola/services/types"

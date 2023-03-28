@@ -21,7 +21,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
+
 	"agola.io/agola/internal/services/executor/registry"
 	"agola.io/agola/services/types"
 )

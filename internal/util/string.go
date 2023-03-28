@@ -19,7 +19,7 @@ import (
 	"io"
 	"strings"
 
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
 )
 
 func CountLines(s string) (uint, error) {

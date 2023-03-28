@@ -17,9 +17,8 @@ package cmd
 import (
 	"os"
 
+	"github.com/sorintlab/errors"
 	"github.com/spf13/cobra"
-
-	"agola.io/agola/internal/errors"
 )
 
 var cmdCompletion = &cobra.Command{

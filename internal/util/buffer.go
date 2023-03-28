@@ -18,7 +18,7 @@ import (
 	"bytes"
 	"io"
 
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
 )
 
 type LimitedBuffer struct {

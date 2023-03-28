@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/sorintlab/errors"
 
-	"agola.io/agola/internal/errors"
 	"agola.io/agola/services/runservice/types"
 )
 

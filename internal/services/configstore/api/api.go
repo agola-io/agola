@@ -19,8 +19,8 @@ import (
 	"net/url"
 
 	"github.com/gorilla/mux"
+	"github.com/sorintlab/errors"
 
-	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
 )
