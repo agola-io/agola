@@ -18,11 +18,11 @@ import (
 	"context"
 	"fmt"
 
-	"agola.io/agola/internal/errors"
-	gwclient "agola.io/agola/services/gateway/client"
-
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+
+	"agola.io/agola/internal/errors"
+	gwclient "agola.io/agola/services/gateway/client"
 )
 
 var cmdVersion = &cobra.Command{

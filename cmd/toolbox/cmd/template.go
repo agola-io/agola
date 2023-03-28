@@ -26,9 +26,9 @@ import (
 	"text/template"
 	"time"
 
-	"agola.io/agola/internal/errors"
-
 	"github.com/spf13/cobra"
+
+	"agola.io/agola/internal/errors"
 )
 
 var cmdTemplate = &cobra.Command{

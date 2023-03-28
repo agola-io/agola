@@ -20,13 +20,13 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/ghodss/yaml"
+	"k8s.io/apimachinery/pkg/api/resource"
+
 	"agola.io/agola/internal/errors"
 	itypes "agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/types"
-
-	"github.com/ghodss/yaml"
-	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const (

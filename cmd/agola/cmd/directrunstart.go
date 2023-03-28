@@ -23,16 +23,16 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/ghodss/yaml"
+	"github.com/gofrs/uuid"
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
+
 	"agola.io/agola/internal/errors"
 	gitsave "agola.io/agola/internal/git-save"
 	"agola.io/agola/internal/util"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
-
-	"github.com/ghodss/yaml"
-	"github.com/gofrs/uuid"
-	"github.com/rs/zerolog/log"
-	"github.com/spf13/cobra"
 )
 
 var cmdDirectRunStart = &cobra.Command{

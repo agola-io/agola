@@ -3,11 +3,11 @@ package types
 import (
 	"time"
 
-	"agola.io/agola/internal/sql"
-	stypes "agola.io/agola/services/types"
-
 	"github.com/gofrs/uuid"
 	"github.com/mitchellh/copystructure"
+
+	"agola.io/agola/internal/sql"
+	stypes "agola.io/agola/services/types"
 )
 
 const (

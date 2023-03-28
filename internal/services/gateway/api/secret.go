@@ -18,14 +18,14 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/gorilla/mux"
+	"github.com/rs/zerolog"
+
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
-
-	"github.com/gorilla/mux"
-	"github.com/rs/zerolog"
 )
 
 func createSecretResponse(s *csapitypes.Secret) *gwapitypes.SecretResponse {

@@ -15,14 +15,14 @@
 package action
 
 import (
+	"github.com/rs/zerolog"
+
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/lock"
 	"agola.io/agola/internal/services/configstore/db"
 	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
-
-	"github.com/rs/zerolog"
 )
 
 type ActionHandler struct {

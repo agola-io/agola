@@ -15,11 +15,11 @@
 package action
 
 import (
+	"github.com/rs/zerolog"
+
 	scommon "agola.io/agola/internal/services/common"
 	csclient "agola.io/agola/services/configstore/client"
 	rsclient "agola.io/agola/services/runservice/client"
-
-	"github.com/rs/zerolog"
 )
 
 type ActionHandler struct {

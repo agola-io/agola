@@ -5,11 +5,11 @@ import (
 	stdsql "database/sql"
 	"encoding/json"
 
+	sq "github.com/Masterminds/squirrel"
+
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/sql"
 	"agola.io/agola/services/configstore/types"
-
-	sq "github.com/Masterminds/squirrel"
 )
 
 func (d *DB) fetchRemoteSources(tx *sql.Tx, q sq.Sqlizer) ([]*types.RemoteSource, []string, error) {

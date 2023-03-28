@@ -1,11 +1,19 @@
 linters:
   enable:
+    - gci
     - stylecheck
     - errorlint
     - wrapcheck
     - paralleltest
 
 linters-settings:
+  gci:
+    sections:
+      - standard
+      - default
+      - prefix(agola.io/agola)
+      - blank
+      - dot
   wrapcheck:
     # An array of strings that specify substrings of signatures to ignore.
     # If this set, it will override the default set of ignored signatures.

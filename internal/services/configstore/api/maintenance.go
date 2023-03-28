@@ -17,11 +17,10 @@ package api
 import (
 	"net/http"
 
-	"agola.io/agola/internal/services/configstore/action"
-	"agola.io/agola/internal/util"
-
 	"github.com/rs/zerolog"
 
+	"agola.io/agola/internal/services/configstore/action"
+	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 )
 

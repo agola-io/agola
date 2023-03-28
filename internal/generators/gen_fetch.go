@@ -47,11 +47,11 @@ import (
 	stdsql "database/sql"
 	"encoding/json"
 
+	sq "github.com/Masterminds/squirrel"
+
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/sql"
 	"{{ .TypesPath }}"
-
-	sq "github.com/Masterminds/squirrel"
 )
 {{- range $index, $oi := .ObjectInfos }}
 

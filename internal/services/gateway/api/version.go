@@ -17,10 +17,10 @@ package api
 import (
 	"net/http"
 
+	"github.com/rs/zerolog"
+
 	"agola.io/agola/internal/services/gateway/action"
 	util "agola.io/agola/internal/util"
-
-	"github.com/rs/zerolog"
 )
 
 type VersionHandler struct {

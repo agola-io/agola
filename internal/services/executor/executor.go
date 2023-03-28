@@ -29,21 +29,20 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gofrs/uuid"
+	"github.com/gorilla/mux"
+	sockaddr "github.com/hashicorp/go-sockaddr"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+
 	"agola.io/agola/internal/common"
 	"agola.io/agola/internal/errors"
-
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/executor/driver"
 	"agola.io/agola/internal/services/executor/registry"
 	"agola.io/agola/internal/util"
 	rsclient "agola.io/agola/services/runservice/client"
 	"agola.io/agola/services/runservice/types"
-
-	"github.com/gofrs/uuid"
-	"github.com/gorilla/mux"
-	sockaddr "github.com/hashicorp/go-sockaddr"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 const (

@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"io"
 
-	"agola.io/agola/internal/errors"
-	"agola.io/agola/internal/sql"
-
 	sq "github.com/Masterminds/squirrel"
 	"github.com/rs/zerolog"
+
+	"agola.io/agola/internal/errors"
+	"agola.io/agola/internal/sql"
 )
 
 func Export(ctx context.Context, log zerolog.Logger, d DB, w io.Writer) error {

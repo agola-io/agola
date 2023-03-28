@@ -17,8 +17,9 @@ package config
 import (
 	"encoding/json"
 
-	"agola.io/agola/internal/errors"
 	"github.com/google/go-jsonnet"
+
+	"agola.io/agola/internal/errors"
 )
 
 func execJsonnet(configData []byte, configContext *ConfigContext) ([]byte, error) {

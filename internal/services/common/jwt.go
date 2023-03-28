@@ -19,8 +19,9 @@ import (
 	"encoding/json"
 	"time"
 
-	"agola.io/agola/internal/errors"
 	"github.com/golang-jwt/jwt/v4"
+
+	"agola.io/agola/internal/errors"
 )
 
 type TokenSigningData struct {

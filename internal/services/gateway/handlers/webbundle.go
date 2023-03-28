@@ -20,9 +20,9 @@ import (
 	"strings"
 	"text/template"
 
-	"agola.io/agola/webbundle"
-
 	assetfs "github.com/elazarl/go-bindata-assetfs"
+
+	"agola.io/agola/webbundle"
 )
 
 // TODO(sgotti) now the test web ui directly calls the run api url, but this is

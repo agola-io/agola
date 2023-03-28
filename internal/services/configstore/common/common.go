@@ -18,8 +18,9 @@ import (
 	"net/url"
 	"strings"
 
-	"agola.io/agola/internal/errors"
 	"github.com/gofrs/uuid"
+
+	"agola.io/agola/internal/errors"
 )
 
 type RefType int

@@ -19,8 +19,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"agola.io/agola/internal/errors"
 	"go.starlark.net/starlark"
+
+	"agola.io/agola/internal/errors"
 )
 
 func starlarkArgs(cc *ConfigContext) (starlark.Tuple, error) {

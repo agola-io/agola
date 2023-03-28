@@ -19,9 +19,10 @@ import (
 	"math"
 	"testing"
 
-	"agola.io/agola/internal/errors"
 	"github.com/google/go-cmp/cmp"
 	"go.starlark.net/starlark"
+
+	"agola.io/agola/internal/errors"
 )
 
 func TestStarlarkJSON(t *testing.T) {

@@ -21,15 +21,15 @@ import (
 	"net/url"
 	"strconv"
 
+	"github.com/gorilla/mux"
+	"github.com/rs/zerolog"
+
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	rstypes "agola.io/agola/services/runservice/types"
-
-	"github.com/gorilla/mux"
-	"github.com/rs/zerolog"
 )
 
 func createRunResponse(r *rstypes.Run, rc *rstypes.RunConfig) *gwapitypes.RunResponse {

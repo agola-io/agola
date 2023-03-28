@@ -17,11 +17,10 @@ package api
 import (
 	"net/http"
 
-	"agola.io/agola/internal/services/runservice/action"
-	"agola.io/agola/internal/util"
-
 	"github.com/rs/zerolog"
 
+	"agola.io/agola/internal/services/runservice/action"
+	"agola.io/agola/internal/util"
 	rsapitypes "agola.io/agola/services/runservice/api/types"
 )
 

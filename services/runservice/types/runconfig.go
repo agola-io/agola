@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/gofrs/uuid"
+	"github.com/mitchellh/copystructure"
+
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/sql"
 	stypes "agola.io/agola/services/types"
 	"agola.io/agola/util"
-
-	"github.com/gofrs/uuid"
-	"github.com/mitchellh/copystructure"
 )
 
 const (

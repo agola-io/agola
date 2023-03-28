@@ -17,9 +17,9 @@ package util
 import (
 	"regexp"
 
-	"agola.io/agola/internal/errors"
-
 	"github.com/gofrs/uuid"
+
+	"agola.io/agola/internal/errors"
 )
 
 var nameRegexp = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9]*([-]?[a-zA-Z0-9]+)+$`)

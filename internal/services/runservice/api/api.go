@@ -24,6 +24,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gorilla/mux"
+	"github.com/rs/zerolog"
+
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/services/runservice/action"
@@ -33,9 +36,6 @@ import (
 	"agola.io/agola/internal/util"
 	rsapitypes "agola.io/agola/services/runservice/api/types"
 	"agola.io/agola/services/runservice/types"
-
-	"github.com/gorilla/mux"
-	"github.com/rs/zerolog"
 )
 
 type LogsHandler struct {
@@ -943,7 +943,6 @@ func NewRunEventsHandler(log zerolog.Logger, d *db.DB, ost *objectstorage.ObjSto
 	}
 }
 
-//
 func (h *RunEventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 

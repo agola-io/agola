@@ -18,11 +18,11 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/gorilla/mux"
+
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
-
-	"github.com/gorilla/mux"
 )
 
 type ErrorResponse struct {

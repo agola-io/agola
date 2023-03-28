@@ -18,13 +18,13 @@ import (
 	"context"
 	"time"
 
+	"github.com/gofrs/uuid"
+
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/configstore/db"
 	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
-
-	"github.com/gofrs/uuid"
 )
 
 type CreateUserRequest struct {

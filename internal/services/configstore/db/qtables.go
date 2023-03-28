@@ -1,12 +1,12 @@
 package db
 
 import (
+	sq "github.com/Masterminds/squirrel"
+
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/sql"
 	"agola.io/agola/services/configstore/types"
 	stypes "agola.io/agola/services/types"
-
-	sq "github.com/Masterminds/squirrel"
 )
 
 var (

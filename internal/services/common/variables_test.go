@@ -17,10 +17,10 @@ package common
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 func TestFilterOverriddenVariables(t *testing.T) {

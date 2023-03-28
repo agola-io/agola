@@ -21,8 +21,9 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 
-	"agola.io/agola/internal/errors"
 	"golang.org/x/crypto/ssh"
+
+	"agola.io/agola/internal/errors"
 )
 
 // GenSSHKeyPair generate an ssh keypair in rsa format, returning the private

@@ -47,12 +47,12 @@ import (
 	"encoding/json"
 	"time"
 
+	sq "github.com/Masterminds/squirrel"
+
 	idb "agola.io/agola/internal/db"
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/sql"
 	"{{ .TypesPath }}"
-
-	sq "github.com/Masterminds/squirrel"
 )
 {{- range $index, $oi := .ObjectInfos }}
 

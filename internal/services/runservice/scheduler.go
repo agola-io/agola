@@ -23,6 +23,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/runconfig"
@@ -31,8 +33,6 @@ import (
 	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/runservice/types"
-
-	"github.com/rs/zerolog"
 )
 
 const (

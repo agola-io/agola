@@ -7,7 +7,7 @@ import (
 )
 
 // copied from zerolog console writer since they aren't exported
-//nolint
+// nolint
 const (
 	colorBlack = iota + 30
 	colorRed

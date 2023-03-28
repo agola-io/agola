@@ -26,6 +26,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/services/config"
@@ -36,8 +38,6 @@ import (
 	"agola.io/agola/internal/testutil"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/runservice/types"
-
-	"github.com/rs/zerolog"
 )
 
 func setupRunservice(ctx context.Context, t *testing.T, log zerolog.Logger, dir string) *Runservice {

@@ -17,10 +17,10 @@ package gitsource
 import (
 	"net/http"
 
+	"golang.org/x/oauth2"
+
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/types"
-
-	"golang.org/x/oauth2"
 )
 
 type CommitStatus string

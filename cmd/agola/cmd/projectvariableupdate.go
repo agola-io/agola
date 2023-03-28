@@ -19,13 +19,13 @@ import (
 	"io"
 	"os"
 
-	"agola.io/agola/internal/errors"
-	gwapitypes "agola.io/agola/services/gateway/api/types"
-	gwclient "agola.io/agola/services/gateway/client"
-
 	"github.com/ghodss/yaml"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+
+	"agola.io/agola/internal/errors"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
+	gwclient "agola.io/agola/services/gateway/client"
 )
 
 var cmdProjectVariableUpdate = &cobra.Command{

@@ -18,14 +18,14 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gorilla/csrf"
+	"github.com/rs/zerolog"
+
 	"agola.io/agola/internal/errors"
 	scommon "agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
 	csclient "agola.io/agola/services/configstore/client"
-
-	"github.com/gorilla/csrf"
-	"github.com/rs/zerolog"
 )
 
 type SkipCSRFOnTokenAuth struct {

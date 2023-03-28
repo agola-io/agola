@@ -19,14 +19,14 @@ import (
 	"io"
 	"os"
 
+	"github.com/ghodss/yaml"
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
+
 	config "agola.io/agola/internal/config"
 	"agola.io/agola/internal/errors"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
-
-	"github.com/ghodss/yaml"
-	"github.com/rs/zerolog/log"
-	"github.com/spf13/cobra"
 )
 
 var cmdProjectVariableCreate = &cobra.Command{

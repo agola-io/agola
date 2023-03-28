@@ -23,9 +23,9 @@ import (
 	"testing"
 	"time"
 
-	"agola.io/agola/internal/testutil"
-
 	"github.com/gofrs/uuid"
+
+	"agola.io/agola/internal/testutil"
 )
 
 func TestK8sPod(t *testing.T) {
