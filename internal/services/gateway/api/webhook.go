@@ -17,6 +17,8 @@ package api
 import (
 	"net/http"
 
+	"github.com/rs/zerolog"
+
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/gateway/action"
@@ -25,8 +27,6 @@ import (
 	csclient "agola.io/agola/services/configstore/client"
 	cstypes "agola.io/agola/services/configstore/types"
 	rsclient "agola.io/agola/services/runservice/client"
-
-	"github.com/rs/zerolog"
 )
 
 type webhooksHandler struct {

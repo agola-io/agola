@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"agola.io/agola/internal/errors"
-	"agola.io/agola/internal/sql"
-
 	sq "github.com/Masterminds/squirrel"
 	"github.com/rs/zerolog"
+
+	"agola.io/agola/internal/errors"
+	"agola.io/agola/internal/sql"
 )
 
 func rebuild(ctx context.Context, log zerolog.Logger, d DB) error {

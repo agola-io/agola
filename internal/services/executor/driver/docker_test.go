@@ -22,11 +22,11 @@ import (
 	"testing"
 	"time"
 
-	"agola.io/agola/internal/testutil"
-
 	"github.com/docker/docker/api/types"
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
+
+	"agola.io/agola/internal/testutil"
 )
 
 func TestDockerPod(t *testing.T) {

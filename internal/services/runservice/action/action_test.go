@@ -17,11 +17,11 @@ package action
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/runservice/types"
 	stypes "agola.io/agola/services/types"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 func TestRecreateRun(t *testing.T) {

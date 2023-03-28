@@ -8,6 +8,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/mitchellh/mapstructure"
+	"github.com/rs/zerolog/log"
+
 	idb "agola.io/agola/internal/db"
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/lock"
@@ -15,9 +18,6 @@ import (
 	ndb "agola.io/agola/internal/services/runservice/db"
 	"agola.io/agola/internal/sql"
 	"agola.io/agola/services/runservice/types"
-
-	"github.com/mitchellh/mapstructure"
-	"github.com/rs/zerolog/log"
 )
 
 func MigrateRunService(ctx context.Context, r io.Reader, w io.Writer) error {

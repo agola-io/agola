@@ -6,15 +6,15 @@ import (
 	"encoding/json"
 	"strings"
 
+	sq "github.com/Masterminds/squirrel"
+	"github.com/rs/zerolog"
+
 	idb "agola.io/agola/internal/db"
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/runservice/db/objects"
 	"agola.io/agola/internal/sql"
 	"agola.io/agola/services/runservice/types"
 	stypes "agola.io/agola/services/types"
-
-	sq "github.com/Masterminds/squirrel"
-	"github.com/rs/zerolog"
 )
 
 //go:generate ../../../../tools/bin/generators -component runservice

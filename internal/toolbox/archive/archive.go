@@ -22,8 +22,9 @@ import (
 	"path"
 	"path/filepath"
 
-	"agola.io/agola/internal/errors"
 	"github.com/bmatcuk/doublestar"
+
+	"agola.io/agola/internal/errors"
 )
 
 type Archive struct {

@@ -17,11 +17,11 @@ package cmd
 import (
 	"context"
 
-	"agola.io/agola/internal/errors"
-	gwclient "agola.io/agola/services/gateway/client"
-
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+
+	"agola.io/agola/internal/errors"
+	gwclient "agola.io/agola/services/gateway/client"
 )
 
 var cmdProjectReconfig = &cobra.Command{

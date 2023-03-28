@@ -21,6 +21,13 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/golang-jwt/jwt/v4"
+	"github.com/gorilla/csrf"
+	ghandlers "github.com/gorilla/handlers"
+	"github.com/gorilla/mux"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+
 	icommon "agola.io/agola/internal/common"
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/objectstorage"
@@ -33,13 +40,6 @@ import (
 	"agola.io/agola/internal/util"
 	csclient "agola.io/agola/services/configstore/client"
 	rsclient "agola.io/agola/services/runservice/client"
-
-	"github.com/golang-jwt/jwt/v4"
-	"github.com/gorilla/csrf"
-	ghandlers "github.com/gorilla/handlers"
-	"github.com/gorilla/mux"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 const (

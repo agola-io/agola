@@ -26,11 +26,11 @@ import (
 	"strings"
 	"time"
 
-	"agola.io/agola/internal/errors"
-	gitsource "agola.io/agola/internal/gitsources"
-
 	"code.gitea.io/sdk/gitea"
 	"golang.org/x/oauth2"
+
+	"agola.io/agola/internal/errors"
+	gitsource "agola.io/agola/internal/gitsources"
 )
 
 var (

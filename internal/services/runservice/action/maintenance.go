@@ -21,12 +21,12 @@ import (
 	"io"
 	"time"
 
+	sq "github.com/Masterminds/squirrel"
+
 	idb "agola.io/agola/internal/db"
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
-
-	sq "github.com/Masterminds/squirrel"
 )
 
 var sb = sq.StatementBuilder.PlaceholderFormat(sq.Dollar)

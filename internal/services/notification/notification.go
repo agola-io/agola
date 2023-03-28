@@ -17,14 +17,14 @@ package notification
 import (
 	"context"
 
+	"github.com/rs/zerolog"
+
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/lock"
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/sql"
 	csclient "agola.io/agola/services/configstore/client"
 	rsclient "agola.io/agola/services/runservice/client"
-
-	"github.com/rs/zerolog"
 )
 
 type NotificationService struct {

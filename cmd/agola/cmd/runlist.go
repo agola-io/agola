@@ -19,12 +19,12 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
+
 	"agola.io/agola/internal/errors"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
-
-	"github.com/rs/zerolog/log"
-	"github.com/spf13/cobra"
 )
 
 var cmdRunList = &cobra.Command{

@@ -20,10 +20,10 @@ import (
 	"log"
 	"os"
 
-	"agola.io/agola/internal/toolbox/unarchive"
 	"github.com/mitchellh/go-homedir"
-
 	"github.com/spf13/cobra"
+
+	"agola.io/agola/internal/toolbox/unarchive"
 )
 
 var cmdUnarchive = &cobra.Command{

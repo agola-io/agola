@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"time"
 
+	sq "github.com/Masterminds/squirrel"
+
 	idb "agola.io/agola/internal/db"
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/sql"
 	"agola.io/agola/services/runservice/types"
-
-	sq "github.com/Masterminds/squirrel"
 )
 
 func (d *DB) InsertOrUpdateSequence(tx *sql.Tx, v *types.Sequence) error {

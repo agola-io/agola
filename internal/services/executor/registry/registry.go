@@ -19,9 +19,9 @@ import (
 	"fmt"
 	"strings"
 
-	"agola.io/agola/internal/errors"
-
 	"github.com/google/go-containerregistry/pkg/name"
+
+	"agola.io/agola/internal/errors"
 )
 
 //func registryAuthToken(auth *types.DockerRegistryAuth) (string, error) {

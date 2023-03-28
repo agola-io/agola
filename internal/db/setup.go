@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"time"
 
+	sq "github.com/Masterminds/squirrel"
+	"github.com/rs/zerolog"
+
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/lock"
 	"agola.io/agola/internal/sql"
 	stypes "agola.io/agola/services/types"
-
-	sq "github.com/Masterminds/squirrel"
-	"github.com/rs/zerolog"
 )
 
 const (

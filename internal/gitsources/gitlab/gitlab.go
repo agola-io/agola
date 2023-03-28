@@ -26,11 +26,11 @@ import (
 	"strings"
 	"time"
 
-	"agola.io/agola/internal/errors"
-	gitsource "agola.io/agola/internal/gitsources"
-
 	gitlab "github.com/xanzy/go-gitlab"
 	"golang.org/x/oauth2"
+
+	"agola.io/agola/internal/errors"
+	gitsource "agola.io/agola/internal/gitsources"
 )
 
 var (

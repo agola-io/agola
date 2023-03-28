@@ -20,11 +20,11 @@ import (
 	"log"
 	"os"
 
+	"github.com/mitchellh/go-homedir"
+	"github.com/spf13/cobra"
+
 	"agola.io/agola/internal/toolbox/archive"
 	"agola.io/agola/internal/util"
-	"github.com/mitchellh/go-homedir"
-
-	"github.com/spf13/cobra"
 )
 
 var cmdArchive = &cobra.Command{

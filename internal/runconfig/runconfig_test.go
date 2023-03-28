@@ -20,14 +20,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"k8s.io/apimachinery/pkg/api/resource"
+
 	"agola.io/agola/internal/config"
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/util"
 	rstypes "agola.io/agola/services/runservice/types"
 	"agola.io/agola/services/types"
-	"k8s.io/apimachinery/pkg/api/resource"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 var uuid = &util.TestUUIDGenerator{}

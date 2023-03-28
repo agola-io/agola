@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gofrs/uuid"
+
 	"agola.io/agola/internal/errors"
 	scommon "agola.io/agola/internal/services/common"
-
-	"github.com/gofrs/uuid"
 )
 
 type ContextKey int

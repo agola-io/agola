@@ -17,10 +17,10 @@ package types
 import (
 	"time"
 
+	"github.com/gofrs/uuid"
+
 	"agola.io/agola/internal/sql"
 	stypes "agola.io/agola/services/types"
-
-	"github.com/gofrs/uuid"
 )
 
 const (

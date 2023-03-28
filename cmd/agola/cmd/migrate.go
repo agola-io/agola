@@ -18,11 +18,11 @@ import (
 	"context"
 	"os"
 
-	"agola.io/agola/internal/errors"
-	"agola.io/agola/internal/migration"
-
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+
+	"agola.io/agola/internal/errors"
+	"agola.io/agola/internal/migration"
 )
 
 var cmdMigrate = &cobra.Command{

@@ -19,10 +19,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	"agola.io/agola/internal/testutil"
 	"agola.io/agola/services/runservice/types"
 	ctypes "agola.io/agola/services/types"
-	"github.com/google/go-cmp/cmp"
 )
 
 func TestAdvanceRunTasks(t *testing.T) {

@@ -19,10 +19,10 @@ import (
 	"net/http"
 	"net/url"
 
-	util "agola.io/agola/internal/util"
-
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
+
+	util "agola.io/agola/internal/util"
 )
 
 type ReposHandler struct {

@@ -29,10 +29,10 @@ import (
 	"text/template"
 	"time"
 
-	"agola.io/agola/internal/errors"
-
 	"github.com/gofrs/uuid"
 	"github.com/sgotti/gexpect"
+
+	"agola.io/agola/internal/errors"
 )
 
 const (

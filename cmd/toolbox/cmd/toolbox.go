@@ -18,9 +18,9 @@ import (
 	"log"
 	"os"
 
-	"agola.io/agola/cmd"
-
 	"github.com/spf13/cobra"
+
+	"agola.io/agola/cmd"
 )
 
 var CmdToolbox = &cobra.Command{

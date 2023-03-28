@@ -27,10 +27,6 @@ import (
 	"strings"
 	"time"
 
-	"agola.io/agola/internal/errors"
-	"agola.io/agola/internal/services/executor/registry"
-	"agola.io/agola/services/types"
-
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -40,6 +36,10 @@ import (
 	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/rs/zerolog"
+
+	"agola.io/agola/internal/errors"
+	"agola.io/agola/internal/services/executor/registry"
+	"agola.io/agola/services/types"
 )
 
 type DockerDriver struct {

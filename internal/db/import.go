@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/rs/zerolog"
+
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/sql"
-
-	"github.com/rs/zerolog"
 )
 
 func Import(ctx context.Context, log zerolog.Logger, d DB, r io.Reader) error {

@@ -17,11 +17,11 @@ package api
 import (
 	"net/http"
 
+	"github.com/rs/zerolog"
+
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
-
-	"github.com/rs/zerolog"
 )
 
 type OAuth2CallbackHandler struct {

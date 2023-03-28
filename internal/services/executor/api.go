@@ -23,9 +23,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"agola.io/agola/internal/errors"
 	"agola.io/agola/services/runservice/types"
-	"github.com/rs/zerolog"
 )
 
 type taskSubmissionHandler struct {

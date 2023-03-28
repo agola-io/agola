@@ -20,8 +20,9 @@ import (
 	"os"
 	"strings"
 
-	"agola.io/agola/internal/errors"
 	minio "github.com/minio/minio-go/v6"
+
+	"agola.io/agola/internal/errors"
 )
 
 type S3Storage struct {

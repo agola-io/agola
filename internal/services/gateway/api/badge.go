@@ -18,11 +18,11 @@ import (
 	"net/http"
 	"net/url"
 
-	"agola.io/agola/internal/services/gateway/action"
-	"agola.io/agola/internal/util"
-
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
+
+	"agola.io/agola/internal/services/gateway/action"
+	"agola.io/agola/internal/util"
 )
 
 type BadgeHandler struct {
