@@ -18,7 +18,8 @@ import (
 	"io"
 	"time"
 
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
+
 	"agola.io/agola/internal/util"
 )
 

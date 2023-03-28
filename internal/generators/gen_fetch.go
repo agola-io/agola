@@ -47,9 +47,9 @@ import (
 	stdsql "database/sql"
 	"encoding/json"
 
+	"github.com/sorintlab/errors"
 	sq "github.com/Masterminds/squirrel"
 
-	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/sql"
 	"{{ .TypesPath }}"
 )

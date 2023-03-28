@@ -20,9 +20,8 @@ import (
 	"log"
 	"os"
 
+	"github.com/sorintlab/errors"
 	"github.com/spf13/cobra"
-
-	"agola.io/agola/internal/errors"
 )
 
 var cmdCreateFile = &cobra.Command{

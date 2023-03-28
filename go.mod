@@ -30,6 +30,7 @@ require (
 	github.com/rs/zerolog v1.29.0
 	github.com/sanity-io/litter v1.5.5
 	github.com/sgotti/gexpect v0.0.0-20210315095146-1ec64e69809b
+	github.com/sorintlab/errors v0.0.0-20220601101606-37744c1b59fb
 	github.com/spf13/cobra v1.6.1
 	github.com/xanzy/go-gitlab v0.81.0
 	go.starlark.net v0.0.0-20230302034142-4b1e35fe2254

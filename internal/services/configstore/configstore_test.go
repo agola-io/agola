@@ -29,8 +29,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/rs/zerolog"
+	"github.com/sorintlab/errors"
 
-	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/configstore/action"
 	"agola.io/agola/internal/sql"

@@ -18,9 +18,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/sorintlab/errors"
 	yaml "gopkg.in/yaml.v2"
 
-	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
 )

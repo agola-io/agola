@@ -5,7 +5,8 @@ import (
 	stdsql "database/sql"
 	"hash/fnv"
 
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
+
 	"agola.io/agola/internal/sql"
 )
 

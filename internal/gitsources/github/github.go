@@ -29,9 +29,9 @@ import (
 	"time"
 
 	"github.com/google/go-github/v50/github"
+	"github.com/sorintlab/errors"
 	"golang.org/x/oauth2"
 
-	"agola.io/agola/internal/errors"
 	gitsource "agola.io/agola/internal/gitsources"
 )
 

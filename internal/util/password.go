@@ -15,9 +15,8 @@
 package util
 
 import (
+	"github.com/sorintlab/errors"
 	"golang.org/x/crypto/bcrypt"
-
-	"agola.io/agola/internal/errors"
 )
 
 func PasswordHash(password string) (string, error) {

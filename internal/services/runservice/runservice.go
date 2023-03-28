@@ -23,10 +23,10 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
+	"github.com/sorintlab/errors"
 
 	scommon "agola.io/agola/internal/common"
 	idb "agola.io/agola/internal/db"
-	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/lock"
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/services/config"

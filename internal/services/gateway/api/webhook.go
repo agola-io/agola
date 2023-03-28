@@ -18,8 +18,8 @@ import (
 	"net/http"
 
 	"github.com/rs/zerolog"
+	"github.com/sorintlab/errors"
 
-	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/services/types"

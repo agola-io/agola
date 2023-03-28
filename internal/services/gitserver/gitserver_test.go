@@ -21,7 +21,8 @@ import (
 	"testing"
 	"time"
 
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
+
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/testutil"
 	"agola.io/agola/internal/util"

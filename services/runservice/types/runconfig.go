@@ -6,8 +6,8 @@ import (
 
 	"github.com/gofrs/uuid"
 	"github.com/mitchellh/copystructure"
+	"github.com/sorintlab/errors"
 
-	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/sql"
 	stypes "agola.io/agola/services/types"
 	"agola.io/agola/util"

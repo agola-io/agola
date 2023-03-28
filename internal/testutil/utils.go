@@ -31,8 +31,7 @@ import (
 
 	"github.com/gofrs/uuid"
 	"github.com/sgotti/gexpect"
-
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
 )
 
 const (

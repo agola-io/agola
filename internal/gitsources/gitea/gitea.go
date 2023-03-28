@@ -27,9 +27,9 @@ import (
 	"time"
 
 	"code.gitea.io/sdk/gitea"
+	"github.com/sorintlab/errors"
 	"golang.org/x/oauth2"
 
-	"agola.io/agola/internal/errors"
 	gitsource "agola.io/agola/internal/gitsources"
 )
 

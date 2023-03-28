@@ -27,7 +27,7 @@ import (
 	"strings"
 	"syscall"
 
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
 )
 
 // scpSyntaxRe matches the SCP-like addresses used by Git to access repositories

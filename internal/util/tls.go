@@ -20,7 +20,7 @@ import (
 	"encoding/pem"
 	"os"
 
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
 )
 
 func NewTLSConfig(certFile, keyFile, caFile string, insecureSkipVerify bool) (*tls.Config, error) {

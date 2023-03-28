@@ -21,8 +21,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
+	"github.com/sorintlab/errors"
 
-	"agola.io/agola/internal/errors"
 	action "agola.io/agola/internal/services/configstore/action"
 	"agola.io/agola/internal/services/configstore/db"
 	"agola.io/agola/internal/sql"

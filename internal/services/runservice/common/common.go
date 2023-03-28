@@ -18,7 +18,8 @@ import (
 	"path"
 	"sort"
 
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
+
 	"agola.io/agola/internal/runconfig"
 	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"

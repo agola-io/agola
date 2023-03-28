@@ -20,7 +20,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
 )
 
 func TestEscapeUnescape(t *testing.T) {

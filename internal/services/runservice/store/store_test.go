@@ -17,7 +17,7 @@ package store
 import (
 	"testing"
 
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
 )
 
 func TestOSTRunTaskIDFromArchivePath(t *testing.T) {

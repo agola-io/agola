@@ -20,9 +20,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/sorintlab/errors"
 	"go.starlark.net/starlark"
-
-	"agola.io/agola/internal/errors"
 )
 
 func TestStarlarkJSON(t *testing.T) {

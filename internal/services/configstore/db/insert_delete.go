@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/sorintlab/errors"
 	sq "github.com/Masterminds/squirrel"
 
 	idb "agola.io/agola/internal/db"
-	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/sql"
 	"agola.io/agola/services/configstore/types"
 )

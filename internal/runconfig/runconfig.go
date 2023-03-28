@@ -18,8 +18,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/sorintlab/errors"
+
 	"agola.io/agola/internal/config"
-	"agola.io/agola/internal/errors"
 	itypes "agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 	rstypes "agola.io/agola/services/runservice/types"

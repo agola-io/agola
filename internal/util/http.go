@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
 )
 
 func HTTPResponse(w http.ResponseWriter, code int, res interface{}) error {

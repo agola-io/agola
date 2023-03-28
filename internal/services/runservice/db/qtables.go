@@ -4,8 +4,8 @@ import (
 	"strings"
 
 	sq "github.com/Masterminds/squirrel"
+	"github.com/sorintlab/errors"
 
-	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/sql"
 	"agola.io/agola/services/runservice/types"
 	stypes "agola.io/agola/services/types"

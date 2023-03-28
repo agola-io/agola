@@ -27,9 +27,9 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/sorintlab/errors"
 
 	icommon "agola.io/agola/internal/common"
-	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/objectstorage"
 	scommon "agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/config"

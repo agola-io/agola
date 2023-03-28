@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"github.com/mitchellh/copystructure"
+	"github.com/sorintlab/errors"
 
-	"agola.io/agola/internal/errors"
 	"agola.io/agola/services/types"
 	"agola.io/agola/util"
 )

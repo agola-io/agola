@@ -15,7 +15,8 @@
 package common
 
 import (
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
+
 	gitsource "agola.io/agola/internal/gitsources"
 	"agola.io/agola/internal/gitsources/gitea"
 	"agola.io/agola/internal/gitsources/github"

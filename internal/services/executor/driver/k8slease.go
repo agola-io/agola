@@ -19,13 +19,12 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/sorintlab/errors"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apilabels "k8s.io/apimachinery/pkg/labels"
-
-	"agola.io/agola/internal/errors"
 )
 
 type LeaseData struct {

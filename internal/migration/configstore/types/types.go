@@ -18,7 +18,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
+
 	"agola.io/agola/services/types"
 	"agola.io/agola/util"
 )

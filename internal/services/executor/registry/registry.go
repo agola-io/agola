@@ -20,8 +20,7 @@ import (
 	"strings"
 
 	"github.com/google/go-containerregistry/pkg/name"
-
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
 )
 
 //func registryAuthToken(auth *types.DockerRegistryAuth) (string, error) {

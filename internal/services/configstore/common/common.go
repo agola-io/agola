@@ -19,8 +19,7 @@ import (
 	"strings"
 
 	"github.com/gofrs/uuid"
-
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
 )
 
 type RefType int

@@ -8,9 +8,9 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/rs/zerolog"
+	"github.com/sorintlab/errors"
 
 	idb "agola.io/agola/internal/db"
-	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/services/runservice/db/objects"
 	"agola.io/agola/internal/sql"
 	"agola.io/agola/services/runservice/types"

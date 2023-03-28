@@ -26,8 +26,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/sorintlab/errors"
 
-	"agola.io/agola/internal/errors"
 	handlers "agola.io/agola/internal/git-handler"
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/util"

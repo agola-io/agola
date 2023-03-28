@@ -18,8 +18,7 @@ import (
 	"encoding/json"
 
 	"github.com/google/go-jsonnet"
-
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
 )
 
 func execJsonnet(configData []byte, configContext *ConfigContext) ([]byte, error) {

@@ -21,9 +21,9 @@ import (
 	"strings"
 
 	"github.com/ghodss/yaml"
+	"github.com/sorintlab/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	"agola.io/agola/internal/errors"
 	itypes "agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/types"

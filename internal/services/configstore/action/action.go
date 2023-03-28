@@ -16,8 +16,8 @@ package action
 
 import (
 	"github.com/rs/zerolog"
+	"github.com/sorintlab/errors"
 
-	"agola.io/agola/internal/errors"
 	"agola.io/agola/internal/lock"
 	"agola.io/agola/internal/services/configstore/db"
 	"agola.io/agola/internal/sql"

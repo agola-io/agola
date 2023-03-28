@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"strings"
 
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
 )
 
 // Errors is an error that contains multiple errors

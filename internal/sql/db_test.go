@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"agola.io/agola/internal/errors"
+	"github.com/sorintlab/errors"
 )
 
 func SetupDB(t *testing.T, ctx context.Context, dir string) *DB {
