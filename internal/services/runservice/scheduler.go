@@ -28,6 +28,7 @@ import (
 
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/runconfig"
+	rsapi "agola.io/agola/internal/services/runservice/api"
 	"agola.io/agola/internal/services/runservice/common"
 	"agola.io/agola/internal/services/runservice/store"
 	"agola.io/agola/internal/sql"
@@ -431,18 +432,15 @@ func (s *Runservice) sendExecutorTask(ctx context.Context, et *types.ExecutorTas
 		return errors.Errorf("no such run task with id %s for run %s", et.Spec.RunTaskID, r.ID)
 	}
 
-	// take a copy to not change the input executorTask
-	et = et.DeepCopy()
-
 	// generate ExecutorTaskSpecData
-	et.Spec.ExecutorTaskSpecData = common.GenExecutorTaskSpecData(r, rt, rc)
-
-	etj, err := json.Marshal(et)
+	etSpecData := common.GenExecutorTaskSpecData(r, rt, rc)
+	etRes := rsapi.GenExecutorTaskResponse(et, etSpecData)
+	etResj, err := json.Marshal(etRes)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	req, err := http.Post(executor.ListenURL+"/api/v1alpha/executor", "", bytes.NewReader(etj))
+	req, err := http.Post(executor.ListenURL+"/api/v1alpha/executor", "", bytes.NewReader(etResj))
 	if err != nil {
 		return errors.WithStack(err)
 	}

@@ -33,8 +33,47 @@ import (
 	"agola.io/agola/internal/services/runservice/store"
 	"agola.io/agola/internal/sql"
 	"agola.io/agola/internal/util"
+	rsapitypes "agola.io/agola/services/runservice/api/types"
 	"agola.io/agola/services/runservice/types"
 )
+
+func GenExecutorTaskResponse(et *types.ExecutorTask, etSpecData *types.ExecutorTaskSpecData) *rsapitypes.ExecutorTask {
+	apiet := &rsapitypes.ExecutorTask{
+		ID:         et.ID,
+		ExecutorID: et.Spec.ExecutorID,
+
+		Stop: et.Spec.Stop,
+
+		Status: &rsapitypes.ExecutorTaskStatus{
+			Phase:     et.Status.Phase,
+			Timedout:  et.Status.Timedout,
+			FailError: et.Status.FailError,
+			Steps:     make([]*rsapitypes.ExecutorTaskStepStatus, len(et.Status.Steps)),
+			StartTime: et.Status.StartTime,
+			EndTime:   et.Status.EndTime,
+		},
+
+		Spec: (*rsapitypes.ExecutorTaskSpecData)(etSpecData),
+	}
+
+	apiet.Status.SetupStep = rsapitypes.ExecutorTaskStepStatus{
+		Phase:      et.Status.SetupStep.Phase,
+		StartTime:  et.Status.SetupStep.StartTime,
+		EndTime:    et.Status.SetupStep.EndTime,
+		ExitStatus: et.Status.SetupStep.ExitStatus,
+	}
+
+	for i, s := range et.Status.Steps {
+		apiet.Status.Steps[i] = &rsapitypes.ExecutorTaskStepStatus{
+			Phase:      s.Phase,
+			StartTime:  s.StartTime,
+			EndTime:    s.EndTime,
+			ExitStatus: s.ExitStatus,
+		}
+	}
+
+	return apiet
+}
 
 type ExecutorStatusHandler struct {
 	log zerolog.Logger
@@ -48,13 +87,15 @@ func NewExecutorStatusHandler(log zerolog.Logger, d *db.DB, ah *action.ActionHan
 
 func (h *ExecutorStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	vars := mux.Vars(r)
+	executorID := vars["executorid"]
 
 	// TODO(sgotti) Check authorized call from executors
-	var recExecutor *types.Executor
+	var executorStatus *rsapitypes.ExecutorStatus
 	d := json.NewDecoder(r.Body)
 	defer r.Body.Close()
 
-	if err := d.Decode(&recExecutor); err != nil {
+	if err := d.Decode(&executorStatus); err != nil {
 		h.log.Err(err).Send()
 		http.Error(w, "", http.StatusBadRequest)
 		return
@@ -64,7 +105,7 @@ func (h *ExecutorStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
 		// TODO(sgotti) validate executor sent data
-		executor, err = h.d.GetExecutorByExecutorID(tx, recExecutor.ExecutorID)
+		executor, err = h.d.GetExecutorByExecutorID(tx, executorID)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -73,16 +114,16 @@ func (h *ExecutorStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 			executor = types.NewExecutor(tx)
 		}
 
-		executor.ExecutorID = recExecutor.ExecutorID
-		executor.ListenURL = recExecutor.ListenURL
-		executor.Archs = recExecutor.Archs
-		executor.Labels = recExecutor.Labels
-		executor.AllowPrivilegedContainers = recExecutor.AllowPrivilegedContainers
-		executor.ActiveTasksLimit = recExecutor.ActiveTasksLimit
-		executor.ActiveTasks = recExecutor.ActiveTasks
-		executor.Dynamic = recExecutor.Dynamic
-		executor.ExecutorGroup = recExecutor.ExecutorGroup
-		executor.SiblingsExecutors = recExecutor.SiblingsExecutors
+		executor.ExecutorID = executorID
+		executor.ListenURL = executorStatus.ListenURL
+		executor.Archs = executorStatus.Archs
+		executor.Labels = executorStatus.Labels
+		executor.AllowPrivilegedContainers = executorStatus.AllowPrivilegedContainers
+		executor.ActiveTasksLimit = executorStatus.ActiveTasksLimit
+		executor.ActiveTasks = executorStatus.ActiveTasks
+		executor.Dynamic = executorStatus.Dynamic
+		executor.ExecutorGroup = executorStatus.ExecutorGroup
+		executor.SiblingsExecutors = executorStatus.SiblingsExecutors
 
 		if err := h.d.InsertOrUpdateExecutor(tx, executor); err != nil {
 			return errors.WithStack(err)
@@ -158,9 +199,12 @@ func NewExecutorTaskStatusHandler(log zerolog.Logger, d *db.DB, c chan<- string)
 
 func (h *ExecutorTaskStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	vars := mux.Vars(r)
+	// executorID := vars["executorid"]
+	etID := vars["taskid"]
 
 	// TODO(sgotti) Check authorized call from executors
-	var et *types.ExecutorTask
+	var et *rsapitypes.ExecutorTaskStatus
 	d := json.NewDecoder(r.Body)
 	defer r.Body.Close()
 
@@ -170,20 +214,36 @@ func (h *ExecutorTaskStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	}
 
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
-		curEt, err := h.d.GetExecutorTask(tx, et.ID)
+		curEt, err := h.d.GetExecutorTask(tx, etID)
 		if err != nil {
 			return errors.WithStack(err)
 		}
-
-		//if curET.Revision >= et.Revision {
-		//	return nil, errors.Errorf("concurrency exception")
-		//}
 
 		if curEt == nil {
 			return nil
 		}
 
-		curEt.Status = et.Status
+		curEt.Status.Phase = et.Phase
+		curEt.Status.Timedout = et.Timedout
+		curEt.Status.FailError = et.FailError
+		curEt.Status.Steps = make([]*types.ExecutorTaskStepStatus, len(et.Steps))
+		curEt.Status.StartTime = et.StartTime
+		curEt.Status.EndTime = et.EndTime
+
+		curEt.Status.SetupStep = types.ExecutorTaskStepStatus{
+			Phase:      et.SetupStep.Phase,
+			StartTime:  et.SetupStep.StartTime,
+			EndTime:    et.SetupStep.EndTime,
+			ExitStatus: et.SetupStep.ExitStatus,
+		}
+		for i, s := range et.Steps {
+			curEt.Status.Steps[i] = &types.ExecutorTaskStepStatus{
+				Phase:      s.Phase,
+				StartTime:  s.StartTime,
+				EndTime:    s.EndTime,
+				ExitStatus: s.ExitStatus,
+			}
+		}
 
 		if err := h.d.UpdateExecutorTask(tx, curEt); err != nil {
 			return errors.WithStack(err)
@@ -196,7 +256,7 @@ func (h *ExecutorTaskStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	go func() { h.c <- et.ID }()
+	go func() { h.c <- etID }()
 }
 
 type ExecutorTaskHandler struct {
@@ -219,13 +279,15 @@ func (h *ExecutorTaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	et, err := h.ah.GetExecutorTask(ctx, etID)
+	ares, err := h.ah.GetExecutorTask(ctx, etID)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, et); err != nil {
+	res := GenExecutorTaskResponse(ares.Et, ares.EtSpecData)
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
 		h.log.Err(err).Send()
 	}
 }
@@ -250,13 +312,20 @@ func (h *ExecutorTasksHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	ets, err := h.ah.GetExecutorTasks(ctx, executorID)
+	ares, err := h.ah.GetExecutorTasks(ctx, executorID)
 	if err != nil {
 		http.Error(w, "", http.StatusInternalServerError)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(ets); err != nil {
+	res := []*rsapitypes.ExecutorTask{}
+
+	for _, ar := range ares {
+		res = append(res, GenExecutorTaskResponse(ar.Et, ar.EtSpecData))
+
+	}
+
+	if err := json.NewEncoder(w).Encode(res); err != nil {
 		http.Error(w, "", http.StatusInternalServerError)
 		return
 	}

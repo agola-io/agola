@@ -729,8 +729,14 @@ func (h *ActionHandler) getRunCounterGroupID(group string) (string, error) {
 	return pl[1], nil
 }
 
-func (h *ActionHandler) GetExecutorTask(ctx context.Context, etID string) (*types.ExecutorTask, error) {
+type GetExecutorTaskResponse struct {
+	Et         *types.ExecutorTask
+	EtSpecData *types.ExecutorTaskSpecData
+}
+
+func (h *ActionHandler) GetExecutorTask(ctx context.Context, etID string) (*GetExecutorTaskResponse, error) {
 	var et *types.ExecutorTask
+	var etSpecData *types.ExecutorTaskSpecData
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
 
@@ -764,7 +770,7 @@ func (h *ActionHandler) GetExecutorTask(ctx context.Context, etID string) (*type
 		}
 
 		// generate ExecutorTaskSpecData
-		et.Spec.ExecutorTaskSpecData = common.GenExecutorTaskSpecData(r, rt, rc)
+		etSpecData = common.GenExecutorTaskSpecData(r, rt, rc)
 
 		return nil
 	})
@@ -772,15 +778,15 @@ func (h *ActionHandler) GetExecutorTask(ctx context.Context, etID string) (*type
 		return nil, errors.WithStack(err)
 	}
 
-	return et, nil
+	return &GetExecutorTaskResponse{et, etSpecData}, nil
 }
 
-func (h *ActionHandler) GetExecutorTasks(ctx context.Context, executorID string) ([]*types.ExecutorTask, error) {
-	var ets []*types.ExecutorTask
+func (h *ActionHandler) GetExecutorTasks(ctx context.Context, executorID string) ([]*GetExecutorTaskResponse, error) {
+	var res []*GetExecutorTaskResponse
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
 
-		ets, err = h.d.GetExecutorTasksByExecutor(tx, executorID)
+		ets, err := h.d.GetExecutorTasksByExecutor(tx, executorID)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -808,7 +814,8 @@ func (h *ActionHandler) GetExecutorTasks(ctx context.Context, executorID string)
 			}
 
 			// generate ExecutorTaskSpecData
-			et.Spec.ExecutorTaskSpecData = common.GenExecutorTaskSpecData(r, rt, rc)
+			etSpecData := common.GenExecutorTaskSpecData(r, rt, rc)
+			res = append(res, &GetExecutorTaskResponse{et, etSpecData})
 		}
 
 		return nil
@@ -817,5 +824,5 @@ func (h *ActionHandler) GetExecutorTasks(ctx context.Context, executorID string)
 		return nil, errors.WithStack(err)
 	}
 
-	return ets, nil
+	return res, nil
 }

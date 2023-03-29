@@ -34,9 +34,9 @@ type ExecutorTask struct {
 	stypes.TypeMeta
 	stypes.ObjectMeta
 
-	Spec ExecutorTaskSpec `json:"spec,omitempty"`
-
 	Status ExecutorTaskStatus `json:"status,omitempty"`
+
+	Spec ExecutorTaskSpec `json:"spec,omitempty"`
 }
 
 func (et *ExecutorTask) DeepCopy() *ExecutorTask {
@@ -54,8 +54,6 @@ type ExecutorTaskSpec struct {
 
 	// Stop is used to signal from the scheduler when the task must be stopped
 	Stop bool `json:"stop,omitempty"`
-
-	*ExecutorTaskSpecData
 }
 
 // ExecutorTaskSpecData defines the task data required to execute the tasks.
