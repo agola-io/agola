@@ -102,30 +102,30 @@ func (c *Client) getParsedResponse(ctx context.Context, method, path string, que
 	return resp, errors.WithStack(d.Decode(obj))
 }
 
-func (c *Client) SendExecutorStatus(ctx context.Context, executor *rstypes.Executor) (*http.Response, error) {
+func (c *Client) SendExecutorStatus(ctx context.Context, executorID string, executor *rsapitypes.ExecutorStatus) (*http.Response, error) {
 	executorj, err := json.Marshal(executor)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	return c.getResponse(ctx, "POST", fmt.Sprintf("/executor/%s", executor.ExecutorID), nil, -1, jsonContent, bytes.NewReader(executorj))
+	return c.getResponse(ctx, "POST", fmt.Sprintf("/executor/%s", executorID), nil, -1, jsonContent, bytes.NewReader(executorj))
 }
 
-func (c *Client) SendExecutorTaskStatus(ctx context.Context, executorID string, et *rstypes.ExecutorTask) (*http.Response, error) {
+func (c *Client) SendExecutorTaskStatus(ctx context.Context, executorID, etID string, et *rsapitypes.ExecutorTaskStatus) (*http.Response, error) {
 	etj, err := json.Marshal(et)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	return c.getResponse(ctx, "POST", fmt.Sprintf("/executor/%s/tasks/%s", executorID, et.ID), nil, -1, jsonContent, bytes.NewReader(etj))
+	return c.getResponse(ctx, "POST", fmt.Sprintf("/executor/%s/tasks/%s", executorID, etID), nil, -1, jsonContent, bytes.NewReader(etj))
 }
 
-func (c *Client) GetExecutorTask(ctx context.Context, executorID, etID string) (*rstypes.ExecutorTask, *http.Response, error) {
-	et := new(rstypes.ExecutorTask)
+func (c *Client) GetExecutorTask(ctx context.Context, executorID, etID string) (*rsapitypes.ExecutorTask, *http.Response, error) {
+	et := new(rsapitypes.ExecutorTask)
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/executor/%s/tasks/%s", executorID, etID), nil, jsonContent, nil, et)
 	return et, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetExecutorTasks(ctx context.Context, executorID string) ([]*rstypes.ExecutorTask, *http.Response, error) {
-	ets := []*rstypes.ExecutorTask{}
+func (c *Client) GetExecutorTasks(ctx context.Context, executorID string) ([]*rsapitypes.ExecutorTask, *http.Response, error) {
+	ets := []*rsapitypes.ExecutorTask{}
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/executor/%s/tasks", executorID), nil, jsonContent, nil, &ets)
 	return ets, resp, errors.WithStack(err)
 }

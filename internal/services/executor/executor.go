@@ -41,6 +41,7 @@ import (
 	"agola.io/agola/internal/services/executor/driver"
 	"agola.io/agola/internal/services/executor/registry"
 	"agola.io/agola/internal/util"
+	rsapitypes "agola.io/agola/services/runservice/api/types"
 	rsclient "agola.io/agola/services/runservice/client"
 	"agola.io/agola/services/runservice/types"
 )
@@ -66,11 +67,11 @@ func (e *Executor) getAllPods(ctx context.Context, all bool) ([]driver.Pod, erro
 	return pods, errors.WithStack(err)
 }
 
-func stepUser(t *types.ExecutorTask) string {
+func stepUser(et *rsapitypes.ExecutorTask) string {
 	// use the container specified user and override with task user if defined
-	user := t.Spec.Containers[0].User
-	if t.Spec.User != "" {
-		user = t.Spec.User
+	user := et.Spec.Containers[0].User
+	if et.Spec.User != "" {
+		user = et.Spec.User
 	}
 
 	return user
@@ -110,7 +111,7 @@ func (e *Executor) createFile(ctx context.Context, pod driver.Pod, command, user
 	return buf.String(), nil
 }
 
-func (e *Executor) doRunStep(ctx context.Context, s *types.RunStep, t *types.ExecutorTask, pod driver.Pod, logPath string) (int, error) {
+func (e *Executor) doRunStep(ctx context.Context, s *types.RunStep, et *rsapitypes.ExecutorTask, pod driver.Pod, logPath string) (int, error) {
 	if err := os.MkdirAll(filepath.Dir(logPath), 0770); err != nil {
 		return -1, errors.WithStack(err)
 	}
@@ -123,8 +124,8 @@ func (e *Executor) doRunStep(ctx context.Context, s *types.RunStep, t *types.Exe
 	// TODO(sgotti) this line is used only for old runconfig versions that don't
 	// set a task default shell in the runconfig
 	shell := defaultShell
-	if t.Spec.Shell != "" {
-		shell = t.Spec.Shell
+	if et.Spec.Shell != "" {
+		shell = et.Spec.Shell
 	}
 	if s.Shell != "" {
 		shell = s.Shell
@@ -132,7 +133,7 @@ func (e *Executor) doRunStep(ctx context.Context, s *types.RunStep, t *types.Exe
 
 	var cmd []string
 	if s.Command != "" {
-		filename, err := e.createFile(ctx, pod, s.Command, stepUser(t), outf)
+		filename, err := e.createFile(ctx, pod, s.Command, stepUser(et), outf)
 		if err != nil {
 			return -1, errors.Wrapf(err, "create file err")
 		}
@@ -144,21 +145,21 @@ func (e *Executor) doRunStep(ctx context.Context, s *types.RunStep, t *types.Exe
 	}
 
 	// override task working dir with runstep working dir if provided
-	workingDir := t.Spec.WorkingDir
+	workingDir := et.Spec.WorkingDir
 	if s.WorkingDir != "" {
 		workingDir = s.WorkingDir
 	}
 
 	// generate the environment using the task environment and then overriding with the runstep environment
 	environment := map[string]string{}
-	for envName, envValue := range t.Spec.Environment {
+	for envName, envValue := range et.Spec.Environment {
 		environment[envName] = envValue
 	}
 	for envName, envValue := range s.Environment {
 		environment[envName] = envValue
 	}
 
-	workingDir, err = e.expandDir(ctx, t, pod, outf, workingDir)
+	workingDir, err = e.expandDir(ctx, et, pod, outf, workingDir)
 	if err != nil {
 		_, _ = outf.WriteString(fmt.Sprintf("failed to expand working dir %q. Error: %s\n", workingDir, err))
 		return -1, errors.WithStack(err)
@@ -168,7 +169,7 @@ func (e *Executor) doRunStep(ctx context.Context, s *types.RunStep, t *types.Exe
 		Cmd:         cmd,
 		Env:         environment,
 		WorkingDir:  workingDir,
-		User:        stepUser(t),
+		User:        stepUser(et),
 		AttachStdin: true,
 		Stdout:      outf,
 		Stderr:      outf,
@@ -188,7 +189,7 @@ func (e *Executor) doRunStep(ctx context.Context, s *types.RunStep, t *types.Exe
 	return exitCode, nil
 }
 
-func (e *Executor) doSaveToWorkspaceStep(ctx context.Context, s *types.SaveToWorkspaceStep, t *types.ExecutorTask, pod driver.Pod, logPath string, archivePath string) (int, error) {
+func (e *Executor) doSaveToWorkspaceStep(ctx context.Context, s *types.SaveToWorkspaceStep, et *rsapitypes.ExecutorTask, pod driver.Pod, logPath string, archivePath string) (int, error) {
 	cmd := []string{toolboxContainerPath, "archive"}
 
 	if err := os.MkdirAll(filepath.Dir(logPath), 0770); err != nil {
@@ -209,17 +210,17 @@ func (e *Executor) doSaveToWorkspaceStep(ctx context.Context, s *types.SaveToWor
 	}
 	defer archivef.Close()
 
-	workingDir, err := e.expandDir(ctx, t, pod, logf, t.Spec.WorkingDir)
+	workingDir, err := e.expandDir(ctx, et, pod, logf, et.Spec.WorkingDir)
 	if err != nil {
-		_, _ = logf.WriteString(fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.Spec.WorkingDir, err))
+		_, _ = logf.WriteString(fmt.Sprintf("failed to expand working dir %q. Error: %s\n", et.Spec.WorkingDir, err))
 		return -1, errors.WithStack(err)
 	}
 
 	execConfig := &driver.ExecConfig{
 		Cmd:         cmd,
-		Env:         t.Spec.Environment,
+		Env:         et.Spec.Environment,
 		WorkingDir:  workingDir,
-		User:        stepUser(t),
+		User:        stepUser(et),
 		AttachStdin: true,
 		Stdout:      archivef,
 		Stderr:      logf,
@@ -269,7 +270,7 @@ func (e *Executor) doSaveToWorkspaceStep(ctx context.Context, s *types.SaveToWor
 	return exitCode, nil
 }
 
-func (e *Executor) expandDir(ctx context.Context, t *types.ExecutorTask, pod driver.Pod, logf io.Writer, dir string) (string, error) {
+func (e *Executor) expandDir(ctx context.Context, et *rsapitypes.ExecutorTask, pod driver.Pod, logf io.Writer, dir string) (string, error) {
 	args := []string{dir}
 	cmd := append([]string{toolboxContainerPath, "expanddir"}, args...)
 
@@ -278,8 +279,8 @@ func (e *Executor) expandDir(ctx context.Context, t *types.ExecutorTask, pod dri
 
 	execConfig := &driver.ExecConfig{
 		Cmd:         cmd,
-		Env:         t.Spec.Environment,
-		User:        stepUser(t),
+		Env:         et.Spec.Environment,
+		User:        stepUser(et),
 		AttachStdin: true,
 		Stdout:      stdout,
 		Stderr:      logf,
@@ -301,14 +302,14 @@ func (e *Executor) expandDir(ctx context.Context, t *types.ExecutorTask, pod dri
 	return stdout.String(), nil
 }
 
-func (e *Executor) mkdir(ctx context.Context, t *types.ExecutorTask, pod driver.Pod, logf io.Writer, dir string) error {
+func (e *Executor) mkdir(ctx context.Context, et *rsapitypes.ExecutorTask, pod driver.Pod, logf io.Writer, dir string) error {
 	args := []string{dir}
 	cmd := append([]string{toolboxContainerPath, "mkdir"}, args...)
 
 	execConfig := &driver.ExecConfig{
 		Cmd:         cmd,
-		Env:         t.Spec.Environment,
-		User:        stepUser(t),
+		Env:         et.Spec.Environment,
+		User:        stepUser(et),
 		AttachStdin: true,
 		Stdout:      logf,
 		Stderr:      logf,
@@ -330,23 +331,23 @@ func (e *Executor) mkdir(ctx context.Context, t *types.ExecutorTask, pod driver.
 	return nil
 }
 
-func (e *Executor) template(ctx context.Context, t *types.ExecutorTask, pod driver.Pod, logf io.Writer, key string) (string, error) {
+func (e *Executor) template(ctx context.Context, et *rsapitypes.ExecutorTask, pod driver.Pod, logf io.Writer, key string) (string, error) {
 	cmd := []string{toolboxContainerPath, "template"}
 
 	// limit the template answer to max 1MiB
 	stdout := util.NewLimitedBuffer(1024 * 1024)
 
-	workingDir, err := e.expandDir(ctx, t, pod, logf, t.Spec.WorkingDir)
+	workingDir, err := e.expandDir(ctx, et, pod, logf, et.Spec.WorkingDir)
 	if err != nil {
-		_, _ = io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.Spec.WorkingDir, err))
+		_, _ = io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", et.Spec.WorkingDir, err))
 		return "", errors.WithStack(err)
 	}
 
 	execConfig := &driver.ExecConfig{
 		Cmd:         cmd,
-		Env:         t.Spec.Environment,
+		Env:         et.Spec.Environment,
 		WorkingDir:  workingDir,
-		User:        stepUser(t),
+		User:        stepUser(et),
 		AttachStdin: true,
 		Stdout:      stdout,
 		Stderr:      logf,
@@ -374,7 +375,7 @@ func (e *Executor) template(ctx context.Context, t *types.ExecutorTask, pod driv
 	return stdout.String(), nil
 }
 
-func (e *Executor) unarchive(ctx context.Context, t *types.ExecutorTask, source io.Reader, pod driver.Pod, logf io.Writer, destDir string, overwrite, removeDestDir bool) error {
+func (e *Executor) unarchive(ctx context.Context, et *rsapitypes.ExecutorTask, source io.Reader, pod driver.Pod, logf io.Writer, destDir string, overwrite, removeDestDir bool) error {
 	args := []string{"--destdir", destDir}
 	if overwrite {
 		args = append(args, "--overwrite")
@@ -384,17 +385,17 @@ func (e *Executor) unarchive(ctx context.Context, t *types.ExecutorTask, source 
 	}
 	cmd := append([]string{toolboxContainerPath, "unarchive"}, args...)
 
-	workingDir, err := e.expandDir(ctx, t, pod, logf, t.Spec.WorkingDir)
+	workingDir, err := e.expandDir(ctx, et, pod, logf, et.Spec.WorkingDir)
 	if err != nil {
-		_, _ = io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.Spec.WorkingDir, err))
+		_, _ = io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", et.Spec.WorkingDir, err))
 		return errors.WithStack(err)
 	}
 
 	execConfig := &driver.ExecConfig{
 		Cmd:         cmd,
-		Env:         t.Spec.Environment,
+		Env:         et.Spec.Environment,
 		WorkingDir:  workingDir,
-		User:        stepUser(t),
+		User:        stepUser(et),
 		AttachStdin: true,
 		Stdout:      logf,
 		Stderr:      logf,
@@ -422,7 +423,7 @@ func (e *Executor) unarchive(ctx context.Context, t *types.ExecutorTask, source 
 	return nil
 }
 
-func (e *Executor) doRestoreWorkspaceStep(ctx context.Context, s *types.RestoreWorkspaceStep, t *types.ExecutorTask, pod driver.Pod, logPath string) (int, error) {
+func (e *Executor) doRestoreWorkspaceStep(ctx context.Context, s *types.RestoreWorkspaceStep, et *rsapitypes.ExecutorTask, pod driver.Pod, logPath string) (int, error) {
 	if err := os.MkdirAll(filepath.Dir(logPath), 0770); err != nil {
 		return -1, errors.WithStack(err)
 	}
@@ -432,7 +433,7 @@ func (e *Executor) doRestoreWorkspaceStep(ctx context.Context, s *types.RestoreW
 	}
 	defer logf.Close()
 
-	for _, op := range t.Spec.WorkspaceOperations {
+	for _, op := range et.Spec.WorkspaceOperations {
 		e.log.Debug().Msgf("unarchiving workspace for taskID: %s, step: %d", op.TaskID, op.Step)
 		resp, err := e.runserviceClient.GetArchive(ctx, op.TaskID, op.Step)
 		if err != nil {
@@ -441,7 +442,7 @@ func (e *Executor) doRestoreWorkspaceStep(ctx context.Context, s *types.RestoreW
 			return -1, errors.WithStack(err)
 		}
 		archivef := resp.Body
-		if err := e.unarchive(ctx, t, archivef, pod, logf, s.DestDir, false, false); err != nil {
+		if err := e.unarchive(ctx, et, archivef, pod, logf, s.DestDir, false, false); err != nil {
 			archivef.Close()
 			return -1, errors.WithStack(err)
 		}
@@ -451,7 +452,7 @@ func (e *Executor) doRestoreWorkspaceStep(ctx context.Context, s *types.RestoreW
 	return 0, nil
 }
 
-func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, t *types.ExecutorTask, pod driver.Pod, logPath string, archivePath string) (int, error) {
+func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, et *rsapitypes.ExecutorTask, pod driver.Pod, logPath string, archivePath string) (int, error) {
 	if err := os.MkdirAll(filepath.Dir(logPath), 0770); err != nil {
 		return -1, errors.WithStack(err)
 	}
@@ -464,14 +465,14 @@ func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, 
 	save := false
 
 	// calculate key from template
-	cacheKey, err := e.template(ctx, t, pod, logf, s.Key)
+	cacheKey, err := e.template(ctx, et, pod, logf, s.Key)
 	if err != nil {
 		return -1, errors.WithStack(err)
 	}
 	fmt.Fprintf(logf, "cache key %q\n", cacheKey)
 
 	// append cache prefix
-	fullCacheKey := t.Spec.CachePrefix + "-" + cacheKey
+	fullCacheKey := et.Spec.CachePrefix + "-" + cacheKey
 
 	// check that the cache key doesn't already exists
 	resp, err := e.runserviceClient.CheckCache(ctx, fullCacheKey, false)
@@ -492,7 +493,7 @@ func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, 
 	}
 
 	fmt.Fprintf(logf, "archiving cache with key %q\n", cacheKey)
-	exitCode, err := e.archiveCache(ctx, s, t, pod, logf, archivePath)
+	exitCode, err := e.archiveCache(ctx, s, et, pod, logf, archivePath)
 	if err != nil {
 		return exitCode, err
 	}
@@ -504,7 +505,7 @@ func (e *Executor) doSaveCacheStep(ctx context.Context, s *types.SaveCacheStep, 
 	return exitCode, nil
 }
 
-func (e *Executor) archiveCache(ctx context.Context, s *types.SaveCacheStep, t *types.ExecutorTask, pod driver.Pod, logf io.Writer, archivePath string) (int, error) {
+func (e *Executor) archiveCache(ctx context.Context, s *types.SaveCacheStep, et *rsapitypes.ExecutorTask, pod driver.Pod, logf io.Writer, archivePath string) (int, error) {
 	if err := os.MkdirAll(filepath.Dir(archivePath), 0770); err != nil {
 		return -1, errors.WithStack(err)
 	}
@@ -514,9 +515,9 @@ func (e *Executor) archiveCache(ctx context.Context, s *types.SaveCacheStep, t *
 	}
 	defer archivef.Close()
 
-	workingDir, err := e.expandDir(ctx, t, pod, logf, t.Spec.WorkingDir)
+	workingDir, err := e.expandDir(ctx, et, pod, logf, et.Spec.WorkingDir)
 	if err != nil {
-		_, _ = io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", t.Spec.WorkingDir, err))
+		_, _ = io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", et.Spec.WorkingDir, err))
 		return -1, errors.WithStack(err)
 	}
 
@@ -524,9 +525,9 @@ func (e *Executor) archiveCache(ctx context.Context, s *types.SaveCacheStep, t *
 
 	execConfig := &driver.ExecConfig{
 		Cmd:         cmd,
-		Env:         t.Spec.Environment,
+		Env:         et.Spec.Environment,
 		WorkingDir:  workingDir,
-		User:        stepUser(t),
+		User:        stepUser(et),
 		AttachStdin: true,
 		Stdout:      archivef,
 		Stderr:      logf,
@@ -602,7 +603,7 @@ func (e *Executor) SendCache(ctx context.Context, fullCacheKey, cacheArchivePath
 	return nil
 }
 
-func (e *Executor) doRestoreCacheStep(ctx context.Context, s *types.RestoreCacheStep, t *types.ExecutorTask, pod driver.Pod, logPath string) (int, error) {
+func (e *Executor) doRestoreCacheStep(ctx context.Context, s *types.RestoreCacheStep, et *rsapitypes.ExecutorTask, pod driver.Pod, logPath string) (int, error) {
 	if err := os.MkdirAll(filepath.Dir(logPath), 0770); err != nil {
 		return -1, errors.WithStack(err)
 	}
@@ -615,14 +616,14 @@ func (e *Executor) doRestoreCacheStep(ctx context.Context, s *types.RestoreCache
 	fmt.Fprintf(logf, "restoring cache: %s\n", util.Dump(s))
 	for _, cacheKeyTemplate := range s.Keys {
 		// calculate key from template
-		cacheKey, err := e.template(ctx, t, pod, logf, cacheKeyTemplate)
+		cacheKey, err := e.template(ctx, et, pod, logf, cacheKeyTemplate)
 		if err != nil {
 			return -1, errors.WithStack(err)
 		}
 		fmt.Fprintf(logf, "cache key %q\n", cacheKey)
 
 		// append cache prefix
-		fullCacheKey := t.Spec.CachePrefix + "-" + cacheKey
+		fullCacheKey := et.Spec.CachePrefix + "-" + cacheKey
 
 		resp, err := e.runserviceClient.GetCache(ctx, fullCacheKey, true)
 		if err != nil {
@@ -637,7 +638,7 @@ func (e *Executor) doRestoreCacheStep(ctx context.Context, s *types.RestoreCache
 		}
 		fmt.Fprintf(logf, "restoring cache with key %q\n", cacheKey)
 		cachef := resp.Body
-		if err := e.unarchive(ctx, t, cachef, pod, logf, s.DestDir, false, false); err != nil {
+		if err := e.unarchive(ctx, et, cachef, pod, logf, s.DestDir, false, false); err != nil {
 			cachef.Close()
 			return -1, errors.WithStack(err)
 		}
@@ -717,8 +718,7 @@ func (e *Executor) sendExecutorStatus(ctx context.Context) error {
 		siblingsExecutors = append(siblingsExecutors, executorID)
 	}
 
-	executor := &types.Executor{
-		ExecutorID:                e.id,
+	executor := &rsapitypes.ExecutorStatus{
 		Archs:                     archs,
 		AllowPrivilegedContainers: e.c.AllowPrivilegedContainers,
 		ListenURL:                 e.listenURL,
@@ -731,13 +731,14 @@ func (e *Executor) sendExecutorStatus(ctx context.Context) error {
 	}
 
 	e.log.Debug().Msgf("send executor status: %s", util.Dump(executor))
-	_, err = e.runserviceClient.SendExecutorStatus(ctx, executor)
+	_, err = e.runserviceClient.SendExecutorStatus(ctx, e.id, executor)
 	return errors.WithStack(err)
 }
 
-func (e *Executor) sendExecutorTaskStatus(ctx context.Context, et *types.ExecutorTask) error {
+func (e *Executor) sendExecutorTaskStatus(ctx context.Context, et *rsapitypes.ExecutorTask) error {
 	e.log.Debug().Msgf("send executor task: %s. status: %s", et.ID, et.Status.Phase)
-	_, err := e.runserviceClient.SendExecutorTaskStatus(ctx, e.id, et)
+
+	_, err := e.runserviceClient.SendExecutorTaskStatus(ctx, e.id, et.ID, et.Status)
 	return errors.WithStack(err)
 }
 
@@ -811,7 +812,7 @@ func (e *Executor) executeTask(rt *runningTask) {
 		if rt.timedout {
 			et.Status.Phase = types.ExecutorTaskPhaseFailed
 			et.Status.Timedout = true
-		} else if rt.et.Spec.Stop {
+		} else if rt.et.Stop {
 			et.Status.Phase = types.ExecutorTaskPhaseStopped
 		} else {
 			et.Status.Phase = types.ExecutorTaskPhaseFailed
@@ -995,14 +996,14 @@ func (e *Executor) executeTaskSteps(ctx context.Context, rt *runningTask, pod dr
 		rt.et.Status.Steps[i].Phase = types.ExecutorTaskPhaseSuccess
 
 		if err != nil {
-			if rt.et.Spec.Stop {
+			if rt.et.Stop {
 				rt.et.Status.Steps[i].Phase = types.ExecutorTaskPhaseStopped
 			} else {
 				rt.et.Status.Steps[i].Phase = types.ExecutorTaskPhaseFailed
 			}
 			serr = errors.Wrapf(err, "failed to execute step %s", util.Dump(step))
 		} else if exitCode != 0 {
-			if rt.et.Spec.Stop {
+			if rt.et.Stop {
 				rt.et.Status.Steps[i].Phase = types.ExecutorTaskPhaseStopped
 			} else {
 				rt.et.Status.Steps[i].Phase = types.ExecutorTaskPhaseFailed
@@ -1188,19 +1189,19 @@ func (e *Executor) tasksUpdater(ctx context.Context) error {
 	return nil
 }
 
-func (e *Executor) taskUpdater(ctx context.Context, et *types.ExecutorTask) {
+func (e *Executor) taskUpdater(ctx context.Context, et *rsapitypes.ExecutorTask) {
 	e.log.Debug().Msgf("et: %s", util.Dump(et))
-	if et.Spec.ExecutorID != e.id {
+	if et.ExecutorID != e.id {
 		return
 	}
 
 	rt, _ := e.runningTasks.get(et.ID)
 	if rt != nil {
 		rt.Lock()
-		// update running task Spec.Stop value only when there's a transitions from false to true,
+		// update running task Stop value only when there's a transitions from false to true,
 		// other spec values cannot change once the task has been scheduled
-		if !rt.et.Spec.Stop && et.Spec.Stop {
-			rt.et.Spec.Stop = et.Spec.Stop
+		if !rt.et.Stop && et.Stop {
+			rt.et.Stop = et.Stop
 
 			// cancel the running task
 			rt.cancel()
@@ -1213,7 +1214,7 @@ func (e *Executor) taskUpdater(ctx context.Context, et *types.ExecutorTask) {
 	// rt == nil
 
 	// only send cancelled phase when the executor task isn't in running tasks and is not started
-	if et.Spec.Stop && et.Status.Phase == types.ExecutorTaskPhaseNotStarted {
+	if et.Stop && et.Status.Phase == types.ExecutorTaskPhaseNotStarted {
 		et.Status.Phase = types.ExecutorTaskPhaseCancelled
 		go func() {
 			if err := e.sendExecutorTaskStatus(ctx, et); err != nil {
@@ -1240,7 +1241,7 @@ func (e *Executor) taskUpdater(ctx context.Context, et *types.ExecutorTask) {
 		}()
 	}
 
-	if !et.Spec.Stop && et.Status.Phase == types.ExecutorTaskPhaseNotStarted {
+	if !et.Stop && et.Status.Phase == types.ExecutorTaskPhaseNotStarted {
 		activeTasks := e.runningTasks.len()
 		// don't start task if we have reached the active tasks limit (they will be retried
 		// on next taskUpdater calls)
@@ -1320,12 +1321,11 @@ type runningTasks struct {
 }
 
 type runningTask struct {
-	sync.Mutex
-
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	et  *types.ExecutorTask
+	et *rsapitypes.ExecutorTask
+
 	pod driver.Pod
 
 	// timedout is used to know when the task is timedout
@@ -1333,6 +1333,8 @@ type runningTask struct {
 
 	// podStartTime is used to know when the pod is started
 	podStartTime *time.Time
+
+	sync.Mutex
 }
 
 func (r *runningTasks) get(rtID string) (*runningTask, bool) {
@@ -1374,7 +1376,7 @@ func (r *runningTasks) ids() []string {
 	return ids
 }
 
-func (e *Executor) handleTasks(ctx context.Context, c <-chan *types.ExecutorTask) {
+func (e *Executor) handleTasks(ctx context.Context, c <-chan *rsapitypes.ExecutorTask) {
 	for et := range c {
 		e.tasksUpdaterMutex.Lock()
 		e.taskUpdater(ctx, et)
@@ -1516,7 +1518,7 @@ func (e *Executor) Run(ctx context.Context) error {
 		return errors.WithStack(err)
 	}
 
-	ch := make(chan *types.ExecutorTask)
+	ch := make(chan *rsapitypes.ExecutorTask)
 	schedulerHandler := NewTaskSubmissionHandler(ch)
 	logsHandler := NewLogsHandler(e.log, e)
 	archivesHandler := NewArchivesHandler(e)

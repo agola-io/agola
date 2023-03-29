@@ -26,19 +26,19 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/sorintlab/errors"
 
-	"agola.io/agola/services/runservice/types"
+	rsapitypes "agola.io/agola/services/runservice/api/types"
 )
 
 type taskSubmissionHandler struct {
-	c chan<- *types.ExecutorTask
+	c chan<- *rsapitypes.ExecutorTask
 }
 
-func NewTaskSubmissionHandler(c chan<- *types.ExecutorTask) *taskSubmissionHandler {
+func NewTaskSubmissionHandler(c chan<- *rsapitypes.ExecutorTask) *taskSubmissionHandler {
 	return &taskSubmissionHandler{c: c}
 }
 
 func (h *taskSubmissionHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	var et *types.ExecutorTask
+	var et *rsapitypes.ExecutorTask
 	d := json.NewDecoder(r.Body)
 
 	if err := d.Decode(&et); err != nil {
