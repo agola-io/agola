@@ -335,7 +335,7 @@ func TestK8sPod(t *testing.T) {
 		var buf bytes.Buffer
 		ce, err := pod.Exec(ctx, &ExecConfig{
 			// k8s doesn't set size=1024k in the tmpf mount options but uses other modes to detect the size
-			Cmd:    []string{"sh", "-c", "if [ $(grep -c /mnt/vol1 /proc/mounts) -ne 1 -o $(grep -c /mnt/vol2 /proc/mounts) ]; then exit 1; fi"},
+			Cmd:    []string{"sh", "-c", "if [ $(grep -c /mnt/vol1 /proc/mounts) -ne 1 -o $(grep -c /mnt/vol2 /proc/mounts) -ne 1 ]; then exit 1; fi"},
 			Stdout: &buf,
 		})
 		if err != nil {
