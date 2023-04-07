@@ -10,14 +10,14 @@ import (
 	"github.com/sorintlab/errors"
 )
 
-func (d *DB) Version() uint { return 1 }
+func (d *DB) Version() uint { return 2 }
 
 func (d *DB) DDL() []string {
 	switch d.DBType() {
 	case sql.Postgres:
-		return DDLPostgresV1
+		return DDLPostgresV2
 	case sql.Sqlite3:
-		return DDLSqlite3V1
+		return DDLSqlite3V2
 	}
 
 	return nil

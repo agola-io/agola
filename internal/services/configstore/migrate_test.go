@@ -36,10 +36,15 @@ var ddls = testutil.DDLS{
 		Postgres: db.DDLPostgresV1,
 		Sqlite3:  db.DDLSqlite3V1,
 	},
+	2: {
+		Postgres: db.DDLPostgresV2,
+		Sqlite3:  db.DDLSqlite3V2,
+	},
 }
 
 var importFixtures = testutil.ImportFixtures{
 	1: "dbv1",
+	2: "dbv2",
 }
 
 func TestCreate(t *testing.T) {

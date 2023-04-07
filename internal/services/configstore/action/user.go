@@ -76,6 +76,23 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 		user.Name = req.UserName
 		user.Secret = util.EncodeSha1Hex(uuid.Must(uuid.NewV4()).String())
 
+		if err := h.d.InsertUser(tx, user); err != nil {
+			return errors.WithStack(err)
+		}
+
+		// create root user project group
+		pg := types.NewProjectGroup(tx)
+		// use public visibility
+		pg.Visibility = types.VisibilityPublic
+		pg.Parent = types.Parent{
+			Kind: types.ObjectKindUser,
+			ID:   user.ID,
+		}
+
+		if err := h.d.InsertProjectGroup(tx, pg); err != nil {
+			return errors.WithStack(err)
+		}
+
 		if req.CreateUserLARequest != nil {
 			la := types.NewLinkedAccount(tx)
 			la.UserID = user.ID
@@ -90,22 +107,6 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 			if err := h.d.InsertLinkedAccount(tx, la); err != nil {
 				return errors.WithStack(err)
 			}
-		}
-
-		// create root user project group
-		pg := types.NewProjectGroup(tx)
-		// use public visibility
-		pg.Visibility = types.VisibilityPublic
-		pg.Parent = types.Parent{
-			Kind: types.ObjectKindUser,
-			ID:   user.ID,
-		}
-
-		if err := h.d.InsertUser(tx, user); err != nil {
-			return errors.WithStack(err)
-		}
-		if err := h.d.InsertProjectGroup(tx, pg); err != nil {
-			return errors.WithStack(err)
 		}
 
 		return nil
@@ -130,35 +131,20 @@ func (h *ActionHandler) DeleteUser(ctx context.Context, userRef string) error {
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", userRef))
 		}
 
-		userOrgInvitations, err := h.d.GetOrgInvitationByUserID(tx, user.ID)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-		for _, orgInvitation := range userOrgInvitations {
-			err = h.d.DeleteOrgInvitation(tx, orgInvitation.ID)
-			if err != nil {
-				return errors.WithStack(err)
-			}
+		if err := h.d.DeleteOrgMembersByUserID(tx, user.ID); err != nil {
+			return util.NewAPIError(util.KindFromRemoteError(err), err)
 		}
 
-		linkedAccounts, err := h.d.GetUserLinkedAccounts(tx, user.ID)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-		for _, la := range linkedAccounts {
-			if err := h.d.DeleteLinkedAccount(tx, la.ID); err != nil {
-				return errors.WithStack(err)
-			}
+		if err := h.d.DeleteOrgInvitationsByUserID(tx, user.ID); err != nil {
+			return util.NewAPIError(util.KindFromRemoteError(err), err)
 		}
 
-		userTokens, err := h.d.GetUserTokens(tx, user.ID)
-		if err != nil {
-			return errors.WithStack(err)
+		if err := h.d.DeleteLinkedAccountsByUserID(tx, user.ID); err != nil {
+			return util.NewAPIError(util.KindFromRemoteError(err), err)
 		}
-		for _, userToken := range userTokens {
-			if err := h.d.DeleteUserToken(tx, userToken.ID); err != nil {
-				return errors.WithStack(err)
-			}
+
+		if err := h.d.DeleteUserTokensByUserID(tx, user.ID); err != nil {
+			return util.NewAPIError(util.KindFromRemoteError(err), err)
 		}
 
 		if err := h.d.DeleteUser(tx, user.ID); err != nil {

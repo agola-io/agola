@@ -278,6 +278,16 @@ func (d *DB) GetUserByTokenValue(tx *sql.Tx, tokenValue string) (*types.User, er
 	return out, errors.WithStack(err)
 }
 
+func (d *DB) DeleteUserTokensByUserID(tx *sql.Tx, userID string) error {
+	q := sq.NewDeleteBuilder()
+	q.DeleteFrom("usertoken").Where(q.E("user_id", userID))
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to delete usertoken")
+	}
+
+	return nil
+}
+
 func (d *DB) GetLinkedAccounts(tx *sql.Tx, linkedAccountsIDs []string) ([]*types.LinkedAccount, error) {
 	q := linkedAccountSelect()
 	q.Where(q.E("id", linkedAccountsIDs))
@@ -359,6 +369,16 @@ func (d *DB) GetLinkedAccountByRemoteUserIDandSource(tx *sql.Tx, remoteUserID, r
 //	out, err := mustSingleRow(users)
 //	return out, errors.WithStack(err)
 // }
+
+func (d *DB) DeleteLinkedAccountsByUserID(tx *sql.Tx, userID string) error {
+	q := sq.NewDeleteBuilder()
+	q.DeleteFrom("linkedaccount").Where(q.E("user_id", userID))
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to delete linkedaccount")
+	}
+
+	return nil
+}
 
 func getUsersFilteredQuery(startUserName string, limit int, asc bool) *sq.SelectBuilder {
 	q := userSelect()
@@ -456,6 +476,14 @@ func (d *DB) GetOrgs(tx *sql.Tx, startOrgName string, limit int, asc bool) ([]*t
 	return orgs, errors.WithStack(err)
 }
 
+func (d *DB) GetOrgMembers(tx *sql.Tx, orgID string) ([]*types.OrganizationMember, error) {
+	q := organizationMemberSelect()
+	q.Where(q.E("organization_id", orgID))
+	orgMembers, _, err := d.fetchOrganizationMembers(tx, q)
+
+	return orgMembers, errors.WithStack(err)
+}
+
 func (d *DB) GetOrgMemberByOrgUserID(tx *sql.Tx, orgID, userID string) (*types.OrganizationMember, error) {
 	q := organizationMemberSelect()
 	q.Where(q.E("orgmember.organization_id", orgID), q.E("orgmember.user_id", userID))
@@ -467,6 +495,38 @@ func (d *DB) GetOrgMemberByOrgUserID(tx *sql.Tx, orgID, userID string) (*types.O
 
 	out, err := mustSingleRow(oms)
 	return out, errors.WithStack(err)
+}
+
+func (d *DB) GetOrgMemberByUserID(tx *sql.Tx, userID string) ([]*types.OrganizationMember, error) {
+	q := organizationMemberSelect()
+	q.Where(q.E("orgmember.user_id", userID))
+
+	oms, _, err := d.fetchOrganizationMembers(tx, q)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return oms, errors.WithStack(err)
+}
+
+func (d *DB) DeleteOrgMembersByOrgID(tx *sql.Tx, orgID string) error {
+	q := sq.NewDeleteBuilder()
+	q.DeleteFrom("orgmember").Where(q.E("organization_id", orgID))
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to delete orgmember")
+	}
+
+	return nil
+}
+
+func (d *DB) DeleteOrgMembersByUserID(tx *sql.Tx, userID string) error {
+	q := sq.NewDeleteBuilder()
+	q.DeleteFrom("orgmember").Where(q.E("user_id", userID))
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to delete orgmember")
+	}
+
+	return nil
 }
 
 type OrgUser struct {
@@ -1088,4 +1148,24 @@ func (d *DB) GetOrgInvitationByUserID(tx *sql.Tx, userID string) ([]*types.OrgIn
 		return nil, errors.WithStack(err)
 	}
 	return orgInvitations, errors.WithStack(err)
+}
+
+func (d *DB) DeleteOrgInvitationsByOrgID(tx *sql.Tx, orgID string) error {
+	q := sq.NewDeleteBuilder()
+	q.DeleteFrom("orginvitation").Where(q.E("organization_id", orgID))
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to delete orginvitation")
+	}
+
+	return nil
+}
+
+func (d *DB) DeleteOrgInvitationsByUserID(tx *sql.Tx, userID string) error {
+	q := sq.NewDeleteBuilder()
+	q.DeleteFrom("orginvitation").Where(q.E("user_id", userID))
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to delete orginvitation")
+	}
+
+	return nil
 }
