@@ -21,9 +21,10 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"agola.io/agola/internal/sqlg"
 	"agola.io/agola/internal/testutil"
 	"agola.io/agola/services/runservice/types"
-	ctypes "agola.io/agola/services/types"
+	stypes "agola.io/agola/services/types"
 )
 
 func TestAdvanceRunTasks(t *testing.T) {
@@ -350,10 +351,8 @@ func TestAdvanceRunTasks(t *testing.T) {
 			}(),
 			scheduledExecutorTasks: []*types.ExecutorTask{
 				{
-					ObjectMeta: ctypes.ObjectMeta{ID: "executortask01"},
-					Spec: types.ExecutorTaskSpec{
-						RunTaskID: "task01",
-					},
+					ObjectMeta: sqlg.ObjectMeta{ID: "executortask01"},
+					RunTaskID:  "task01",
 				},
 			},
 			out: func() *types.Run {
@@ -383,10 +382,8 @@ func TestAdvanceRunTasks(t *testing.T) {
 			}(),
 			scheduledExecutorTasks: []*types.ExecutorTask{
 				{
-					ObjectMeta: ctypes.ObjectMeta{ID: "executortask01"},
-					Spec: types.ExecutorTaskSpec{
-						RunTaskID: "task01",
-					},
+					ObjectMeta: sqlg.ObjectMeta{ID: "executortask01"},
+					RunTaskID:  "task01",
 				},
 			},
 			out: func() *types.Run {
@@ -597,10 +594,10 @@ func TestChooseExecutor(t *testing.T) {
 
 	executorOK := &types.Executor{
 		ExecutorID:       "executorOK",
-		Archs:            []ctypes.Arch{ctypes.ArchAMD64},
+		Archs:            []stypes.Arch{stypes.ArchAMD64},
 		ActiveTasksLimit: 2,
 		ActiveTasks:      0,
-		ObjectMeta: ctypes.ObjectMeta{
+		ObjectMeta: sqlg.ObjectMeta{
 			UpdateTime: time.Now(),
 		},
 	}
@@ -622,7 +619,7 @@ func TestChooseExecutor(t *testing.T) {
 	executorOKMultipleArchs := func() *types.Executor {
 		e := executorOK.DeepCopy()
 		e.ExecutorID = "executorOKMultipleArchs"
-		e.Archs = []ctypes.Arch{ctypes.ArchAMD64, ctypes.ArchARM64}
+		e.Archs = []stypes.Arch{stypes.ArchAMD64, stypes.ArchARM64}
 		return e
 	}()
 
@@ -638,7 +635,7 @@ func TestChooseExecutor(t *testing.T) {
 		ID:   "task01",
 		Name: "task01",
 		Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
-			Arch: ctypes.ArchAMD64,
+			Arch: stypes.ArchAMD64,
 		},
 	}
 
@@ -646,7 +643,7 @@ func TestChooseExecutor(t *testing.T) {
 		ID:   "task01",
 		Name: "task01",
 		Runtime: &types.Runtime{Type: types.RuntimeType("pod"),
-			Arch: ctypes.ArchAMD64,
+			Arch: stypes.ArchAMD64,
 			Containers: []*types.Container{
 				{
 					Privileged: true,
@@ -685,7 +682,7 @@ func TestChooseExecutor(t *testing.T) {
 			name: "test single executor with different arch",
 			executors: func() []*types.Executor {
 				e := executorOK.DeepCopy()
-				e.Archs = []ctypes.Arch{ctypes.ArchARM64}
+				e.Archs = []stypes.Arch{stypes.ArchARM64}
 				return []*types.Executor{e}
 			}(),
 			rct: rct,

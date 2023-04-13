@@ -15,20 +15,12 @@
 package types
 
 import (
-	"github.com/gofrs/uuid"
-
-	"agola.io/agola/internal/sql"
-	stypes "agola.io/agola/services/types"
-)
-
-const (
-	ProjectGroupKind    = "projectgroup"
-	ProjectGroupVersion = "v0.1.0"
+	"agola.io/agola/internal/sqlg"
+	"agola.io/agola/internal/sqlg/sql"
 )
 
 type ProjectGroup struct {
-	stypes.TypeMeta
-	stypes.ObjectMeta
+	sqlg.ObjectMeta
 
 	Name string `json:"name,omitempty"`
 
@@ -39,13 +31,6 @@ type ProjectGroup struct {
 
 func NewProjectGroup(tx *sql.Tx) *ProjectGroup {
 	return &ProjectGroup{
-		TypeMeta: stypes.TypeMeta{
-			Kind:    ProjectGroupKind,
-			Version: ProjectGroupVersion,
-		},
-		ObjectMeta: stypes.ObjectMeta{
-			ID:   uuid.Must(uuid.NewV4()).String(),
-			TxID: tx.ID(),
-		},
+		ObjectMeta: sqlg.NewObjectMeta(tx),
 	}
 }

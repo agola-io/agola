@@ -15,10 +15,8 @@
 package types
 
 import (
-	"github.com/gofrs/uuid"
-
-	"agola.io/agola/internal/sql"
-	stypes "agola.io/agola/services/types"
+	"agola.io/agola/internal/sqlg"
+	"agola.io/agola/internal/sqlg/sql"
 )
 
 // RemoteRepositoryConfigType defines how a remote repository is configured and
@@ -42,14 +40,8 @@ func IsValidRemoteRepositoryConfigType(t RemoteRepositoryConfigType) bool {
 	return true
 }
 
-const (
-	ProjectKind    = "project"
-	ProjectVersion = "v0.1.0"
-)
-
 type Project struct {
-	stypes.TypeMeta
-	stypes.ObjectMeta
+	sqlg.ObjectMeta
 
 	Name string `json:"name,omitempty"`
 
@@ -93,13 +85,6 @@ type Project struct {
 
 func NewProject(tx *sql.Tx) *Project {
 	return &Project{
-		TypeMeta: stypes.TypeMeta{
-			Kind:    ProjectKind,
-			Version: ProjectVersion,
-		},
-		ObjectMeta: stypes.ObjectMeta{
-			ID:   uuid.Must(uuid.NewV4()).String(),
-			TxID: tx.ID(),
-		},
+		ObjectMeta: sqlg.NewObjectMeta(tx),
 	}
 }

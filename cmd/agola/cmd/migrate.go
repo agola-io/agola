@@ -16,18 +16,22 @@ package cmd
 
 import (
 	"context"
-	"os"
 
 	"github.com/rs/zerolog/log"
 	"github.com/sorintlab/errors"
 	"github.com/spf13/cobra"
 
-	"agola.io/agola/internal/migration"
+	"agola.io/agola/internal/services/config"
+	csdb "agola.io/agola/internal/services/configstore/db"
+	rsdb "agola.io/agola/internal/services/runservice/db"
+	"agola.io/agola/internal/sqlg/lock"
+	"agola.io/agola/internal/sqlg/manager"
+	"agola.io/agola/internal/sqlg/sql"
 )
 
 var cmdMigrate = &cobra.Command{
 	Use:   "migrate",
-	Short: "migrate from an old data format export to the new data format",
+	Short: "migrate component database to latest version",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := migrate(cmd, args); err != nil {
 			log.Fatal().Err(err).Send()
@@ -36,9 +40,8 @@ var cmdMigrate = &cobra.Command{
 }
 
 type migrateOptions struct {
+	config      string
 	serviceName string
-	inFilePath  string
-	outFilePath string
 }
 
 var migrateOpts migrateOptions
@@ -46,51 +49,98 @@ var migrateOpts migrateOptions
 func init() {
 	flags := cmdMigrate.Flags()
 
+	flags.StringVar(&migrateOpts.config, "config", "./config.yml", "config file path")
 	flags.StringVar(&migrateOpts.serviceName, "service", "", "service name (runservice or configstore)")
-	flags.StringVar(&migrateOpts.inFilePath, "in", "-", "input file path")
-	flags.StringVar(&migrateOpts.outFilePath, "out", "-", "output file path")
 
 	cmdAgola.AddCommand(cmdMigrate)
 }
 
 func migrate(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+
 	if migrateOpts.serviceName != "runservice" && migrateOpts.serviceName != "configstore" {
 		return errors.Errorf("service option must be runservice or configstore")
 	}
 
-	var r *os.File
-	if migrateOpts.inFilePath == "-" {
-		r = os.Stdin
-	} else {
-		var err error
-		r, err = os.Open(migrateOpts.inFilePath)
-		if err != nil {
-			return errors.WithStack(err)
-		}
+	components := []string{migrateOpts.serviceName}
+
+	c, err := config.Parse(migrateOpts.config, components)
+	if err != nil {
+		return errors.Wrapf(err, "config error")
 	}
 
-	var w *os.File
-	if migrateOpts.outFilePath == "-" {
-		w = os.Stdout
-	} else {
-		var err error
-		w, err = os.Create(migrateOpts.outFilePath)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-	}
-
-	log.Info().Msgf("migrating %s", migrateOpts.serviceName)
+	var sdb *sql.DB
+	var d manager.DB
 	switch migrateOpts.serviceName {
 	case "runservice":
-		if err := migration.MigrateRunService(context.Background(), r, w); err != nil {
-			return errors.WithStack(err)
+		var err error
+
+		dbConf := c.Runservice.DB
+
+		sdb, err = sql.NewDB(dbConf.Type, dbConf.ConnString)
+		if err != nil {
+			return errors.Wrapf(err, "new db error")
 		}
+
+		d, err = rsdb.NewDB(log.Logger, sdb)
+		if err != nil {
+			return errors.Wrapf(err, "new db error")
+		}
+
 	case "configstore":
-		if err := migration.MigrateConfigStore(context.Background(), r, w); err != nil {
-			return errors.WithStack(err)
+		var err error
+
+		dbConf := c.Configstore.DB
+
+		sdb, err = sql.NewDB(dbConf.Type, dbConf.ConnString)
+		if err != nil {
+			return errors.Wrapf(err, "new db error")
+		}
+
+		d, err = csdb.NewDB(log.Logger, sdb)
+		if err != nil {
+			return errors.Wrapf(err, "new db error")
 		}
 	}
+
+	var lf lock.LockFactory
+	switch d.DBType() {
+	case sql.Sqlite3:
+		ll := lock.NewLocalLocks()
+		lf = lock.NewLocalLockFactory(ll)
+	case sql.Postgres:
+		lf = lock.NewPGLockFactory(sdb)
+	default:
+		return errors.Errorf("unknown db type %q", d.DBType())
+	}
+
+	dbm := manager.NewDBManager(log.Logger, d, lf)
+
+	log.Info().Msgf("migrating service %s", migrateOpts.serviceName)
+
+	curDBVersion, err := dbm.GetVersion(ctx)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	if err := dbm.CheckVersion(curDBVersion, d.Version()); err != nil {
+		return errors.WithStack(err)
+	}
+
+	migrationRequired, err := dbm.CheckMigrationRequired(curDBVersion, d.Version())
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	if !migrationRequired {
+		log.Info().Msgf("db already at latest version: %d", curDBVersion)
+		return nil
+	}
+
+	if err := dbm.Migrate(ctx); err != nil {
+		return errors.Wrap(err, "migrate db error")
+	}
+
+	log.Info().Msgf("db migrated to version: %d", d.Version())
 
 	return nil
 }

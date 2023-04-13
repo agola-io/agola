@@ -97,6 +97,16 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemot
 		}
 	}
 
+	registrationEnabled := true
+	if req.RegistrationEnabled != nil {
+		registrationEnabled = *req.RegistrationEnabled
+	}
+
+	loginEnabled := true
+	if req.LoginEnabled != nil {
+		loginEnabled = *req.LoginEnabled
+	}
+
 	creq := &csapitypes.CreateUpdateRemoteSourceRequest{
 		Name:                req.Name,
 		Type:                cstypes.RemoteSourceType(req.Type),
@@ -107,8 +117,8 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemot
 		Oauth2ClientSecret:  req.Oauth2ClientSecret,
 		SSHHostKey:          req.SSHHostKey,
 		SkipSSHHostKeyCheck: req.SkipSSHHostKeyCheck,
-		RegistrationEnabled: req.RegistrationEnabled,
-		LoginEnabled:        req.LoginEnabled,
+		RegistrationEnabled: registrationEnabled,
+		LoginEnabled:        loginEnabled,
 	}
 
 	h.log.Info().Msgf("creating remotesource")
@@ -167,10 +177,10 @@ func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, req *UpdateRemot
 		rs.SkipSSHHostKeyCheck = *req.SkipSSHHostKeyCheck
 	}
 	if req.RegistrationEnabled != nil {
-		rs.RegistrationEnabled = req.RegistrationEnabled
+		rs.RegistrationEnabled = *req.RegistrationEnabled
 	}
 	if req.LoginEnabled != nil {
-		rs.LoginEnabled = req.LoginEnabled
+		rs.LoginEnabled = *req.LoginEnabled
 	}
 
 	creq := &csapitypes.CreateUpdateRemoteSourceRequest{

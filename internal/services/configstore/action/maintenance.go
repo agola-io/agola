@@ -21,15 +21,15 @@ import (
 	"io"
 	"time"
 
-	sq "github.com/Masterminds/squirrel"
+	sq "github.com/huandu/go-sqlbuilder"
 	"github.com/sorintlab/errors"
 
-	idb "agola.io/agola/internal/db"
-	"agola.io/agola/internal/sql"
+	"agola.io/agola/internal/services/configstore/db"
+	"agola.io/agola/internal/sqlg"
+	"agola.io/agola/internal/sqlg/manager"
+	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/internal/util"
 )
-
-var sb = sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
 
 const (
 	maintenanceTableName = "maintenance"
@@ -39,13 +39,11 @@ var (
 	maintenanceTableDDL = fmt.Sprintf("create table if not exists %s (enabled boolean not null, time timestamptz not null)", maintenanceTableName)
 )
 
-func isMaintenanceEnabled(tx *sql.Tx) (bool, error) {
+func isMaintenanceEnabled(d *db.DB, tx *sql.Tx) (bool, error) {
 	var enabled *bool
-	q, args, err := sb.Select("enabled").From(maintenanceTableName).ToSql()
-	if err != nil {
-		return false, errors.WithStack(err)
-	}
-	if err = tx.QueryRow(q, args...).Scan(&enabled); err != nil && !errors.Is(err, stdsql.ErrNoRows) {
+	sb := sq.Select("enabled").From(maintenanceTableName)
+	q, args := sb.BuildWithFlavor(d.Flavor())
+	if err := tx.QueryRow(q, args...).Scan(&enabled); err != nil && !errors.Is(err, stdsql.ErrNoRows) {
 		return false, errors.Wrapf(err, "cannot get maintenance mode")
 	}
 
@@ -64,7 +62,7 @@ func (h *ActionHandler) IsMaintenanceEnabled(ctx context.Context) (bool, error) 
 		}
 
 		var err error
-		enabled, err = isMaintenanceEnabled(tx)
+		enabled, err = isMaintenanceEnabled(h.d, tx)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -91,7 +89,7 @@ func (h *ActionHandler) MaintenanceMode(ctx context.Context, enable bool) error 
 	}
 
 	err = h.d.Do(ctx, func(tx *sql.Tx) error {
-		enabled, err := isMaintenanceEnabled(tx)
+		enabled, err := isMaintenanceEnabled(h.d, tx)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -103,12 +101,14 @@ func (h *ActionHandler) MaintenanceMode(ctx context.Context, enable bool) error 
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("maintenance mode already disabled"))
 		}
 
-		dq := sb.Delete(maintenanceTableName)
-		if _, err := h.d.Exec(tx, dq); err != nil {
+		db := sq.DeleteFrom(maintenanceTableName)
+		q, args := db.BuildWithFlavor(h.d.Flavor())
+		if _, err := tx.Exec(q, args...); err != nil {
 			return errors.Wrapf(err, "failed to update %s table", maintenanceTableName)
 		}
-		iq := sb.Insert(maintenanceTableName).Columns("enabled", "time").Values(enable, time.Now())
-		if _, err := h.d.Exec(tx, iq); err != nil {
+		ib := sq.InsertInto(maintenanceTableName).Cols("enabled", "time").Values(enable, time.Now())
+		q, args = ib.BuildWithFlavor(h.d.Flavor())
+		if _, err := tx.Exec(q, args...); err != nil {
 			return errors.Wrapf(err, "failed to update %s table", maintenanceTableName)
 		}
 
@@ -122,7 +122,8 @@ func (h *ActionHandler) MaintenanceMode(ctx context.Context, enable bool) error 
 }
 
 func (h *ActionHandler) Export(ctx context.Context, w io.Writer) error {
-	return errors.WithStack(idb.Export(ctx, h.log, h.d, w))
+	dbm := manager.NewDBManager(h.log, h.d, h.lf)
+	return errors.WithStack(dbm.Export(ctx, sqlg.ObjectNames(h.d.ObjectsInfo()), w))
 }
 
 func (h *ActionHandler) Import(ctx context.Context, r io.Reader) error {
@@ -130,16 +131,22 @@ func (h *ActionHandler) Import(ctx context.Context, r io.Reader) error {
 		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("not in maintenance mode"))
 	}
 
-	if err := idb.Drop(ctx, h.log, h.d, h.lf); err != nil {
+	dbm := manager.NewDBManager(h.log, h.d, h.lf)
+
+	if err := dbm.Drop(ctx); err != nil {
 		return errors.Wrap(err, "drop db error")
 	}
 
-	if err := idb.Import(ctx, h.log, h.d, r); err != nil {
-		return errors.Wrap(err, "import error")
+	if err := dbm.Setup(ctx); err != nil {
+		return errors.Wrap(err, "setup db error")
 	}
 
-	if err := idb.Setup(ctx, h.log, h.d, h.lf); err != nil {
-		return errors.Wrap(err, "setup db error")
+	if err := dbm.Create(ctx, h.d.DDL(), h.d.Version()); err != nil {
+		return errors.Wrap(err, "create db error")
+	}
+
+	if err := dbm.Import(ctx, r); err != nil {
+		return errors.Wrap(err, "import db error")
 	}
 
 	return nil

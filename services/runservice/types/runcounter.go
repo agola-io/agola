@@ -1,20 +1,12 @@
 package types
 
 import (
-	"github.com/gofrs/uuid"
-
-	"agola.io/agola/internal/sql"
-	stypes "agola.io/agola/services/types"
-)
-
-const (
-	RunCounterKind    = "runcounter"
-	RunCounterVersion = "v0.1.0"
+	"agola.io/agola/internal/sqlg"
+	"agola.io/agola/internal/sqlg/sql"
 )
 
 type RunCounter struct {
-	stypes.TypeMeta
-	stypes.ObjectMeta
+	sqlg.ObjectMeta
 
 	GroupID string
 	Value   uint64
@@ -22,14 +14,8 @@ type RunCounter struct {
 
 func NewRunCounter(tx *sql.Tx, groupID string) *RunCounter {
 	return &RunCounter{
-		TypeMeta: stypes.TypeMeta{
-			Kind:    RunCounterKind,
-			Version: RunCounterVersion,
-		},
-		ObjectMeta: stypes.ObjectMeta{
-			ID:   uuid.Must(uuid.NewV4()).String(),
-			TxID: tx.ID(),
-		},
+		ObjectMeta: sqlg.NewObjectMeta(tx),
+
 		GroupID: groupID,
 	}
 }

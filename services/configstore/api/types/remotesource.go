@@ -28,6 +28,6 @@ type CreateUpdateRemoteSourceRequest struct {
 	Oauth2ClientSecret  string
 	SSHHostKey          string
 	SkipSSHHostKeyCheck bool
-	RegistrationEnabled *bool
-	LoginEnabled        *bool
+	RegistrationEnabled bool
+	LoginEnabled        bool
 }

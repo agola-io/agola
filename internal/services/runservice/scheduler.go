@@ -31,7 +31,7 @@ import (
 	rsapi "agola.io/agola/internal/services/runservice/api"
 	"agola.io/agola/internal/services/runservice/common"
 	"agola.io/agola/internal/services/runservice/store"
-	"agola.io/agola/internal/sql"
+	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/runservice/types"
 )
@@ -92,7 +92,7 @@ func advanceRunTasks(log zerolog.Logger, curRun *types.Run, rc *types.RunConfig,
 		for _, rt := range newRun.Tasks {
 			isScheduled := false
 			for _, et := range scheduledExecutorTasks {
-				if rt.ID == et.Spec.RunTaskID {
+				if rt.ID == et.RunTaskID {
 					isScheduled = true
 				}
 			}
@@ -124,7 +124,7 @@ func advanceRunTasks(log zerolog.Logger, curRun *types.Run, rc *types.RunConfig,
 		if curRun.Result.IsSet() {
 			isScheduled := false
 			for _, et := range scheduledExecutorTasks {
-				if rt.ID == et.Spec.RunTaskID {
+				if rt.ID == et.RunTaskID {
 					isScheduled = true
 				}
 			}
@@ -393,18 +393,18 @@ func (s *Runservice) sendExecutorTask(ctx context.Context, et *types.ExecutorTas
 	err := s.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
 
-		executor, err = s.d.GetExecutorByExecutorID(tx, et.Spec.ExecutorID)
+		executor, err = s.d.GetExecutorByExecutorID(tx, et.ExecutorID)
 		if err != nil {
 			return errors.WithStack(err)
 		}
 
-		r, err = s.d.GetRun(tx, et.Spec.RunID)
+		r, err = s.d.GetRun(tx, et.RunID)
 		if err != nil {
 			return errors.WithStack(err)
 		}
 
 		if r == nil {
-			return errors.Errorf("run with id %q doesn't exist", et.Spec.RunID)
+			return errors.Errorf("run with id %q doesn't exist", et.RunID)
 		}
 
 		rc, err = s.d.GetRunConfig(tx, r.RunConfigID)
@@ -423,13 +423,13 @@ func (s *Runservice) sendExecutorTask(ctx context.Context, et *types.ExecutorTas
 	}
 
 	if executor == nil {
-		s.log.Warn().Msgf("executor with id %q doesn't exist", et.Spec.ExecutorID)
+		s.log.Warn().Msgf("executor with id %q doesn't exist", et.ExecutorID)
 		return nil
 	}
 
-	rt, ok := r.Tasks[et.Spec.RunTaskID]
+	rt, ok := r.Tasks[et.RunTaskID]
 	if !ok {
-		return errors.Errorf("no such run task with id %s for run %s", et.Spec.RunTaskID, r.ID)
+		return errors.Errorf("no such run task with id %s for run %s", et.RunTaskID, r.ID)
 	}
 
 	// generate ExecutorTaskSpecData
@@ -557,7 +557,7 @@ func (s *Runservice) scheduleRun(ctx context.Context, runID string) error {
 		// if the run is set to stop, stop all active tasks
 		if r.Stop {
 			for _, et := range scheduledExecutorTasks {
-				et.Spec.Stop = true
+				et.Stop = true
 
 				et.TxID = tx.ID()
 				et.Revision = curScheduledExecutorTasksRevisions[et.ID]
@@ -714,13 +714,13 @@ func (s *Runservice) handleExecutorTaskUpdate(ctx context.Context, executorTaskI
 			return errors.Errorf("executor task with id %q doesn't exist", executorTaskID)
 		}
 
-		r, err = s.d.GetRun(tx, et.Spec.RunID)
+		r, err = s.d.GetRun(tx, et.RunID)
 		if err != nil {
 			return errors.WithStack(err)
 		}
 
 		if r == nil {
-			return errors.Errorf("run with id %q doesn't exist", et.Spec.RunID)
+			return errors.Errorf("run with id %q doesn't exist", et.RunID)
 		}
 
 		if err := s.updateRunTaskStatus(et, r); err != nil {
@@ -742,16 +742,16 @@ func (s *Runservice) handleExecutorTaskUpdate(ctx context.Context, executorTaskI
 func (s *Runservice) updateRunTaskStatus(et *types.ExecutorTask, r *types.Run) error {
 	s.log.Debug().Msgf("et: %s", util.Dump(et))
 
-	rt, ok := r.Tasks[et.Spec.RunTaskID]
+	rt, ok := r.Tasks[et.RunTaskID]
 	if !ok {
-		return errors.Errorf("no such run task with id %s for run %s", et.Spec.RunTaskID, r.ID)
+		return errors.Errorf("no such run task with id %s for run %s", et.RunTaskID, r.ID)
 	}
 
-	rt.StartTime = et.Status.StartTime
-	rt.EndTime = et.Status.EndTime
+	rt.StartTime = et.StartTime
+	rt.EndTime = et.EndTime
 
 	wrongstatus := false
-	switch et.Status.Phase {
+	switch et.Phase {
 	case types.ExecutorTaskPhaseNotStarted:
 		if rt.Status != types.RunTaskStatusNotStarted {
 			wrongstatus = true
@@ -786,11 +786,11 @@ func (s *Runservice) updateRunTaskStatus(et *types.ExecutorTask, r *types.Run) e
 		}
 	}
 	if wrongstatus {
-		s.log.Warn().Msgf("ignoring wrong executor task %q status: %q, rt status: %q", et.ID, et.Status.Phase, rt.Status)
+		s.log.Warn().Msgf("ignoring wrong executor task %q status: %q, rt status: %q", et.ID, et.Phase, rt.Status)
 		return nil
 	}
 
-	switch et.Status.Phase {
+	switch et.Phase {
 	case types.ExecutorTaskPhaseNotStarted:
 		rt.Status = types.RunTaskStatusNotStarted
 	case types.ExecutorTaskPhaseCancelled:
@@ -805,12 +805,12 @@ func (s *Runservice) updateRunTaskStatus(et *types.ExecutorTask, r *types.Run) e
 		rt.Status = types.RunTaskStatusFailed
 	}
 
-	rt.Timedout = et.Status.Timedout
-	rt.SetupStep.Phase = et.Status.SetupStep.Phase
-	rt.SetupStep.StartTime = et.Status.SetupStep.StartTime
-	rt.SetupStep.EndTime = et.Status.SetupStep.EndTime
+	rt.Timedout = et.Timedout
+	rt.SetupStep.Phase = et.SetupStep.Phase
+	rt.SetupStep.StartTime = et.SetupStep.StartTime
+	rt.SetupStep.EndTime = et.SetupStep.EndTime
 
-	for i, s := range et.Status.Steps {
+	for i, s := range et.Steps {
 		rt.Steps[i].Phase = s.Phase
 		rt.Steps[i].ExitStatus = s.ExitStatus
 		rt.Steps[i].StartTime = s.StartTime
@@ -894,14 +894,14 @@ func (s *Runservice) executorTaskCleaner(ctx context.Context, executorTaskID str
 			return nil
 		}
 
-		if et.Status.Phase.IsFinished() {
-			r, err := s.d.GetRun(tx, et.Spec.RunID)
+		if et.Phase.IsFinished() {
+			r, err := s.d.GetRun(tx, et.RunID)
 			if err != nil {
 				return errors.WithStack(err)
 			}
 			if r == nil {
 				// run doesn't exists, remove executor task
-				s.log.Warn().Msgf("deleting executor task %q since run %q doesn't exist", et.ID, et.Spec.RunID)
+				s.log.Warn().Msgf("deleting executor task %q since run %q doesn't exist", et.ID, et.RunID)
 				if err := s.d.DeleteExecutorTask(tx, et.ID); err != nil {
 					s.log.Err(err).Send()
 					return errors.WithStack(err)
@@ -911,8 +911,8 @@ func (s *Runservice) executorTaskCleaner(ctx context.Context, executorTaskID str
 
 			if r.Phase.IsFinished() {
 				// if the run is finished mark the executor tasks to stop
-				if !et.Spec.Stop {
-					et.Spec.Stop = true
+				if !et.Stop {
+					et.Stop = true
 					if err := s.d.UpdateExecutorTask(tx, et); err != nil {
 						return errors.WithStack(err)
 					}
@@ -921,18 +921,18 @@ func (s *Runservice) executorTaskCleaner(ctx context.Context, executorTaskID str
 			}
 		}
 
-		if !et.Status.Phase.IsFinished() {
+		if !et.Phase.IsFinished() {
 			// if the executor doesn't exists anymore mark the not finished executor tasks as failed
-			executor, err := s.d.GetExecutorByExecutorID(tx, et.Spec.ExecutorID)
+			executor, err := s.d.GetExecutorByExecutorID(tx, et.ExecutorID)
 			if err != nil {
 				return errors.WithStack(err)
 			}
 			if executor == nil {
-				s.log.Warn().Msgf("executor with id %q doesn't exist. marking executor task %q as failed", et.Spec.ExecutorID, et.ID)
-				et.Status.FailError = "executor deleted"
-				et.Status.Phase = types.ExecutorTaskPhaseFailed
-				et.Status.EndTime = util.TimeP(time.Now())
-				for _, s := range et.Status.Steps {
+				s.log.Warn().Msgf("executor with id %q doesn't exist. marking executor task %q as failed", et.ExecutorID, et.ID)
+				et.FailError = "executor deleted"
+				et.Phase = types.ExecutorTaskPhaseFailed
+				et.EndTime = util.TimeP(time.Now())
+				for _, s := range et.Steps {
 					if s.Phase == types.ExecutorTaskPhaseRunning {
 						s.Phase = types.ExecutorTaskPhaseFailed
 						s.EndTime = util.TimeP(time.Now())
@@ -1027,7 +1027,7 @@ func (s *Runservice) fetchLog(ctx context.Context, runID string, rt *types.RunTa
 		if et == nil {
 			return nil
 		}
-		executor, err = s.d.GetExecutorByExecutorID(tx, et.Spec.ExecutorID)
+		executor, err = s.d.GetExecutorByExecutorID(tx, et.ExecutorID)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -1046,7 +1046,7 @@ func (s *Runservice) fetchLog(ctx context.Context, runID string, rt *types.RunTa
 	}
 
 	if executor == nil {
-		s.log.Warn().Msgf("executor with id %q doesn't exist. Skipping fetching", et.Spec.ExecutorID)
+		s.log.Warn().Msgf("executor with id %q doesn't exist. Skipping fetching", et.ExecutorID)
 		return nil
 	}
 
@@ -1238,7 +1238,7 @@ func (s *Runservice) fetchArchive(ctx context.Context, runID string, rt *types.R
 		if et == nil {
 			return nil
 		}
-		executor, err = s.d.GetExecutorByExecutorID(tx, et.Spec.ExecutorID)
+		executor, err = s.d.GetExecutorByExecutorID(tx, et.ExecutorID)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -1257,7 +1257,7 @@ func (s *Runservice) fetchArchive(ctx context.Context, runID string, rt *types.R
 	}
 
 	if executor == nil {
-		s.log.Warn().Msgf("executor with id %q doesn't exist. Skipping fetching", et.Spec.ExecutorID)
+		s.log.Warn().Msgf("executor with id %q doesn't exist. Skipping fetching", et.ExecutorID)
 		return nil
 	}
 

@@ -3,63 +3,21 @@ package db
 import (
 	"context"
 	stdsql "database/sql"
-	"encoding/json"
 	"path"
 	"strings"
 
-	sq "github.com/Masterminds/squirrel"
+	sq "github.com/huandu/go-sqlbuilder"
 	"github.com/rs/zerolog"
 	"github.com/sorintlab/errors"
 
-	idb "agola.io/agola/internal/db"
 	"agola.io/agola/internal/services/configstore/common"
 	"agola.io/agola/internal/services/configstore/db/objects"
-	"agola.io/agola/internal/sql"
+	"agola.io/agola/internal/sqlg"
+	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/services/configstore/types"
-	stypes "agola.io/agola/services/types"
 )
 
-//go:generate ../../../../tools/bin/generators -component configstore
-
-const (
-	dataTablesVersion  = 1
-	queryTablesVersion = 1
-)
-
-var dstmts = []string{
-	// data tables containing object. One table per object type to make things simple.
-	"create table if not exists remotesource (id varchar, revision bigint, data bytea, PRIMARY KEY (id))",
-	"create table if not exists user_t (id varchar, revision bigint, data bytea, PRIMARY KEY (id))",
-	"create table if not exists usertoken (id varchar, revision bigint, data bytea, PRIMARY KEY (id))",
-	"create table if not exists linkedaccount (id varchar, revision bigint, data bytea, PRIMARY KEY (id))",
-	"create table if not exists org (id varchar, revision bigint, data bytea, PRIMARY KEY (id))",
-	"create table if not exists orgmember (id varchar, revision bigint, data bytea, PRIMARY KEY (id))",
-	"create table if not exists projectgroup (id varchar, revision bigint, data bytea, PRIMARY KEY (id))",
-	"create table if not exists project (id varchar, revision bigint, data bytea, PRIMARY KEY (id))",
-	"create table if not exists secret (id varchar, revision bigint, data bytea, PRIMARY KEY (id))",
-	"create table if not exists variable (id varchar, revision bigint, data bytea, PRIMARY KEY (id))",
-	"create table if not exists orginvitation (id varchar, revision bigint, data bytea, PRIMARY KEY (id))",
-}
-
-var qstmts = []string{
-	// query tables for single object types. Can be rebuilt by data tables.
-	"create table if not exists remotesource_q (id varchar, revision bigint, name varchar, data bytea, PRIMARY KEY (id))",
-	"create table if not exists user_t_q (id varchar, revision bigint, name varchar, data bytea, PRIMARY KEY (id))",
-	"create table if not exists usertoken_q (id varchar, revision bigint, user_id varchar, name varchar, value varchar, data bytea, PRIMARY KEY (id))",
-	"create table if not exists linkedaccount_q (id varchar, revision bigint, remotesource_id varchar, user_id varchar, remoteuser_id varchar, data bytea, PRIMARY KEY (id))",
-	"create table if not exists org_q (id varchar, revision bigint, name varchar, data bytea, PRIMARY KEY (id))",
-	"create table if not exists orgmember_q (id varchar, revision bigint, org_id varchar, user_id varchar, data bytea, PRIMARY KEY (id))",
-	"create table if not exists projectgroup_q (id varchar, revision bigint, name varchar, parent_id varchar, parent_kind varchar, data bytea, PRIMARY KEY (id))",
-	"create table if not exists project_q (id varchar, revision bigint, name varchar, parent_id varchar, parent_kind varchar, data bytea, PRIMARY KEY (id))",
-	"create table if not exists secret_q (id varchar, revision bigint, name varchar, parent_id varchar, parent_kind varchar, data bytea, PRIMARY KEY (id))",
-	"create table if not exists variable_q (id varchar, revision bigint, name varchar, parent_id varchar, parent_kind varchar, data bytea, PRIMARY KEY (id))",
-	"create table if not exists orginvitation_q (id varchar, revision bigint, user_id varchar, org_id varchar, data bytea, PRIMARY KEY (id))",
-}
-
-// denormalized tables for querying, can be rebuilt by query tables.
-// TODO(sgotti) currently not needed
-
-var sb = sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
+//go:generate ../../../../tools/bin/dbgenerator -component configstore
 
 type DB struct {
 	log zerolog.Logger
@@ -73,123 +31,55 @@ func NewDB(log zerolog.Logger, sdb *sql.DB) (*DB, error) {
 	}, nil
 }
 
+func (d *DB) DBType() sql.Type {
+	return d.sdb.Type()
+}
+
 func (d *DB) Do(ctx context.Context, f func(tx *sql.Tx) error) error {
 	return errors.WithStack(d.sdb.Do(ctx, f))
 }
 
-func (d *DB) Exec(tx *sql.Tx, rq sq.Sqlizer) (stdsql.Result, error) {
-	return d.exec(tx, rq)
-}
-
-func (d *DB) Query(tx *sql.Tx, rq sq.Sqlizer) (*stdsql.Rows, error) {
-	return d.query(tx, rq)
-}
-
-func (d *DB) DataTablesVersion() uint  { return dataTablesVersion }
-func (d *DB) QueryTablesVersion() uint { return queryTablesVersion }
-
-func (d *DB) DTablesStatements() []string {
-	return dstmts
-}
-
-func (d *DB) QTablesStatements() []string {
-	return qstmts
-}
-
-func (d *DB) ObjectsInfo() []idb.ObjectInfo {
+func (d *DB) ObjectsInfo() []sqlg.ObjectInfo {
 	return objects.ObjectsInfo
 }
 
-func (d *DB) exec(tx *sql.Tx, rq sq.Sqlizer) (stdsql.Result, error) {
-	q, args, err := rq.ToSql()
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to build query")
+func (d *DB) Flavor() sq.Flavor {
+	switch d.sdb.Type() {
+	case sql.Postgres:
+		return sq.PostgreSQL
+	case sql.Sqlite3:
+		return sq.SQLite
 	}
+
+	return sq.PostgreSQL
+}
+
+func (d *DB) exec(tx *sql.Tx, rq sq.Builder) (stdsql.Result, error) {
+	q, args := rq.BuildWithFlavor(d.Flavor())
 	// d.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
 
 	r, err := tx.Exec(q, args...)
 	return r, errors.WithStack(err)
 }
 
-func (d *DB) query(tx *sql.Tx, rq sq.Sqlizer) (*stdsql.Rows, error) {
-	q, args, err := rq.ToSql()
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to build query")
-	}
-	// d.log.Debug().Msgf("q: %s, args: %s", q, util.Dump(args))
+func (d *DB) query(tx *sql.Tx, rq sq.Builder) (*stdsql.Rows, error) {
+	q, args := rq.BuildWithFlavor(d.Flavor())
+	// d.log.Debug().Msgf("start q: %s, args: %s", q, util.Dump(args))
 
 	r, err := tx.Query(q, args...)
+	// d.log.Debug().Msgf("end q: %s, args: %s", q, util.Dump(args))
 	return r, errors.WithStack(err)
 }
 
-func (d *DB) UnmarshalObject(data []byte) (stypes.Object, error) {
-	var om stypes.TypeMeta
-	if err := json.Unmarshal(data, &om); err != nil {
-		return nil, errors.WithStack(err)
+func mustSingleRow[T any](s []*T) (*T, error) {
+	if len(s) > 1 {
+		return nil, errors.Errorf("too many rows returned")
+	}
+	if len(s) == 0 {
+		return nil, nil
 	}
 
-	var obj stypes.Object
-
-	switch om.Kind {
-	case types.RemoteSourceKind:
-		obj = &types.RemoteSource{}
-	case types.UserKind:
-		obj = &types.User{}
-	case types.UserTokenKind:
-		obj = &types.UserToken{}
-	case types.LinkedAccountKind:
-		obj = &types.LinkedAccount{}
-	case types.OrganizationKind:
-		obj = &types.Organization{}
-	case types.OrganizationMemberKind:
-		obj = &types.OrganizationMember{}
-	case types.ProjectGroupKind:
-		obj = &types.ProjectGroup{}
-	case types.ProjectKind:
-		obj = &types.Project{}
-	case types.SecretKind:
-		obj = &types.Secret{}
-	case types.VariableKind:
-		obj = &types.Variable{}
-	case types.OrgInvitationKind:
-		obj = &types.OrgInvitation{}
-	default:
-		panic(errors.Errorf("unknown object kind %q", om.Kind))
-	}
-
-	if err := json.Unmarshal(data, &obj); err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	return obj, nil
-}
-func (d *DB) InsertRawObject(tx *sql.Tx, obj stypes.Object) ([]byte, error) {
-	switch obj.GetKind() {
-	case types.RemoteSourceKind:
-		return d.insertRawRemoteSourceData(tx, obj.(*types.RemoteSource))
-	case types.UserKind:
-		return d.insertRawUserData(tx, obj.(*types.User))
-	case types.UserTokenKind:
-		return d.insertRawUserTokenData(tx, obj.(*types.UserToken))
-	case types.LinkedAccountKind:
-		return d.insertRawLinkedAccountData(tx, obj.(*types.LinkedAccount))
-	case types.OrganizationKind:
-		return d.insertRawOrganizationData(tx, obj.(*types.Organization))
-	case types.OrganizationMemberKind:
-		return d.insertRawOrganizationMemberData(tx, obj.(*types.OrganizationMember))
-	case types.ProjectGroupKind:
-		return d.insertRawProjectGroupData(tx, obj.(*types.ProjectGroup))
-	case types.ProjectKind:
-		return d.insertRawProjectData(tx, obj.(*types.Project))
-	case types.SecretKind:
-		return d.insertRawSecretData(tx, obj.(*types.Secret))
-	case types.VariableKind:
-		return d.insertRawVariableData(tx, obj.(*types.Variable))
-	case types.OrgInvitationKind:
-		return d.insertRawOrgInvitationData(tx, obj.(*types.OrgInvitation))
-	default:
-		panic(errors.Errorf("unknown object kind %q", obj.GetKind()))
-	}
+	return s[0], nil
 }
 
 func (d *DB) GetPath(tx *sql.Tx, objectKind types.ObjectKind, id string) (string, error) {
@@ -261,51 +151,45 @@ func (d *DB) GetRemoteSource(tx *sql.Tx, rsRef string) (*types.RemoteSource, err
 }
 
 func (d *DB) GetRemoteSourceByID(tx *sql.Tx, remoteSourceID string) (*types.RemoteSource, error) {
-	q := remoteSourceQSelect.Where(sq.Eq{"id": remoteSourceID})
+	q := remoteSourceSelect()
+	q.Where(q.E("id", remoteSourceID))
 	remoteSources, _, err := d.fetchRemoteSources(tx, q)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	if len(remoteSources) > 1 {
-		return nil, errors.Errorf("too many rows returned")
-	}
-	if len(remoteSources) == 0 {
-		return nil, nil
-	}
-	return remoteSources[0], nil
+
+	out, err := mustSingleRow(remoteSources)
+	return out, errors.WithStack(err)
 }
 
 func (d *DB) GetRemoteSourceByName(tx *sql.Tx, name string) (*types.RemoteSource, error) {
-	q := remoteSourceQSelect.Where(sq.Eq{"name": name})
+	q := remoteSourceSelect()
+	q.Where(q.E("name", name))
 	remoteSources, _, err := d.fetchRemoteSources(tx, q)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	if len(remoteSources) > 1 {
-		return nil, errors.Errorf("too many rows returned")
-	}
-	if len(remoteSources) == 0 {
-		return nil, nil
-	}
-	return remoteSources[0], nil
+
+	out, err := mustSingleRow(remoteSources)
+	return out, errors.WithStack(err)
 }
 
-func getRemoteSourcesFilteredQuery(startRemoteSourceName string, limit int, asc bool) sq.SelectBuilder {
-	q := remoteSourceQSelect
+func getRemoteSourcesFilteredQuery(startRemoteSourceName string, limit int, asc bool) *sq.SelectBuilder {
+	q := remoteSourceSelect()
 	if asc {
-		q = q.OrderBy("remotesource_q.name asc")
+		q = q.OrderBy("remotesource.name").Asc()
 	} else {
-		q = q.OrderBy("remotesource_q.name desc")
+		q = q.OrderBy("remotesource.name").Desc()
 	}
 	if startRemoteSourceName != "" {
 		if asc {
-			q = q.Where(sq.Gt{"remotesource_q.name": startRemoteSourceName})
+			q = q.Where(q.G("remotesource.name", startRemoteSourceName))
 		} else {
-			q = q.Where(sq.Lt{"remotesource_q.name": startRemoteSourceName})
+			q = q.Where(q.L("remotesource.name", startRemoteSourceName))
 		}
 	}
 	if limit > 0 {
-		q = q.Limit(uint64(limit))
+		q = q.Limit(limit)
 	}
 
 	return q
@@ -335,184 +219,163 @@ func (d *DB) GetUser(tx *sql.Tx, userRef string) (*types.User, error) {
 }
 
 func (d *DB) GetUserByID(tx *sql.Tx, userID string) (*types.User, error) {
-	q := userQSelect.Where(sq.Eq{"id": userID})
+	q := userSelect()
+	q.Where(q.E("id", userID))
 	users, _, err := d.fetchUsers(tx, q)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	if len(users) > 1 {
-		return nil, errors.Errorf("too many rows returned")
-	}
-	if len(users) == 0 {
-		return nil, nil
-	}
-	return users[0], nil
+
+	out, err := mustSingleRow(users)
+	return out, errors.WithStack(err)
 }
 
 func (d *DB) GetUserByName(tx *sql.Tx, name string) (*types.User, error) {
-	q := userQSelect.Where(sq.Eq{"name": name})
+	q := userSelect()
+	q.Where(q.E("name", name))
 	users, _, err := d.fetchUsers(tx, q)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	if len(users) > 1 {
-		return nil, errors.Errorf("too many rows returned")
-	}
-	if len(users) == 0 {
-		return nil, nil
-	}
-	return users[0], nil
+
+	out, err := mustSingleRow(users)
+	return out, errors.WithStack(err)
 }
 
 func (d *DB) GetUserTokens(tx *sql.Tx, userID string) ([]*types.UserToken, error) {
-	q := userTokenQSelect.Join("user_t_q on usertoken_q.user_id = user_t_q.id").Where(sq.Eq{"user_t_q.id": userID})
+	q := userTokenSelect()
+	q.Join("user_t", "usertoken.user_id = user_t.id").Where(q.E("user_t.id", userID))
 	tokens, _, err := d.fetchUserTokens(tx, q)
 
 	return tokens, errors.WithStack(err)
 }
 
 func (d *DB) GetUserToken(tx *sql.Tx, userID, tokenName string) (*types.UserToken, error) {
-	q := userTokenQSelect.Join("user_t_q on usertoken_q.user_id = user_t_q.id").Where(sq.Eq{"user_t_q.id": userID, "usertoken_q.name": tokenName})
+	q := userTokenSelect()
+	q.Join("user_t", "usertoken.user_id = user_t.id")
+	q.Where(q.E("user_t.id", userID), q.E("usertoken.name", tokenName))
+
 	userTokens, _, err := d.fetchUserTokens(tx, q)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	if len(userTokens) > 1 {
-		return nil, errors.Errorf("too many rows returned")
-	}
-	if len(userTokens) == 0 {
-		return nil, nil
-	}
-	return userTokens[0], nil
+
+	out, err := mustSingleRow(userTokens)
+	return out, errors.WithStack(err)
 }
 
 func (d *DB) GetUserByTokenValue(tx *sql.Tx, tokenValue string) (*types.User, error) {
-	q := userQSelect
-	q = q.Join("usertoken_q on usertoken_q.user_id = user_t_q.id")
-	q = q.Where(sq.Eq{"usertoken_q.value": tokenValue})
+	q := userSelect()
+	q = q.Join("usertoken", "usertoken.user_id = user_t.id")
+	q = q.Where(q.E("usertoken.value", tokenValue))
 
 	users, _, err := d.fetchUsers(tx, q)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	if len(users) > 1 {
-		return nil, errors.Errorf("too many rows returned")
-	}
-	if len(users) == 0 {
-		return nil, nil
-	}
-	return users[0], nil
+
+	out, err := mustSingleRow(users)
+	return out, errors.WithStack(err)
 }
 
 func (d *DB) GetLinkedAccounts(tx *sql.Tx, linkedAccountsIDs []string) ([]*types.LinkedAccount, error) {
-	q := linkedAccountQSelect.Where(sq.Eq{"id": linkedAccountsIDs})
+	q := linkedAccountSelect()
+	q.Where(q.E("id", linkedAccountsIDs))
 	linkedAccounts, _, err := d.fetchLinkedAccounts(tx, q)
 
 	return linkedAccounts, errors.WithStack(err)
 }
 
 func (d *DB) GetLinkedAccount(tx *sql.Tx, linkedAccountID string) (*types.LinkedAccount, error) {
-	q := linkedAccountQSelect.Where(sq.Eq{"id": linkedAccountID})
+	q := linkedAccountSelect()
+	q.Where(q.E("id", linkedAccountID))
 	linkedAccounts, _, err := d.fetchLinkedAccounts(tx, q)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	if len(linkedAccounts) > 1 {
-		return nil, errors.Errorf("too many rows returned")
-	}
-	if len(linkedAccounts) == 0 {
-		return nil, nil
-	}
-	return linkedAccounts[0], nil
+
+	out, err := mustSingleRow(linkedAccounts)
+	return out, errors.WithStack(err)
 }
 
 // func (d *DB) GetLinkedAccount(tx *sql.Tx, userID, linkedAccountID string) (*types.LinkedAccount, error) {
-// 	q := linkedAccountQSelect.Where(sq.Eq{"id": linkedAccountID, "user_id": userID})
+// 	q := linkedAccountSelect()
+//	q..Eq{"id": linkedAccountID, "user_id": userID))
 // 	linkedAccounts, _, err := d.fetchLinkedAccounts(tx, q)
 // 	if err != nil {
 // 		return nil, errors.WithStack(err)
 // 	}
-// 	if len(linkedAccounts) > 1 {
-// 		return nil, errors.Errorf("too many rows returned")
-// 	}
-// 	if len(linkedAccounts) == 0 {
-// 		return nil, nil
-// 	}
-// 	return linkedAccounts[0], nil
+//
+//	out, err := mustSingleRow(linkedAccounts)
+//	return out, errors.WithStack(err)
 // }
 
 func (d *DB) GetUserLinkedAccounts(tx *sql.Tx, userID string) ([]*types.LinkedAccount, error) {
-	q := linkedAccountQSelect.Join("user_t_q on linkedaccount_q.user_id = user_t_q.id").Where(sq.Eq{"user_t_q.id": userID})
+	q := linkedAccountSelect()
+	q.Join("user_t", "linkedaccount.user_id = user_t.id").Where(q.E("user_t.id", userID))
+
 	linkedAccounts, _, err := d.fetchLinkedAccounts(tx, q)
 
 	return linkedAccounts, errors.WithStack(err)
 }
 
 func (d *DB) GetUserByLinkedAccount(tx *sql.Tx, linkedAccountID string) (*types.User, error) {
-	q := userQSelect
-	q = q.Join("linkedaccount_q on linkedaccount_q.user_id = user_t_q.id")
-	q = q.Where(sq.Eq{"linkedaccount_q.id": linkedAccountID})
+	q := userSelect()
+	q = q.Join("linkedaccount", "linkedaccount.user_id = user_t.id")
+	q = q.Where(q.E("linkedaccount.id", linkedAccountID))
+
 	users, _, err := d.fetchUsers(tx, q)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	if len(users) > 1 {
-		return nil, errors.Errorf("too many rows returned")
-	}
-	if len(users) == 0 {
-		return nil, nil
-	}
-	return users[0], nil
+
+	out, err := mustSingleRow(users)
+	return out, errors.WithStack(err)
 }
 
 func (d *DB) GetLinkedAccountByRemoteUserIDandSource(tx *sql.Tx, remoteUserID, remoteSourceID string) (*types.LinkedAccount, error) {
-	q := linkedAccountQSelect.Where(sq.Eq{"linkedaccount_q.remoteuser_id": remoteUserID, "linkedaccount_q.remotesource_id": remoteSourceID})
+	q := linkedAccountSelect()
+	q.Where(q.E("linkedaccount.remote_user_id", remoteUserID), q.E("linkedaccount.remote_source_id", remoteSourceID))
+
 	linkedAccounts, _, err := d.fetchLinkedAccounts(tx, q)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	if len(linkedAccounts) > 1 {
-		return nil, errors.Errorf("too many rows returned")
-	}
-	if len(linkedAccounts) == 0 {
-		return nil, nil
-	}
-	return linkedAccounts[0], nil
+
+	out, err := mustSingleRow(linkedAccounts)
+	return out, errors.WithStack(err)
 }
 
 // func (d *DB) GetUserByLinkedAccountRemoteUserIDandSource(tx *sql.Tx, remoteUserID, remoteSourceID string) (*types.User, error) {
-// 	q := userQSelect
-// 	q = q.Join("linkedaccount_q on linkedaccount_q.user_id = user_t_q.id")
-// 	q = q.Where(sq.Eq{"linkedaccount_q.remoteuser_id": remoteUserID, "linkedaccount_q.remotesource_id": remoteSourceID})
+// 	q := userSelect()
+// 	q = q.Join("linkedaccount", "linkedaccount.user_id = user_t.id")
+// 	q = q.Where(q.E("linkedaccount.remote_user_id", remoteUserID), q.E("linkedaccount.remote_source_id", remoteSourceID))
+
 // 	users, _, err := d.fetchUsers(tx, q)
 // 	if err != nil {
 // 		return nil, errors.WithStack(err)
 // 	}
-// 	if len(users) > 1 {
-// 		return nil, errors.Errorf("too many rows returned")
-// 	}
-// 	if len(users) == 0 {
-// 		return nil, nil
-// 	}
-// 	return users[0], nil
+
+//	out, err := mustSingleRow(users)
+//	return out, errors.WithStack(err)
 // }
 
-func getUsersFilteredQuery(startUserName string, limit int, asc bool) sq.SelectBuilder {
-	q := userQSelect
+func getUsersFilteredQuery(startUserName string, limit int, asc bool) *sq.SelectBuilder {
+	q := userSelect()
 	if asc {
-		q = q.OrderBy("user_t_q.name asc")
+		q = q.OrderBy("user_t.name").Asc()
 	} else {
-		q = q.OrderBy("user_t_q.name desc")
+		q = q.OrderBy("user_t.name").Desc()
 	}
 	if startUserName != "" {
 		if asc {
-			q = q.Where(sq.Gt{"user_t_q.name": startUserName})
+			q = q.Where(q.G("user_t.name", startUserName))
 		} else {
-			q = q.Where(sq.Lt{"user_t_q.name": startUserName})
+			q = q.Where(q.L("user_t.name", startUserName))
 		}
 	}
 	if limit > 0 {
-		q = q.Limit(uint64(limit))
+		q = q.Limit(limit)
 	}
 
 	return q
@@ -542,55 +405,45 @@ func (d *DB) GetOrg(tx *sql.Tx, orgRef string) (*types.Organization, error) {
 }
 
 func (d *DB) GetOrgByID(tx *sql.Tx, orgID string) (*types.Organization, error) {
-	q := orgQSelect.Where(sq.Eq{"id": orgID})
+	q := organizationSelect()
+	q.Where(q.E("id", orgID))
 	orgs, _, err := d.fetchOrganizations(tx, q)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	if len(orgs) > 1 {
-		return nil, errors.Errorf("too many rows returned")
-	}
-	if len(orgs) == 0 {
-		return nil, nil
-	}
-
-	return orgs[0], nil
+	out, err := mustSingleRow(orgs)
+	return out, errors.WithStack(err)
 }
 
 func (d *DB) GetOrgByName(tx *sql.Tx, name string) (*types.Organization, error) {
-	q := orgQSelect.Where(sq.Eq{"name": name})
+	q := organizationSelect()
+	q.Where(q.E("name", name))
 	orgs, _, err := d.fetchOrganizations(tx, q)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	if len(orgs) > 1 {
-		return nil, errors.Errorf("too many rows returned")
-	}
-	if len(orgs) == 0 {
-		return nil, nil
-	}
-
-	return orgs[0], nil
+	out, err := mustSingleRow(orgs)
+	return out, errors.WithStack(err)
 }
 
-func getOrgsFilteredQuery(startOrgName string, limit int, asc bool) sq.SelectBuilder {
-	q := orgQSelect
+func getOrgsFilteredQuery(startOrgName string, limit int, asc bool) *sq.SelectBuilder {
+	q := organizationSelect()
 	if asc {
-		q = q.OrderBy("name asc")
+		q = q.OrderBy("name").Asc()
 	} else {
-		q = q.OrderBy("name desc")
+		q = q.OrderBy("name").Desc()
 	}
 	if startOrgName != "" {
 		if asc {
-			q = q.Where(sq.Gt{"name": startOrgName})
+			q = q.Where(q.G("name", startOrgName))
 		} else {
-			q = q.Where(sq.Lt{"name": startOrgName})
+			q = q.Where(q.L("name", startOrgName))
 		}
 	}
 	if limit > 0 {
-		q = q.Limit(uint64(limit))
+		q = q.Limit(limit)
 	}
 
 	return q
@@ -604,19 +457,16 @@ func (d *DB) GetOrgs(tx *sql.Tx, startOrgName string, limit int, asc bool) ([]*t
 }
 
 func (d *DB) GetOrgMemberByOrgUserID(tx *sql.Tx, orgID, userID string) (*types.OrganizationMember, error) {
-	q := orgmemberQSelect.Where(sq.Eq{"orgmember_q.org_id": orgID, "orgmember_q.user_id": userID})
+	q := organizationMemberSelect()
+	q.Where(q.E("orgmember.organization_id", orgID), q.E("orgmember.user_id", userID))
 
 	oms, _, err := d.fetchOrganizationMembers(tx, q)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	if len(oms) > 1 {
-		return nil, errors.Errorf("too many rows returned")
-	}
-	if len(oms) == 0 {
-		return nil, nil
-	}
-	return oms[0], nil
+
+	out, err := mustSingleRow(oms)
+	return out, errors.WithStack(err)
 }
 
 type OrgUser struct {
@@ -626,12 +476,13 @@ type OrgUser struct {
 
 // TODO(sgotti) implement cursor fetching
 func (d *DB) GetOrgUsers(tx *sql.Tx, orgID string) ([]*OrgUser, error) {
-	q := sb.Select(
-		"orgmember_q.revision", "orgmember_q.data",
-		"user_t_q.revision", "user_t_q.data").From("orgmember_q")
-	q = q.Where(sq.Eq{"orgmember_q.org_id": orgID})
-	q = q.Join("user_t_q on user_t_q.id = orgmember_q.user_id")
-	q = q.OrderBy("user_t_q.name")
+	cols := organizationMemberSelectColumns()
+	cols = append(cols, userSelectColumns()...)
+
+	q := sq.Select(cols...).From("orgmember")
+	q = q.Join("user_t", "user_t.id = orgmember.user_id")
+	q = q.Where(q.E("orgmember.organization_id", orgID))
+	q = q.OrderBy("user_t.name")
 
 	rows, err := d.query(tx, q)
 	if err != nil {
@@ -641,29 +492,25 @@ func (d *DB) GetOrgUsers(tx *sql.Tx, orgID string) ([]*OrgUser, error) {
 
 	orgusers := []*OrgUser{}
 	for rows.Next() {
-		var orgmemberRevision uint64
-		var orgmember *types.OrganizationMember
-		var userRevision uint64
-		var user *types.User
-		var orgmemberdata []byte
-		var userdata []byte
-		if err := rows.Scan(&orgmemberRevision, &orgmemberdata, &userRevision, &userdata); err != nil {
+		orgMemberCols := d.OrganizationMemberArray()
+		userCols := d.UserArray()
+		if err := d.scanArray(rows, orgMemberCols, userCols); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan rows")
 		}
 
-		if err := json.Unmarshal(orgmemberdata, &orgmember); err != nil {
-			return nil, errors.Wrapf(err, "failed to unmarshal orgmember")
+		orgMember, _, err := d.OrganizationMemberFromArray(orgMemberCols, tx.ID())
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to fetch org")
 		}
-		orgmember.Revision = orgmemberRevision
 
-		if err := json.Unmarshal(userdata, &user); err != nil {
-			return nil, errors.Wrapf(err, "failed to unmarshal org")
+		user, _, err := d.UserFromArray(userCols, tx.ID())
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to fetch user")
 		}
-		user.Revision = userRevision
 
 		orgusers = append(orgusers, &OrgUser{
 			User: user,
-			Role: orgmember.MemberRole,
+			Role: orgMember.MemberRole,
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -680,12 +527,13 @@ type UserOrg struct {
 
 // TODO(sgotti) implement cursor fetching
 func (d *DB) GetUserOrgs(tx *sql.Tx, userID string) ([]*UserOrg, error) {
-	q := sb.Select(
-		"orgmember_q.revision", "orgmember_q.data",
-		"org_q.revision", "org_q.data").From("orgmember_q")
-	q = q.Where(sq.Eq{"orgmember_q.user_id": userID})
-	q = q.Join("org_q on org_q.id = orgmember_q.org_id")
-	q = q.OrderBy("org_q.name")
+	cols := organizationMemberSelectColumns()
+	cols = append(cols, organizationSelectColumns()...)
+
+	q := sq.Select(cols...).From("orgmember")
+	q = q.Where(q.E("orgmember.user_id", userID))
+	q = q.Join("organization", "organization.id = orgmember.organization_id")
+	q = q.OrderBy("organization.name")
 
 	rows, err := d.query(tx, q)
 	if err != nil {
@@ -695,28 +543,25 @@ func (d *DB) GetUserOrgs(tx *sql.Tx, userID string) ([]*UserOrg, error) {
 
 	userorgs := []*UserOrg{}
 	for rows.Next() {
-		var orgmemberRevision uint64
-		var orgmember *types.OrganizationMember
-		var orgRevision uint64
-		var org *types.Organization
-		var orgmemberdata []byte
-		var orgdata []byte
-		if err := rows.Scan(&orgmemberRevision, &orgmemberdata, &orgRevision, &orgdata); err != nil {
+		orgMemberCols := d.OrganizationMemberArray()
+		organizationCols := d.OrganizationArray()
+		if err := d.scanArray(rows, orgMemberCols, organizationCols); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan rows")
 		}
-		if err := json.Unmarshal(orgmemberdata, &orgmember); err != nil {
-			return nil, errors.Wrapf(err, "failed to unmarshal orgmember")
-		}
-		orgmember.Revision = orgmemberRevision
 
-		if err := json.Unmarshal(orgdata, &org); err != nil {
-			return nil, errors.Wrapf(err, "failed to unmarshal org")
+		orgMember, _, err := d.OrganizationMemberFromArray(orgMemberCols, tx.ID())
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to fetch org")
 		}
-		org.Revision = orgRevision
+
+		org, _, err := d.OrganizationFromArray(organizationCols, tx.ID())
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to fetch org")
+		}
 
 		userorgs = append(userorgs, &UserOrg{
 			Organization: org,
-			Role:         orgmember.MemberRole,
+			Role:         orgMember.MemberRole,
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -828,33 +673,27 @@ func (d *DB) GetProjectGroup(tx *sql.Tx, projectGroupRef string) (*types.Project
 }
 
 func (d *DB) GetProjectGroupByID(tx *sql.Tx, projectGroupID string) (*types.ProjectGroup, error) {
-	q := projectGroupQSelect.Where(sq.Eq{"id": projectGroupID})
+	q := projectGroupSelect()
+	q.Where(q.E("id", projectGroupID))
 	projectGroups, _, err := d.fetchProjectGroups(tx, q)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	if len(projectGroups) > 1 {
-		return nil, errors.Errorf("too many rows returned")
-	}
-	if len(projectGroups) == 0 {
-		return nil, nil
-	}
-	return projectGroups[0], nil
+
+	out, err := mustSingleRow(projectGroups)
+	return out, errors.WithStack(err)
 }
 
 func (d *DB) GetProjectGroupByName(tx *sql.Tx, parentID, name string) (*types.ProjectGroup, error) {
-	q := projectGroupQSelect.Where(sq.Eq{"parent_id": parentID, "name": name})
+	q := projectGroupSelect()
+	q.Where(q.E("parent_id", parentID), q.E("name", name))
 	projectGroups, _, err := d.fetchProjectGroups(tx, q)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	if len(projectGroups) > 1 {
-		return nil, errors.Errorf("too many rows returned")
-	}
-	if len(projectGroups) == 0 {
-		return nil, nil
-	}
-	return projectGroups[0], nil
+
+	out, err := mustSingleRow(projectGroups)
+	return out, errors.WithStack(err)
 }
 
 func (d *DB) GetProjectGroupByPath(tx *sql.Tx, projectGroupPath string) (*types.ProjectGroup, error) {
@@ -904,7 +743,8 @@ func (d *DB) GetProjectGroupByPath(tx *sql.Tx, projectGroupPath string) (*types.
 }
 
 func (d *DB) GetProjectGroupSubgroups(tx *sql.Tx, parentID string) ([]*types.ProjectGroup, error) {
-	q := projectGroupQSelect.Where(sq.Eq{"parent_id": parentID})
+	q := projectGroupSelect()
+	q.Where(q.E("parent_id", parentID))
 	projectGroups, _, err := d.fetchProjectGroups(tx, q)
 
 	return projectGroups, errors.WithStack(err)
@@ -956,35 +796,29 @@ func (d *DB) GetProject(tx *sql.Tx, projectRef string) (*types.Project, error) {
 }
 
 func (d *DB) GetProjectByID(tx *sql.Tx, projectID string) (*types.Project, error) {
-	q := projectQSelect.Where(sq.Eq{"id": projectID})
+	q := projectSelect()
+	q.Where(q.E("id", projectID))
 
 	projects, _, err := d.fetchProjects(tx, q)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	if len(projects) > 1 {
-		return nil, errors.Errorf("too many rows returned")
-	}
-	if len(projects) == 0 {
-		return nil, nil
-	}
-	return projects[0], nil
+
+	out, err := mustSingleRow(projects)
+	return out, errors.WithStack(err)
 }
 
 func (d *DB) GetProjectByName(tx *sql.Tx, parentID, name string) (*types.Project, error) {
-	q := projectQSelect.Where(sq.Eq{"parent_id": parentID, "name": name})
+	q := projectSelect()
+	q.Where(q.E("parent_id", parentID), q.E("name", name))
 
 	projects, _, err := d.fetchProjects(tx, q)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	if len(projects) > 1 {
-		return nil, errors.Errorf("too many rows returned")
-	}
-	if len(projects) == 0 {
-		return nil, nil
-	}
-	return projects[0], nil
+
+	out, err := mustSingleRow(projects)
+	return out, errors.WithStack(err)
 }
 
 func (d *DB) GetProjectByPath(tx *sql.Tx, projectPath string) (*types.Project, error) {
@@ -1011,44 +845,40 @@ func (d *DB) GetProjectByPath(tx *sql.Tx, projectPath string) (*types.Project, e
 }
 
 func (d *DB) GetProjectGroupProjects(tx *sql.Tx, parentID string) ([]*types.Project, error) {
-	q := projectQSelect.Where(sq.Eq{"parent_id": parentID})
+	q := projectSelect()
+	q.Where(q.E("parent_id", parentID))
 	projects, _, err := d.fetchProjects(tx, q)
 
 	return projects, errors.WithStack(err)
 }
 
 func (d *DB) GetSecretByID(tx *sql.Tx, secretID string) (*types.Secret, error) {
-	q := secretQSelect.Where(sq.Eq{"id": secretID})
+	q := secretSelect()
+	q.Where(q.E("id", secretID))
 	secrets, _, err := d.fetchSecrets(tx, q)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	if len(secrets) > 1 {
-		return nil, errors.Errorf("too many rows returned")
-	}
-	if len(secrets) == 0 {
-		return nil, nil
-	}
-	return secrets[0], nil
+
+	out, err := mustSingleRow(secrets)
+	return out, errors.WithStack(err)
 }
 
 func (d *DB) GetSecretByName(tx *sql.Tx, parentID, name string) (*types.Secret, error) {
-	q := secretQSelect.Where(sq.Eq{"parent_id": parentID, "name": name})
+	q := secretSelect()
+	q.Where(q.E("parent_id", parentID), q.E("name", name))
 	secrets, _, err := d.fetchSecrets(tx, q)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	if len(secrets) > 1 {
-		return nil, errors.Errorf("too many rows returned")
-	}
-	if len(secrets) == 0 {
-		return nil, nil
-	}
-	return secrets[0], nil
+
+	out, err := mustSingleRow(secrets)
+	return out, errors.WithStack(err)
 }
 
 func (d *DB) GetSecrets(tx *sql.Tx, parentID string) ([]*types.Secret, error) {
-	q := secretQSelect.Where(sq.Eq{"parent_id": parentID})
+	q := secretSelect()
+	q.Where(q.E("parent_id", parentID))
 	secrets, _, err := d.fetchSecrets(tx, q)
 	return secrets, errors.WithStack(err)
 }
@@ -1128,37 +958,32 @@ func (d *DB) GetSecretsTree(tx *sql.Tx, parentKind types.ObjectKind, parentID st
 }
 
 func (d *DB) GetVariableByID(tx *sql.Tx, variableID string) (*types.Variable, error) {
-	q := variableQSelect.Where(sq.Eq{"id": variableID})
+	q := variableSelect()
+	q.Where(q.E("id", variableID))
 	variables, _, err := d.fetchVariables(tx, q)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	if len(variables) > 1 {
-		return nil, errors.Errorf("too many rows returned")
-	}
-	if len(variables) == 0 {
-		return nil, nil
-	}
-	return variables[0], nil
+
+	out, err := mustSingleRow(variables)
+	return out, errors.WithStack(err)
 }
 
 func (d *DB) GetVariableByName(tx *sql.Tx, parentID, name string) (*types.Variable, error) {
-	q := variableQSelect.Where(sq.Eq{"parent_id": parentID, "name": name})
+	q := variableSelect()
+	q.Where(q.E("parent_id", parentID), q.E("name", name))
 	variables, _, err := d.fetchVariables(tx, q)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	if len(variables) > 1 {
-		return nil, errors.Errorf("too many rows returned")
-	}
-	if len(variables) == 0 {
-		return nil, nil
-	}
-	return variables[0], nil
+
+	out, err := mustSingleRow(variables)
+	return out, errors.WithStack(err)
 }
 
 func (d *DB) GetVariables(tx *sql.Tx, parentID string) ([]*types.Variable, error) {
-	q := variableQSelect.Where(sq.Eq{"parent_id": parentID})
+	q := variableSelect()
+	q.Where(q.E("parent_id", parentID))
 	variables, _, err := d.fetchVariables(tx, q)
 	return variables, errors.WithStack(err)
 }
@@ -1202,58 +1027,61 @@ func (d *DB) GetVariablesTree(tx *sql.Tx, parentKind types.ObjectKind, parentID 
 
 // Test only functions
 func (d *DB) GetAllProjects(tx *sql.Tx) ([]*types.Project, error) {
-	q := projectQSelect.OrderBy("id")
+	q := projectSelect()
+	q.OrderBy("id")
 	projects, _, err := d.fetchProjects(tx, q)
 
 	return projects, errors.WithStack(err)
 }
 
 func (d *DB) GetAllProjectGroups(tx *sql.Tx) ([]*types.ProjectGroup, error) {
-	q := projectGroupQSelect.OrderBy("id")
+	q := projectGroupSelect()
+	q.OrderBy("id")
 	projectGroups, _, err := d.fetchProjectGroups(tx, q)
 
 	return projectGroups, errors.WithStack(err)
 }
 
 func (d *DB) GetAllSecrets(tx *sql.Tx) ([]*types.Secret, error) {
-	q := secretQSelect.OrderBy("id")
+	q := secretSelect()
+	q.OrderBy("id")
 	secrets, _, err := d.fetchSecrets(tx, q)
 
 	return secrets, errors.WithStack(err)
 }
 
 func (d *DB) GetAllVariables(tx *sql.Tx) ([]*types.Variable, error) {
-	q := variableQSelect.OrderBy("id")
+	q := variableSelect()
+	q.OrderBy("id")
 	variables, _, err := d.fetchVariables(tx, q)
 
 	return variables, errors.WithStack(err)
 }
 
 func (d *DB) GetOrgInvitations(tx *sql.Tx, orgID string) ([]*types.OrgInvitation, error) {
-	q := orgInvitationQSelect.Where(sq.Eq{"org_id": orgID})
+	q := orgInvitationSelect()
+	q.Where(q.E("organization_id", orgID))
 	orgInvitations, _, err := d.fetchOrgInvitations(tx, q)
 
 	return orgInvitations, errors.WithStack(err)
 }
 
 func (d *DB) GetOrgInvitationByOrgUserID(tx *sql.Tx, orgID, userID string) (*types.OrgInvitation, error) {
-	q := orgInvitationQSelect.Where(sq.Eq{"org_id": orgID, "user_id": userID})
+	q := orgInvitationSelect()
+	q.Where(q.E("organization_id", orgID), q.E("user_id", userID))
 
 	orgInvitations, _, err := d.fetchOrgInvitations(tx, q)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	if len(orgInvitations) > 1 {
-		return nil, errors.Errorf("too many rows returned")
-	}
-	if len(orgInvitations) == 0 {
-		return nil, nil
-	}
-	return orgInvitations[0], nil
+
+	out, err := mustSingleRow(orgInvitations)
+	return out, errors.WithStack(err)
 }
 
 func (d *DB) GetOrgInvitationByUserID(tx *sql.Tx, userID string) ([]*types.OrgInvitation, error) {
-	q := orgInvitationQSelect.Where(sq.Eq{"user_id": userID})
+	q := orgInvitationSelect()
+	q.Where(q.E("user_id", userID))
 
 	orgInvitations, _, err := d.fetchOrgInvitations(tx, q)
 	if err != nil {

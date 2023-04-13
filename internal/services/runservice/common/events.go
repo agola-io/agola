@@ -15,10 +15,8 @@
 package common
 
 import (
-	"github.com/sorintlab/errors"
-
 	"agola.io/agola/internal/services/runservice/db"
-	"agola.io/agola/internal/sql"
+	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/services/runservice/types"
 )
 
@@ -27,13 +25,6 @@ func NewRunEvent(d *db.DB, tx *sql.Tx, runID string, phase types.RunPhase, resul
 	runEvent.RunID = runID
 	runEvent.Phase = phase
 	runEvent.Result = result
-
-	runEventSequence, err := d.NextSequence(tx, types.SequenceTypeRunEvent)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	runEvent.Sequence = runEventSequence
 
 	return runEvent, nil
 }

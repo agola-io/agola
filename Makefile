@@ -60,11 +60,11 @@ webbundle/bindata.go: go-bindata $(WEBDISTPATH)
 
 .PHONY: generate
 generate: generators
-	go generate ./...
+	go generate $(PROJDIR)/...
 
 .PHONY: generators
 generators:
-	GOBIN=$(PROJDIR)/tools/bin go install ./internal/generators
+	go build -o $(PROJDIR)/tools/bin/dbgenerator ./internal/generators/db
 
 .PHONY: docker-agola
 docker-agola:

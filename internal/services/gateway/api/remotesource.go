@@ -124,8 +124,8 @@ func createRemoteSourceResponse(r *cstypes.RemoteSource) *gwapitypes.RemoteSourc
 		ID:                  r.ID,
 		Name:                r.Name,
 		AuthType:            string(r.AuthType),
-		RegistrationEnabled: *r.RegistrationEnabled,
-		LoginEnabled:        *r.LoginEnabled,
+		RegistrationEnabled: r.RegistrationEnabled,
+		LoginEnabled:        r.LoginEnabled,
 	}
 	return rs
 }
