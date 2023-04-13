@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	Version = uint(1)
+	Version = uint(2)
 )
 
 const TypesImport = "agola.io/agola/services/configstore/types"
@@ -41,6 +41,9 @@ var ObjectsInfo = []sqlg.ObjectInfo{
 			{Name: "Name", Type: "string"},
 			{Name: "Value", Type: "string"},
 		},
+		Constraints: []string{
+			"foreign key (user_id) references user_t(id)",
+		},
 	},
 	{Name: "LinkedAccount", Table: "linkedaccount",
 		Fields: []sqlg.ObjectField{
@@ -53,6 +56,10 @@ var ObjectsInfo = []sqlg.ObjectInfo{
 			{Name: "Oauth2AccessToken", Type: "string"},
 			{Name: "Oauth2RefreshToken", Type: "string"},
 			{Name: "Oauth2AccessTokenExpiresAt", Type: "time.Time"},
+		},
+		Constraints: []string{
+			"foreign key (user_id) references user_t(id)",
+			"foreign key (remote_source_id) references remotesource(id)",
 		},
 	},
 	{Name: "Organization", Table: "organization",
@@ -67,6 +74,10 @@ var ObjectsInfo = []sqlg.ObjectInfo{
 			{Name: "OrganizationID", Type: "string"},
 			{Name: "UserID", Type: "string"},
 			{Name: "MemberRole", Type: "types.MemberRole", SQLType: "varchar"},
+		},
+		Constraints: []string{
+			"foreign key (organization_id) references organization(id)",
+			"foreign key (user_id) references user_t(id)",
 		},
 	},
 	{Name: "ProjectGroup", Table: "projectgroup",
@@ -120,6 +131,10 @@ var ObjectsInfo = []sqlg.ObjectInfo{
 			{Name: "UserID", Type: "string"},
 			{Name: "OrganizationID", Type: "string"},
 			{Name: "Role", Type: "types.MemberRole", SQLType: "varchar"},
+		},
+		Constraints: []string{
+			"foreign key (user_id) references user_t(id)",
+			"foreign key (organization_id) references organization(id)",
 		},
 	},
 }

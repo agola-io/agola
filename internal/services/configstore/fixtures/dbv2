@@ -52,26 +52,8 @@
 
 {"exportMeta":{"kind":"UserToken"},"id":"380b36a3-c860-4540-89b1-99a0708eac58","creationTime":"2023-04-07T12:12:19.048529Z","updateTime":"2023-04-07T12:12:19.048529Z","name":"default","value":"tokenvalue","user_id":"06c3b92a-f544-4eab-a254-a9d0465e16fc"}
 
-// userToken without referenced user
-{"exportMeta":{"kind":"UserToken"},"id":"889ffe3c-2fc8-4705-b0b7-bb96c6ecbf66","creationTime":"2023-04-07T12:12:19.048529Z","updateTime":"2023-04-07T12:12:19.048529Z","name":"default","value":"tokenvalue","user_id":"b4b49284-c91c-4808-af3a-d41a11797c11"}
-
 {"exportMeta":{"kind":"OrganizationMember"},"id":"8749225d-5356-4c15-a14a-986a21e06498","creationTime":"2023-04-07T12:12:19.048529Z","updateTime":"2023-04-07T12:12:19.048529Z","organization_id":"15bfe438-9844-4024-b493-d137468bf6e9","user_id":"06c3b92a-f544-4eab-a254-a9d0465e16fc","member_role":"owner"}
-
-// orgMember without referenced user
-{"exportMeta":{"kind":"OrganizationMember"},"id":"8fef9619-3e12-4337-a946-78c866277a16","creationTime":"2023-04-07T12:12:19.048529Z","updateTime":"2023-04-07T12:12:19.048529Z","organization_id":"15bfe438-9844-4024-b493-d137468bf6e9","user_id":"b4b49284-c91c-4808-af3a-d41a11797c11","member_role":"owner"}
-// orgMember without referenced organization
-{"exportMeta":{"kind":"OrganizationMember"},"id":"65322fa9-904d-48f5-8a7b-910e93bf58d5","creationTime":"2023-04-07T12:12:19.048529Z","updateTime":"2023-04-07T12:12:19.048529Z","organization_id":"9f8afa62-b1ab-415d-9d8c-6a894bfbc2c8","user_id":"06c3b92a-f544-4eab-a254-a9d0465e16fc","member_role":"owner"}
 
 {"exportMeta":{"kind":"OrgInvitation"},"id":"ccfa97b7-f673-4437-9d5f-8fd11ec05c6f","creationTime":"2023-04-07T12:12:19.048529Z","updateTime":"2023-04-07T12:12:19.048529Z","organization_id":"15bfe438-9844-4024-b493-d137468bf6e9","user_id":"06c3b92a-f544-4eab-a254-a9d0465e16fc","role":"owner"}
 
-// orgInviation without referenced user
-{"exportMeta":{"kind":"OrgInvitation"},"id":"4371cce3-c2f4-4193-bdb4-8c6b3af6a6df","creationTime":"2023-04-07T12:12:19.048529Z","updateTime":"2023-04-07T12:12:19.048529Z","organization_id":"15bfe438-9844-4024-b493-d137468bf6e9","user_id":"b4b49284-c91c-4808-af3a-d41a11797c11","role":"owner"}
-// orgInviation without referenced organization
-{"exportMeta":{"kind":"OrgInvitation"},"id":"b7419a90-f5e5-4a7f-bf80-ab50e1a51816","creationTime":"2023-04-07T12:12:19.048529Z","updateTime":"2023-04-07T12:12:19.048529Z","organization_id":"9f8afa62-b1ab-415d-9d8c-6a894bfbc2c8","user_id":"06c3b92a-f544-4eab-a254-a9d0465e16fc","role":"owner"}
-
 {"exportMeta":{"kind":"LinkedAccount"},"id":"4037d8a4-78a2-41dc-8108-faa7f514b5e2","creationTime":"2023-04-07T12:12:19.048529Z","updateTime":"2023-04-07T12:12:19.048529Z","user_id":"06c3b92a-f544-4eab-a254-a9d0465e16fc","remote_user_id":"12345","remote_username":"remoteuser01","remote_source_id":"41e2edca-ed29-4bab-a552-e4720cc2aca9","oauth2_access_token":"accesstoken","oauth_2_access_token_expires_at":"0001-01-01T00:00:00Z"}
-
-// linkedAccount without referenced user
-{"exportMeta":{"kind":"LinkedAccount"},"id":"c36e0120-b4bf-4b5f-ba7e-8a16ec549a68","creationTime":"2023-04-07T12:12:19.048529Z","updateTime":"2023-04-07T12:12:19.048529Z","user_id":"b4b49284-c91c-4808-af3a-d41a11797c11","remote_user_id":"12345","remote_username":"remoteuser01","remote_source_id":"41e2edca-ed29-4bab-a552-e4720cc2aca9","oauth2_access_token":"accesstoken","oauth_2_access_token_expires_at":"0001-01-01T00:00:00Z"}
-// linkedAccount without referenced remotesource
-{"exportMeta":{"kind":"LinkedAccount"},"id":"0ee496df-41c9-4c45-b3ee-f4dab13f11b6","creationTime":"2023-04-07T12:12:19.048529Z","updateTime":"2023-04-07T12:12:19.048529Z","user_id":"06c3b92a-f544-4eab-a254-a9d0465e16fc","remote_user_id":"12345","remote_username":"remoteuser01","remote_source_id":"7dc468fc-3c94-4e96-a5ed-6b2ae9c07dd4","oauth2_access_token":"accesstoken","oauth_2_access_token_expires_at":"0001-01-01T00:00:00Z"}
