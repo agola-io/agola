@@ -66,6 +66,10 @@ func MigrateRunService(ctx context.Context, r io.Reader, w io.Writer) error {
 		return errors.WithStack(err)
 	}
 
+	if _, err := tx.Exec("PRAGMA defer_foreign_keys = ON"); err != nil {
+		return errors.WithStack(err)
+	}
+
 	var curNewRunSequence uint64
 	var prevOldRunSequence string
 	for {

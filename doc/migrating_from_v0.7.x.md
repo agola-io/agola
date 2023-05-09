@@ -19,7 +19,7 @@ We suggest to test this migration on a test environment before doing this on you
 
    `cat /tmp/runservice-export | ./tmp/agola migrateexport --service runservice > /tmp/runservice-migrated`
 
-   `cat /tmp/runservice-export | ./tmp/agola migratexporte --service configstore > /tmp/configstore-migrated`
+   `cat /tmp/runservice-export | ./tmp/agola migrateexport --service configstore > /tmp/configstore-migrated`
 
 1. Update the agola binaries on your environment or use a test enviroment and start only the runservice and configstore.
 1. Update the agola config file and remove the runservice, configstore, notification service etcd entries and add the db entries. Every component should have its own dedicated database. DO NOT use the same database for all the services. For PostgresSQL it can be the same postgres instance but with different databases.
