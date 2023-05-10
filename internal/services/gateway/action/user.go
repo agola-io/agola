@@ -337,11 +337,11 @@ func (h *ActionHandler) RefreshLinkedAccount(ctx context.Context, rs *cstypes.Re
 	case cstypes.RemoteSourceAuthTypeOauth2:
 		// refresh access token if expired
 		if isAccessTokenExpired(la.Oauth2AccessTokenExpiresAt) {
-			userSource, err := scommon.GetOauth2Source(rs, "")
+			oauth2Client, err := scommon.GetOauth2Client(rs)
 			if err != nil {
-				return nil, errors.WithStack(err)
+				return nil, errors.Wrapf(err, "failed to create oauth2 client")
 			}
-			token, err := userSource.RefreshOauth2Token(la.Oauth2RefreshToken)
+			token, err := oauth2Client.RefreshOauth2Token(la.Oauth2RefreshToken)
 			if err != nil {
 				return nil, errors.WithStack(err)
 			}
@@ -687,15 +687,15 @@ func (h *ActionHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSource
 
 	switch rs.AuthType {
 	case cstypes.RemoteSourceAuthTypeOauth2:
-		oauth2Source, err := scommon.GetOauth2Source(rs, "")
+		oauth2Client, err := scommon.GetOauth2Client(rs)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to create git source")
+			return nil, errors.Wrapf(err, "failed to create oauth2 client")
 		}
 		token, err := scommon.GenerateOauth2JWTToken(h.sd, rs.Name, string(requestType), req)
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
-		redirect, err := oauth2Source.GetOauth2AuthorizationURL(h.webExposedURL+"/oauth2/callback", token)
+		redirect, err := oauth2Client.GetOauth2AuthorizationURL(h.webExposedURL+"/oauth2/callback", token)
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
@@ -890,12 +890,12 @@ func (h *ActionHandler) HandleOauth2Callback(ctx context.Context, code, state st
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get remote source %q", remoteSourceName))
 	}
 
-	oauth2Source, err := scommon.GetOauth2Source(rs, "")
+	oauth2Client, err := scommon.GetOauth2Client(rs)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create oauth2 source")
+		return nil, errors.Wrapf(err, "failed to create oauth2 client")
 	}
 
-	oauth2Token, err := oauth2Source.RequestOauth2Token(h.webExposedURL+"/oauth2/callback", code)
+	oauth2Token, err := oauth2Client.RequestOauth2Token(h.webExposedURL+"/oauth2/callback", code)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

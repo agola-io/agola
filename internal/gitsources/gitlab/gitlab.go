@@ -42,20 +42,19 @@ var (
 	pullRequestRefFmt   = "refs/merge-requests/%s/head"
 )
 
+type httpOpts struct {
+	SkipVerify bool
+}
+
 type Opts struct {
-	APIURL         string
-	Token          string
-	SkipVerify     bool
-	Oauth2ClientID string
-	Oauth2Secret   string
+	APIURL     string
+	SkipVerify bool
+	Token      string
 }
 
 type Client struct {
-	client           *gitlab.Client
-	oauth2HTTPClient *http.Client
-	APIURL           string
-	oauth2ClientID   string
-	oauth2Secret     string
+	client *gitlab.Client
+	APIURL string
 }
 
 // fromCommitStatus converts a gitsource commit status to a gitlab commit status
@@ -74,7 +73,7 @@ func fromCommitStatus(status gitsource.CommitStatus) gitlab.BuildStateValue {
 	}
 }
 
-func New(opts Opts) (*Client, error) {
+func newHTTPClient(opts httpOpts) *http.Client {
 	// copied from net/http until it has a clone function: https://github.com/golang/go/issues/26013
 	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
@@ -89,7 +88,12 @@ func New(opts Opts) (*Client, error) {
 		ExpectContinueTimeout: 1 * time.Second,
 		TLSClientConfig:       &tls.Config{InsecureSkipVerify: opts.SkipVerify},
 	}
-	httpClient := &http.Client{Transport: transport}
+
+	return &http.Client{Transport: transport}
+}
+
+func New(opts Opts) (*Client, error) {
+	httpClient := newHTTPClient(httpOpts{SkipVerify: opts.SkipVerify})
 
 	client, err := gitlab.NewOAuthClient(opts.Token, gitlab.WithHTTPClient(httpClient), gitlab.WithBaseURL(opts.APIURL))
 	if err != nil {
@@ -97,54 +101,9 @@ func New(opts Opts) (*Client, error) {
 	}
 
 	return &Client{
-		client:           client,
-		oauth2HTTPClient: httpClient,
-		APIURL:           opts.APIURL,
-		oauth2ClientID:   opts.Oauth2ClientID,
-		oauth2Secret:     opts.Oauth2Secret,
+		client: client,
+		APIURL: opts.APIURL,
 	}, nil
-}
-
-func (c *Client) oauth2Config(callbackURL string) *oauth2.Config {
-	return &oauth2.Config{
-		ClientID:     c.oauth2ClientID,
-		ClientSecret: c.oauth2Secret,
-		Scopes:       GitlabOauth2Scopes,
-		Endpoint: oauth2.Endpoint{
-			AuthURL:  fmt.Sprintf("%s/oauth/authorize", c.APIURL),
-			TokenURL: fmt.Sprintf("%s/oauth/token", c.APIURL),
-		},
-		RedirectURL: callbackURL,
-	}
-}
-
-func (c *Client) GetOauth2AuthorizationURL(callbackURL, state string) (string, error) {
-	var config = c.oauth2Config(callbackURL)
-	return config.AuthCodeURL(state), nil
-}
-
-func (c *Client) RequestOauth2Token(callbackURL, code string) (*oauth2.Token, error) {
-	ctx := context.TODO()
-	ctx = context.WithValue(ctx, oauth2.HTTPClient, c.oauth2HTTPClient)
-
-	var config = c.oauth2Config(callbackURL)
-	token, err := config.Exchange(ctx, code)
-	if err != nil {
-		return nil, errors.Wrapf(err, "cannot get oauth2 token")
-	}
-	return token, nil
-}
-
-func (c *Client) RefreshOauth2Token(refreshToken string) (*oauth2.Token, error) {
-	ctx := context.TODO()
-	ctx = context.WithValue(ctx, oauth2.HTTPClient, c.oauth2HTTPClient)
-
-	var config = c.oauth2Config("")
-	token := &oauth2.Token{RefreshToken: refreshToken}
-	ts := config.TokenSource(ctx, token)
-	ntoken, err := ts.Token()
-
-	return ntoken, errors.WithStack(err)
 }
 
 func (c *Client) GetRepoInfo(repopath string) (*gitsource.RepoInfo, error) {
@@ -393,4 +352,71 @@ func (c *Client) TagLink(repoInfo *gitsource.RepoInfo, tag string) string {
 
 func (c *Client) PullRequestLink(repoInfo *gitsource.RepoInfo, prID string) string {
 	return fmt.Sprintf("%s/merge_requests/%s", repoInfo.HTMLURL, prID)
+}
+
+type Oauth2Opts struct {
+	APIURL         string
+	SkipVerify     bool
+	Oauth2ClientID string
+	Oauth2Secret   string
+}
+
+type Oauth2Client struct {
+	httpClient     *http.Client
+	APIURL         string
+	oauth2ClientID string
+	oauth2Secret   string
+}
+
+func NewOauth2Client(opts Oauth2Opts) (*Oauth2Client, error) {
+	httpClient := newHTTPClient(httpOpts{SkipVerify: opts.SkipVerify})
+
+	return &Oauth2Client{
+		httpClient:     httpClient,
+		APIURL:         opts.APIURL,
+		oauth2ClientID: opts.Oauth2ClientID,
+		oauth2Secret:   opts.Oauth2Secret,
+	}, nil
+}
+
+func (c *Oauth2Client) oauth2Config(callbackURL string) *oauth2.Config {
+	return &oauth2.Config{
+		ClientID:     c.oauth2ClientID,
+		ClientSecret: c.oauth2Secret,
+		Scopes:       GitlabOauth2Scopes,
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  fmt.Sprintf("%s/oauth/authorize", c.APIURL),
+			TokenURL: fmt.Sprintf("%s/oauth/token", c.APIURL),
+		},
+		RedirectURL: callbackURL,
+	}
+}
+
+func (c *Oauth2Client) GetOauth2AuthorizationURL(callbackURL, state string) (string, error) {
+	var config = c.oauth2Config(callbackURL)
+	return config.AuthCodeURL(state), nil
+}
+
+func (c *Oauth2Client) RequestOauth2Token(callbackURL, code string) (*oauth2.Token, error) {
+	ctx := context.TODO()
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, c.httpClient)
+
+	var config = c.oauth2Config(callbackURL)
+	token, err := config.Exchange(ctx, code)
+	if err != nil {
+		return nil, errors.Wrapf(err, "cannot get oauth2 token")
+	}
+	return token, nil
+}
+
+func (c *Oauth2Client) RefreshOauth2Token(refreshToken string) (*oauth2.Token, error) {
+	ctx := context.TODO()
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, c.httpClient)
+
+	var config = c.oauth2Config("")
+	token := &oauth2.Token{RefreshToken: refreshToken}
+	ts := config.TokenSource(ctx, token)
+	ntoken, err := ts.Token()
+
+	return ntoken, errors.WithStack(err)
 }
