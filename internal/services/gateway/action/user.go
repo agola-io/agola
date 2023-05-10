@@ -337,7 +337,7 @@ func (h *ActionHandler) RefreshLinkedAccount(ctx context.Context, rs *cstypes.Re
 	case cstypes.RemoteSourceAuthTypeOauth2:
 		// refresh access token if expired
 		if isAccessTokenExpired(la.Oauth2AccessTokenExpiresAt) {
-			userSource, err := scommon.GetOauth2Source(rs, "")
+			userSource, err := scommon.GetOauth2Source(rs)
 			if err != nil {
 				return nil, errors.WithStack(err)
 			}
@@ -687,7 +687,7 @@ func (h *ActionHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSource
 
 	switch rs.AuthType {
 	case cstypes.RemoteSourceAuthTypeOauth2:
-		oauth2Source, err := scommon.GetOauth2Source(rs, "")
+		oauth2Source, err := scommon.GetOauth2Source(rs)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create git source")
 		}
@@ -890,7 +890,7 @@ func (h *ActionHandler) HandleOauth2Callback(ctx context.Context, code, state st
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get remote source %q", remoteSourceName))
 	}
 
-	oauth2Source, err := scommon.GetOauth2Source(rs, "")
+	oauth2Source, err := scommon.GetOauth2Source(rs)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create oauth2 source")
 	}

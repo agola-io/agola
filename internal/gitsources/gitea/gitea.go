@@ -61,6 +61,13 @@ type Client struct {
 	oauth2Secret     string
 }
 
+type Oauth2SourceClient struct {
+	oauth2HTTPClient *http.Client
+	APIURL           string
+	oauth2ClientID   string
+	oauth2Secret     string
+}
+
 // fromCommitStatus converts a gitsource commit status to a gitea commit status
 func fromCommitStatus(status gitsource.CommitStatus) gitea.StatusState {
 	switch status {
@@ -138,7 +145,18 @@ func NewWithBasicAuth(opts Opts) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) oauth2Config(callbackURL string) *oauth2.Config {
+func NewOauth2SourceClient(opts Opts) (*Oauth2SourceClient, error) {
+	httpClient := newHTTPClient(opts)
+
+	return &Oauth2SourceClient{
+		oauth2HTTPClient: httpClient,
+		APIURL:           opts.APIURL,
+		oauth2ClientID:   opts.Oauth2ClientID,
+		oauth2Secret:     opts.Oauth2Secret,
+	}, nil
+}
+
+func (c *Oauth2SourceClient) oauth2Config(callbackURL string) *oauth2.Config {
 	return &oauth2.Config{
 		ClientID:     c.oauth2ClientID,
 		ClientSecret: c.oauth2Secret,
@@ -151,12 +169,12 @@ func (c *Client) oauth2Config(callbackURL string) *oauth2.Config {
 	}
 }
 
-func (c *Client) GetOauth2AuthorizationURL(callbackURL, state string) (string, error) {
+func (c *Oauth2SourceClient) GetOauth2AuthorizationURL(callbackURL, state string) (string, error) {
 	var config = c.oauth2Config(callbackURL)
 	return config.AuthCodeURL(state), nil
 }
 
-func (c *Client) RequestOauth2Token(callbackURL, code string) (*oauth2.Token, error) {
+func (c *Oauth2SourceClient) RequestOauth2Token(callbackURL, code string) (*oauth2.Token, error) {
 	ctx := context.TODO()
 	ctx = context.WithValue(ctx, oauth2.HTTPClient, c.oauth2HTTPClient)
 
@@ -168,7 +186,7 @@ func (c *Client) RequestOauth2Token(callbackURL, code string) (*oauth2.Token, er
 	return token, nil
 }
 
-func (c *Client) RefreshOauth2Token(refreshToken string) (*oauth2.Token, error) {
+func (c *Oauth2SourceClient) RefreshOauth2Token(refreshToken string) (*oauth2.Token, error) {
 	ctx := context.TODO()
 	ctx = context.WithValue(ctx, oauth2.HTTPClient, c.oauth2HTTPClient)
 
