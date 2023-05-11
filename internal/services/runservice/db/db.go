@@ -242,10 +242,10 @@ func (d *DB) getGroupRunsFilteredQuery(phaseFilter []types.RunPhase, resultFilte
 		q.OrderBy("run.counter").Desc()
 	}
 	if len(phaseFilter) > 0 {
-		q.Where(q.E("phase", phaseFilter))
+		q.Where(q.In("phase", sq.Flatten(phaseFilter)...))
 	}
 	if len(resultFilter) > 0 {
-		q.Where(q.E("result", resultFilter))
+		q.Where(q.In("result", sq.Flatten(resultFilter)...))
 	}
 	if startRunCounter > 0 {
 		switch sortOrder {
