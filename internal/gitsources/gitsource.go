@@ -72,6 +72,9 @@ type PasswordSource interface {
 
 type Oauth2Source interface {
 	UserSource
+}
+
+type Oauth2Client interface {
 	// GetOauth2AuthorizationURL return the authorization request URL to the
 	// authorization server
 	GetOauth2AuthorizationURL(callbackURL, state string) (redirectURL string, err error)

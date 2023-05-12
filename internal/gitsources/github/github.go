@@ -51,22 +51,21 @@ const (
 	GitHubSSHHostKey = "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk="
 )
 
+type httpOpts struct {
+	SkipVerify bool
+}
+
 type Opts struct {
-	APIURL         string
-	WebURL         string
-	Token          string
-	SkipVerify     bool
-	Oauth2ClientID string
-	Oauth2Secret   string
+	APIURL     string
+	WebURL     string
+	SkipVerify bool
+	Token      string
 }
 
 type Client struct {
-	client           *github.Client
-	oauth2HTTPClient *http.Client
-	APIURL           string
-	WebURL           string
-	oauth2ClientID   string
-	oauth2Secret     string
+	client *github.Client
+	APIURL string
+	WebURL string
 }
 
 // fromCommitStatus converts a gitsource commit status to a github commit status
@@ -107,9 +106,9 @@ func (t *TokenTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	return t.rt.RoundTrip(r)
 }
 
-func New(opts Opts) (*Client, error) {
+func newHTTPTransport(opts httpOpts) *http.Transport {
 	// copied from net/http until it has a clone function: https://github.com/golang/go/issues/26013
-	transport := &http.Transport{
+	return &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
 			Timeout:   30 * time.Second,
@@ -122,85 +121,49 @@ func New(opts Opts) (*Client, error) {
 		ExpectContinueTimeout: 1 * time.Second,
 		TLSClientConfig:       &tls.Config{InsecureSkipVerify: opts.SkipVerify},
 	}
-	httpClient := &http.Client{Transport: &TokenTransport{token: opts.Token, rt: transport}}
-	oauth2HTTPClient := &http.Client{Transport: transport}
+}
 
+func getURLs(apiURL, webURL string) (string, string) {
 	isPublicGithub := false
 	// TODO(sgotti) improve detection of public github url (handle also trailing slash)
-	if opts.APIURL == GitHubAPIURL {
+	if apiURL == GitHubAPIURL {
 		isPublicGithub = true
 	}
 
 	if isPublicGithub {
-		opts.WebURL = GitHubWebURL
-		if !strings.HasSuffix(opts.APIURL, "/") {
-			opts.APIURL += "/"
+		webURL = GitHubWebURL
+		if !strings.HasSuffix(apiURL, "/") {
+			apiURL += "/"
 		}
 	} else {
-		if opts.WebURL == "" {
-			opts.WebURL = opts.APIURL
+		if webURL == "" {
+			webURL = apiURL
 		}
-		if !strings.HasSuffix(opts.APIURL, "/") {
-			opts.APIURL += "/"
+		if !strings.HasSuffix(apiURL, "/") {
+			apiURL += "/"
 		}
-		if !strings.HasSuffix(opts.APIURL, "/api/v3/") {
-			opts.APIURL += "api/v3/"
+		if !strings.HasSuffix(apiURL, "/api/v3/") {
+			apiURL += "api/v3/"
 		}
 	}
+
+	return apiURL, webURL
+}
+
+func New(opts Opts) (*Client, error) {
+	httpTransport := newHTTPTransport(httpOpts{SkipVerify: opts.SkipVerify})
+	httpClient := &http.Client{Transport: &TokenTransport{token: opts.Token, rt: httpTransport}}
+
+	apiURL, webURL := getURLs(opts.APIURL, opts.WebURL)
 
 	client := github.NewClient(httpClient)
-	client.BaseURL, _ = url.Parse(opts.APIURL)
+	client.BaseURL, _ = url.Parse(apiURL)
 
 	return &Client{
-		client:           client,
-		oauth2HTTPClient: oauth2HTTPClient,
-		APIURL:           opts.APIURL,
-		WebURL:           opts.WebURL,
-		oauth2ClientID:   opts.Oauth2ClientID,
-		oauth2Secret:     opts.Oauth2Secret,
+		client: client,
+		APIURL: apiURL,
+		WebURL: webURL,
 	}, nil
-}
-
-func (c *Client) oauth2Config(callbackURL string) *oauth2.Config {
-	return &oauth2.Config{
-		ClientID:     c.oauth2ClientID,
-		ClientSecret: c.oauth2Secret,
-		Scopes:       GitHubOauth2Scopes,
-		Endpoint: oauth2.Endpoint{
-			AuthURL:  fmt.Sprintf("%s/login/oauth/authorize", c.WebURL),
-			TokenURL: fmt.Sprintf("%s/login/oauth/access_token", c.WebURL),
-		},
-		RedirectURL: callbackURL,
-	}
-}
-
-func (c *Client) GetOauth2AuthorizationURL(callbackURL, state string) (string, error) {
-	var config = c.oauth2Config(callbackURL)
-	return config.AuthCodeURL(state), nil
-}
-
-func (c *Client) RequestOauth2Token(callbackURL, code string) (*oauth2.Token, error) {
-	ctx := context.TODO()
-	ctx = context.WithValue(ctx, oauth2.HTTPClient, c.oauth2HTTPClient)
-
-	var config = c.oauth2Config(callbackURL)
-	token, err := config.Exchange(ctx, code)
-	if err != nil {
-		return nil, errors.Wrapf(err, "cannot get oauth2 token")
-	}
-	return token, nil
-}
-
-func (c *Client) RefreshOauth2Token(refreshToken string) (*oauth2.Token, error) {
-	ctx := context.TODO()
-	ctx = context.WithValue(ctx, oauth2.HTTPClient, c.oauth2HTTPClient)
-
-	var config = c.oauth2Config("")
-	token := &oauth2.Token{RefreshToken: refreshToken}
-	ts := config.TokenSource(ctx, token)
-	ntoken, err := ts.Token()
-
-	return ntoken, errors.WithStack(err)
 }
 
 func (c *Client) GetUserInfo() (*gitsource.UserInfo, error) {
@@ -520,4 +483,77 @@ func (c *Client) TagLink(repoInfo *gitsource.RepoInfo, tag string) string {
 
 func (c *Client) PullRequestLink(repoInfo *gitsource.RepoInfo, prID string) string {
 	return fmt.Sprintf("%s/pull/%s", repoInfo.HTMLURL, prID)
+}
+
+type Oauth2Opts struct {
+	APIURL         string
+	WebURL         string
+	SkipVerify     bool
+	Oauth2ClientID string
+	Oauth2Secret   string
+}
+
+type Oauth2Client struct {
+	httpClient     *http.Client
+	APIURL         string
+	WebURL         string
+	oauth2ClientID string
+	oauth2Secret   string
+}
+
+func NewOauth2Client(opts Oauth2Opts) (*Oauth2Client, error) {
+	httpTransport := newHTTPTransport(httpOpts{SkipVerify: opts.SkipVerify})
+	httpClient := &http.Client{Transport: httpTransport}
+
+	apiURL, webURL := getURLs(opts.APIURL, opts.WebURL)
+
+	return &Oauth2Client{
+		httpClient:     httpClient,
+		APIURL:         apiURL,
+		WebURL:         webURL,
+		oauth2ClientID: opts.Oauth2ClientID,
+		oauth2Secret:   opts.Oauth2Secret,
+	}, nil
+}
+
+func (c *Oauth2Client) oauth2Config(callbackURL string) *oauth2.Config {
+	return &oauth2.Config{
+		ClientID:     c.oauth2ClientID,
+		ClientSecret: c.oauth2Secret,
+		Scopes:       GitHubOauth2Scopes,
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  fmt.Sprintf("%s/login/oauth/authorize", c.WebURL),
+			TokenURL: fmt.Sprintf("%s/login/oauth/access_token", c.WebURL),
+		},
+		RedirectURL: callbackURL,
+	}
+}
+
+func (c *Oauth2Client) GetOauth2AuthorizationURL(callbackURL, state string) (string, error) {
+	var config = c.oauth2Config(callbackURL)
+	return config.AuthCodeURL(state), nil
+}
+
+func (c *Oauth2Client) RequestOauth2Token(callbackURL, code string) (*oauth2.Token, error) {
+	ctx := context.TODO()
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, c.httpClient)
+
+	var config = c.oauth2Config(callbackURL)
+	token, err := config.Exchange(ctx, code)
+	if err != nil {
+		return nil, errors.Wrapf(err, "cannot get oauth2 token")
+	}
+	return token, nil
+}
+
+func (c *Oauth2Client) RefreshOauth2Token(refreshToken string) (*oauth2.Token, error) {
+	ctx := context.TODO()
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, c.httpClient)
+
+	var config = c.oauth2Config("")
+	token := &oauth2.Token{RefreshToken: refreshToken}
+	ts := config.TokenSource(ctx, token)
+	ntoken, err := ts.Token()
+
+	return ntoken, errors.WithStack(err)
 }
