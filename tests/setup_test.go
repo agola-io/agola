@@ -4168,3 +4168,135 @@ func TestExportImport(t *testing.T) {
 		t.Fatalf("expected 0 orgs got: %d", len(orgs))
 	}
 }
+
+func TestGetProjectRuns(t *testing.T) {
+	t.Parallel()
+
+	config := `
+    {
+		runs: [
+		  {
+			name: 'run01',
+			tasks: [
+			  {
+				name: 'task01',
+				runtime: {
+				  containers: [
+					{
+					  image: 'alpine/git',
+					},
+				  ],
+				},
+				steps: [
+				  { type: 'clone' },
+				  { type: 'run', command: 'env' },
+				],
+			  },
+			],
+		  },
+		],
+	}
+	`
+
+	tests := []struct {
+		name         string
+		phaseFilter  []string
+		resultFilter []string
+		num          int
+	}{
+		{
+			name: "test get all runs",
+			num:  1,
+		},
+		{
+			name:         "test get runs phase finished and result success",
+			phaseFilter:  []string{"finished"},
+			resultFilter: []string{"success"},
+			num:          1,
+		},
+		{
+			name:        "test get runs phase running",
+			phaseFilter: []string{"running"},
+			num:         0,
+		},
+		{
+			name:         "test get runs result failed",
+			resultFilter: []string{"failed"},
+			num:          0,
+		},
+		{
+			name:         "test get runs with all filters",
+			phaseFilter:  []string{"setuperror", "queued", "cancelled", "running", "finished"},
+			resultFilter: []string{"unknown", "stopped", "success", "failed"},
+			num:          1,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			dir := t.TempDir()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			sc := setup(ctx, t, dir, withGitea(true))
+			defer sc.stop()
+
+			giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+
+			giteaToken, token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+
+			giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
+
+			giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)
+
+			push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
+
+			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+				if err != nil {
+					return false, nil
+				}
+
+				if len(runs) == 0 {
+					return false, nil
+				}
+				run := runs[0]
+				if run.Phase != rstypes.RunPhaseFinished {
+					return false, nil
+				}
+
+				return true, nil
+			})
+
+			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, tt.phaseFilter, tt.resultFilter, 0, 0, false)
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			t.Logf("runs: %s", util.Dump(runs))
+
+			if len(runs) != tt.num {
+				t.Fatalf("expected %d run got: %d", tt.num, len(runs))
+			}
+
+			if len(runs) > 0 {
+				run := runs[0]
+				if run.Phase != rstypes.RunPhaseFinished {
+					t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, run.Phase)
+				}
+				if run.Result != rstypes.RunResultSuccess {
+					t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, run.Result)
+				}
+			}
+		})
+	}
+}
