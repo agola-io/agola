@@ -1,5 +1,72 @@
 ## Changelog
 
+### v0.8.0
+
+#### Important Upgrade Notes
+
+Agola v0.8.0 moved its internal db based on etcd and objectstorage to a standard external sql database (PostgreSQL or sqlite for single node deployments).
+
+If you are going to update from a version <= v0.7.x you should do some manual steps to migrate the runservice and configstore data.
+
+These steps are provided in the [migration documentation](https://github.com/agola-io/agola/blob/bd109b9e230949dec860ba8b040e1fc460ba372d/doc/migrating_from_v0.7.x.md)
+
+#### Changes from v0.7.0
+
+- gateway: fix GetUserGitSource action (@alessandro-sorint)                                   [#404](https://github.com/agola-io/agola/pull/404)
+- gitsources: split oauth2Client from gitsource (@sgotti)                                     [#403](https://github.com/agola-io/agola/pull/403)
+- runservice/db: fix get run query (@alessandro-sorint)                                       [#402](https://github.com/agola-io/agola/pull/402)
+- migrateexport: defer sqlite foreign keys (@sgotti)                                          [#400](https://github.com/agola-io/agola/pull/400)
+- configstore: add some db constraints (@sgotti)                                              [#399](https://github.com/agola-io/agola/pull/399)
+- *: new db schema (@sgotti)                                                                  [#398](https://github.com/agola-io/agola/pull/398)
+- executor: fix k8s test (@sgotti)                                                            [#397](https://github.com/agola-io/agola/pull/397)
+- cmd: fix run list task api call (@sgotti)                                                   [#364](https://github.com/agola-io/agola/pull/364)
+- runservice: use dedicated api types for executor communication (@sgotti)                    [#396](https://github.com/agola-io/agola/pull/396)
+- *: use github.com/sorintlab/errors (@sgotti)                                                [#395](https://github.com/agola-io/agola/pull/395)
+- *: organize imports and add gci linter (@sgotti)                                            [#394](https://github.com/agola-io/agola/pull/394)
+- executor: close cache archive file before sending (@sgotti)                                 [#390](https://github.com/agola-io/agola/pull/390)
+- github: update github ssh key (@sgotti)                                                     [#392](https://github.com/agola-io/agola/pull/392)
+- configstore: fix remote source ssh_host_key update (@sgotti)                                [#391](https://github.com/agola-io/agola/pull/391)
+- gateway: skip csrf check only on successful token auth (@sgotti)                            [#389](https://github.com/agola-io/agola/pull/389)
+- gateway: use auth cookies instead of jwt tokens (@sgotti)                                   [#365](https://github.com/agola-io/agola/pull/365)
+- *: Fix auth flow with password based remote source (@sgotti)                                [#388](https://github.com/agola-io/agola/pull/388)
+- *: improve some error handling/logging (@sgotti)                                            [#387](https://github.com/agola-io/agola/pull/387)
+- ci: update images (@sgotti)                                                                 [#386](https://github.com/agola-io/agola/pull/386)
+- *: update dependencies (@sgotti)                                                            [#385](https://github.com/agola-io/agola/pull/385)
+- tests: parallelize tests (@sgotti)                                                          [#384](https://github.com/agola-io/agola/pull/384)
+- util: add wrapper error helper type (@sgotti)                                               [#375](https://github.com/agola-io/agola/pull/375)
+- *: enable stylecheck and fix related lint warnings. (@sgotti)                               [#383](https://github.com/agola-io/agola/pull/383)
+- *: update to go 1.20 (@sgotti)                                                              [#376](https://github.com/agola-io/agola/pull/376)
+- *: remove deprecated use of io/ioutil package (@sgotti)                                     [#377](https://github.com/agola-io/agola/pull/377)
+- tests: fix failing gitea pull request creation (@sgotti)                                    [#374](https://github.com/agola-io/agola/pull/374)
+- tests: cleanups (@sgotti)                                                                   [#373](https://github.com/agola-io/agola/pull/373)
+- configstore: fix GetOrgInvitations db action (@alessandro-sorint)                           [#368](https://github.com/agola-io/agola/pull/368)
+- util: fix empty APIError error message printing (@sgotti)                                   [#370](https://github.com/agola-io/agola/pull/370)
+- integration tests: fix TestMaintenance (@alessandro-sorint)                                 [#369](https://github.com/agola-io/agola/pull/369)
+- add cmd import, export, maintenance for runservice and configstore (@alessandro-sorint)     [#340](https://github.com/agola-io/agola/pull/340)
+- gateway/client: add GetOrgs (@alessandro-sorint)                                            [#366](https://github.com/agola-io/agola/pull/366)
+- tests: remove repeated strings (@alessandro-sorint)                                         [#361](https://github.com/agola-io/agola/pull/361)
+- gateway: add admin api to get remote source user (@alessandro-sorint)                       [#353](https://github.com/agola-io/agola/pull/353)
+- db: improve transactions handling (@sgotti)                                                 [#363](https://github.com/agola-io/agola/pull/363)
+- *: implement org member adding modes: direct or invitation (@alessandro-sorint)             [#285](https://github.com/agola-io/agola/pull/285)
+- tests: improve tests setup (@sgotti)                                                        [#359](https://github.com/agola-io/agola/pull/359)
+- configstore: use GetOrg method in DeleteOrg (@alessandro-sorint)                            [#356](https://github.com/agola-io/agola/pull/356)
+- configstore: fix deleteUser query (@alessandro-sorint)                                      [#354](https://github.com/agola-io/agola/pull/354)
+- *: add api to update organization (@alessandro-sorint)                                      [#349](https://github.com/agola-io/agola/pull/349)
+- configstore: fix action AddOrgMember (@alessandro-sorint)                                   [#352](https://github.com/agola-io/agola/pull/352)
+- Handle remote repo default branch (@alessandro-sorint)                                      [#303](https://github.com/agola-io/agola/pull/303)
+- gateway: add GetUserGitSource action to get user gitsource (@alessandro-sorint)             [#348](https://github.com/agola-io/agola/pull/348)
+- runservice: add tasks timeout (@alessandro-sorint)                                          [#331](https://github.com/agola-io/agola/pull/331)
+- runservice: added logcleanerLoop for deleting older logs (@alessandro-sorint)               [#294](https://github.com/agola-io/agola/pull/294)
+- *: fix updating of user linked account (@sgotti)                                            [#346](https://github.com/agola-io/agola/pull/346)
+- executor: use a timeout for pod creation (@alessandro-sorint)                               [#343](https://github.com/agola-io/agola/pull/343)
+- executor: avoid locking during setupTask (@alessandro-sorint)                               [#344](https://github.com/agola-io/agola/pull/344)
+- update to go 1.18 (@alessandro-sorint)                                                      [#336](https://github.com/agola-io/agola/pull/336)
+- services config: correctly use yaml tags instead of json tags (@sgotti)                     [#341](https://github.com/agola-io/agola/pull/341)
+- types: add custom Duration type (@alessandro-sorint)                                        [#342](https://github.com/agola-io/agola/pull/342)
+- executor: fix synchronization when pod is starting (@alessandro-sorint)                     [#293](https://github.com/agola-io/agola/pull/293)
+- gateway: return task containers image names in RunTaskResponse (@tulliobotti64)             [#338](https://github.com/agola-io/agola/pull/338)
+- *: replace etcd and datamanager with a sql db (@sgotti)                                     [#328](https://github.com/agola-io/agola/pull/328)
+
 ### v0.7.0
 
 - runconfig: temporary enable ssh client ssh-rsa sha1 signature algorithm (@sgotti)                     [#333](https://github.com/agola-io/agola/pull/333)
