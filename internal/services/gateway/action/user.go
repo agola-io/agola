@@ -1118,7 +1118,7 @@ func (h *ActionHandler) GetUserGitSource(ctx context.Context, remoteSourceRef, u
 		return nil, nil, nil, errors.Errorf("user doesn't have a linked account for remote source %q", rs.Name)
 	}
 
-	gitSource, err := h.GetGitSource(ctx, rs, la.RemoteUserName, la)
+	gitSource, err := h.GetGitSource(ctx, rs, userRef, la)
 	if err != nil {
 		return nil, nil, nil, errors.Wrapf(err, "failed to create git source")
 	}
