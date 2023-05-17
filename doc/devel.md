@@ -4,24 +4,18 @@
 
 - Clone the [agola-web repository](https://github.com/agola-io/agola-web)
 
-For the first time you'll need the `vue cli` and its services installed as global modules:
-
-```
-npm install -g @vue/cli @vue/cli-service-global
-```
-
 Inside the `agola-web` repository run:
 
-```
-npm install
-npm run serve
+``` sh
+pnpm install
+pnpm run serve
 ```
 
 ### Build the agola binary
 
 To build agola we usually test and support the latest two major versions of Go like in the [Go release policy](https://golang.org/doc/devel/release.html#policy).
 
-```
+``` sh
 make
 ```
 
@@ -29,7 +23,7 @@ make
 
 - Copy the `example/agolademo/config.yml` where you prefer
 
-```
+``` sh
 ./bin/agola serve --config /path/to/your/config.yml --components all-base,executor
 ```
 
