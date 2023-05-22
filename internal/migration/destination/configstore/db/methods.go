@@ -5,6 +5,7 @@ package db
 import (
 	stdsql "database/sql"
 
+	"agola.io/agola/internal/sqlg"
 	"agola.io/agola/internal/sqlg/sql"
 
 	"github.com/sorintlab/errors"
@@ -15,17 +16,16 @@ func (d *DB) Version() uint { return 1 }
 func (d *DB) DDL() []string {
 	switch d.DBType() {
 	case sql.Postgres:
-		return DDLPostgresV1
+		return DDLPostgres
 	case sql.Sqlite3:
-		return DDLSqlite3V1
+		return DDLSqlite3
 	}
 
 	return nil
 }
 
-func (d *DB) Sequences() []string {
-	return []string{
-	}
+func (d *DB) Sequences() []sqlg.Sequence {
+	return Sequences
 }
 
 func (d *DB) scanArray(rows *stdsql.Rows, colsList ...[]any) error {

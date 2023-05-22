@@ -54,3 +54,25 @@ func GenDB(version uint, objectsInfo []sqlg.ObjectInfo, typesImport string, addi
 	genDML(gd)
 	genFetch(gd)
 }
+
+func GenDBFixtures(version uint, objectsInfo []sqlg.ObjectInfo, typesImport string, additionalImports []string) {
+	hasJSON := false
+	for _, oi := range objectsInfo {
+		for _, of := range oi.Fields {
+			if of.JSON {
+				hasJSON = true
+				break
+			}
+		}
+	}
+
+	gd := &genData{
+		Version:           version,
+		ObjectsInfo:       objectsInfo,
+		TypesImport:       typesImport,
+		AdditionalImports: additionalImports,
+		HasJSON:           hasJSON,
+	}
+
+	genCreateFixtures(gd)
+}

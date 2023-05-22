@@ -15,7 +15,7 @@ import (
 	"agola.io/agola/services/runservice/types"
 )
 
-//go:generate ../../../../tools/bin/dbgenerator -component runservice
+//go:generate ../../../../tools/bin/dbgenerator -type db -component runservice
 
 type DB struct {
 	log zerolog.Logger

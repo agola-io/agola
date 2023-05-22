@@ -1,0 +1,633 @@
+{
+	"ddl": {
+		"postgres": [
+			"create table if not exists remotesource (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamptz NOT NULL, update_time timestamptz NOT NULL, name varchar NOT NULL, apiurl varchar NOT NULL, skip_verify boolean NOT NULL, type varchar NOT NULL, auth_type varchar NOT NULL, oauth2_client_id varchar NOT NULL, oauth2_client_secret varchar NOT NULL, ssh_host_key varchar NOT NULL, skip_ssh_host_key_check boolean NOT NULL, registration_enabled boolean NOT NULL, login_enabled boolean NOT NULL, PRIMARY KEY (id))",
+			"create table if not exists user_t (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamptz NOT NULL, update_time timestamptz NOT NULL, name varchar NOT NULL, secret varchar NOT NULL, admin boolean NOT NULL, PRIMARY KEY (id))",
+			"create table if not exists usertoken (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamptz NOT NULL, update_time timestamptz NOT NULL, user_id varchar NOT NULL, name varchar NOT NULL, value varchar NOT NULL, PRIMARY KEY (id))",
+			"create table if not exists linkedaccount (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamptz NOT NULL, update_time timestamptz NOT NULL, user_id varchar NOT NULL, remote_user_id varchar NOT NULL, remote_user_name varchar NOT NULL, remote_user_avatar_url varchar NOT NULL, remote_source_id varchar NOT NULL, user_access_token varchar NOT NULL, oauth2_access_token varchar NOT NULL, oauth2_refresh_token varchar NOT NULL, oauth2_access_token_expires_at timestamptz NOT NULL, PRIMARY KEY (id))",
+			"create table if not exists organization (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamptz NOT NULL, update_time timestamptz NOT NULL, name varchar NOT NULL, visibility varchar NOT NULL, creator_user_id varchar NOT NULL, PRIMARY KEY (id))",
+			"create table if not exists orgmember (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamptz NOT NULL, update_time timestamptz NOT NULL, organization_id varchar NOT NULL, user_id varchar NOT NULL, member_role varchar NOT NULL, PRIMARY KEY (id))",
+			"create table if not exists projectgroup (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamptz NOT NULL, update_time timestamptz NOT NULL, name varchar NOT NULL, parent_kind varchar NOT NULL, parent_id varchar NOT NULL, visibility varchar NOT NULL, PRIMARY KEY (id))",
+			"create table if not exists project (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamptz NOT NULL, update_time timestamptz NOT NULL, name varchar NOT NULL, parent_kind varchar NOT NULL, parent_id varchar NOT NULL, secret varchar NOT NULL, visibility varchar NOT NULL, remote_repository_config_type varchar NOT NULL, remote_source_id varchar NOT NULL, linked_account_id varchar NOT NULL, repository_id varchar NOT NULL, repository_path varchar NOT NULL, ssh_private_key varchar NOT NULL, skip_ssh_host_key_check boolean NOT NULL, webhook_secret varchar NOT NULL, pass_vars_to_forked_pr boolean NOT NULL, default_branch varchar NOT NULL, PRIMARY KEY (id))",
+			"create table if not exists secret (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamptz NOT NULL, update_time timestamptz NOT NULL, name varchar NOT NULL, parent_kind varchar NOT NULL, parent_id varchar NOT NULL, type varchar NOT NULL, data jsonb NOT NULL, secret_provider_id varchar NOT NULL, path varchar NOT NULL, PRIMARY KEY (id))",
+			"create table if not exists variable (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamptz NOT NULL, update_time timestamptz NOT NULL, name varchar NOT NULL, parent_kind varchar NOT NULL, parent_id varchar NOT NULL, variable_values jsonb NOT NULL, PRIMARY KEY (id))",
+			"create table if not exists orginvitation (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamptz NOT NULL, update_time timestamptz NOT NULL, user_id varchar NOT NULL, organization_id varchar NOT NULL, role varchar NOT NULL, PRIMARY KEY (id))"
+		],
+		"sqlite3": [
+			"create table if not exists remotesource (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamp NOT NULL, update_time timestamp NOT NULL, name varchar NOT NULL, apiurl varchar NOT NULL, skip_verify integer NOT NULL, type varchar NOT NULL, auth_type varchar NOT NULL, oauth2_client_id varchar NOT NULL, oauth2_client_secret varchar NOT NULL, ssh_host_key varchar NOT NULL, skip_ssh_host_key_check integer NOT NULL, registration_enabled integer NOT NULL, login_enabled integer NOT NULL, PRIMARY KEY (id))",
+			"create table if not exists user_t (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamp NOT NULL, update_time timestamp NOT NULL, name varchar NOT NULL, secret varchar NOT NULL, admin integer NOT NULL, PRIMARY KEY (id))",
+			"create table if not exists usertoken (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamp NOT NULL, update_time timestamp NOT NULL, user_id varchar NOT NULL, name varchar NOT NULL, value varchar NOT NULL, PRIMARY KEY (id))",
+			"create table if not exists linkedaccount (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamp NOT NULL, update_time timestamp NOT NULL, user_id varchar NOT NULL, remote_user_id varchar NOT NULL, remote_user_name varchar NOT NULL, remote_user_avatar_url varchar NOT NULL, remote_source_id varchar NOT NULL, user_access_token varchar NOT NULL, oauth2_access_token varchar NOT NULL, oauth2_refresh_token varchar NOT NULL, oauth2_access_token_expires_at timestamp NOT NULL, PRIMARY KEY (id))",
+			"create table if not exists organization (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamp NOT NULL, update_time timestamp NOT NULL, name varchar NOT NULL, visibility varchar NOT NULL, creator_user_id varchar NOT NULL, PRIMARY KEY (id))",
+			"create table if not exists orgmember (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamp NOT NULL, update_time timestamp NOT NULL, organization_id varchar NOT NULL, user_id varchar NOT NULL, member_role varchar NOT NULL, PRIMARY KEY (id))",
+			"create table if not exists projectgroup (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamp NOT NULL, update_time timestamp NOT NULL, name varchar NOT NULL, parent_kind varchar NOT NULL, parent_id varchar NOT NULL, visibility varchar NOT NULL, PRIMARY KEY (id))",
+			"create table if not exists project (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamp NOT NULL, update_time timestamp NOT NULL, name varchar NOT NULL, parent_kind varchar NOT NULL, parent_id varchar NOT NULL, secret varchar NOT NULL, visibility varchar NOT NULL, remote_repository_config_type varchar NOT NULL, remote_source_id varchar NOT NULL, linked_account_id varchar NOT NULL, repository_id varchar NOT NULL, repository_path varchar NOT NULL, ssh_private_key varchar NOT NULL, skip_ssh_host_key_check integer NOT NULL, webhook_secret varchar NOT NULL, pass_vars_to_forked_pr integer NOT NULL, default_branch varchar NOT NULL, PRIMARY KEY (id))",
+			"create table if not exists secret (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamp NOT NULL, update_time timestamp NOT NULL, name varchar NOT NULL, parent_kind varchar NOT NULL, parent_id varchar NOT NULL, type varchar NOT NULL, data text NOT NULL, secret_provider_id varchar NOT NULL, path varchar NOT NULL, PRIMARY KEY (id))",
+			"create table if not exists variable (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamp NOT NULL, update_time timestamp NOT NULL, name varchar NOT NULL, parent_kind varchar NOT NULL, parent_id varchar NOT NULL, variable_values text NOT NULL, PRIMARY KEY (id))",
+			"create table if not exists orginvitation (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamp NOT NULL, update_time timestamp NOT NULL, user_id varchar NOT NULL, organization_id varchar NOT NULL, role varchar NOT NULL, PRIMARY KEY (id))"
+		]
+	},
+	"sequences": [],
+	"tables": [
+		{
+			"name": "remotesource",
+			"columns": [
+				{
+					"name": "id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "revision",
+					"type": "uint64",
+					"nullable": false
+				},
+				{
+					"name": "creation_time",
+					"type": "time.Time",
+					"nullable": false
+				},
+				{
+					"name": "update_time",
+					"type": "time.Time",
+					"nullable": false
+				},
+				{
+					"name": "name",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "apiurl",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "skip_verify",
+					"type": "bool",
+					"nullable": false
+				},
+				{
+					"name": "type",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "auth_type",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "oauth2_client_id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "oauth2_client_secret",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "ssh_host_key",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "skip_ssh_host_key_check",
+					"type": "bool",
+					"nullable": false
+				},
+				{
+					"name": "registration_enabled",
+					"type": "bool",
+					"nullable": false
+				},
+				{
+					"name": "login_enabled",
+					"type": "bool",
+					"nullable": false
+				}
+			]
+		},
+		{
+			"name": "user_t",
+			"columns": [
+				{
+					"name": "id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "revision",
+					"type": "uint64",
+					"nullable": false
+				},
+				{
+					"name": "creation_time",
+					"type": "time.Time",
+					"nullable": false
+				},
+				{
+					"name": "update_time",
+					"type": "time.Time",
+					"nullable": false
+				},
+				{
+					"name": "name",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "secret",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "admin",
+					"type": "bool",
+					"nullable": false
+				}
+			]
+		},
+		{
+			"name": "usertoken",
+			"columns": [
+				{
+					"name": "id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "revision",
+					"type": "uint64",
+					"nullable": false
+				},
+				{
+					"name": "creation_time",
+					"type": "time.Time",
+					"nullable": false
+				},
+				{
+					"name": "update_time",
+					"type": "time.Time",
+					"nullable": false
+				},
+				{
+					"name": "user_id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "name",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "value",
+					"type": "string",
+					"nullable": false
+				}
+			]
+		},
+		{
+			"name": "linkedaccount",
+			"columns": [
+				{
+					"name": "id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "revision",
+					"type": "uint64",
+					"nullable": false
+				},
+				{
+					"name": "creation_time",
+					"type": "time.Time",
+					"nullable": false
+				},
+				{
+					"name": "update_time",
+					"type": "time.Time",
+					"nullable": false
+				},
+				{
+					"name": "user_id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "remote_user_id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "remote_user_name",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "remote_user_avatar_url",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "remote_source_id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "user_access_token",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "oauth2_access_token",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "oauth2_refresh_token",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "oauth2_access_token_expires_at",
+					"type": "time.Time",
+					"nullable": false
+				}
+			]
+		},
+		{
+			"name": "organization",
+			"columns": [
+				{
+					"name": "id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "revision",
+					"type": "uint64",
+					"nullable": false
+				},
+				{
+					"name": "creation_time",
+					"type": "time.Time",
+					"nullable": false
+				},
+				{
+					"name": "update_time",
+					"type": "time.Time",
+					"nullable": false
+				},
+				{
+					"name": "name",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "visibility",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "creator_user_id",
+					"type": "string",
+					"nullable": false
+				}
+			]
+		},
+		{
+			"name": "orgmember",
+			"columns": [
+				{
+					"name": "id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "revision",
+					"type": "uint64",
+					"nullable": false
+				},
+				{
+					"name": "creation_time",
+					"type": "time.Time",
+					"nullable": false
+				},
+				{
+					"name": "update_time",
+					"type": "time.Time",
+					"nullable": false
+				},
+				{
+					"name": "organization_id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "user_id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "member_role",
+					"type": "string",
+					"nullable": false
+				}
+			]
+		},
+		{
+			"name": "projectgroup",
+			"columns": [
+				{
+					"name": "id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "revision",
+					"type": "uint64",
+					"nullable": false
+				},
+				{
+					"name": "creation_time",
+					"type": "time.Time",
+					"nullable": false
+				},
+				{
+					"name": "update_time",
+					"type": "time.Time",
+					"nullable": false
+				},
+				{
+					"name": "name",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "parent_kind",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "parent_id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "visibility",
+					"type": "string",
+					"nullable": false
+				}
+			]
+		},
+		{
+			"name": "project",
+			"columns": [
+				{
+					"name": "id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "revision",
+					"type": "uint64",
+					"nullable": false
+				},
+				{
+					"name": "creation_time",
+					"type": "time.Time",
+					"nullable": false
+				},
+				{
+					"name": "update_time",
+					"type": "time.Time",
+					"nullable": false
+				},
+				{
+					"name": "name",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "parent_kind",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "parent_id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "secret",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "visibility",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "remote_repository_config_type",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "remote_source_id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "linked_account_id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "repository_id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "repository_path",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "ssh_private_key",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "skip_ssh_host_key_check",
+					"type": "bool",
+					"nullable": false
+				},
+				{
+					"name": "webhook_secret",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "pass_vars_to_forked_pr",
+					"type": "bool",
+					"nullable": false
+				},
+				{
+					"name": "default_branch",
+					"type": "string",
+					"nullable": false
+				}
+			]
+		},
+		{
+			"name": "secret",
+			"columns": [
+				{
+					"name": "id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "revision",
+					"type": "uint64",
+					"nullable": false
+				},
+				{
+					"name": "creation_time",
+					"type": "time.Time",
+					"nullable": false
+				},
+				{
+					"name": "update_time",
+					"type": "time.Time",
+					"nullable": false
+				},
+				{
+					"name": "name",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "parent_kind",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "parent_id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "type",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "data",
+					"type": "json",
+					"nullable": false
+				},
+				{
+					"name": "secret_provider_id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "path",
+					"type": "string",
+					"nullable": false
+				}
+			]
+		},
+		{
+			"name": "variable",
+			"columns": [
+				{
+					"name": "id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "revision",
+					"type": "uint64",
+					"nullable": false
+				},
+				{
+					"name": "creation_time",
+					"type": "time.Time",
+					"nullable": false
+				},
+				{
+					"name": "update_time",
+					"type": "time.Time",
+					"nullable": false
+				},
+				{
+					"name": "name",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "parent_kind",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "parent_id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "variable_values",
+					"type": "json",
+					"nullable": false
+				}
+			]
+		},
+		{
+			"name": "orginvitation",
+			"columns": [
+				{
+					"name": "id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "revision",
+					"type": "uint64",
+					"nullable": false
+				},
+				{
+					"name": "creation_time",
+					"type": "time.Time",
+					"nullable": false
+				},
+				{
+					"name": "update_time",
+					"type": "time.Time",
+					"nullable": false
+				},
+				{
+					"name": "user_id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "organization_id",
+					"type": "string",
+					"nullable": false
+				},
+				{
+					"name": "role",
+					"type": "string",
+					"nullable": false
+				}
+			]
+		}
+	]
+}

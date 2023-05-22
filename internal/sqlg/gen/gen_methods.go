@@ -71,6 +71,7 @@ package db
 import (
 	stdsql "database/sql"
 
+	"agola.io/agola/internal/sqlg"
 	"agola.io/agola/internal/sqlg/sql"
 
 	"github.com/sorintlab/errors"
@@ -81,20 +82,16 @@ func (d *DB) Version() uint { return {{ $.Version }} }
 func (d *DB) DDL() []string {
 	switch d.DBType() {
 	case sql.Postgres:
-		return DDLPostgresV{{ .Version }}
+		return DDLPostgres
 	case sql.Sqlite3:
-		return DDLSqlite3V{{ .Version }}
+		return DDLSqlite3
 	}
 
 	return nil
 }
 
-func (d *DB) Sequences() []string {
-	return []string{
-		{{- range $seq := .Sequences }}
-		{{ $seq | quote}},
-		{{- end }}
-	}
+func (d *DB) Sequences() []sqlg.Sequence {
+	return Sequences
 }
 
 func (d *DB) scanArray(rows *stdsql.Rows, colsList ...[]any) error {

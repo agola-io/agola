@@ -17,7 +17,7 @@ import (
 	"agola.io/agola/services/configstore/types"
 )
 
-//go:generate ../../../../tools/bin/dbgenerator -component configstore
+//go:generate ../../../../tools/bin/dbgenerator -type db -component configstore
 
 type DB struct {
 	log zerolog.Logger
