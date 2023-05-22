@@ -1,4 +1,4 @@
-package configstore
+package tests
 
 import (
 	"context"
@@ -12,6 +12,8 @@ import (
 	"agola.io/agola/internal/sqlg/manager"
 	"agola.io/agola/internal/testutil"
 )
+
+//go:generate ../../../../../tools/bin/dbgenerator -type dbfixtures -component configstore
 
 func newSetupDBFn(log zerolog.Logger) testutil.SetupDBFn {
 	return func(ctx context.Context, t *testing.T, dir string) *testutil.DBContext {
@@ -31,38 +33,19 @@ func newSetupDBFn(log zerolog.Logger) testutil.SetupDBFn {
 	}
 }
 
-var ddls = testutil.DDLS{
-	1: {
-		Postgres: db.DDLPostgresV1,
-		Sqlite3:  db.DDLSqlite3V1,
-	},
-	2: {
-		Postgres: db.DDLPostgresV2,
-		Sqlite3:  db.DDLSqlite3V2,
-	},
-}
-
-var importFixtures = testutil.ImportFixtures{
-	1: "dbv1",
-	2: "dbv2",
+var importFixtures = testutil.DataFixtures{
+	1: "dbv1.jsonc",
+	2: "dbv2.jsonc",
 }
 
 func TestCreate(t *testing.T) {
 	log := testutil.NewLogger(t)
 
-	testutil.TestCreate(t, objects.Version, ddls, importFixtures, newSetupDBFn(log))
+	testutil.TestCreate(t, objects.Version, importFixtures, newSetupDBFn(log))
 }
 
 func TestMigrate(t *testing.T) {
 	log := testutil.NewLogger(t)
 
-	testutil.TestMigrate(t, objects.Version, ddls, importFixtures, newSetupDBFn(log))
-}
-
-func TestFixtureImportExport(t *testing.T) {
-	log := testutil.NewLogger(t)
-
-	seqs := map[string]uint64{}
-
-	testutil.TestImportExport(t, objects.Version, ddls, importFixtures, newSetupDBFn(log), seqs)
+	testutil.TestMigrate(t, objects.Version, importFixtures, newSetupDBFn(log))
 }

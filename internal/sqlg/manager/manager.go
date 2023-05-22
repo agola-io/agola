@@ -52,7 +52,7 @@ type DB interface {
 	FetchObjects(tx *sql.Tx, kind string, q sq.Builder) ([]sqlg.Object, error)
 	ObjectToExportJSON(obj sqlg.Object, e *json.Encoder) error
 
-	Sequences() []string
+	Sequences() []sqlg.Sequence
 	GetSequence(tx *sql.Tx, sequenceName string) (uint64, error)
 	PopulateSequences(tx *sql.Tx) error
 }

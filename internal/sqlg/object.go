@@ -52,6 +52,12 @@ func NewObjectMeta(tx *sql.Tx) ObjectMeta {
 	}
 }
 
+type Sequence struct {
+	Name   string
+	Table  string
+	Column string
+}
+
 func (m *ObjectMeta) GetID() string {
 	return m.ID
 }
@@ -64,6 +70,7 @@ type ObjectField struct {
 	Name     string
 	ColName  string
 	Type     string
+	BaseType string
 	SQLType  string
 	Nullable bool
 	Unique   bool
@@ -101,7 +108,7 @@ func (oi ObjectInfo) PopulatePostgres() ObjectInfo {
 		}
 
 		if field.SQLType == "" {
-			switch field.Type {
+			switch field.BaseType {
 			case "string":
 				field.SQLType = "varchar"
 			case "bool":
@@ -118,7 +125,7 @@ func (oi ObjectInfo) PopulatePostgres() ObjectInfo {
 				field.SQLType = "bigint"
 
 			default:
-				panic(fmt.Errorf("unknown field type: %q", field.Type))
+				panic(fmt.Errorf("unknown field type: %q", field.BaseType))
 			}
 		}
 
@@ -133,13 +140,14 @@ func (oi ObjectInfo) PopulateSqlite3() ObjectInfo {
 		if field.JSON {
 			field.SQLType = "text"
 		}
+
 		if field.Sequence {
 			field.SQLType = "integer"
 			field.Unique = true
 		}
 
 		if field.SQLType == "" {
-			switch field.Type {
+			switch field.BaseType {
 			case "string":
 				field.SQLType = "varchar"
 			case "bool":
@@ -157,7 +165,7 @@ func (oi ObjectInfo) PopulateSqlite3() ObjectInfo {
 				field.SQLType = "bigint"
 
 			default:
-				panic(fmt.Errorf("unknown field type: %q", field.Type))
+				panic(fmt.Errorf("unknown field type: %q", field.BaseType))
 			}
 		}
 
@@ -178,6 +186,10 @@ func PopulateObjectsInfo(inObjectsInfo []ObjectInfo, dbType sql.Type) []ObjectIn
 		for i, field := range oi.Fields {
 			if field.ColName == "" {
 				field.ColName = xstrings.ToSnakeCase(field.Name)
+			}
+
+			if field.BaseType == "" {
+				field.BaseType = field.Type
 			}
 
 			oi.Fields[i] = field

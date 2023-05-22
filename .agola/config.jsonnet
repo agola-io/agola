@@ -48,7 +48,7 @@ local task_build_go(version, arch) = {
         SKIP_DOCKER_TESTS: "1",
         SKIP_K8S_TESTS: "1",
       },
-      command: 'go test -tags "sqlite_unlock_notify" -v -count 1 -parallel 5 $(go list ./... | grep -v /tests)' },
+      command: 'go test -tags "sqlite_unlock_notify" -v -count 1 -parallel 5 $(go list ./... | grep -v agola.io/agola/tests)' },
     { type: 'run', name: 'run tests (postgres)',
       environment: {
         DB_TYPE: "postgres",
@@ -56,7 +56,7 @@ local task_build_go(version, arch) = {
         SKIP_DOCKER_TESTS: "1",
         SKIP_K8S_TESTS: "1",
       },
-      command: 'go test -tags "sqlite_unlock_notify" -v -count 1 -parallel 5 $(go list ./... | grep -v /tests)' },
+      command: 'go test -tags "sqlite_unlock_notify" -v -count 1 -parallel 5 $(go list ./... | grep -v agola.io/agola/tests)' },
     { type: 'run', name: 'fetch gitea binary for integration tests', command: 'curl -L https://github.com/go-gitea/gitea/releases/download/v1.15.11/gitea-1.15.11-linux-amd64 -o ./bin/gitea && chmod +x ./bin/gitea' },
     { type: 'save_to_workspace', contents: [{ source_dir: './bin', dest_dir: '/bin/', paths: ['*'] }] },
   ],
