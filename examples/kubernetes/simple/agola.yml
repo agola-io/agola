@@ -79,6 +79,10 @@ data:
         # paths to the private and public keys in pem encoding when using rsa signing
         #privateKeyPath: /path/to/privatekey.pem
         #publicKeyPath: /path/to/public.pem
+
+      cookieSigning:
+        key: supersecretsigningkey
+
       adminToken: "admintoken"
 
     scheduler:
