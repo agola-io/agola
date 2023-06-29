@@ -17,6 +17,10 @@ package tests
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -254,6 +258,13 @@ func withGitea(gitea bool) func(*setupContext) {
 func withOrganizationMemberAddingMode(organizationMemberAddingMode config.OrganizationMemberAddingMode) func(*setupContext) {
 	return func(s *setupContext) {
 		s.config.Gateway.OrganizationMemberAddingMode = organizationMemberAddingMode
+	}
+}
+
+func withWebhooks(webhookURL string, webhookSecret string) func(*setupContext) {
+	return func(s *setupContext) {
+		s.config.Notification.WebhookURL = webhookURL
+		s.config.Notification.WebhookSecret = webhookSecret
 	}
 }
 
@@ -4295,6 +4306,246 @@ func TestGetProjectRuns(t *testing.T) {
 				}
 				if run.Result != rstypes.RunResultSuccess {
 					t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, run.Result)
+				}
+			}
+		})
+	}
+}
+
+func TestRunEventsNotification(t *testing.T) {
+	tests := []struct {
+		name                   string
+		config                 string
+		expectedRunResult      rstypes.RunResult
+		expectedRunPhase       rstypes.RunPhase
+		expectedRunPhaseEvents []rstypes.RunPhase
+		expectedRunTaskStatus  []rstypes.RunTaskStatus
+	}{
+		{
+			name: "test run result success",
+			config: `
+			{
+			  runs: [
+			    {
+			      name: 'run01',
+			      tasks: [
+			        {
+			          name: 'task01',
+			          runtime: {
+			            containers: [
+			              {
+			                image: 'alpine/git',
+			              },
+			            ],
+			          },
+			          steps: [
+			            { type: 'run', command: 'env' },
+			          ],
+			        },
+			      ],
+			    },
+			  ],
+			}
+			`,
+			expectedRunResult:      rstypes.RunResultSuccess,
+			expectedRunPhase:       rstypes.RunPhaseFinished,
+			expectedRunPhaseEvents: []rstypes.RunPhase{rstypes.RunPhaseQueued, rstypes.RunPhaseRunning, rstypes.RunPhaseRunning, rstypes.RunPhaseFinished},
+			expectedRunTaskStatus:  []rstypes.RunTaskStatus{rstypes.RunTaskStatusNotStarted, rstypes.RunTaskStatusNotStarted, rstypes.RunTaskStatusSuccess, rstypes.RunTaskStatusSuccess},
+		},
+		{
+			name: "test run result failed",
+			config: `
+			{
+			  runs: [
+			    {
+			      name: 'run01',
+			      tasks: [
+			        {
+			          name: 'task01',
+			          runtime: {
+			            containers: [
+			              {
+			                image: 'alpine/git',
+			              },
+			            ],
+			          },
+			          steps: [
+			            { type: 'run', command: 'false' },
+			          ],
+			        },
+			      ],
+			      when: {
+			        branch: 'master',
+			      },
+			    },
+			  ],
+			}
+			`,
+			expectedRunResult:      rstypes.RunResultFailed,
+			expectedRunPhase:       rstypes.RunPhaseFinished,
+			expectedRunPhaseEvents: []rstypes.RunPhase{rstypes.RunPhaseQueued, rstypes.RunPhaseRunning, rstypes.RunPhaseRunning, rstypes.RunPhaseFinished},
+			expectedRunTaskStatus:  []rstypes.RunTaskStatus{rstypes.RunTaskStatusNotStarted, rstypes.RunTaskStatusNotStarted, rstypes.RunTaskStatusFailed, rstypes.RunTaskStatusFailed},
+		},
+		{
+			name: "test run setup config error",
+			config: `
+				{
+				  runserror:
+				}
+				`,
+			expectedRunResult:      rstypes.RunResultUnknown,
+			expectedRunPhase:       rstypes.RunPhaseSetupError,
+			expectedRunPhaseEvents: []rstypes.RunPhase{rstypes.RunPhaseSetupError},
+			expectedRunTaskStatus:  []rstypes.RunTaskStatus{rstypes.RunTaskStatusNotStarted},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			wrDir := t.TempDir()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			wr := setupWebhooksReceiver(ctx, t, wrDir)
+			defer wr.stop()
+
+			sc := setup(ctx, t, dir, withGitea(true), withWebhooks(fmt.Sprintf("%s/%s", wr.exposedURL, "webhooks"), "secretkey"))
+			defer sc.stop()
+
+			giteaToken, tokenUser01 := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+
+			giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+
+			giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01)
+
+			giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)
+
+			push(t, tt.config, giteaRepo.CloneURL, giteaToken, "commit", false)
+
+			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+				if err != nil {
+					return false, nil
+				}
+
+				if len(runs) == 0 {
+					return false, nil
+				}
+				if runs[0].Phase != tt.expectedRunPhase {
+					return false, nil
+				}
+
+				return true, nil
+			})
+
+			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			if len(runs) != 1 {
+				t.Fatalf("expected %d run got: %d", 1, len(runs))
+			}
+
+			if runs[0].Phase != tt.expectedRunPhase {
+				t.Fatalf("expected run phase %q, got %q", tt.expectedRunPhase, runs[0].Phase)
+			}
+			if runs[0].Result != tt.expectedRunResult {
+				t.Fatalf("expected run result %q, got %q", tt.expectedRunResult, runs[0].Result)
+			}
+
+			run, _, err := gwClient.GetProjectRun(ctx, project.ID, runs[0].Number)
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+				webhooks, err := wr.webhooks.getWebhooks()
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				if len(webhooks) < len(tt.expectedRunPhaseEvents) {
+					return false, nil
+				}
+
+				return true, nil
+			})
+
+			webhooks, err := wr.webhooks.getWebhooks()
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			for i, w := range webhooks {
+				data, err := json.Marshal(w.webhookData)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				sig256 := hmac.New(sha256.New, []byte(sc.config.Notification.WebhookSecret))
+				_, err = io.MultiWriter(sig256).Write(data)
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				signatureSHA256 := hex.EncodeToString(sig256.Sum(nil))
+				if signatureSHA256 != w.signature {
+					t.Fatalf("expected webhook signature %q, got %q", signatureSHA256, w.signature)
+				}
+
+				if w.webhookData.Run.Counter != run.Number {
+					t.Fatalf("expected webhook run counter %q, got %q", run.Number, w.webhookData.Run.Counter)
+				}
+				if w.webhookData.Run.Name != run.Name {
+					t.Fatalf("expected webhook run name %q, got %q", run.Name, w.webhookData.Run.Name)
+				}
+				if w.webhookData.Run.Phase != string(tt.expectedRunPhaseEvents[i]) {
+					t.Fatalf("expected webhook run phase %q, got %q", tt.expectedRunPhaseEvents[i], w.webhookData.Run.Phase)
+				}
+				if len(w.webhookData.Run.Tasks) != len(run.Tasks) {
+					t.Fatalf("expected %d webhook run tasks got: %d", 1, len(w.webhookData.Run.Tasks))
+				}
+
+				if len(run.Tasks) > 0 {
+					var taskID string
+					for id := range w.webhookData.Run.Tasks {
+						taskID = id
+					}
+					whTask := w.webhookData.Run.Tasks[taskID]
+					task := run.Tasks[taskID]
+
+					if whTask.ID != task.ID {
+						t.Fatalf("expected webhook run task id %q, got %q", task.ID, whTask.ID)
+					}
+					if whTask.Name != task.Name {
+						t.Fatalf("expected webhook run task name %q, got %q", task.Name, whTask.Name)
+					}
+					if whTask.Status != string(tt.expectedRunTaskStatus[i]) {
+						t.Fatalf("expected webhook run task status %q, got %q", string(tt.expectedRunTaskStatus[i]), whTask.Status)
+					}
+					if whTask.Approved != false {
+						t.Fatalf("expected webhook run task approved %t, got %t", false, whTask.Approved)
+					}
+					if whTask.Skip != false {
+						t.Fatalf("expected webhook run task skip %t, got %t", false, whTask.Skip)
+					}
+					if whTask.Timedout != false {
+						t.Fatalf("expected webhook run task timedout %t, got %t", false, whTask.Timedout)
+					}
+					if whTask.WaitingApproval != false {
+						t.Fatalf("expected webhook run task waitingApproval %t, got %t", false, whTask.Timedout)
+					}
+					if len(whTask.Steps) != 1 {
+						t.Fatalf("expected %d webhook run task steps got: %d", 1, len(whTask.Steps))
+					}
+					if whTask.Level != 0 {
+						t.Fatalf("expected %d webhook run task level got: %d", 1, whTask.Level)
+					}
 				}
 			}
 		})

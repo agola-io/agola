@@ -101,8 +101,18 @@ func (n *NotificationService) runEventsHandler(ctx context.Context) error {
 			// this is just a basic handling. Improve it to store received events and
 			// their status in the db so we can also do more logic like retrying and handle
 			// multiple kind of notifications (email etc...)
-			if err := n.updateCommitStatus(ctx, ev); err != nil {
-				n.log.Info().Err(err).Msgf("failed to update commit status")
+			switch ev.RunEventType {
+			case rstypes.RunPhaseChanged:
+				if err := n.updateCommitStatus(ctx, ev); err != nil {
+					n.log.Error().Msgf("failed to update commit status")
+				}
+				if n.c.WebhookURL != "" {
+					if err := n.sendWebhooks(ctx, ev); err != nil {
+						n.log.Error().Msgf("failed to update run status")
+					}
+				}
+			default:
+				n.log.Error().Msgf("run event %q is not valid", ev.RunEventType)
 			}
 
 		default:

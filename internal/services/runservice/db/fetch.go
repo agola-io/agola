@@ -532,6 +532,7 @@ func (d *DB) fetchRunEventsSkipLastFields(tx *sql.Tx, q sq.Builder, skipFieldsCo
 }
 
 func (d *DB) scanRunEvent(rows *stdsql.Rows, skipFieldsCount uint) (*types.RunEvent, string, error) {
+	var inDataJSON []byte
 
 	v := &types.RunEvent{}
 
@@ -540,7 +541,7 @@ func (d *DB) scanRunEvent(rows *stdsql.Rows, skipFieldsCount uint) (*types.RunEv
 		x.Init()
 	}
 
-	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Sequence, &v.RunID, &v.Phase, &v.Result})
+	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Sequence, &v.RunEventType, &v.RunID, &v.Phase, &v.Result, &inDataJSON, &v.DataVersion})
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))
@@ -554,6 +555,9 @@ func (d *DB) scanRunEvent(rows *stdsql.Rows, skipFieldsCount uint) (*types.RunEv
 		if err := x.PreJSON(); err != nil {
 			return nil, "", errors.Wrap(err, "prejson error")
 		}
+	}
+	if err := json.Unmarshal(inDataJSON, &v.Data); err != nil {
+		return nil, "", errors.Wrap(err, "failed to unmarshal v.Data")
 	}
 
 	return v, v.ID, nil
@@ -585,9 +589,12 @@ func (d *DB) RunEventArray() []any {
 	a = append(a, new(time.Time))
 	a = append(a, new(time.Time))
 	a = append(a, new(uint64))
+	a = append(a, new(types.RunEventType))
 	a = append(a, new(string))
 	a = append(a, new(types.RunPhase))
 	a = append(a, new(types.RunResult))
+	a = append(a, new([]byte))
+	a = append(a, new(uint64))
 
 	return a
 }
@@ -604,14 +611,19 @@ func (d *DB) RunEventFromArray(a []any, txID string) (*types.RunEvent, string, e
 	v.CreationTime = *a[2].(*time.Time)
 	v.UpdateTime = *a[3].(*time.Time)
 	v.Sequence = *a[4].(*uint64)
-	v.RunID = *a[5].(*string)
-	v.Phase = *a[6].(*types.RunPhase)
-	v.Result = *a[7].(*types.RunResult)
+	v.RunEventType = *a[5].(*types.RunEventType)
+	v.RunID = *a[6].(*string)
+	v.Phase = *a[7].(*types.RunPhase)
+	v.Result = *a[8].(*types.RunResult)
+	v.DataVersion = *a[10].(*uint64)
 
 	if x, ok := vi.(sqlg.PreJSONSetupper); ok {
 		if err := x.PreJSON(); err != nil {
 			return nil, "", errors.Wrap(err, "prejson error")
 		}
+	}
+	if err := json.Unmarshal(a[9].([]byte), &v.Data); err != nil {
+		return nil, "", errors.Wrap(err, "failed to unmarshal v.v.Data")
 	}
 
 	v.TxID = txID

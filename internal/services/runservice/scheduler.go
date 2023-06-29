@@ -587,7 +587,7 @@ func (s *Runservice) scheduleRun(ctx context.Context, runID string) error {
 
 		// detect changes to phase and result and set related events
 		if prevPhase != r.Phase || prevResult != r.Result {
-			runEvent, err := common.NewRunEvent(s.d, tx, r.ID, r.Phase, r.Result)
+			runEvent, err := common.NewRunEvent(s.d, tx, r, rc, types.RunPhaseChanged)
 			if err != nil {
 				return errors.WithStack(err)
 			}

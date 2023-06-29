@@ -282,23 +282,27 @@ func (d *DB) insertRawRunCounterPostgres(tx *sql.Tx, runcounter *types.RunCounte
 	return nil
 }
 var (
-	runEventInsertPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inRunID string, inPhase types.RunPhase, inResult types.RunResult) *sq.InsertBuilder {
+	runEventInsertPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inRunEventType types.RunEventType, inRunID string, inPhase types.RunPhase, inResult types.RunResult, inData []byte, inDataVersion uint64) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("runevent").Cols("id", "revision", "creation_time", "update_time", "run_id", "phase", "result").Values(inId, inRevision, inCreationTime, inUpdateTime, inRunID, inPhase, inResult)
+		return ib.InsertInto("runevent").Cols("id", "revision", "creation_time", "update_time", "run_event_type", "run_id", "phase", "result", "data", "data_version").Values(inId, inRevision, inCreationTime, inUpdateTime, inRunEventType, inRunID, inPhase, inResult, inData, inDataVersion)
 	}
-	runEventUpdatePostgres = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inRunID string, inPhase types.RunPhase, inResult types.RunResult) *sq.UpdateBuilder {
+	runEventUpdatePostgres = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inRunEventType types.RunEventType, inRunID string, inPhase types.RunPhase, inResult types.RunResult, inData []byte, inDataVersion uint64) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("runevent").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("run_id", inRunID), ub.Assign("phase", inPhase), ub.Assign("result", inResult)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("runevent").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("run_event_type", inRunEventType), ub.Assign("run_id", inRunID), ub.Assign("phase", inPhase), ub.Assign("result", inResult), ub.Assign("data", inData), ub.Assign("data_version", inDataVersion)).Where(ub.E("id", inId), ub.E("revision", curRevision))
 	}
 
-	runEventInsertRawPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inRunID string, inPhase types.RunPhase, inResult types.RunResult) *sq.InsertBuilder {
+	runEventInsertRawPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inRunEventType types.RunEventType, inRunID string, inPhase types.RunPhase, inResult types.RunResult, inData []byte, inDataVersion uint64) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("runevent").Cols("id", "revision", "creation_time", "update_time", "sequence", "run_id", "phase", "result").SQL("OVERRIDING SYSTEM VALUE").Values(inId, inRevision, inCreationTime, inUpdateTime, inSequence, inRunID, inPhase, inResult)
+		return ib.InsertInto("runevent").Cols("id", "revision", "creation_time", "update_time", "sequence", "run_event_type", "run_id", "phase", "result", "data", "data_version").SQL("OVERRIDING SYSTEM VALUE").Values(inId, inRevision, inCreationTime, inUpdateTime, inSequence, inRunEventType, inRunID, inPhase, inResult, inData, inDataVersion)
 	}
 )
 
 func (d *DB) insertRunEventPostgres(tx *sql.Tx, runevent *types.RunEvent) error {
-	q := runEventInsertPostgres(runevent.ID, runevent.Revision, runevent.CreationTime, runevent.UpdateTime, runevent.RunID, runevent.Phase, runevent.Result)
+	inDataJSON, err := json.Marshal(runevent.Data)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal runevent.Data")
+	}
+	q := runEventInsertPostgres(runevent.ID, runevent.Revision, runevent.CreationTime, runevent.UpdateTime, runevent.RunEventType, runevent.RunID, runevent.Phase, runevent.Result, inDataJSON, runevent.DataVersion)
 
 	if _, err := d.exec(tx, q); err != nil {
 		return errors.Wrap(err, "failed to insert runEvent")
@@ -308,7 +312,11 @@ func (d *DB) insertRunEventPostgres(tx *sql.Tx, runevent *types.RunEvent) error 
 }
 
 func (d *DB) updateRunEventPostgres(tx *sql.Tx, curRevision uint64, runevent *types.RunEvent) (stdsql.Result, error) {
-	q := runEventUpdatePostgres(curRevision, runevent.ID, runevent.Revision, runevent.CreationTime, runevent.UpdateTime, runevent.RunID, runevent.Phase, runevent.Result)
+	inDataJSON, err := json.Marshal(runevent.Data)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal runevent.Data")
+	}
+	q := runEventUpdatePostgres(curRevision, runevent.ID, runevent.Revision, runevent.CreationTime, runevent.UpdateTime, runevent.RunEventType, runevent.RunID, runevent.Phase, runevent.Result, inDataJSON, runevent.DataVersion)
 
 	res, err := d.exec(tx, q)
 	if err != nil {
@@ -319,7 +327,11 @@ func (d *DB) updateRunEventPostgres(tx *sql.Tx, curRevision uint64, runevent *ty
 }
 
 func (d *DB) insertRawRunEventPostgres(tx *sql.Tx, runevent *types.RunEvent) error {
-	q := runEventInsertRawPostgres(runevent.ID, runevent.Revision, runevent.CreationTime, runevent.UpdateTime, runevent.Sequence, runevent.RunID, runevent.Phase, runevent.Result)
+	inDataJSON, err := json.Marshal(runevent.Data)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal runevent.Data")
+	}
+	q := runEventInsertRawPostgres(runevent.ID, runevent.Revision, runevent.CreationTime, runevent.UpdateTime, runevent.Sequence, runevent.RunEventType, runevent.RunID, runevent.Phase, runevent.Result, inDataJSON, runevent.DataVersion)
 
 	if _, err := d.exec(tx, q); err != nil {
 		return errors.Wrap(err, "failed to insert runEvent")

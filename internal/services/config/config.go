@@ -90,6 +90,9 @@ type Notification struct {
 	ConfigstoreURL string `yaml:"configstoreURL"`
 
 	DB DB `yaml:"db"`
+
+	WebhookURL    string `yaml:"webhookURL"`
+	WebhookSecret string `yaml:"webhookSecret"`
 }
 
 type Runservice struct {
