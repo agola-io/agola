@@ -276,32 +276,34 @@ func (vt OrganizationMemberAddingMode) IsValid() bool {
 	return false
 }
 
-var defaultConfig = Config{
-	ID: "agola",
-	Gateway: Gateway{
-		TokenSigning: TokenSigning{
-			Duration: 12 * time.Hour,
+var defaultConfig = func() *Config {
+	return &Config{
+		ID: "agola",
+		Gateway: Gateway{
+			TokenSigning: TokenSigning{
+				Duration: 12 * time.Hour,
+			},
+			CookieSigning: CookieSigning{
+				Duration: 12 * time.Hour,
+			},
+			OrganizationMemberAddingMode: defaultOrganizationMemberAddingMode,
 		},
-		CookieSigning: CookieSigning{
-			Duration: 12 * time.Hour,
+		Runservice: Runservice{
+			RunCacheExpireInterval:     7 * 24 * time.Hour,
+			RunWorkspaceExpireInterval: 7 * 24 * time.Hour,
+			RunLogExpireInterval:       30 * 24 * time.Hour,
 		},
-		OrganizationMemberAddingMode: defaultOrganizationMemberAddingMode,
-	},
-	Runservice: Runservice{
-		RunCacheExpireInterval:     7 * 24 * time.Hour,
-		RunWorkspaceExpireInterval: 7 * 24 * time.Hour,
-		RunLogExpireInterval:       30 * 24 * time.Hour,
-	},
-	Executor: Executor{
-		InitImage: InitImage{
-			Image: "busybox:stable",
+		Executor: Executor{
+			InitImage: InitImage{
+				Image: "busybox:stable",
+			},
+			ActiveTasksLimit: 2,
 		},
-		ActiveTasksLimit: 2,
-	},
-	Gitserver: Gitserver{
-		RepositoryCleanupInterval:    24 * time.Hour,
-		RepositoryRefsExpireInterval: 30 * 24 * time.Hour,
-	},
+		Gitserver: Gitserver{
+			RepositoryCleanupInterval:    24 * time.Hour,
+			RepositoryRefsExpireInterval: 30 * 24 * time.Hour,
+		},
+	}
 }
 
 func Parse(configFile string, componentsNames []string) (*Config, error) {
@@ -310,7 +312,7 @@ func Parse(configFile string, componentsNames []string) (*Config, error) {
 		return nil, errors.WithStack(err)
 	}
 
-	c := &defaultConfig
+	c := defaultConfig()
 	if err := yaml.Unmarshal(configData, &c); err != nil {
 		return nil, errors.WithStack(err)
 	}
