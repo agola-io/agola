@@ -113,6 +113,8 @@ gateway:
   tokenSigning:
     method: hmac
     key: supersecretsigningkey
+  cookieSigning:
+    key: supersecretsigningkey
   adminToken: "admintoken"
 
 scheduler:
@@ -167,6 +169,8 @@ gateway:
   tokenSigning:
     method: hmac
     key: supersecretsigningkey
+  cookieSigning:
+    key: supersecretsigningkey
   adminToken: "admintoken"
 
 scheduler:
@@ -201,6 +205,8 @@ gateway:
     listenAddress: ":8000"
   tokenSigning:
     method: hmac
+    key: supersecretsigningkey
+  cookieSigning:
     key: supersecretsigningkey
   adminToken: "admintoken"
 
