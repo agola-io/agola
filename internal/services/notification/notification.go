@@ -63,8 +63,8 @@ func NewNotificationService(ctx context.Context, log zerolog.Logger, gc *config.
 		return nil, errors.Errorf("unknown type %q", c.DB.Type)
 	}
 
-	configstoreClient := csclient.NewClient(c.ConfigstoreURL)
-	runserviceClient := rsclient.NewClient(c.RunserviceURL)
+	configstoreClient := csclient.NewClient(c.ConfigstoreURL, c.ConfigstoreAPIToken)
+	runserviceClient := rsclient.NewClient(c.RunserviceURL, c.RunserviceAPIToken)
 
 	return &NotificationService{
 		log:               log,

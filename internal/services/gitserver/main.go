@@ -30,6 +30,7 @@ import (
 
 	handlers "agola.io/agola/internal/git-handler"
 	"agola.io/agola/internal/services/config"
+	shandlers "agola.io/agola/internal/services/handlers"
 	"agola.io/agola/internal/util"
 )
 
@@ -141,7 +142,12 @@ func (s *Gitserver) Run(ctx context.Context) error {
 	gitSmartHandler := handlers.NewGitSmartHandler(s.log, s.c.DataDir, true, repoAbsPath, nil)
 	fetchFileHandler := handlers.NewFetchFileHandler(s.log, s.c.DataDir, repoAbsPath)
 
+	authHandler := shandlers.NewInternalAuthChecker(s.log, s.c.APIToken)
+
 	router := mux.NewRouter()
+
+	router.Use(authHandler)
+
 	router.MatcherFunc(Matcher(handlers.InfoRefsRegExp)).Handler(gitSmartHandler)
 	router.MatcherFunc(Matcher(handlers.UploadPackRegExp)).Handler(gitSmartHandler)
 	router.MatcherFunc(Matcher(handlers.ReceivePackRegExp)).Handler(gitSmartHandler)

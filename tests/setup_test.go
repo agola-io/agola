@@ -238,8 +238,9 @@ type setupContext struct {
 	dir string
 	log zerolog.Logger
 
-	config    *config.Config
-	withGitea bool
+	config                   *config.Config
+	withGitea                bool
+	withInternalServicesAuth bool
 
 	agola *testAgola
 	gitea *testutil.TestGitea
@@ -268,6 +269,12 @@ func withWebhooks(webhookURL string, webhookSecret string) func(*setupContext) {
 	}
 }
 
+func withInternalServicesAuth(enabled bool) func(*setupContext) {
+	return func(s *setupContext) {
+		s.withInternalServicesAuth = enabled
+	}
+}
+
 func setup(ctx context.Context, t *testing.T, dir string, opts ...setupOption) *setupContext {
 	log := testutil.NewLogger(t)
 
@@ -286,6 +293,9 @@ func setup(ctx context.Context, t *testing.T, dir string, opts ...setupOption) *
 	_, _, notificationDBConnString := testutil.CreateDB(t, log, ctx, dir)
 
 	sc := &setupContext{ctx: ctx, t: t, dir: dir, log: log}
+
+	// enable internal services auth by default
+	sc.withInternalServicesAuth = true
 
 	sc.config = &config.Config{
 		ID: "agola",
@@ -393,6 +403,32 @@ func setup(ctx context.Context, t *testing.T, dir string, opts ...setupOption) *
 
 	if sc.withGitea {
 		sc.gitea = setupGitea(t, dir, dockerBridgeAddress)
+	}
+
+	if sc.withInternalServicesAuth {
+		runserviceAPIToken := "runserviceapitoken"
+		executorAPIToken := "executorapitoken"
+		configstoreAPIToken := "configstoreapitoken"
+		gitserverAPIToken := "gitserverapitoken"
+
+		sc.config.Gateway.RunserviceAPIToken = runserviceAPIToken
+		sc.config.Gateway.ConfigstoreAPIToken = configstoreAPIToken
+		sc.config.Gateway.GitserverAPIToken = gitserverAPIToken
+
+		sc.config.Scheduler.RunserviceAPIToken = runserviceAPIToken
+
+		sc.config.Notification.RunserviceAPIToken = runserviceAPIToken
+		sc.config.Notification.ConfigstoreAPIToken = configstoreAPIToken
+
+		sc.config.Runservice.APIToken = runserviceAPIToken
+		sc.config.Runservice.ExecutorAPIToken = executorAPIToken
+
+		sc.config.Executor.APIToken = executorAPIToken
+		sc.config.Executor.RunserviceAPIToken = runserviceAPIToken
+
+		sc.config.Configstore.APIToken = configstoreAPIToken
+
+		sc.config.Gitserver.APIToken = gitserverAPIToken
 	}
 
 	gwPort, err := testutil.GetFreePort(dockerBridgeAddress, true, false)
@@ -1453,6 +1489,14 @@ func directRun(t *testing.T, dir, config string, configFormat ConfigFormat, gate
 }
 
 func TestDirectRun(t *testing.T) {
+	testDirectRun(t, true)
+}
+
+func TestDirectRunWithoutInternalServicesAuth(t *testing.T) {
+	testDirectRun(t, false)
+}
+
+func testDirectRun(t *testing.T, internalServicesAuth bool) {
 	t.Parallel()
 
 	config := `
@@ -1533,7 +1577,7 @@ func TestDirectRun(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			sc := setup(ctx, t, dir, withGitea(true))
+			sc := setup(ctx, t, dir, withGitea(true), withInternalServicesAuth(internalServicesAuth))
 			defer sc.stop()
 
 			gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, "admintoken")

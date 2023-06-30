@@ -127,8 +127,8 @@ func NewGateway(ctx context.Context, log zerolog.Logger, gc *config.Config) (*Ga
 		return nil, errors.WithStack(err)
 	}
 
-	configstoreClient := csclient.NewClient(c.ConfigstoreURL)
-	runserviceClient := rsclient.NewClient(c.RunserviceURL)
+	configstoreClient := csclient.NewClient(c.ConfigstoreURL, c.ConfigstoreAPIToken)
+	runserviceClient := rsclient.NewClient(c.RunserviceURL, c.RunserviceAPIToken)
 
 	ah := action.NewActionHandler(log, sd, sc, configstoreClient, runserviceClient, gc.ID, c.APIExposedURL, c.WebExposedURL, c.UnsecureCookies, action.OrganizationMemberAddingMode(c.OrganizationMemberAddingMode))
 
@@ -263,7 +263,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	versionHandler := api.NewVersionHandler(g.log, g.ah)
 
-	reposHandler := api.NewReposHandler(g.log, g.c.GitserverURL)
+	reposHandler := api.NewReposHandler(g.log, g.c.GitserverURL, g.c.GitserverAPIToken)
 
 	loginUserHandler := api.NewLoginUserHandler(g.log, g.ah)
 	authorizeHandler := api.NewAuthorizeHandler(g.log, g.ah)

@@ -200,7 +200,7 @@ func NewScheduler(ctx context.Context, log zerolog.Logger, c *config.Scheduler) 
 	return &Scheduler{
 		log:              log,
 		c:                c,
-		runserviceClient: rsclient.NewClient(c.RunserviceURL),
+		runserviceClient: rsclient.NewClient(c.RunserviceURL, c.RunserviceAPIToken),
 	}, nil
 }
 

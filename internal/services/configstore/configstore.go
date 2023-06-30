@@ -33,6 +33,7 @@ import (
 	action "agola.io/agola/internal/services/configstore/action"
 	"agola.io/agola/internal/services/configstore/api"
 	"agola.io/agola/internal/services/configstore/db"
+	"agola.io/agola/internal/services/handlers"
 	"agola.io/agola/internal/sqlg/lock"
 	"agola.io/agola/internal/sqlg/manager"
 	"agola.io/agola/internal/sqlg/sql"
@@ -204,8 +205,12 @@ func (s *Configstore) setupDefaultRouter() http.Handler {
 	deleteOrgInvitationHandler := api.NewDeleteOrgInvitationHandler(s.log, s.ah)
 	orgInvitationHandler := api.NewOrgInvitationHandler(s.log, s.ah)
 
+	authHandler := handlers.NewInternalAuthChecker(s.log, s.c.APIToken)
+
 	router := mux.NewRouter()
 	apirouter := router.PathPrefix("/api/v1alpha").Subrouter().UseEncodedPath()
+
+	apirouter.Use(authHandler)
 
 	apirouter.Handle("/projectgroups/{projectgroupref}", projectGroupHandler).Methods("GET")
 	apirouter.Handle("/projectgroups/{projectgroupref}/subgroups", projectGroupSubgroupsHandler).Methods("GET")

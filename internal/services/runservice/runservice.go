@@ -29,6 +29,7 @@ import (
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/config"
+	"agola.io/agola/internal/services/handlers"
 	"agola.io/agola/internal/services/runservice/action"
 	"agola.io/agola/internal/services/runservice/api"
 	"agola.io/agola/internal/services/runservice/db"
@@ -165,8 +166,12 @@ func (s *Runservice) setupDefaultRouter(etCh chan string) http.Handler {
 
 	changeGroupsUpdateTokensHandler := api.NewChangeGroupsUpdateTokensHandler(s.log, s.d, s.ah)
 
+	authHandler := handlers.NewInternalAuthChecker(s.log, s.c.APIToken)
+
 	router := mux.NewRouter().UseEncodedPath().SkipClean(true)
 	apirouter := router.PathPrefix("/api/v1alpha").Subrouter().UseEncodedPath().SkipClean(true)
+
+	apirouter.Use(authHandler)
 
 	// don't return 404 on a call to an undefined handler but 400 to distinguish between a non existent resource and a wrong method
 	apirouter.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusBadRequest) })

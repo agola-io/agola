@@ -26,12 +26,13 @@ import (
 )
 
 type ReposHandler struct {
-	log          zerolog.Logger
-	gitServerURL string
+	log               zerolog.Logger
+	gitserverURL      string
+	gitserverAPIToken string
 }
 
-func NewReposHandler(log zerolog.Logger, gitServerURL string) *ReposHandler {
-	return &ReposHandler{log: log, gitServerURL: gitServerURL}
+func NewReposHandler(log zerolog.Logger, gitServerURL, gitserverAPIToken string) *ReposHandler {
+	return &ReposHandler{log: log, gitserverURL: gitServerURL, gitserverAPIToken: gitserverAPIToken}
 }
 
 func (h *ReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -39,7 +40,7 @@ func (h *ReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	path := vars["rest"]
 
-	u, err := url.Parse(h.gitServerURL)
+	u, err := url.Parse(h.gitserverURL)
 	if err != nil {
 		h.log.Err(err).Send()
 		util.HTTPError(w, err)
@@ -50,8 +51,7 @@ func (h *ReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	defer r.Body.Close()
 	// proxy all the request body to the destination server
-	req, err := http.NewRequest(r.Method, u.String(), r.Body)
-	req = req.WithContext(ctx)
+	req, err := http.NewRequestWithContext(ctx, r.Method, u.String(), r.Body)
 	if err != nil {
 		h.log.Err(err).Send()
 		util.HTTPError(w, err)
@@ -63,6 +63,11 @@ func (h *ReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		for _, v := range vv {
 			req.Header.Add(k, v)
 		}
+	}
+
+	req.Header.Del("Authorization")
+	if h.gitserverAPIToken != "" {
+		req.Header.Set("Authorization", "token "+h.gitserverAPIToken)
 	}
 
 	resp, err := http.DefaultClient.Do(req)

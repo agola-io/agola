@@ -40,6 +40,7 @@ import (
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/executor/driver"
 	"agola.io/agola/internal/services/executor/registry"
+	"agola.io/agola/internal/services/handlers"
 	"agola.io/agola/internal/util"
 	rsapitypes "agola.io/agola/services/runservice/api/types"
 	rsclient "agola.io/agola/services/runservice/client"
@@ -1427,7 +1428,7 @@ func NewExecutor(ctx context.Context, log zerolog.Logger, c *config.Executor) (*
 	e := &Executor{
 		log:              log,
 		c:                c,
-		runserviceClient: rsclient.NewClient(c.RunserviceURL),
+		runserviceClient: rsclient.NewClient(c.RunserviceURL, c.RunserviceAPIToken),
 		runningTasks: &runningTasks{
 			tasks: make(map[string]*runningTask),
 		},
@@ -1523,8 +1524,12 @@ func (e *Executor) Run(ctx context.Context) error {
 	logsHandler := NewLogsHandler(e.log, e)
 	archivesHandler := NewArchivesHandler(e)
 
+	authHandler := handlers.NewInternalAuthChecker(e.log, e.c.APIToken)
+
 	router := mux.NewRouter()
 	apirouter := router.PathPrefix("/api/v1alpha").Subrouter()
+
+	apirouter.Use(authHandler)
 
 	apirouter.Handle("/executor", schedulerHandler).Methods("POST")
 	apirouter.Handle("/executor/logs", logsHandler).Methods("GET")
