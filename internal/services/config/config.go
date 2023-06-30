@@ -43,6 +43,19 @@ type Config struct {
 	Executor     Executor     `yaml:"executor"`
 	Configstore  Configstore  `yaml:"configstore"`
 	Gitserver    Gitserver    `yaml:"gitserver"`
+
+	// Global urls to avoid repeating them for every service
+
+	// APIExposedURL is the gateway API exposed url i.e. https://myagola.example.com
+	APIExposedURL string `yaml:"apiExposedURL"`
+
+	// WebExposedURL is the web interface exposed url i.e. https://myagola.example.com
+	// This is used for generating the redirect_url in oauth2 redirects
+	WebExposedURL string `yaml:"webExposedURL"`
+
+	RunserviceURL  string `yaml:"runserviceURL"`
+	ConfigstoreURL string `yaml:"configstoreURL"`
+	GitserverURL   string `yaml:"gitserverURL"`
 }
 
 type Gateway struct {
@@ -86,7 +99,8 @@ type Notification struct {
 	// This is used for generating the redirect_url in oauth2 redirects
 	WebExposedURL string `yaml:"webExposedURL"`
 
-	RunserviceURL  string `yaml:"runserviceURL"`
+	RunserviceURL string `yaml:"runserviceURL"`
+
 	ConfigstoreURL string `yaml:"configstoreURL"`
 
 	DB DB `yaml:"db"`
@@ -117,7 +131,8 @@ type Executor struct {
 	DataDir string `yaml:"dataDir"`
 
 	RunserviceURL string `yaml:"runserviceURL"`
-	ToolboxPath   string `yaml:"toolboxPath"`
+
+	ToolboxPath string `yaml:"toolboxPath"`
 
 	Web Web `yaml:"web"`
 
@@ -165,7 +180,8 @@ type Configstore struct {
 
 	DB DB `yaml:"db"`
 
-	Web           Web           `yaml:"web"`
+	Web Web `yaml:"web"`
+
 	ObjectStorage ObjectStorage `yaml:"objectStorage"`
 }
 
@@ -174,7 +190,8 @@ type Gitserver struct {
 
 	DataDir string `yaml:"dataDir"`
 
-	Web           Web           `yaml:"web"`
+	Web Web `yaml:"web"`
+
 	ObjectStorage ObjectStorage `yaml:"objectStorage"`
 
 	RepositoryCleanupInterval    time.Duration `yaml:"repositoryCleanupInterval"`
@@ -315,6 +332,41 @@ func Parse(configFile string, componentsNames []string) (*Config, error) {
 	c := defaultConfig()
 	if err := yaml.Unmarshal(configData, &c); err != nil {
 		return nil, errors.WithStack(err)
+	}
+
+	// Use global values if service values are empty
+	if c.Gateway.APIExposedURL == "" {
+		c.Gateway.APIExposedURL = c.APIExposedURL
+	}
+	if c.Gateway.WebExposedURL == "" {
+		c.Gateway.WebExposedURL = c.WebExposedURL
+	}
+	if c.Gateway.RunserviceURL == "" {
+		c.Gateway.RunserviceURL = c.RunserviceURL
+	}
+	if c.Gateway.ConfigstoreURL == "" {
+		c.Gateway.ConfigstoreURL = c.ConfigstoreURL
+	}
+	if c.Gateway.GitserverURL == "" {
+		c.Gateway.GitserverURL = c.GitserverURL
+	}
+
+	if c.Scheduler.RunserviceURL == "" {
+		c.Scheduler.RunserviceURL = c.RunserviceURL
+	}
+
+	if c.Notification.WebExposedURL == "" {
+		c.Notification.WebExposedURL = c.WebExposedURL
+	}
+	if c.Notification.RunserviceURL == "" {
+		c.Notification.RunserviceURL = c.RunserviceURL
+	}
+	if c.Notification.ConfigstoreURL == "" {
+		c.Notification.ConfigstoreURL = c.ConfigstoreURL
+	}
+
+	if c.Executor.RunserviceURL == "" {
+		c.Executor.RunserviceURL = c.RunserviceURL
 	}
 
 	return c, Validate(c, componentsNames)
