@@ -119,6 +119,14 @@ func (m *DBManager) Unlock() error {
 	return errors.WithStack(m.lock.Unlock())
 }
 
+func (m *DBManager) WantedVersion() uint {
+	return m.d.Version()
+}
+
+func (m *DBManager) DDL() []string {
+	return m.d.DDL()
+}
+
 func (m *DBManager) GetVersion(ctx context.Context) (uint, error) {
 	var curVersion uint
 	err := m.d.Do(ctx, func(tx *sql.Tx) error {
