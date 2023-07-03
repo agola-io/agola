@@ -107,7 +107,7 @@ func (n *NotificationService) runEventsHandler(ctx context.Context) error {
 					n.log.Error().Msgf("failed to update commit status")
 				}
 				if n.c.WebhookURL != "" {
-					if err := n.sendWebhooks(ctx, ev); err != nil {
+					if err := n.handleWebhooks(ctx, ev); err != nil {
 						n.log.Error().Msgf("failed to update run status")
 					}
 				}

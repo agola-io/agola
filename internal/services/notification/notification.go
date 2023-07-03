@@ -20,8 +20,11 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/sorintlab/errors"
 
+	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/config"
+	"agola.io/agola/internal/services/notification/db"
 	"agola.io/agola/internal/sqlg/lock"
+	"agola.io/agola/internal/sqlg/manager"
 	"agola.io/agola/internal/sqlg/sql"
 	csclient "agola.io/agola/services/configstore/client"
 	rsclient "agola.io/agola/services/runservice/client"
@@ -32,6 +35,7 @@ type NotificationService struct {
 	gc  *config.Config
 	c   *config.Notification
 
+	d  *db.DB
 	lf lock.LockFactory
 
 	runserviceClient  *rsclient.Client
@@ -63,6 +67,17 @@ func NewNotificationService(ctx context.Context, log zerolog.Logger, gc *config.
 		return nil, errors.Errorf("unknown type %q", c.DB.Type)
 	}
 
+	d, err := db.NewDB(log, sdb)
+	if err != nil {
+		return nil, errors.Wrapf(err, "new db error")
+	}
+
+	dbm := manager.NewDBManager(log, d, lf)
+
+	if err := common.SetupDB(ctx, dbm); err != nil {
+		return nil, errors.Wrap(err, "failed to setup db")
+	}
+
 	configstoreClient := csclient.NewClient(c.ConfigstoreURL, c.ConfigstoreAPIToken)
 	runserviceClient := rsclient.NewClient(c.RunserviceURL, c.RunserviceAPIToken)
 
@@ -70,6 +85,7 @@ func NewNotificationService(ctx context.Context, log zerolog.Logger, gc *config.
 		log:               log,
 		gc:                gc,
 		c:                 c,
+		d:                 d,
 		lf:                lf,
 		runserviceClient:  runserviceClient,
 		configstoreClient: configstoreClient,
@@ -78,6 +94,7 @@ func NewNotificationService(ctx context.Context, log zerolog.Logger, gc *config.
 
 func (n *NotificationService) Run(ctx context.Context) error {
 	go n.runEventsHandlerLoop(ctx)
+	go n.RunWebhookDeliveriesHandlerLoop(ctx)
 
 	<-ctx.Done()
 	n.log.Info().Msgf("notification service exiting")
