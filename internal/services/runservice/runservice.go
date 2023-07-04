@@ -27,6 +27,7 @@ import (
 
 	scommon "agola.io/agola/internal/common"
 	"agola.io/agola/internal/objectstorage"
+	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/runservice/action"
 	"agola.io/agola/internal/services/runservice/api"
@@ -122,43 +123,7 @@ func NewRunservice(ctx context.Context, log zerolog.Logger, c *config.Runservice
 
 	dbm := manager.NewDBManager(log, d, lf)
 
-	setupDB := func() error {
-		if err := dbm.Lock(ctx); err != nil {
-			return errors.WithStack(err)
-		}
-		defer func() { _ = dbm.Unlock() }()
-
-		if err := dbm.Setup(ctx); err != nil {
-			return errors.Wrap(err, "setup db error")
-		}
-
-		curDBVersion, err := dbm.GetVersion(ctx)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-
-		if err := dbm.CheckVersion(curDBVersion, d.Version()); err != nil {
-			return errors.WithStack(err)
-		}
-
-		if curDBVersion == 0 {
-			if err := dbm.Create(ctx, d.DDL(), d.Version()); err != nil {
-				return errors.Wrap(err, "create db error")
-			}
-		} else {
-			migrationRequired, err := dbm.CheckMigrationRequired(curDBVersion, d.Version())
-			if err != nil {
-				return errors.WithStack(err)
-			}
-			if migrationRequired {
-				return errors.Errorf("db requires migration, current version: %d, wanted version: %d", curDBVersion, d.Version())
-			}
-		}
-
-		return nil
-	}
-
-	if err := setupDB(); err != nil {
+	if err := common.SetupDB(ctx, dbm); err != nil {
 		return nil, errors.Wrap(err, "failed to setup db")
 	}
 

@@ -9,7 +9,7 @@ import (
 )
 
 func (m *DBManager) Migrate(ctx context.Context) error {
-	return m.MigrateToVersion(ctx, m.d.Version())
+	return m.MigrateToVersion(ctx, m.WantedVersion())
 }
 
 func (m *DBManager) checkMigrateFunctions(newVersion uint) error {
