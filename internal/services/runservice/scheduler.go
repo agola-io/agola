@@ -440,12 +440,19 @@ func (s *Runservice) sendExecutorTask(ctx context.Context, et *types.ExecutorTas
 		return errors.WithStack(err)
 	}
 
-	req, err := http.Post(executor.ListenURL+"/api/v1alpha/executor", "", bytes.NewReader(etResj))
+	req, err := http.NewRequestWithContext(ctx, "POST", executor.ListenURL+"/api/v1alpha/executor", bytes.NewReader(etResj))
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	if req.StatusCode != http.StatusOK {
-		return errors.Errorf("received http status: %d", req.StatusCode)
+	if s.c.ExecutorAPIToken != "" {
+		req.Header.Set("Authorization", "token "+s.c.ExecutorAPIToken)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return errors.Errorf("received http status: %d", resp.StatusCode)
 	}
 
 	return nil
@@ -1070,22 +1077,30 @@ func (s *Runservice) fetchLog(ctx context.Context, runID string, rt *types.RunTa
 	} else {
 		u = fmt.Sprintf(executor.ListenURL+"/api/v1alpha/executor/logs?taskid=%s&step=%d", et.ID, stepnum)
 	}
-	r, err := http.Get(u)
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	defer r.Body.Close()
+	if s.c.ExecutorAPIToken != "" {
+		req.Header.Set("Authorization", "token "+s.c.ExecutorAPIToken)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	defer resp.Body.Close()
 
 	// ignore if not found
-	if r.StatusCode == http.StatusNotFound {
+	if resp.StatusCode == http.StatusNotFound {
 		return nil
 	}
-	if r.StatusCode != http.StatusOK {
-		return errors.Errorf("received http status: %d", r.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		return errors.Errorf("received http status: %d", resp.StatusCode)
 	}
 
 	size := int64(-1)
-	sizeStr := r.Header.Get("Content-Length")
+	sizeStr := resp.Header.Get("Content-Length")
 	if sizeStr != "" {
 		size, err = strconv.ParseInt(sizeStr, 10, 64)
 		if err != nil {
@@ -1093,7 +1108,7 @@ func (s *Runservice) fetchLog(ctx context.Context, runID string, rt *types.RunTa
 		}
 	}
 
-	return errors.WithStack(s.ost.WriteObject(logPath, r.Body, size, false))
+	return errors.WithStack(s.ost.WriteObject(logPath, resp.Body, size, false))
 }
 
 func (s *Runservice) finishSetupLogPhase(ctx context.Context, runID, runTaskID string) error {
@@ -1272,22 +1287,31 @@ func (s *Runservice) fetchArchive(ctx context.Context, runID string, rt *types.R
 
 	u := fmt.Sprintf(executor.ListenURL+"/api/v1alpha/executor/archives?taskid=%s&step=%d", et.ID, stepnum)
 	s.log.Debug().Msgf("fetchArchive: %s", u)
-	r, err := http.Get(u)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	defer r.Body.Close()
+	if s.c.ExecutorAPIToken != "" {
+		req.Header.Set("Authorization", "token "+s.c.ExecutorAPIToken)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	defer resp.Body.Close()
 
 	// ignore if not found
-	if r.StatusCode == http.StatusNotFound {
+	if resp.StatusCode == http.StatusNotFound {
 		return nil
 	}
-	if r.StatusCode != http.StatusOK {
-		return errors.Errorf("received http status: %d", r.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		return errors.Errorf("received http status: %d", resp.StatusCode)
 	}
 
 	size := int64(-1)
-	sizeStr := r.Header.Get("Content-Length")
+	sizeStr := resp.Header.Get("Content-Length")
 	if sizeStr != "" {
 		size, err = strconv.ParseInt(sizeStr, 10, 64)
 		if err != nil {
@@ -1295,7 +1319,7 @@ func (s *Runservice) fetchArchive(ctx context.Context, runID string, rt *types.R
 		}
 	}
 
-	return errors.WithStack(s.ost.WriteObject(path, r.Body, size, false))
+	return errors.WithStack(s.ost.WriteObject(path, resp.Body, size, false))
 }
 
 func (s *Runservice) fetchTaskArchives(ctx context.Context, runID string, rt *types.RunTask) {
