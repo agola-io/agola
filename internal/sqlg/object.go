@@ -123,6 +123,8 @@ func (oi ObjectInfo) PopulatePostgres() ObjectInfo {
 				field.SQLType = "timestamptz"
 			case "time.Duration":
 				field.SQLType = "bigint"
+			case "[]byte":
+				field.SQLType = "bytea"
 
 			default:
 				panic(fmt.Errorf("unknown field type: %q", field.BaseType))
@@ -163,6 +165,8 @@ func (oi ObjectInfo) PopulateSqlite3() ObjectInfo {
 				field.SQLType = "timestamp"
 			case "time.Duration":
 				field.SQLType = "bigint"
+			case "[]byte":
+				field.SQLType = "blob"
 
 			default:
 				panic(fmt.Errorf("unknown field type: %q", field.BaseType))
