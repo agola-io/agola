@@ -174,6 +174,7 @@ const (
 	ColTypeTime
 	ColTypeDuration
 	ColTypeJSON
+	ColTypeByteArray
 )
 
 func (c *DBContext) ColumnType(tableName, colName string) (ColType, error) {
@@ -197,6 +198,8 @@ func (c *DBContext) ColumnType(tableName, colName string) (ColType, error) {
 		return ColTypeDuration, nil
 	case "json":
 		return ColTypeJSON, nil
+	case "[]byte":
+		return ColTypeByteArray, nil
 
 	default:
 		panic(fmt.Errorf("unknown col type: %q", col.Type))
@@ -353,6 +356,17 @@ func (c *DBContext) Import(ctx context.Context, r io.Reader) error {
 						return errors.WithStack(err)
 					}
 					values = append(values, vj)
+				case ColTypeByteArray:
+					if !hasValue {
+						values = append(values, 0)
+					} else {
+						var b []byte
+						if err := json.Unmarshal(v, &b); err != nil {
+							return errors.WithStack(err)
+						}
+						values = append(values, b)
+					}
+
 				default:
 					values = append(values, v)
 				}
