@@ -6,6 +6,7 @@ import (
 	"github.com/sorintlab/errors"
 
 	csobjects "agola.io/agola/internal/services/configstore/db/objects"
+	nsobjects "agola.io/agola/internal/services/notification/db/objects"
 	rsobjects "agola.io/agola/internal/services/runservice/db/objects"
 	"agola.io/agola/internal/sqlg/gen"
 )
@@ -28,6 +29,8 @@ func main() {
 			gen.GenDB(rsobjects.Version, rsobjects.ObjectsInfo, rsobjects.TypesImport, rsobjects.AdditionalImports)
 		case "configstore":
 			gen.GenDB(csobjects.Version, csobjects.ObjectsInfo, csobjects.TypesImport, csobjects.AdditionalImports)
+		case "notification":
+			gen.GenDB(nsobjects.Version, nsobjects.ObjectsInfo, nsobjects.TypesImport, nsobjects.AdditionalImports)
 		default:
 			panic(errors.Errorf("wrong component name %q", componentName))
 		}
@@ -37,6 +40,8 @@ func main() {
 			gen.GenDBFixtures(rsobjects.Version, rsobjects.ObjectsInfo, rsobjects.TypesImport, rsobjects.AdditionalImports)
 		case "configstore":
 			gen.GenDBFixtures(csobjects.Version, csobjects.ObjectsInfo, csobjects.TypesImport, csobjects.AdditionalImports)
+		case "notification":
+			gen.GenDBFixtures(nsobjects.Version, nsobjects.ObjectsInfo, nsobjects.TypesImport, nsobjects.AdditionalImports)
 		default:
 			panic(errors.Errorf("wrong component name %q", componentName))
 		}

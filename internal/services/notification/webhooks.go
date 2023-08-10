@@ -15,20 +15,16 @@
 package notification
 
 import (
-	"bytes"
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
-	"io"
-	"net/http"
 	"time"
 
 	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/gateway/action"
+	"agola.io/agola/internal/sqlg/sql"
+	"agola.io/agola/services/notification/types"
 	rstypes "agola.io/agola/services/runservice/types"
 )
 
@@ -36,6 +32,8 @@ const (
 	signatureSHA256Key = "X-Agola-SHA256Signature"
 
 	agolaEventHeader = "X-Agola-Event"
+
+	agolaDeliveryHeader = "X-Agola-Delivery"
 
 	webhookVersion = 1
 )
@@ -107,7 +105,7 @@ type RunTaskDepend struct {
 	Conditions []string `json:"conditions"`
 }
 
-func (n *NotificationService) sendWebhooks(ctx context.Context, ev *rstypes.RunEvent) error {
+func (n *NotificationService) handleWebhooks(ctx context.Context, ev *rstypes.RunEvent) error {
 	data := ev.Data.(*rstypes.RunEventData)
 
 	// ignore user direct runs
@@ -141,6 +139,7 @@ func (n *NotificationService) sendWebhooks(ctx context.Context, ev *rstypes.RunE
 		task.ID = t.ID
 		task.Name = data.Tasks[t.ID].Name
 		task.Level = data.Tasks[t.ID].Level
+		task.Depends = make(map[string]*RunTaskDepend)
 		for tdID, td := range data.Tasks[t.ID].Depends {
 			taskDepend := &RunTaskDepend{
 				TaskID:     td.TaskID,
@@ -180,41 +179,34 @@ func (n *NotificationService) sendWebhooks(ctx context.Context, ev *rstypes.RunE
 		webhook.Run.Tasks[id] = task
 	}
 
-	if err := n.sendRunWebhook(ctx, webhook); err != nil {
-		return errors.WithStack(err)
-	}
+	var wh *types.RunWebhook
 
-	return nil
-}
-
-func (n *NotificationService) sendRunWebhook(ctx context.Context, webhook *RunWebhook) error {
-	c := &http.Client{}
-
-	body, err := json.Marshal(webhook)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	req, err := http.NewRequest("POST", n.c.WebhookURL, bytes.NewReader(body))
-	req = req.WithContext(ctx)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add(agolaEventHeader, string(AgolaEventRun))
-
-	if n.c.WebhookSecret != "" {
-		sig256 := hmac.New(sha256.New, []byte(n.c.WebhookSecret))
-		_, err = io.MultiWriter(sig256).Write([]byte(body))
+	err := n.d.Do(ctx, func(tx *sql.Tx) error {
+		payload, err := json.Marshal(webhook)
 		if err != nil {
 			return errors.WithStack(err)
 		}
 
-		signatureSHA256 := hex.EncodeToString(sig256.Sum(nil))
+		wh = types.NewRunWebhook(tx)
+		wh.Payload = payload
 
-		req.Header.Set(signatureSHA256Key, signatureSHA256)
+		if err := n.d.InsertRunWebhook(tx, wh); err != nil {
+			return errors.WithStack(err)
+		}
+
+		runWebhookDelivery := types.NewRunWebhookDelivery(tx)
+		runWebhookDelivery.RunWebhookID = wh.ID
+		runWebhookDelivery.DeliveryStatus = types.DeliveryStatusNotDelivered
+
+		if err := n.d.InsertRunWebhookDelivery(tx, runWebhookDelivery); err != nil {
+			return errors.WithStack(err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return errors.WithStack(err)
 	}
 
-	_, err = c.Do(req)
-	return errors.WithStack(err)
+	return nil
 }
