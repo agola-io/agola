@@ -11,7 +11,7 @@ import (
 	"github.com/sorintlab/errors"
 )
 
-func (d *DB) Version() uint { return 1 }
+func (d *DB) Version() uint { return 2 }
 
 func (d *DB) DDL() []string {
 	switch d.DBType() {

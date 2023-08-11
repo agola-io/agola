@@ -290,6 +290,139 @@ func (d *DB) insertRawRunWebhookDelivery(tx *sql.Tx, v *types.RunWebhookDelivery
 	return nil
 }
 
+var (
+	lastRunEventSequenceSelectColumns = func(additionalCols ...string) []string {
+		columns := []string{"lastruneventsequence.id", "lastruneventsequence.revision", "lastruneventsequence.creation_time", "lastruneventsequence.update_time", "lastruneventsequence.value"}
+		columns = append(columns, additionalCols...)
+
+		return columns
+	}
+
+	lastRunEventSequenceSelect = func(additionalCols ...string) *sq.SelectBuilder {
+		return sq.NewSelectBuilder().Select(lastRunEventSequenceSelectColumns(additionalCols...)...).From("lastruneventsequence")
+	}
+)
+
+func (d *DB) InsertOrUpdateLastRunEventSequence(tx *sql.Tx, v *types.LastRunEventSequence) error {
+	var err error
+	if v.Revision == 0 {
+		err = d.InsertLastRunEventSequence(tx, v)
+	} else {
+		err = d.UpdateLastRunEventSequence(tx, v)
+	}
+
+	return errors.WithStack(err)
+}
+
+func (d *DB) InsertLastRunEventSequence(tx *sql.Tx, v *types.LastRunEventSequence) error {
+	if v.Revision != 0 {
+		return errors.Errorf("expected revision 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not created by this transaction")
+	}
+
+	v.Revision = 1
+
+	now := time.Now()
+	v.CreationTime = now
+	v.UpdateTime = now
+
+	var err error
+
+	switch d.DBType() {
+	case sql.Postgres:
+		err = d.insertRawLastRunEventSequencePostgres(tx, v);
+	case sql.Sqlite3:
+		err = d.insertLastRunEventSequenceSqlite3(tx, v);
+	}
+
+	if err != nil {
+		v.Revision = 0
+		return errors.Wrap(err, "failed to insert lastruneventsequence")
+	}
+
+	return nil
+}
+
+func (d *DB) UpdateLastRunEventSequence(tx *sql.Tx, v *types.LastRunEventSequence) error {
+	if v.Revision < 1 {
+		return errors.Errorf("expected revision > 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not fetched by this transaction")
+	}
+
+	curRevision := v.Revision
+	v.Revision++
+
+	v.UpdateTime = time.Now()
+
+	var res stdsql.Result
+	var err error
+	switch d.DBType() {
+	case sql.Postgres:
+		res, err = d.updateLastRunEventSequencePostgres(tx, curRevision, v);
+	case sql.Sqlite3:
+		res, err = d.updateLastRunEventSequenceSqlite3(tx, curRevision, v);
+	}
+	if err != nil {
+		v.Revision = curRevision
+		return errors.Wrap(err, "failed to update lastruneventsequence")
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		v.Revision = curRevision
+		return errors.Wrap(err, "failed to update lastruneventsequence")
+	}
+
+	if rows != 1 {
+		v.Revision = curRevision
+		return sqlg.ErrConcurrent
+	}
+
+	return nil
+}
+
+func (d *DB) deleteLastRunEventSequence(tx *sql.Tx, lastRunEventSequenceID string) error {
+	q := sq.NewDeleteBuilder()
+	q.DeleteFrom("lastruneventsequence").Where(q.E("id", lastRunEventSequenceID))
+
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to delete lastRunEventSequence")
+	}
+
+	return nil
+}
+
+func (d *DB) DeleteLastRunEventSequence(tx *sql.Tx, id string) error {
+	return d.deleteLastRunEventSequence(tx, id)
+}
+
+// insertRawLastRunEventSequence should be used only for import.
+// * It won't update object times.
+// * It will insert values for sequences.
+func (d *DB) insertRawLastRunEventSequence(tx *sql.Tx, v *types.LastRunEventSequence) error {
+	v.Revision = 1
+
+	var err error
+	switch d.DBType() {
+	case sql.Postgres:
+		err = d.insertRawLastRunEventSequencePostgres(tx, v);
+	case sql.Sqlite3:
+		err = d.insertRawLastRunEventSequenceSqlite3(tx, v);
+	}
+	if err != nil {
+		v.Revision = 0
+		return errors.Wrap(err, "failed to insert lastruneventsequence")
+	}
+
+	return nil
+}
+
 func (d *DB) UnmarshalExportObject(data []byte) (sqlg.Object, error) {
 	type exportObjectExportMeta struct {
 		ExportMeta sqlg.ExportMeta `json:"exportMeta"`
@@ -307,6 +440,8 @@ func (d *DB) UnmarshalExportObject(data []byte) (sqlg.Object, error) {
 		obj = &types.RunWebhook{}
 	case "RunWebhookDelivery":
 		obj = &types.RunWebhookDelivery{}
+	case "LastRunEventSequence":
+		obj = &types.LastRunEventSequence{}
 
 	default:
 		panic(errors.Errorf("unknown object kind %q, data: %s", om.ExportMeta.Kind, data))
@@ -325,6 +460,8 @@ func (d *DB) InsertRawObject(tx *sql.Tx, obj sqlg.Object) error {
 		return d.insertRawRunWebhook(tx, o)
 	case *types.RunWebhookDelivery:
 		return d.insertRawRunWebhookDelivery(tx, o)
+	case *types.LastRunEventSequence:
+		return d.insertRawLastRunEventSequence(tx, o)
 
 	default:
 		panic(errors.Errorf("unknown object type %T", obj))
@@ -337,6 +474,8 @@ func (d *DB) SelectObject(kind string) *sq.SelectBuilder {
 		return runWebhookSelect()
 	case "RunWebhookDelivery":
 		return runWebhookDeliverySelect()
+	case "LastRunEventSequence":
+		return lastRunEventSequenceSelect()
 
 	default:
 		panic(errors.Errorf("unknown object kind %q", kind))
@@ -359,6 +498,18 @@ func (d *DB) FetchObjects(tx *sql.Tx, kind string, q sq.Builder) ([]sqlg.Object,
 		return objs, nil
 	case "RunWebhookDelivery":
 		fobjs, _, err := d.fetchRunWebhookDeliverys(tx, q)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		objs := make([]sqlg.Object, len(fobjs))
+		for i, fobj := range fobjs {
+		        objs[i] = fobj
+		}
+
+		return objs, nil
+	case "LastRunEventSequence":
+		fobjs, _, err := d.fetchLastRunEventSequences(tx, q)
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
@@ -397,6 +548,18 @@ func (d *DB) ObjectToExportJSON(obj sqlg.Object, e *json.Encoder) error {
 		}
 
 		if err := e.Encode(&exportObject{ExportMeta: sqlg.ExportMeta{ Kind: "RunWebhookDelivery" }, RunWebhookDelivery: o}); err != nil {
+			return errors.WithStack(err)
+		}
+
+		return nil
+	case *types.LastRunEventSequence:
+		type exportObject struct {
+			ExportMeta sqlg.ExportMeta `json:"exportMeta"`
+
+			*types.LastRunEventSequence
+		}
+
+		if err := e.Encode(&exportObject{ExportMeta: sqlg.ExportMeta{ Kind: "LastRunEventSequence" }, LastRunEventSequence: o}); err != nil {
 			return errors.WithStack(err)
 		}
 

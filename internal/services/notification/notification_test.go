@@ -20,6 +20,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -31,11 +32,14 @@ import (
 	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/internal/testutil"
 	"agola.io/agola/services/notification/types"
+	rsclient "agola.io/agola/services/runservice/client"
+	rstypes "agola.io/agola/services/runservice/types"
 )
 
 const (
 	webhookSecret  = "secretkey"
 	webhookPayload = "payloadtest"
+	webhookURL     = "testWebhookURL"
 )
 
 // setupNotificationService don't start the notification service but just create it to manually call its methods
@@ -174,6 +178,117 @@ func TestRunWebhookDelivery(t *testing.T) {
 	})
 }
 
+func TestLastRunEventSequence(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	log := testutil.NewLogger(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ns := setupNotificationService(ctx, t, log, dir)
+	ns.c.WebhookURL = webhookURL
+
+	t.Logf("starting ns")
+
+	runEventsSender := setupRunEventsSender(ctx, t)
+	defer runEventsSender.stop()
+
+	t.Logf("starting run events service")
+
+	ns.runserviceClient = rsclient.NewClient(runEventsSender.exposedURL, "")
+
+	lastRunEventSequenceValue := getLastRunEventSequenceValue(t, ctx, ns)
+	if lastRunEventSequenceValue != 0 {
+		t.Fatalf("expected lastRunEventSequence %d, got: %d", 0, lastRunEventSequenceValue)
+	}
+
+	// test runEventsHandler start from sequence 0
+	runEvents := make([]*rstypes.RunEvent, 0)
+	runEvents = append(runEvents, generateRunEvent(1, rstypes.RunPhaseChanged))
+	runEvents = append(runEvents, generateRunEvent(2, rstypes.RunPhaseChanged))
+
+	runEventsSender.runEvents.addRunEvent(runEvents[0])
+	runEventsSender.runEvents.addRunEvent(runEvents[1])
+	expectedLastRunEventSequenceValue := uint64(2)
+
+	err := ns.runEventsHandler(ctx)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	lastRunEventSequenceValue = getLastRunEventSequenceValue(t, ctx, ns)
+	if lastRunEventSequenceValue != expectedLastRunEventSequenceValue {
+		t.Fatalf("expected %d last run event got: %d", expectedLastRunEventSequenceValue, lastRunEventSequenceValue)
+	}
+
+	// test new events
+	runEvents = append(runEvents, generateRunEvent(3, rstypes.RunPhaseChanged))
+	runEvents = append(runEvents, generateRunEvent(4, rstypes.RunPhaseChanged))
+
+	runEventsSender.runEvents.addRunEvent(runEvents[2])
+	runEventsSender.runEvents.addRunEvent(runEvents[3])
+
+	err = ns.runEventsHandler(ctx)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	runWebhooks := getRunWebhooks(t, ctx, ns)
+	if len(runWebhooks) != len(runEvents) {
+		t.Fatalf("expected %d runWebhooks got: %d", len(runEvents), len(runWebhooks))
+	}
+
+	for i := range runEvents {
+		runWebhook := ns.generatewebhook(ctx, runEvents[i])
+		webhookPayload, err := json.Marshal(runWebhook)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		if !bytes.Equal(runWebhooks[i].Payload, webhookPayload) {
+			t.Fatalf("expected %s run webhook payload got: %s", runWebhooks[i].Payload, webhookPayload)
+		}
+	}
+
+	expectedLastRunEventSequenceValue = 4
+	lastRunEventSequenceValue = getLastRunEventSequenceValue(t, ctx, ns)
+	if lastRunEventSequenceValue != expectedLastRunEventSequenceValue {
+		t.Fatalf("expected %d last run event sequence got: %d", expectedLastRunEventSequenceValue, lastRunEventSequenceValue)
+	}
+}
+
+func generateRunEvent(sequence uint64, runEventType rstypes.RunEventType) *rstypes.RunEvent {
+	return &rstypes.RunEvent{
+		Sequence:     sequence,
+		RunEventType: runEventType,
+		DataVersion:  rstypes.RunEventDataVersion,
+		Data:         &rstypes.RunEventData{},
+	}
+}
+
+func getLastRunEventSequenceValue(t *testing.T, ctx context.Context, ns *NotificationService) uint64 {
+	var lastRunEventSequence uint64
+
+	err := ns.d.Do(ctx, func(tx *sql.Tx) error {
+		l, err := ns.d.GetLastRunEventSequence(tx)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if l != nil {
+			lastRunEventSequence = l.Value
+		}
+
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	return lastRunEventSequence
+}
+
 func getRunWebhookDeliveries(t *testing.T, ctx context.Context, ns *NotificationService) []*types.RunWebhookDelivery {
 	var wd []*types.RunWebhookDelivery
 
@@ -211,6 +326,25 @@ func createRunWebhook(t *testing.T, ctx context.Context, ns *NotificationService
 	}
 
 	return wh
+}
+
+func getRunWebhooks(t *testing.T, ctx context.Context, ns *NotificationService) []*types.RunWebhook {
+	var runWebhooks []*types.RunWebhook
+
+	err := ns.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		runWebhooks, err = ns.d.GetRunWebhooks(tx, 0)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	return runWebhooks
 }
 
 func createRunWebhookDelivery(t *testing.T, ctx context.Context, ns *NotificationService, runWebhookID string, deliveryStatus types.DeliveryStatus) *types.RunWebhookDelivery {

@@ -104,3 +104,49 @@ func (d *DB) insertRawRunWebhookDeliveryPostgres(tx *sql.Tx, runwebhookdelivery 
 
 	return nil
 }
+var (
+	lastRunEventSequenceInsertPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inValue uint64) *sq.InsertBuilder {
+		ib:= sq.NewInsertBuilder()
+		return ib.InsertInto("lastruneventsequence").Cols("id", "revision", "creation_time", "update_time", "value").Values(inId, inRevision, inCreationTime, inUpdateTime, inValue)
+	}
+	lastRunEventSequenceUpdatePostgres = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inValue uint64) *sq.UpdateBuilder {
+		ub:= sq.NewUpdateBuilder()
+		return ub.Update("lastruneventsequence").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("value", inValue)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+	}
+
+	lastRunEventSequenceInsertRawPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inValue uint64) *sq.InsertBuilder {
+		ib:= sq.NewInsertBuilder()
+		return ib.InsertInto("lastruneventsequence").Cols("id", "revision", "creation_time", "update_time", "value").SQL("OVERRIDING SYSTEM VALUE").Values(inId, inRevision, inCreationTime, inUpdateTime, inValue)
+	}
+)
+
+func (d *DB) insertLastRunEventSequencePostgres(tx *sql.Tx, lastruneventsequence *types.LastRunEventSequence) error {
+	q := lastRunEventSequenceInsertPostgres(lastruneventsequence.ID, lastruneventsequence.Revision, lastruneventsequence.CreationTime, lastruneventsequence.UpdateTime, lastruneventsequence.Value)
+
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to insert lastRunEventSequence")
+	}
+
+	return nil
+}
+
+func (d *DB) updateLastRunEventSequencePostgres(tx *sql.Tx, curRevision uint64, lastruneventsequence *types.LastRunEventSequence) (stdsql.Result, error) {
+	q := lastRunEventSequenceUpdatePostgres(curRevision, lastruneventsequence.ID, lastruneventsequence.Revision, lastruneventsequence.CreationTime, lastruneventsequence.UpdateTime, lastruneventsequence.Value)
+
+	res, err := d.exec(tx, q)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to update lastRunEventSequence")
+	}
+
+	return res, nil
+}
+
+func (d *DB) insertRawLastRunEventSequencePostgres(tx *sql.Tx, lastruneventsequence *types.LastRunEventSequence) error {
+	q := lastRunEventSequenceInsertRawPostgres(lastruneventsequence.ID, lastruneventsequence.Revision, lastruneventsequence.CreationTime, lastruneventsequence.UpdateTime, lastruneventsequence.Value)
+
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to insert lastRunEventSequence")
+	}
+
+	return nil
+}

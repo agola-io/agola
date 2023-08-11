@@ -16,15 +16,10 @@ package notification
 
 import (
 	"context"
-	"encoding/json"
 	"time"
-
-	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/gateway/action"
-	"agola.io/agola/internal/sqlg/sql"
-	"agola.io/agola/services/notification/types"
 	rstypes "agola.io/agola/services/runservice/types"
 )
 
@@ -105,7 +100,7 @@ type RunTaskDepend struct {
 	Conditions []string `json:"conditions"`
 }
 
-func (n *NotificationService) handleWebhooks(ctx context.Context, ev *rstypes.RunEvent) error {
+func (n *NotificationService) generatewebhook(ctx context.Context, ev *rstypes.RunEvent) *RunWebhook {
 	data := ev.Data.(*rstypes.RunEventData)
 
 	// ignore user direct runs
@@ -179,34 +174,5 @@ func (n *NotificationService) handleWebhooks(ctx context.Context, ev *rstypes.Ru
 		webhook.Run.Tasks[id] = task
 	}
 
-	var wh *types.RunWebhook
-
-	err := n.d.Do(ctx, func(tx *sql.Tx) error {
-		payload, err := json.Marshal(webhook)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-
-		wh = types.NewRunWebhook(tx)
-		wh.Payload = payload
-
-		if err := n.d.InsertRunWebhook(tx, wh); err != nil {
-			return errors.WithStack(err)
-		}
-
-		runWebhookDelivery := types.NewRunWebhookDelivery(tx)
-		runWebhookDelivery.RunWebhookID = wh.ID
-		runWebhookDelivery.DeliveryStatus = types.DeliveryStatusNotDelivered
-
-		if err := n.d.InsertRunWebhookDelivery(tx, runWebhookDelivery); err != nil {
-			return errors.WithStack(err)
-		}
-
-		return nil
-	})
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	return nil
+	return webhook
 }
