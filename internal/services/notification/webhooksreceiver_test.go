@@ -136,9 +136,14 @@ func (wr *webhooksReceiver) start() error {
 		Handler: router,
 	}
 
+	ln, err := net.Listen("tcp", httpServer.Addr)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
 	lerrCh := make(chan error)
 	go func() {
-		lerrCh <- httpServer.ListenAndServe()
+		lerrCh <- httpServer.Serve(ln)
 	}()
 
 	go func() {
