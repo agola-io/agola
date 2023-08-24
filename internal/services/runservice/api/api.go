@@ -949,23 +949,23 @@ func (h *RunEventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
 	// TODO(sgotti) handle additional events filtering (by type, etc...)
-	var startRunEventSequence uint64
-	startRunEventSequenceStr := q.Get("startsequence")
-	if startRunEventSequenceStr != "" {
+	var afterRunEventSequence uint64
+	afterRunEventSequenceStr := q.Get("afterSequence")
+	if afterRunEventSequenceStr != "" {
 		var err error
-		startRunEventSequence, err = strconv.ParseUint(startRunEventSequenceStr, 10, 64)
+		afterRunEventSequence, err = strconv.ParseUint(afterRunEventSequenceStr, 10, 64)
 		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse startsequence")))
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse afterSequence")))
 			return
 		}
 	}
 
-	if err := h.sendRunEvents(ctx, startRunEventSequence, w); err != nil {
+	if err := h.sendRunEvents(ctx, afterRunEventSequence, w); err != nil {
 		h.log.Err(err).Send()
 	}
 }
 
-func (h *RunEventsHandler) sendRunEvents(ctx context.Context, startRunEventSequence uint64, w http.ResponseWriter) error {
+func (h *RunEventsHandler) sendRunEvents(ctx context.Context, afterRunEventSequence uint64, w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -977,9 +977,9 @@ func (h *RunEventsHandler) sendRunEvents(ctx context.Context, startRunEventSeque
 
 	// TODO(sgotti) use a notify system instead of polling the database
 
-	curEventSequence := startRunEventSequence
+	curEventSequence := afterRunEventSequence
 
-	if startRunEventSequence == 0 {
+	if afterRunEventSequence == 0 {
 		err := h.d.Do(ctx, func(tx *sql.Tx) error {
 			// start from last event
 			runEvent, err := h.d.GetLastRunEvent(tx)

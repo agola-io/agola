@@ -304,9 +304,9 @@ func (c *Client) DeleteLogs(ctx context.Context, runID, taskID string, setup boo
 	return resp, errors.WithStack(err)
 }
 
-func (c *Client) GetRunEvents(ctx context.Context, startRunEventID string) (*http.Response, error) {
+func (c *Client) GetRunEvents(ctx context.Context, afterSequence uint64) (*http.Response, error) {
 	q := url.Values{}
-	q.Add("startruneventid", startRunEventID)
+	q.Add("afterSequence", strconv.FormatUint(afterSequence, 10))
 
 	resp, err := c.GetResponse(ctx, "GET", "/runs/events", q, -1, nil, nil)
 	return resp, errors.WithStack(err)

@@ -23,6 +23,7 @@ import (
 
 	"agola.io/agola/internal/services/config"
 	csdb "agola.io/agola/internal/services/configstore/db"
+	nsdb "agola.io/agola/internal/services/notification/db"
 	rsdb "agola.io/agola/internal/services/runservice/db"
 	"agola.io/agola/internal/sqlg/lock"
 	"agola.io/agola/internal/sqlg/manager"
@@ -50,7 +51,7 @@ func init() {
 	flags := cmdMigrate.Flags()
 
 	flags.StringVar(&migrateOpts.config, "config", "./config.yml", "config file path")
-	flags.StringVar(&migrateOpts.serviceName, "service", "", "service name (runservice or configstore)")
+	flags.StringVar(&migrateOpts.serviceName, "service", "", "service name (runservice, configstore or notification)")
 
 	cmdAgola.AddCommand(cmdMigrate)
 }
@@ -58,8 +59,8 @@ func init() {
 func migrate(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
-	if migrateOpts.serviceName != "runservice" && migrateOpts.serviceName != "configstore" {
-		return errors.Errorf("service option must be runservice or configstore")
+	if migrateOpts.serviceName != "runservice" && migrateOpts.serviceName != "configstore" && migrateOpts.serviceName != "notification" {
+		return errors.Errorf("service option must be runservice, configstore or notification")
 	}
 
 	components := []string{migrateOpts.serviceName}
@@ -86,7 +87,6 @@ func migrate(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return errors.Wrapf(err, "new db error")
 		}
-
 	case "configstore":
 		var err error
 
@@ -98,6 +98,20 @@ func migrate(cmd *cobra.Command, args []string) error {
 		}
 
 		d, err = csdb.NewDB(log.Logger, sdb)
+		if err != nil {
+			return errors.Wrapf(err, "new db error")
+		}
+	case "notification":
+		var err error
+
+		dbConf := c.Notification.DB
+
+		sdb, err = sql.NewDB(dbConf.Type, dbConf.ConnString)
+		if err != nil {
+			return errors.Wrapf(err, "new db error")
+		}
+
+		d, err = nsdb.NewDB(log.Logger, sdb)
 		if err != nil {
 			return errors.Wrapf(err, "new db error")
 		}

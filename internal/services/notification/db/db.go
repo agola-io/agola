@@ -117,3 +117,27 @@ func (d *DB) GetRunWebhookByID(tx *sql.Tx, runWebhookID string) (*types.RunWebho
 	out, err := mustSingleRow(runWebhooks)
 	return out, errors.WithStack(err)
 }
+
+func (d *DB) GetRunWebhooks(tx *sql.Tx, limit int) ([]*types.RunWebhook, error) {
+	q := runWebhookSelect()
+	if limit > 0 {
+		q.Limit(limit)
+	}
+	runWebhooks, _, err := d.fetchRunWebhooks(tx, q)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return runWebhooks, errors.WithStack(err)
+}
+
+func (d *DB) GetLastRunEventSequence(tx *sql.Tx) (*types.LastRunEventSequence, error) {
+	q := lastRunEventSequenceSelect()
+	lastRunEventSequences, _, err := d.fetchLastRunEventSequences(tx, q)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	out, err := mustSingleRow(lastRunEventSequences)
+	return out, errors.WithStack(err)
+}

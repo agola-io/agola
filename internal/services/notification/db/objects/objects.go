@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	Version = uint(1)
+	Version = uint(2)
 )
 
 const TypesImport = "agola.io/agola/services/notification/types"
@@ -33,6 +33,15 @@ var ObjectsInfo = []sqlg.ObjectInfo{
 		},
 		Indexes: []string{
 			"create index if not exists runwebhookdelivery_sequence_idx on runwebhookdelivery(sequence)",
+		},
+	},
+	{
+		// lastruneventsequence table contains the sequence of the last RunEvent managed by the notification service.
+		// It must contain at most one row.
+		// if in future we'll need to store multiple last sequences like this we could reuse it adding a specific key.
+		Name: "LastRunEventSequence", Table: "lastruneventsequence",
+		Fields: []sqlg.ObjectField{
+			{Name: "Value", Type: "uint64"},
 		},
 	},
 }

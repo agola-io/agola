@@ -104,3 +104,49 @@ func (d *DB) insertRawRunWebhookDeliverySqlite3(tx *sql.Tx, runwebhookdelivery *
 
 	return nil
 }
+var (
+	lastRunEventSequenceInsertSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inValue uint64) *sq.InsertBuilder {
+		ib:= sq.NewInsertBuilder()
+		return ib.InsertInto("lastruneventsequence").Cols("id", "revision", "creation_time", "update_time", "value").Values(inId, inRevision, inCreationTime, inUpdateTime, inValue)
+	}
+	lastRunEventSequenceUpdateSqlite3 = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inValue uint64) *sq.UpdateBuilder {
+		ub:= sq.NewUpdateBuilder()
+		return ub.Update("lastruneventsequence").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("value", inValue)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+	}
+
+	lastRunEventSequenceInsertRawSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inValue uint64) *sq.InsertBuilder {
+		ib:= sq.NewInsertBuilder()
+		return ib.InsertInto("lastruneventsequence").Cols("id", "revision", "creation_time", "update_time", "value").SQL("").Values(inId, inRevision, inCreationTime, inUpdateTime, inValue)
+	}
+)
+
+func (d *DB) insertLastRunEventSequenceSqlite3(tx *sql.Tx, lastruneventsequence *types.LastRunEventSequence) error {
+	q := lastRunEventSequenceInsertSqlite3(lastruneventsequence.ID, lastruneventsequence.Revision, lastruneventsequence.CreationTime, lastruneventsequence.UpdateTime, lastruneventsequence.Value)
+
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to insert lastRunEventSequence")
+	}
+
+	return nil
+}
+
+func (d *DB) updateLastRunEventSequenceSqlite3(tx *sql.Tx, curRevision uint64, lastruneventsequence *types.LastRunEventSequence) (stdsql.Result, error) {
+	q := lastRunEventSequenceUpdateSqlite3(curRevision, lastruneventsequence.ID, lastruneventsequence.Revision, lastruneventsequence.CreationTime, lastruneventsequence.UpdateTime, lastruneventsequence.Value)
+
+	res, err := d.exec(tx, q)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to update lastRunEventSequence")
+	}
+
+	return res, nil
+}
+
+func (d *DB) insertRawLastRunEventSequenceSqlite3(tx *sql.Tx, lastruneventsequence *types.LastRunEventSequence) error {
+	q := lastRunEventSequenceInsertRawSqlite3(lastruneventsequence.ID, lastruneventsequence.Revision, lastruneventsequence.CreationTime, lastruneventsequence.UpdateTime, lastruneventsequence.Value)
+
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to insert lastRunEventSequence")
+	}
+
+	return nil
+}
