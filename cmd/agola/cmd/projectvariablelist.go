@@ -67,21 +67,37 @@ func variableList(cmd *cobra.Command, ownertype string, args []string) error {
 
 func printVariables(ownertype, description string, tree, removeoverridden bool) error {
 
-	var err error
-	var variables []*gwapitypes.VariableResponse
+	var variablesAll []*gwapitypes.VariableResponse
 
 	gwclient := gwclient.NewClient(gatewayURL, token)
 
 	switch ownertype {
 	case "project":
-		variables, _, err = gwclient.GetProjectVariables(context.TODO(), variableListOpts.parentRef, tree, removeoverridden)
+		hasMoreData := true
+		var cursor string
+		for hasMoreData {
+			variables, _, err := gwclient.GetProjectVariables(context.TODO(), variableListOpts.parentRef, tree, removeoverridden, "", false, 0, cursor)
+			if err != nil {
+				return errors.Wrapf(err, "failed to list %s variables", ownertype)
+			}
+			variablesAll = append(variablesAll, variables.Variables...)
+			cursor = variables.Cursor
+			hasMoreData = cursor != ""
+		}
 	case "projectgroup":
-		variables, _, err = gwclient.GetProjectGroupVariables(context.TODO(), variableListOpts.parentRef, tree, removeoverridden)
+		hasMoreData := true
+		var cursor string
+		for hasMoreData {
+			variables, _, err := gwclient.GetProjectGroupVariables(context.TODO(), variableListOpts.parentRef, tree, removeoverridden, "", false, 0, cursor)
+			if err != nil {
+				return errors.Wrapf(err, "failed to list %s variables", ownertype)
+			}
+			variablesAll = append(variablesAll, variables.Variables...)
+			cursor = variables.Cursor
+			hasMoreData = cursor != ""
+		}
 	}
-	if err != nil {
-		return errors.Wrapf(err, "failed to list %s variables", ownertype)
-	}
-	prettyJSON, err := json.MarshalIndent(variables, "", "\t")
+	prettyJSON, err := json.MarshalIndent(variablesAll, "", "\t")
 	if err != nil {
 		return errors.Wrapf(err, "failed to convert %s variables to json", ownertype)
 	}

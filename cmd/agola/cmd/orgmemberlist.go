@@ -23,6 +23,7 @@ import (
 	"github.com/sorintlab/errors"
 	"github.com/spf13/cobra"
 
+	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 )
 
@@ -56,13 +57,21 @@ func init() {
 
 func orgMemberList(cmd *cobra.Command, args []string) error {
 	gwclient := gwclient.NewClient(gatewayURL, token)
+	var orgMembersAll []*gwapitypes.OrgMemberResponse
 
-	orgMembers, _, err := gwclient.GetOrgMembers(context.TODO(), orgMemberListOpts.orgname)
-	if err != nil {
-		return errors.Wrapf(err, "failed to get organization member")
+	hasMoreData := true
+	var cursor string
+	for hasMoreData {
+		orgMembers, _, err := gwclient.GetOrgMembers(context.TODO(), orgMemberListOpts.orgname, false, 0, "")
+		if err != nil {
+			return errors.Wrapf(err, "failed to get organization member")
+		}
+		orgMembersAll = append(orgMembersAll, orgMembers.OrgMembers...)
+		cursor = orgMembers.Cursor
+		hasMoreData = cursor != ""
 	}
 
-	out, err := json.MarshalIndent(orgMembers, "", "\t")
+	out, err := json.MarshalIndent(orgMembersAll, "", "\t")
 	if err != nil {
 		return errors.WithStack(err)
 	}

@@ -15,11 +15,14 @@
 package api
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
+	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
@@ -36,6 +39,13 @@ func createSecretResponse(s *csapitypes.Secret) *gwapitypes.SecretResponse {
 	}
 }
 
+type SecretsCursor struct {
+	LastSecretName   string
+	Asc              bool
+	Tree             bool
+	RemoveOverridden bool
+}
+
 type SecretHandler struct {
 	log zerolog.Logger
 	ah  *action.ActionHandler
@@ -48,8 +58,55 @@ func NewSecretHandler(log zerolog.Logger, ah *action.ActionHandler) *SecretHandl
 func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	query := r.URL.Query()
-	_, tree := query["tree"]
-	_, removeoverridden := query["removeoverridden"]
+
+	cursorS := query.Get("cursor")
+	var start string
+	var asc bool
+	var tree bool
+	var removeoverridden bool
+
+	if cursorS != "" {
+		decodedCursor, err := base64.StdEncoding.DecodeString(cursorS)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot decode cursor")))
+			return
+		}
+
+		var cursor SecretsCursor
+		if err := json.Unmarshal(decodedCursor, &cursor); err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot unmarshal cursor")))
+			return
+		}
+
+		start = cursor.LastSecretName
+		asc = cursor.Asc
+		tree = cursor.Tree
+		removeoverridden = cursor.RemoveOverridden
+	} else {
+		if _, ok := query["asc"]; ok {
+			asc = true
+		}
+
+		start = query.Get("start")
+
+		_, tree = query["tree"]
+		_, removeoverridden = query["removeoverridden"]
+	}
+
+	var limit int
+	limitS := query.Get("limit")
+	if limitS != "" {
+		var err error
+		limit, err = strconv.Atoi(limitS)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit")))
+			return
+		}
+	}
+	if limit < 0 {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0")))
+		return
+	}
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
 	if util.HTTPError(w, err) {
@@ -60,6 +117,9 @@ func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	areq := &action.GetSecretsRequest{
 		ParentType:       parentType,
 		ParentRef:        parentRef,
+		Start:            start,
+		Asc:              asc,
+		Limit:            limit,
 		Tree:             tree,
 		RemoveOverridden: removeoverridden,
 	}
@@ -69,12 +129,32 @@ func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	secrets := make([]*gwapitypes.SecretResponse, len(cssecrets))
-	for i, s := range cssecrets {
+	cursorS = ""
+	if cssecrets.HasMoreData {
+		cursor := SecretsCursor{
+			LastSecretName:   cssecrets.Secrets[limit-1].Name,
+			Asc:              asc,
+			Tree:             tree,
+			RemoveOverridden: removeoverridden,
+		}
+		serializedCursor, err := json.Marshal(&cursor)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrInternal, errors.Wrapf(err, "cannot marshal cursor")))
+			return
+		}
+		cursorS = base64.StdEncoding.EncodeToString(serializedCursor)
+	}
+
+	secrets := make([]*gwapitypes.SecretResponse, len(cssecrets.Secrets))
+	for i, s := range cssecrets.Secrets {
 		secrets[i] = createSecretResponse(s)
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, secrets); err != nil {
+	response := &gwapitypes.SecretsResponse{
+		Secrets: secrets,
+		Cursor:  cursorS,
+	}
+	if err := util.HTTPResponse(w, http.StatusOK, response); err != nil {
 		h.log.Err(err).Send()
 	}
 }

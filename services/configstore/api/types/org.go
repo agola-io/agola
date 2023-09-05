@@ -15,24 +15,34 @@
 package types
 
 import (
-	cstypes "agola.io/agola/services/configstore/types"
+	"agola.io/agola/services/configstore/types"
 )
 
 type CreateOrgRequest struct {
 	Name          string
-	Visibility    cstypes.Visibility
+	Visibility    types.Visibility
 	CreatorUserID string
 }
 
 type AddOrgMemberRequest struct {
-	Role cstypes.MemberRole
+	Role types.MemberRole
+}
+
+type OrgsResponse struct {
+	Orgs        []*types.Organization
+	HasMoreData bool
 }
 
 type OrgMemberResponse struct {
-	User *cstypes.User
-	Role cstypes.MemberRole
+	User *types.User
+	Role types.MemberRole
+}
+
+type OrgMembersResponse struct {
+	OrgMembers  []*OrgMemberResponse
+	HasMoreData bool
 }
 
 type UpdateOrgRequest struct {
-	Visibility cstypes.Visibility
+	Visibility types.Visibility
 }

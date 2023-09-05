@@ -30,3 +30,8 @@ type Variable struct {
 	// dynamic data
 	ParentPath string
 }
+
+type VariablesResponse struct {
+	Variables   []*Variable
+	HasMoreData bool
+}

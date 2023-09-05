@@ -61,12 +61,26 @@ func printUsers(users []*gwapitypes.PrivateUserResponse) {
 func userList(cmd *cobra.Command, args []string) error {
 	gwclient := gwclient.NewClient(gatewayURL, token)
 
-	users, _, err := gwclient.GetUsers(context.TODO(), userListOpts.start, userListOpts.limit, false)
-	if err != nil {
-		return errors.WithStack(err)
+	var usersAll []*gwapitypes.PrivateUserResponse
+	if runListOpts.limit == 0 {
+		hasMoreData := true
+		var cursor string
+		for hasMoreData {
+			usersResp, _, err := gwclient.GetUsers(context.TODO(), userListOpts.start, 0, false, cursor)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			usersAll = append(usersAll, usersResp.Users...)
+		}
+	} else {
+		usersResp, _, err := gwclient.GetUsers(context.TODO(), userListOpts.start, userListOpts.limit, false, "")
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		usersAll = usersResp.Users
 	}
 
-	printUsers(users)
+	printUsers(usersAll)
 
 	return nil
 }

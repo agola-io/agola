@@ -15,6 +15,7 @@
 package api
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -156,6 +157,16 @@ func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+type RemoteSourcesCursor struct {
+	LastRemoteSourceID string
+	Asc                bool
+}
+
+const (
+	DefaultRemoteSourcesLimit = 25
+	MaxRemoteSourcesLimit     = 40
+)
+
 type RemoteSourcesHandler struct {
 	log zerolog.Logger
 	ah  *action.ActionHandler
@@ -169,8 +180,43 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	ctx := r.Context()
 	query := r.URL.Query()
 
+	cursorS := query.Get("cursor")
+	var start string
+	var asc bool
+
+	if cursorS != "" {
+		decodedCursor, err := base64.StdEncoding.DecodeString(cursorS)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot decode cursor")))
+			return
+		}
+
+		var cursor RemoteSourcesCursor
+		if err := json.Unmarshal(decodedCursor, &cursor); err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot unmarshal cursor")))
+			return
+		}
+
+		remoteSource, err := h.ah.GetRemoteSource(ctx, cursor.LastRemoteSourceID)
+		if util.HTTPError(w, err) {
+			h.log.Err(err).Send()
+			return
+		}
+		if remoteSource == nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cursor not valid")))
+			return
+		}
+		start = remoteSource.Name
+		asc = cursor.Asc
+	} else {
+		if _, ok := query["asc"]; ok {
+			asc = true
+		}
+		start = query.Get("start")
+	}
+
+	limit := DefaultRemoteSourcesLimit
 	limitS := query.Get("limit")
-	limit := DefaultRunsLimit
 	if limitS != "" {
 		var err error
 		limit, err = strconv.Atoi(limitS)
@@ -183,15 +229,9 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0")))
 		return
 	}
-	if limit > MaxRunsLimit {
-		limit = MaxRunsLimit
+	if limit > MaxRemoteSourcesLimit {
+		limit = MaxRemoteSourcesLimit
 	}
-	asc := false
-	if _, ok := query["asc"]; ok {
-		asc = true
-	}
-
-	start := query.Get("start")
 
 	areq := &action.GetRemoteSourcesRequest{
 		Start: start,
@@ -204,12 +244,30 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	remoteSources := make([]*gwapitypes.RemoteSourceResponse, len(csRemoteSources))
-	for i, rs := range csRemoteSources {
+	cursorS = ""
+	if csRemoteSources.HasMoreData {
+		cursor := RemoteSourcesCursor{
+			LastRemoteSourceID: csRemoteSources.RemoteSources[limit-1].ID,
+			Asc:                asc,
+		}
+		serializedCursor, err := json.Marshal(&cursor)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrInternal, errors.Wrapf(err, "cannot marshal cursor")))
+			return
+		}
+		cursorS = base64.StdEncoding.EncodeToString(serializedCursor)
+	}
+
+	remoteSources := make([]*gwapitypes.RemoteSourceResponse, len(csRemoteSources.RemoteSources))
+	for i, rs := range csRemoteSources.RemoteSources {
 		remoteSources[i] = createRemoteSourceResponse(rs)
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, remoteSources); err != nil {
+	response := &gwapitypes.RemoteSourcesResponse{
+		RemoteSources: remoteSources,
+		Cursor:        cursorS,
+	}
+	if err := util.HTTPResponse(w, http.StatusOK, response); err != nil {
 		h.log.Err(err).Send()
 	}
 }

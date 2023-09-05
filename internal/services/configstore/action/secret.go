@@ -42,7 +42,7 @@ func (h *ActionHandler) GetSecret(ctx context.Context, secretID string) (*types.
 	return secret, nil
 }
 
-func (h *ActionHandler) GetSecrets(ctx context.Context, parentKind types.ObjectKind, parentRef string, tree bool) ([]*types.Secret, error) {
+func (h *ActionHandler) GetSecrets(ctx context.Context, parentKind types.ObjectKind, parentRef string, tree bool, startSecretName string, asc bool, limit int) ([]*types.Secret, error) {
 	var secrets []*types.Secret
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		parentID, err := h.ResolveObjectID(tx, parentKind, parentRef)
@@ -50,9 +50,9 @@ func (h *ActionHandler) GetSecrets(ctx context.Context, parentKind types.ObjectK
 			return errors.WithStack(err)
 		}
 		if tree {
-			secrets, err = h.d.GetSecretsTree(tx, parentKind, parentID)
+			secrets, err = h.d.GetSecretsTree(tx, parentKind, parentID, startSecretName, asc, limit)
 		} else {
-			secrets, err = h.d.GetSecrets(tx, parentID)
+			secrets, err = h.d.GetSecrets(tx, parentID, startSecretName, asc, limit)
 		}
 		return errors.WithStack(err)
 	})

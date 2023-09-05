@@ -734,9 +734,15 @@ func (h *RunsByGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var runs []*types.Run
 	var cgt *types.ChangeGroupsUpdateToken
 
+	var hasMoreData bool
+	aLimit := limit
+	if aLimit != 0 {
+		aLimit++
+	}
+
 	err = h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		runs, err = h.d.GetGroupRuns(tx, group, phaseFilter, resultFilter, startRunCounter, limit, sortOrder)
+		runs, err = h.d.GetGroupRuns(tx, group, phaseFilter, resultFilter, startRunCounter, aLimit, sortOrder)
 		if err != nil {
 			h.log.Err(err).Send()
 			return errors.WithStack(err)
@@ -750,6 +756,11 @@ func (h *RunsByGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if limit != 0 && len(runs) > limit {
+		hasMoreData = true
+		runs = runs[:limit]
+	}
+
 	cgts, err := types.MarshalChangeGroupsUpdateToken(cgt)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -759,6 +770,7 @@ func (h *RunsByGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	res := &rsapitypes.GetRunsResponse{
 		Runs:                    runs,
 		ChangeGroupsUpdateToken: cgts,
+		HasMoreData:             hasMoreData,
 	}
 	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
 		h.log.Err(err).Send()

@@ -53,9 +53,17 @@ func (c *Client) GetProjectGroupSubgroups(ctx context.Context, projectGroupRef s
 	return projectGroups, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetProjectGroupProjects(ctx context.Context, projectGroupRef string) ([]*csapitypes.Project, *http.Response, error) {
-	projects := []*csapitypes.Project{}
-	resp, err := c.GetParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s/projects", url.PathEscape(projectGroupRef)), nil, common.JSONContent, nil, &projects)
+func (c *Client) GetProjectGroupProjects(ctx context.Context, projectGroupRef string, start string, limit int) (*csapitypes.ProjectsResponse, *http.Response, error) {
+	q := url.Values{}
+	if start != "" {
+		q.Add("start", start)
+	}
+	if limit > 0 {
+		q.Add("limit", strconv.Itoa(limit))
+	}
+
+	projects := new(csapitypes.ProjectsResponse)
+	resp, err := c.GetParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s/projects", url.PathEscape(projectGroupRef)), q, common.JSONContent, nil, projects)
 	return projects, resp, errors.WithStack(err)
 }
 
@@ -119,25 +127,43 @@ func (c *Client) DeleteProject(ctx context.Context, projectRef string) (*http.Re
 	return resp, errors.WithStack(err)
 }
 
-func (c *Client) GetProjectGroupSecrets(ctx context.Context, projectGroupRef string, tree bool) ([]*csapitypes.Secret, *http.Response, error) {
+func (c *Client) GetProjectGroupSecrets(ctx context.Context, projectGroupRef string, tree bool, start string, asc bool, limit int) (*csapitypes.SecretsResponse, *http.Response, error) {
 	q := url.Values{}
 	if tree {
 		q.Add("tree", "")
 	}
+	if start != "" {
+		q.Add("start", start)
+	}
+	if limit > 0 {
+		q.Add("limit", strconv.Itoa(limit))
+	}
+	if asc {
+		q.Add("asc", "")
+	}
 
-	secrets := []*csapitypes.Secret{}
-	resp, err := c.GetParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s/secrets", url.PathEscape(projectGroupRef)), q, common.JSONContent, nil, &secrets)
+	secrets := new(csapitypes.SecretsResponse)
+	resp, err := c.GetParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s/secrets", url.PathEscape(projectGroupRef)), q, common.JSONContent, nil, secrets)
 	return secrets, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetProjectSecrets(ctx context.Context, projectRef string, tree bool) ([]*csapitypes.Secret, *http.Response, error) {
+func (c *Client) GetProjectSecrets(ctx context.Context, projectRef string, tree bool, start string, asc bool, limit int) (*csapitypes.SecretsResponse, *http.Response, error) {
 	q := url.Values{}
 	if tree {
 		q.Add("tree", "")
 	}
+	if start != "" {
+		q.Add("start", start)
+	}
+	if limit > 0 {
+		q.Add("limit", strconv.Itoa(limit))
+	}
+	if asc {
+		q.Add("asc", "")
+	}
 
-	secrets := []*csapitypes.Secret{}
-	resp, err := c.GetParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s/secrets", url.PathEscape(projectRef)), q, common.JSONContent, nil, &secrets)
+	secrets := new(csapitypes.SecretsResponse)
+	resp, err := c.GetParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s/secrets", url.PathEscape(projectRef)), q, common.JSONContent, nil, secrets)
 	return secrets, resp, errors.WithStack(err)
 }
 
@@ -195,25 +221,43 @@ func (c *Client) DeleteProjectSecret(ctx context.Context, projectRef, secretName
 	return resp, errors.WithStack(err)
 }
 
-func (c *Client) GetProjectGroupVariables(ctx context.Context, projectGroupRef string, tree bool) ([]*csapitypes.Variable, *http.Response, error) {
+func (c *Client) GetProjectGroupVariables(ctx context.Context, projectGroupRef string, tree bool, start string, asc bool, limit int) (*csapitypes.VariablesResponse, *http.Response, error) {
 	q := url.Values{}
 	if tree {
 		q.Add("tree", "")
 	}
+	if start != "" {
+		q.Add("start", start)
+	}
+	if limit > 0 {
+		q.Add("limit", strconv.Itoa(limit))
+	}
+	if asc {
+		q.Add("asc", "")
+	}
 
-	variables := []*csapitypes.Variable{}
-	resp, err := c.GetParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s/variables", url.PathEscape(projectGroupRef)), q, common.JSONContent, nil, &variables)
+	variables := new(csapitypes.VariablesResponse)
+	resp, err := c.GetParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s/variables", url.PathEscape(projectGroupRef)), q, common.JSONContent, nil, variables)
 	return variables, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetProjectVariables(ctx context.Context, projectRef string, tree bool) ([]*csapitypes.Variable, *http.Response, error) {
+func (c *Client) GetProjectVariables(ctx context.Context, projectRef string, tree bool, start string, asc bool, limit int) (*csapitypes.VariablesResponse, *http.Response, error) {
 	q := url.Values{}
 	if tree {
 		q.Add("tree", "")
 	}
+	if start != "" {
+		q.Add("start", start)
+	}
+	if limit > 0 {
+		q.Add("limit", strconv.Itoa(limit))
+	}
+	if asc {
+		q.Add("asc", "")
+	}
 
-	variables := []*csapitypes.Variable{}
-	resp, err := c.GetParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s/variables", url.PathEscape(projectRef)), q, common.JSONContent, nil, &variables)
+	variables := new(csapitypes.VariablesResponse)
+	resp, err := c.GetParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s/variables", url.PathEscape(projectRef)), q, common.JSONContent, nil, variables)
 	return variables, resp, errors.WithStack(err)
 }
 
@@ -282,12 +326,12 @@ func (c *Client) GetUserByToken(ctx context.Context, token string) (*cstypes.Use
 	q.Add("query_type", "bytoken")
 	q.Add("token", token)
 
-	users := []*cstypes.User{}
+	users := new(csapitypes.PrivateUsersResponse)
 	resp, err := c.GetParsedResponse(ctx, "GET", "/users", q, common.JSONContent, nil, &users)
 	if err != nil {
 		return nil, resp, errors.WithStack(err)
 	}
-	return users[0], resp, errors.WithStack(err)
+	return users.Users[0], resp, errors.WithStack(err)
 }
 
 func (c *Client) GetUserByLinkedAccountRemoteUserAndSource(ctx context.Context, remoteUserID, remoteSourceID string) (*cstypes.User, *http.Response, error) {
@@ -296,12 +340,12 @@ func (c *Client) GetUserByLinkedAccountRemoteUserAndSource(ctx context.Context, 
 	q.Add("remoteuserid", remoteUserID)
 	q.Add("remotesourceid", remoteSourceID)
 
-	users := []*cstypes.User{}
+	users := new(csapitypes.PrivateUsersResponse)
 	resp, err := c.GetParsedResponse(ctx, "GET", "/users", q, common.JSONContent, nil, &users)
 	if err != nil {
 		return nil, resp, errors.WithStack(err)
 	}
-	return users[0], resp, errors.WithStack(err)
+	return users.Users[0], resp, errors.WithStack(err)
 }
 
 func (c *Client) GetUserByLinkedAccount(ctx context.Context, linkedAccountID string) (*cstypes.User, *http.Response, error) {
@@ -309,12 +353,12 @@ func (c *Client) GetUserByLinkedAccount(ctx context.Context, linkedAccountID str
 	q.Add("query_type", "bylinkedaccount")
 	q.Add("linkedaccountid", linkedAccountID)
 
-	users := []*cstypes.User{}
+	users := new(csapitypes.PrivateUsersResponse)
 	resp, err := c.GetParsedResponse(ctx, "GET", "/users", q, common.JSONContent, nil, &users)
 	if err != nil {
 		return nil, resp, errors.WithStack(err)
 	}
-	return users[0], resp, errors.WithStack(err)
+	return users.Users[0], resp, errors.WithStack(err)
 }
 
 func (c *Client) CreateUser(ctx context.Context, req *csapitypes.CreateUserRequest) (*cstypes.User, *http.Response, error) {
@@ -344,7 +388,7 @@ func (c *Client) DeleteUser(ctx context.Context, userRef string) (*http.Response
 	return resp, errors.WithStack(err)
 }
 
-func (c *Client) GetUsers(ctx context.Context, start string, limit int, asc bool) ([]*cstypes.User, *http.Response, error) {
+func (c *Client) GetUsers(ctx context.Context, start string, limit int, asc bool) (*csapitypes.PrivateUsersResponse, *http.Response, error) {
 	q := url.Values{}
 	if start != "" {
 		q.Add("start", start)
@@ -356,8 +400,8 @@ func (c *Client) GetUsers(ctx context.Context, start string, limit int, asc bool
 		q.Add("asc", "")
 	}
 
-	users := []*cstypes.User{}
-	resp, err := c.GetParsedResponse(ctx, "GET", "/users", q, common.JSONContent, nil, &users)
+	users := new(csapitypes.PrivateUsersResponse)
+	resp, err := c.GetParsedResponse(ctx, "GET", "/users", q, common.JSONContent, nil, users)
 	return users, resp, errors.WithStack(err)
 }
 
@@ -428,7 +472,7 @@ func (c *Client) GetRemoteSource(ctx context.Context, rsRef string) (*cstypes.Re
 	return rs, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetRemoteSources(ctx context.Context, start string, limit int, asc bool) ([]*cstypes.RemoteSource, *http.Response, error) {
+func (c *Client) GetRemoteSources(ctx context.Context, start string, limit int, asc bool) (*csapitypes.RemoteSourcesReponse, *http.Response, error) {
 	q := url.Values{}
 	if start != "" {
 		q.Add("start", start)
@@ -440,8 +484,8 @@ func (c *Client) GetRemoteSources(ctx context.Context, start string, limit int, 
 		q.Add("asc", "")
 	}
 
-	rss := []*cstypes.RemoteSource{}
-	resp, err := c.GetParsedResponse(ctx, "GET", "/remotesources", q, common.JSONContent, nil, &rss)
+	rss := new(csapitypes.RemoteSourcesReponse)
+	resp, err := c.GetParsedResponse(ctx, "GET", "/remotesources", q, common.JSONContent, nil, rss)
 	return rss, resp, errors.WithStack(err)
 }
 
@@ -532,7 +576,7 @@ func (c *Client) RemoveOrgMember(ctx context.Context, orgRef, userRef string) (*
 	return resp, errors.WithStack(err)
 }
 
-func (c *Client) GetOrgs(ctx context.Context, start string, limit int, asc bool) ([]*cstypes.Organization, *http.Response, error) {
+func (c *Client) GetOrgs(ctx context.Context, start string, limit int, asc bool) (*csapitypes.OrgsResponse, *http.Response, error) {
 	q := url.Values{}
 	if start != "" {
 		q.Add("start", start)
@@ -544,8 +588,8 @@ func (c *Client) GetOrgs(ctx context.Context, start string, limit int, asc bool)
 		q.Add("asc", "")
 	}
 
-	orgs := []*cstypes.Organization{}
-	resp, err := c.GetParsedResponse(ctx, "GET", "/orgs", q, common.JSONContent, nil, &orgs)
+	orgs := new(csapitypes.OrgsResponse)
+	resp, err := c.GetParsedResponse(ctx, "GET", "/orgs", q, common.JSONContent, nil, orgs)
 	return orgs, resp, errors.WithStack(err)
 }
 
@@ -555,9 +599,20 @@ func (c *Client) GetOrg(ctx context.Context, orgRef string) (*cstypes.Organizati
 	return org, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetOrgMembers(ctx context.Context, orgRef string) ([]*csapitypes.OrgMemberResponse, *http.Response, error) {
-	orgMembers := []*csapitypes.OrgMemberResponse{}
-	resp, err := c.GetParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s/members", orgRef), nil, common.JSONContent, nil, &orgMembers)
+func (c *Client) GetOrgMembers(ctx context.Context, orgRef string, start string, limit int, asc bool) (*csapitypes.OrgMembersResponse, *http.Response, error) {
+	q := url.Values{}
+	if start != "" {
+		q.Add("start", start)
+	}
+	if limit > 0 {
+		q.Add("limit", strconv.Itoa(limit))
+	}
+	if asc {
+		q.Add("asc", "")
+	}
+
+	orgMembers := new(csapitypes.OrgMembersResponse)
+	resp, err := c.GetParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s/members", orgRef), q, common.JSONContent, nil, orgMembers)
 	return orgMembers, resp, errors.WithStack(err)
 }
 

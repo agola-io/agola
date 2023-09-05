@@ -27,6 +27,11 @@ type SecretResponse struct {
 	ParentPath string `json:"parent_path"`
 }
 
+type SecretsResponse struct {
+	Secrets []*SecretResponse `json:"secrets"`
+	Cursor  string            `json:"cursor"`
+}
+
 type CreateSecretRequest struct {
 	Name string `json:"name,omitempty"`
 

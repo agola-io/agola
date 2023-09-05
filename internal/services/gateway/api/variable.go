@@ -15,11 +15,14 @@
 package api
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
+	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/gateway/action"
@@ -53,6 +56,13 @@ func createVariableResponse(v *csapitypes.Variable, secrets []*csapitypes.Secret
 	return nv
 }
 
+type VariablesCursor struct {
+	LastVariableName string
+	Asc              bool
+	Tree             bool
+	RemoveOverridden bool
+}
+
 type VariableHandler struct {
 	log zerolog.Logger
 	ah  *action.ActionHandler
@@ -65,8 +75,55 @@ func NewVariableHandler(log zerolog.Logger, ah *action.ActionHandler) *VariableH
 func (h *VariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	query := r.URL.Query()
-	_, tree := query["tree"]
-	_, removeoverridden := query["removeoverridden"]
+
+	cursorS := query.Get("cursor")
+	var start string
+	var asc bool
+	var tree bool
+	var removeoverridden bool
+
+	if cursorS != "" {
+		decodedCursor, err := base64.StdEncoding.DecodeString(cursorS)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot decode cursor")))
+			return
+		}
+
+		var cursor VariablesCursor
+		if err := json.Unmarshal(decodedCursor, &cursor); err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot unmarshal cursor")))
+			return
+		}
+
+		start = cursor.LastVariableName
+		asc = cursor.Asc
+		tree = cursor.Tree
+		removeoverridden = cursor.RemoveOverridden
+	} else {
+		if _, ok := query["asc"]; ok {
+			asc = true
+		}
+
+		start = query.Get("start")
+
+		_, tree = query["tree"]
+		_, removeoverridden = query["removeoverridden"]
+	}
+
+	var limit int
+	limitS := query.Get("limit")
+	if limitS != "" {
+		var err error
+		limit, err = strconv.Atoi(limitS)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit")))
+			return
+		}
+	}
+	if limit < 0 {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0")))
+		return
+	}
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
 	if util.HTTPError(w, err) {
@@ -77,6 +134,9 @@ func (h *VariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	areq := &action.GetVariablesRequest{
 		ParentType:       parentType,
 		ParentRef:        parentRef,
+		Start:            start,
+		Asc:              asc,
+		Limit:            limit,
 		Tree:             tree,
 		RemoveOverridden: removeoverridden,
 	}
@@ -86,12 +146,32 @@ func (h *VariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	variables := make([]*gwapitypes.VariableResponse, len(csvars))
-	for i, v := range csvars {
+	cursorS = ""
+	if csvars.HasMoreData {
+		cursor := VariablesCursor{
+			LastVariableName: csvars.Variables[limit-1].Name,
+			Asc:              asc,
+			Tree:             tree,
+			RemoveOverridden: removeoverridden,
+		}
+		serializedCursor, err := json.Marshal(&cursor)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrInternal, errors.Wrapf(err, "cannot marshal cursor")))
+			return
+		}
+		cursorS = base64.StdEncoding.EncodeToString(serializedCursor)
+	}
+
+	variables := make([]*gwapitypes.VariableResponse, len(csvars.Variables))
+	for i, v := range csvars.Variables {
 		variables[i] = createVariableResponse(v, cssecrets)
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, variables); err != nil {
+	response := &gwapitypes.VariablesResponse{
+		Variables: variables,
+		Cursor:    cursorS,
+	}
+	if err := util.HTTPResponse(w, http.StatusOK, response); err != nil {
 		h.log.Err(err).Send()
 	}
 }

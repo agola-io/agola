@@ -16,6 +16,7 @@ package api
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"sort"
@@ -182,6 +183,17 @@ func createUserResponse(u *cstypes.User) *gwapitypes.UserResponse {
 	return user
 }
 
+type UsersCursor struct {
+	LastUserID string
+	Asc        bool
+	QueryType  string
+}
+
+const (
+	DefaultUsersLimit = 25
+	MaxUsersLimit     = 40
+)
+
 type UsersHandler struct {
 	log zerolog.Logger
 	ah  *action.ActionHandler
@@ -196,8 +208,47 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	query := r.URL.Query()
 
+	cursorS := query.Get("cursor")
+	var start string
+	var asc bool
+	var queryType string
+
+	if cursorS != "" {
+		decodedCursor, err := base64.StdEncoding.DecodeString(cursorS)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot decode cursor")))
+			return
+		}
+
+		var cursor UsersCursor
+		if err := json.Unmarshal(decodedCursor, &cursor); err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot unmarshal cursor")))
+			return
+		}
+
+		user, err := h.ah.GetUser(ctx, cursor.LastUserID)
+		if util.HTTPError(w, err) {
+			h.log.Err(err).Send()
+			return
+		}
+		if user == nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cursor not valid")))
+			return
+		}
+		start = user.Name
+		asc = cursor.Asc
+		queryType = cursor.QueryType
+	} else {
+		if _, ok := query["asc"]; ok {
+			asc = true
+		}
+
+		start = query.Get("start")
+		queryType = query.Get("query_type")
+	}
+
+	limit := DefaultUsersLimit
 	limitS := query.Get("limit")
-	limit := DefaultRunsLimit
 	if limitS != "" {
 		var err error
 		limit, err = strconv.Atoi(limitS)
@@ -210,19 +261,12 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0")))
 		return
 	}
-	if limit > MaxRunsLimit {
-		limit = MaxRunsLimit
+	if limit > MaxUsersLimit {
+		limit = MaxUsersLimit
 	}
-	asc := false
-	if _, ok := query["asc"]; ok {
-		asc = true
-	}
-
-	start := query.Get("start")
-	queryType := query.Get("query_type")
 
 	var ausers []*action.PrivateUserResponse
-	var err error
+	var hasMoreData bool
 	switch queryType {
 	case "byremoteuser":
 		remoteUserID := query.Get("remoteuserid")
@@ -240,14 +284,31 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Limit: limit,
 			Asc:   asc,
 		}
-		ausers, err = h.ah.GetUsers(ctx, areq)
+		apusers, err := h.ah.GetUsers(ctx, areq)
 		if util.HTTPError(w, err) {
 			h.log.Err(err).Send()
 			return
 		}
+		ausers = apusers.Users
+		hasMoreData = apusers.HasMoreData
 	default:
 		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("unknown query_type: %q", queryType)))
 		return
+	}
+
+	cursorS = ""
+	if hasMoreData {
+		cursor := UsersCursor{
+			LastUserID: ausers[limit-1].User.ID,
+			Asc:        asc,
+			QueryType:  queryType,
+		}
+		serializedCursor, err := json.Marshal(&cursor)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrInternal, errors.Wrapf(err, "cannot marshal cursor")))
+			return
+		}
+		cursorS = base64.StdEncoding.EncodeToString(serializedCursor)
 	}
 
 	users := make([]*gwapitypes.PrivateUserResponse, len(ausers))
@@ -255,7 +316,11 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		users[i] = createPrivateUserResponse(p.User, p.Tokens, p.LinkedAccounts)
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, users); err != nil {
+	response := &gwapitypes.PrivateUsersResponse{
+		Users:  users,
+		Cursor: cursorS,
+	}
+	if err := util.HTTPResponse(w, http.StatusOK, response); err != nil {
 		h.log.Err(err).Send()
 	}
 }

@@ -105,19 +105,47 @@ func runList(cmd *cobra.Command, args []string) error {
 
 	isProject := !flags.Changed("username")
 
-	var runsResp []*gwapitypes.RunsResponse
-	var err error
+	var runsAll []*gwapitypes.Runs
 	if isProject {
-		runsResp, _, err = gwclient.GetProjectRuns(context.TODO(), runListOpts.projectRef, runListOpts.phaseFilter, nil, runListOpts.start, runListOpts.limit, false)
+		if runListOpts.limit == 0 {
+			hasMoreData := true
+			var cursor string
+			for hasMoreData {
+				runsResp, _, err := gwclient.GetProjectRuns(context.TODO(), runListOpts.projectRef, runListOpts.phaseFilter, nil, runListOpts.start, 0, false, cursor)
+				if err != nil {
+					return errors.WithStack(err)
+				}
+				runsAll = append(runsAll, runsResp.Runs...)
+			}
+		} else {
+			runsResp, _, err := gwclient.GetProjectRuns(context.TODO(), runListOpts.projectRef, runListOpts.phaseFilter, nil, runListOpts.start, runListOpts.limit, false, "")
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			runsAll = runsResp.Runs
+		}
 	} else {
-		runsResp, _, err = gwclient.GetUserRuns(context.TODO(), runListOpts.username, runListOpts.phaseFilter, nil, runListOpts.start, runListOpts.limit, false)
-	}
-	if err != nil {
-		return errors.WithStack(err)
+		if runListOpts.limit == 0 {
+			hasMoreData := true
+			var cursor string
+			for hasMoreData {
+				runsResp, _, err := gwclient.GetUserRuns(context.TODO(), runListOpts.username, runListOpts.phaseFilter, nil, runListOpts.start, 0, false, cursor)
+				if err != nil {
+					return errors.WithStack(err)
+				}
+				runsAll = append(runsAll, runsResp.Runs...)
+			}
+		} else {
+			runsResp, _, err := gwclient.GetUserRuns(context.TODO(), runListOpts.username, runListOpts.phaseFilter, nil, runListOpts.start, runListOpts.limit, false, "")
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			runsAll = runsResp.Runs
+		}
 	}
 
-	runs := make([]*runDetails, len(runsResp))
-	for i, runResponse := range runsResp {
+	runs := make([]*runDetails, len(runsAll))
+	for i, runResponse := range runsAll {
 		var err error
 		var run *gwapitypes.RunResponse
 		if isProject {

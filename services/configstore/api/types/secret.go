@@ -33,3 +33,8 @@ type Secret struct {
 	// dynamic data
 	ParentPath string
 }
+
+type SecretsResponse struct {
+	Secrets     []*Secret
+	HasMoreData bool
+}

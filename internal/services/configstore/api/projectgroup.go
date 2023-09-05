@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
@@ -130,6 +131,19 @@ func NewProjectGroupProjectsHandler(log zerolog.Logger, ah *action.ActionHandler
 func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
+	query := r.URL.Query()
+
+	start := query.Get("start")
+	var limit int
+	limitS := query.Get("limit")
+	if limitS != "" {
+		var err error
+		limit, err = strconv.Atoi(limitS)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit")))
+			return
+		}
+	}
 
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
@@ -137,10 +151,21 @@ func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	projects, err := h.ah.GetProjectGroupProjects(ctx, projectGroupRef)
+	var hasMoreData bool
+	aLimit := limit
+	if aLimit != 0 {
+		aLimit++
+	}
+
+	projects, err := h.ah.GetProjectGroupProjects(ctx, projectGroupRef, start, aLimit)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
+	}
+
+	if limit != 0 && len(projects) > limit {
+		hasMoreData = true
+		projects = projects[:limit]
 	}
 
 	resProjects, err := projectsResponse(ctx, h.readDB, projects)
@@ -149,7 +174,11 @@ func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, resProjects); err != nil {
+	response := csapitypes.ProjectsResponse{
+		Projects:    resProjects,
+		HasMoreData: hasMoreData,
+	}
+	if err := util.HTTPResponse(w, http.StatusOK, response); err != nil {
 		h.log.Err(err).Send()
 	}
 }

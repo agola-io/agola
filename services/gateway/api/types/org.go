@@ -32,13 +32,19 @@ type OrgResponse struct {
 	Visibility Visibility `json:"visibility,omitempty"`
 }
 
+type OrgsResponse struct {
+	Orgs   []*OrgResponse `json:"orgs"`
+	Cursor string         `json:"cursor"`
+}
+
 type UpdateOrgRequest struct {
 	Visibility *Visibility `json:"visibility"`
 }
 
 type OrgMembersResponse struct {
 	Organization *OrgResponse         `json:"organization"`
-	Members      []*OrgMemberResponse `json:"members"`
+	OrgMembers   []*OrgMemberResponse `json:"org_members"`
+	Cursor       string               `json:"cursor"`
 }
 
 type OrgMemberResponse struct {

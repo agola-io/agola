@@ -113,9 +113,17 @@ func (c *Client) GetProjectGroupSubgroups(ctx context.Context, projectGroupRef s
 	return projectGroups, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetProjectGroupProjects(ctx context.Context, projectGroupRef string) ([]*gwapitypes.ProjectResponse, *http.Response, error) {
-	projects := []*gwapitypes.ProjectResponse{}
-	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s/projects", url.PathEscape(projectGroupRef)), nil, jsonContent, nil, &projects)
+func (c *Client) GetProjectGroupProjects(ctx context.Context, projectGroupRef string, limit int, cursor string) (*gwapitypes.ProjectsResponse, *http.Response, error) {
+	q := url.Values{}
+	if cursor != "" {
+		q.Add("cursor", cursor)
+	}
+	if limit > 0 {
+		q.Add("limit", strconv.Itoa(limit))
+	}
+
+	projects := new(gwapitypes.ProjectsResponse)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s/projects", url.PathEscape(projectGroupRef)), q, jsonContent, nil, projects)
 	return projects, resp, errors.WithStack(err)
 }
 
@@ -199,8 +207,7 @@ func (c *Client) DeleteProjectGroupSecret(ctx context.Context, projectGroupRef, 
 	return c.getResponse(ctx, "DELETE", path.Join("/projectgroups", url.PathEscape(projectGroupRef), "secrets", secretName), nil, jsonContent, nil)
 }
 
-func (c *Client) GetProjectGroupSecrets(ctx context.Context, projectRef string, tree, removeoverridden bool) ([]*gwapitypes.SecretResponse, *http.Response, error) {
-	secrets := []*gwapitypes.SecretResponse{}
+func (c *Client) GetProjectGroupSecrets(ctx context.Context, projectRef string, tree, removeoverridden bool, start string, asc bool, limit int, cursor string) (*gwapitypes.SecretsResponse, *http.Response, error) {
 	q := url.Values{}
 	if tree {
 		q.Add("tree", "")
@@ -208,7 +215,21 @@ func (c *Client) GetProjectGroupSecrets(ctx context.Context, projectRef string, 
 	if removeoverridden {
 		q.Add("removeoverridden", "")
 	}
-	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s/secrets", url.PathEscape(projectRef)), q, jsonContent, nil, &secrets)
+	if start != "" {
+		q.Add("start", start)
+	}
+	if limit > 0 {
+		q.Add("limit", strconv.Itoa(limit))
+	}
+	if asc {
+		q.Add("asc", "")
+	}
+	if cursor != "" {
+		q.Add("cursor", cursor)
+	}
+
+	secrets := new(gwapitypes.SecretsResponse)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s/secrets", url.PathEscape(projectRef)), q, jsonContent, nil, secrets)
 	return secrets, resp, errors.WithStack(err)
 }
 
@@ -238,8 +259,7 @@ func (c *Client) DeleteProjectSecret(ctx context.Context, projectRef, secretName
 	return c.getResponse(ctx, "DELETE", path.Join("/projects", url.PathEscape(projectRef), "secrets", secretName), nil, jsonContent, nil)
 }
 
-func (c *Client) GetProjectSecrets(ctx context.Context, projectRef string, tree, removeoverridden bool) ([]*gwapitypes.SecretResponse, *http.Response, error) {
-	secrets := []*gwapitypes.SecretResponse{}
+func (c *Client) GetProjectSecrets(ctx context.Context, projectRef string, tree, removeoverridden bool, start string, asc bool, limit int, cursor string) (*gwapitypes.SecretsResponse, *http.Response, error) {
 	q := url.Values{}
 	if tree {
 		q.Add("tree", "")
@@ -247,6 +267,20 @@ func (c *Client) GetProjectSecrets(ctx context.Context, projectRef string, tree,
 	if removeoverridden {
 		q.Add("removeoverridden", "")
 	}
+	if start != "" {
+		q.Add("start", start)
+	}
+	if limit > 0 {
+		q.Add("limit", strconv.Itoa(limit))
+	}
+	if asc {
+		q.Add("asc", "")
+	}
+	if cursor != "" {
+		q.Add("cursor", cursor)
+	}
+
+	secrets := new(gwapitypes.SecretsResponse)
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s/secrets", url.PathEscape(projectRef)), q, jsonContent, nil, &secrets)
 	return secrets, resp, errors.WithStack(err)
 }
@@ -277,8 +311,7 @@ func (c *Client) DeleteProjectGroupVariable(ctx context.Context, projectGroupRef
 	return c.getResponse(ctx, "DELETE", path.Join("/projectgroups", url.PathEscape(projectGroupRef), "variables", variableName), nil, jsonContent, nil)
 }
 
-func (c *Client) GetProjectGroupVariables(ctx context.Context, projectRef string, tree, removeoverridden bool) ([]*gwapitypes.VariableResponse, *http.Response, error) {
-	variables := []*gwapitypes.VariableResponse{}
+func (c *Client) GetProjectGroupVariables(ctx context.Context, projectRef string, tree, removeoverridden bool, start string, asc bool, limit int, cursor string) (*gwapitypes.VariablesResponse, *http.Response, error) {
 	q := url.Values{}
 	if tree {
 		q.Add("tree", "")
@@ -286,7 +319,21 @@ func (c *Client) GetProjectGroupVariables(ctx context.Context, projectRef string
 	if removeoverridden {
 		q.Add("removeoverridden", "")
 	}
-	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s/variables", url.PathEscape(projectRef)), q, jsonContent, nil, &variables)
+	if start != "" {
+		q.Add("start", start)
+	}
+	if limit > 0 {
+		q.Add("limit", strconv.Itoa(limit))
+	}
+	if asc {
+		q.Add("asc", "")
+	}
+	if cursor != "" {
+		q.Add("cursor", cursor)
+	}
+
+	variables := new(gwapitypes.VariablesResponse)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s/variables", url.PathEscape(projectRef)), q, jsonContent, nil, variables)
 	return variables, resp, errors.WithStack(err)
 }
 
@@ -316,8 +363,7 @@ func (c *Client) DeleteProjectVariable(ctx context.Context, projectRef, variable
 	return c.getResponse(ctx, "DELETE", path.Join("/projects", url.PathEscape(projectRef), "variables", variableName), nil, jsonContent, nil)
 }
 
-func (c *Client) GetProjectVariables(ctx context.Context, projectRef string, tree, removeoverridden bool) ([]*gwapitypes.VariableResponse, *http.Response, error) {
-	variables := []*gwapitypes.VariableResponse{}
+func (c *Client) GetProjectVariables(ctx context.Context, projectRef string, tree, removeoverridden bool, start string, asc bool, limit int, cursor string) (*gwapitypes.VariablesResponse, *http.Response, error) {
 	q := url.Values{}
 	if tree {
 		q.Add("tree", "")
@@ -325,7 +371,21 @@ func (c *Client) GetProjectVariables(ctx context.Context, projectRef string, tre
 	if removeoverridden {
 		q.Add("removeoverridden", "")
 	}
-	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s/variables", url.PathEscape(projectRef)), q, jsonContent, nil, &variables)
+	if start != "" {
+		q.Add("start", start)
+	}
+	if limit > 0 {
+		q.Add("limit", strconv.Itoa(limit))
+	}
+	if asc {
+		q.Add("asc", "")
+	}
+	if cursor != "" {
+		q.Add("cursor", cursor)
+	}
+
+	variables := new(gwapitypes.VariablesResponse)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s/variables", url.PathEscape(projectRef)), q, jsonContent, nil, variables)
 	return variables, resp, errors.WithStack(err)
 }
 
@@ -358,7 +418,7 @@ func (c *Client) GetUser(ctx context.Context, userRef string) (*gwapitypes.UserR
 	return user, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetUsers(ctx context.Context, start string, limit int, asc bool) ([]*gwapitypes.PrivateUserResponse, *http.Response, error) {
+func (c *Client) GetUsers(ctx context.Context, start string, limit int, asc bool, cursor string) (*gwapitypes.PrivateUsersResponse, *http.Response, error) {
 	q := url.Values{}
 	if start != "" {
 		q.Add("start", start)
@@ -369,9 +429,12 @@ func (c *Client) GetUsers(ctx context.Context, start string, limit int, asc bool
 	if asc {
 		q.Add("asc", "")
 	}
+	if cursor != "" {
+		q.Add("cursor", cursor)
+	}
 
-	users := []*gwapitypes.PrivateUserResponse{}
-	resp, err := c.getParsedResponse(ctx, "GET", "/users", q, jsonContent, nil, &users)
+	users := new(gwapitypes.PrivateUsersResponse)
+	resp, err := c.getParsedResponse(ctx, "GET", "/users", q, jsonContent, nil, users)
 	return users, resp, errors.WithStack(err)
 }
 
@@ -381,12 +444,12 @@ func (c *Client) GetUserByLinkedAccountRemoteUserAndSource(ctx context.Context, 
 	q.Add("remoteuserid", remoteUserID)
 	q.Add("remotesourceref", remoteSourceRef)
 
-	users := []*gwapitypes.PrivateUserResponse{}
-	resp, err := c.getParsedResponse(ctx, "GET", "/users", q, jsonContent, nil, &users)
+	users := new(gwapitypes.PrivateUsersResponse)
+	resp, err := c.getParsedResponse(ctx, "GET", "/users", q, jsonContent, nil, users)
 	if err != nil {
 		return nil, resp, errors.WithStack(err)
 	}
-	return users[0], resp, errors.WithStack(err)
+	return users.Users[0], resp, errors.WithStack(err)
 }
 
 func (c *Client) CreateUser(ctx context.Context, req *gwapitypes.CreateUserRequest) (*gwapitypes.UserResponse, *http.Response, error) {
@@ -493,15 +556,15 @@ func (c *Client) getRunTask(ctx context.Context, groupType, groupRef string, run
 	return task, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetProjectRuns(ctx context.Context, projectRef string, phaseFilter, resultFilter []string, start uint64, limit int, asc bool) ([]*gwapitypes.RunsResponse, *http.Response, error) {
-	return c.getRuns(ctx, "projects", projectRef, phaseFilter, resultFilter, start, limit, asc)
+func (c *Client) GetProjectRuns(ctx context.Context, projectRef string, phaseFilter, resultFilter []string, start uint64, limit int, asc bool, cursor string) (*gwapitypes.RunsResponse, *http.Response, error) {
+	return c.getRuns(ctx, "projects", projectRef, phaseFilter, resultFilter, start, limit, asc, cursor)
 }
 
-func (c *Client) GetUserRuns(ctx context.Context, userRef string, phaseFilter, resultFilter []string, start uint64, limit int, asc bool) ([]*gwapitypes.RunsResponse, *http.Response, error) {
-	return c.getRuns(ctx, "users", userRef, phaseFilter, resultFilter, start, limit, asc)
+func (c *Client) GetUserRuns(ctx context.Context, userRef string, phaseFilter, resultFilter []string, start uint64, limit int, asc bool, cursor string) (*gwapitypes.RunsResponse, *http.Response, error) {
+	return c.getRuns(ctx, "users", userRef, phaseFilter, resultFilter, start, limit, asc, cursor)
 }
 
-func (c *Client) getRuns(ctx context.Context, groupType, groupRef string, phaseFilter, resultFilter []string, start uint64, limit int, asc bool) ([]*gwapitypes.RunsResponse, *http.Response, error) {
+func (c *Client) getRuns(ctx context.Context, groupType, groupRef string, phaseFilter, resultFilter []string, start uint64, limit int, asc bool, cursor string) (*gwapitypes.RunsResponse, *http.Response, error) {
 	q := url.Values{}
 	for _, phase := range phaseFilter {
 		q.Add("phase", phase)
@@ -518,9 +581,12 @@ func (c *Client) getRuns(ctx context.Context, groupType, groupRef string, phaseF
 	if asc {
 		q.Add("asc", "")
 	}
+	if cursor != "" {
+		q.Add("cursor", cursor)
+	}
 
-	getRunsResponse := []*gwapitypes.RunsResponse{}
-	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/%s/%s/runs", groupType, url.PathEscape(groupRef)), q, jsonContent, nil, &getRunsResponse)
+	getRunsResponse := new(gwapitypes.RunsResponse)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/%s/%s/runs", groupType, url.PathEscape(groupRef)), q, jsonContent, nil, getRunsResponse)
 	return getRunsResponse, resp, errors.WithStack(err)
 }
 
@@ -570,7 +636,7 @@ func (c *Client) GetRemoteSource(ctx context.Context, rsRef string) (*gwapitypes
 	return rs, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetRemoteSources(ctx context.Context, start string, limit int, asc bool) ([]*gwapitypes.RemoteSourceResponse, *http.Response, error) {
+func (c *Client) GetRemoteSources(ctx context.Context, start string, limit int, asc bool, cursor string) (*gwapitypes.RemoteSourcesResponse, *http.Response, error) {
 	q := url.Values{}
 	if start != "" {
 		q.Add("start", start)
@@ -581,9 +647,12 @@ func (c *Client) GetRemoteSources(ctx context.Context, start string, limit int, 
 	if asc {
 		q.Add("asc", "")
 	}
+	if cursor != "" {
+		q.Add("cursor", cursor)
+	}
 
-	rss := []*gwapitypes.RemoteSourceResponse{}
-	resp, err := c.getParsedResponse(ctx, "GET", "/remotesources", q, jsonContent, nil, &rss)
+	rss := new(gwapitypes.RemoteSourcesResponse)
+	resp, err := c.getParsedResponse(ctx, "GET", "/remotesources", q, jsonContent, nil, rss)
 	return rss, resp, errors.WithStack(err)
 }
 
@@ -619,8 +688,11 @@ func (c *Client) GetOrg(ctx context.Context, orgRef string) (*gwapitypes.OrgResp
 	return res, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetOrgs(ctx context.Context, start string, limit int, asc bool) ([]*gwapitypes.OrgResponse, *http.Response, error) {
+func (c *Client) GetOrgs(ctx context.Context, start string, limit int, asc bool, cursor string) (*gwapitypes.OrgsResponse, *http.Response, error) {
 	q := url.Values{}
+	if cursor != "" {
+		q.Add("cursor", cursor)
+	}
 	if start != "" {
 		q.Add("start", start)
 	}
@@ -631,8 +703,8 @@ func (c *Client) GetOrgs(ctx context.Context, start string, limit int, asc bool)
 		q.Add("asc", "")
 	}
 
-	orgs := []*gwapitypes.OrgResponse{}
-	resp, err := c.getParsedResponse(ctx, "GET", "/orgs", q, jsonContent, nil, &orgs)
+	orgs := new(gwapitypes.OrgsResponse)
+	resp, err := c.getParsedResponse(ctx, "GET", "/orgs", q, jsonContent, nil, orgs)
 	return orgs, resp, errors.WithStack(err)
 }
 
@@ -680,9 +752,20 @@ func (c *Client) RemoveOrgMember(ctx context.Context, orgRef, userRef string) (*
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/orgs/%s/members/%s", orgRef, userRef), nil, jsonContent, nil)
 }
 
-func (c *Client) GetOrgMembers(ctx context.Context, orgRef string) (*gwapitypes.OrgMembersResponse, *http.Response, error) {
+func (c *Client) GetOrgMembers(ctx context.Context, orgRef string, asc bool, limit int, cursor string) (*gwapitypes.OrgMembersResponse, *http.Response, error) {
+	q := url.Values{}
+	if cursor != "" {
+		q.Add("cursor", cursor)
+	}
+	if limit > 0 {
+		q.Add("limit", strconv.Itoa(limit))
+	}
+	if asc {
+		q.Add("asc", "")
+	}
+
 	res := &gwapitypes.OrgMembersResponse{}
-	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s/members", orgRef), nil, jsonContent, nil, &res)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s/members", orgRef), q, jsonContent, nil, &res)
 	return res, resp, errors.WithStack(err)
 }
 

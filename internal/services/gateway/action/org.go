@@ -39,7 +39,7 @@ type GetOrgsRequest struct {
 	Asc   bool
 }
 
-func (h *ActionHandler) GetOrgs(ctx context.Context, req *GetOrgsRequest) ([]*cstypes.Organization, error) {
+func (h *ActionHandler) GetOrgs(ctx context.Context, req *GetOrgsRequest) (*csapitypes.OrgsResponse, error) {
 	orgs, _, err := h.configstoreClient.GetOrgs(ctx, req.Start, req.Limit, req.Asc)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
@@ -50,6 +50,7 @@ func (h *ActionHandler) GetOrgs(ctx context.Context, req *GetOrgsRequest) ([]*cs
 type OrgMembersResponse struct {
 	Organization *cstypes.Organization
 	Members      []*OrgMemberResponse
+	HasMoreData  bool
 }
 
 type OrgMemberResponse struct {
@@ -57,22 +58,23 @@ type OrgMemberResponse struct {
 	Role cstypes.MemberRole
 }
 
-func (h *ActionHandler) GetOrgMembers(ctx context.Context, orgRef string) (*OrgMembersResponse, error) {
+func (h *ActionHandler) GetOrgMembers(ctx context.Context, orgRef string, start string, limit int, asc bool) (*OrgMembersResponse, error) {
 	org, _, err := h.configstoreClient.GetOrg(ctx, orgRef)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
 
-	orgMembers, _, err := h.configstoreClient.GetOrgMembers(ctx, orgRef)
+	orgMembers, _, err := h.configstoreClient.GetOrgMembers(ctx, orgRef, start, limit, asc)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
 
 	res := &OrgMembersResponse{
 		Organization: org,
-		Members:      make([]*OrgMemberResponse, len(orgMembers)),
+		Members:      make([]*OrgMemberResponse, len(orgMembers.OrgMembers)),
+		HasMoreData:  orgMembers.HasMoreData,
 	}
-	for i, orgMember := range orgMembers {
+	for i, orgMember := range orgMembers.OrgMembers {
 		res.Members[i] = &OrgMemberResponse{
 			User: orgMember.User,
 			Role: orgMember.Role,

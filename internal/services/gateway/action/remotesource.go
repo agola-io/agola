@@ -39,7 +39,7 @@ type GetRemoteSourcesRequest struct {
 	Asc   bool
 }
 
-func (h *ActionHandler) GetRemoteSources(ctx context.Context, req *GetRemoteSourcesRequest) ([]*cstypes.RemoteSource, error) {
+func (h *ActionHandler) GetRemoteSources(ctx context.Context, req *GetRemoteSourcesRequest) (*csapitypes.RemoteSourcesReponse, error) {
 	remoteSources, _, err := h.configstoreClient.GetRemoteSources(ctx, req.Start, req.Limit, req.Asc)
 	if err != nil {
 		return nil, errors.WithStack(err)

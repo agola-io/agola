@@ -17,6 +17,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
@@ -71,16 +72,47 @@ func (h *SecretsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	_, tree := query["tree"]
 
+	var limit int
+	limitS := query.Get("limit")
+	if limitS != "" {
+		var err error
+		limit, err = strconv.Atoi(limitS)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit")))
+			return
+		}
+	}
+	if limit < 0 {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0")))
+		return
+	}
+	asc := false
+	if _, ok := query["asc"]; ok {
+		asc = true
+	}
+	start := query.Get("start")
+
 	parentKind, parentRef, err := GetObjectKindRef(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	secrets, err := h.ah.GetSecrets(ctx, parentKind, parentRef, tree)
+	var hasMoreData bool
+	aLimit := limit
+	if aLimit != 0 {
+		aLimit++
+	}
+
+	secrets, err := h.ah.GetSecrets(ctx, parentKind, parentRef, tree, start, asc, aLimit)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
+	}
+
+	if limit != 0 && len(secrets) > limit {
+		hasMoreData = true
+		secrets = secrets[:limit]
 	}
 
 	resSecrets := make([]*csapitypes.Secret, len(secrets))
@@ -105,7 +137,11 @@ func (h *SecretsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, resSecrets); err != nil {
+	response := &csapitypes.SecretsResponse{
+		Secrets:     resSecrets,
+		HasMoreData: hasMoreData,
+	}
+	if err := util.HTTPResponse(w, http.StatusOK, response); err != nil {
 		h.log.Err(err).Send()
 	}
 }

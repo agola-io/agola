@@ -977,7 +977,7 @@ func TestProjectGroupDeleteDontSeeOldChildObjects(t *testing.T) {
 	}
 
 	// Get by projectgroup id
-	projects, err := cs.ah.GetProjectGroupProjects(ctx, spg01.ID)
+	projects, err := cs.ah.GetProjectGroupProjects(ctx, spg01.ID, "", 0)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -986,7 +986,7 @@ func TestProjectGroupDeleteDontSeeOldChildObjects(t *testing.T) {
 	}
 
 	// Get by projectgroup path
-	projects, err = cs.ah.GetProjectGroupProjects(ctx, path.Join("org", org.Name, pg01.Name, spg01.Name))
+	projects, err = cs.ah.GetProjectGroupProjects(ctx, path.Join("org", org.Name, pg01.Name, spg01.Name), "", 0)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -994,7 +994,7 @@ func TestProjectGroupDeleteDontSeeOldChildObjects(t *testing.T) {
 		t.Fatalf("mismatch (-want +got):\n%s", diff)
 	}
 
-	secrets, err := cs.ah.GetSecrets(ctx, types.ObjectKindProject, project.ID, false)
+	secrets, err := cs.ah.GetSecrets(ctx, types.ObjectKindProject, project.ID, false, "", false, 0)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -1002,7 +1002,7 @@ func TestProjectGroupDeleteDontSeeOldChildObjects(t *testing.T) {
 		t.Fatalf("mismatch (-want +got):\n%s", diff)
 	}
 
-	secrets, err = cs.ah.GetSecrets(ctx, types.ObjectKindProject, path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name), false)
+	secrets, err = cs.ah.GetSecrets(ctx, types.ObjectKindProject, path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name), false, "", false, 0)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -1010,7 +1010,7 @@ func TestProjectGroupDeleteDontSeeOldChildObjects(t *testing.T) {
 		t.Fatalf("mismatch (-want +got):\n%s", diff)
 	}
 
-	variables, err := cs.ah.GetVariables(ctx, types.ObjectKindProject, project.ID, false)
+	variables, err := cs.ah.GetVariables(ctx, types.ObjectKindProject, project.ID, false, "", false, 0)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -1018,7 +1018,7 @@ func TestProjectGroupDeleteDontSeeOldChildObjects(t *testing.T) {
 		t.Fatalf("mismatch (-want +got):\n%s", diff)
 	}
 
-	variables, err = cs.ah.GetVariables(ctx, types.ObjectKindProject, path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name), false)
+	variables, err = cs.ah.GetVariables(ctx, types.ObjectKindProject, path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name), false, "", false, 0)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}

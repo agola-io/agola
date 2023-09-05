@@ -26,7 +26,7 @@ import (
 // calculated considering also the related run service id (or use a global
 // sequential id generator).
 
-type RunsResponse struct {
+type Runs struct {
 	Number      uint64            `json:"number"`
 	Name        string            `json:"name"`
 	Annotations map[string]string `json:"annotations"`
@@ -38,6 +38,11 @@ type RunsResponse struct {
 	EnqueueTime *time.Time `json:"enqueue_time"`
 	StartTime   *time.Time `json:"start_time"`
 	EndTime     *time.Time `json:"end_time"`
+}
+
+type RunsResponse struct {
+	Runs   []*Runs
+	Cursor string
 }
 
 type RunResponse struct {

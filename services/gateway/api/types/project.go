@@ -42,6 +42,11 @@ type ProjectResponse struct {
 	DefaultBranch      string     `json:"default_branch,omitempty"`
 }
 
+type ProjectsResponse struct {
+	Projects []*ProjectResponse `json:"projects,omitempty"`
+	Cursor   string             `json:"cursor,omitempty"`
+}
+
 type ProjectCreateRunRequest struct {
 	Branch    string `json:"branch,omitempty"`
 	Tag       string `json:"tag,omitempty"`

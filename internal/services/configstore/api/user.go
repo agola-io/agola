@@ -220,6 +220,7 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	queryType := query.Get("query_type")
 
 	var users []*types.User
+	var hasMoreData bool
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		switch queryType {
 		case "bytoken":
@@ -264,7 +265,11 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		default:
 			// default query
 			var err error
-			users, err = h.d.GetUsers(tx, start, limit, asc)
+			qLimit := limit
+			if qLimit != 0 {
+				qLimit++
+			}
+			users, err = h.d.GetUsers(tx, start, qLimit, asc)
 			return errors.WithStack(err)
 		}
 
@@ -276,7 +281,16 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, users); err != nil {
+	if limit != 0 && len(users) > limit {
+		hasMoreData = true
+		users = users[:limit]
+	}
+
+	response := csapitypes.PrivateUsersResponse{
+		Users:       users,
+		HasMoreData: hasMoreData,
+	}
+	if err := util.HTTPResponse(w, http.StatusOK, response); err != nil {
 		h.log.Err(err).Send()
 	}
 }

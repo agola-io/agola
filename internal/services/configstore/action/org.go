@@ -38,7 +38,7 @@ func orgMemberResponse(orgUser *db.OrgUser) *OrgMemberResponse {
 	}
 }
 
-func (h *ActionHandler) GetOrgMembers(ctx context.Context, orgRef string) ([]*OrgMemberResponse, error) {
+func (h *ActionHandler) GetOrgMembers(ctx context.Context, orgRef string, start string, limit int, asc bool) ([]*OrgMemberResponse, error) {
 	var orgUsers []*db.OrgUser
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
@@ -50,7 +50,7 @@ func (h *ActionHandler) GetOrgMembers(ctx context.Context, orgRef string) ([]*Or
 			return util.NewAPIError(util.ErrNotExist, errors.Errorf("org %q doesn't exist", orgRef))
 		}
 
-		orgUsers, err = h.d.GetOrgUsers(tx, org.ID)
+		orgUsers, err = h.d.GetOrgUsers(tx, org.ID, start, limit, asc)
 		return errors.WithStack(err)
 	})
 	if err != nil {
@@ -211,7 +211,7 @@ func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 			return errors.WithStack(err)
 		}
 		for _, subgroup := range subgroups {
-			projects, err := h.d.GetProjectGroupProjects(tx, subgroup.ID)
+			projects, err := h.d.GetProjectGroupProjects(tx, subgroup.ID, "", 0)
 			if err != nil {
 				return errors.WithStack(err)
 			}

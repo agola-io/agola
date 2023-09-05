@@ -19,6 +19,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -52,6 +53,7 @@ import (
 	"agola.io/agola/internal/services/configstore"
 	"agola.io/agola/internal/services/executor"
 	"agola.io/agola/internal/services/gateway"
+	gwapi "agola.io/agola/internal/services/gateway/api"
 	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/services/gitserver"
 	"agola.io/agola/internal/services/notification"
@@ -79,6 +81,9 @@ const (
 	agolaOrg01 = "org01"
 	agolaOrg02 = "org02"
 	agolaOrg03 = "org03"
+
+	agolaProject01 = "project01"
+	agolaProject02 = "project02"
 
 	configstoreService = "configstore"
 	runserviceService  = "runservice"
@@ -1148,15 +1153,6 @@ func push(t *testing.T, config, cloneURL, remoteToken, message string, pushNewBr
 	}
 
 	t.Logf("sshurl: %s", cloneURL)
-	if err := r.Push(&git.PushOptions{
-		RemoteName: "origin",
-		Auth: &githttp.BasicAuth{
-			Username: giteaUser01,
-			Password: remoteToken,
-		},
-	}); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
 
 	if pushNewBranch {
 		// change worktree and push to a new branch
@@ -1196,6 +1192,16 @@ func push(t *testing.T, config, cloneURL, remoteToken, message string, pushNewBr
 			RefSpecs: []gitconfig.RefSpec{
 				gitconfig.RefSpec("refs/heads/new-branch:refs/heads/new-branch"),
 			},
+			Auth: &githttp.BasicAuth{
+				Username: giteaUser01,
+				Password: remoteToken,
+			},
+		}); err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+	} else {
+		if err := r.Push(&git.PushOptions{
+			RemoteName: "origin",
 			Auth: &githttp.BasicAuth{
 				Username: giteaUser01,
 				Password: remoteToken,
@@ -1375,15 +1381,15 @@ func TestPush(t *testing.T) {
 			push(t, tt.config, giteaRepo.CloneURL, giteaToken, tt.message, false)
 
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false, "")
 				if err != nil {
 					return false, nil
 				}
 
-				if len(runs) == 0 {
+				if len(runs.Runs) == 0 {
 					return false, nil
 				}
-				run := runs[0]
+				run := runs.Runs[0]
 				if run.Phase != rstypes.RunPhaseFinished {
 					return false, nil
 				}
@@ -1391,19 +1397,19 @@ func TestPush(t *testing.T) {
 				return true, nil
 			})
 
-			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false, "")
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
 
-			t.Logf("runs: %s", util.Dump(runs))
+			t.Logf("runs: %s", util.Dump(runs.Runs))
 
-			if len(runs) != tt.num {
-				t.Fatalf("expected %d run got: %d", tt.num, len(runs))
+			if len(runs.Runs) != tt.num {
+				t.Fatalf("expected %d run got: %d", tt.num, len(runs.Runs))
 			}
 
-			if len(runs) > 0 {
-				run := runs[0]
+			if len(runs.Runs) > 0 {
+				run := runs.Runs[0]
 				if run.Phase != rstypes.RunPhaseFinished {
 					t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, run.Phase)
 				}
@@ -1595,16 +1601,16 @@ func testDirectRun(t *testing.T, internalServicesAuth bool) {
 			directRun(t, dir, config, ConfigFormatJsonnet, sc.config.Gateway.APIExposedURL, token, tt.args...)
 
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
+				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false, "")
 				if err != nil {
 					return false, nil
 				}
 
-				if len(runs) != 1 {
+				if len(runs.Runs) != 1 {
 					return false, nil
 				}
 
-				run := runs[0]
+				run := runs.Runs[0]
 				if run.Phase != rstypes.RunPhaseFinished {
 					return false, nil
 				}
@@ -1612,18 +1618,18 @@ func testDirectRun(t *testing.T, internalServicesAuth bool) {
 				return true, nil
 			})
 
-			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false, "")
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
 
-			t.Logf("runs: %s", util.Dump(runs))
+			t.Logf("runs: %s", util.Dump(runs.Runs))
 
-			if len(runs) != 1 {
-				t.Fatalf("expected 1 run got: %d", len(runs))
+			if len(runs.Runs) != 1 {
+				t.Fatalf("expected 1 run got: %d", len(runs.Runs))
 			}
 
-			run := runs[0]
+			run := runs.Runs[0]
 			if run.Phase != rstypes.RunPhaseFinished {
 				t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, run.Phase)
 			}
@@ -1749,16 +1755,16 @@ func TestDirectRunVariables(t *testing.T) {
 
 			// TODO(sgotti) add an util to wait for a run phase
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
+				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false, "")
 				if err != nil {
 					return false, nil
 				}
 
-				if len(runs) != 1 {
+				if len(runs.Runs) != 1 {
 					return false, nil
 				}
 
-				run := runs[0]
+				run := runs.Runs[0]
 				if run.Phase != rstypes.RunPhaseFinished {
 					return false, nil
 				}
@@ -1766,18 +1772,18 @@ func TestDirectRunVariables(t *testing.T) {
 				return true, nil
 			})
 
-			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false, "")
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
 
-			t.Logf("runs: %s", util.Dump(runs))
+			t.Logf("runs: %s", util.Dump(runs.Runs))
 
-			if len(runs) != 1 {
-				t.Fatalf("expected 1 run got: %d", len(runs))
+			if len(runs.Runs) != 1 {
+				t.Fatalf("expected 1 run got: %d", len(runs.Runs))
 			}
 
-			run, _, err := gwClient.GetUserRun(ctx, user.ID, runs[0].Number)
+			run, _, err := gwClient.GetUserRun(ctx, user.ID, runs.Runs[0].Number)
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
@@ -1919,16 +1925,16 @@ func TestDirectRunLogs(t *testing.T) {
 			directRun(t, dir, config, ConfigFormatJsonnet, sc.config.Gateway.APIExposedURL, token)
 
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
+				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false, "")
 				if err != nil {
 					return false, nil
 				}
 
-				if len(runs) != 1 {
+				if len(runs.Runs) != 1 {
 					return false, nil
 				}
 
-				run := runs[0]
+				run := runs.Runs[0]
 				if run.Phase != rstypes.RunPhaseFinished {
 					return false, nil
 				}
@@ -1936,18 +1942,18 @@ func TestDirectRunLogs(t *testing.T) {
 				return true, nil
 			})
 
-			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false, "")
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
 
-			t.Logf("runs: %s", util.Dump(runs))
+			t.Logf("runs: %s", util.Dump(runs.Runs))
 
-			if len(runs) != 1 {
-				t.Fatalf("expected 1 run got: %d", len(runs))
+			if len(runs.Runs) != 1 {
+				t.Fatalf("expected 1 run got: %d", len(runs.Runs))
 			}
 
-			run, _, err := gwClient.GetUserRun(ctx, user.ID, runs[0].Number)
+			run, _, err := gwClient.GetUserRun(ctx, user.ID, runs.Runs[0].Number)
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
@@ -1968,7 +1974,7 @@ func TestDirectRunLogs(t *testing.T) {
 			}
 
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
-				t, _, err := gwClient.GetUserRunTask(ctx, user.ID, runs[0].Number, task.ID)
+				t, _, err := gwClient.GetUserRunTask(ctx, user.ID, runs.Runs[0].Number, task.ID)
 				if err != nil {
 					return false, nil
 				}
@@ -2246,15 +2252,15 @@ func TestPullRequest(t *testing.T) {
 				}
 			}
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false, "")
 				if err != nil {
 					return false, nil
 				}
 
-				if len(runs) == 0 {
+				if len(runs.Runs) == 0 {
 					return false, nil
 				}
-				run := runs[0]
+				run := runs.Runs[0]
 				if run.Phase != rstypes.RunPhaseFinished {
 					return false, nil
 				}
@@ -2262,14 +2268,14 @@ func TestPullRequest(t *testing.T) {
 				return true, nil
 			})
 
-			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false, "")
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
 
-			t.Logf("runs: %s", util.Dump(runs))
+			t.Logf("runs: %s", util.Dump(runs.Runs))
 
-			run, _, err := gwClient.GetProjectRun(ctx, project.ID, runs[0].Number)
+			run, _, err := gwClient.GetProjectRun(ctx, project.ID, runs.Runs[0].Number)
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
@@ -2282,8 +2288,8 @@ func TestPullRequest(t *testing.T) {
 				}
 			}
 
-			if len(runs) > 0 {
-				run := runs[0]
+			if len(runs.Runs) > 0 {
+				run := runs.Runs[0]
 				if run.Phase != rstypes.RunPhaseFinished {
 					t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, run.Phase)
 				}
@@ -2461,16 +2467,16 @@ def main(ctx):
 
 				// TODO(sgotti) add an util to wait for a run phase
 				_ = testutil.Wait(30*time.Second, func() (bool, error) {
-					runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
+					runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false, "")
 					if err != nil {
 						return false, nil
 					}
 
-					if len(runs) != 1 {
+					if len(runs.Runs) != 1 {
 						return false, nil
 					}
 
-					run := runs[0]
+					run := runs.Runs[0]
 					if run.Phase != rstypes.RunPhaseFinished {
 						return false, nil
 					}
@@ -2478,18 +2484,18 @@ def main(ctx):
 					return true, nil
 				})
 
-				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
+				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false, "")
 				if err != nil {
 					t.Fatalf("unexpected err: %v", err)
 				}
 
-				t.Logf("runs: %s", util.Dump(runs))
+				t.Logf("runs: %s", util.Dump(runs.Runs))
 
-				if len(runs) != 1 {
-					t.Fatalf("expected 1 run got: %d", len(runs))
+				if len(runs.Runs) != 1 {
+					t.Fatalf("expected 1 run got: %d", len(runs.Runs))
 				}
 
-				run, _, err := gwClient.GetUserRun(ctx, user.ID, runs[0].Number)
+				run, _, err := gwClient.GetUserRun(ctx, user.ID, runs.Runs[0].Number)
 				if err != nil {
 					t.Fatalf("unexpected err: %v", err)
 				}
@@ -2966,17 +2972,17 @@ func TestAddUpdateOrgUserMembers(t *testing.T) {
 		Role: gwapitypes.MemberRoleMember,
 	}
 
-	orgMembers, _, err := gwClient.GetOrgMembers(ctx, agolaOrg01)
+	orgMembers, _, err := gwClient.GetOrgMembers(ctx, agolaOrg01, false, 0, "")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	if orgMembers == nil {
 		t.Fatal("unexpected members nil")
 	}
-	if len(orgMembers.Members) != 1 {
-		t.Fatalf("expected Members len 1, got: %d", len(orgMembers.Members))
+	if len(orgMembers.OrgMembers) != 1 {
+		t.Fatalf("expected Members len 1, got: %d", len(orgMembers.OrgMembers))
 	}
-	if diff := cmp.Diff(*orgMembers.Members[0], expectedOrgMember); diff != "" {
+	if diff := cmp.Diff(*orgMembers.OrgMembers[0], expectedOrgMember); diff != "" {
 		t.Fatalf("org member mismatch (-expected +got):\n%s", diff)
 	}
 
@@ -2988,17 +2994,17 @@ func TestAddUpdateOrgUserMembers(t *testing.T) {
 
 	expectedOrgMember.Role = gwapitypes.MemberRoleOwner
 
-	orgMembers, _, err = gwClient.GetOrgMembers(ctx, agolaOrg01)
+	orgMembers, _, err = gwClient.GetOrgMembers(ctx, agolaOrg01, false, 0, "")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	if orgMembers == nil {
 		t.Fatal("unexpected members nil")
 	}
-	if len(orgMembers.Members) != 1 {
-		t.Fatalf("expected Members len 1, got: %d", len(orgMembers.Members))
+	if len(orgMembers.OrgMembers) != 1 {
+		t.Fatalf("expected Members len 1, got: %d", len(orgMembers.OrgMembers))
 	}
-	if diff := cmp.Diff(*orgMembers.Members[0], expectedOrgMember); diff != "" {
+	if diff := cmp.Diff(*orgMembers.OrgMembers[0], expectedOrgMember); diff != "" {
 		t.Fatalf("org member mismatch (-expected +got):\n%s", diff)
 	}
 }
@@ -3254,12 +3260,12 @@ func TestOrgInvitation(t *testing.T) {
 					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 				}
 
-				org01Members, _, err := tc.gwClientUser01.GetOrgMembers(ctx, agolaOrg01)
+				org01Members, _, err := tc.gwClientUser01.GetOrgMembers(ctx, agolaOrg01, false, 0, "")
 				if err != nil {
 					t.Fatalf("unexpected err: %v", err)
 				}
-				if len(org01Members.Members) != 2 {
-					t.Fatalf("expected 2 members got: %d", len(org01Members.Members))
+				if len(org01Members.OrgMembers) != 2 {
+					t.Fatalf("expected 2 members got: %d", len(org01Members.OrgMembers))
 				}
 			},
 		},
@@ -3395,12 +3401,12 @@ func TestOrgInvitation(t *testing.T) {
 					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 				}
 
-				orgMembers, _, err := gwClientUser01.GetOrgMembers(ctx, agolaOrg01)
+				orgMembers, _, err := gwClientUser01.GetOrgMembers(ctx, agolaOrg01, false, 0, "")
 				if err != nil {
 					t.Fatalf("unexpected err: %v", err)
 				}
-				if len(orgMembers.Members) != 2 {
-					t.Fatalf("expected 2 members got: %d", len(orgMembers.Members))
+				if len(orgMembers.OrgMembers) != 2 {
+					t.Fatalf("expected 2 members got: %d", len(orgMembers.OrgMembers))
 				}
 			},
 		},
@@ -3648,11 +3654,11 @@ func TestGetUsers(t *testing.T) {
 					{ID: user01.ID, UserName: user01.UserName, Tokens: []string{}, LinkedAccounts: []*gwapitypes.LinkedAccountResponse{}},
 					{ID: user02.ID, UserName: user02.UserName, Tokens: []string{}, LinkedAccounts: []*gwapitypes.LinkedAccountResponse{}},
 				}
-				users, _, err := gwClient.GetUsers(ctx, "", 0, true)
+				users, _, err := gwClient.GetUsers(ctx, "", 0, true, "")
 				if err != nil {
 					t.Fatalf("unexpected err: %v", err)
 				}
-				if diff := cmp.Diff(expectedUsers, users); diff != "" {
+				if diff := cmp.Diff(expectedUsers, users.Users); diff != "" {
 					t.Fatalf("users mismatch (-want +got):\n%s", diff)
 				}
 			},
@@ -3664,7 +3670,7 @@ func TestGetUsers(t *testing.T) {
 
 				gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, user01Token)
 
-				_, _, err := gwClient.GetUsers(ctx, "", 0, true)
+				_, _, err := gwClient.GetUsers(ctx, "", 0, true, "")
 				expectedErr := "remote error unauthorized"
 				if err == nil {
 					t.Fatalf("expected error %v, got nil err", expectedErr)
@@ -4007,15 +4013,15 @@ func TestExportImport(t *testing.T) {
 	push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
 	_ = testutil.Wait(30*time.Second, func() (bool, error) {
-		runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+		runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false, "")
 		if err != nil {
 			return false, nil
 		}
 
-		if len(runs) == 0 {
+		if len(runs.Runs) == 0 {
 			return false, nil
 		}
-		run := runs[0]
+		run := runs.Runs[0]
 		if run.Phase != rstypes.RunPhaseFinished {
 			return false, nil
 		}
@@ -4023,17 +4029,17 @@ func TestExportImport(t *testing.T) {
 		return true, nil
 	})
 
-	runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+	runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false, "")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	if len(runs) != 1 {
-		t.Fatalf("expected %d run got: %d", 1, len(runs))
+	if len(runs.Runs) != 1 {
+		t.Fatalf("expected %d run got: %d", 1, len(runs.Runs))
 	}
 
 	gwClient = gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
 
-	users, _, err := gwClient.GetUsers(ctx, "", 0, false)
+	users, _, err := gwClient.GetUsers(ctx, "", 0, false, "")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -4043,12 +4049,12 @@ func TestExportImport(t *testing.T) {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	remotesources, _, err := gwClient.GetRemoteSources(ctx, "", 0, false)
+	remotesources, _, err := gwClient.GetRemoteSources(ctx, "", 0, false, "")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	user01Projects, _, err := gwClient.GetProjectGroupProjects(ctx, "user/user01")
+	user01Projects, _, err := gwClient.GetProjectGroupProjects(ctx, "user/user01", 0, "")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -4175,7 +4181,7 @@ func TestExportImport(t *testing.T) {
 		return true, nil
 	})
 
-	impUsers, _, err := gwClient.GetUsers(ctx, "", 0, false)
+	impUsers, _, err := gwClient.GetUsers(ctx, "", 0, false, "")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -4191,7 +4197,7 @@ func TestExportImport(t *testing.T) {
 		t.Fatalf("projectgroup mismatch (-want +got):\n%s", diff)
 	}
 
-	impRemotesources, _, err := gwClient.GetRemoteSources(ctx, "", 0, false)
+	impRemotesources, _, err := gwClient.GetRemoteSources(ctx, "", 0, false, "")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -4199,7 +4205,7 @@ func TestExportImport(t *testing.T) {
 		t.Fatalf("remotesources mismatch (-want +got):\n%s", diff)
 	}
 
-	impUser01Projects, _, err := gwClient.GetProjectGroupProjects(ctx, "user/user01")
+	impUser01Projects, _, err := gwClient.GetProjectGroupProjects(ctx, "user/user01", 0, "")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -4207,7 +4213,7 @@ func TestExportImport(t *testing.T) {
 		t.Fatalf("user01 projects mismatch (-want +got):\n%s", diff)
 	}
 
-	impRuns, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+	impRuns, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false, "")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -4215,12 +4221,12 @@ func TestExportImport(t *testing.T) {
 		t.Fatalf("runs mismatch (-want +got):\n%s", diff)
 	}
 
-	orgs, _, err := gwClient.GetOrgs(ctx, "", 0, false)
+	orgs, _, err := gwClient.GetOrgs(ctx, "", 0, false, "")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	if len(orgs) != 0 {
-		t.Fatalf("expected 0 orgs got: %d", len(orgs))
+	if len(orgs.Orgs) != 0 {
+		t.Fatalf("expected 0 orgs got: %d", len(orgs.Orgs))
 	}
 }
 
@@ -4316,15 +4322,15 @@ func TestGetProjectRuns(t *testing.T) {
 			push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false, "")
 				if err != nil {
 					return false, nil
 				}
 
-				if len(runs) == 0 {
+				if len(runs.Runs) == 0 {
 					return false, nil
 				}
-				run := runs[0]
+				run := runs.Runs[0]
 				if run.Phase != rstypes.RunPhaseFinished {
 					return false, nil
 				}
@@ -4332,19 +4338,19 @@ func TestGetProjectRuns(t *testing.T) {
 				return true, nil
 			})
 
-			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, tt.phaseFilter, tt.resultFilter, 0, 0, false)
+			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, tt.phaseFilter, tt.resultFilter, 0, 0, false, "")
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
 
 			t.Logf("runs: %s", util.Dump(runs))
 
-			if len(runs) != tt.num {
-				t.Fatalf("expected %d run got: %d", tt.num, len(runs))
+			if len(runs.Runs) != tt.num {
+				t.Fatalf("expected %d run got: %d", tt.num, len(runs.Runs))
 			}
 
-			if len(runs) > 0 {
-				run := runs[0]
+			if len(runs.Runs) > 0 {
+				run := runs.Runs[0]
 				if run.Phase != rstypes.RunPhaseFinished {
 					t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, run.Phase)
 				}
@@ -4474,37 +4480,37 @@ func TestRunEventsNotification(t *testing.T) {
 			push(t, tt.config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false, "")
 				if err != nil {
 					return false, nil
 				}
 
-				if len(runs) == 0 {
+				if len(runs.Runs) == 0 {
 					return false, nil
 				}
-				if runs[0].Phase != tt.expectedRunPhase {
+				if runs.Runs[0].Phase != tt.expectedRunPhase {
 					return false, nil
 				}
 
 				return true, nil
 			})
 
-			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false, "")
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
-			if len(runs) != 1 {
-				t.Fatalf("expected %d run got: %d", 1, len(runs))
+			if len(runs.Runs) != 1 {
+				t.Fatalf("expected %d run got: %d", 1, len(runs.Runs))
 			}
 
-			if runs[0].Phase != tt.expectedRunPhase {
-				t.Fatalf("expected run phase %q, got %q", tt.expectedRunPhase, runs[0].Phase)
+			if runs.Runs[0].Phase != tt.expectedRunPhase {
+				t.Fatalf("expected run phase %q, got %q", tt.expectedRunPhase, runs.Runs[0].Phase)
 			}
-			if runs[0].Result != tt.expectedRunResult {
-				t.Fatalf("expected run result %q, got %q", tt.expectedRunResult, runs[0].Result)
+			if runs.Runs[0].Result != tt.expectedRunResult {
+				t.Fatalf("expected run result %q, got %q", tt.expectedRunResult, runs.Runs[0].Result)
 			}
 
-			run, _, err := gwClient.GetProjectRun(ctx, project.ID, runs[0].Number)
+			run, _, err := gwClient.GetProjectRun(ctx, project.ID, runs.Runs[0].Number)
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
@@ -4593,5 +4599,641 @@ func TestRunEventsNotification(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestOrgsCursor(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sc := setup(ctx, t, dir)
+	defer sc.stop()
+
+	gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, "admintoken")
+
+	org01, _, err := gwClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg01, Visibility: gwapitypes.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	org02, _, err := gwClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg02, Visibility: gwapitypes.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	cursor := gwapi.OrgsCursor{
+		LastOrgID: org01.ID,
+		Asc:       true,
+	}
+	serializedCursor, err := json.Marshal(&cursor)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedCursorS := base64.StdEncoding.EncodeToString(serializedCursor)
+
+	orgsResponse, _, err := gwClient.GetOrgs(ctx, "", 1, true, "")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(orgsResponse.Orgs) != 1 {
+		t.Fatalf("expected %d org got: %d", 1, len(orgsResponse.Orgs))
+	}
+	if diff := cmp.Diff(orgsResponse.Orgs[0], org01); diff != "" {
+		t.Fatalf("org mismatch (-expected +got):\n%s", diff)
+	}
+	if orgsResponse.Cursor != expectedCursorS {
+		t.Fatalf("expected cursor %s, got %s", expectedCursorS, orgsResponse.Cursor)
+	}
+
+	orgsResponse, _, err = gwClient.GetOrgs(ctx, "", 1, true, orgsResponse.Cursor)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if diff := cmp.Diff(orgsResponse.Orgs[0], org02); diff != "" {
+		t.Fatalf("org mismatch (-expected +got):\n%s", diff)
+	}
+	if orgsResponse.Cursor != "" {
+		t.Fatalf("expected cursor empty, got %s", orgsResponse.Cursor)
+	}
+}
+
+func TestOrgMembersCursor(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sc := setup(ctx, t, dir)
+	defer sc.stop()
+
+	gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, "admintoken")
+
+	_, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	_, _, err = gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser02})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	_, _, err = gwClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg01, Visibility: gwapitypes.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	orgMember01, _, err := gwClient.AddOrgMember(ctx, agolaOrg01, agolaUser01, gwapitypes.MemberRoleMember)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	orgMember02, _, err := gwClient.AddOrgMember(ctx, agolaOrg01, agolaUser02, gwapitypes.MemberRoleMember)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	cursor := gwapi.OrgMembersCursor{
+		LastOrgUserID: orgMember01.User.ID,
+		Asc:           true,
+	}
+	serializedCursor, err := json.Marshal(&cursor)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedCursorS := base64.StdEncoding.EncodeToString(serializedCursor)
+
+	orgMembers, _, err := gwClient.GetOrgMembers(ctx, agolaOrg01, true, 1, "")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(orgMembers.OrgMembers) != 1 {
+		t.Fatalf("expected %d org got: %d", 1, len(orgMembers.OrgMembers))
+	}
+	if diff := cmp.Diff(*orgMembers.OrgMembers[0], orgMember01.OrgMemberResponse); diff != "" {
+		t.Fatalf("org mismatch (-expected +got):\n%s", diff)
+	}
+	if orgMembers.Cursor != expectedCursorS {
+		t.Fatalf("expected cursor %s, got %s", expectedCursorS, orgMembers.Cursor)
+	}
+
+	orgMembers, _, err = gwClient.GetOrgMembers(ctx, agolaOrg01, true, 1, orgMembers.Cursor)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(orgMembers.OrgMembers) != 1 {
+		t.Fatalf("expected %d org got: %d", 1, len(orgMembers.OrgMembers))
+	}
+	if diff := cmp.Diff(*orgMembers.OrgMembers[0], orgMember02.OrgMemberResponse); diff != "" {
+		t.Fatalf("org mismatch (-expected +got):\n%s", diff)
+	}
+	if orgMembers.Cursor != "" {
+		t.Fatalf("expected cursor empty, got %s", orgMembers.Cursor)
+	}
+}
+
+func TestRunsCursor(t *testing.T) {
+	t.Parallel()
+
+	config := `
+			{
+			  runs: [
+			    {
+			      name: 'run01',
+			      tasks: [
+			        {
+			          name: 'task01',
+			          runtime: {
+			            containers: [
+			              {
+			                image: 'alpine/git',
+			              },
+			            ],
+			          },
+			          steps: [
+			            { type: 'clone' },
+			            { type: 'run', command: 'env' },
+			          ],
+			        },
+			      ],
+			    },
+			  ],
+			}
+			`
+
+	dir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sc := setup(ctx, t, dir, withGitea(true))
+	defer sc.stop()
+
+	giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+
+	giteaToken, token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+
+	giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
+
+	giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)
+
+	push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
+
+	push(t, config, giteaRepo.CloneURL, giteaToken, "commit", true)
+
+	_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false, "")
+		if err != nil {
+			return false, nil
+		}
+
+		if len(runs.Runs) != 2 {
+			return false, nil
+		}
+
+		return true, nil
+	})
+
+	cursor := gwapi.RunsCursor{
+		LastRunNumber: 1,
+		Asc:           true,
+	}
+	serializedCursor, err := json.Marshal(&cursor)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedCursorS := base64.StdEncoding.EncodeToString(serializedCursor)
+
+	runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 1, true, "")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(runs.Runs) != 1 {
+		t.Fatalf("expected %d run got: %d", 1, len(runs.Runs))
+	}
+	if runs.Cursor != expectedCursorS {
+		t.Fatalf("expected cursor %s, got %s", expectedCursorS, runs.Cursor)
+	}
+
+	runs, _, err = gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 1, true, runs.Cursor)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(runs.Runs) != 1 {
+		t.Fatalf("expected %d run got: %d", 1, len(runs.Runs))
+	}
+	if runs.Cursor != "" {
+		t.Fatalf("expected cursor empy, got %s", runs.Cursor)
+	}
+}
+
+func TestProjectgroupProjectsCursor(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sc := setup(ctx, t, dir, withGitea(true))
+	defer sc.stop()
+
+	giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+
+	giteaToken, token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+
+	giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
+
+	_, _, err = gwClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg01, Visibility: gwapitypes.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	_, _, err = giteaClient.CreateRepo(gitea.CreateRepoOption{
+		Name:    "repo01",
+		Private: false,
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	project01, _, err := gwClient.CreateProject(ctx, &gwapitypes.CreateProjectRequest{
+		Name:             agolaProject01,
+		ParentRef:        path.Join("org", agolaOrg01),
+		RemoteSourceName: "gitea",
+		RepoPath:         path.Join(giteaUser01, "repo01"),
+		Visibility:       gwapitypes.VisibilityPublic,
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	project02, _, err := gwClient.CreateProject(ctx, &gwapitypes.CreateProjectRequest{
+		Name:             agolaProject02,
+		ParentRef:        path.Join("org", agolaOrg01),
+		RemoteSourceName: "gitea",
+		RepoPath:         path.Join(giteaUser01, "repo01"),
+		Visibility:       gwapitypes.VisibilityPublic,
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	cursor := gwapi.ProjectGroupProjectsCursor{
+		LastProjectID: project01.ID,
+	}
+	serializedCursor, err := json.Marshal(&cursor)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedCursorS := base64.StdEncoding.EncodeToString(serializedCursor)
+
+	projects, _, err := gwClient.GetProjectGroupProjects(ctx, path.Join("org", agolaOrg01), 1, "")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(projects.Projects) != 1 {
+		t.Fatalf("expected %d run got: %d", 1, len(projects.Projects))
+	}
+	if diff := cmp.Diff(projects.Projects[0], project01); diff != "" {
+		t.Fatalf("project mismatch (-expected +got):\n%s", diff)
+	}
+	if projects.Cursor != expectedCursorS {
+		t.Fatalf("expected cursor %s, got %s", expectedCursorS, projects.Cursor)
+	}
+
+	projects, _, err = gwClient.GetProjectGroupProjects(ctx, path.Join("org", agolaOrg01), 1, projects.Cursor)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(projects.Projects) != 1 {
+		t.Fatalf("expected %d run got: %d", 1, len(projects.Projects))
+	}
+	if diff := cmp.Diff(projects.Projects[0], project02); diff != "" {
+		t.Fatalf("project mismatch (-expected +got):\n%s", diff)
+	}
+	if projects.Cursor != "" {
+		t.Fatalf("expected cursor empty, got %s", projects.Cursor)
+	}
+}
+
+func TestUsersCursor(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sc := setup(ctx, t, dir)
+	defer sc.stop()
+
+	gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, "admintoken")
+
+	user01, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedUser01 := &gwapitypes.PrivateUserResponse{
+		ID:             user01.ID,
+		UserName:       user01.UserName,
+		Tokens:         []string{},
+		LinkedAccounts: []*gwapitypes.LinkedAccountResponse{},
+	}
+
+	user02, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser02})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedUser02 := &gwapitypes.PrivateUserResponse{
+		ID:             user02.ID,
+		UserName:       user02.UserName,
+		Tokens:         []string{},
+		LinkedAccounts: []*gwapitypes.LinkedAccountResponse{},
+	}
+
+	cursor := gwapi.UsersCursor{
+		LastUserID: user01.ID,
+		Asc:        true,
+	}
+	serializedCursor, err := json.Marshal(&cursor)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedCursorS := base64.StdEncoding.EncodeToString(serializedCursor)
+
+	users, _, err := gwClient.GetUsers(ctx, "", 1, true, "")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(users.Users) != 1 {
+		t.Fatalf("expected %d run got: %d", 1, len(users.Users))
+	}
+	if diff := cmp.Diff(users.Users[0], expectedUser01); diff != "" {
+		t.Fatalf("user mismatch (-expected +got):\n%s", diff)
+	}
+	if users.Cursor != expectedCursorS {
+		t.Fatalf("expected cursor %s, got %s", expectedCursorS, users.Cursor)
+	}
+
+	users, _, err = gwClient.GetUsers(ctx, "", 1, true, users.Cursor)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(users.Users) != 1 {
+		t.Fatalf("expected %d run got: %d", 1, len(users.Users))
+	}
+	if diff := cmp.Diff(users.Users[0], expectedUser02); diff != "" {
+		t.Fatalf("user mismatch (-expected +got):\n%s", diff)
+	}
+	if users.Cursor != "" {
+		t.Fatalf("expected cursor empty, got %s", users.Cursor)
+	}
+}
+
+func TestRemoteSourcesCursor(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sc := setup(ctx, t, dir)
+	defer sc.stop()
+
+	gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, "admintoken")
+
+	remoteSource01, _, err := gwClient.CreateRemoteSource(ctx, &gwapitypes.CreateRemoteSourceRequest{
+		Name:                "gitea01",
+		APIURL:              "http://test",
+		Type:                "gitea",
+		AuthType:            "password",
+		SkipSSHHostKeyCheck: true,
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	remoteSource02, _, err := gwClient.CreateRemoteSource(ctx, &gwapitypes.CreateRemoteSourceRequest{
+		Name:                "gitea02",
+		APIURL:              "http://test",
+		Type:                "gitea",
+		AuthType:            "password",
+		SkipSSHHostKeyCheck: true,
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	cursor := gwapi.RemoteSourcesCursor{
+		LastRemoteSourceID: remoteSource01.ID,
+		Asc:                true,
+	}
+	serializedCursor, err := json.Marshal(&cursor)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedCursorS := base64.StdEncoding.EncodeToString(serializedCursor)
+
+	remoteSources, _, err := gwClient.GetRemoteSources(ctx, "", 1, true, "")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(remoteSources.RemoteSources) != 1 {
+		t.Fatalf("expected %d remoteSource got: %d", 1, len(remoteSources.RemoteSources))
+	}
+	if diff := cmp.Diff(remoteSources.RemoteSources[0], remoteSource01); diff != "" {
+		t.Fatalf("user mismatch (-expected +got):\n%s", diff)
+	}
+	if remoteSources.Cursor != expectedCursorS {
+		t.Fatalf("expected cursor %s, got %s", expectedCursorS, remoteSources.Cursor)
+	}
+
+	remoteSources, _, err = gwClient.GetRemoteSources(ctx, "", 1, true, remoteSources.Cursor)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(remoteSources.RemoteSources) != 1 {
+		t.Fatalf("expected %d run got: %d", 1, len(remoteSources.RemoteSources))
+	}
+	if diff := cmp.Diff(remoteSources.RemoteSources[0], remoteSource02); diff != "" {
+		t.Fatalf("user mismatch (-expected +got):\n%s", diff)
+	}
+	if remoteSources.Cursor != "" {
+		t.Fatalf("expected cursor empty, got %s", remoteSources.Cursor)
+	}
+}
+
+func TestSecretsCursor(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sc := setup(ctx, t, dir)
+	defer sc.stop()
+
+	gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, "admintoken")
+
+	_, _, err := gwClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg01, Visibility: gwapitypes.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	secret01, _, err := gwClient.CreateProjectGroupSecret(ctx, path.Join("org", agolaOrg01), &gwapitypes.CreateSecretRequest{
+		Name: "secret01",
+		Type: gwapitypes.SecretTypeInternal,
+		Data: map[string]string{"key": "value"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	secret01.ParentPath = path.Join("org", agolaOrg01)
+
+	secret02, _, err := gwClient.CreateProjectGroupSecret(ctx, path.Join("org", agolaOrg01), &gwapitypes.CreateSecretRequest{
+		Name: "secret02",
+		Type: gwapitypes.SecretTypeInternal,
+		Data: map[string]string{"key": "value"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	secret02.ParentPath = path.Join("org", agolaOrg01)
+
+	cursor := gwapi.SecretsCursor{
+		LastSecretName: secret01.Name,
+		Asc:            true,
+	}
+	serializedCursor, err := json.Marshal(&cursor)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedCursorS := base64.StdEncoding.EncodeToString(serializedCursor)
+
+	secrets, _, err := gwClient.GetProjectGroupSecrets(ctx, path.Join("org", agolaOrg01), false, false, "", true, 1, "")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(secrets.Secrets) != 1 {
+		t.Fatalf("expected %d secret got: %d", 1, len(secrets.Secrets))
+	}
+	if diff := cmp.Diff(secrets.Secrets[0], secret01); diff != "" {
+		t.Fatalf("user mismatch (-expected +got):\n%s", diff)
+	}
+	if secrets.Cursor != expectedCursorS {
+		t.Fatalf("expected cursor %s, got %s", expectedCursorS, secrets.Cursor)
+	}
+
+	secrets, _, err = gwClient.GetProjectGroupSecrets(ctx, path.Join("org", agolaOrg01), false, false, "", true, 1, secrets.Cursor)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(secrets.Secrets) != 1 {
+		t.Fatalf("expected %d run got: %d", 1, len(secrets.Secrets))
+	}
+	if diff := cmp.Diff(secrets.Secrets[0], secret02); diff != "" {
+		t.Fatalf("user mismatch (-expected +got):\n%s", diff)
+	}
+	if secrets.Cursor != "" {
+		t.Fatalf("expected cursor empty, got %s", secrets.Cursor)
+	}
+}
+
+func TestVariablesCursor(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sc := setup(ctx, t, dir)
+	defer sc.stop()
+
+	gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, "admintoken")
+
+	_, _, err := gwClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg01, Visibility: gwapitypes.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	variable01, _, err := gwClient.CreateProjectGroupVariable(ctx, path.Join("org", agolaOrg01), &gwapitypes.CreateVariableRequest{
+		Name: "variable01",
+		Values: []gwapitypes.VariableValueRequest{
+			{
+				SecretName: "secret01",
+				SecretVar:  "secretvar",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	variable01.ParentPath = path.Join("org", agolaOrg01)
+
+	variable02, _, err := gwClient.CreateProjectGroupVariable(ctx, path.Join("org", agolaOrg01), &gwapitypes.CreateVariableRequest{
+		Name: "variable02",
+		Values: []gwapitypes.VariableValueRequest{
+			{
+				SecretName: "secret01",
+				SecretVar:  "secretvar",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	variable02.ParentPath = path.Join("org", agolaOrg01)
+
+	cursor := gwapi.VariablesCursor{
+		LastVariableName: variable01.Name,
+		Asc:              true,
+	}
+	serializedCursor, err := json.Marshal(&cursor)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	expectedCursorS := base64.StdEncoding.EncodeToString(serializedCursor)
+
+	variables, _, err := gwClient.GetProjectGroupVariables(ctx, path.Join("org", agolaOrg01), false, false, "", true, 1, "")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(variables.Variables) != 1 {
+		t.Fatalf("expected %d secret got: %d", 1, len(variables.Variables))
+	}
+	if diff := cmp.Diff(variables.Variables[0], variable01); diff != "" {
+		t.Fatalf("user mismatch (-expected +got):\n%s", diff)
+	}
+	if variables.Cursor != expectedCursorS {
+		t.Fatalf("expected cursor %s, got %s", expectedCursorS, variables.Cursor)
+	}
+
+	variables, _, err = gwClient.GetProjectGroupVariables(ctx, path.Join("org", agolaOrg01), false, false, "", true, 1, variables.Cursor)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(variables.Variables) != 1 {
+		t.Fatalf("expected %d run got: %d", 1, len(variables.Variables))
+	}
+	if diff := cmp.Diff(variables.Variables[0], variable02); diff != "" {
+		t.Fatalf("user mismatch (-expected +got):\n%s", diff)
+	}
+	if variables.Cursor != "" {
+		t.Fatalf("expected cursor empty, got %s", variables.Cursor)
 	}
 }

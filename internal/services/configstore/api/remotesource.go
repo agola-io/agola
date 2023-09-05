@@ -224,10 +224,16 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 
 	start := query.Get("start")
 
+	var hasMoreData bool
+	qLimit := limit
+	if qLimit != 0 {
+		qLimit++
+	}
+
 	var remoteSources []*types.RemoteSource
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		remoteSources, err = h.d.GetRemoteSources(tx, start, limit, asc)
+		remoteSources, err = h.d.GetRemoteSources(tx, start, qLimit, asc)
 		return errors.WithStack(err)
 	})
 	if err != nil {
@@ -236,7 +242,16 @@ func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, remoteSources); err != nil {
+	if limit != 0 && len(remoteSources) > limit {
+		hasMoreData = true
+		remoteSources = remoteSources[:limit]
+	}
+
+	response := csapitypes.RemoteSourcesReponse{
+		RemoteSources: remoteSources,
+		HasMoreData:   hasMoreData,
+	}
+	if err := util.HTTPResponse(w, http.StatusOK, response); err != nil {
 		h.log.Err(err).Send()
 	}
 }

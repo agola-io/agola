@@ -15,6 +15,7 @@
 package api
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -286,8 +287,8 @@ const (
 	MaxRunsLimit     = 40
 )
 
-func createRunsResponse(r *rstypes.Run) *gwapitypes.RunsResponse {
-	run := &gwapitypes.RunsResponse{
+func createRunsResponse(r *rstypes.Run) *gwapitypes.Runs {
+	run := &gwapitypes.Runs{
 		Number:      r.Counter,
 		Name:        r.Name,
 		Annotations: r.Annotations,
@@ -302,6 +303,14 @@ func createRunsResponse(r *rstypes.Run) *gwapitypes.RunsResponse {
 	}
 
 	return run
+}
+
+type RunsCursor struct {
+	LastRunNumber uint64
+	Asc           bool
+	SubGroup      string
+	PhaseFilter   []string
+	ResultFilter  []string
 }
 
 type RunsHandler struct {
@@ -332,12 +341,54 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ref = vars["userref"]
 	}
 
-	subGroup := q.Get("subgroup")
-	phaseFilter := q["phase"]
-	resultFilter := q["result"]
+	cursorS := q.Get("cursor")
+	var startRunNumber uint64
+	var asc bool
+	var subGroup string
+	var phaseFilter []string
+	var resultFilter []string
 
-	limitS := q.Get("limit")
+	if cursorS != "" {
+		decodedCursor, err := base64.StdEncoding.DecodeString(cursorS)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot decode cursor")))
+			return
+		}
+
+		var cursor RunsCursor
+		if err := json.Unmarshal(decodedCursor, &cursor); err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot unmarshal cursor")))
+			return
+		}
+
+		startRunNumber = cursor.LastRunNumber
+		asc = cursor.Asc
+		subGroup = cursor.SubGroup
+		phaseFilter = cursor.PhaseFilter
+		resultFilter = cursor.ResultFilter
+	} else {
+		subGroup = q.Get("subgroup")
+		phaseFilter = q["phase"]
+		resultFilter = q["result"]
+
+		if _, ok := q["asc"]; ok {
+			asc = true
+		}
+
+		startRunNumberStr := q.Get("start")
+
+		if startRunNumberStr != "" {
+			var err error
+			startRunNumber, err = strconv.ParseUint(startRunNumberStr, 10, 64)
+			if err != nil {
+				util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse run number")))
+				return
+			}
+		}
+	}
+
 	limit := DefaultRunsLimit
+	limitS := q.Get("limit")
 	if limitS != "" {
 		var err error
 		limit, err = strconv.Atoi(limitS)
@@ -352,22 +403,6 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if limit > MaxRunsLimit {
 		limit = MaxRunsLimit
-	}
-	asc := false
-	if _, ok := q["asc"]; ok {
-		asc = true
-	}
-
-	startRunNumberStr := q.Get("start")
-
-	var startRunNumber uint64
-	if startRunNumberStr != "" {
-		var err error
-		startRunNumber, err = strconv.ParseUint(startRunNumberStr, 10, 64)
-		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse run number")))
-			return
-		}
 	}
 
 	areq := &action.GetRunsRequest{
@@ -386,11 +421,32 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	runs := make([]*gwapitypes.RunsResponse, len(runsResp.Runs))
+	cursorS = ""
+	if runsResp.HasMoreData {
+		cursor := RunsCursor{
+			LastRunNumber: runsResp.Runs[limit-1].Counter,
+			Asc:           asc,
+			SubGroup:      subGroup,
+			PhaseFilter:   phaseFilter,
+			ResultFilter:  resultFilter,
+		}
+		serializedCursor, err := json.Marshal(&cursor)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrInternal, errors.Wrapf(err, "cannot marshal cursor")))
+			return
+		}
+		cursorS = base64.StdEncoding.EncodeToString(serializedCursor)
+	}
+
+	runs := make([]*gwapitypes.Runs, len(runsResp.Runs))
 	for i, r := range runsResp.Runs {
 		runs[i] = createRunsResponse(r)
 	}
-	if err := util.HTTPResponse(w, http.StatusOK, runs); err != nil {
+	response := &gwapitypes.RunsResponse{
+		Runs:   runs,
+		Cursor: cursorS,
+	}
+	if err := util.HTTPResponse(w, http.StatusOK, response); err != nil {
 		h.log.Err(err).Send()
 	}
 }

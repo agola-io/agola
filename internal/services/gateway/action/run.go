@@ -615,20 +615,20 @@ func (h *ActionHandler) genRunVariables(ctx context.Context, req *CreateRunReque
 	variables := map[string]string{}
 
 	// get project variables
-	pvars, _, err := h.configstoreClient.GetProjectVariables(ctx, req.Project.ID, true)
+	pvars, _, err := h.configstoreClient.GetProjectVariables(ctx, req.Project.ID, true, "", false, 0)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get project variables")
 	}
 
 	// remove overriden variables
-	pvars = scommon.FilterOverriddenVariables(pvars)
+	pvars.Variables = scommon.FilterOverriddenVariables(pvars.Variables)
 
 	// get project secrets
-	secrets, _, err := h.configstoreClient.GetProjectSecrets(ctx, req.Project.ID, true)
+	secrets, _, err := h.configstoreClient.GetProjectSecrets(ctx, req.Project.ID, true, "", false, 0)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get project secrets")
 	}
-	for _, pvar := range pvars {
+	for _, pvar := range pvars.Variables {
 		// find the value match
 		var varval cstypes.VariableValue
 		for _, varval = range pvar.Values {
@@ -637,7 +637,7 @@ func (h *ActionHandler) genRunVariables(ctx context.Context, req *CreateRunReque
 				continue
 			}
 			// get the secret value referenced by the variable, it must be a secret at the same level or a lower level
-			secret := scommon.GetVarValueMatchingSecret(varval, pvar.ParentPath, secrets)
+			secret := scommon.GetVarValueMatchingSecret(varval, pvar.ParentPath, secrets.Secrets)
 			if secret != nil {
 				varValue, ok := secret.Data[varval.SecretVar]
 				if ok {

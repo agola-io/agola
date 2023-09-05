@@ -166,7 +166,7 @@ func (h *DeleteOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 const (
 	DefaultOrgsLimit = 10
-	MaxOrgsLimit     = 20
+	MaxOrgsLimit     = 21
 )
 
 type OrgsHandler struct {
@@ -206,19 +206,34 @@ func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	start := query.Get("start")
 
+	var hasMoreData bool
+	qLimit := limit
+	if qLimit != 0 {
+		qLimit++
+	}
+
 	var orgs []*types.Organization
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		orgs, err = h.d.GetOrgs(tx, start, limit, asc)
+		orgs, err = h.d.GetOrgs(tx, start, qLimit, asc)
 		return errors.WithStack(err)
 	})
+	if limit != 0 && len(orgs) > limit {
+		hasMoreData = true
+		orgs = orgs[:limit]
+	}
+
 	if err != nil {
 		h.log.Err(err).Send()
 		util.HTTPError(w, err)
 		return
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, orgs); err != nil {
+	response := csapitypes.OrgsResponse{
+		Orgs:        orgs,
+		HasMoreData: hasMoreData,
+	}
+	if err := util.HTTPResponse(w, http.StatusOK, response); err != nil {
 		h.log.Err(err).Send()
 	}
 }
@@ -303,20 +318,51 @@ func NewOrgMembersHandler(log zerolog.Logger, ah *action.ActionHandler) *OrgMemb
 func (h *OrgMembersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
+	query := r.URL.Query()
 	orgRef := vars["orgref"]
 
-	orgUsers, err := h.ah.GetOrgMembers(ctx, orgRef)
+	var limit int
+	limitS := query.Get("limit")
+	if limitS != "" {
+		var err error
+		limit, err = strconv.Atoi(limitS)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit")))
+			return
+		}
+	}
+	asc := false
+	if _, ok := query["asc"]; ok {
+		asc = true
+	}
+	start := query.Get("start")
+
+	var hasMoreData bool
+	aLimit := limit
+	if aLimit != 0 {
+		aLimit++
+	}
+	orgUsers, err := h.ah.GetOrgMembers(ctx, orgRef, start, aLimit, asc)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	res := make([]*csapitypes.OrgMemberResponse, len(orgUsers))
-	for i, orgUser := range orgUsers {
-		res[i] = orgMemberResponse(orgUser)
+	if limit != 0 && len(orgUsers) > limit {
+		hasMoreData = true
+		orgUsers = orgUsers[:limit]
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+	orgMembers := make([]*csapitypes.OrgMemberResponse, len(orgUsers))
+	for i, orgUser := range orgUsers {
+		orgMembers[i] = orgMemberResponse(orgUser)
+	}
+
+	response := csapitypes.OrgMembersResponse{
+		OrgMembers:  orgMembers,
+		HasMoreData: hasMoreData,
+	}
+	if err := util.HTTPResponse(w, http.StatusOK, response); err != nil {
 		h.log.Err(err).Send()
 	}
 }

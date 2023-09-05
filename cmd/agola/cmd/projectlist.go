@@ -18,8 +18,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"github.com/sorintlab/errors"
 	"github.com/spf13/cobra"
 
 	gwapitypes "agola.io/agola/services/gateway/api/types"
@@ -63,12 +63,18 @@ func printProjects(projects []*gwapitypes.ProjectResponse) {
 func projectList(cmd *cobra.Command, args []string) error {
 	gwclient := gwclient.NewClient(gatewayURL, token)
 
-	projects, _, err := gwclient.GetProjectGroupProjects(context.TODO(), projectListOpts.parentPath)
-	if err != nil {
-		return errors.WithStack(err)
+	var projectsAll []*gwapitypes.ProjectResponse
+	hasMoreData := true
+	var cursor string
+	for hasMoreData {
+		projectsResp, _, err := gwclient.GetProjectGroupProjects(context.TODO(), projectListOpts.parentPath, 0, cursor)
+		projectsAll = append(projectsAll, projectsResp.Projects...)
+		if err != nil {
+			return errors.WithStack(err)
+		}
 	}
 
-	printProjects(projects)
+	printProjects(projectsAll)
 
 	return nil
 }

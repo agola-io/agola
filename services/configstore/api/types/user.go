@@ -17,7 +17,7 @@ package types
 import (
 	"time"
 
-	cstypes "agola.io/agola/services/configstore/types"
+	"agola.io/agola/services/configstore/types"
 )
 
 type CreateUserRequest struct {
@@ -59,15 +59,20 @@ type CreateUserTokenResponse struct {
 }
 
 type UserOrgsResponse struct {
-	Organization *cstypes.Organization
-	Role         cstypes.MemberRole
+	Organization *types.Organization
+	Role         types.MemberRole
 }
 
 // User augments cstypes.User with the user tokens and linked accouts
 type User struct {
-	*cstypes.User
+	*types.User
 
 	// dynamic data
-	Tokens         []*cstypes.UserToken
-	LinkedAccounts []*cstypes.LinkedAccount
+	Tokens         []*types.UserToken
+	LinkedAccounts []*types.LinkedAccount
+}
+
+type PrivateUsersResponse struct {
+	Users       []*types.User
+	HasMoreData bool
 }

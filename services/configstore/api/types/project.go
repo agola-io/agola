@@ -44,3 +44,8 @@ type Project struct {
 	ParentPath       string
 	GlobalVisibility cstypes.Visibility
 }
+
+type ProjectsResponse struct {
+	Projects    []*Project
+	HasMoreData bool
+}

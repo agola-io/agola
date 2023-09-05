@@ -15,9 +15,11 @@
 package api
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
@@ -182,6 +184,10 @@ func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+type ProjectGroupProjectsCursor struct {
+	LastProjectID string
+}
+
 type ProjectGroupProjectsHandler struct {
 	log zerolog.Logger
 	ah  *action.ActionHandler
@@ -194,24 +200,88 @@ func NewProjectGroupProjectsHandler(log zerolog.Logger, ah *action.ActionHandler
 func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
+	query := r.URL.Query()
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
 		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
 		return
 	}
 
-	csprojects, err := h.ah.GetProjectGroupProjects(ctx, projectGroupRef)
+	var start string
+
+	cursorS := query.Get("cursor")
+	if cursorS != "" {
+		decodedCursor, err := base64.StdEncoding.DecodeString(cursorS)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot decode cursor")))
+			return
+		}
+
+		var cursor ProjectGroupProjectsCursor
+		if err := json.Unmarshal(decodedCursor, &cursor); err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot unmarshal cursor")))
+			return
+		}
+
+		project, err := h.ah.GetProject(ctx, cursor.LastProjectID)
+		if util.HTTPError(w, err) {
+			h.log.Err(err).Send()
+			return
+		}
+		if project == nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cursor not valid")))
+			return
+		}
+		start = project.Name
+	} else {
+		start = query.Get("start")
+	}
+
+	var limit int
+	limitS := query.Get("limit")
+	if limitS != "" {
+		var err error
+		limit, err = strconv.Atoi(limitS)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit")))
+			return
+		}
+	}
+
+	if limit < 0 {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0")))
+		return
+	}
+
+	csprojects, err := h.ah.GetProjectGroupProjects(ctx, projectGroupRef, start, limit)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	projects := make([]*gwapitypes.ProjectResponse, len(csprojects))
-	for i, p := range csprojects {
+	cursorS = ""
+	if csprojects.HasMoreData {
+		cursor := ProjectGroupProjectsCursor{
+			LastProjectID: csprojects.Projects[limit-1].ID,
+		}
+		serializedCursor, err := json.Marshal(&cursor)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrInternal, errors.Wrapf(err, "cannot marshal cursor")))
+			return
+		}
+		cursorS = base64.StdEncoding.EncodeToString(serializedCursor)
+	}
+
+	projects := make([]*gwapitypes.ProjectResponse, len(csprojects.Projects))
+	for i, p := range csprojects.Projects {
 		projects[i] = createProjectResponse(p)
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, projects); err != nil {
+	response := gwapitypes.ProjectsResponse{
+		Projects: projects,
+		Cursor:   cursorS,
+	}
+	if err := util.HTTPResponse(w, http.StatusOK, response); err != nil {
 		h.log.Err(err).Send()
 	}
 }

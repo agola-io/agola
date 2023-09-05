@@ -67,21 +67,37 @@ func secretList(cmd *cobra.Command, ownertype string, args []string) error {
 
 func printSecrets(ownertype, description string, tree, removeoverridden bool) error {
 
-	var err error
-	var secrets []*gwapitypes.SecretResponse
+	var secretsAll []*gwapitypes.SecretResponse
 
 	gwclient := gwclient.NewClient(gatewayURL, token)
 
 	switch ownertype {
 	case "project":
-		secrets, _, err = gwclient.GetProjectSecrets(context.TODO(), secretListOpts.parentRef, tree, removeoverridden)
+		hasMoreData := true
+		var cursor string
+		for hasMoreData {
+			secrets, _, err := gwclient.GetProjectSecrets(context.TODO(), secretListOpts.parentRef, tree, removeoverridden, "", false, 0, cursor)
+			if err != nil {
+				return errors.Wrapf(err, "failed to list %s secrets", ownertype)
+			}
+			secretsAll = append(secretsAll, secrets.Secrets...)
+			cursor = secrets.Cursor
+			hasMoreData = cursor != ""
+		}
 	case "projectgroup":
-		secrets, _, err = gwclient.GetProjectGroupSecrets(context.TODO(), secretListOpts.parentRef, tree, removeoverridden)
+		hasMoreData := true
+		var cursor string
+		for hasMoreData {
+			secrets, _, err := gwclient.GetProjectGroupSecrets(context.TODO(), secretListOpts.parentRef, tree, removeoverridden, "", false, 0, cursor)
+			if err != nil {
+				return errors.Wrapf(err, "failed to list %s secrets", ownertype)
+			}
+			secretsAll = append(secretsAll, secrets.Secrets...)
+			cursor = secrets.Cursor
+			hasMoreData = cursor != ""
+		}
 	}
-	if err != nil {
-		return errors.Wrapf(err, "failed to list %s secrets", ownertype)
-	}
-	prettyJSON, err := json.MarshalIndent(secrets, "", "\t")
+	prettyJSON, err := json.MarshalIndent(secretsAll, "", "\t")
 	if err != nil {
 		return errors.Wrapf(err, "failed to convert %s secrets to json", ownertype)
 	}

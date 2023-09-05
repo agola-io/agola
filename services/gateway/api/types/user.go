@@ -35,6 +35,11 @@ type PrivateUserResponse struct {
 	LinkedAccounts []*LinkedAccountResponse `json:"linked_accounts"`
 }
 
+type PrivateUsersResponse struct {
+	Users  []*PrivateUserResponse `json:"users"`
+	Cursor string                 `json:"cursor"`
+}
+
 type UserResponse struct {
 	ID       string `json:"id"`
 	UserName string `json:"username"`

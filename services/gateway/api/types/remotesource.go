@@ -47,3 +47,8 @@ type RemoteSourceResponse struct {
 	RegistrationEnabled bool   `json:"registration_enabled"`
 	LoginEnabled        bool   `json:"login_enabled"`
 }
+
+type RemoteSourcesResponse struct {
+	RemoteSources []*RemoteSourceResponse `json:"remote_sources"`
+	Cursor        string                  `json:"cursor"`
+}

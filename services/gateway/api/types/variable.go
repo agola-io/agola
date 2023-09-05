@@ -40,6 +40,11 @@ type VariableResponse struct {
 	ParentPath string          `json:"parent_path"`
 }
 
+type VariablesResponse struct {
+	Variables []*VariableResponse `json:"variables"`
+	Cursor    string              `json:"cursor"`
+}
+
 type CreateVariableRequest struct {
 	Name string `json:"name,omitempty"`
 

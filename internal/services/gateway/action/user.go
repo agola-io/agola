@@ -53,6 +53,11 @@ type PrivateUserResponse struct {
 	LinkedAccounts []*cstypes.LinkedAccount
 }
 
+type PrivateUsersResponse struct {
+	Users       []*PrivateUserResponse
+	HasMoreData bool
+}
+
 func (h *ActionHandler) GetCurrentUser(ctx context.Context, userRef string) (*PrivateUserResponse, error) {
 	if !common.IsUserLoggedOrAdmin(ctx) {
 		return nil, errors.Errorf("user not logged in")
@@ -106,7 +111,7 @@ type GetUsersRequest struct {
 	Asc   bool
 }
 
-func (h *ActionHandler) GetUsers(ctx context.Context, req *GetUsersRequest) ([]*PrivateUserResponse, error) {
+func (h *ActionHandler) GetUsers(ctx context.Context, req *GetUsersRequest) (*PrivateUsersResponse, error) {
 	if !common.IsUserAdmin(ctx) {
 		return nil, util.NewAPIError(util.ErrUnauthorized, errors.Errorf("user not admin"))
 	}
@@ -116,8 +121,8 @@ func (h *ActionHandler) GetUsers(ctx context.Context, req *GetUsersRequest) ([]*
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
 
-	users := make([]*PrivateUserResponse, len(csusers))
-	for i, user := range csusers {
+	users := make([]*PrivateUserResponse, len(csusers.Users))
+	for i, user := range csusers.Users {
 		tokens, _, err := h.configstoreClient.GetUserTokens(ctx, user.ID)
 		if err != nil {
 			return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q tokens", user.ID))
@@ -131,7 +136,12 @@ func (h *ActionHandler) GetUsers(ctx context.Context, req *GetUsersRequest) ([]*
 		users[i] = &PrivateUserResponse{User: user, Tokens: tokens, LinkedAccounts: linkedAccounts}
 	}
 
-	return users, nil
+	res := &PrivateUsersResponse{
+		Users:       users,
+		HasMoreData: csusers.HasMoreData,
+	}
+
+	return res, nil
 }
 
 type CreateUserRequest struct {

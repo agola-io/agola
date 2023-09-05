@@ -31,30 +31,38 @@ type GetVariablesRequest struct {
 
 	Tree             bool
 	RemoveOverridden bool
+	Start            string
+	Asc              bool
+	Limit            int
 }
 
-func (h *ActionHandler) GetVariables(ctx context.Context, req *GetVariablesRequest) ([]*csapitypes.Variable, []*csapitypes.Secret, error) {
-	var csvars []*csapitypes.Variable
-	var cssecrets []*csapitypes.Secret
+func (h *ActionHandler) GetVariables(ctx context.Context, req *GetVariablesRequest) (*csapitypes.VariablesResponse, []*csapitypes.Secret, error) {
+	limit := req.Limit
+	if req.RemoveOverridden {
+		limit = 0
+	}
+
+	var csvars *csapitypes.VariablesResponse
+	var cssecrets *csapitypes.SecretsResponse
 
 	switch req.ParentType {
 	case cstypes.ObjectKindProjectGroup:
 		var err error
-		csvars, _, err = h.configstoreClient.GetProjectGroupVariables(ctx, req.ParentRef, req.Tree)
+		csvars, _, err = h.configstoreClient.GetProjectGroupVariables(ctx, req.ParentRef, req.Tree, req.Start, req.Asc, limit)
 		if err != nil {
 			return nil, nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 		}
-		cssecrets, _, err = h.configstoreClient.GetProjectGroupSecrets(ctx, req.ParentRef, true)
+		cssecrets, _, err = h.configstoreClient.GetProjectGroupSecrets(ctx, req.ParentRef, true, "", false, 0)
 		if err != nil {
 			return nil, nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 		}
 	case cstypes.ObjectKindProject:
 		var err error
-		csvars, _, err = h.configstoreClient.GetProjectVariables(ctx, req.ParentRef, req.Tree)
+		csvars, _, err = h.configstoreClient.GetProjectVariables(ctx, req.ParentRef, req.Tree, req.Start, req.Asc, limit)
 		if err != nil {
 			return nil, nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 		}
-		cssecrets, _, err = h.configstoreClient.GetProjectSecrets(ctx, req.ParentRef, true)
+		cssecrets, _, err = h.configstoreClient.GetProjectSecrets(ctx, req.ParentRef, true, "", false, 0)
 		if err != nil {
 			return nil, nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 		}
@@ -62,10 +70,14 @@ func (h *ActionHandler) GetVariables(ctx context.Context, req *GetVariablesReque
 
 	if req.RemoveOverridden {
 		// remove overriden variables
-		csvars = common.FilterOverriddenVariables(csvars)
+		csvars.Variables = common.FilterOverriddenVariables(csvars.Variables)
 	}
 
-	return csvars, cssecrets, nil
+	if limit > 0 && len(csvars.Variables) > limit {
+		csvars.Variables = csvars.Variables[:limit]
+	}
+
+	return csvars, cssecrets.Secrets, nil
 }
 
 type CreateVariableRequest struct {
@@ -99,13 +111,13 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateVariableR
 		Values: req.Values,
 	}
 
-	var cssecrets []*csapitypes.Secret
+	var cssecrets *csapitypes.SecretsResponse
 	var rv *csapitypes.Variable
 
 	switch req.ParentType {
 	case cstypes.ObjectKindProjectGroup:
 		var err error
-		cssecrets, _, err = h.configstoreClient.GetProjectGroupSecrets(ctx, req.ParentRef, true)
+		cssecrets, _, err = h.configstoreClient.GetProjectGroupSecrets(ctx, req.ParentRef, true, "", false, 0)
 		if err != nil {
 			return nil, nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get project group %q secrets", req.ParentRef))
 		}
@@ -117,7 +129,7 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateVariableR
 		}
 	case cstypes.ObjectKindProject:
 		var err error
-		cssecrets, _, err = h.configstoreClient.GetProjectSecrets(ctx, req.ParentRef, true)
+		cssecrets, _, err = h.configstoreClient.GetProjectSecrets(ctx, req.ParentRef, true, "", false, 0)
 		if err != nil {
 			return nil, nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get project %q secrets", req.ParentRef))
 		}
@@ -130,7 +142,7 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateVariableR
 	}
 	h.log.Info().Msgf("variable %s created, ID: %s", rv.Name, rv.ID)
 
-	return rv, cssecrets, nil
+	return rv, cssecrets.Secrets, nil
 }
 
 type UpdateVariableRequest struct {
@@ -166,13 +178,13 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableR
 		Values: req.Values,
 	}
 
-	var cssecrets []*csapitypes.Secret
+	var cssecrets *csapitypes.SecretsResponse
 	var rv *csapitypes.Variable
 
 	switch req.ParentType {
 	case cstypes.ObjectKindProjectGroup:
 		var err error
-		cssecrets, _, err = h.configstoreClient.GetProjectGroupSecrets(ctx, req.ParentRef, true)
+		cssecrets, _, err = h.configstoreClient.GetProjectGroupSecrets(ctx, req.ParentRef, true, "", false, 0)
 		if err != nil {
 			return nil, nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get project group %q secrets", req.ParentRef))
 		}
@@ -184,7 +196,7 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableR
 		}
 	case cstypes.ObjectKindProject:
 		var err error
-		cssecrets, _, err = h.configstoreClient.GetProjectSecrets(ctx, req.ParentRef, true)
+		cssecrets, _, err = h.configstoreClient.GetProjectSecrets(ctx, req.ParentRef, true, "", false, 0)
 		if err != nil {
 			return nil, nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get project %q secrets", req.ParentRef))
 		}
@@ -197,7 +209,7 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableR
 	}
 	h.log.Info().Msgf("variable %s created, ID: %s", rv.Name, rv.ID)
 
-	return rv, cssecrets, nil
+	return rv, cssecrets.Secrets, nil
 }
 
 func (h *ActionHandler) DeleteVariable(ctx context.Context, parentType cstypes.ObjectKind, parentRef, name string) error {

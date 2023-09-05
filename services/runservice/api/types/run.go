@@ -27,6 +27,7 @@ type RunResponse struct {
 type GetRunsResponse struct {
 	Runs                    []*rstypes.Run `json:"runs"`
 	ChangeGroupsUpdateToken string         `json:"change_groups_update_tokens"`
+	HasMoreData             bool           `json:"has_more_data"`
 }
 
 type RunCreateRequest struct {

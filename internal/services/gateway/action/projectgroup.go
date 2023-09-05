@@ -41,8 +41,8 @@ func (h *ActionHandler) GetProjectGroupSubgroups(ctx context.Context, projectGro
 	return projectGroups, nil
 }
 
-func (h *ActionHandler) GetProjectGroupProjects(ctx context.Context, projectGroupRef string) ([]*csapitypes.Project, error) {
-	projects, _, err := h.configstoreClient.GetProjectGroupProjects(ctx, projectGroupRef)
+func (h *ActionHandler) GetProjectGroupProjects(ctx context.Context, projectGroupRef string, start string, limit int) (*csapitypes.ProjectsResponse, error) {
+	projects, _, err := h.configstoreClient.GetProjectGroupProjects(ctx, projectGroupRef, start, limit)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}

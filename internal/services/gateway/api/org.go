@@ -15,6 +15,7 @@
 package api
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -171,6 +172,16 @@ func createOrgResponse(o *cstypes.Organization) *gwapitypes.OrgResponse {
 	return org
 }
 
+type OrgsCursor struct {
+	LastOrgID string
+	Asc       bool
+}
+
+const (
+	DefaultOrgsLimit = 10
+	MaxOrgsLimit     = 20
+)
+
 type OrgsHandler struct {
 	log zerolog.Logger
 	ah  *action.ActionHandler
@@ -184,8 +195,45 @@ func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	query := r.URL.Query()
 
+	cursorS := query.Get("cursor")
+	var start string
+	var asc bool
+
+	if cursorS != "" {
+		decodedCursor, err := base64.StdEncoding.DecodeString(cursorS)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot decode cursor")))
+			return
+		}
+
+		var cursor OrgsCursor
+		if err := json.Unmarshal(decodedCursor, &cursor); err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot unmarshal cursor")))
+			return
+		}
+
+		asc = cursor.Asc
+
+		org, err := h.ah.GetOrg(ctx, cursor.LastOrgID)
+		if util.HTTPError(w, err) {
+			h.log.Err(err).Send()
+			return
+		}
+		if org == nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cursor not valid")))
+			return
+		}
+		start = org.Name
+	} else {
+		if _, ok := query["asc"]; ok {
+			asc = true
+		}
+
+		start = query.Get("start")
+	}
+
+	limit := DefaultOrgsLimit
 	limitS := query.Get("limit")
-	limit := DefaultRunsLimit
 	if limitS != "" {
 		var err error
 		limit, err = strconv.Atoi(limitS)
@@ -198,15 +246,9 @@ func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0")))
 		return
 	}
-	if limit > MaxRunsLimit {
-		limit = MaxRunsLimit
+	if limit > MaxOrgsLimit {
+		limit = MaxOrgsLimit
 	}
-	asc := false
-	if _, ok := query["asc"]; ok {
-		asc = true
-	}
-
-	start := query.Get("start")
 
 	areq := &action.GetOrgsRequest{
 		Start: start,
@@ -219,11 +261,29 @@ func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	orgs := make([]*gwapitypes.OrgResponse, len(csorgs))
-	for i, p := range csorgs {
+	cursorS = ""
+	if csorgs.HasMoreData {
+		cursor := OrgsCursor{
+			LastOrgID: csorgs.Orgs[limit-1].ID,
+			Asc:       asc,
+		}
+		serializedCursor, err := json.Marshal(&cursor)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrInternal, errors.Wrapf(err, "cannot marshal cursor")))
+			return
+		}
+		cursorS = base64.StdEncoding.EncodeToString(serializedCursor)
+	}
+
+	orgs := make([]*gwapitypes.OrgResponse, len(csorgs.Orgs))
+	for i, p := range csorgs.Orgs {
 		orgs[i] = createOrgResponse(p)
 	}
-	if err := util.HTTPResponse(w, http.StatusOK, orgs); err != nil {
+	response := &gwapitypes.OrgsResponse{
+		Orgs:   orgs,
+		Cursor: cursorS,
+	}
+	if err := util.HTTPResponse(w, http.StatusOK, response); err != nil {
 		h.log.Err(err).Send()
 	}
 }
@@ -233,6 +293,11 @@ func createOrgMemberResponse(user *cstypes.User, role cstypes.MemberRole) *gwapi
 		User: createUserResponse(user),
 		Role: gwapitypes.MemberRole(role),
 	}
+}
+
+type OrgMembersCursor struct {
+	LastOrgUserID string
+	Asc           bool
 }
 
 type OrgMembersHandler struct {
@@ -246,22 +311,89 @@ func NewOrgMembersHandler(log zerolog.Logger, ah *action.ActionHandler) *OrgMemb
 
 func (h *OrgMembersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	query := r.URL.Query()
 
 	vars := mux.Vars(r)
 	orgRef := vars["orgref"]
 
-	ares, err := h.ah.GetOrgMembers(ctx, orgRef)
+	cursorS := query.Get("cursor")
+	var asc bool
+	var start string
+
+	if cursorS != "" {
+		decodedCursor, err := base64.StdEncoding.DecodeString(cursorS)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot decode cursor")))
+			return
+		}
+
+		var cursor OrgMembersCursor
+		if err := json.Unmarshal(decodedCursor, &cursor); err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot unmarshal cursor")))
+			return
+		}
+
+		user, err := h.ah.GetUser(ctx, cursor.LastOrgUserID)
+		if util.HTTPError(w, err) {
+			h.log.Err(err).Send()
+			return
+		}
+		if user == nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cursor not valid")))
+			return
+		}
+		asc = cursor.Asc
+		start = user.Name
+	} else {
+		if _, ok := query["asc"]; ok {
+			asc = true
+		}
+
+		start = query.Get("start")
+	}
+
+	var limit int
+	limitS := query.Get("limit")
+	if limitS != "" {
+		var err error
+		limit, err = strconv.Atoi(limitS)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit")))
+			return
+		}
+	}
+	if limit < 0 {
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0")))
+		return
+	}
+
+	ares, err := h.ah.GetOrgMembers(ctx, orgRef, start, limit, asc)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
+	cursorS = ""
+	if ares.HasMoreData {
+		cursor := OrgMembersCursor{
+			LastOrgUserID: ares.Members[limit-1].User.ID,
+			Asc:           asc,
+		}
+		serializedCursor, err := json.Marshal(&cursor)
+		if err != nil {
+			util.HTTPError(w, util.NewAPIError(util.ErrInternal, errors.Wrapf(err, "cannot marshal cursor")))
+			return
+		}
+		cursorS = base64.StdEncoding.EncodeToString(serializedCursor)
+	}
+
 	res := &gwapitypes.OrgMembersResponse{
 		Organization: createOrgResponse(ares.Organization),
-		Members:      make([]*gwapitypes.OrgMemberResponse, len(ares.Members)),
+		OrgMembers:   make([]*gwapitypes.OrgMemberResponse, len(ares.Members)),
+		Cursor:       cursorS,
 	}
 	for i, m := range ares.Members {
-		res.Members[i] = createOrgMemberResponse(m.User, m.Role)
+		res.OrgMembers[i] = createOrgMemberResponse(m.User, m.Role)
 	}
 	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
 		h.log.Err(err).Send()

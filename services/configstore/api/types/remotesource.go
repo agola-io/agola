@@ -15,19 +15,24 @@
 package types
 
 import (
-	cstypes "agola.io/agola/services/configstore/types"
+	"agola.io/agola/services/configstore/types"
 )
 
 type CreateUpdateRemoteSourceRequest struct {
 	Name                string
 	APIURL              string
 	SkipVerify          bool
-	Type                cstypes.RemoteSourceType
-	AuthType            cstypes.RemoteSourceAuthType
+	Type                types.RemoteSourceType
+	AuthType            types.RemoteSourceAuthType
 	Oauth2ClientID      string
 	Oauth2ClientSecret  string
 	SSHHostKey          string
 	SkipSSHHostKeyCheck bool
 	RegistrationEnabled bool
 	LoginEnabled        bool
+}
+
+type RemoteSourcesReponse struct {
+	RemoteSources []*types.RemoteSource
+	HasMoreData   bool
 }

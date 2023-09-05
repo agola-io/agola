@@ -67,7 +67,7 @@ func (h *ActionHandler) GetProjectGroupSubgroups(ctx context.Context, projectGro
 	return projectGroups, nil
 }
 
-func (h *ActionHandler) GetProjectGroupProjects(ctx context.Context, projectGroupRef string) ([]*types.Project, error) {
+func (h *ActionHandler) GetProjectGroupProjects(ctx context.Context, projectGroupRef string, start string, limit int) ([]*types.Project, error) {
 	var projects []*types.Project
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
@@ -80,7 +80,7 @@ func (h *ActionHandler) GetProjectGroupProjects(ctx context.Context, projectGrou
 			return util.NewAPIError(util.ErrNotExist, errors.Errorf("project group %q doesn't exist", projectGroupRef))
 		}
 
-		projects, err = h.d.GetProjectGroupProjects(tx, projectGroup.ID)
+		projects, err = h.d.GetProjectGroupProjects(tx, projectGroup.ID, start, limit)
 		return errors.WithStack(err)
 	})
 	if err != nil {

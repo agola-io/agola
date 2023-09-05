@@ -24,7 +24,7 @@ import (
 	"agola.io/agola/services/configstore/types"
 )
 
-func (h *ActionHandler) GetVariables(ctx context.Context, parentKind types.ObjectKind, parentRef string, tree bool) ([]*types.Variable, error) {
+func (h *ActionHandler) GetVariables(ctx context.Context, parentKind types.ObjectKind, parentRef string, tree bool, startVariableName string, asc bool, limit int) ([]*types.Variable, error) {
 	var variables []*types.Variable
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		parentID, err := h.ResolveObjectID(tx, parentKind, parentRef)
@@ -32,9 +32,9 @@ func (h *ActionHandler) GetVariables(ctx context.Context, parentKind types.Objec
 			return errors.WithStack(err)
 		}
 		if tree {
-			variables, err = h.d.GetVariablesTree(tx, parentKind, parentID)
+			variables, err = h.d.GetVariablesTree(tx, parentKind, parentID, startVariableName, asc, limit)
 		} else {
-			variables, err = h.d.GetVariables(tx, parentID)
+			variables, err = h.d.GetVariables(tx, parentID, startVariableName, asc, limit)
 		}
 		return errors.WithStack(err)
 	})

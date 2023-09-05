@@ -31,16 +31,24 @@ type GetSecretsRequest struct {
 
 	Tree             bool
 	RemoveOverridden bool
+	Start            string
+	Asc              bool
+	Limit            int
 }
 
-func (h *ActionHandler) GetSecrets(ctx context.Context, req *GetSecretsRequest) ([]*csapitypes.Secret, error) {
-	var cssecrets []*csapitypes.Secret
+func (h *ActionHandler) GetSecrets(ctx context.Context, req *GetSecretsRequest) (*csapitypes.SecretsResponse, error) {
+	limit := req.Limit
+	if req.RemoveOverridden {
+		limit = 0
+	}
+
+	var cssecrets *csapitypes.SecretsResponse
 	var err error
 	switch req.ParentType {
 	case cstypes.ObjectKindProjectGroup:
-		cssecrets, _, err = h.configstoreClient.GetProjectGroupSecrets(ctx, req.ParentRef, req.Tree)
+		cssecrets, _, err = h.configstoreClient.GetProjectGroupSecrets(ctx, req.ParentRef, req.Tree, req.Start, req.Asc, limit)
 	case cstypes.ObjectKindProject:
-		cssecrets, _, err = h.configstoreClient.GetProjectSecrets(ctx, req.ParentRef, req.Tree)
+		cssecrets, _, err = h.configstoreClient.GetProjectSecrets(ctx, req.ParentRef, req.Tree, req.Start, req.Asc, limit)
 	}
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
@@ -48,7 +56,11 @@ func (h *ActionHandler) GetSecrets(ctx context.Context, req *GetSecretsRequest) 
 
 	if req.RemoveOverridden {
 		// remove overriden secrets
-		cssecrets = common.FilterOverriddenSecrets(cssecrets)
+		cssecrets.Secrets = common.FilterOverriddenSecrets(cssecrets.Secrets)
+	}
+
+	if limit > 0 && len(cssecrets.Secrets) > limit {
+		cssecrets.Secrets = cssecrets.Secrets[:limit]
 	}
 
 	return cssecrets, nil

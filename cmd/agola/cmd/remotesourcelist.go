@@ -61,12 +61,26 @@ func printRemoteSources(remoteSources []*gwapitypes.RemoteSourceResponse) {
 func remoteSourceList(cmd *cobra.Command, args []string) error {
 	gwclient := gwclient.NewClient(gatewayURL, token)
 
-	remouteSources, _, err := gwclient.GetRemoteSources(context.TODO(), remoteSourceListOpts.start, remoteSourceListOpts.limit, false)
-	if err != nil {
-		return errors.WithStack(err)
+	var remouteSourcesAll []*gwapitypes.RemoteSourceResponse
+	if runListOpts.limit == 0 {
+		hasMoreData := true
+		var cursor string
+		for hasMoreData {
+			remouteSourcesResp, _, err := gwclient.GetRemoteSources(context.TODO(), remoteSourceListOpts.start, 0, false, cursor)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			remouteSourcesAll = append(remouteSourcesAll, remouteSourcesResp.RemoteSources...)
+		}
+	} else {
+		remouteSourcesResp, _, err := gwclient.GetRemoteSources(context.TODO(), remoteSourceListOpts.start, remoteSourceListOpts.limit, false, "")
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		remouteSourcesAll = remouteSourcesResp.RemoteSources
 	}
 
-	printRemoteSources(remouteSources)
+	printRemoteSources(remouteSourcesAll)
 
 	return nil
 }

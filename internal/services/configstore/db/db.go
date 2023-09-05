@@ -535,14 +535,28 @@ type OrgUser struct {
 }
 
 // TODO(sgotti) implement cursor fetching
-func (d *DB) GetOrgUsers(tx *sql.Tx, orgID string) ([]*OrgUser, error) {
+func (d *DB) GetOrgUsers(tx *sql.Tx, orgID string, start string, limit int, asc bool) ([]*OrgUser, error) {
 	cols := organizationMemberSelectColumns()
 	cols = append(cols, userSelectColumns()...)
 
 	q := sq.Select(cols...).From("orgmember")
 	q = q.Join("user_t", "user_t.id = orgmember.user_id")
 	q = q.Where(q.E("orgmember.organization_id", orgID))
-	q = q.OrderBy("user_t.name")
+	if start != "" {
+		if asc {
+			q = q.Where(q.G("user_t.name", start))
+		} else {
+			q = q.Where(q.L("user_t.name", start))
+		}
+	}
+	if asc {
+		q = q.OrderBy("name").Asc()
+	} else {
+		q = q.OrderBy("name").Desc()
+	}
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
 
 	rows, err := d.query(tx, q)
 	if err != nil {
@@ -904,9 +918,16 @@ func (d *DB) GetProjectByPath(tx *sql.Tx, projectPath string) (*types.Project, e
 	return project, nil
 }
 
-func (d *DB) GetProjectGroupProjects(tx *sql.Tx, parentID string) ([]*types.Project, error) {
+func (d *DB) GetProjectGroupProjects(tx *sql.Tx, parentID string, start string, limit int) ([]*types.Project, error) {
 	q := projectSelect()
 	q.Where(q.E("parent_id", parentID))
+	if start != "" {
+		q.Where(q.G("name", start))
+	}
+	q = q.OrderBy("name")
+	if limit > 0 {
+		q.Limit(limit)
+	}
 	projects, _, err := d.fetchProjects(tx, q)
 
 	return projects, errors.WithStack(err)
@@ -936,9 +957,24 @@ func (d *DB) GetSecretByName(tx *sql.Tx, parentID, name string) (*types.Secret, 
 	return out, errors.WithStack(err)
 }
 
-func (d *DB) GetSecrets(tx *sql.Tx, parentID string) ([]*types.Secret, error) {
+func (d *DB) GetSecrets(tx *sql.Tx, parentID string, startSecretName string, asc bool, limit int) ([]*types.Secret, error) {
 	q := secretSelect()
 	q.Where(q.E("parent_id", parentID))
+	if asc {
+		q.OrderBy("name").Asc()
+	} else {
+		q.OrderBy("name").Desc()
+	}
+	if startSecretName != "" {
+		if asc {
+			q.Where(q.G("name", startSecretName))
+		} else {
+			q.Where(q.L("name", startSecretName))
+		}
+	}
+	if limit > 0 {
+		q.Limit(limit)
+	}
 	secrets, _, err := d.fetchSecrets(tx, q)
 	return secrets, errors.WithStack(err)
 }
@@ -980,15 +1016,20 @@ func (d *DB) GetSecretTree(tx *sql.Tx, parentKind types.ObjectKind, parentID, na
 	return nil, nil
 }
 
-func (d *DB) GetSecretsTree(tx *sql.Tx, parentKind types.ObjectKind, parentID string) ([]*types.Secret, error) {
+func (d *DB) GetSecretsTree(tx *sql.Tx, parentKind types.ObjectKind, parentID string, startSecretName string, asc bool, limit int) ([]*types.Secret, error) {
 	allSecrets := []*types.Secret{}
 
 	for parentKind == types.ObjectKindProjectGroup || parentKind == types.ObjectKindProject {
-		secrets, err := d.GetSecrets(tx, parentID)
+		secrets, err := d.GetSecrets(tx, parentID, startSecretName, asc, limit)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to get secrets for %s %q", parentKind, parentID)
 		}
 		allSecrets = append(allSecrets, secrets...)
+
+		if limit > 0 && len(allSecrets) > limit {
+			allSecrets = allSecrets[:limit]
+			return allSecrets, nil
+		}
 
 		switch parentKind {
 		case types.ObjectKindProjectGroup:
@@ -1041,22 +1082,43 @@ func (d *DB) GetVariableByName(tx *sql.Tx, parentID, name string) (*types.Variab
 	return out, errors.WithStack(err)
 }
 
-func (d *DB) GetVariables(tx *sql.Tx, parentID string) ([]*types.Variable, error) {
+func (d *DB) GetVariables(tx *sql.Tx, parentID string, startVariableName string, asc bool, limit int) ([]*types.Variable, error) {
 	q := variableSelect()
 	q.Where(q.E("parent_id", parentID))
+	q.Where(q.E("parent_id", parentID))
+	if asc {
+		q.OrderBy("name").Asc()
+	} else {
+		q.OrderBy("name").Desc()
+	}
+	if startVariableName != "" {
+		if asc {
+			q.Where(q.G("name", startVariableName))
+		} else {
+			q.Where(q.L("name", startVariableName))
+		}
+	}
+	if limit > 0 {
+		q.Limit(limit)
+	}
 	variables, _, err := d.fetchVariables(tx, q)
 	return variables, errors.WithStack(err)
 }
 
-func (d *DB) GetVariablesTree(tx *sql.Tx, parentKind types.ObjectKind, parentID string) ([]*types.Variable, error) {
+func (d *DB) GetVariablesTree(tx *sql.Tx, parentKind types.ObjectKind, parentID string, startVariableName string, asc bool, limit int) ([]*types.Variable, error) {
 	allVariables := []*types.Variable{}
 
 	for parentKind == types.ObjectKindProjectGroup || parentKind == types.ObjectKindProject {
-		vars, err := d.GetVariables(tx, parentID)
+		vars, err := d.GetVariables(tx, parentID, startVariableName, asc, limit)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to get variables for %s %q", parentKind, parentID)
 		}
 		allVariables = append(allVariables, vars...)
+
+		if limit > 0 && len(allVariables) > limit {
+			allVariables = allVariables[:limit]
+			return allVariables, nil
+		}
 
 		switch parentKind {
 		case types.ObjectKindProjectGroup:
