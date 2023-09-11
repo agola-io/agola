@@ -80,42 +80,6 @@ func setupConfigstore(ctx context.Context, t *testing.T, log zerolog.Logger, dir
 	return cs
 }
 
-func setupUsers(t *testing.T, ctx context.Context, cs *Configstore) {
-	i := 1
-	for i < 5 {
-		req := &action.CreateUserRequest{
-			UserName: "UserTest" + fmt.Sprint(i),
-		}
-		_, err := cs.ah.CreateUser(ctx, req)
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
-
-		i++
-	}
-}
-
-func setupOrgs(t *testing.T, ctx context.Context, cs *Configstore, userMemberID string) {
-	i := 1
-	for i < 5 {
-		req := &action.CreateOrgRequest{
-			Name:       "OrgTest" + fmt.Sprint(i),
-			Visibility: "public",
-		}
-		org, err := cs.ah.CreateOrg(ctx, req)
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
-
-		_, err = cs.ah.AddOrgMember(ctx, org.ID, userMemberID, types.MemberRoleOwner)
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
-
-		i++
-	}
-}
-
 func getRemoteSources(ctx context.Context, cs *Configstore) ([]*types.RemoteSource, error) {
 	var users []*types.RemoteSource
 	err := cs.d.Do(ctx, func(tx *sql.Tx) error {
@@ -1419,6 +1383,22 @@ func TestOrgInvitation(t *testing.T) {
 	t.Parallel()
 
 	log := testutil.NewLogger(t)
+
+	setupUsers := func(t *testing.T, ctx context.Context, cs *Configstore) {
+		for i := 1; i < 5; i++ {
+			if _, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)}); err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+		}
+	}
+
+	setupOrgs := func(t *testing.T, ctx context.Context, cs *Configstore, creatorUserID string) {
+		for i := 1; i < 5; i++ {
+			if _, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: fmt.Sprintf("org%d", i), Visibility: "public", CreatorUserID: creatorUserID}); err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+		}
+	}
 
 	tests := []struct {
 		name string
