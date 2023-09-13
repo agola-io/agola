@@ -98,6 +98,10 @@ const (
 	GroupTypeUsers    = "users"
 )
 
+const (
+	remoteErrorBadRequest = "remote error badrequest"
+)
+
 func setupGitea(t *testing.T, dir, dockerBridgeAddress string) *testutil.TestGitea {
 	tgitea, err := testutil.NewTestGitea(t, dir, dockerBridgeAddress)
 	if err != nil {
@@ -620,7 +624,7 @@ func TestPasswordRegisterUser(t *testing.T) {
 			RemoteSourceLoginPassword: giteaUser01Password,
 		},
 	})
-	expectedErr := "remote error badrequest"
+	expectedErr := remoteErrorBadRequest
 	if err == nil {
 		t.Fatalf("expected error %v, got nil err", expectedErr)
 	}
@@ -734,7 +738,7 @@ func TestPasswordLogin(t *testing.T) {
 	// Do an agola call that will use the linkedAccount userAccessToken to call gitea api
 	// should fails since the registered token has been removed
 	_, _, err = tokenGWClient.GetUserRemoteRepos(ctx, rs.ID)
-	expectedErr := "remote error badrequest"
+	expectedErr := remoteErrorBadRequest
 	if err == nil {
 		t.Fatalf("expected error %v, got nil err", expectedErr)
 	}
@@ -3409,7 +3413,7 @@ func TestOrgInvitation(t *testing.T) {
 			orgInvitationEnabled: false,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser02, Role: cstypes.MemberRoleMember})
-				expectedErr := "remote error badrequest"
+				expectedErr := remoteErrorBadRequest
 				if err == nil {
 					t.Fatalf("expected error %v, got nil err", expectedErr)
 				}
@@ -3423,7 +3427,7 @@ func TestOrgInvitation(t *testing.T) {
 			orgInvitationEnabled: true,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser01.AddOrgMember(ctx, agolaOrg01, agolaUser02, gwapitypes.MemberRoleMember)
-				expectedErr := "remote error badrequest"
+				expectedErr := remoteErrorBadRequest
 				if err == nil {
 					t.Fatalf("expected error %v, got nil err", expectedErr)
 				}
@@ -3824,7 +3828,7 @@ func TestMaintenance(t *testing.T) {
 					return true, nil
 				})
 
-				expectedErr := "remote error badrequest"
+				expectedErr := remoteErrorBadRequest
 				_, err = gwClient.EnableMaintenance(ctx, configstoreService)
 				if err == nil {
 					t.Fatalf("expected error %v, got nil err", expectedErr)
@@ -3897,7 +3901,7 @@ func TestMaintenance(t *testing.T) {
 			f: func(ctx context.Context, t *testing.T, sc *setupContext) {
 				gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
 
-				expectedErr := "remote error badrequest"
+				expectedErr := remoteErrorBadRequest
 				_, err := gwClient.DisableMaintenance(ctx, configstoreService)
 				if err == nil {
 					t.Fatalf("expected error %v, got nil err", expectedErr)
@@ -3920,7 +3924,7 @@ func TestMaintenance(t *testing.T) {
 			f: func(ctx context.Context, t *testing.T, sc *setupContext) {
 				gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
 
-				expectedErr := "remote error badrequest"
+				expectedErr := remoteErrorBadRequest
 				_, err := gwClient.EnableMaintenance(ctx, "test")
 				if err == nil {
 					t.Fatalf("expected error %v, got nil err", expectedErr)
