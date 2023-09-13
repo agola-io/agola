@@ -34,6 +34,10 @@ import (
 
 var jsonContent = http.Header{"Content-Type": []string{"application/json"}}
 
+type Response struct {
+	*http.Response
+}
+
 type Client struct {
 	url    string
 	client *http.Client
@@ -76,20 +80,22 @@ func (c *Client) doRequest(ctx context.Context, method, path string, query url.V
 	return res, errors.WithStack(err)
 }
 
-func (c *Client) getResponse(ctx context.Context, method, path string, query url.Values, header http.Header, ibody io.Reader) (*http.Response, error) {
-	resp, err := c.doRequest(ctx, method, path, query, header, ibody)
+func (c *Client) getResponse(ctx context.Context, method, path string, query url.Values, header http.Header, ibody io.Reader) (*Response, error) {
+	cresp, err := c.doRequest(ctx, method, path, query, header, ibody)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	if err := util.ErrFromRemote(resp); err != nil {
+	resp := &Response{Response: cresp}
+
+	if err := util.ErrFromRemote(resp.Response); err != nil {
 		return resp, errors.WithStack(err)
 	}
 
 	return resp, nil
 }
 
-func (c *Client) getParsedResponse(ctx context.Context, method, path string, query url.Values, header http.Header, ibody io.Reader, obj interface{}) (*http.Response, error) {
+func (c *Client) getParsedResponse(ctx context.Context, method, path string, query url.Values, header http.Header, ibody io.Reader, obj interface{}) (*Response, error) {
 	resp, err := c.getResponse(ctx, method, path, query, header, ibody)
 	if err != nil {
 		return resp, errors.WithStack(err)
@@ -101,31 +107,31 @@ func (c *Client) getParsedResponse(ctx context.Context, method, path string, que
 	return resp, errors.WithStack(d.Decode(obj))
 }
 
-func (c *Client) GetProjectGroup(ctx context.Context, projectGroupRef string) (*gwapitypes.ProjectGroupResponse, *http.Response, error) {
+func (c *Client) GetProjectGroup(ctx context.Context, projectGroupRef string) (*gwapitypes.ProjectGroupResponse, *Response, error) {
 	projectGroup := new(gwapitypes.ProjectGroupResponse)
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s", url.PathEscape(projectGroupRef)), nil, jsonContent, nil, projectGroup)
 	return projectGroup, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetProjectGroupSubgroups(ctx context.Context, projectGroupRef string) ([]*gwapitypes.ProjectGroupResponse, *http.Response, error) {
+func (c *Client) GetProjectGroupSubgroups(ctx context.Context, projectGroupRef string) ([]*gwapitypes.ProjectGroupResponse, *Response, error) {
 	projectGroups := []*gwapitypes.ProjectGroupResponse{}
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s/subgroups", url.PathEscape(projectGroupRef)), nil, jsonContent, nil, &projectGroups)
 	return projectGroups, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetProjectGroupProjects(ctx context.Context, projectGroupRef string) ([]*gwapitypes.ProjectResponse, *http.Response, error) {
+func (c *Client) GetProjectGroupProjects(ctx context.Context, projectGroupRef string) ([]*gwapitypes.ProjectResponse, *Response, error) {
 	projects := []*gwapitypes.ProjectResponse{}
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projectgroups/%s/projects", url.PathEscape(projectGroupRef)), nil, jsonContent, nil, &projects)
 	return projects, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetProject(ctx context.Context, projectRef string) (*gwapitypes.ProjectResponse, *http.Response, error) {
+func (c *Client) GetProject(ctx context.Context, projectRef string) (*gwapitypes.ProjectResponse, *Response, error) {
 	project := new(gwapitypes.ProjectResponse)
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s", url.PathEscape(projectRef)), nil, jsonContent, nil, project)
 	return project, resp, errors.WithStack(err)
 }
 
-func (c *Client) CreateProjectGroup(ctx context.Context, req *gwapitypes.CreateProjectGroupRequest) (*gwapitypes.ProjectResponse, *http.Response, error) {
+func (c *Client) CreateProjectGroup(ctx context.Context, req *gwapitypes.CreateProjectGroupRequest) (*gwapitypes.ProjectResponse, *Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -136,7 +142,7 @@ func (c *Client) CreateProjectGroup(ctx context.Context, req *gwapitypes.CreateP
 	return projectGroup, resp, errors.WithStack(err)
 }
 
-func (c *Client) UpdateProjectGroup(ctx context.Context, projectGroupRef string, req *gwapitypes.UpdateProjectGroupRequest) (*gwapitypes.ProjectResponse, *http.Response, error) {
+func (c *Client) UpdateProjectGroup(ctx context.Context, projectGroupRef string, req *gwapitypes.UpdateProjectGroupRequest) (*gwapitypes.ProjectResponse, *Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -147,11 +153,11 @@ func (c *Client) UpdateProjectGroup(ctx context.Context, projectGroupRef string,
 	return projectGroup, resp, errors.WithStack(err)
 }
 
-func (c *Client) DeleteProjectGroup(ctx context.Context, projectGroupRef string) (*http.Response, error) {
+func (c *Client) DeleteProjectGroup(ctx context.Context, projectGroupRef string) (*Response, error) {
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/projectgroups/%s", url.PathEscape(projectGroupRef)), nil, jsonContent, nil)
 }
 
-func (c *Client) CreateProject(ctx context.Context, req *gwapitypes.CreateProjectRequest) (*gwapitypes.ProjectResponse, *http.Response, error) {
+func (c *Client) CreateProject(ctx context.Context, req *gwapitypes.CreateProjectRequest) (*gwapitypes.ProjectResponse, *Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -162,7 +168,7 @@ func (c *Client) CreateProject(ctx context.Context, req *gwapitypes.CreateProjec
 	return project, resp, errors.WithStack(err)
 }
 
-func (c *Client) UpdateProject(ctx context.Context, projectRef string, req *gwapitypes.UpdateProjectRequest) (*gwapitypes.ProjectResponse, *http.Response, error) {
+func (c *Client) UpdateProject(ctx context.Context, projectRef string, req *gwapitypes.UpdateProjectRequest) (*gwapitypes.ProjectResponse, *Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -173,7 +179,7 @@ func (c *Client) UpdateProject(ctx context.Context, projectRef string, req *gwap
 	return project, resp, errors.WithStack(err)
 }
 
-func (c *Client) CreateProjectGroupSecret(ctx context.Context, projectGroupRef string, req *gwapitypes.CreateSecretRequest) (*gwapitypes.SecretResponse, *http.Response, error) {
+func (c *Client) CreateProjectGroupSecret(ctx context.Context, projectGroupRef string, req *gwapitypes.CreateSecretRequest) (*gwapitypes.SecretResponse, *Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -184,7 +190,7 @@ func (c *Client) CreateProjectGroupSecret(ctx context.Context, projectGroupRef s
 	return secret, resp, errors.WithStack(err)
 }
 
-func (c *Client) UpdateProjectGroupSecret(ctx context.Context, projectGroupRef, secretName string, req *gwapitypes.UpdateSecretRequest) (*gwapitypes.SecretResponse, *http.Response, error) {
+func (c *Client) UpdateProjectGroupSecret(ctx context.Context, projectGroupRef, secretName string, req *gwapitypes.UpdateSecretRequest) (*gwapitypes.SecretResponse, *Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -195,11 +201,11 @@ func (c *Client) UpdateProjectGroupSecret(ctx context.Context, projectGroupRef, 
 	return secret, resp, errors.WithStack(err)
 }
 
-func (c *Client) DeleteProjectGroupSecret(ctx context.Context, projectGroupRef, secretName string) (*http.Response, error) {
+func (c *Client) DeleteProjectGroupSecret(ctx context.Context, projectGroupRef, secretName string) (*Response, error) {
 	return c.getResponse(ctx, "DELETE", path.Join("/projectgroups", url.PathEscape(projectGroupRef), "secrets", secretName), nil, jsonContent, nil)
 }
 
-func (c *Client) GetProjectGroupSecrets(ctx context.Context, projectRef string, tree, removeoverridden bool) ([]*gwapitypes.SecretResponse, *http.Response, error) {
+func (c *Client) GetProjectGroupSecrets(ctx context.Context, projectRef string, tree, removeoverridden bool) ([]*gwapitypes.SecretResponse, *Response, error) {
 	secrets := []*gwapitypes.SecretResponse{}
 	q := url.Values{}
 	if tree {
@@ -212,7 +218,7 @@ func (c *Client) GetProjectGroupSecrets(ctx context.Context, projectRef string, 
 	return secrets, resp, errors.WithStack(err)
 }
 
-func (c *Client) CreateProjectSecret(ctx context.Context, projectRef string, req *gwapitypes.CreateSecretRequest) (*gwapitypes.SecretResponse, *http.Response, error) {
+func (c *Client) CreateProjectSecret(ctx context.Context, projectRef string, req *gwapitypes.CreateSecretRequest) (*gwapitypes.SecretResponse, *Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -223,7 +229,7 @@ func (c *Client) CreateProjectSecret(ctx context.Context, projectRef string, req
 	return secret, resp, errors.WithStack(err)
 }
 
-func (c *Client) UpdateProjectSecret(ctx context.Context, projectRef, secretName string, req *gwapitypes.UpdateSecretRequest) (*gwapitypes.SecretResponse, *http.Response, error) {
+func (c *Client) UpdateProjectSecret(ctx context.Context, projectRef, secretName string, req *gwapitypes.UpdateSecretRequest) (*gwapitypes.SecretResponse, *Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -234,11 +240,11 @@ func (c *Client) UpdateProjectSecret(ctx context.Context, projectRef, secretName
 	return secret, resp, errors.WithStack(err)
 }
 
-func (c *Client) DeleteProjectSecret(ctx context.Context, projectRef, secretName string) (*http.Response, error) {
+func (c *Client) DeleteProjectSecret(ctx context.Context, projectRef, secretName string) (*Response, error) {
 	return c.getResponse(ctx, "DELETE", path.Join("/projects", url.PathEscape(projectRef), "secrets", secretName), nil, jsonContent, nil)
 }
 
-func (c *Client) GetProjectSecrets(ctx context.Context, projectRef string, tree, removeoverridden bool) ([]*gwapitypes.SecretResponse, *http.Response, error) {
+func (c *Client) GetProjectSecrets(ctx context.Context, projectRef string, tree, removeoverridden bool) ([]*gwapitypes.SecretResponse, *Response, error) {
 	secrets := []*gwapitypes.SecretResponse{}
 	q := url.Values{}
 	if tree {
@@ -251,7 +257,7 @@ func (c *Client) GetProjectSecrets(ctx context.Context, projectRef string, tree,
 	return secrets, resp, errors.WithStack(err)
 }
 
-func (c *Client) CreateProjectGroupVariable(ctx context.Context, projectGroupRef string, req *gwapitypes.CreateVariableRequest) (*gwapitypes.VariableResponse, *http.Response, error) {
+func (c *Client) CreateProjectGroupVariable(ctx context.Context, projectGroupRef string, req *gwapitypes.CreateVariableRequest) (*gwapitypes.VariableResponse, *Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -262,7 +268,7 @@ func (c *Client) CreateProjectGroupVariable(ctx context.Context, projectGroupRef
 	return variable, resp, errors.WithStack(err)
 }
 
-func (c *Client) UpdateProjectGroupVariable(ctx context.Context, projectGroupRef, variableName string, req *gwapitypes.UpdateVariableRequest) (*gwapitypes.VariableResponse, *http.Response, error) {
+func (c *Client) UpdateProjectGroupVariable(ctx context.Context, projectGroupRef, variableName string, req *gwapitypes.UpdateVariableRequest) (*gwapitypes.VariableResponse, *Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -273,11 +279,11 @@ func (c *Client) UpdateProjectGroupVariable(ctx context.Context, projectGroupRef
 	return variable, resp, errors.WithStack(err)
 }
 
-func (c *Client) DeleteProjectGroupVariable(ctx context.Context, projectGroupRef, variableName string) (*http.Response, error) {
+func (c *Client) DeleteProjectGroupVariable(ctx context.Context, projectGroupRef, variableName string) (*Response, error) {
 	return c.getResponse(ctx, "DELETE", path.Join("/projectgroups", url.PathEscape(projectGroupRef), "variables", variableName), nil, jsonContent, nil)
 }
 
-func (c *Client) GetProjectGroupVariables(ctx context.Context, projectRef string, tree, removeoverridden bool) ([]*gwapitypes.VariableResponse, *http.Response, error) {
+func (c *Client) GetProjectGroupVariables(ctx context.Context, projectRef string, tree, removeoverridden bool) ([]*gwapitypes.VariableResponse, *Response, error) {
 	variables := []*gwapitypes.VariableResponse{}
 	q := url.Values{}
 	if tree {
@@ -290,7 +296,7 @@ func (c *Client) GetProjectGroupVariables(ctx context.Context, projectRef string
 	return variables, resp, errors.WithStack(err)
 }
 
-func (c *Client) CreateProjectVariable(ctx context.Context, projectRef string, req *gwapitypes.CreateVariableRequest) (*gwapitypes.VariableResponse, *http.Response, error) {
+func (c *Client) CreateProjectVariable(ctx context.Context, projectRef string, req *gwapitypes.CreateVariableRequest) (*gwapitypes.VariableResponse, *Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -301,7 +307,7 @@ func (c *Client) CreateProjectVariable(ctx context.Context, projectRef string, r
 	return variable, resp, errors.WithStack(err)
 }
 
-func (c *Client) UpdateProjectVariable(ctx context.Context, projectRef, variableName string, req *gwapitypes.UpdateVariableRequest) (*gwapitypes.VariableResponse, *http.Response, error) {
+func (c *Client) UpdateProjectVariable(ctx context.Context, projectRef, variableName string, req *gwapitypes.UpdateVariableRequest) (*gwapitypes.VariableResponse, *Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -312,11 +318,11 @@ func (c *Client) UpdateProjectVariable(ctx context.Context, projectRef, variable
 	return variable, resp, errors.WithStack(err)
 }
 
-func (c *Client) DeleteProjectVariable(ctx context.Context, projectRef, variableName string) (*http.Response, error) {
+func (c *Client) DeleteProjectVariable(ctx context.Context, projectRef, variableName string) (*Response, error) {
 	return c.getResponse(ctx, "DELETE", path.Join("/projects", url.PathEscape(projectRef), "variables", variableName), nil, jsonContent, nil)
 }
 
-func (c *Client) GetProjectVariables(ctx context.Context, projectRef string, tree, removeoverridden bool) ([]*gwapitypes.VariableResponse, *http.Response, error) {
+func (c *Client) GetProjectVariables(ctx context.Context, projectRef string, tree, removeoverridden bool) ([]*gwapitypes.VariableResponse, *Response, error) {
 	variables := []*gwapitypes.VariableResponse{}
 	q := url.Values{}
 	if tree {
@@ -329,11 +335,11 @@ func (c *Client) GetProjectVariables(ctx context.Context, projectRef string, tre
 	return variables, resp, errors.WithStack(err)
 }
 
-func (c *Client) DeleteProject(ctx context.Context, projectRef string) (*http.Response, error) {
+func (c *Client) DeleteProject(ctx context.Context, projectRef string) (*Response, error) {
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/projects/%s", url.PathEscape(projectRef)), nil, jsonContent, nil)
 }
 
-func (c *Client) ProjectCreateRun(ctx context.Context, projectRef string, req *gwapitypes.ProjectCreateRunRequest) (*http.Response, error) {
+func (c *Client) ProjectCreateRun(ctx context.Context, projectRef string, req *gwapitypes.ProjectCreateRunRequest) (*Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -342,23 +348,23 @@ func (c *Client) ProjectCreateRun(ctx context.Context, projectRef string, req *g
 	return c.getResponse(ctx, "POST", fmt.Sprintf("/projects/%s/createrun", url.PathEscape(projectRef)), nil, jsonContent, bytes.NewReader(reqj))
 }
 
-func (c *Client) ReconfigProject(ctx context.Context, projectRef string) (*http.Response, error) {
+func (c *Client) ReconfigProject(ctx context.Context, projectRef string) (*Response, error) {
 	return c.getResponse(ctx, "PUT", fmt.Sprintf("/projects/%s/reconfig", url.PathEscape(projectRef)), nil, jsonContent, nil)
 }
 
-func (c *Client) GetCurrentUser(ctx context.Context) (*gwapitypes.PrivateUserResponse, *http.Response, error) {
+func (c *Client) GetCurrentUser(ctx context.Context) (*gwapitypes.PrivateUserResponse, *Response, error) {
 	user := new(gwapitypes.PrivateUserResponse)
 	resp, err := c.getParsedResponse(ctx, "GET", "/user", nil, jsonContent, nil, user)
 	return user, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetUser(ctx context.Context, userRef string) (*gwapitypes.UserResponse, *http.Response, error) {
+func (c *Client) GetUser(ctx context.Context, userRef string) (*gwapitypes.UserResponse, *Response, error) {
 	user := new(gwapitypes.UserResponse)
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/users/%s", userRef), nil, jsonContent, nil, user)
 	return user, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetUsers(ctx context.Context, start string, limit int, asc bool) ([]*gwapitypes.PrivateUserResponse, *http.Response, error) {
+func (c *Client) GetUsers(ctx context.Context, start string, limit int, asc bool) ([]*gwapitypes.PrivateUserResponse, *Response, error) {
 	q := url.Values{}
 	if start != "" {
 		q.Add("start", start)
@@ -375,7 +381,7 @@ func (c *Client) GetUsers(ctx context.Context, start string, limit int, asc bool
 	return users, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetUserByLinkedAccountRemoteUserAndSource(ctx context.Context, remoteUserID, remoteSourceRef string) (*gwapitypes.PrivateUserResponse, *http.Response, error) {
+func (c *Client) GetUserByLinkedAccountRemoteUserAndSource(ctx context.Context, remoteUserID, remoteSourceRef string) (*gwapitypes.PrivateUserResponse, *Response, error) {
 	q := url.Values{}
 	q.Add("query_type", "byremoteuser")
 	q.Add("remoteuserid", remoteUserID)
@@ -389,7 +395,7 @@ func (c *Client) GetUserByLinkedAccountRemoteUserAndSource(ctx context.Context, 
 	return users[0], resp, errors.WithStack(err)
 }
 
-func (c *Client) CreateUser(ctx context.Context, req *gwapitypes.CreateUserRequest) (*gwapitypes.UserResponse, *http.Response, error) {
+func (c *Client) CreateUser(ctx context.Context, req *gwapitypes.CreateUserRequest) (*gwapitypes.UserResponse, *Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -400,11 +406,11 @@ func (c *Client) CreateUser(ctx context.Context, req *gwapitypes.CreateUserReque
 	return user, resp, errors.WithStack(err)
 }
 
-func (c *Client) DeleteUser(ctx context.Context, userRef string) (*http.Response, error) {
+func (c *Client) DeleteUser(ctx context.Context, userRef string) (*Response, error) {
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/users/%s", userRef), nil, jsonContent, nil)
 }
 
-func (c *Client) UserCreateRun(ctx context.Context, req *gwapitypes.UserCreateRunRequest) (*http.Response, error) {
+func (c *Client) UserCreateRun(ctx context.Context, req *gwapitypes.UserCreateRunRequest) (*Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -413,7 +419,7 @@ func (c *Client) UserCreateRun(ctx context.Context, req *gwapitypes.UserCreateRu
 	return c.getResponse(ctx, "POST", "/user/createrun", nil, jsonContent, bytes.NewReader(reqj))
 }
 
-func (c *Client) CreateUserLA(ctx context.Context, userRef string, req *gwapitypes.CreateUserLARequest) (*gwapitypes.CreateUserLAResponse, *http.Response, error) {
+func (c *Client) CreateUserLA(ctx context.Context, userRef string, req *gwapitypes.CreateUserLARequest) (*gwapitypes.CreateUserLAResponse, *Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -424,11 +430,11 @@ func (c *Client) CreateUserLA(ctx context.Context, userRef string, req *gwapityp
 	return la, resp, errors.WithStack(err)
 }
 
-func (c *Client) DeleteUserLA(ctx context.Context, userRef, laID string) (*http.Response, error) {
+func (c *Client) DeleteUserLA(ctx context.Context, userRef, laID string) (*Response, error) {
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/users/%s/linkedaccounts/%s", userRef, laID), nil, jsonContent, nil)
 }
 
-func (c *Client) Login(ctx context.Context, req *gwapitypes.LoginUserRequest) (*gwapitypes.LoginUserResponse, *http.Response, error) {
+func (c *Client) Login(ctx context.Context, req *gwapitypes.LoginUserRequest) (*gwapitypes.LoginUserResponse, *Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -439,7 +445,7 @@ func (c *Client) Login(ctx context.Context, req *gwapitypes.LoginUserRequest) (*
 	return loginResponse, resp, errors.WithStack(err)
 }
 
-func (c *Client) RegisterUser(ctx context.Context, req *gwapitypes.RegisterUserRequest) (*gwapitypes.RegisterUserResponse, *http.Response, error) {
+func (c *Client) RegisterUser(ctx context.Context, req *gwapitypes.RegisterUserRequest) (*gwapitypes.RegisterUserResponse, *Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -450,7 +456,7 @@ func (c *Client) RegisterUser(ctx context.Context, req *gwapitypes.RegisterUserR
 	return res, resp, errors.WithStack(err)
 }
 
-func (c *Client) CreateUserToken(ctx context.Context, userRef string, req *gwapitypes.CreateUserTokenRequest) (*gwapitypes.CreateUserTokenResponse, *http.Response, error) {
+func (c *Client) CreateUserToken(ctx context.Context, userRef string, req *gwapitypes.CreateUserTokenRequest) (*gwapitypes.CreateUserTokenResponse, *Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -461,47 +467,47 @@ func (c *Client) CreateUserToken(ctx context.Context, userRef string, req *gwapi
 	return tresp, resp, errors.WithStack(err)
 }
 
-func (c *Client) DeleteUserToken(ctx context.Context, userRef, tokenName string) (*http.Response, error) {
+func (c *Client) DeleteUserToken(ctx context.Context, userRef, tokenName string) (*Response, error) {
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/users/%s/tokens/%s", userRef, tokenName), nil, jsonContent, nil)
 }
 
-func (c *Client) GetProjectRun(ctx context.Context, projectRef string, runNumber uint64) (*gwapitypes.RunResponse, *http.Response, error) {
+func (c *Client) GetProjectRun(ctx context.Context, projectRef string, runNumber uint64) (*gwapitypes.RunResponse, *Response, error) {
 	return c.getRun(ctx, "projects", projectRef, runNumber)
 }
 
-func (c *Client) GetUserRun(ctx context.Context, userRef string, runNumber uint64) (*gwapitypes.RunResponse, *http.Response, error) {
+func (c *Client) GetUserRun(ctx context.Context, userRef string, runNumber uint64) (*gwapitypes.RunResponse, *Response, error) {
 	return c.getRun(ctx, "users", userRef, runNumber)
 }
 
-func (c *Client) getRun(ctx context.Context, groupType, groupRef string, runNumber uint64) (*gwapitypes.RunResponse, *http.Response, error) {
+func (c *Client) getRun(ctx context.Context, groupType, groupRef string, runNumber uint64) (*gwapitypes.RunResponse, *Response, error) {
 	run := new(gwapitypes.RunResponse)
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/%s/%s/runs/%d", groupType, url.PathEscape(groupRef), runNumber), nil, jsonContent, nil, run)
 	return run, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetProjectRunTask(ctx context.Context, projectRef string, runNumber uint64, taskID string) (*gwapitypes.RunTaskResponse, *http.Response, error) {
+func (c *Client) GetProjectRunTask(ctx context.Context, projectRef string, runNumber uint64, taskID string) (*gwapitypes.RunTaskResponse, *Response, error) {
 	return c.getRunTask(ctx, "projects", projectRef, runNumber, taskID)
 }
 
-func (c *Client) GetUserRunTask(ctx context.Context, userRef string, runNumber uint64, taskID string) (*gwapitypes.RunTaskResponse, *http.Response, error) {
+func (c *Client) GetUserRunTask(ctx context.Context, userRef string, runNumber uint64, taskID string) (*gwapitypes.RunTaskResponse, *Response, error) {
 	return c.getRunTask(ctx, "users", userRef, runNumber, taskID)
 }
 
-func (c *Client) getRunTask(ctx context.Context, groupType, groupRef string, runNumber uint64, taskID string) (*gwapitypes.RunTaskResponse, *http.Response, error) {
+func (c *Client) getRunTask(ctx context.Context, groupType, groupRef string, runNumber uint64, taskID string) (*gwapitypes.RunTaskResponse, *Response, error) {
 	task := new(gwapitypes.RunTaskResponse)
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/%s/%s/runs/%d/tasks/%s", groupType, url.PathEscape(groupRef), runNumber, taskID), nil, jsonContent, nil, task)
 	return task, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetProjectRuns(ctx context.Context, projectRef string, phaseFilter, resultFilter []string, start uint64, limit int, asc bool) ([]*gwapitypes.RunsResponse, *http.Response, error) {
+func (c *Client) GetProjectRuns(ctx context.Context, projectRef string, phaseFilter, resultFilter []string, start uint64, limit int, asc bool) ([]*gwapitypes.RunsResponse, *Response, error) {
 	return c.getRuns(ctx, "projects", projectRef, phaseFilter, resultFilter, start, limit, asc)
 }
 
-func (c *Client) GetUserRuns(ctx context.Context, userRef string, phaseFilter, resultFilter []string, start uint64, limit int, asc bool) ([]*gwapitypes.RunsResponse, *http.Response, error) {
+func (c *Client) GetUserRuns(ctx context.Context, userRef string, phaseFilter, resultFilter []string, start uint64, limit int, asc bool) ([]*gwapitypes.RunsResponse, *Response, error) {
 	return c.getRuns(ctx, "users", userRef, phaseFilter, resultFilter, start, limit, asc)
 }
 
-func (c *Client) getRuns(ctx context.Context, groupType, groupRef string, phaseFilter, resultFilter []string, start uint64, limit int, asc bool) ([]*gwapitypes.RunsResponse, *http.Response, error) {
+func (c *Client) getRuns(ctx context.Context, groupType, groupRef string, phaseFilter, resultFilter []string, start uint64, limit int, asc bool) ([]*gwapitypes.RunsResponse, *Response, error) {
 	q := url.Values{}
 	for _, phase := range phaseFilter {
 		q.Add("phase", phase)
@@ -524,15 +530,15 @@ func (c *Client) getRuns(ctx context.Context, groupType, groupRef string, phaseF
 	return getRunsResponse, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetProjectLogs(ctx context.Context, projectRef string, runNumber uint64, taskID string, setup bool, step int, follow bool) (*http.Response, error) {
+func (c *Client) GetProjectLogs(ctx context.Context, projectRef string, runNumber uint64, taskID string, setup bool, step int, follow bool) (*Response, error) {
 	return c.getLogs(ctx, "projects", projectRef, runNumber, taskID, setup, step, follow)
 }
 
-func (c *Client) GetUserLogs(ctx context.Context, userRef string, runNumber uint64, taskID string, setup bool, step int, follow bool) (*http.Response, error) {
+func (c *Client) GetUserLogs(ctx context.Context, userRef string, runNumber uint64, taskID string, setup bool, step int, follow bool) (*Response, error) {
 	return c.getLogs(ctx, "users", userRef, runNumber, taskID, setup, step, follow)
 }
 
-func (c *Client) getLogs(ctx context.Context, groupType, groupRef string, runNumber uint64, taskID string, setup bool, step int, follow bool) (*http.Response, error) {
+func (c *Client) getLogs(ctx context.Context, groupType, groupRef string, runNumber uint64, taskID string, setup bool, step int, follow bool) (*Response, error) {
 	q := url.Values{}
 	if setup {
 		q.Add("setup", "")
@@ -545,15 +551,15 @@ func (c *Client) getLogs(ctx context.Context, groupType, groupRef string, runNum
 	return c.getResponse(ctx, "GET", fmt.Sprintf("/%s/%s/runs/%d/tasks/%s/logs", groupType, url.PathEscape(groupRef), runNumber, taskID), q, nil, nil)
 }
 
-func (c *Client) DeleteProjectLogs(ctx context.Context, projectRef string, runNumber uint64, taskID string, setup bool, step int) (*http.Response, error) {
+func (c *Client) DeleteProjectLogs(ctx context.Context, projectRef string, runNumber uint64, taskID string, setup bool, step int) (*Response, error) {
 	return c.deleteLogs(ctx, "projects", projectRef, runNumber, taskID, setup, step)
 }
 
-func (c *Client) DeleteUserLogs(ctx context.Context, userRef string, runNumber uint64, taskID string, setup bool, step int) (*http.Response, error) {
+func (c *Client) DeleteUserLogs(ctx context.Context, userRef string, runNumber uint64, taskID string, setup bool, step int) (*Response, error) {
 	return c.deleteLogs(ctx, "users", userRef, runNumber, taskID, setup, step)
 }
 
-func (c *Client) deleteLogs(ctx context.Context, groupType, groupRef string, runNumber uint64, taskID string, setup bool, step int) (*http.Response, error) {
+func (c *Client) deleteLogs(ctx context.Context, groupType, groupRef string, runNumber uint64, taskID string, setup bool, step int) (*Response, error) {
 	q := url.Values{}
 	if setup {
 		q.Add("setup", "")
@@ -564,13 +570,13 @@ func (c *Client) deleteLogs(ctx context.Context, groupType, groupRef string, run
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/%s/%s/runs/%d/tasks/%s/logs", groupType, url.PathEscape(groupRef), runNumber, taskID), q, nil, nil)
 }
 
-func (c *Client) GetRemoteSource(ctx context.Context, rsRef string) (*gwapitypes.RemoteSourceResponse, *http.Response, error) {
+func (c *Client) GetRemoteSource(ctx context.Context, rsRef string) (*gwapitypes.RemoteSourceResponse, *Response, error) {
 	rs := new(gwapitypes.RemoteSourceResponse)
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/remotesources/%s", rsRef), nil, jsonContent, nil, rs)
 	return rs, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetRemoteSources(ctx context.Context, start string, limit int, asc bool) ([]*gwapitypes.RemoteSourceResponse, *http.Response, error) {
+func (c *Client) GetRemoteSources(ctx context.Context, start string, limit int, asc bool) ([]*gwapitypes.RemoteSourceResponse, *Response, error) {
 	q := url.Values{}
 	if start != "" {
 		q.Add("start", start)
@@ -587,7 +593,7 @@ func (c *Client) GetRemoteSources(ctx context.Context, start string, limit int, 
 	return rss, resp, errors.WithStack(err)
 }
 
-func (c *Client) CreateRemoteSource(ctx context.Context, req *gwapitypes.CreateRemoteSourceRequest) (*gwapitypes.RemoteSourceResponse, *http.Response, error) {
+func (c *Client) CreateRemoteSource(ctx context.Context, req *gwapitypes.CreateRemoteSourceRequest) (*gwapitypes.RemoteSourceResponse, *Response, error) {
 	rsj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -598,7 +604,7 @@ func (c *Client) CreateRemoteSource(ctx context.Context, req *gwapitypes.CreateR
 	return rs, resp, errors.WithStack(err)
 }
 
-func (c *Client) UpdateRemoteSource(ctx context.Context, rsRef string, req *gwapitypes.UpdateRemoteSourceRequest) (*gwapitypes.RemoteSourceResponse, *http.Response, error) {
+func (c *Client) UpdateRemoteSource(ctx context.Context, rsRef string, req *gwapitypes.UpdateRemoteSourceRequest) (*gwapitypes.RemoteSourceResponse, *Response, error) {
 	rsj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -609,17 +615,17 @@ func (c *Client) UpdateRemoteSource(ctx context.Context, rsRef string, req *gwap
 	return rs, resp, errors.WithStack(err)
 }
 
-func (c *Client) DeleteRemoteSource(ctx context.Context, rsRef string) (*http.Response, error) {
+func (c *Client) DeleteRemoteSource(ctx context.Context, rsRef string) (*Response, error) {
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/remotesources/%s", rsRef), nil, jsonContent, nil)
 }
 
-func (c *Client) GetOrg(ctx context.Context, orgRef string) (*gwapitypes.OrgResponse, *http.Response, error) {
+func (c *Client) GetOrg(ctx context.Context, orgRef string) (*gwapitypes.OrgResponse, *Response, error) {
 	res := &gwapitypes.OrgResponse{}
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s", orgRef), nil, jsonContent, nil, &res)
 	return res, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetOrgs(ctx context.Context, start string, limit int, asc bool) ([]*gwapitypes.OrgResponse, *http.Response, error) {
+func (c *Client) GetOrgs(ctx context.Context, start string, limit int, asc bool) ([]*gwapitypes.OrgResponse, *Response, error) {
 	q := url.Values{}
 	if start != "" {
 		q.Add("start", start)
@@ -636,7 +642,7 @@ func (c *Client) GetOrgs(ctx context.Context, start string, limit int, asc bool)
 	return orgs, resp, errors.WithStack(err)
 }
 
-func (c *Client) CreateOrg(ctx context.Context, req *gwapitypes.CreateOrgRequest) (*gwapitypes.OrgResponse, *http.Response, error) {
+func (c *Client) CreateOrg(ctx context.Context, req *gwapitypes.CreateOrgRequest) (*gwapitypes.OrgResponse, *Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -647,11 +653,11 @@ func (c *Client) CreateOrg(ctx context.Context, req *gwapitypes.CreateOrgRequest
 	return org, resp, errors.WithStack(err)
 }
 
-func (c *Client) DeleteOrg(ctx context.Context, orgRef string) (*http.Response, error) {
+func (c *Client) DeleteOrg(ctx context.Context, orgRef string) (*Response, error) {
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/orgs/%s", orgRef), nil, jsonContent, nil)
 }
 
-func (c *Client) UpdateOrg(ctx context.Context, orgRef string, req *gwapitypes.UpdateOrgRequest) (*gwapitypes.OrgResponse, *http.Response, error) {
+func (c *Client) UpdateOrg(ctx context.Context, orgRef string, req *gwapitypes.UpdateOrgRequest) (*gwapitypes.OrgResponse, *Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -662,7 +668,7 @@ func (c *Client) UpdateOrg(ctx context.Context, orgRef string, req *gwapitypes.U
 	return org, resp, errors.WithStack(err)
 }
 
-func (c *Client) AddOrgMember(ctx context.Context, orgRef, userRef string, role gwapitypes.MemberRole) (*gwapitypes.AddOrgMemberResponse, *http.Response, error) {
+func (c *Client) AddOrgMember(ctx context.Context, orgRef, userRef string, role gwapitypes.MemberRole) (*gwapitypes.AddOrgMemberResponse, *Response, error) {
 	req := &gwapitypes.AddOrgMemberRequest{
 		Role: role,
 	}
@@ -676,59 +682,59 @@ func (c *Client) AddOrgMember(ctx context.Context, orgRef, userRef string, role 
 	return res, resp, errors.WithStack(err)
 }
 
-func (c *Client) RemoveOrgMember(ctx context.Context, orgRef, userRef string) (*http.Response, error) {
+func (c *Client) RemoveOrgMember(ctx context.Context, orgRef, userRef string) (*Response, error) {
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/orgs/%s/members/%s", orgRef, userRef), nil, jsonContent, nil)
 }
 
-func (c *Client) GetOrgMembers(ctx context.Context, orgRef string) (*gwapitypes.OrgMembersResponse, *http.Response, error) {
+func (c *Client) GetOrgMembers(ctx context.Context, orgRef string) (*gwapitypes.OrgMembersResponse, *Response, error) {
 	res := &gwapitypes.OrgMembersResponse{}
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s/members", orgRef), nil, jsonContent, nil, &res)
 	return res, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetVersion(ctx context.Context) (*gwapitypes.VersionResponse, *http.Response, error) {
+func (c *Client) GetVersion(ctx context.Context) (*gwapitypes.VersionResponse, *Response, error) {
 	res := &gwapitypes.VersionResponse{}
 	resp, err := c.getParsedResponse(ctx, "GET", "/version", nil, jsonContent, nil, &res)
 	return res, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetUserOrgs(ctx context.Context) ([]*gwapitypes.UserOrgsResponse, *http.Response, error) {
+func (c *Client) GetUserOrgs(ctx context.Context) ([]*gwapitypes.UserOrgsResponse, *Response, error) {
 	userOrgs := []*gwapitypes.UserOrgsResponse{}
 	resp, err := c.getParsedResponse(ctx, "GET", "/user/orgs", nil, jsonContent, nil, &userOrgs)
 	return userOrgs, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetUserRemoteRepos(ctx context.Context, rsRef string) ([]*gwapitypes.RemoteRepoResponse, *http.Response, error) {
+func (c *Client) GetUserRemoteRepos(ctx context.Context, rsRef string) ([]*gwapitypes.RemoteRepoResponse, *Response, error) {
 	remoteRepos := []*gwapitypes.RemoteRepoResponse{}
 	resp, err := c.getParsedResponse(ctx, "GET", path.Join("/user/remoterepos", url.PathEscape(rsRef)), nil, jsonContent, nil, &remoteRepos)
 	return remoteRepos, resp, err
 }
 
-func (c *Client) RefreshRemoteRepo(ctx context.Context, projectRef string) (*gwapitypes.ProjectResponse, *http.Response, error) {
+func (c *Client) RefreshRemoteRepo(ctx context.Context, projectRef string) (*gwapitypes.ProjectResponse, *Response, error) {
 	project := new(gwapitypes.ProjectResponse)
 	resp, err := c.getParsedResponse(ctx, "POST", path.Join("/projects", url.PathEscape(projectRef), "/refreshremoterepo"), nil, jsonContent, nil, project)
 	return project, resp, err
 }
 
-func (c *Client) GetOrgInvitations(ctx context.Context, orgRef string) ([]*gwapitypes.OrgInvitationResponse, *http.Response, error) {
+func (c *Client) GetOrgInvitations(ctx context.Context, orgRef string) ([]*gwapitypes.OrgInvitationResponse, *Response, error) {
 	orgInvitations := []*gwapitypes.OrgInvitationResponse{}
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s/invitations", orgRef), nil, jsonContent, nil, &orgInvitations)
 	return orgInvitations, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetUserOrgInvitations(ctx context.Context) ([]*gwapitypes.OrgInvitationResponse, *http.Response, error) {
+func (c *Client) GetUserOrgInvitations(ctx context.Context) ([]*gwapitypes.OrgInvitationResponse, *Response, error) {
 	orgInvitations := []*gwapitypes.OrgInvitationResponse{}
 	resp, err := c.getParsedResponse(ctx, "GET", "/user/org_invitations", nil, jsonContent, nil, &orgInvitations)
 	return orgInvitations, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetOrgInvitation(ctx context.Context, orgRef, userRef string) (*gwapitypes.OrgInvitationResponse, *http.Response, error) {
+func (c *Client) GetOrgInvitation(ctx context.Context, orgRef, userRef string) (*gwapitypes.OrgInvitationResponse, *Response, error) {
 	orgInvitation := new(gwapitypes.OrgInvitationResponse)
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s/invitations/%s", orgRef, userRef), nil, jsonContent, nil, orgInvitation)
 	return orgInvitation, resp, errors.WithStack(err)
 }
 
-func (c *Client) CreateOrgInvitation(ctx context.Context, orgRef string, req *gwapitypes.CreateOrgInvitationRequest) (*gwapitypes.OrgInvitationResponse, *http.Response, error) {
+func (c *Client) CreateOrgInvitation(ctx context.Context, orgRef string, req *gwapitypes.CreateOrgInvitationRequest) (*gwapitypes.OrgInvitationResponse, *Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
@@ -739,12 +745,12 @@ func (c *Client) CreateOrgInvitation(ctx context.Context, orgRef string, req *gw
 	return orgInvitation, resp, errors.WithStack(err)
 }
 
-func (c *Client) DeleteOrgInvitation(ctx context.Context, orgRef string, userRef string) (*http.Response, error) {
+func (c *Client) DeleteOrgInvitation(ctx context.Context, orgRef string, userRef string) (*Response, error) {
 	resp, err := c.getResponse(ctx, "DELETE", fmt.Sprintf("/orgs/%s/invitations/%s", orgRef, userRef), nil, jsonContent, nil)
 	return resp, errors.WithStack(err)
 }
 
-func (c *Client) UserOrgInvitationAction(ctx context.Context, orgRef string, req *gwapitypes.OrgInvitationActionRequest) (*http.Response, error) {
+func (c *Client) UserOrgInvitationAction(ctx context.Context, orgRef string, req *gwapitypes.OrgInvitationActionRequest) (*Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -754,24 +760,24 @@ func (c *Client) UserOrgInvitationAction(ctx context.Context, orgRef string, req
 	return resp, errors.WithStack(err)
 }
 
-func (c *Client) GetMaintenanceStatus(ctx context.Context, serviceName string) (*gwapitypes.MaintenanceStatusResponse, *http.Response, error) {
+func (c *Client) GetMaintenanceStatus(ctx context.Context, serviceName string) (*gwapitypes.MaintenanceStatusResponse, *Response, error) {
 	maintenanceStatus := new(gwapitypes.MaintenanceStatusResponse)
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/maintenance/%s", serviceName), nil, jsonContent, nil, maintenanceStatus)
 	return maintenanceStatus, resp, errors.WithStack(err)
 }
 
-func (c *Client) EnableMaintenance(ctx context.Context, serviceName string) (*http.Response, error) {
+func (c *Client) EnableMaintenance(ctx context.Context, serviceName string) (*Response, error) {
 	return c.getResponse(ctx, "PUT", fmt.Sprintf("/maintenance/%s", serviceName), nil, jsonContent, nil)
 }
 
-func (c *Client) DisableMaintenance(ctx context.Context, serviceName string) (*http.Response, error) {
+func (c *Client) DisableMaintenance(ctx context.Context, serviceName string) (*Response, error) {
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/maintenance/%s", serviceName), nil, jsonContent, nil)
 }
 
-func (c *Client) Export(ctx context.Context, serviceName string) (*http.Response, error) {
+func (c *Client) Export(ctx context.Context, serviceName string) (*Response, error) {
 	return c.getResponse(ctx, "GET", fmt.Sprintf("/export/%s", serviceName), nil, jsonContent, nil)
 }
 
-func (c *Client) Import(ctx context.Context, serviceName string, r io.Reader) (*http.Response, error) {
+func (c *Client) Import(ctx context.Context, serviceName string, r io.Reader) (*Response, error) {
 	return c.getResponse(ctx, "POST", fmt.Sprintf("/import/%s", serviceName), nil, jsonContent, r)
 }

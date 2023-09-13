@@ -23,6 +23,8 @@ import (
 
 	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
+	csclient "agola.io/agola/services/configstore/client"
+	rsclient "agola.io/agola/services/runservice/client"
 )
 
 const (
@@ -95,12 +97,16 @@ func (h *ActionHandler) Export(ctx context.Context, serviceName string) (*http.R
 	}
 
 	var err error
-	var resp *http.Response
+	var res *http.Response
 	switch serviceName {
 	case ConfigstoreService:
+		var resp *csclient.Response
 		resp, err = h.configstoreClient.Export(ctx)
+		res = resp.Response
 	case RunserviceService:
+		var resp *rsclient.Response
 		resp, err = h.runserviceClient.Export(ctx)
+		res = resp.Response
 	default:
 		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid service name %q", serviceName))
 	}
@@ -108,7 +114,7 @@ func (h *ActionHandler) Export(ctx context.Context, serviceName string) (*http.R
 		return nil, errors.WithStack(err)
 	}
 
-	return resp, nil
+	return res, nil
 }
 
 func (h *ActionHandler) Import(ctx context.Context, r io.Reader, serviceName string) error {
