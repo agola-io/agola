@@ -22,7 +22,7 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/securecookie v1.1.1
 	github.com/hashicorp/go-sockaddr v1.0.2
-	github.com/huandu/go-sqlbuilder v1.21.0
+	github.com/huandu/go-sqlbuilder v1.22.0
 	github.com/huandu/xstrings v1.4.0
 	github.com/iancoleman/strcase v0.2.0
 	github.com/lib/pq v1.10.7

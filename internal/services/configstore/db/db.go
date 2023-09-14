@@ -476,14 +476,6 @@ func (d *DB) GetOrgs(tx *sql.Tx, startOrgName string, limit int, asc bool) ([]*t
 	return orgs, errors.WithStack(err)
 }
 
-func (d *DB) GetOrgMembers(tx *sql.Tx, orgID string) ([]*types.OrganizationMember, error) {
-	q := organizationMemberSelect()
-	q.Where(q.E("organization_id", orgID))
-	orgMembers, _, err := d.fetchOrganizationMembers(tx, q)
-
-	return orgMembers, errors.WithStack(err)
-}
-
 func (d *DB) GetOrgMemberByOrgUserID(tx *sql.Tx, orgID, userID string) (*types.OrganizationMember, error) {
 	q := organizationMemberSelect()
 	q.Where(q.E("orgmember.organization_id", orgID), q.E("orgmember.user_id", userID))
@@ -534,8 +526,7 @@ type OrgUser struct {
 	Role types.MemberRole
 }
 
-// TODO(sgotti) implement cursor fetching
-func (d *DB) GetOrgUsers(tx *sql.Tx, orgID string) ([]*OrgUser, error) {
+func (d *DB) GetOrgMembers(tx *sql.Tx, orgID string, startUserName string, limit int, sortDirection types.SortDirection) ([]*OrgUser, error) {
 	cols := organizationMemberSelectColumns()
 	cols = append(cols, userSelectColumns()...)
 
@@ -543,6 +534,25 @@ func (d *DB) GetOrgUsers(tx *sql.Tx, orgID string) ([]*OrgUser, error) {
 	q = q.Join("user_t", "user_t.id = orgmember.user_id")
 	q = q.Where(q.E("orgmember.organization_id", orgID))
 	q = q.OrderBy("user_t.name")
+	switch sortDirection {
+	case types.SortDirectionAsc:
+		q.Asc()
+	case types.SortDirectionDesc:
+		q.Desc()
+	}
+
+	if startUserName != "" {
+		switch sortDirection {
+		case types.SortDirectionAsc:
+			q = q.Where(q.G("user_t.name", startUserName))
+		case types.SortDirectionDesc:
+			q = q.Where(q.L("user_t.name", startUserName))
+		}
+	}
+
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
 
 	rows, err := d.query(tx, q)
 	if err != nil {

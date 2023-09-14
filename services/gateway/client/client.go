@@ -722,9 +722,12 @@ func (c *Client) RemoveOrgMember(ctx context.Context, orgRef, userRef string) (*
 	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/orgs/%s/members/%s", orgRef, userRef), nil, jsonContent, nil)
 }
 
-func (c *Client) GetOrgMembers(ctx context.Context, orgRef string) (*gwapitypes.OrgMembersResponse, *Response, error) {
+func (c *Client) GetOrgMembers(ctx context.Context, orgRef string, opts *ListOptions) (*gwapitypes.OrgMembersResponse, *Response, error) {
+	q := url.Values{}
+	opts.Add(q)
+
 	res := &gwapitypes.OrgMembersResponse{}
-	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s/members", orgRef), nil, jsonContent, nil, &res)
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s/members", orgRef), q, jsonContent, nil, &res)
 	return res, resp, errors.WithStack(err)
 }
 

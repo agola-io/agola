@@ -628,9 +628,26 @@ func (c *Client) GetOrg(ctx context.Context, orgRef string) (*cstypes.Organizati
 	return org, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetOrgMembers(ctx context.Context, orgRef string) ([]*csapitypes.OrgMemberResponse, *Response, error) {
+type GetOrgMembersOptions struct {
+	*ListOptions
+
+	StartUserName string
+}
+
+func (o *GetOrgMembersOptions) Add(q url.Values) {
+	o.ListOptions.Add(q)
+
+	if o.StartUserName != "" {
+		q.Add("startusername", o.StartUserName)
+	}
+}
+
+func (c *Client) GetOrgMembers(ctx context.Context, orgRef string, opts *GetOrgMembersOptions) ([]*csapitypes.OrgMemberResponse, *Response, error) {
+	q := url.Values{}
+	opts.Add(q)
+
 	orgMembers := []*csapitypes.OrgMemberResponse{}
-	resp, err := c.GetParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s/members", orgRef), nil, common.JSONContent, nil, &orgMembers)
+	resp, err := c.GetParsedResponse(ctx, "GET", fmt.Sprintf("/orgs/%s/members", orgRef), q, common.JSONContent, nil, &orgMembers)
 	return orgMembers, resp, errors.WithStack(err)
 }
 

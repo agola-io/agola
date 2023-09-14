@@ -17,6 +17,7 @@ package api
 import (
 	"net/http"
 	"net/url"
+	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/sorintlab/errors"
@@ -25,9 +26,9 @@ import (
 	"agola.io/agola/services/configstore/types"
 )
 
-type ErrorResponse struct {
-	Message string `json:"message"`
-}
+const (
+	agolaHasMoreHeader = "X-Agola-HasMore"
+)
 
 func GetObjectKindRef(r *http.Request) (types.ObjectKind, string, error) {
 	vars := mux.Vars(r)
@@ -48,4 +49,45 @@ func GetObjectKindRef(r *http.Request) (types.ObjectKind, string, error) {
 	}
 
 	return "", "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot get project or projectgroup ref"))
+}
+
+type requestOptions struct {
+	Limit         int
+	SortDirection types.SortDirection
+}
+
+func parseRequestOptions(r *http.Request) (*requestOptions, error) {
+	query := r.URL.Query()
+
+	limit := 0
+	limitS := query.Get("limit")
+	if limitS != "" {
+		var err error
+		limit, err = strconv.Atoi(limitS)
+		if err != nil {
+			return nil, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit"))
+		}
+	}
+	if limit < 0 {
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0"))
+	}
+
+	sortDirection := types.SortDirection(query.Get("sortdirection"))
+	if sortDirection != "" {
+		switch sortDirection {
+		case types.SortDirectionAsc:
+		case types.SortDirectionDesc:
+		default:
+			return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("wrong sort direction %q", sortDirection))
+		}
+	}
+
+	return &requestOptions{
+		Limit:         limit,
+		SortDirection: sortDirection,
+	}, nil
+}
+
+func addHasMoreHeader(w http.ResponseWriter, hasMore bool) {
+	w.Header().Add(agolaHasMoreHeader, strconv.FormatBool(hasMore))
 }
