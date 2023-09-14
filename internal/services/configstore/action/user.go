@@ -27,6 +27,49 @@ import (
 	"agola.io/agola/services/configstore/types"
 )
 
+type GetUsersRequest struct {
+	StartUserName string
+
+	Limit         int
+	SortDirection types.SortDirection
+}
+
+type GetUsersResponse struct {
+	Users []*types.User
+
+	HasMore bool
+}
+
+func (h *ActionHandler) GetUsers(ctx context.Context, req *GetUsersRequest) (*GetUsersResponse, error) {
+	limit := req.Limit
+	if limit > 0 {
+		limit += 1
+	}
+
+	var users []*types.User
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		users, err = h.d.GetUsers(tx, req.StartUserName, limit, req.SortDirection)
+		return errors.WithStack(err)
+	})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	var hasMore bool
+	if req.Limit > 0 {
+		hasMore = len(users) > req.Limit
+		if hasMore {
+			users = users[0:req.Limit]
+		}
+	}
+
+	return &GetUsersResponse{
+		Users:   users,
+		HasMore: hasMore,
+	}, nil
+}
+
 type CreateUserRequest struct {
 	UserName string
 

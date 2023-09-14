@@ -33,6 +33,7 @@ import (
 	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
+	"agola.io/agola/services/configstore/client"
 	cstypes "agola.io/agola/services/configstore/types"
 )
 
@@ -101,19 +102,44 @@ func (h *ActionHandler) GetUserOrgs(ctx context.Context, userRef string) ([]*csa
 }
 
 type GetUsersRequest struct {
-	Start string
-	Limit int
-	Asc   bool
+	Cursor string
+
+	Limit         int
+	SortDirection SortDirection
 }
 
-func (h *ActionHandler) GetUsers(ctx context.Context, req *GetUsersRequest) ([]*PrivateUserResponse, error) {
+type GetUsersResponse struct {
+	Users []*PrivateUserResponse
+
+	Cursor string
+}
+
+func (h *ActionHandler) GetUsers(ctx context.Context, req *GetUsersRequest) (*GetUsersResponse, error) {
 	if !common.IsUserAdmin(ctx) {
 		return nil, util.NewAPIError(util.ErrUnauthorized, errors.Errorf("user not admin"))
 	}
 
-	csusers, _, err := h.configstoreClient.GetUsers(ctx, req.Start, req.Limit, req.Asc)
+	inCursor := &StartCursor{}
+	sortDirection := req.SortDirection
+	if req.Cursor != "" {
+		if err := UnmarshalCursor(req.Cursor, inCursor); err != nil {
+			return nil, errors.WithStack(err)
+		}
+		sortDirection = inCursor.SortDirection
+	}
+
+	csusers, resp, err := h.configstoreClient.GetUsers(ctx, &client.GetUsersOptions{ListOptions: &client.ListOptions{Limit: req.Limit, SortDirection: cstypes.SortDirection(sortDirection)}, StartUserName: inCursor.Start})
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
+	}
+
+	var outCursor string
+	if resp.HasMore && len(csusers) > 0 {
+		lastUserName := csusers[len(csusers)-1].Name
+		outCursor, err = MarshalCursor(&StartCursor{Start: lastUserName})
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
 	}
 
 	users := make([]*PrivateUserResponse, len(csusers))
@@ -131,7 +157,12 @@ func (h *ActionHandler) GetUsers(ctx context.Context, req *GetUsersRequest) ([]*
 		users[i] = &PrivateUserResponse{User: user, Tokens: tokens, LinkedAccounts: linkedAccounts}
 	}
 
-	return users, nil
+	res := &GetUsersResponse{
+		Users:  users,
+		Cursor: outCursor,
+	}
+
+	return res, nil
 }
 
 type CreateUserRequest struct {

@@ -164,7 +164,7 @@ func (s *Configstore) setupDefaultRouter() http.Handler {
 	deleteVariableHandler := api.NewDeleteVariableHandler(s.log, s.ah)
 
 	userHandler := api.NewUserHandler(s.log, s.d)
-	usersHandler := api.NewUsersHandler(s.log, s.d)
+	usersHandler := api.NewUsersHandler(s.log, s.d, s.ah)
 	createUserHandler := api.NewCreateUserHandler(s.log, s.ah)
 	updateUserHandler := api.NewUpdateUserHandler(s.log, s.ah)
 	deleteUserHandler := api.NewDeleteUserHandler(s.log, s.ah)
