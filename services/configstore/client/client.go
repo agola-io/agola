@@ -32,8 +32,38 @@ import (
 	cstypes "agola.io/agola/services/configstore/types"
 )
 
+const (
+	agolaHasMoreHeader = "X-Agola-HasMore"
+)
+
+type ListOptions struct {
+	Limit         int
+	SortDirection cstypes.SortDirection
+}
+
+func (o *ListOptions) Add(q url.Values) {
+	if o == nil {
+		return
+	}
+
+	if o.Limit != 0 {
+		q.Add("limit", strconv.Itoa(o.Limit))
+	}
+
+	switch o.SortDirection {
+	case cstypes.SortDirectionDesc:
+		q.Add("sortdirection", "desc")
+	case cstypes.SortDirectionAsc:
+		fallthrough
+	default:
+		q.Add("sortdirection", "asc")
+	}
+}
+
 type Response struct {
 	*http.Response
+
+	HasMore bool
 }
 
 type Client struct {
@@ -57,6 +87,17 @@ func (c *Client) GetResponse(ctx context.Context, method, path string, query url
 	if err := util.ErrFromRemote(resp.Response); err != nil {
 		return resp, errors.WithStack(err)
 	}
+
+	hasMore := false
+	hasMoreValue := resp.Header.Get(agolaHasMoreHeader)
+	if hasMoreValue != "" {
+		hasMore, err = strconv.ParseBool(hasMoreValue)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+	}
+
+	resp.HasMore = hasMore
 
 	return resp, nil
 }
