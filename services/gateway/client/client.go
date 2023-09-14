@@ -34,8 +34,42 @@ import (
 
 var jsonContent = http.Header{"Content-Type": []string{"application/json"}}
 
+const (
+	agolaCursorHeader = "X-Agola-Cursor"
+)
+
 type Response struct {
 	*http.Response
+
+	Cursor string
+}
+
+type ListOptions struct {
+	Cursor string
+
+	Limit         int
+	SortDirection gwapitypes.SortDirection
+}
+
+func (o *ListOptions) Add(q url.Values) {
+	if o == nil {
+		return
+	}
+
+	if o.Cursor != "" {
+		q.Add("cursor", o.Cursor)
+	}
+
+	if o.Limit != 0 {
+		q.Add("limit", strconv.Itoa(o.Limit))
+	}
+
+	switch o.SortDirection {
+	case gwapitypes.SortDirectionDesc:
+		q.Add("sortdirection", "desc")
+	case gwapitypes.SortDirectionAsc:
+		q.Add("sortdirection", "asc")
+	}
 }
 
 type Client struct {
@@ -91,6 +125,8 @@ func (c *Client) getResponse(ctx context.Context, method, path string, query url
 	if err := util.ErrFromRemote(resp.Response); err != nil {
 		return resp, errors.WithStack(err)
 	}
+
+	resp.Cursor = resp.Response.Header.Get(agolaCursorHeader)
 
 	return resp, nil
 }
