@@ -645,17 +645,9 @@ func (c *Client) GetOrg(ctx context.Context, orgRef string) (*gwapitypes.OrgResp
 	return res, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetOrgs(ctx context.Context, start string, limit int, asc bool) ([]*gwapitypes.OrgResponse, *Response, error) {
+func (c *Client) GetOrgs(ctx context.Context, opts *ListOptions) ([]*gwapitypes.OrgResponse, *Response, error) {
 	q := url.Values{}
-	if start != "" {
-		q.Add("start", start)
-	}
-	if limit > 0 {
-		q.Add("limit", strconv.Itoa(limit))
-	}
-	if asc {
-		q.Add("asc", "")
-	}
+	opts.Add(q)
 
 	orgs := []*gwapitypes.OrgResponse{}
 	resp, err := c.getParsedResponse(ctx, "GET", "/orgs", q, jsonContent, nil, &orgs)

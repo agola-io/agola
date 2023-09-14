@@ -454,20 +454,28 @@ func (d *DB) GetOrgByName(tx *sql.Tx, name string) (*types.Organization, error) 
 	return out, errors.WithStack(err)
 }
 
-func getOrgsFilteredQuery(startOrgName string, limit int, asc bool) *sq.SelectBuilder {
+func getOrgsFilteredQuery(startOrgName string, visibilities []types.Visibility, limit int, sortDirection types.SortDirection) *sq.SelectBuilder {
 	q := organizationSelect()
-	if asc {
-		q = q.OrderBy("name").Asc()
-	} else {
-		q = q.OrderBy("name").Desc()
+	q = q.OrderBy("name")
+	switch sortDirection {
+	case types.SortDirectionAsc:
+		q = q.Asc()
+	case types.SortDirectionDesc:
+		q = q.Desc()
 	}
 	if startOrgName != "" {
-		if asc {
+		switch sortDirection {
+		case types.SortDirectionAsc:
 			q = q.Where(q.G("name", startOrgName))
-		} else {
+		case types.SortDirectionDesc:
 			q = q.Where(q.L("name", startOrgName))
 		}
 	}
+
+	if len(visibilities) > 0 {
+		q.Where(q.In("visibility", sq.Flatten(visibilities)...))
+	}
+
 	if limit > 0 {
 		q = q.Limit(limit)
 	}
@@ -475,8 +483,8 @@ func getOrgsFilteredQuery(startOrgName string, limit int, asc bool) *sq.SelectBu
 	return q
 }
 
-func (d *DB) GetOrgs(tx *sql.Tx, startOrgName string, limit int, asc bool) ([]*types.Organization, error) {
-	q := getOrgsFilteredQuery(startOrgName, limit, asc)
+func (d *DB) GetOrgs(tx *sql.Tx, startOrgName string, visibilities []types.Visibility, limit int, sortDirection types.SortDirection) ([]*types.Organization, error) {
+	q := getOrgsFilteredQuery(startOrgName, visibilities, limit, sortDirection)
 	orgs, _, err := d.fetchOrganizations(tx, q)
 
 	return orgs, errors.WithStack(err)

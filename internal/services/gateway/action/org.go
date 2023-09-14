@@ -48,17 +48,59 @@ func (h *ActionHandler) GetOrg(ctx context.Context, orgRef string) (*cstypes.Org
 }
 
 type GetOrgsRequest struct {
-	Start string
-	Limit int
-	Asc   bool
+	Cursor string
+
+	Limit         int
+	SortDirection SortDirection
+
+	Public  bool
+	Private bool
 }
 
-func (h *ActionHandler) GetOrgs(ctx context.Context, req *GetOrgsRequest) ([]*cstypes.Organization, error) {
-	orgs, _, err := h.configstoreClient.GetOrgs(ctx, req.Start, req.Limit, req.Asc)
+type GetOrgsResponse struct {
+	Orgs   []*cstypes.Organization
+	Cursor string
+}
+
+func (h *ActionHandler) GetOrgs(ctx context.Context, req *GetOrgsRequest) (*GetOrgsResponse, error) {
+	inCursor := &StartCursor{}
+	sortDirection := req.SortDirection
+	if req.Cursor != "" {
+		if err := UnmarshalCursor(req.Cursor, inCursor); err != nil {
+			return nil, errors.WithStack(err)
+		}
+		sortDirection = inCursor.SortDirection
+	}
+
+	isAdmin := common.IsUserAdmin(ctx)
+
+	// only admin will also get private organizations
+	// normal user will only get public organizations. Private organizations where they are members won't be returned.
+	visibilites := []cstypes.Visibility{cstypes.VisibilityPublic}
+	if isAdmin {
+		visibilites = append(visibilites, cstypes.VisibilityPrivate)
+	}
+
+	orgs, resp, err := h.configstoreClient.GetOrgs(ctx, &client.GetOrgsOptions{ListOptions: &client.ListOptions{Limit: req.Limit, SortDirection: cstypes.SortDirection(sortDirection)}, StartOrgName: inCursor.Start, Visibilities: visibilites})
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
-	return orgs, nil
+
+	var outCursor string
+	if resp.HasMore && len(orgs) > 0 {
+		lastRemoteSourceName := orgs[len(orgs)-1].Name
+		outCursor, err = MarshalCursor(&StartCursor{Start: lastRemoteSourceName})
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+	}
+
+	res := &GetOrgsResponse{
+		Orgs:   orgs,
+		Cursor: outCursor,
+	}
+
+	return res, nil
 }
 
 type GetOrgMembersRequest struct {

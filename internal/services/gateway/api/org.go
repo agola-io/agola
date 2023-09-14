@@ -181,51 +181,38 @@ func NewOrgsHandler(log zerolog.Logger, ah *action.ActionHandler) *OrgsHandler {
 }
 
 func (h *OrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	query := r.URL.Query()
-
-	limitS := query.Get("limit")
-	limit := DefaultRunsLimit
-	if limitS != "" {
-		var err error
-		limit, err = strconv.Atoi(limitS)
-		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit")))
-			return
-		}
-	}
-	if limit < 0 {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0")))
-		return
-	}
-	if limit > MaxRunsLimit {
-		limit = MaxRunsLimit
-	}
-	asc := false
-	if _, ok := query["asc"]; ok {
-		asc = true
-	}
-
-	start := query.Get("start")
-
-	areq := &action.GetOrgsRequest{
-		Start: start,
-		Limit: limit,
-		Asc:   asc,
-	}
-	csorgs, err := h.ah.GetOrgs(ctx, areq)
+	res, err := h.do(w, r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	orgs := make([]*gwapitypes.OrgResponse, len(csorgs))
-	for i, p := range csorgs {
-		orgs[i] = createOrgResponse(p)
-	}
-	if err := util.HTTPResponse(w, http.StatusOK, orgs); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
 		h.log.Err(err).Send()
 	}
+}
+
+func (h *OrgsHandler) do(w http.ResponseWriter, r *http.Request) ([]*gwapitypes.OrgResponse, error) {
+	ctx := r.Context()
+
+	ropts, err := parseRequestOptions(r)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	ares, err := h.ah.GetOrgs(ctx, &action.GetOrgsRequest{Cursor: ropts.Cursor, Limit: ropts.Limit, SortDirection: action.SortDirection(ropts.SortDirection)})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	orgs := make([]*gwapitypes.OrgResponse, len(ares.Orgs))
+	for i, p := range ares.Orgs {
+		orgs[i] = createOrgResponse(p)
+	}
+
+	addCursorHeader(w, ares.Cursor)
+
+	return orgs, nil
 }
 
 func createOrgMemberResponse(user *cstypes.User, role cstypes.MemberRole) *gwapitypes.OrgMemberResponse {

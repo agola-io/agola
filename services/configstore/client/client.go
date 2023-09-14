@@ -644,17 +644,28 @@ func (c *Client) RemoveOrgMember(ctx context.Context, orgRef, userRef string) (*
 	return resp, errors.WithStack(err)
 }
 
-func (c *Client) GetOrgs(ctx context.Context, start string, limit int, asc bool) ([]*cstypes.Organization, *Response, error) {
+type GetOrgsOptions struct {
+	*ListOptions
+
+	StartOrgName string
+
+	Visibilities []cstypes.Visibility
+}
+
+func (o *GetOrgsOptions) Add(q url.Values) {
+	o.ListOptions.Add(q)
+
+	if o.StartOrgName != "" {
+		q.Add("startorgname", o.StartOrgName)
+	}
+	for _, v := range o.Visibilities {
+		q.Add("visibilities", string(v))
+	}
+}
+
+func (c *Client) GetOrgs(ctx context.Context, opts *GetOrgsOptions) ([]*cstypes.Organization, *Response, error) {
 	q := url.Values{}
-	if start != "" {
-		q.Add("start", start)
-	}
-	if limit > 0 {
-		q.Add("limit", strconv.Itoa(limit))
-	}
-	if asc {
-		q.Add("asc", "")
-	}
+	opts.Add(q)
 
 	orgs := []*cstypes.Organization{}
 	resp, err := c.GetParsedResponse(ctx, "GET", "/orgs", q, common.JSONContent, nil, &orgs)
