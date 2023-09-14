@@ -508,11 +508,46 @@ func (h *DeleteUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-func userOrgsResponse(userOrg *action.UserOrgsResponse) *csapitypes.UserOrgsResponse {
-	return &csapitypes.UserOrgsResponse{
+func userOrgResponse(userOrg *action.UserOrg) *csapitypes.UserOrgResponse {
+	return &csapitypes.UserOrgResponse{
 		Organization: userOrg.Organization,
 		Role:         userOrg.Role,
 	}
+}
+
+type UserOrgHandler struct {
+	log zerolog.Logger
+	ah  *action.ActionHandler
+}
+
+func NewUserOrgHandler(log zerolog.Logger, ah *action.ActionHandler) *UserOrgHandler {
+	return &UserOrgHandler{log: log, ah: ah}
+}
+
+func (h *UserOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(w, r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *UserOrgHandler) do(w http.ResponseWriter, r *http.Request) (*csapitypes.UserOrgResponse, error) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	userRef := vars["userref"]
+	orgRef := vars["orgref"]
+
+	userOrg, err := h.ah.GetUserOrg(ctx, userRef, orgRef)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return userOrgResponse(userOrg), nil
 }
 
 type UserOrgsHandler struct {
@@ -525,24 +560,50 @@ func NewUserOrgsHandler(log zerolog.Logger, ah *action.ActionHandler) *UserOrgsH
 }
 
 func (h *UserOrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	vars := mux.Vars(r)
-	userRef := vars["userref"]
-
-	userOrgs, err := h.ah.GetUserOrgs(ctx, userRef)
+	res, err := h.do(w, r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	res := make([]*csapitypes.UserOrgsResponse, len(userOrgs))
-	for i, userOrg := range userOrgs {
-		res[i] = userOrgsResponse(userOrg)
-	}
-
 	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
 		h.log.Err(err).Send()
 	}
+}
+
+func (h *UserOrgsHandler) do(w http.ResponseWriter, r *http.Request) ([]*csapitypes.UserOrgResponse, error) {
+	ctx := r.Context()
+	query := r.URL.Query()
+	vars := mux.Vars(r)
+	userRef := vars["userref"]
+
+	ropts, err := parseRequestOptions(r)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	startOrgName := query.Get("startorgname")
+
+	areq := &action.GetUserOrgsRequest{
+		UserRef:      userRef,
+		StartOrgName: startOrgName,
+
+		Limit:         ropts.Limit,
+		SortDirection: ropts.SortDirection,
+	}
+	ares, err := h.ah.GetUserOrgs(ctx, areq)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	res := make([]*csapitypes.UserOrgResponse, len(ares.UserOrgs))
+	for i, userOrg := range ares.UserOrgs {
+		res[i] = userOrgResponse(userOrg)
+	}
+
+	addHasMoreHeader(w, ares.HasMore)
+
+	return res, nil
 }
 
 type UserOrgInvitationsHandler struct {

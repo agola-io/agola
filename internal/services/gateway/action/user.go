@@ -89,16 +89,54 @@ func (h *ActionHandler) GetUser(ctx context.Context, userRef string) (*cstypes.U
 	return user, nil
 }
 
-func (h *ActionHandler) GetUserOrgs(ctx context.Context, userRef string) ([]*csapitypes.UserOrgsResponse, error) {
+type GetUserOrgsRequest struct {
+	UserRef string
+
+	Cursor string
+
+	Limit         int
+	SortDirection SortDirection
+}
+
+type GetUserOrgsResponse struct {
+	Orgs   []*csapitypes.UserOrgResponse
+	Cursor string
+}
+
+func (h *ActionHandler) GetUserOrgs(ctx context.Context, req *GetUserOrgsRequest) (*GetUserOrgsResponse, error) {
 	if !common.IsUserLogged(ctx) {
 		return nil, errors.Errorf("user not logged in")
 	}
 
-	orgs, _, err := h.configstoreClient.GetUserOrgs(ctx, userRef)
+	inCursor := &StartCursor{}
+	sortDirection := req.SortDirection
+	if req.Cursor != "" {
+		if err := UnmarshalCursor(req.Cursor, inCursor); err != nil {
+			return nil, errors.WithStack(err)
+		}
+		sortDirection = inCursor.SortDirection
+	}
+
+	orgs, resp, err := h.configstoreClient.GetUserOrgs(ctx, req.UserRef, &client.GetUserOrgsOptions{ListOptions: &client.ListOptions{Limit: req.Limit, SortDirection: cstypes.SortDirection(sortDirection)}, StartOrgName: inCursor.Start})
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
-	return orgs, nil
+
+	var outCursor string
+	if resp.HasMore && len(orgs) > 0 {
+		lastOrgName := orgs[len(orgs)-1].Organization.Name
+		outCursor, err = MarshalCursor(&StartCursor{Start: lastOrgName})
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+	}
+
+	res := &GetUserOrgsResponse{
+		Orgs:   orgs,
+		Cursor: outCursor,
+	}
+
+	return res, nil
 }
 
 type GetUsersRequest struct {

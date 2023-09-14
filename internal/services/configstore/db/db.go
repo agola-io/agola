@@ -598,15 +598,14 @@ type UserOrg struct {
 	Role         types.MemberRole
 }
 
-// TODO(sgotti) implement cursor fetching
-func (d *DB) GetUserOrgs(tx *sql.Tx, userID string) ([]*UserOrg, error) {
+func (d *DB) GetUserOrg(tx *sql.Tx, userID string, orgID string) (*UserOrg, error) {
 	cols := organizationMemberSelectColumns()
 	cols = append(cols, organizationSelectColumns()...)
 
 	q := sq.Select(cols...).From("orgmember")
-	q = q.Where(q.E("orgmember.user_id", userID))
 	q = q.Join("organization", "organization.id = orgmember.organization_id")
-	q = q.OrderBy("organization.name")
+	q = q.Where(q.E("orgmember.user_id", userID))
+	q = q.Where(q.E("organization.id", orgID))
 
 	rows, err := d.query(tx, q)
 	if err != nil {
@@ -624,7 +623,72 @@ func (d *DB) GetUserOrgs(tx *sql.Tx, userID string) ([]*UserOrg, error) {
 
 		orgMember, _, err := d.OrganizationMemberFromArray(orgMemberCols, tx.ID())
 		if err != nil {
+			return nil, errors.Wrapf(err, "failed to fetch orgmember")
+		}
+
+		org, _, err := d.OrganizationFromArray(organizationCols, tx.ID())
+		if err != nil {
 			return nil, errors.Wrapf(err, "failed to fetch org")
+		}
+
+		userorgs = append(userorgs, &UserOrg{
+			Organization: org,
+			Role:         orgMember.MemberRole,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	out, err := mustSingleRow(userorgs)
+	return out, errors.WithStack(err)
+}
+
+func (d *DB) GetUserOrgs(tx *sql.Tx, userID string, startOrgName string, limit int, sortDirection types.SortDirection) ([]*UserOrg, error) {
+	cols := organizationMemberSelectColumns()
+	cols = append(cols, organizationSelectColumns()...)
+
+	q := sq.Select(cols...).From("orgmember")
+	q = q.Where(q.E("orgmember.user_id", userID))
+	q = q.Join("organization", "organization.id = orgmember.organization_id")
+	q = q.OrderBy("organization.name")
+	switch sortDirection {
+	case types.SortDirectionAsc:
+		q.Asc()
+	case types.SortDirectionDesc:
+		q.Desc()
+	}
+
+	if startOrgName != "" {
+		switch sortDirection {
+		case types.SortDirectionAsc:
+			q = q.Where(q.G("organization.name", startOrgName))
+		case types.SortDirectionDesc:
+			q = q.Where(q.L("organization.name", startOrgName))
+		}
+	}
+
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
+
+	rows, err := d.query(tx, q)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	defer rows.Close()
+
+	userorgs := []*UserOrg{}
+	for rows.Next() {
+		orgMemberCols := d.OrganizationMemberArray()
+		organizationCols := d.OrganizationArray()
+		if err := d.scanArray(rows, orgMemberCols, organizationCols); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan rows")
+		}
+
+		orgMember, _, err := d.OrganizationMemberFromArray(orgMemberCols, tx.ID())
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to fetch orgmember")
 		}
 
 		org, _, err := d.OrganizationFromArray(organizationCols, tx.ID())

@@ -574,20 +574,21 @@ func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName 
 	return errors.WithStack(err)
 }
 
-type UserOrgsResponse struct {
+type UserOrg struct {
 	Organization *types.Organization
 	Role         types.MemberRole
 }
 
-func userOrgsResponse(userOrg *db.UserOrg) *UserOrgsResponse {
-	return &UserOrgsResponse{
+func userOrgResponse(userOrg *db.UserOrg) *UserOrg {
+	return &UserOrg{
 		Organization: userOrg.Organization,
 		Role:         userOrg.Role,
 	}
 }
 
-func (h *ActionHandler) GetUserOrgs(ctx context.Context, userRef string) ([]*UserOrgsResponse, error) {
-	var userOrgs []*db.UserOrg
+func (h *ActionHandler) GetUserOrg(ctx context.Context, userRef, orgRef string) (*UserOrg, error) {
+	var dbUserOrg *db.UserOrg
+
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
 		user, err := h.d.GetUser(tx, userRef)
@@ -597,20 +598,85 @@ func (h *ActionHandler) GetUserOrgs(ctx context.Context, userRef string) ([]*Use
 		if user == nil {
 			return util.NewAPIError(util.ErrNotExist, errors.Errorf("user %q doesn't exist", userRef))
 		}
+		org, err := h.d.GetOrg(tx, orgRef)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if org == nil {
+			return util.NewAPIError(util.ErrNotExist, errors.Errorf("org %q doesn't exist", orgRef))
+		}
 
-		userOrgs, err = h.d.GetUserOrgs(tx, user.ID)
+		dbUserOrg, err = h.d.GetUserOrg(tx, user.ID, org.ID)
 		return errors.WithStack(err)
 	})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	res := make([]*UserOrgsResponse, len(userOrgs))
-	for i, userOrg := range userOrgs {
-		res[i] = userOrgsResponse(userOrg)
+	if dbUserOrg == nil {
+		return nil, util.NewAPIError(util.ErrNotExist, errors.Errorf("user %q is not member of org %q", userRef, orgRef))
 	}
 
-	return res, nil
+	userOrg := userOrgResponse(dbUserOrg)
+
+	return userOrg, nil
+}
+
+type GetUserOrgsRequest struct {
+	UserRef      string
+	StartOrgName string
+
+	Limit         int
+	SortDirection types.SortDirection
+}
+
+type GetUserOrgsResponse struct {
+	UserOrgs []*UserOrg
+
+	HasMore bool
+}
+
+func (h *ActionHandler) GetUserOrgs(ctx context.Context, req *GetUserOrgsRequest) (*GetUserOrgsResponse, error) {
+	limit := req.Limit
+	if limit > 0 {
+		limit += 1
+	}
+
+	var dbUserOrgs []*db.UserOrg
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		user, err := h.d.GetUser(tx, req.UserRef)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if user == nil {
+			return util.NewAPIError(util.ErrNotExist, errors.Errorf("user %q doesn't exist", req.UserRef))
+		}
+
+		dbUserOrgs, err = h.d.GetUserOrgs(tx, user.ID, req.StartOrgName, limit, req.SortDirection)
+		return errors.WithStack(err)
+	})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	userOrgs := make([]*UserOrg, len(dbUserOrgs))
+	for i, dbUserOrg := range dbUserOrgs {
+		userOrgs[i] = userOrgResponse(dbUserOrg)
+	}
+
+	var hasMore bool
+	if req.Limit > 0 {
+		hasMore = len(userOrgs) > req.Limit
+		if hasMore {
+			userOrgs = userOrgs[0:req.Limit]
+		}
+	}
+
+	return &GetUserOrgsResponse{
+		UserOrgs: userOrgs,
+		HasMore:  hasMore,
+	}, nil
 }
 
 func (h *ActionHandler) GetUserOrgInvitations(ctx context.Context, userRef string) ([]*types.OrgInvitation, error) {

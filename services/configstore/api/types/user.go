@@ -58,7 +58,7 @@ type CreateUserTokenResponse struct {
 	Token string `json:"token"`
 }
 
-type UserOrgsResponse struct {
+type UserOrgResponse struct {
 	Organization *cstypes.Organization
 	Role         cstypes.MemberRole
 }

@@ -36,18 +36,16 @@ func (h *ActionHandler) IsOrgOwner(ctx context.Context, orgID string) (bool, err
 		return false, nil
 	}
 
-	userOrgs, _, err := h.configstoreClient.GetUserOrgs(ctx, userID)
+	userOrg, _, err := h.configstoreClient.GetUserOrg(ctx, userID, orgID)
 	if err != nil {
-		return false, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user orgs"))
+		if util.RemoteErrorIs(err, util.ErrNotExist) {
+			return false, nil
+		}
+		return false, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user org"))
 	}
 
-	for _, userOrg := range userOrgs {
-		if userOrg.Organization.ID != orgID {
-			continue
-		}
-		if userOrg.Role == cstypes.MemberRoleOwner {
-			return true, nil
-		}
+	if userOrg.Role == cstypes.MemberRoleOwner {
+		return true, nil
 	}
 
 	return false, nil
@@ -71,18 +69,16 @@ func (h *ActionHandler) IsProjectOwner(ctx context.Context, ownerType cstypes.Ob
 	}
 
 	if ownerType == cstypes.ObjectKindOrg {
-		userOrgs, _, err := h.configstoreClient.GetUserOrgs(ctx, userID)
+		userOrg, _, err := h.configstoreClient.GetUserOrg(ctx, userID, ownerID)
 		if err != nil {
-			return false, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user orgs"))
+			if util.RemoteErrorIs(err, util.ErrNotExist) {
+				return false, nil
+			}
+			return false, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user org"))
 		}
 
-		for _, userOrg := range userOrgs {
-			if userOrg.Organization.ID != ownerID {
-				continue
-			}
-			if userOrg.Role == cstypes.MemberRoleOwner {
-				return true, nil
-			}
+		if userOrg.Role == cstypes.MemberRoleOwner {
+			return true, nil
 		}
 	}
 
@@ -107,17 +103,16 @@ func (h *ActionHandler) IsProjectMember(ctx context.Context, ownerType cstypes.O
 	}
 
 	if ownerType == cstypes.ObjectKindOrg {
-		userOrgs, _, err := h.configstoreClient.GetUserOrgs(ctx, userID)
+		userOrg, _, err := h.configstoreClient.GetUserOrg(ctx, userID, ownerID)
 		if err != nil {
 			return false, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user orgs"))
 		}
 
-		for _, userOrg := range userOrgs {
-			if userOrg.Organization.ID != ownerID {
-				continue
-			}
-			return true, nil
+		if userOrg == nil {
+			return false, nil
 		}
+
+		return true, nil
 	}
 
 	return false, nil

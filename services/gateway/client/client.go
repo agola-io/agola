@@ -729,9 +729,12 @@ func (c *Client) GetVersion(ctx context.Context) (*gwapitypes.VersionResponse, *
 	return res, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetUserOrgs(ctx context.Context) ([]*gwapitypes.UserOrgsResponse, *Response, error) {
-	userOrgs := []*gwapitypes.UserOrgsResponse{}
-	resp, err := c.getParsedResponse(ctx, "GET", "/user/orgs", nil, jsonContent, nil, &userOrgs)
+func (c *Client) GetUserOrgs(ctx context.Context, opts *ListOptions) ([]*gwapitypes.UserOrgResponse, *Response, error) {
+	q := url.Values{}
+	opts.Add(q)
+
+	userOrgs := []*gwapitypes.UserOrgResponse{}
+	resp, err := c.getParsedResponse(ctx, "GET", "/user/orgs", q, jsonContent, nil, &userOrgs)
 	return userOrgs, resp, errors.WithStack(err)
 }
 

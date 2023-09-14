@@ -499,9 +499,32 @@ func (c *Client) DeleteUserToken(ctx context.Context, userRef, tokenName string)
 	return resp, errors.WithStack(err)
 }
 
-func (c *Client) GetUserOrgs(ctx context.Context, userRef string) ([]*csapitypes.UserOrgsResponse, *Response, error) {
-	userOrgs := []*csapitypes.UserOrgsResponse{}
-	resp, err := c.GetParsedResponse(ctx, "GET", fmt.Sprintf("/users/%s/orgs", userRef), nil, common.JSONContent, nil, &userOrgs)
+func (c *Client) GetUserOrg(ctx context.Context, userRef, orgRef string) (*csapitypes.UserOrgResponse, *Response, error) {
+	userOrg := new(csapitypes.UserOrgResponse)
+	resp, err := c.GetParsedResponse(ctx, "GET", fmt.Sprintf("/users/%s/orgs/%s", userRef, orgRef), nil, common.JSONContent, nil, &userOrg)
+	return userOrg, resp, errors.WithStack(err)
+}
+
+type GetUserOrgsOptions struct {
+	*ListOptions
+
+	StartOrgName string
+}
+
+func (o *GetUserOrgsOptions) Add(q url.Values) {
+	o.ListOptions.Add(q)
+
+	if o.StartOrgName != "" {
+		q.Add("startorgname", o.StartOrgName)
+	}
+}
+
+func (c *Client) GetUserOrgs(ctx context.Context, userRef string, opts *GetUserOrgsOptions) ([]*csapitypes.UserOrgResponse, *Response, error) {
+	q := url.Values{}
+	opts.Add(q)
+
+	userOrgs := []*csapitypes.UserOrgResponse{}
+	resp, err := c.GetParsedResponse(ctx, "GET", fmt.Sprintf("/users/%s/orgs", userRef), q, common.JSONContent, nil, &userOrgs)
 	return userOrgs, resp, errors.WithStack(err)
 }
 
