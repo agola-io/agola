@@ -4357,6 +4357,8 @@ func TestGetProjectRuns(t *testing.T) {
 }
 
 func TestRunEventsNotification(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name                   string
 		config                 string
