@@ -174,17 +174,20 @@ func (d *DB) GetRemoteSourceByName(tx *sql.Tx, name string) (*types.RemoteSource
 	return out, errors.WithStack(err)
 }
 
-func getRemoteSourcesFilteredQuery(startRemoteSourceName string, limit int, asc bool) *sq.SelectBuilder {
+func getRemoteSourcesFilteredQuery(startRemoteSourceName string, limit int, sortDirection types.SortDirection) *sq.SelectBuilder {
 	q := remoteSourceSelect()
-	if asc {
-		q = q.OrderBy("remotesource.name").Asc()
-	} else {
-		q = q.OrderBy("remotesource.name").Desc()
+	q = q.OrderBy("remotesource.name")
+	switch sortDirection {
+	case types.SortDirectionAsc:
+		q = q.Asc()
+	case types.SortDirectionDesc:
+		q = q.Desc()
 	}
 	if startRemoteSourceName != "" {
-		if asc {
+		switch sortDirection {
+		case types.SortDirectionAsc:
 			q = q.Where(q.G("remotesource.name", startRemoteSourceName))
-		} else {
+		case types.SortDirectionDesc:
 			q = q.Where(q.L("remotesource.name", startRemoteSourceName))
 		}
 	}
@@ -195,8 +198,8 @@ func getRemoteSourcesFilteredQuery(startRemoteSourceName string, limit int, asc 
 	return q
 }
 
-func (d *DB) GetRemoteSources(tx *sql.Tx, startRemoteSourceName string, limit int, asc bool) ([]*types.RemoteSource, error) {
-	q := getRemoteSourcesFilteredQuery(startRemoteSourceName, limit, asc)
+func (d *DB) GetRemoteSources(tx *sql.Tx, startRemoteSourceName string, limit int, sortDirection types.SortDirection) ([]*types.RemoteSource, error) {
+	q := getRemoteSourcesFilteredQuery(startRemoteSourceName, limit, sortDirection)
 	remoteSources, _, err := d.fetchRemoteSources(tx, q)
 
 	return remoteSources, errors.WithStack(err)

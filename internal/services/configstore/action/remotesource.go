@@ -24,6 +24,49 @@ import (
 	"agola.io/agola/services/configstore/types"
 )
 
+type GetRemoteSourcesRequest struct {
+	StartRemoteSourceName string
+
+	Limit         int
+	SortDirection types.SortDirection
+}
+
+type GetRemoteSourcesResponse struct {
+	RemoteSources []*types.RemoteSource
+
+	HasMore bool
+}
+
+func (h *ActionHandler) GetRemoteSources(ctx context.Context, req *GetRemoteSourcesRequest) (*GetRemoteSourcesResponse, error) {
+	limit := req.Limit
+	if limit > 0 {
+		limit += 1
+	}
+
+	var remoteSources []*types.RemoteSource
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		remoteSources, err = h.d.GetRemoteSources(tx, req.StartRemoteSourceName, limit, req.SortDirection)
+		return errors.WithStack(err)
+	})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	var hasMore bool
+	if req.Limit > 0 {
+		hasMore = len(remoteSources) > req.Limit
+		if hasMore {
+			remoteSources = remoteSources[0:req.Limit]
+		}
+	}
+
+	return &GetRemoteSourcesResponse{
+		RemoteSources: remoteSources,
+		HasMore:       hasMore,
+	}, nil
+}
+
 func (h *ActionHandler) ValidateRemoteSourceReq(ctx context.Context, req *CreateUpdateRemoteSourceRequest) error {
 	if req.Name == "" {
 		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource name required"))

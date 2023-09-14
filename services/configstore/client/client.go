@@ -534,17 +534,23 @@ func (c *Client) GetRemoteSource(ctx context.Context, rsRef string) (*cstypes.Re
 	return rs, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetRemoteSources(ctx context.Context, start string, limit int, asc bool) ([]*cstypes.RemoteSource, *Response, error) {
+type GetRemoteSourcesOptions struct {
+	*ListOptions
+
+	StartRemoteSourceName string
+}
+
+func (o *GetRemoteSourcesOptions) Add(q url.Values) {
+	o.ListOptions.Add(q)
+
+	if o.StartRemoteSourceName != "" {
+		q.Add("startremotesourcename", o.StartRemoteSourceName)
+	}
+}
+
+func (c *Client) GetRemoteSources(ctx context.Context, opts *GetRemoteSourcesOptions) ([]*cstypes.RemoteSource, *Response, error) {
 	q := url.Values{}
-	if start != "" {
-		q.Add("start", start)
-	}
-	if limit > 0 {
-		q.Add("limit", strconv.Itoa(limit))
-	}
-	if asc {
-		q.Add("asc", "")
-	}
+	opts.Add(q)
 
 	rss := []*cstypes.RemoteSource{}
 	resp, err := c.GetParsedResponse(ctx, "GET", "/remotesources", q, common.JSONContent, nil, &rss)

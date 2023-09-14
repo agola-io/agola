@@ -84,7 +84,7 @@ func getRemoteSources(ctx context.Context, cs *Configstore) ([]*types.RemoteSour
 	var users []*types.RemoteSource
 	err := cs.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		users, err = cs.d.GetRemoteSources(tx, "", 0, true)
+		users, err = cs.d.GetRemoteSources(tx, "", 0, types.SortDirectionAsc)
 		return errors.WithStack(err)
 	})
 
@@ -1066,6 +1066,105 @@ func TestOrgMembers(t *testing.T) {
 			t.Fatalf("unexpected err: %v", err)
 		}
 		if diff := cmpDiffObject(res, expectedResponse); diff != "" {
+			t.Fatalf("mismatch (-want +got):\n%s", diff)
+		}
+	})
+}
+
+func TestGetRemoteSources(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	ctx := context.Background()
+	log := testutil.NewLogger(t)
+
+	cs := setupConfigstore(ctx, t, log, dir)
+
+	t.Logf("starting cs")
+	go func() { _ = cs.Run(ctx) }()
+
+	remoteSources := []*types.RemoteSource{}
+	for i := 1; i < 10; i++ {
+		remoteSource, err := cs.ah.CreateRemoteSource(ctx, &action.CreateUpdateRemoteSourceRequest{Name: fmt.Sprintf("rs%d", i), Type: types.RemoteSourceTypeGitea, AuthType: types.RemoteSourceAuthTypePassword, APIURL: "http://example.com"})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		remoteSources = append(remoteSources, remoteSource)
+	}
+
+	t.Run("test get all remote sources", func(t *testing.T) {
+		res, err := cs.ah.GetRemoteSources(ctx, &action.GetRemoteSourcesRequest{SortDirection: types.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		expectedRemoteSources := 9
+		if len(res.RemoteSources) != expectedRemoteSources {
+			t.Fatalf("expected %d remote sources, got %d remote sources", expectedRemoteSources, len(res.RemoteSources))
+		}
+		if res.HasMore {
+			t.Fatalf("expected hasMore false, got %t", res.HasMore)
+		}
+	})
+
+	t.Run("test get remote sources with limit less than remote sources", func(t *testing.T) {
+		res, err := cs.ah.GetRemoteSources(ctx, &action.GetRemoteSourcesRequest{Limit: 5, SortDirection: types.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		expectedRemoteSources := 5
+		if len(res.RemoteSources) != expectedRemoteSources {
+			t.Fatalf("expected %d remote sources, got %d remote sources", expectedRemoteSources, len(res.RemoteSources))
+		}
+		if !res.HasMore {
+			t.Fatalf("expected hasMore true, got %t", res.HasMore)
+		}
+	})
+
+	t.Run("test get remote sources with limit less than remote sources continuation", func(t *testing.T) {
+		respAllRemoteSources := []*types.RemoteSource{}
+
+		res, err := cs.ah.GetRemoteSources(ctx, &action.GetRemoteSourcesRequest{Limit: 5, SortDirection: types.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		expectedRemoteSources := 5
+		if len(res.RemoteSources) != expectedRemoteSources {
+			t.Fatalf("expected %d remote sources, got %d remote sources", expectedRemoteSources, len(res.RemoteSources))
+		}
+		if !res.HasMore {
+			t.Fatalf("expected hasMore true, got %t", res.HasMore)
+		}
+
+		respAllRemoteSources = append(respAllRemoteSources, res.RemoteSources...)
+		lastRemoteSource := res.RemoteSources[len(res.RemoteSources)-1]
+
+		// fetch next results
+		for {
+			res, err = cs.ah.GetRemoteSources(ctx, &action.GetRemoteSourcesRequest{StartRemoteSourceName: lastRemoteSource.Name, Limit: 5, SortDirection: types.SortDirectionAsc})
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			expectedRemoteSources := 5
+			if res.HasMore && len(res.RemoteSources) != expectedRemoteSources {
+				t.Fatalf("expected %d remote sources, got %d remote sources", expectedRemoteSources, len(res.RemoteSources))
+			}
+
+			respAllRemoteSources = append(respAllRemoteSources, res.RemoteSources...)
+
+			if !res.HasMore {
+				break
+			}
+
+			lastRemoteSource = res.RemoteSources[len(res.RemoteSources)-1]
+		}
+
+		expectedRemoteSources = 9
+		if len(remoteSources) != expectedRemoteSources {
+			t.Fatalf("expected %d remote sources, got %d remote sources", expectedRemoteSources, len(remoteSources))
+		}
+
+		if diff := cmpDiffObject(remoteSources, respAllRemoteSources); diff != "" {
 			t.Fatalf("mismatch (-want +got):\n%s", diff)
 		}
 	})

@@ -195,7 +195,7 @@ func (s *Configstore) setupDefaultRouter() http.Handler {
 	removeOrgMemberHandler := api.NewRemoveOrgMemberHandler(s.log, s.ah)
 
 	remoteSourceHandler := api.NewRemoteSourceHandler(s.log, s.d)
-	remoteSourcesHandler := api.NewRemoteSourcesHandler(s.log, s.d)
+	remoteSourcesHandler := api.NewRemoteSourcesHandler(s.log, s.ah)
 	createRemoteSourceHandler := api.NewCreateRemoteSourceHandler(s.log, s.ah)
 	updateRemoteSourceHandler := api.NewUpdateRemoteSourceHandler(s.log, s.ah)
 	deleteRemoteSourceHandler := api.NewDeleteRemoteSourceHandler(s.log, s.ah)
