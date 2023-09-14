@@ -329,3 +329,223 @@ func (d *DB) LastRunEventSequenceFromArray(a []any, txID string) (*types.LastRun
 
 	return v, v.ID, nil
 }
+
+func (d *DB) fetchCommitStatuss(tx *sql.Tx, q sq.Builder) ([]*types.CommitStatus, []string, error) {
+	rows, err := d.query(tx, q)
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+	defer rows.Close()
+
+	return d.scanCommitStatuss(rows, tx.ID(), 0)
+}
+
+func (d *DB) fetchCommitStatussSkipLastFields(tx *sql.Tx, q sq.Builder, skipFieldsCount uint) ([]*types.CommitStatus, []string, error) {
+	rows, err := d.query(tx, q)
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+	defer rows.Close()
+
+	return d.scanCommitStatuss(rows, tx.ID(), skipFieldsCount)
+}
+
+func (d *DB) scanCommitStatus(rows *stdsql.Rows, skipFieldsCount uint) (*types.CommitStatus, string, error) {
+
+	v := &types.CommitStatus{}
+
+	var vi any = v
+	if x, ok := vi.(sqlg.Initer); ok {
+		x.Init()
+	}
+
+	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.ProjectID, &v.State, &v.CommitSHA, &v.RunCounter, &v.Description, &v.Context})
+
+	for i := uint(0); i < skipFieldsCount; i++ {
+		fields = append(fields, new(any))
+	}
+
+	if err := rows.Scan(fields...); err != nil {
+		return nil, "", errors.Wrap(err, "failed to scan row")
+	}
+
+	if x, ok := vi.(sqlg.PreJSONSetupper); ok {
+		if err := x.PreJSON(); err != nil {
+			return nil, "", errors.Wrap(err, "prejson error")
+		}
+	}
+
+	return v, v.ID, nil
+}
+
+func (d *DB) scanCommitStatuss(rows *stdsql.Rows, txID string, skipFieldsCount uint) ([]*types.CommitStatus, []string, error) {
+	vs := []*types.CommitStatus{}
+	ids := []string{}
+	for rows.Next() {
+		v, id, err := d.scanCommitStatus(rows, skipFieldsCount)
+		if err != nil {
+			rows.Close()
+			return nil, nil, errors.WithStack(err)
+		}
+		v.TxID = txID
+		vs = append(vs, v)
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+	return vs, ids, nil
+}
+
+func (d *DB) CommitStatusArray() []any {
+	a := []any{}
+	a = append(a, new(string))
+	a = append(a, new(uint64))
+	a = append(a, new(time.Time))
+	a = append(a, new(time.Time))
+	a = append(a, new(string))
+	a = append(a, new(types.CommitState))
+	a = append(a, new(string))
+	a = append(a, new(uint64))
+	a = append(a, new(string))
+	a = append(a, new(string))
+
+	return a
+}
+
+func (d *DB) CommitStatusFromArray(a []any, txID string) (*types.CommitStatus, string, error) {
+	v := &types.CommitStatus{}
+
+	var vi any = v
+	if x, ok := vi.(sqlg.Initer); ok {
+		x.Init()
+	}
+	v.ID = *a[0].(*string)
+	v.Revision = *a[1].(*uint64)
+	v.CreationTime = *a[2].(*time.Time)
+	v.UpdateTime = *a[3].(*time.Time)
+	v.ProjectID = *a[4].(*string)
+	v.State = *a[5].(*types.CommitState)
+	v.CommitSHA = *a[6].(*string)
+	v.RunCounter = *a[7].(*uint64)
+	v.Description = *a[8].(*string)
+	v.Context = *a[9].(*string)
+
+	if x, ok := vi.(sqlg.PreJSONSetupper); ok {
+		if err := x.PreJSON(); err != nil {
+			return nil, "", errors.Wrap(err, "prejson error")
+		}
+	}
+
+	v.TxID = txID
+
+	return v, v.ID, nil
+}
+
+func (d *DB) fetchCommitStatusDeliverys(tx *sql.Tx, q sq.Builder) ([]*types.CommitStatusDelivery, []string, error) {
+	rows, err := d.query(tx, q)
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+	defer rows.Close()
+
+	return d.scanCommitStatusDeliverys(rows, tx.ID(), 0)
+}
+
+func (d *DB) fetchCommitStatusDeliverysSkipLastFields(tx *sql.Tx, q sq.Builder, skipFieldsCount uint) ([]*types.CommitStatusDelivery, []string, error) {
+	rows, err := d.query(tx, q)
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+	defer rows.Close()
+
+	return d.scanCommitStatusDeliverys(rows, tx.ID(), skipFieldsCount)
+}
+
+func (d *DB) scanCommitStatusDelivery(rows *stdsql.Rows, skipFieldsCount uint) (*types.CommitStatusDelivery, string, error) {
+
+	v := &types.CommitStatusDelivery{}
+
+	var vi any = v
+	if x, ok := vi.(sqlg.Initer); ok {
+		x.Init()
+	}
+
+	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Sequence, &v.CommitStatusID, &v.DeliveryStatus, &v.DeliveredAt})
+
+	for i := uint(0); i < skipFieldsCount; i++ {
+		fields = append(fields, new(any))
+	}
+
+	if err := rows.Scan(fields...); err != nil {
+		return nil, "", errors.Wrap(err, "failed to scan row")
+	}
+
+	if x, ok := vi.(sqlg.PreJSONSetupper); ok {
+		if err := x.PreJSON(); err != nil {
+			return nil, "", errors.Wrap(err, "prejson error")
+		}
+	}
+
+	return v, v.ID, nil
+}
+
+func (d *DB) scanCommitStatusDeliverys(rows *stdsql.Rows, txID string, skipFieldsCount uint) ([]*types.CommitStatusDelivery, []string, error) {
+	vs := []*types.CommitStatusDelivery{}
+	ids := []string{}
+	for rows.Next() {
+		v, id, err := d.scanCommitStatusDelivery(rows, skipFieldsCount)
+		if err != nil {
+			rows.Close()
+			return nil, nil, errors.WithStack(err)
+		}
+		v.TxID = txID
+		vs = append(vs, v)
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+	return vs, ids, nil
+}
+
+func (d *DB) CommitStatusDeliveryArray() []any {
+	a := []any{}
+	a = append(a, new(string))
+	a = append(a, new(uint64))
+	a = append(a, new(time.Time))
+	a = append(a, new(time.Time))
+	a = append(a, new(uint64))
+	a = append(a, new(string))
+	a = append(a, new(types.DeliveryStatus))
+	a = append(a, new(*time.Time))
+
+	return a
+}
+
+func (d *DB) CommitStatusDeliveryFromArray(a []any, txID string) (*types.CommitStatusDelivery, string, error) {
+	v := &types.CommitStatusDelivery{}
+
+	var vi any = v
+	if x, ok := vi.(sqlg.Initer); ok {
+		x.Init()
+	}
+	v.ID = *a[0].(*string)
+	v.Revision = *a[1].(*uint64)
+	v.CreationTime = *a[2].(*time.Time)
+	v.UpdateTime = *a[3].(*time.Time)
+	v.Sequence = *a[4].(*uint64)
+	v.CommitStatusID = *a[5].(*string)
+	v.DeliveryStatus = *a[6].(*types.DeliveryStatus)
+	v.DeliveredAt = *a[7].(**time.Time)
+
+	if x, ok := vi.(sqlg.PreJSONSetupper); ok {
+		if err := x.PreJSON(); err != nil {
+			return nil, "", errors.Wrap(err, "prejson error")
+		}
+	}
+
+	v.TxID = txID
+
+	return v, v.ID, nil
+}

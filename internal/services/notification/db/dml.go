@@ -423,6 +423,280 @@ func (d *DB) insertRawLastRunEventSequence(tx *sql.Tx, v *types.LastRunEventSequ
 	return nil
 }
 
+var (
+	commitStatusSelectColumns = func(additionalCols ...string) []string {
+		columns := []string{"commitstatus.id", "commitstatus.revision", "commitstatus.creation_time", "commitstatus.update_time", "commitstatus.project_id", "commitstatus.state", "commitstatus.commit_sha", "commitstatus.run_counter", "commitstatus.description", "commitstatus.context"}
+		columns = append(columns, additionalCols...)
+
+		return columns
+	}
+
+	commitStatusSelect = func(additionalCols ...string) *sq.SelectBuilder {
+		return sq.NewSelectBuilder().Select(commitStatusSelectColumns(additionalCols...)...).From("commitstatus")
+	}
+)
+
+func (d *DB) InsertOrUpdateCommitStatus(tx *sql.Tx, v *types.CommitStatus) error {
+	var err error
+	if v.Revision == 0 {
+		err = d.InsertCommitStatus(tx, v)
+	} else {
+		err = d.UpdateCommitStatus(tx, v)
+	}
+
+	return errors.WithStack(err)
+}
+
+func (d *DB) InsertCommitStatus(tx *sql.Tx, v *types.CommitStatus) error {
+	if v.Revision != 0 {
+		return errors.Errorf("expected revision 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not created by this transaction")
+	}
+
+	v.Revision = 1
+
+	now := time.Now()
+	v.CreationTime = now
+	v.UpdateTime = now
+
+	var err error
+
+	switch d.DBType() {
+	case sql.Postgres:
+		err = d.insertRawCommitStatusPostgres(tx, v);
+	case sql.Sqlite3:
+		err = d.insertCommitStatusSqlite3(tx, v);
+	}
+
+	if err != nil {
+		v.Revision = 0
+		return errors.Wrap(err, "failed to insert commitstatus")
+	}
+
+	return nil
+}
+
+func (d *DB) UpdateCommitStatus(tx *sql.Tx, v *types.CommitStatus) error {
+	if v.Revision < 1 {
+		return errors.Errorf("expected revision > 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not fetched by this transaction")
+	}
+
+	curRevision := v.Revision
+	v.Revision++
+
+	v.UpdateTime = time.Now()
+
+	var res stdsql.Result
+	var err error
+	switch d.DBType() {
+	case sql.Postgres:
+		res, err = d.updateCommitStatusPostgres(tx, curRevision, v);
+	case sql.Sqlite3:
+		res, err = d.updateCommitStatusSqlite3(tx, curRevision, v);
+	}
+	if err != nil {
+		v.Revision = curRevision
+		return errors.Wrap(err, "failed to update commitstatus")
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		v.Revision = curRevision
+		return errors.Wrap(err, "failed to update commitstatus")
+	}
+
+	if rows != 1 {
+		v.Revision = curRevision
+		return sqlg.ErrConcurrent
+	}
+
+	return nil
+}
+
+func (d *DB) deleteCommitStatus(tx *sql.Tx, commitStatusID string) error {
+	q := sq.NewDeleteBuilder()
+	q.DeleteFrom("commitstatus").Where(q.E("id", commitStatusID))
+
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to delete commitStatus")
+	}
+
+	return nil
+}
+
+func (d *DB) DeleteCommitStatus(tx *sql.Tx, id string) error {
+	return d.deleteCommitStatus(tx, id)
+}
+
+// insertRawCommitStatus should be used only for import.
+// * It won't update object times.
+// * It will insert values for sequences.
+func (d *DB) insertRawCommitStatus(tx *sql.Tx, v *types.CommitStatus) error {
+	v.Revision = 1
+
+	var err error
+	switch d.DBType() {
+	case sql.Postgres:
+		err = d.insertRawCommitStatusPostgres(tx, v);
+	case sql.Sqlite3:
+		err = d.insertRawCommitStatusSqlite3(tx, v);
+	}
+	if err != nil {
+		v.Revision = 0
+		return errors.Wrap(err, "failed to insert commitstatus")
+	}
+
+	return nil
+}
+
+var (
+	commitStatusDeliverySelectColumns = func(additionalCols ...string) []string {
+		columns := []string{"commitstatusdelivery.id", "commitstatusdelivery.revision", "commitstatusdelivery.creation_time", "commitstatusdelivery.update_time", "commitstatusdelivery.sequence", "commitstatusdelivery.commit_status_id", "commitstatusdelivery.delivery_status", "commitstatusdelivery.delivered_at"}
+		columns = append(columns, additionalCols...)
+
+		return columns
+	}
+
+	commitStatusDeliverySelect = func(additionalCols ...string) *sq.SelectBuilder {
+		return sq.NewSelectBuilder().Select(commitStatusDeliverySelectColumns(additionalCols...)...).From("commitstatusdelivery")
+	}
+)
+
+func (d *DB) InsertOrUpdateCommitStatusDelivery(tx *sql.Tx, v *types.CommitStatusDelivery) error {
+	var err error
+	if v.Revision == 0 {
+		err = d.InsertCommitStatusDelivery(tx, v)
+	} else {
+		err = d.UpdateCommitStatusDelivery(tx, v)
+	}
+
+	return errors.WithStack(err)
+}
+
+func (d *DB) InsertCommitStatusDelivery(tx *sql.Tx, v *types.CommitStatusDelivery) error {
+	if v.Revision != 0 {
+		return errors.Errorf("expected revision 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not created by this transaction")
+	}
+
+	v.Revision = 1
+
+	now := time.Now()
+	v.CreationTime = now
+	v.UpdateTime = now
+
+	var err error
+	var nextSeq uint64
+
+	nextSeq, err = d.nextSequence(tx, "commitstatusdelivery_sequence_seq")
+	if err != nil {
+		v.Revision = 0
+		return errors.Wrap(err, "failed to create next sequence for commitstatusdelivery_sequence_seq")
+	}
+	v.Sequence = nextSeq
+
+	switch d.DBType() {
+	case sql.Postgres:
+		err = d.insertRawCommitStatusDeliveryPostgres(tx, v);
+	case sql.Sqlite3:
+		err = d.insertCommitStatusDeliverySqlite3(tx, v);
+	}
+
+	if err != nil {
+		v.Revision = 0
+		return errors.Wrap(err, "failed to insert commitstatusdelivery")
+	}
+
+	return nil
+}
+
+func (d *DB) UpdateCommitStatusDelivery(tx *sql.Tx, v *types.CommitStatusDelivery) error {
+	if v.Revision < 1 {
+		return errors.Errorf("expected revision > 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not fetched by this transaction")
+	}
+
+	curRevision := v.Revision
+	v.Revision++
+
+	v.UpdateTime = time.Now()
+
+	var res stdsql.Result
+	var err error
+	switch d.DBType() {
+	case sql.Postgres:
+		res, err = d.updateCommitStatusDeliveryPostgres(tx, curRevision, v);
+	case sql.Sqlite3:
+		res, err = d.updateCommitStatusDeliverySqlite3(tx, curRevision, v);
+	}
+	if err != nil {
+		v.Revision = curRevision
+		return errors.Wrap(err, "failed to update commitstatusdelivery")
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		v.Revision = curRevision
+		return errors.Wrap(err, "failed to update commitstatusdelivery")
+	}
+
+	if rows != 1 {
+		v.Revision = curRevision
+		return sqlg.ErrConcurrent
+	}
+
+	return nil
+}
+
+func (d *DB) deleteCommitStatusDelivery(tx *sql.Tx, commitStatusDeliveryID string) error {
+	q := sq.NewDeleteBuilder()
+	q.DeleteFrom("commitstatusdelivery").Where(q.E("id", commitStatusDeliveryID))
+
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to delete commitStatusDelivery")
+	}
+
+	return nil
+}
+
+func (d *DB) DeleteCommitStatusDelivery(tx *sql.Tx, id string) error {
+	return d.deleteCommitStatusDelivery(tx, id)
+}
+
+// insertRawCommitStatusDelivery should be used only for import.
+// * It won't update object times.
+// * It will insert values for sequences.
+func (d *DB) insertRawCommitStatusDelivery(tx *sql.Tx, v *types.CommitStatusDelivery) error {
+	v.Revision = 1
+
+	var err error
+	switch d.DBType() {
+	case sql.Postgres:
+		err = d.insertRawCommitStatusDeliveryPostgres(tx, v);
+	case sql.Sqlite3:
+		err = d.insertRawCommitStatusDeliverySqlite3(tx, v);
+	}
+	if err != nil {
+		v.Revision = 0
+		return errors.Wrap(err, "failed to insert commitstatusdelivery")
+	}
+
+	return nil
+}
+
 func (d *DB) UnmarshalExportObject(data []byte) (sqlg.Object, error) {
 	type exportObjectExportMeta struct {
 		ExportMeta sqlg.ExportMeta `json:"exportMeta"`
@@ -442,6 +716,10 @@ func (d *DB) UnmarshalExportObject(data []byte) (sqlg.Object, error) {
 		obj = &types.RunWebhookDelivery{}
 	case "LastRunEventSequence":
 		obj = &types.LastRunEventSequence{}
+	case "CommitStatus":
+		obj = &types.CommitStatus{}
+	case "CommitStatusDelivery":
+		obj = &types.CommitStatusDelivery{}
 
 	default:
 		panic(errors.Errorf("unknown object kind %q, data: %s", om.ExportMeta.Kind, data))
@@ -462,6 +740,10 @@ func (d *DB) InsertRawObject(tx *sql.Tx, obj sqlg.Object) error {
 		return d.insertRawRunWebhookDelivery(tx, o)
 	case *types.LastRunEventSequence:
 		return d.insertRawLastRunEventSequence(tx, o)
+	case *types.CommitStatus:
+		return d.insertRawCommitStatus(tx, o)
+	case *types.CommitStatusDelivery:
+		return d.insertRawCommitStatusDelivery(tx, o)
 
 	default:
 		panic(errors.Errorf("unknown object type %T", obj))
@@ -476,6 +758,10 @@ func (d *DB) SelectObject(kind string) *sq.SelectBuilder {
 		return runWebhookDeliverySelect()
 	case "LastRunEventSequence":
 		return lastRunEventSequenceSelect()
+	case "CommitStatus":
+		return commitStatusSelect()
+	case "CommitStatusDelivery":
+		return commitStatusDeliverySelect()
 
 	default:
 		panic(errors.Errorf("unknown object kind %q", kind))
@@ -510,6 +796,30 @@ func (d *DB) FetchObjects(tx *sql.Tx, kind string, q sq.Builder) ([]sqlg.Object,
 		return objs, nil
 	case "LastRunEventSequence":
 		fobjs, _, err := d.fetchLastRunEventSequences(tx, q)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		objs := make([]sqlg.Object, len(fobjs))
+		for i, fobj := range fobjs {
+		        objs[i] = fobj
+		}
+
+		return objs, nil
+	case "CommitStatus":
+		fobjs, _, err := d.fetchCommitStatuss(tx, q)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		objs := make([]sqlg.Object, len(fobjs))
+		for i, fobj := range fobjs {
+		        objs[i] = fobj
+		}
+
+		return objs, nil
+	case "CommitStatusDelivery":
+		fobjs, _, err := d.fetchCommitStatusDeliverys(tx, q)
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
@@ -560,6 +870,30 @@ func (d *DB) ObjectToExportJSON(obj sqlg.Object, e *json.Encoder) error {
 		}
 
 		if err := e.Encode(&exportObject{ExportMeta: sqlg.ExportMeta{ Kind: "LastRunEventSequence" }, LastRunEventSequence: o}); err != nil {
+			return errors.WithStack(err)
+		}
+
+		return nil
+	case *types.CommitStatus:
+		type exportObject struct {
+			ExportMeta sqlg.ExportMeta `json:"exportMeta"`
+
+			*types.CommitStatus
+		}
+
+		if err := e.Encode(&exportObject{ExportMeta: sqlg.ExportMeta{ Kind: "CommitStatus" }, CommitStatus: o}); err != nil {
+			return errors.WithStack(err)
+		}
+
+		return nil
+	case *types.CommitStatusDelivery:
+		type exportObject struct {
+			ExportMeta sqlg.ExportMeta `json:"exportMeta"`
+
+			*types.CommitStatusDelivery
+		}
+
+		if err := e.Encode(&exportObject{ExportMeta: sqlg.ExportMeta{ Kind: "CommitStatusDelivery" }, CommitStatusDelivery: o}); err != nil {
 			return errors.WithStack(err)
 		}
 
@@ -672,6 +1006,10 @@ func (d *DB) populateSequencesPostgres(tx *sql.Tx) error {
 	if _, err := tx.Exec(q); err != nil {
 		return errors.Wrap(err, "failed to update sequence runwebhookdelivery_sequence_seq")
 	}
+	q = "SELECT setval('commitstatusdelivery_sequence_seq', (SELECT COALESCE(MAX(sequence), 1) FROM commitstatusdelivery));"
+	if _, err := tx.Exec(q); err != nil {
+		return errors.Wrap(err, "failed to update sequence commitstatusdelivery_sequence_seq")
+	}
 
 	return nil
 }
@@ -681,6 +1019,10 @@ func (d *DB) populateSequencesSqlite3(tx *sql.Tx) error {
 	q = "INSERT INTO sequence_t (name, value) VALUES ('runwebhookdelivery_sequence_seq', (SELECT COALESCE(MAX(sequence), 1) FROM runwebhookdelivery));"
 	if _, err := tx.Exec(q); err != nil {
 		return errors.Wrap(err, "failed to update sequence for runwebhookdelivery_sequence_seq")
+	}
+	q = "INSERT INTO sequence_t (name, value) VALUES ('commitstatusdelivery_sequence_seq', (SELECT COALESCE(MAX(sequence), 1) FROM commitstatusdelivery));"
+	if _, err := tx.Exec(q); err != nil {
+		return errors.Wrap(err, "failed to update sequence for commitstatusdelivery_sequence_seq")
 	}
 
 	return nil

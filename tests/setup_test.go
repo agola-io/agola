@@ -24,10 +24,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -5649,6 +5651,207 @@ func TestRunEventsNotification(t *testing.T) {
 						t.Fatalf("expected %d webhook run task level got: %d", 1, whTask.Level)
 					}
 				}
+			}
+		})
+	}
+}
+
+func TestCommitStatusDelivery(t *testing.T) {
+	tests := []struct {
+		name                     string
+		config                   string
+		expectedRunResult        rstypes.RunResult
+		expectedRunPhase         rstypes.RunPhase
+		expectedGiteaStatusState gitea.StatusState
+		expectedGiteaDescription string
+		expectedGiteaContext     string
+	}{
+		{
+			name: "test run result success",
+			config: `
+			{
+			  runs: [
+			    {
+			      name: 'run01',
+			      tasks: [
+			        {
+			          name: 'task01',
+			          runtime: {
+			            containers: [
+			              {
+			                image: 'alpine/git',
+			              },
+			            ],
+			          },
+			          steps: [
+			            { type: 'run', command: 'env' },
+			          ],
+			        },
+			      ],
+			    },
+			  ],
+			}
+			`,
+			expectedRunResult:        rstypes.RunResultSuccess,
+			expectedRunPhase:         rstypes.RunPhaseFinished,
+			expectedGiteaStatusState: gitea.StatusSuccess,
+			expectedGiteaDescription: "The run finished successfully",
+			expectedGiteaContext:     "agola/project01/run01",
+		},
+		{
+			name: "test run result failed",
+			config: `
+			{
+			  runs: [
+			    {
+			      name: 'run01',
+			      tasks: [
+			        {
+			          name: 'task01',
+			          runtime: {
+			            containers: [
+			              {
+			                image: 'alpine/git',
+			              },
+			            ],
+			          },
+			          steps: [
+			            { type: 'run', command: 'false' },
+			          ],
+			        },
+			      ],
+			      when: {
+			        branch: 'master',
+			      },
+			    },
+			  ],
+			}
+			`,
+			expectedRunResult:        rstypes.RunResultFailed,
+			expectedRunPhase:         rstypes.RunPhaseFinished,
+			expectedGiteaStatusState: gitea.StatusFailure,
+			expectedGiteaDescription: "The run failed",
+			expectedGiteaContext:     "agola/project01/run01",
+		},
+		{
+			name: "test run setup config error",
+			config: `
+				{
+				  runserror:
+				}
+				`,
+			expectedRunResult:        rstypes.RunResultUnknown,
+			expectedRunPhase:         rstypes.RunPhaseSetupError,
+			expectedGiteaStatusState: gitea.StatusError,
+			expectedGiteaDescription: "The run encountered an error",
+			expectedGiteaContext:     "agola/project01/Setup Error",
+		},
+	}
+
+	// it has been copied from the notification service
+	webRunURL := func(webExposedURL, projectID string, runNumber uint64) (string, error) {
+		u, err := url.Parse(webExposedURL + "/run")
+		if err != nil {
+			return "", errors.WithStack(err)
+		}
+		q := url.Values{}
+		q.Set("projectref", projectID)
+		q.Set("runnumber", strconv.FormatUint(runNumber, 10))
+
+		u.RawQuery = q.Encode()
+
+		return u.String(), nil
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			sc := setup(ctx, t, dir, withGitea(true))
+			defer sc.stop()
+
+			giteaToken, tokenUser01 := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+
+			giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+
+			giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01)
+
+			giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)
+
+			push(t, tt.config, giteaRepo.CloneURL, giteaToken, "commit", false)
+
+			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+				if err != nil {
+					return false, nil
+				}
+
+				if len(runs) == 0 {
+					return false, nil
+				}
+				if runs[0].Phase != tt.expectedRunPhase {
+					return false, nil
+				}
+
+				return true, nil
+			})
+
+			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			if len(runs) != 1 {
+				t.Fatalf("expected %d run got: %d", 1, len(runs))
+			}
+
+			if runs[0].Phase != tt.expectedRunPhase {
+				t.Fatalf("expected run phase %q, got %q", tt.expectedRunPhase, runs[0].Phase)
+			}
+			if runs[0].Result != tt.expectedRunResult {
+				t.Fatalf("expected run result %q, got %q", tt.expectedRunResult, runs[0].Result)
+			}
+
+			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+				combinedStatus, _, err := giteaClient.GetCombinedStatus(agolaUser01, giteaRepo.Name, "master")
+				if err != nil {
+					return false, nil
+				}
+
+				if combinedStatus.State != tt.expectedGiteaStatusState {
+					return false, nil
+				}
+
+				return true, nil
+			})
+
+			targetURL, err := webRunURL(sc.config.Notification.WebExposedURL, project.ID, runs[0].Number)
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			combinedStatus, _, err := giteaClient.GetCombinedStatus(agolaUser01, giteaRepo.Name, "master")
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			if combinedStatus.State != tt.expectedGiteaStatusState {
+				t.Fatalf("expected commit state %q, got %q", tt.expectedGiteaStatusState, combinedStatus.State)
+			}
+			if combinedStatus.Statuses[0].Description != tt.expectedGiteaDescription {
+				t.Fatalf("expected commit state description %q, got %q", tt.expectedGiteaDescription, combinedStatus.Statuses[0].Description)
+			}
+			if combinedStatus.Statuses[0].Context != tt.expectedGiteaContext {
+				t.Fatalf("expected commit state context %q, got %q", tt.expectedGiteaContext, combinedStatus.Statuses[0].Context)
+			}
+			if combinedStatus.Statuses[0].TargetURL != targetURL {
+				t.Fatalf("expected commit state targetURL %q, got %q", targetURL, combinedStatus.Statuses[0].TargetURL)
 			}
 		})
 	}

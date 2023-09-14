@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	Version = uint(2)
+	Version = uint(3)
 )
 
 const TypesImport = "agola.io/agola/services/notification/types"
@@ -42,6 +42,32 @@ var ObjectsInfo = []sqlg.ObjectInfo{
 		Name: "LastRunEventSequence", Table: "lastruneventsequence",
 		Fields: []sqlg.ObjectField{
 			{Name: "Value", Type: "uint64"},
+		},
+	},
+	{
+		Name: "CommitStatus", Table: "commitstatus",
+		Fields: []sqlg.ObjectField{
+			{Name: "ProjectID", Type: "string"},
+			{Name: "State", Type: "types.CommitState", BaseType: "string"},
+			{Name: "CommitSHA", Type: "string"},
+			{Name: "RunCounter", Type: "uint64"},
+			{Name: "Description", Type: "string"},
+			{Name: "Context", Type: "string"},
+		},
+	},
+	{
+		Name: "CommitStatusDelivery", Table: "commitstatusdelivery",
+		Fields: []sqlg.ObjectField{
+			{Name: "Sequence", Type: "uint64", Sequence: true},
+			{Name: "CommitStatusID", Type: "string"},
+			{Name: "DeliveryStatus", Type: "types.DeliveryStatus", BaseType: "string"},
+			{Name: "DeliveredAt", Type: "time.Time", Nullable: true},
+		},
+		Constraints: []string{
+			"foreign key (commit_status_id) references commitstatus(id)",
+		},
+		Indexes: []string{
+			"create index if not exists commitstatusdelivery_sequence_idx on commitstatusdelivery(sequence)",
 		},
 	},
 }

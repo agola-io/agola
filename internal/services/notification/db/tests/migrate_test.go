@@ -36,6 +36,7 @@ func newSetupDBFn(log zerolog.Logger) testutil.SetupDBFn {
 var migrateFixtures = testutil.DataFixtures{
 	1: "dbv1.jsonc",
 	2: "dbv2.jsonc",
+	3: "dbv3.jsonc",
 }
 
 func TestCreate(t *testing.T) {

@@ -150,3 +150,95 @@ func (d *DB) insertRawLastRunEventSequencePostgres(tx *sql.Tx, lastruneventseque
 
 	return nil
 }
+var (
+	commitStatusInsertPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inProjectID string, inState types.CommitState, inCommitSHA string, inRunCounter uint64, inDescription string, inContext string) *sq.InsertBuilder {
+		ib:= sq.NewInsertBuilder()
+		return ib.InsertInto("commitstatus").Cols("id", "revision", "creation_time", "update_time", "project_id", "state", "commit_sha", "run_counter", "description", "context").Values(inId, inRevision, inCreationTime, inUpdateTime, inProjectID, inState, inCommitSHA, inRunCounter, inDescription, inContext)
+	}
+	commitStatusUpdatePostgres = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inProjectID string, inState types.CommitState, inCommitSHA string, inRunCounter uint64, inDescription string, inContext string) *sq.UpdateBuilder {
+		ub:= sq.NewUpdateBuilder()
+		return ub.Update("commitstatus").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("project_id", inProjectID), ub.Assign("state", inState), ub.Assign("commit_sha", inCommitSHA), ub.Assign("run_counter", inRunCounter), ub.Assign("description", inDescription), ub.Assign("context", inContext)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+	}
+
+	commitStatusInsertRawPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inProjectID string, inState types.CommitState, inCommitSHA string, inRunCounter uint64, inDescription string, inContext string) *sq.InsertBuilder {
+		ib:= sq.NewInsertBuilder()
+		return ib.InsertInto("commitstatus").Cols("id", "revision", "creation_time", "update_time", "project_id", "state", "commit_sha", "run_counter", "description", "context").SQL("OVERRIDING SYSTEM VALUE").Values(inId, inRevision, inCreationTime, inUpdateTime, inProjectID, inState, inCommitSHA, inRunCounter, inDescription, inContext)
+	}
+)
+
+func (d *DB) insertCommitStatusPostgres(tx *sql.Tx, commitstatus *types.CommitStatus) error {
+	q := commitStatusInsertPostgres(commitstatus.ID, commitstatus.Revision, commitstatus.CreationTime, commitstatus.UpdateTime, commitstatus.ProjectID, commitstatus.State, commitstatus.CommitSHA, commitstatus.RunCounter, commitstatus.Description, commitstatus.Context)
+
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to insert commitStatus")
+	}
+
+	return nil
+}
+
+func (d *DB) updateCommitStatusPostgres(tx *sql.Tx, curRevision uint64, commitstatus *types.CommitStatus) (stdsql.Result, error) {
+	q := commitStatusUpdatePostgres(curRevision, commitstatus.ID, commitstatus.Revision, commitstatus.CreationTime, commitstatus.UpdateTime, commitstatus.ProjectID, commitstatus.State, commitstatus.CommitSHA, commitstatus.RunCounter, commitstatus.Description, commitstatus.Context)
+
+	res, err := d.exec(tx, q)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to update commitStatus")
+	}
+
+	return res, nil
+}
+
+func (d *DB) insertRawCommitStatusPostgres(tx *sql.Tx, commitstatus *types.CommitStatus) error {
+	q := commitStatusInsertRawPostgres(commitstatus.ID, commitstatus.Revision, commitstatus.CreationTime, commitstatus.UpdateTime, commitstatus.ProjectID, commitstatus.State, commitstatus.CommitSHA, commitstatus.RunCounter, commitstatus.Description, commitstatus.Context)
+
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to insert commitStatus")
+	}
+
+	return nil
+}
+var (
+	commitStatusDeliveryInsertPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inCommitStatusID string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time) *sq.InsertBuilder {
+		ib:= sq.NewInsertBuilder()
+		return ib.InsertInto("commitstatusdelivery").Cols("id", "revision", "creation_time", "update_time", "commit_status_id", "delivery_status", "delivered_at").Values(inId, inRevision, inCreationTime, inUpdateTime, inCommitStatusID, inDeliveryStatus, inDeliveredAt)
+	}
+	commitStatusDeliveryUpdatePostgres = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inCommitStatusID string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time) *sq.UpdateBuilder {
+		ub:= sq.NewUpdateBuilder()
+		return ub.Update("commitstatusdelivery").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("commit_status_id", inCommitStatusID), ub.Assign("delivery_status", inDeliveryStatus), ub.Assign("delivered_at", inDeliveredAt)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+	}
+
+	commitStatusDeliveryInsertRawPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inCommitStatusID string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time) *sq.InsertBuilder {
+		ib:= sq.NewInsertBuilder()
+		return ib.InsertInto("commitstatusdelivery").Cols("id", "revision", "creation_time", "update_time", "sequence", "commit_status_id", "delivery_status", "delivered_at").SQL("OVERRIDING SYSTEM VALUE").Values(inId, inRevision, inCreationTime, inUpdateTime, inSequence, inCommitStatusID, inDeliveryStatus, inDeliveredAt)
+	}
+)
+
+func (d *DB) insertCommitStatusDeliveryPostgres(tx *sql.Tx, commitstatusdelivery *types.CommitStatusDelivery) error {
+	q := commitStatusDeliveryInsertPostgres(commitstatusdelivery.ID, commitstatusdelivery.Revision, commitstatusdelivery.CreationTime, commitstatusdelivery.UpdateTime, commitstatusdelivery.CommitStatusID, commitstatusdelivery.DeliveryStatus, commitstatusdelivery.DeliveredAt)
+
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to insert commitStatusDelivery")
+	}
+
+	return nil
+}
+
+func (d *DB) updateCommitStatusDeliveryPostgres(tx *sql.Tx, curRevision uint64, commitstatusdelivery *types.CommitStatusDelivery) (stdsql.Result, error) {
+	q := commitStatusDeliveryUpdatePostgres(curRevision, commitstatusdelivery.ID, commitstatusdelivery.Revision, commitstatusdelivery.CreationTime, commitstatusdelivery.UpdateTime, commitstatusdelivery.CommitStatusID, commitstatusdelivery.DeliveryStatus, commitstatusdelivery.DeliveredAt)
+
+	res, err := d.exec(tx, q)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to update commitStatusDelivery")
+	}
+
+	return res, nil
+}
+
+func (d *DB) insertRawCommitStatusDeliveryPostgres(tx *sql.Tx, commitstatusdelivery *types.CommitStatusDelivery) error {
+	q := commitStatusDeliveryInsertRawPostgres(commitstatusdelivery.ID, commitstatusdelivery.Revision, commitstatusdelivery.CreationTime, commitstatusdelivery.UpdateTime, commitstatusdelivery.Sequence, commitstatusdelivery.CommitStatusID, commitstatusdelivery.DeliveryStatus, commitstatusdelivery.DeliveredAt)
+
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to insert commitStatusDelivery")
+	}
+
+	return nil
+}

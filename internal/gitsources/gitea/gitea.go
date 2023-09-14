@@ -325,18 +325,23 @@ func (c *Client) DeleteRepoWebhook(repopath, u string) error {
 	return nil
 }
 
-func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource.CommitStatus, targetURL, description, context string) error {
+func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource.CommitStatus, targetURL, description, context string) (bool, error) {
 	owner, reponame, err := parseRepoPath(repopath)
 	if err != nil {
-		return errors.WithStack(err)
+		return false, errors.WithStack(err)
 	}
-	_, _, err = c.client.CreateStatus(owner, reponame, commitSHA, gitea.CreateStatusOption{
+	_, resp, err := c.client.CreateStatus(owner, reponame, commitSHA, gitea.CreateStatusOption{
 		State:       fromCommitStatus(status),
 		TargetURL:   targetURL,
 		Description: description,
 		Context:     context,
 	})
-	return errors.WithStack(err)
+
+	var delivered bool
+	if resp != nil {
+		delivered = resp.StatusCode == http.StatusCreated
+	}
+	return delivered, errors.WithStack(err)
 }
 
 func (c *Client) ListUserRepos() ([]*gitsource.RepoInfo, error) {

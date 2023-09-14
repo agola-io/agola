@@ -141,3 +141,55 @@ func (d *DB) GetLastRunEventSequence(tx *sql.Tx) (*types.LastRunEventSequence, e
 	out, err := mustSingleRow(lastRunEventSequences)
 	return out, errors.WithStack(err)
 }
+
+func (d *DB) GetCommitStatusDeliveriesAfterSequence(tx *sql.Tx, afterSequence uint64, deliveryStatus types.DeliveryStatus, limit int) ([]*types.CommitStatusDelivery, error) {
+	q := commitStatusDeliverySelect().OrderBy("sequence").Asc()
+	if deliveryStatus != "" {
+		q.Where(q.E("delivery_status", deliveryStatus))
+	}
+	q.Where(q.G("sequence", afterSequence))
+
+	if limit > 0 {
+		q.Limit(limit)
+	}
+
+	commitStatusDeliveries, _, err := d.fetchCommitStatusDeliverys(tx, q)
+	return commitStatusDeliveries, errors.WithStack(err)
+}
+
+func (d *DB) GetCommitStatusDeliveryByID(tx *sql.Tx, commitStatusDeliveryID string) (*types.CommitStatusDelivery, error) {
+	q := commitStatusDeliverySelect()
+	q.Where(q.E("id", commitStatusDeliveryID))
+	commitStatusDeliveries, _, err := d.fetchCommitStatusDeliverys(tx, q)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	out, err := mustSingleRow(commitStatusDeliveries)
+	return out, errors.WithStack(err)
+}
+
+func (d *DB) GetCommitStatusByID(tx *sql.Tx, commitStatusID string) (*types.CommitStatus, error) {
+	q := commitStatusSelect()
+	q.Where(q.E("id", commitStatusID))
+	commitStatuses, _, err := d.fetchCommitStatuss(tx, q)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	out, err := mustSingleRow(commitStatuses)
+	return out, errors.WithStack(err)
+}
+
+func (d *DB) GetCommitStatuses(tx *sql.Tx, limit int) ([]*types.CommitStatus, error) {
+	q := commitStatusSelect()
+	if limit > 0 {
+		q.Limit(limit)
+	}
+	commitStatuses, _, err := d.fetchCommitStatuss(tx, q)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return commitStatuses, errors.WithStack(err)
+}
