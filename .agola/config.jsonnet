@@ -6,7 +6,7 @@ local go_runtime(version, arch) = {
       image: 'golang:' + version + '-buster',
     },
     {
-      image: 'postgres',
+      image: 'postgres:15',
       environment: {
         POSTGRES_PASSWORD: 'password',
       },
