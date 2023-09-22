@@ -58,13 +58,13 @@ func init() {
 }
 
 func userTokenDelete(cmd *cobra.Command, args []string) error {
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
 	userName := userTokenDeleteOpts.userName
 	tokenName := userTokenDeleteOpts.tokenName
 
 	log.Info().Msgf("deleting token %q for user %q", tokenName, userName)
-	_, err := gwclient.DeleteUserToken(context.TODO(), userName, tokenName)
+	_, err := gwClient.DeleteUserToken(context.TODO(), userName, tokenName)
 	if err != nil {
 		return errors.Wrapf(err, "failed to delete user token")
 	}

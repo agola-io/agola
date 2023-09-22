@@ -53,10 +53,10 @@ func init() {
 }
 
 func userDelete(cmd *cobra.Command, args []string) error {
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
 	log.Info().Msgf("deleting user %q", userDeleteOpts.username)
-	if _, err := gwclient.DeleteUser(context.TODO(), userDeleteOpts.username); err != nil {
+	if _, err := gwClient.DeleteUser(context.TODO(), userDeleteOpts.username); err != nil {
 		return errors.Wrapf(err, "failed to delete user")
 	}
 

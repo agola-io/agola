@@ -55,9 +55,9 @@ func init() {
 }
 
 func orgMemberList(cmd *cobra.Command, args []string) error {
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
-	orgMembers, _, err := gwclient.GetOrgMembers(context.TODO(), orgMemberListOpts.orgname)
+	orgMembers, _, err := gwClient.GetOrgMembers(context.TODO(), orgMemberListOpts.orgname)
 	if err != nil {
 		return errors.Wrapf(err, "failed to get organization member")
 	}

@@ -62,7 +62,7 @@ func init() {
 }
 
 func runCreate(cmd *cobra.Command, args []string) error {
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
 	set := 0
 	flags := cmd.Flags()
@@ -86,7 +86,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		CommitSHA: runCreateOpts.commitSHA,
 	}
 
-	_, err := gwclient.ProjectCreateRun(context.TODO(), runCreateOpts.projectRef, req)
+	_, err := gwClient.ProjectCreateRun(context.TODO(), runCreateOpts.projectRef, req)
 
 	return errors.WithStack(err)
 }

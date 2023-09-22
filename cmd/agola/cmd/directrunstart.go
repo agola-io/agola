@@ -94,7 +94,7 @@ func parseVariable(variable string) (string, string, error) {
 }
 
 func directRunStart(cmd *cobra.Command, args []string) error {
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
 	for _, res := range directRunStartOpts.prRefRegexes {
 		if _, err := regexp.Compile(res); err != nil {
@@ -126,7 +126,7 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 		return errors.Errorf(`only one of "--branch", "--tag" or "--ref" can be provided`)
 	}
 
-	user, _, err := gwclient.GetCurrentUser(context.TODO())
+	user, _, err := gwClient.GetCurrentUser(context.TODO())
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -214,7 +214,7 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 		PullRequestRefRegexes: directRunStartOpts.prRefRegexes,
 		Variables:             variables,
 	}
-	if _, err := gwclient.UserCreateRun(context.TODO(), req); err != nil {
+	if _, err := gwClient.UserCreateRun(context.TODO(), req); err != nil {
 		return errors.WithStack(err)
 	}
 

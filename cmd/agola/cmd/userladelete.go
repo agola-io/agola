@@ -58,13 +58,13 @@ func init() {
 }
 
 func userLADelete(cmd *cobra.Command, args []string) error {
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
 	userName := userLADeleteOpts.userName
 	laID := userLADeleteOpts.laID
 
 	log.Info().Msgf("deleting linked account %q for user %q", laID, userName)
-	_, err := gwclient.DeleteUserLA(context.TODO(), userName, laID)
+	_, err := gwClient.DeleteUserLA(context.TODO(), userName, laID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to delete linked account")
 	}

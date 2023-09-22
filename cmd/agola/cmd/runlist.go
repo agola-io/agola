@@ -101,16 +101,16 @@ func runList(cmd *cobra.Command, args []string) error {
 		return errors.Errorf(`one of "--username" or "--project" must be provided`)
 	}
 
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
 	isProject := !flags.Changed("username")
 
 	var runsResp []*gwapitypes.RunsResponse
 	var err error
 	if isProject {
-		runsResp, _, err = gwclient.GetProjectRuns(context.TODO(), runListOpts.projectRef, runListOpts.phaseFilter, nil, runListOpts.start, runListOpts.limit, false)
+		runsResp, _, err = gwClient.GetProjectRuns(context.TODO(), runListOpts.projectRef, runListOpts.phaseFilter, nil, runListOpts.start, runListOpts.limit, false)
 	} else {
-		runsResp, _, err = gwclient.GetUserRuns(context.TODO(), runListOpts.username, runListOpts.phaseFilter, nil, runListOpts.start, runListOpts.limit, false)
+		runsResp, _, err = gwClient.GetUserRuns(context.TODO(), runListOpts.username, runListOpts.phaseFilter, nil, runListOpts.start, runListOpts.limit, false)
 	}
 	if err != nil {
 		return errors.WithStack(err)
@@ -121,9 +121,9 @@ func runList(cmd *cobra.Command, args []string) error {
 		var err error
 		var run *gwapitypes.RunResponse
 		if isProject {
-			run, _, err = gwclient.GetProjectRun(context.TODO(), runListOpts.projectRef, runResponse.Number)
+			run, _, err = gwClient.GetProjectRun(context.TODO(), runListOpts.projectRef, runResponse.Number)
 		} else {
-			run, _, err = gwclient.GetUserRun(context.TODO(), runListOpts.username, runResponse.Number)
+			run, _, err = gwClient.GetUserRun(context.TODO(), runListOpts.username, runResponse.Number)
 		}
 		if err != nil {
 			return errors.WithStack(err)
@@ -133,9 +133,9 @@ func runList(cmd *cobra.Command, args []string) error {
 		for _, task := range run.Tasks {
 			var runTaskResponse *gwapitypes.RunTaskResponse
 			if isProject {
-				runTaskResponse, _, err = gwclient.GetProjectRunTask(context.TODO(), runListOpts.projectRef, run.Number, task.ID)
+				runTaskResponse, _, err = gwClient.GetProjectRunTask(context.TODO(), runListOpts.projectRef, run.Number, task.ID)
 			} else {
-				runTaskResponse, _, err = gwclient.GetUserRunTask(context.TODO(), runListOpts.username, run.Number, task.ID)
+				runTaskResponse, _, err = gwClient.GetUserRunTask(context.TODO(), runListOpts.username, run.Number, task.ID)
 			}
 			t := &taskDetails{
 				name:            task.Name,

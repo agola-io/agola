@@ -53,10 +53,10 @@ func init() {
 }
 
 func projectReconfig(cmd *cobra.Command, args []string) error {
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
 	log.Info().Msgf("reconfiguring remote project")
-	if _, err := gwclient.ReconfigProject(context.TODO(), projectReconfigOpts.name); err != nil {
+	if _, err := gwClient.ReconfigProject(context.TODO(), projectReconfigOpts.name); err != nil {
 		return errors.Wrapf(err, "failed to reconfigure remote project")
 	}
 	log.Info().Msgf("project reconfigured")

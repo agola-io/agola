@@ -61,7 +61,7 @@ func init() {
 }
 
 func projectGroupUpdate(cmd *cobra.Command, args []string) error {
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
 	req := &gwapitypes.UpdateProjectGroupRequest{}
 
@@ -80,7 +80,7 @@ func projectGroupUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	log.Info().Msgf("updating project group")
-	projectGroup, _, err := gwclient.UpdateProjectGroup(context.TODO(), projectGroupUpdateOpts.ref, req)
+	projectGroup, _, err := gwClient.UpdateProjectGroup(context.TODO(), projectGroupUpdateOpts.ref, req)
 	if err != nil {
 		return errors.Wrapf(err, "failed to update project group")
 	}

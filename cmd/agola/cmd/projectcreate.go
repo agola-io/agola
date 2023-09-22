@@ -85,7 +85,7 @@ func IsValidVisibility(v string) bool {
 }
 
 func projectCreate(cmd *cobra.Command, args []string) error {
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
 	// TODO(sgotti) make this a custom pflag Value?
 	if !IsValidVisibility(projectCreateOpts.visibility) {
@@ -104,7 +104,7 @@ func projectCreate(cmd *cobra.Command, args []string) error {
 
 	log.Info().Msgf("creating project")
 
-	project, _, err := gwclient.CreateProject(context.TODO(), req)
+	project, _, err := gwClient.CreateProject(context.TODO(), req)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create project")
 	}

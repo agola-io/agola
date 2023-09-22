@@ -73,7 +73,7 @@ func init() {
 }
 
 func remoteSourceUpdate(cmd *cobra.Command, args []string) error {
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
 	req := &gwapitypes.UpdateRemoteSourceRequest{}
 
@@ -107,7 +107,7 @@ func remoteSourceUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	log.Info().Msgf("updating remotesource")
-	remoteSource, _, err := gwclient.UpdateRemoteSource(context.TODO(), remoteSourceUpdateOpts.ref, req)
+	remoteSource, _, err := gwClient.UpdateRemoteSource(context.TODO(), remoteSourceUpdateOpts.ref, req)
 	if err != nil {
 		return errors.Wrapf(err, "failed to update remotesource")
 	}
