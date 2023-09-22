@@ -70,13 +70,13 @@ func printSecrets(ownertype, description string, tree, removeoverridden bool) er
 	var err error
 	var secrets []*gwapitypes.SecretResponse
 
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
 	switch ownertype {
 	case "project":
-		secrets, _, err = gwclient.GetProjectSecrets(context.TODO(), secretListOpts.parentRef, tree, removeoverridden)
+		secrets, _, err = gwClient.GetProjectSecrets(context.TODO(), secretListOpts.parentRef, tree, removeoverridden)
 	case "projectgroup":
-		secrets, _, err = gwclient.GetProjectGroupSecrets(context.TODO(), secretListOpts.parentRef, tree, removeoverridden)
+		secrets, _, err = gwClient.GetProjectGroupSecrets(context.TODO(), secretListOpts.parentRef, tree, removeoverridden)
 	}
 	if err != nil {
 		return errors.Wrapf(err, "failed to list %s secrets", ownertype)

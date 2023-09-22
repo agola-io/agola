@@ -76,7 +76,7 @@ func init() {
 }
 
 func secretUpdate(cmd *cobra.Command, ownertype string, args []string) error {
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
 	// "github.com/ghodss/yaml" doesn't provide a streaming decoder
 	var data []byte
@@ -111,14 +111,14 @@ func secretUpdate(cmd *cobra.Command, ownertype string, args []string) error {
 	switch ownertype {
 	case "project":
 		log.Info().Msgf("creating project secret")
-		secret, _, err := gwclient.UpdateProjectSecret(context.TODO(), secretUpdateOpts.parentRef, secretUpdateOpts.name, req)
+		secret, _, err := gwClient.UpdateProjectSecret(context.TODO(), secretUpdateOpts.parentRef, secretUpdateOpts.name, req)
 		if err != nil {
 			return errors.Wrapf(err, "failed to update project secret")
 		}
 		log.Info().Msgf("project secret %q updated, ID: %q", secret.Name, secret.ID)
 	case "projectgroup":
 		log.Info().Msgf("creating project group secret")
-		secret, _, err := gwclient.UpdateProjectGroupSecret(context.TODO(), secretUpdateOpts.parentRef, secretUpdateOpts.name, req)
+		secret, _, err := gwClient.UpdateProjectGroupSecret(context.TODO(), secretUpdateOpts.parentRef, secretUpdateOpts.name, req)
 		if err != nil {
 			return errors.Wrapf(err, "failed to update project group secret")
 		}

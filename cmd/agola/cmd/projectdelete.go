@@ -53,11 +53,11 @@ func init() {
 }
 
 func projectDelete(cmd *cobra.Command, args []string) error {
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
 	log.Info().Msgf("deleting project")
 
-	if _, err := gwclient.DeleteProject(context.TODO(), projectDeleteOpts.ref); err != nil {
+	if _, err := gwClient.DeleteProject(context.TODO(), projectDeleteOpts.ref); err != nil {
 		return errors.Wrapf(err, "failed to delete project")
 	}
 

@@ -40,9 +40,9 @@ func init() {
 }
 
 func printVersions(cmd *cobra.Command, args []string) error {
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
-	gwversion, _, err := gwclient.GetVersion(context.TODO())
+	gwversion, _, err := gwClient.GetVersion(context.TODO())
 	if err != nil {
 		return errors.WithStack(err)
 	}

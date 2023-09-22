@@ -54,14 +54,14 @@ func init() {
 }
 
 func userCreate(cmd *cobra.Command, args []string) error {
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
 	req := &gwapitypes.CreateUserRequest{
 		UserName: userCreateOpts.username,
 	}
 
 	log.Info().Msgf("creating user")
-	user, _, err := gwclient.CreateUser(context.TODO(), req)
+	user, _, err := gwClient.CreateUser(context.TODO(), req)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create user")
 	}

@@ -61,7 +61,7 @@ func init() {
 }
 
 func projectGroupCreate(cmd *cobra.Command, args []string) error {
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
 	// TODO(sgotti) make this a custom pflag Value?
 	if !IsValidVisibility(projectGroupCreateOpts.visibility) {
@@ -76,7 +76,7 @@ func projectGroupCreate(cmd *cobra.Command, args []string) error {
 
 	log.Info().Msgf("creating project group")
 
-	projectGroup, _, err := gwclient.CreateProjectGroup(context.TODO(), req)
+	projectGroup, _, err := gwClient.CreateProjectGroup(context.TODO(), req)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create project group")
 	}

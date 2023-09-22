@@ -56,7 +56,7 @@ func init() {
 }
 
 func orgCreate(cmd *cobra.Command, args []string) error {
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
 	// TODO(sgotti) make this a custom pflag Value?
 	if !IsValidVisibility(orgCreateOpts.visibility) {
@@ -69,7 +69,7 @@ func orgCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	log.Info().Msgf("creating org")
-	org, _, err := gwclient.CreateOrg(context.TODO(), req)
+	org, _, err := gwClient.CreateOrg(context.TODO(), req)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create org")
 	}

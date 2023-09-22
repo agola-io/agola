@@ -58,19 +58,19 @@ func init() {
 }
 
 func variableDelete(cmd *cobra.Command, ownertype string, args []string) error {
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
 	switch ownertype {
 	case "project":
 		log.Info().Msgf("deleting project variable")
-		_, err := gwclient.DeleteProjectVariable(context.TODO(), variableDeleteOpts.parentRef, variableDeleteOpts.name)
+		_, err := gwClient.DeleteProjectVariable(context.TODO(), variableDeleteOpts.parentRef, variableDeleteOpts.name)
 		if err != nil {
 			return errors.Wrapf(err, "failed to delete project variable")
 		}
 		log.Info().Msgf("project variable deleted")
 	case "projectgroup":
 		log.Info().Msgf("deleting project group variable")
-		_, err := gwclient.DeleteProjectGroupVariable(context.TODO(), variableDeleteOpts.parentRef, variableDeleteOpts.name)
+		_, err := gwClient.DeleteProjectGroupVariable(context.TODO(), variableDeleteOpts.parentRef, variableDeleteOpts.name)
 		if err != nil {
 			return errors.Wrapf(err, "failed to delete project group variable")
 		}

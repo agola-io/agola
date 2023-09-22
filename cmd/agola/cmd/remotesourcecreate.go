@@ -82,7 +82,7 @@ func init() {
 }
 
 func remoteSourceCreate(cmd *cobra.Command, args []string) error {
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
 	flags := cmd.Flags()
 
@@ -115,7 +115,7 @@ func remoteSourceCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	log.Info().Msgf("creating remotesource")
-	remoteSource, _, err := gwclient.CreateRemoteSource(context.TODO(), req)
+	remoteSource, _, err := gwClient.CreateRemoteSource(context.TODO(), req)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create remotesource")
 	}

@@ -70,13 +70,13 @@ func printVariables(ownertype, description string, tree, removeoverridden bool) 
 	var err error
 	var variables []*gwapitypes.VariableResponse
 
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
 	switch ownertype {
 	case "project":
-		variables, _, err = gwclient.GetProjectVariables(context.TODO(), variableListOpts.parentRef, tree, removeoverridden)
+		variables, _, err = gwClient.GetProjectVariables(context.TODO(), variableListOpts.parentRef, tree, removeoverridden)
 	case "projectgroup":
-		variables, _, err = gwclient.GetProjectGroupVariables(context.TODO(), variableListOpts.parentRef, tree, removeoverridden)
+		variables, _, err = gwClient.GetProjectGroupVariables(context.TODO(), variableListOpts.parentRef, tree, removeoverridden)
 	}
 	if err != nil {
 		return errors.Wrapf(err, "failed to list %s variables", ownertype)

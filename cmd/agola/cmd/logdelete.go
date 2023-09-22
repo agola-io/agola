@@ -89,7 +89,7 @@ func logDelete(cmd *cobra.Command, args []string) error {
 		return errors.Errorf("%d is an invalid step number, it must be equal or greater than zero", logDeleteOpts.step)
 	}
 
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
 	isProject := !flags.Changed("username")
 
@@ -103,9 +103,9 @@ func logDelete(cmd *cobra.Command, args []string) error {
 		var run *gwapitypes.RunResponse
 		var err error
 		if isProject {
-			run, _, err = gwclient.GetProjectRun(context.TODO(), logDeleteOpts.projectRef, logDeleteOpts.runNumber)
+			run, _, err = gwClient.GetProjectRun(context.TODO(), logDeleteOpts.projectRef, logDeleteOpts.runNumber)
 		} else {
-			run, _, err = gwclient.GetUserRun(context.TODO(), logDeleteOpts.username, logDeleteOpts.runNumber)
+			run, _, err = gwClient.GetUserRun(context.TODO(), logDeleteOpts.username, logDeleteOpts.runNumber)
 		}
 		if err != nil {
 			return errors.WithStack(err)
@@ -127,9 +127,9 @@ func logDelete(cmd *cobra.Command, args []string) error {
 
 	var err error
 	if isProject {
-		_, err = gwclient.DeleteProjectLogs(context.TODO(), logDeleteOpts.projectRef, logDeleteOpts.runNumber, taskid, logDeleteOpts.setup, logDeleteOpts.step)
+		_, err = gwClient.DeleteProjectLogs(context.TODO(), logDeleteOpts.projectRef, logDeleteOpts.runNumber, taskid, logDeleteOpts.setup, logDeleteOpts.step)
 	} else {
-		_, err = gwclient.DeleteUserLogs(context.TODO(), logDeleteOpts.username, logDeleteOpts.runNumber, taskid, logDeleteOpts.setup, logDeleteOpts.step)
+		_, err = gwClient.DeleteUserLogs(context.TODO(), logDeleteOpts.username, logDeleteOpts.runNumber, taskid, logDeleteOpts.setup, logDeleteOpts.step)
 	}
 
 	if err != nil {

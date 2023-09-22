@@ -69,7 +69,7 @@ func init() {
 }
 
 func variableUpdate(cmd *cobra.Command, ownertype string, args []string) error {
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
 	// "github.com/ghodss/yaml" doesn't provide a streaming decoder
 	var data []byte
@@ -111,14 +111,14 @@ func variableUpdate(cmd *cobra.Command, ownertype string, args []string) error {
 	switch ownertype {
 	case "project":
 		log.Info().Msgf("updating project variable")
-		variable, _, err := gwclient.UpdateProjectVariable(context.TODO(), variableUpdateOpts.parentRef, variableUpdateOpts.name, req)
+		variable, _, err := gwClient.UpdateProjectVariable(context.TODO(), variableUpdateOpts.parentRef, variableUpdateOpts.name, req)
 		if err != nil {
 			return errors.Wrapf(err, "failed to update project variable")
 		}
 		log.Info().Msgf("project variable %q updated, ID: %q", variable.Name, variable.ID)
 	case "projectgroup":
 		log.Info().Msgf("updating project group variable")
-		variable, _, err := gwclient.UpdateProjectGroupVariable(context.TODO(), variableUpdateOpts.parentRef, variableUpdateOpts.name, req)
+		variable, _, err := gwClient.UpdateProjectGroupVariable(context.TODO(), variableUpdateOpts.parentRef, variableUpdateOpts.name, req)
 		if err != nil {
 			return errors.Wrapf(err, "failed to update project group variable")
 		}

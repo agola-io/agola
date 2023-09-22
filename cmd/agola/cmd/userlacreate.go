@@ -63,7 +63,7 @@ func init() {
 }
 
 func userLACreate(cmd *cobra.Command, args []string) error {
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
 	req := &gwapitypes.CreateUserLARequest{
 		RemoteSourceName:          userLACreateOpts.remoteSourceName,
@@ -72,7 +72,7 @@ func userLACreate(cmd *cobra.Command, args []string) error {
 	}
 
 	log.Info().Msgf("creating linked account for user %q", userLACreateOpts.username)
-	resp, _, err := gwclient.CreateUserLA(context.TODO(), userLACreateOpts.username, req)
+	resp, _, err := gwClient.CreateUserLA(context.TODO(), userLACreateOpts.username, req)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create linked account")
 	}

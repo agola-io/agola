@@ -53,10 +53,10 @@ func init() {
 }
 
 func orgDelete(cmd *cobra.Command, args []string) error {
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
 	log.Info().Msgf("deleting organization %q", orgDeleteOpts.name)
-	if _, err := gwclient.DeleteOrg(context.TODO(), orgDeleteOpts.name); err != nil {
+	if _, err := gwClient.DeleteOrg(context.TODO(), orgDeleteOpts.name); err != nil {
 		return errors.Wrapf(err, "failed to delete organization")
 	}
 

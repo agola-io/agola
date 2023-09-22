@@ -61,9 +61,9 @@ func printProjects(projects []*gwapitypes.ProjectResponse) {
 }
 
 func projectList(cmd *cobra.Command, args []string) error {
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
-	projects, _, err := gwclient.GetProjectGroupProjects(context.TODO(), projectListOpts.parentPath)
+	projects, _, err := gwClient.GetProjectGroupProjects(context.TODO(), projectListOpts.parentPath)
 	if err != nil {
 		return errors.WithStack(err)
 	}

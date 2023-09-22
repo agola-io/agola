@@ -60,14 +60,14 @@ func init() {
 }
 
 func userTokenCreate(cmd *cobra.Command, args []string) error {
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
 	req := &gwapitypes.CreateUserTokenRequest{
 		TokenName: userTokenCreateOpts.tokenName,
 	}
 
 	log.Info().Msgf("creating token for user %q", userTokenCreateOpts.username)
-	resp, _, err := gwclient.CreateUserToken(context.TODO(), userTokenCreateOpts.username, req)
+	resp, _, err := gwClient.CreateUserToken(context.TODO(), userTokenCreateOpts.username, req)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create token")
 	}

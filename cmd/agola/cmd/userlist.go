@@ -59,9 +59,9 @@ func printUsers(users []*gwapitypes.PrivateUserResponse) {
 }
 
 func userList(cmd *cobra.Command, args []string) error {
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
-	users, _, err := gwclient.GetUsers(context.TODO(), userListOpts.start, userListOpts.limit, false)
+	users, _, err := gwClient.GetUsers(context.TODO(), userListOpts.start, userListOpts.limit, false)
 	if err != nil {
 		return errors.WithStack(err)
 	}

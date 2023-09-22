@@ -58,19 +58,19 @@ func init() {
 }
 
 func secretDelete(cmd *cobra.Command, ownertype string, args []string) error {
-	gwclient := gwclient.NewClient(gatewayURL, token)
+	gwClient := gwclient.NewClient(gatewayURL, token)
 
 	switch ownertype {
 	case "project":
 		log.Info().Msgf("deleting project secret")
-		_, err := gwclient.DeleteProjectSecret(context.TODO(), secretDeleteOpts.parentRef, secretDeleteOpts.name)
+		_, err := gwClient.DeleteProjectSecret(context.TODO(), secretDeleteOpts.parentRef, secretDeleteOpts.name)
 		if err != nil {
 			return errors.Wrapf(err, "failed to delete project secret")
 		}
 		log.Info().Msgf("project secret deleted")
 	case "projectgroup":
 		log.Info().Msgf("deleting project group secret")
-		_, err := gwclient.DeleteProjectGroupSecret(context.TODO(), secretDeleteOpts.parentRef, secretDeleteOpts.name)
+		_, err := gwClient.DeleteProjectGroupSecret(context.TODO(), secretDeleteOpts.parentRef, secretDeleteOpts.name)
 		if err != nil {
 			return errors.Wrapf(err, "failed to delete project group secret")
 		}
