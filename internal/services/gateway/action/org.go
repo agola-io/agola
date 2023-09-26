@@ -22,6 +22,7 @@ import (
 	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
+	"agola.io/agola/services/configstore/client"
 	cstypes "agola.io/agola/services/configstore/types"
 )
 
@@ -47,9 +48,13 @@ func (h *ActionHandler) GetOrgs(ctx context.Context, req *GetOrgsRequest) ([]*cs
 	return orgs, nil
 }
 
-type OrgMembersResponse struct {
-	Organization *cstypes.Organization
-	Members      []*OrgMemberResponse
+type GetOrgMembersRequest struct {
+	OrgRef string
+
+	Cursor string
+
+	Limit         int
+	SortDirection SortDirection
 }
 
 type OrgMemberResponse struct {
@@ -57,27 +62,54 @@ type OrgMemberResponse struct {
 	Role cstypes.MemberRole
 }
 
-func (h *ActionHandler) GetOrgMembers(ctx context.Context, orgRef string) (*OrgMembersResponse, error) {
-	org, _, err := h.configstoreClient.GetOrg(ctx, orgRef)
+type GetOrgMembersResponse struct {
+	Organization *cstypes.Organization
+	Members      []*OrgMemberResponse
+	Cursor       string
+}
+
+func (h *ActionHandler) GetOrgMembers(ctx context.Context, req *GetOrgMembersRequest) (*GetOrgMembersResponse, error) {
+	inCursor := &StartCursor{}
+	sortDirection := req.SortDirection
+	if req.Cursor != "" {
+		if err := UnmarshalCursor(req.Cursor, inCursor); err != nil {
+			return nil, errors.WithStack(err)
+		}
+		sortDirection = inCursor.SortDirection
+	}
+
+	org, _, err := h.configstoreClient.GetOrg(ctx, req.OrgRef)
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
 
-	orgMembers, _, err := h.configstoreClient.GetOrgMembers(ctx, orgRef)
+	orgMembers, resp, err := h.configstoreClient.GetOrgMembers(ctx, req.OrgRef, &client.GetOrgMembersOptions{ListOptions: &client.ListOptions{Limit: req.Limit, SortDirection: cstypes.SortDirection(sortDirection)}, StartUserName: inCursor.Start})
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
 
-	res := &OrgMembersResponse{
+	var outCursor string
+	if resp.HasMore && len(orgMembers) > 0 {
+		lastUserName := orgMembers[len(orgMembers)-1].User.Name
+		outCursor, err = MarshalCursor(&StartCursor{Start: lastUserName})
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+	}
+
+	res := &GetOrgMembersResponse{
 		Organization: org,
 		Members:      make([]*OrgMemberResponse, len(orgMembers)),
+		Cursor:       outCursor,
 	}
+
 	for i, orgMember := range orgMembers {
 		res.Members[i] = &OrgMemberResponse{
 			User: orgMember.User,
 			Role: orgMember.Role,
 		}
 	}
+
 	return res, nil
 }
 

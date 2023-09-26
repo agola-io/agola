@@ -152,9 +152,9 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	if len(g.c.Web.AllowedOrigins) > 0 {
 		corsAllowedMethodsOptions := ghandlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "DELETE"})
-		corsAllowedHeadersOptions := ghandlers.AllowedHeaders([]string{"Accept", "Accept-Encoding", "Content-Length", "Content-Type", "Content-Range", "X-Csrf-Token", "Authorization"})
+		corsAllowedHeadersOptions := ghandlers.AllowedHeaders([]string{"Accept", "Accept-Encoding", "Content-Length", "Content-Type", "Content-Range", "X-Csrf-Token", "X-Agola-Cursor", "Authorization"})
 		corsAllowedOriginsOptions := ghandlers.AllowedOrigins(g.c.Web.AllowedOrigins)
-		corsExposeHeadersOptions := ghandlers.ExposedHeaders([]string{"X-Csrf-Token"})
+		corsExposeHeadersOptions := ghandlers.ExposedHeaders([]string{"X-Csrf-Token", "X-Agola-Cursor"})
 		corsHandler = ghandlers.CORS(corsAllowedMethodsOptions, corsAllowedHeadersOptions, corsAllowedOriginsOptions, corsExposeHeadersOptions, ghandlers.AllowCredentials())
 	}
 

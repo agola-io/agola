@@ -22,6 +22,13 @@ import (
 	rsclient "agola.io/agola/services/runservice/client"
 )
 
+type SortDirection string
+
+const (
+	SortDirectionAsc  SortDirection = "asc"
+	SortDirectionDesc SortDirection = "desc"
+)
+
 type ActionHandler struct {
 	log                          zerolog.Logger
 	sd                           *scommon.TokenSigningData

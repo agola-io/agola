@@ -23,6 +23,7 @@ import (
 	"github.com/sorintlab/errors"
 	"github.com/spf13/cobra"
 
+	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 )
 
@@ -54,19 +55,37 @@ func init() {
 	cmdOrgMember.AddCommand(cmdOrgMemberList)
 }
 
+func printOrgMembers(orgMembers []*gwapitypes.OrgMemberResponse) error {
+	for _, orgMember := range orgMembers {
+		out, err := json.MarshalIndent(orgMember, "", "\t")
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		os.Stdout.Write(out)
+	}
+
+	return nil
+}
+
 func orgMemberList(cmd *cobra.Command, args []string) error {
 	gwClient := gwclient.NewClient(gatewayURL, token)
 
-	orgMembers, _, err := gwClient.GetOrgMembers(context.TODO(), orgMemberListOpts.orgname)
-	if err != nil {
-		return errors.Wrapf(err, "failed to get organization member")
-	}
+	var cursor string
+	for {
+		orgMembersResp, resp, err := gwClient.GetOrgMembers(context.TODO(), orgMemberListOpts.orgname, &gwclient.ListOptions{Cursor: cursor})
+		if err != nil {
+			return errors.Wrapf(err, "failed to get organization member")
+		}
 
-	out, err := json.MarshalIndent(orgMembers, "", "\t")
-	if err != nil {
-		return errors.WithStack(err)
+		if err := printOrgMembers(orgMembersResp.Members); err != nil {
+			return errors.WithStack(err)
+		}
+
+		cursor = resp.Cursor
+		if cursor == "" {
+			break
+		}
 	}
-	os.Stdout.Write(out)
 
 	return nil
 }

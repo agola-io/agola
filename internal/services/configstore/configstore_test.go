@@ -1067,6 +1067,121 @@ func TestOrgMembers(t *testing.T) {
 	})
 }
 
+func TestGetOrgMembers(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	ctx := context.Background()
+	log := testutil.NewLogger(t)
+
+	cs := setupConfigstore(ctx, t, log, dir)
+
+	t.Logf("starting cs")
+	go func() { _ = cs.Run(ctx) }()
+
+	users := []*types.User{}
+	for i := 1; i < 10; i++ {
+		user, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		users = append(users, user)
+	}
+
+	org, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: "org01", Visibility: types.VisibilityPublic, CreatorUserID: users[0].ID})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	for _, user := range users {
+		if _, err := cs.ah.AddOrgMember(ctx, org.ID, user.ID, types.MemberRoleMember); err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+	}
+
+	t.Run("test get all org members", func(t *testing.T) {
+		res, err := cs.ah.GetOrgMembers(ctx, &action.GetOrgMembersRequest{OrgRef: org.ID, SortDirection: types.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		expectedOrgMembers := 9
+		if len(res.OrgMembers) != expectedOrgMembers {
+			t.Fatalf("expected %d org members, got %d org members", expectedOrgMembers, len(res.OrgMembers))
+		}
+		if res.HasMore {
+			t.Fatalf("expected hasMore false, got %t", res.HasMore)
+		}
+	})
+
+	t.Run("test get org members with limit less than org members", func(t *testing.T) {
+		res, err := cs.ah.GetOrgMembers(ctx, &action.GetOrgMembersRequest{OrgRef: org.ID, Limit: 5, SortDirection: types.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		expectedOrgMembers := 5
+		if len(res.OrgMembers) != expectedOrgMembers {
+			t.Fatalf("expected %d org members, got %d org members", expectedOrgMembers, len(res.OrgMembers))
+		}
+		if !res.HasMore {
+			t.Fatalf("expected hasMore true, got %t", res.HasMore)
+		}
+	})
+
+	t.Run("test get org members with limit less than org members continuation", func(t *testing.T) {
+		orgMembers := []*action.OrgMember{}
+
+		res, err := cs.ah.GetOrgMembers(ctx, &action.GetOrgMembersRequest{OrgRef: org.ID, Limit: 5, SortDirection: types.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		expectedOrgMembers := 5
+		if len(res.OrgMembers) != expectedOrgMembers {
+			t.Fatalf("expected %d org members, got %d org members", expectedOrgMembers, len(res.OrgMembers))
+		}
+		if !res.HasMore {
+			t.Fatalf("expected hasMore true, got %t", res.HasMore)
+		}
+
+		orgMembers = append(orgMembers, res.OrgMembers...)
+		lastUser := res.OrgMembers[len(res.OrgMembers)-1]
+
+		// fetch next results
+		for {
+			res, err = cs.ah.GetOrgMembers(ctx, &action.GetOrgMembersRequest{OrgRef: org.ID, StartUserName: lastUser.User.Name, Limit: 5, SortDirection: types.SortDirectionAsc})
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			expectedOrgMembers := 5
+			if res.HasMore && len(res.OrgMembers) != expectedOrgMembers {
+				t.Fatalf("expected %d org members, got %d org members", expectedOrgMembers, len(res.OrgMembers))
+			}
+
+			orgMembers = append(orgMembers, res.OrgMembers...)
+
+			if !res.HasMore {
+				break
+			}
+
+			lastUser = res.OrgMembers[len(res.OrgMembers)-1]
+		}
+
+		expectedOrgMembers = 9
+		if len(orgMembers) != expectedOrgMembers {
+			t.Fatalf("expected %d org members, got %d org members", expectedOrgMembers, len(orgMembers))
+		}
+
+		orgMemberUsers := []*types.User{}
+		for _, orgMember := range orgMembers {
+			orgMemberUsers = append(orgMemberUsers, orgMember.User)
+
+		}
+		if diff := cmpDiffObject(users, orgMemberUsers); diff != "" {
+			t.Fatalf("mismatch (-want +got):\n%s", diff)
+		}
+	})
+}
+
 func TestRemoteSource(t *testing.T) {
 	t.Parallel()
 

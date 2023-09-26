@@ -154,7 +154,7 @@ func (h *ActionHandler) GetLogs(ctx context.Context, req *GetLogsRequest) (*http
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
 
-	return resp, nil
+	return resp.Response, nil
 }
 
 type DeleteLogsRequest struct {

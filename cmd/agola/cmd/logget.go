@@ -17,7 +17,6 @@ package cmd
 import (
 	"context"
 	"io"
-	"net/http"
 	"os"
 
 	"github.com/rs/zerolog/log"
@@ -136,7 +135,7 @@ func logGet(cmd *cobra.Command, args []string) error {
 
 	log.Info().Msgf("getting log")
 
-	var resp *http.Response
+	var resp *gwclient.Response
 	var err error
 	if isProject {
 		resp, err = gwClient.GetProjectLogs(context.TODO(), logGetOpts.projectRef, logGetOpts.runNumber, taskid, logGetOpts.setup, logGetOpts.step, logGetOpts.follow)

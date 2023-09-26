@@ -284,7 +284,7 @@ func (h *RemoveOrgMemberHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-func orgMemberResponse(orgUser *action.OrgMemberResponse) *csapitypes.OrgMemberResponse {
+func orgMemberResponse(orgUser *action.OrgMember) *csapitypes.OrgMemberResponse {
 	return &csapitypes.OrgMemberResponse{
 		User: orgUser.User,
 		Role: orgUser.Role,
@@ -301,24 +301,50 @@ func NewOrgMembersHandler(log zerolog.Logger, ah *action.ActionHandler) *OrgMemb
 }
 
 func (h *OrgMembersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	vars := mux.Vars(r)
-	orgRef := vars["orgref"]
-
-	orgUsers, err := h.ah.GetOrgMembers(ctx, orgRef)
+	res, err := h.do(w, r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	res := make([]*csapitypes.OrgMemberResponse, len(orgUsers))
-	for i, orgUser := range orgUsers {
-		res[i] = orgMemberResponse(orgUser)
-	}
-
 	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
 		h.log.Err(err).Send()
 	}
+}
+
+func (h *OrgMembersHandler) do(w http.ResponseWriter, r *http.Request) ([]*csapitypes.OrgMemberResponse, error) {
+	ctx := r.Context()
+	query := r.URL.Query()
+	vars := mux.Vars(r)
+	orgRef := vars["orgref"]
+
+	ropts, err := parseRequestOptions(r)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	startUserName := query.Get("startusername")
+
+	areq := &action.GetOrgMembersRequest{
+		OrgRef:        orgRef,
+		StartUserName: startUserName,
+
+		Limit:         ropts.Limit,
+		SortDirection: ropts.SortDirection,
+	}
+	ares, err := h.ah.GetOrgMembers(ctx, areq)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	res := make([]*csapitypes.OrgMemberResponse, len(ares.OrgMembers))
+	for i, orgMember := range ares.OrgMembers {
+		res[i] = orgMemberResponse(orgMember)
+	}
+
+	addHasMoreHeader(w, ares.HasMore)
+
+	return res, nil
 }
 
 type OrgInvitationsHandler struct {

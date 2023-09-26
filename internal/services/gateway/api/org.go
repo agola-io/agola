@@ -245,15 +245,30 @@ func NewOrgMembersHandler(log zerolog.Logger, ah *action.ActionHandler) *OrgMemb
 }
 
 func (h *OrgMembersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	vars := mux.Vars(r)
-	orgRef := vars["orgref"]
-
-	ares, err := h.ah.GetOrgMembers(ctx, orgRef)
+	res, err := h.do(w, r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *OrgMembersHandler) do(w http.ResponseWriter, r *http.Request) (*gwapitypes.OrgMembersResponse, error) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	orgRef := vars["orgref"]
+
+	ropts, err := parseRequestOptions(r)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	ares, err := h.ah.GetOrgMembers(ctx, &action.GetOrgMembersRequest{OrgRef: orgRef, Cursor: ropts.Cursor, Limit: ropts.Limit, SortDirection: action.SortDirection(ropts.SortDirection)})
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	res := &gwapitypes.OrgMembersResponse{
@@ -263,9 +278,10 @@ func (h *OrgMembersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for i, m := range ares.Members {
 		res.Members[i] = createOrgMemberResponse(m.User, m.Role)
 	}
-	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
-		h.log.Err(err).Send()
-	}
+
+	addCursorHeader(w, ares.Cursor)
+
+	return res, nil
 }
 
 func createAddOrgMemberResponse(org *cstypes.Organization, user *cstypes.User, role cstypes.MemberRole) *gwapitypes.AddOrgMemberResponse {

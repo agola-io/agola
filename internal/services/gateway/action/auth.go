@@ -228,7 +228,7 @@ func (h *ActionHandler) IsOrgMember(ctx context.Context, userRef, orgRef string)
 		return false, errors.Wrapf(err, "failed to get user %s:", userRef)
 	}
 
-	orgMembers, err := h.GetOrgMembers(ctx, orgRef)
+	orgMembers, err := h.GetOrgMembers(ctx, &GetOrgMembersRequest{OrgRef: orgRef})
 	if err != nil {
 		return false, errors.Wrapf(err, "failed to get org %s members:", orgRef)
 	}
