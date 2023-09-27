@@ -417,17 +417,27 @@ func (c *Client) DeleteUser(ctx context.Context, userRef string) (*Response, err
 	return resp, errors.WithStack(err)
 }
 
-func (c *Client) GetUsers(ctx context.Context, start string, limit int, asc bool) ([]*cstypes.User, *Response, error) {
+type GetUsersOptions struct {
+	*ListOptions
+
+	StartUserName string
+}
+
+func (o *GetUsersOptions) Add(q url.Values) {
+	if o == nil {
+		return
+	}
+
+	o.ListOptions.Add(q)
+
+	if o.StartUserName != "" {
+		q.Add("startusername", o.StartUserName)
+	}
+}
+
+func (c *Client) GetUsers(ctx context.Context, opts *GetUsersOptions) ([]*cstypes.User, *Response, error) {
 	q := url.Values{}
-	if start != "" {
-		q.Add("start", start)
-	}
-	if limit > 0 {
-		q.Add("limit", strconv.Itoa(limit))
-	}
-	if asc {
-		q.Add("asc", "")
-	}
+	opts.Add(q)
 
 	users := []*cstypes.User{}
 	resp, err := c.GetParsedResponse(ctx, "GET", "/users", q, common.JSONContent, nil, &users)

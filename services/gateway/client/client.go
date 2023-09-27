@@ -400,17 +400,9 @@ func (c *Client) GetUser(ctx context.Context, userRef string) (*gwapitypes.UserR
 	return user, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetUsers(ctx context.Context, start string, limit int, asc bool) ([]*gwapitypes.PrivateUserResponse, *Response, error) {
+func (c *Client) GetUsers(ctx context.Context, opts *ListOptions) ([]*gwapitypes.PrivateUserResponse, *Response, error) {
 	q := url.Values{}
-	if start != "" {
-		q.Add("start", start)
-	}
-	if limit > 0 {
-		q.Add("limit", strconv.Itoa(limit))
-	}
-	if asc {
-		q.Add("asc", "")
-	}
+	opts.Add(q)
 
 	users := []*gwapitypes.PrivateUserResponse{}
 	resp, err := c.getParsedResponse(ctx, "GET", "/users", q, jsonContent, nil, &users)

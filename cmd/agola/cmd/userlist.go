@@ -36,19 +36,7 @@ var cmdUserList = &cobra.Command{
 	Short: "list",
 }
 
-type userListOptions struct {
-	limit int
-	start string
-}
-
-var userListOpts userListOptions
-
 func init() {
-	flags := cmdUserList.Flags()
-
-	flags.IntVar(&userListOpts.limit, "limit", 10, "max number of runs to show")
-	flags.StringVar(&userListOpts.start, "start", "", "starting user name (excluded) to fetch")
-
 	cmdUser.AddCommand(cmdUserList)
 }
 
@@ -61,12 +49,20 @@ func printUsers(users []*gwapitypes.PrivateUserResponse) {
 func userList(cmd *cobra.Command, args []string) error {
 	gwClient := gwclient.NewClient(gatewayURL, token)
 
-	users, _, err := gwClient.GetUsers(context.TODO(), userListOpts.start, userListOpts.limit, false)
-	if err != nil {
-		return errors.WithStack(err)
-	}
+	var cursor string
+	for {
+		users, resp, err := gwClient.GetUsers(context.TODO(), &gwclient.ListOptions{Cursor: cursor})
+		if err != nil {
+			return errors.Wrapf(err, "failed to get users")
+		}
 
-	printUsers(users)
+		printUsers(users)
+
+		cursor = resp.Cursor
+		if cursor == "" {
+			break
+		}
+	}
 
 	return nil
 }

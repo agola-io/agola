@@ -3593,7 +3593,7 @@ func TestOrgInvitation(t *testing.T) {
 	}
 }
 
-func TestGetUsers(t *testing.T) {
+func TestGetUsersPermissions(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -3652,7 +3652,7 @@ func TestGetUsers(t *testing.T) {
 					{ID: user01.ID, UserName: user01.UserName, Tokens: []string{}, LinkedAccounts: []*gwapitypes.LinkedAccountResponse{}},
 					{ID: user02.ID, UserName: user02.UserName, Tokens: []string{}, LinkedAccounts: []*gwapitypes.LinkedAccountResponse{}},
 				}
-				users, _, err := gwClient.GetUsers(ctx, "", 0, true)
+				users, _, err := gwClient.GetUsers(ctx, nil)
 				if err != nil {
 					t.Fatalf("unexpected err: %v", err)
 				}
@@ -3668,7 +3668,7 @@ func TestGetUsers(t *testing.T) {
 
 				gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, user01Token)
 
-				_, _, err := gwClient.GetUsers(ctx, "", 0, true)
+				_, _, err := gwClient.GetUsers(ctx, nil)
 				expectedErr := "remote error unauthorized"
 				if err == nil {
 					t.Fatalf("expected error %v, got nil err", expectedErr)
@@ -3695,6 +3695,107 @@ func TestGetUsers(t *testing.T) {
 			tt.f(ctx, t, sc)
 		})
 	}
+}
+
+func TestGetUsers(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sc := setup(ctx, t, dir)
+	defer sc.stop()
+
+	gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
+
+	users := []*gwapitypes.UserResponse{}
+	for i := 1; i < 10; i++ {
+		user, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: fmt.Sprintf("orguser%d", i)})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		users = append(users, user)
+	}
+
+	t.Run("test get users with default limit greater than users", func(t *testing.T) {
+		users, resp, err := gwClient.GetUsers(ctx, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		expectedUsers := 9
+		if len(users) != expectedUsers {
+			t.Fatalf("expected %d members, got %d members", expectedUsers, len(users))
+		}
+		if resp.Cursor != "" {
+			t.Fatalf("expected no cursor, got cursor %q", resp.Cursor)
+		}
+	})
+
+	t.Run("test get users with limit less than users", func(t *testing.T) {
+		users, resp, err := gwClient.GetUsers(ctx, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		expectedUsers := 5
+		if len(users) != expectedUsers {
+			t.Fatalf("expected %d users, got %d users", expectedUsers, len(users))
+		}
+		if resp.Cursor == "" {
+			t.Fatalf("expected cursor, got no cursor")
+		}
+	})
+
+	t.Run("test get users with limit less than users continuation", func(t *testing.T) {
+		respAllUsers := []*gwapitypes.UserResponse{}
+
+		respUsers, resp, err := gwClient.GetUsers(ctx, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		expectedUsers := 5
+		if len(respUsers) != expectedUsers {
+			t.Fatalf("expected %d users, got %d users", expectedUsers, len(respUsers))
+		}
+		if resp.Cursor == "" {
+			t.Fatalf("expected cursor, got no cursor")
+		}
+
+		for _, respUser := range respUsers {
+			respAllUsers = append(respAllUsers, &gwapitypes.UserResponse{ID: respUser.ID, UserName: respUser.UserName})
+		}
+
+		// fetch next results
+		for {
+			respUsers, resp, err = gwClient.GetUsers(ctx, &gwclient.ListOptions{Cursor: resp.Cursor, Limit: 5})
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			expectedUsers := 5
+			if resp.Cursor != "" && len(respUsers) != expectedUsers {
+				t.Fatalf("expected %d users, got %d users", expectedUsers, len(respUsers))
+			}
+
+			for _, respUser := range respUsers {
+				respAllUsers = append(respAllUsers, &gwapitypes.UserResponse{ID: respUser.ID, UserName: respUser.UserName})
+			}
+
+			if resp.Cursor == "" {
+				break
+			}
+		}
+
+		expectedUsers = 9
+		if len(respAllUsers) != expectedUsers {
+			t.Fatalf("expected %d users, got %d users", expectedUsers, len(respAllUsers))
+		}
+
+		if diff := cmp.Diff(users, respAllUsers); diff != "" {
+			t.Fatalf("mismatch (-want +got):\n%s", diff)
+		}
+	})
 }
 
 func TestGetOrgMembers(t *testing.T) {
@@ -4150,7 +4251,7 @@ func TestExportImport(t *testing.T) {
 
 	gwClient = gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
 
-	users, _, err := gwClient.GetUsers(ctx, "", 0, false)
+	users, _, err := gwClient.GetUsers(ctx, nil)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -4292,7 +4393,7 @@ func TestExportImport(t *testing.T) {
 		return true, nil
 	})
 
-	impUsers, _, err := gwClient.GetUsers(ctx, "", 0, false)
+	impUsers, _, err := gwClient.GetUsers(ctx, nil)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}

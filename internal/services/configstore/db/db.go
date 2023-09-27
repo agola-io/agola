@@ -380,17 +380,20 @@ func (d *DB) DeleteLinkedAccountsByUserID(tx *sql.Tx, userID string) error {
 	return nil
 }
 
-func getUsersFilteredQuery(startUserName string, limit int, asc bool) *sq.SelectBuilder {
+func getUsersFilteredQuery(startUserName string, limit int, sortDirection types.SortDirection) *sq.SelectBuilder {
 	q := userSelect()
-	if asc {
-		q = q.OrderBy("user_t.name").Asc()
-	} else {
-		q = q.OrderBy("user_t.name").Desc()
+	q = q.OrderBy("user_t.name")
+	switch sortDirection {
+	case types.SortDirectionAsc:
+		q = q.Asc()
+	case types.SortDirectionDesc:
+		q = q.Desc()
 	}
 	if startUserName != "" {
-		if asc {
+		switch sortDirection {
+		case types.SortDirectionAsc:
 			q = q.Where(q.G("user_t.name", startUserName))
-		} else {
+		case types.SortDirectionDesc:
 			q = q.Where(q.L("user_t.name", startUserName))
 		}
 	}
@@ -401,8 +404,8 @@ func getUsersFilteredQuery(startUserName string, limit int, asc bool) *sq.Select
 	return q
 }
 
-func (d *DB) GetUsers(tx *sql.Tx, startUserName string, limit int, asc bool) ([]*types.User, error) {
-	q := getUsersFilteredQuery(startUserName, limit, asc)
+func (d *DB) GetUsers(tx *sql.Tx, startUserName string, limit int, sortDirection types.SortDirection) ([]*types.User, error) {
+	q := getUsersFilteredQuery(startUserName, limit, sortDirection)
 	users, _, err := d.fetchUsers(tx, q)
 
 	return users, errors.WithStack(err)

@@ -17,7 +17,6 @@ package api
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
@@ -174,55 +173,46 @@ func (h *DeleteUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-const (
-	DefaultUsersLimit = 10
-	MaxUsersLimit     = 20
-)
-
 type UsersHandler struct {
 	log zerolog.Logger
 	d   *db.DB
+	ah  *action.ActionHandler
 }
 
-func NewUsersHandler(log zerolog.Logger, d *db.DB) *UsersHandler {
-	return &UsersHandler{log: log, d: d}
+func NewUsersHandler(log zerolog.Logger, d *db.DB, ah *action.ActionHandler) *UsersHandler {
+	return &UsersHandler{log: log, d: d, ah: ah}
 }
 
 func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(w, r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *UsersHandler) do(w http.ResponseWriter, r *http.Request) ([]*types.User, error) {
 	ctx := r.Context()
 	query := r.URL.Query()
 
-	limitS := query.Get("limit")
-	limit := DefaultUsersLimit
-	if limitS != "" {
-		var err error
-		limit, err = strconv.Atoi(limitS)
-		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit")))
-			return
-		}
-	}
-	if limit < 0 {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0")))
-		return
-	}
-	if limit > MaxUsersLimit {
-		limit = MaxUsersLimit
-	}
-	asc := false
-	if _, ok := query["asc"]; ok {
-		asc = true
+	ropts, err := parseRequestOptions(r)
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
-	start := query.Get("start")
+	startUserName := query.Get("startusername")
 
 	// handle special queries, like get user by token
 	queryType := query.Get("query_type")
 
 	var users []*types.User
-	err := h.d.Do(ctx, func(tx *sql.Tx) error {
-		switch queryType {
-		case "bytoken":
+	switch queryType {
+	case "bytoken":
+		err = h.d.Do(ctx, func(tx *sql.Tx) error {
 			token := query.Get("token")
 			user, err := h.d.GetUserByTokenValue(tx, token)
 			if err != nil {
@@ -232,7 +222,14 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return util.NewAPIError(util.ErrNotExist, errors.Errorf("user with required token doesn't exist"))
 			}
 			users = []*types.User{user}
-		case "bylinkedaccount":
+			return nil
+		})
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+	case "bylinkedaccount":
+		err = h.d.Do(ctx, func(tx *sql.Tx) error {
 			linkedAccountID := query.Get("linkedaccountid")
 			user, err := h.d.GetUserByLinkedAccount(tx, linkedAccountID)
 			if err != nil {
@@ -242,7 +239,14 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return util.NewAPIError(util.ErrNotExist, errors.Errorf("user with linked account %q token doesn't exist", linkedAccountID))
 			}
 			users = []*types.User{user}
-		case "byremoteuser":
+			return nil
+		})
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+	case "byremoteuser":
+		err = h.d.Do(ctx, func(tx *sql.Tx) error {
 			remoteUserID := query.Get("remoteuserid")
 			remoteSourceID := query.Get("remotesourceid")
 			la, err := h.d.GetLinkedAccountByRemoteUserIDandSource(tx, remoteUserID, remoteSourceID)
@@ -261,24 +265,27 @@ func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return util.NewAPIError(util.ErrNotExist, errors.Errorf("user with remote user %q for remote source %q token doesn't exist", remoteUserID, remoteSourceID))
 			}
 			users = []*types.User{user}
-		default:
-			// default query
-			var err error
-			users, err = h.d.GetUsers(tx, start, limit, asc)
-			return errors.WithStack(err)
+			return nil
+		})
+		if err != nil {
+			return nil, errors.WithStack(err)
 		}
 
-		return nil
-	})
-	if err != nil {
-		h.log.Err(err).Send()
-		util.HTTPError(w, err)
-		return
+	default:
+		// default query
+		var err error
+
+		ares, err := h.ah.GetUsers(ctx, &action.GetUsersRequest{StartUserName: startUserName, Limit: ropts.Limit, SortDirection: ropts.SortDirection})
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		users = ares.Users
+
+		addHasMoreHeader(w, ares.HasMore)
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, users); err != nil {
-		h.log.Err(err).Send()
-	}
+	return users, nil
 }
 
 type UserLinkedAccountsHandler struct {

@@ -94,7 +94,7 @@ func getUsers(ctx context.Context, cs *Configstore) ([]*types.User, error) {
 	var users []*types.User
 	err := cs.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		users, err = cs.d.GetUsers(tx, "", 0, true)
+		users, err = cs.d.GetUsers(tx, "", 0, types.SortDirectionAsc)
 		return errors.WithStack(err)
 	})
 
@@ -1062,6 +1062,105 @@ func TestOrgMembers(t *testing.T) {
 			t.Fatalf("unexpected err: %v", err)
 		}
 		if diff := cmpDiffObject(res, expectedResponse); diff != "" {
+			t.Fatalf("mismatch (-want +got):\n%s", diff)
+		}
+	})
+}
+
+func TestGetUsers(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	ctx := context.Background()
+	log := testutil.NewLogger(t)
+
+	cs := setupConfigstore(ctx, t, log, dir)
+
+	t.Logf("starting cs")
+	go func() { _ = cs.Run(ctx) }()
+
+	users := []*types.User{}
+	for i := 1; i < 10; i++ {
+		user, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		users = append(users, user)
+	}
+
+	t.Run("test get all users", func(t *testing.T) {
+		res, err := cs.ah.GetUsers(ctx, &action.GetUsersRequest{SortDirection: types.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		expectedUsers := 9
+		if len(res.Users) != expectedUsers {
+			t.Fatalf("expected %d users, got %d users", expectedUsers, len(res.Users))
+		}
+		if res.HasMore {
+			t.Fatalf("expected hasMore false, got %t", res.HasMore)
+		}
+	})
+
+	t.Run("test get users with limit less than users", func(t *testing.T) {
+		res, err := cs.ah.GetUsers(ctx, &action.GetUsersRequest{Limit: 5, SortDirection: types.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		expectedUsers := 5
+		if len(res.Users) != expectedUsers {
+			t.Fatalf("expected %d users, got %d users", expectedUsers, len(res.Users))
+		}
+		if !res.HasMore {
+			t.Fatalf("expected hasMore true, got %t", res.HasMore)
+		}
+	})
+
+	t.Run("test get users with limit less than users continuation", func(t *testing.T) {
+		respAllUsers := []*types.User{}
+
+		res, err := cs.ah.GetUsers(ctx, &action.GetUsersRequest{Limit: 5, SortDirection: types.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		expectedUsers := 5
+		if len(res.Users) != expectedUsers {
+			t.Fatalf("expected %d users, got %d users", expectedUsers, len(res.Users))
+		}
+		if !res.HasMore {
+			t.Fatalf("expected hasMore true, got %t", res.HasMore)
+		}
+
+		respAllUsers = append(respAllUsers, res.Users...)
+		lastUser := res.Users[len(res.Users)-1]
+
+		// fetch next results
+		for {
+			res, err = cs.ah.GetUsers(ctx, &action.GetUsersRequest{StartUserName: lastUser.Name, Limit: 5, SortDirection: types.SortDirectionAsc})
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			expectedUsers := 5
+			if res.HasMore && len(res.Users) != expectedUsers {
+				t.Fatalf("expected %d users, got %d users", expectedUsers, len(res.Users))
+			}
+
+			respAllUsers = append(respAllUsers, res.Users...)
+
+			if !res.HasMore {
+				break
+			}
+
+			lastUser = res.Users[len(res.Users)-1]
+		}
+
+		expectedUsers = 9
+		if len(users) != expectedUsers {
+			t.Fatalf("expected %d users, got %d users", expectedUsers, len(users))
+		}
+
+		if diff := cmpDiffObject(users, respAllUsers); diff != "" {
 			t.Fatalf("mismatch (-want +got):\n%s", diff)
 		}
 	})
