@@ -10,6 +10,7 @@ local go_runtime(version, arch) = {
       environment: {
         POSTGRES_PASSWORD: 'password',
       },
+      entrypoint: 'docker-entrypoint.sh -c max_connections=300'
     },
   ],
 };
