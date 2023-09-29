@@ -180,6 +180,7 @@ func (s *Configstore) setupDefaultRouter() http.Handler {
 	createUserTokenHandler := api.NewCreateUserTokenHandler(s.log, s.ah)
 	deleteUserTokenHandler := api.NewDeleteUserTokenHandler(s.log, s.ah)
 
+	userOrgHandler := api.NewUserOrgHandler(s.log, s.ah)
 	userOrgsHandler := api.NewUserOrgsHandler(s.log, s.ah)
 
 	orgHandler := api.NewOrgHandler(s.log, s.d)
@@ -258,6 +259,7 @@ func (s *Configstore) setupDefaultRouter() http.Handler {
 	apirouter.Handle("/users/{userref}/tokens/{tokenname}", deleteUserTokenHandler).Methods("DELETE")
 
 	apirouter.Handle("/users/{userref}/orgs", userOrgsHandler).Methods("GET")
+	apirouter.Handle("/users/{userref}/orgs/{orgref}", userOrgHandler).Methods("GET")
 
 	apirouter.Handle("/orgs/{orgref}", orgHandler).Methods("GET")
 	apirouter.Handle("/orgs", orgsHandler).Methods("GET")

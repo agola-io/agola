@@ -2583,12 +2583,12 @@ func TestUserOrgs(t *testing.T) {
 
 	gwClientNew := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
 
-	orgs, _, err := gwClientNew.GetUserOrgs(ctx)
+	orgs, _, err := gwClientNew.GetUserOrgs(ctx, nil)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	expectedOrgs := []*gwapitypes.UserOrgsResponse{
+	expectedOrgs := []*gwapitypes.UserOrgResponse{
 		{
 			Organization: &gwapitypes.OrgResponse{ID: org01.ID, Name: agolaOrg01, Visibility: gwapitypes.VisibilityPublic},
 			Role:         gwapitypes.MemberRoleMember,
@@ -3906,6 +3906,125 @@ func TestGetOrgMembers(t *testing.T) {
 			orgMemberUsers = append(orgMemberUsers, orgMember.User)
 		}
 		if diff := cmp.Diff(users, orgMemberUsers); diff != "" {
+			t.Fatalf("mismatch (-want +got):\n%s", diff)
+		}
+	})
+}
+
+func TestGetUserOrgs(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sc := setup(ctx, t, dir, withGitea(true))
+	defer sc.stop()
+
+	createLinkedAccount(ctx, t, sc.gitea, sc.config)
+	gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
+
+	user, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: "orguser01"})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	orgs := []*gwapitypes.OrgResponse{}
+	for i := 1; i < 10; i++ {
+		org, _, err := gwClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: fmt.Sprintf("org%d", i), Visibility: gwapitypes.VisibilityPublic})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		orgs = append(orgs, org)
+	}
+
+	for _, org := range orgs {
+		if _, _, err := gwClient.AddOrgMember(ctx, org.ID, user.ID, gwapitypes.MemberRoleMember); err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+	}
+
+	tokenUser, _, err := gwClient.CreateUserToken(ctx, user.ID, &gwapitypes.CreateUserTokenRequest{TokenName: "test"})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	gwClient = gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser.Token)
+
+	t.Run("test get user orgs with default limit greater than user orgs", func(t *testing.T) {
+		userOrgs, resp, err := gwClient.GetUserOrgs(ctx, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		expectedUserOrgs := 9
+		if len(userOrgs) != expectedUserOrgs {
+			t.Fatalf("expected %d members, got %d members", expectedUserOrgs, len(userOrgs))
+		}
+		if resp.Cursor != "" {
+			t.Fatalf("expected no cursor, got cursor %q", resp.Cursor)
+		}
+	})
+
+	t.Run("test get user orgs with limit less than user orgs", func(t *testing.T) {
+		res, resp, err := gwClient.GetUserOrgs(ctx, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		expectedUserOrgs := 5
+		if len(res) != expectedUserOrgs {
+			t.Fatalf("expected %d user orgs, got %d user orgs", expectedUserOrgs, len(res))
+		}
+		if resp.Cursor == "" {
+			t.Fatalf("expected cursor, got no cursor")
+		}
+	})
+
+	t.Run("test get user orgs with limit less than user orgs continuation", func(t *testing.T) {
+		respAllUserOrgs := []*gwapitypes.UserOrgResponse{}
+
+		respUserOrgs, resp, err := gwClient.GetUserOrgs(ctx, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		expectedUserOrgs := 5
+		if len(respUserOrgs) != expectedUserOrgs {
+			t.Fatalf("expected %d user orgs, got %d user orgs", expectedUserOrgs, len(respUserOrgs))
+		}
+		if resp.Cursor == "" {
+			t.Fatalf("expected cursor, got no cursor")
+		}
+
+		respAllUserOrgs = append(respAllUserOrgs, respUserOrgs...)
+
+		// fetch next results
+		for {
+			respUserOrgs, resp, err = gwClient.GetUserOrgs(ctx, &gwclient.ListOptions{Cursor: resp.Cursor, Limit: 5})
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			expectedUserOrgs := 5
+			if resp.Cursor != "" && len(respUserOrgs) != expectedUserOrgs {
+				t.Fatalf("expected %d user orgs, got %d user orgs", expectedUserOrgs, len(respUserOrgs))
+			}
+
+			respAllUserOrgs = append(respAllUserOrgs, respUserOrgs...)
+
+			if resp.Cursor == "" {
+				break
+			}
+		}
+
+		expectedUserOrgs = 9
+		if len(respAllUserOrgs) != expectedUserOrgs {
+			t.Fatalf("expected %d user orgs, got %d user orgs", expectedUserOrgs, len(respAllUserOrgs))
+		}
+
+		userOrgs := []*gwapitypes.OrgResponse{}
+		for _, userOrg := range respAllUserOrgs {
+			userOrgs = append(userOrgs, userOrg.Organization)
+		}
+		if diff := cmp.Diff(orgs, userOrgs); diff != "" {
 			t.Fatalf("mismatch (-want +got):\n%s", diff)
 		}
 	})

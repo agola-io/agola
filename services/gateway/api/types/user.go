@@ -111,7 +111,7 @@ type UserCreateRunRequest struct {
 	Variables             map[string]string `json:"variables,omitempty"`
 }
 
-type UserOrgsResponse struct {
+type UserOrgResponse struct {
 	Organization *OrgResponse
 	Role         MemberRole
 }

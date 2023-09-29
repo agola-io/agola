@@ -1013,13 +1013,15 @@ func TestOrgMembers(t *testing.T) {
 	}
 
 	t.Run("test user org creator is org member with owner role", func(t *testing.T) {
-		expectedResponse := []*action.UserOrgsResponse{
-			{
-				Organization: org,
-				Role:         types.MemberRoleOwner,
+		expectedResponse := &action.GetUserOrgsResponse{
+			UserOrgs: []*action.UserOrg{
+				{
+					Organization: org,
+					Role:         types.MemberRoleOwner,
+				},
 			},
 		}
-		res, err := cs.ah.GetUserOrgs(ctx, user.ID)
+		res, err := cs.ah.GetUserOrgs(ctx, &action.GetUserOrgsRequest{UserRef: user.ID})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -1045,19 +1047,21 @@ func TestOrgMembers(t *testing.T) {
 
 	// delete some org and check that if also orgmembers aren't yet cleaned only the existing orgs are reported
 	t.Run("test only existing orgs are reported", func(t *testing.T) {
-		expectedResponse := []*action.UserOrgsResponse{
-			{
-				Organization: org,
-				Role:         types.MemberRoleOwner,
+		expectedResponse := &action.GetUserOrgsResponse{
+			UserOrgs: []*action.UserOrg{
+				{
+					Organization: org,
+					Role:         types.MemberRoleOwner,
+				},
 			},
 		}
 		for i := 5; i < 10; i++ {
-			expectedResponse = append(expectedResponse, &action.UserOrgsResponse{
+			expectedResponse.UserOrgs = append(expectedResponse.UserOrgs, &action.UserOrg{
 				Organization: orgs[i],
 				Role:         types.MemberRoleOwner,
 			})
 		}
-		res, err := cs.ah.GetUserOrgs(ctx, user.ID)
+		res, err := cs.ah.GetUserOrgs(ctx, &action.GetUserOrgsRequest{UserRef: user.ID})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -1276,6 +1280,121 @@ func TestGetOrgMembers(t *testing.T) {
 
 		}
 		if diff := cmpDiffObject(users, orgMemberUsers); diff != "" {
+			t.Fatalf("mismatch (-want +got):\n%s", diff)
+		}
+	})
+}
+
+func TestGetUserOrgs(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	ctx := context.Background()
+	log := testutil.NewLogger(t)
+
+	cs := setupConfigstore(ctx, t, log, dir)
+
+	t.Logf("starting cs")
+	go func() { _ = cs.Run(ctx) }()
+
+	user, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "orguser01"})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	orgs := []*types.Organization{}
+	for i := 1; i < 10; i++ {
+		org, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: fmt.Sprintf("org%d", i), Visibility: types.VisibilityPublic})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		orgs = append(orgs, org)
+	}
+
+	for _, org := range orgs {
+		if _, err := cs.ah.AddOrgMember(ctx, org.ID, user.ID, types.MemberRoleMember); err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+	}
+
+	t.Run("test get all user orgs", func(t *testing.T) {
+		res, err := cs.ah.GetUserOrgs(ctx, &action.GetUserOrgsRequest{UserRef: user.ID, SortDirection: types.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		expectedUserOrgs := 9
+		if len(res.UserOrgs) != expectedUserOrgs {
+			t.Fatalf("expected %d user orgs, got %d user orgs", expectedUserOrgs, len(res.UserOrgs))
+		}
+		if res.HasMore {
+			t.Fatalf("expected hasMore false, got %t", res.HasMore)
+		}
+	})
+
+	t.Run("test get user orgs with limit less than user orgs", func(t *testing.T) {
+		res, err := cs.ah.GetUserOrgs(ctx, &action.GetUserOrgsRequest{UserRef: user.ID, Limit: 5, SortDirection: types.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		expectedUserOrgs := 5
+		if len(res.UserOrgs) != expectedUserOrgs {
+			t.Fatalf("expected %d user orgs, got %d user orgs", expectedUserOrgs, len(res.UserOrgs))
+		}
+		if !res.HasMore {
+			t.Fatalf("expected hasMore true, got %t", res.HasMore)
+		}
+	})
+
+	t.Run("test get user orgs with limit less than user orgs continuation", func(t *testing.T) {
+		respAllUserOrgs := []*action.UserOrg{}
+
+		respUserOrgs, err := cs.ah.GetUserOrgs(ctx, &action.GetUserOrgsRequest{UserRef: user.ID, Limit: 5, SortDirection: types.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		expectedUserOrgs := 5
+		if len(respUserOrgs.UserOrgs) != expectedUserOrgs {
+			t.Fatalf("expected %d user orgs, got %d user orgs", expectedUserOrgs, len(respUserOrgs.UserOrgs))
+		}
+		if !respUserOrgs.HasMore {
+			t.Fatalf("expected hasMore true, got %t", respUserOrgs.HasMore)
+		}
+
+		respAllUserOrgs = append(respAllUserOrgs, respUserOrgs.UserOrgs...)
+		lastUserOrg := respUserOrgs.UserOrgs[len(respUserOrgs.UserOrgs)-1]
+
+		// fetch next results
+		for {
+			respUserOrgs, err = cs.ah.GetUserOrgs(ctx, &action.GetUserOrgsRequest{UserRef: user.ID, StartOrgName: lastUserOrg.Organization.Name, Limit: 5, SortDirection: types.SortDirectionAsc})
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			expectedUserOrgs := 5
+			if respUserOrgs.HasMore && len(respUserOrgs.UserOrgs) != expectedUserOrgs {
+				t.Fatalf("expected %d user orgs, got %d user orgs", expectedUserOrgs, len(respUserOrgs.UserOrgs))
+			}
+
+			respAllUserOrgs = append(respAllUserOrgs, respUserOrgs.UserOrgs...)
+
+			if !respUserOrgs.HasMore {
+				break
+			}
+
+			lastUserOrg = respUserOrgs.UserOrgs[len(respUserOrgs.UserOrgs)-1]
+		}
+
+		expectedUserOrgs = 9
+		if len(respAllUserOrgs) != expectedUserOrgs {
+			t.Fatalf("expected %d user orgs, got %d user orgs", expectedUserOrgs, len(respAllUserOrgs))
+		}
+
+		userOrgs := []*types.Organization{}
+		for _, userOrg := range respAllUserOrgs {
+			userOrgs = append(userOrgs, userOrg.Organization)
+
+		}
+		if diff := cmpDiffObject(orgs, userOrgs); diff != "" {
 			t.Fatalf("mismatch (-want +got):\n%s", diff)
 		}
 	})
