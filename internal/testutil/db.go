@@ -241,7 +241,7 @@ func (c *DBContext) query(tx *sql.Tx, rq sq.Builder) (*stdsql.Rows, error) {
 	return r, errors.WithStack(err)
 }
 
-func (c *DBContext) Import(ctx context.Context, r io.Reader) error {
+func (c *DBContext) Import(ctx context.Context, r io.Reader, createData *CreateData) error {
 	br := bufio.NewReader(r)
 	dec := json.NewDecoder(br)
 
@@ -381,7 +381,7 @@ func (c *DBContext) Import(ctx context.Context, r io.Reader) error {
 		}
 
 		// Populate sequences
-		for _, seq := range c.D.Sequences() {
+		for _, seq := range createData.Sequences {
 			switch c.D.DBType() {
 			case sql.Postgres:
 				q := fmt.Sprintf("SELECT setval('%s', (SELECT COALESCE(MAX(%s), 1) FROM %s));", seq.Name, seq.Column, seq.Table)
@@ -552,7 +552,7 @@ func TestCreate(t *testing.T, lastVersion uint, dataFixtures DataFixtures, setup
 			err = dc.DBM.Create(ctx, stmts, createVersion)
 			assert.NilError(t, err)
 
-			err = dc.Import(ctx, bytes.NewBuffer(dataFixture))
+			err = dc.Import(ctx, bytes.NewBuffer(dataFixture), createData)
 			assert.NilError(t, err)
 		})
 	}
@@ -610,7 +610,7 @@ func TestMigrate(t *testing.T, lastVersion uint, dataFixtures DataFixtures, setu
 				err = createDC.DBM.Create(ctx, createStmts, migrateVersion)
 				assert.NilError(t, err)
 
-				err = createDC.Import(ctx, bytes.NewBuffer(dataFixtureCreate))
+				err = createDC.Import(ctx, bytes.NewBuffer(dataFixtureCreate), createDataCreate)
 				assert.NilError(t, err)
 
 				// create db at create version to be migrated.
@@ -648,7 +648,7 @@ func TestMigrate(t *testing.T, lastVersion uint, dataFixtures DataFixtures, setu
 				err = dc.DBM.Create(ctx, stmts, createVersion)
 				assert.NilError(t, err)
 
-				err = dc.Import(ctx, bytes.NewBuffer(dataFixture))
+				err = dc.Import(ctx, bytes.NewBuffer(dataFixture), createData)
 				assert.NilError(t, err)
 
 				err = dc.DBM.MigrateToVersion(ctx, migrateVersion)
