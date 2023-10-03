@@ -3697,6 +3697,109 @@ func TestGetUsersPermissions(t *testing.T) {
 	}
 }
 
+func TestGetRemoteSources(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sc := setup(ctx, t, dir)
+	defer sc.stop()
+
+	gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
+
+	remoteSources := []*gwapitypes.RemoteSourceResponse{}
+	for i := 1; i < 10; i++ {
+		remoteSource, _, err := gwClient.CreateRemoteSource(ctx, &gwapitypes.CreateRemoteSourceRequest{
+			Name:                fmt.Sprintf("rs%d", i),
+			APIURL:              "http://apiurl",
+			Type:                "gitea",
+			AuthType:            "password",
+			SkipSSHHostKeyCheck: true,
+		})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		remoteSources = append(remoteSources, remoteSource)
+	}
+
+	t.Run("test get remote sources with default limit greater than remote sources", func(t *testing.T) {
+		remoteSources, resp, err := gwClient.GetRemoteSources(ctx, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		expectedRemoteSources := 9
+		if len(remoteSources) != expectedRemoteSources {
+			t.Fatalf("expected %d members, got %d members", expectedRemoteSources, len(remoteSources))
+		}
+		if resp.Cursor != "" {
+			t.Fatalf("expected no cursor, got cursor %q", resp.Cursor)
+		}
+	})
+
+	t.Run("test get remote sources with limit less than remote sources", func(t *testing.T) {
+		remoteSources, resp, err := gwClient.GetRemoteSources(ctx, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		expectedRemoteSources := 5
+		if len(remoteSources) != expectedRemoteSources {
+			t.Fatalf("expected %d remote sources, got %d remote sources", expectedRemoteSources, len(remoteSources))
+		}
+		if resp.Cursor == "" {
+			t.Fatalf("expected cursor, got no cursor")
+		}
+	})
+
+	t.Run("test get remote sources with limit less than remote sources continuation", func(t *testing.T) {
+		respAllRemoteSources := []*gwapitypes.RemoteSourceResponse{}
+
+		respRemoteSources, resp, err := gwClient.GetRemoteSources(ctx, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		expectedRemoteSources := 5
+		if len(respRemoteSources) != expectedRemoteSources {
+			t.Fatalf("expected %d remote sources, got %d remote sources", expectedRemoteSources, len(respRemoteSources))
+		}
+		if resp.Cursor == "" {
+			t.Fatalf("expected cursor, got no cursor")
+		}
+
+		respAllRemoteSources = append(respAllRemoteSources, respRemoteSources...)
+
+		// fetch next results
+		for {
+			respRemoteSources, resp, err = gwClient.GetRemoteSources(ctx, &gwclient.ListOptions{Cursor: resp.Cursor, Limit: 5})
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			expectedRemoteSources := 5
+			if resp.Cursor != "" && len(respRemoteSources) != expectedRemoteSources {
+				t.Fatalf("expected %d remote sources, got %d remote sources", expectedRemoteSources, len(respRemoteSources))
+			}
+
+			respAllRemoteSources = append(respAllRemoteSources, respRemoteSources...)
+
+			if resp.Cursor == "" {
+				break
+			}
+		}
+
+		expectedRemoteSources = 9
+		if len(respAllRemoteSources) != expectedRemoteSources {
+			t.Fatalf("expected %d remote sources, got %d remote sources", expectedRemoteSources, len(respAllRemoteSources))
+		}
+
+		if diff := cmp.Diff(remoteSources, respAllRemoteSources); diff != "" {
+			t.Fatalf("mismatch (-want +got):\n%s", diff)
+		}
+	})
+}
+
 func TestGetUsers(t *testing.T) {
 	t.Parallel()
 
@@ -4380,7 +4483,7 @@ func TestExportImport(t *testing.T) {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	remotesources, _, err := gwClient.GetRemoteSources(ctx, "", 0, false)
+	remotesources, _, err := gwClient.GetRemoteSources(ctx, nil)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -4528,7 +4631,7 @@ func TestExportImport(t *testing.T) {
 		t.Fatalf("projectgroup mismatch (-want +got):\n%s", diff)
 	}
 
-	impRemotesources, _, err := gwClient.GetRemoteSources(ctx, "", 0, false)
+	impRemotesources, _, err := gwClient.GetRemoteSources(ctx, nil)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}

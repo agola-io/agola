@@ -22,6 +22,7 @@ import (
 	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
+	"agola.io/agola/services/configstore/client"
 	cstypes "agola.io/agola/services/configstore/types"
 )
 
@@ -34,17 +35,47 @@ func (h *ActionHandler) GetRemoteSource(ctx context.Context, rsRef string) (*cst
 }
 
 type GetRemoteSourcesRequest struct {
-	Start string
-	Limit int
-	Asc   bool
+	Cursor string
+
+	Limit         int
+	SortDirection SortDirection
 }
 
-func (h *ActionHandler) GetRemoteSources(ctx context.Context, req *GetRemoteSourcesRequest) ([]*cstypes.RemoteSource, error) {
-	remoteSources, _, err := h.configstoreClient.GetRemoteSources(ctx, req.Start, req.Limit, req.Asc)
+type GetRemoteSourcesResponse struct {
+	RemoteSources []*cstypes.RemoteSource
+	Cursor        string
+}
+
+func (h *ActionHandler) GetRemoteSources(ctx context.Context, req *GetRemoteSourcesRequest) (*GetRemoteSourcesResponse, error) {
+	inCursor := &StartCursor{}
+	sortDirection := req.SortDirection
+	if req.Cursor != "" {
+		if err := UnmarshalCursor(req.Cursor, inCursor); err != nil {
+			return nil, errors.WithStack(err)
+		}
+		sortDirection = inCursor.SortDirection
+	}
+
+	remoteSources, resp, err := h.configstoreClient.GetRemoteSources(ctx, &client.GetRemoteSourcesOptions{ListOptions: &client.ListOptions{Limit: req.Limit, SortDirection: cstypes.SortDirection(sortDirection)}, StartRemoteSourceName: inCursor.Start})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	return remoteSources, nil
+
+	var outCursor string
+	if resp.HasMore && len(remoteSources) > 0 {
+		lastRemoteSourceName := remoteSources[len(remoteSources)-1].Name
+		outCursor, err = MarshalCursor(&StartCursor{Start: lastRemoteSourceName})
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+	}
+
+	res := &GetRemoteSourcesResponse{
+		RemoteSources: remoteSources,
+		Cursor:        outCursor,
+	}
+
+	return res, nil
 }
 
 type CreateRemoteSourceRequest struct {

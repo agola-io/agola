@@ -17,7 +17,6 @@ package api
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
@@ -166,52 +165,38 @@ func NewRemoteSourcesHandler(log zerolog.Logger, ah *action.ActionHandler) *Remo
 }
 
 func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	query := r.URL.Query()
-
-	limitS := query.Get("limit")
-	limit := DefaultRunsLimit
-	if limitS != "" {
-		var err error
-		limit, err = strconv.Atoi(limitS)
-		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit")))
-			return
-		}
-	}
-	if limit < 0 {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0")))
-		return
-	}
-	if limit > MaxRunsLimit {
-		limit = MaxRunsLimit
-	}
-	asc := false
-	if _, ok := query["asc"]; ok {
-		asc = true
-	}
-
-	start := query.Get("start")
-
-	areq := &action.GetRemoteSourcesRequest{
-		Start: start,
-		Limit: limit,
-		Asc:   asc,
-	}
-	csRemoteSources, err := h.ah.GetRemoteSources(ctx, areq)
+	res, err := h.do(w, r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	remoteSources := make([]*gwapitypes.RemoteSourceResponse, len(csRemoteSources))
-	for i, rs := range csRemoteSources {
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *RemoteSourcesHandler) do(w http.ResponseWriter, r *http.Request) ([]*gwapitypes.RemoteSourceResponse, error) {
+	ctx := r.Context()
+
+	ropts, err := parseRequestOptions(r)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	ares, err := h.ah.GetRemoteSources(ctx, &action.GetRemoteSourcesRequest{Cursor: ropts.Cursor, Limit: ropts.Limit, SortDirection: action.SortDirection(ropts.SortDirection)})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	remoteSources := make([]*gwapitypes.RemoteSourceResponse, len(ares.RemoteSources))
+	for i, rs := range ares.RemoteSources {
 		remoteSources[i] = createRemoteSourceResponse(rs)
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, remoteSources); err != nil {
-		h.log.Err(err).Send()
-	}
+	addCursorHeader(w, ares.Cursor)
+
+	return remoteSources, nil
 }
 
 type DeleteRemoteSourceHandler struct {

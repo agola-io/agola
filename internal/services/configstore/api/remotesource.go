@@ -17,7 +17,6 @@ package api
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
@@ -182,63 +181,46 @@ func (h *DeleteRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	}
 }
 
-const (
-	DefaultRemoteSourcesLimit = 10
-	MaxRemoteSourcesLimit     = 20
-)
-
 type RemoteSourcesHandler struct {
 	log zerolog.Logger
-	d   *db.DB
+	ah  *action.ActionHandler
 }
 
-func NewRemoteSourcesHandler(log zerolog.Logger, d *db.DB) *RemoteSourcesHandler {
-	return &RemoteSourcesHandler{log: log, d: d}
+func NewRemoteSourcesHandler(log zerolog.Logger, ah *action.ActionHandler) *RemoteSourcesHandler {
+	return &RemoteSourcesHandler{log: log, ah: ah}
 }
 
 func (h *RemoteSourcesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(w, r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *RemoteSourcesHandler) do(w http.ResponseWriter, r *http.Request) ([]*types.RemoteSource, error) {
 	ctx := r.Context()
 	query := r.URL.Query()
 
-	limitS := query.Get("limit")
-	limit := DefaultRemoteSourcesLimit
-	if limitS != "" {
-		var err error
-		limit, err = strconv.Atoi(limitS)
-		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit")))
-			return
-		}
-	}
-	if limit < 0 {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0")))
-		return
-	}
-	if limit > MaxRemoteSourcesLimit {
-		limit = MaxRemoteSourcesLimit
-	}
-	asc := false
-	if _, ok := query["asc"]; ok {
-		asc = true
-	}
-
-	start := query.Get("start")
-
-	var remoteSources []*types.RemoteSource
-	err := h.d.Do(ctx, func(tx *sql.Tx) error {
-		var err error
-		remoteSources, err = h.d.GetRemoteSources(tx, start, limit, asc)
-		return errors.WithStack(err)
-	})
+	ropts, err := parseRequestOptions(r)
 	if err != nil {
-		h.log.Err(err).Send()
-		util.HTTPError(w, err)
-		return
+		return nil, errors.WithStack(err)
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, remoteSources); err != nil {
-		h.log.Err(err).Send()
+	startRemoteSourceName := query.Get("startremotesourcename")
+
+	ares, err := h.ah.GetRemoteSources(ctx, &action.GetRemoteSourcesRequest{StartRemoteSourceName: startRemoteSourceName, Limit: ropts.Limit, SortDirection: ropts.SortDirection})
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
+
+	addHasMoreHeader(w, ares.HasMore)
+
+	return ares.RemoteSources, nil
 }
 
 type LinkedAccountsHandler struct {

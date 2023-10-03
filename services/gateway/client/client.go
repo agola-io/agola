@@ -604,17 +604,9 @@ func (c *Client) GetRemoteSource(ctx context.Context, rsRef string) (*gwapitypes
 	return rs, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetRemoteSources(ctx context.Context, start string, limit int, asc bool) ([]*gwapitypes.RemoteSourceResponse, *Response, error) {
+func (c *Client) GetRemoteSources(ctx context.Context, opts *ListOptions) ([]*gwapitypes.RemoteSourceResponse, *Response, error) {
 	q := url.Values{}
-	if start != "" {
-		q.Add("start", start)
-	}
-	if limit > 0 {
-		q.Add("limit", strconv.Itoa(limit))
-	}
-	if asc {
-		q.Add("asc", "")
-	}
+	opts.Add(q)
 
 	rss := []*gwapitypes.RemoteSourceResponse{}
 	resp, err := c.getParsedResponse(ctx, "GET", "/remotesources", q, jsonContent, nil, &rss)

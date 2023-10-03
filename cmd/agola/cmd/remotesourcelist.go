@@ -36,19 +36,7 @@ var cmdRemoteSourceList = &cobra.Command{
 	Short: "list",
 }
 
-type remoteSourceListOptions struct {
-	limit int
-	start string
-}
-
-var remoteSourceListOpts remoteSourceListOptions
-
 func init() {
-	flags := cmdRemoteSourceList.Flags()
-
-	flags.IntVar(&remoteSourceListOpts.limit, "limit", 10, "max number of runs to show")
-	flags.StringVar(&remoteSourceListOpts.start, "start", "", "starting user name (excluded) to fetch")
-
 	cmdRemoteSource.AddCommand(cmdRemoteSourceList)
 }
 
@@ -61,12 +49,19 @@ func printRemoteSources(remoteSources []*gwapitypes.RemoteSourceResponse) {
 func remoteSourceList(cmd *cobra.Command, args []string) error {
 	gwClient := gwclient.NewClient(gatewayURL, token)
 
-	remouteSources, _, err := gwClient.GetRemoteSources(context.TODO(), remoteSourceListOpts.start, remoteSourceListOpts.limit, false)
-	if err != nil {
-		return errors.WithStack(err)
-	}
+	var cursor string
+	for {
+		remoteSources, resp, err := gwClient.GetRemoteSources(context.TODO(), &gwclient.ListOptions{Cursor: cursor})
+		if err != nil {
+			return errors.Wrapf(err, "failed to get remote sources")
+		}
+		printRemoteSources(remoteSources)
 
-	printRemoteSources(remouteSources)
+		cursor = resp.Cursor
+		if cursor == "" {
+			break
+		}
+	}
 
 	return nil
 }
