@@ -71,7 +71,7 @@ type CreateSecretRequest struct {
 }
 
 func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretRequest) (*csapitypes.Secret, error) {
-	isVariableOwner, err := h.IsVariableOwner(ctx, req.ParentType, req.ParentRef)
+	isVariableOwner, err := h.IsAuthUserVariableOwner(ctx, req.ParentType, req.ParentRef)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to determine ownership")
 	}
@@ -125,7 +125,7 @@ type UpdateSecretRequest struct {
 }
 
 func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretRequest) (*csapitypes.Secret, error) {
-	isVariableOwner, err := h.IsVariableOwner(ctx, req.ParentType, req.ParentRef)
+	isVariableOwner, err := h.IsAuthUserVariableOwner(ctx, req.ParentType, req.ParentRef)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to determine ownership")
 	}
@@ -161,7 +161,7 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretReque
 }
 
 func (h *ActionHandler) DeleteSecret(ctx context.Context, parentType cstypes.ObjectKind, parentRef, name string) error {
-	isVariableOwner, err := h.IsVariableOwner(ctx, parentType, parentRef)
+	isVariableOwner, err := h.IsAuthUserVariableOwner(ctx, parentType, parentRef)
 	if err != nil {
 		return errors.Wrapf(err, "failed to determine ownership")
 	}

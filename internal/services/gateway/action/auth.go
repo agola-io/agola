@@ -25,7 +25,7 @@ import (
 	cstypes "agola.io/agola/services/configstore/types"
 )
 
-func (h *ActionHandler) IsOrgOwner(ctx context.Context, orgID string) (bool, error) {
+func (h *ActionHandler) IsAuthUserOrgOwner(ctx context.Context, orgID string) (bool, error) {
 	isAdmin := common.IsUserAdmin(ctx)
 	if isAdmin {
 		return true, nil
@@ -51,7 +51,7 @@ func (h *ActionHandler) IsOrgOwner(ctx context.Context, orgID string) (bool, err
 	return false, nil
 }
 
-func (h *ActionHandler) IsProjectOwner(ctx context.Context, ownerType cstypes.ObjectKind, ownerID string) (bool, error) {
+func (h *ActionHandler) IsAuthUserProjectOwner(ctx context.Context, ownerType cstypes.ObjectKind, ownerID string) (bool, error) {
 	isAdmin := common.IsUserAdmin(ctx)
 	if isAdmin {
 		return true, nil
@@ -85,7 +85,7 @@ func (h *ActionHandler) IsProjectOwner(ctx context.Context, ownerType cstypes.Ob
 	return false, nil
 }
 
-func (h *ActionHandler) IsProjectMember(ctx context.Context, ownerType cstypes.ObjectKind, ownerID string) (bool, error) {
+func (h *ActionHandler) IsAuthUserMember(ctx context.Context, ownerType cstypes.ObjectKind, ownerID string) (bool, error) {
 	isAdmin := common.IsUserAdmin(ctx)
 	if isAdmin {
 		return true, nil
@@ -118,7 +118,7 @@ func (h *ActionHandler) IsProjectMember(ctx context.Context, ownerType cstypes.O
 	return false, nil
 }
 
-func (h *ActionHandler) IsVariableOwner(ctx context.Context, parentType cstypes.ObjectKind, parentRef string) (bool, error) {
+func (h *ActionHandler) IsAuthUserVariableOwner(ctx context.Context, parentType cstypes.ObjectKind, parentRef string) (bool, error) {
 	var ownerType cstypes.ObjectKind
 	var ownerID string
 	switch parentType {
@@ -138,10 +138,10 @@ func (h *ActionHandler) IsVariableOwner(ctx context.Context, parentType cstypes.
 		ownerID = p.OwnerID
 	}
 
-	return h.IsProjectOwner(ctx, ownerType, ownerID)
+	return h.IsAuthUserProjectOwner(ctx, ownerType, ownerID)
 }
 
-func (h *ActionHandler) CanGetRun(ctx context.Context, groupType scommon.GroupType, ref string) (bool, string, error) {
+func (h *ActionHandler) CanAuthUserGetRun(ctx context.Context, groupType scommon.GroupType, ref string) (bool, string, error) {
 	var visibility cstypes.Visibility
 	var ownerType cstypes.ObjectKind
 	var refID string
@@ -172,7 +172,7 @@ func (h *ActionHandler) CanGetRun(ctx context.Context, groupType scommon.GroupTy
 	if visibility == cstypes.VisibilityPublic {
 		return true, refID, nil
 	}
-	isProjectMember, err := h.IsProjectMember(ctx, ownerType, ownerID)
+	isProjectMember, err := h.IsAuthUserMember(ctx, ownerType, ownerID)
 	if err != nil {
 		return false, "", errors.Wrapf(err, "failed to determine ownership")
 	}
@@ -182,7 +182,7 @@ func (h *ActionHandler) CanGetRun(ctx context.Context, groupType scommon.GroupTy
 	return true, refID, nil
 }
 
-func (h *ActionHandler) CanDoRunActions(ctx context.Context, groupType scommon.GroupType, ref string) (bool, string, error) {
+func (h *ActionHandler) CanAuthUserDoRunActions(ctx context.Context, groupType scommon.GroupType, ref string) (bool, string, error) {
 	var ownerType cstypes.ObjectKind
 	var refID string
 	var ownerID string
@@ -207,7 +207,7 @@ func (h *ActionHandler) CanDoRunActions(ctx context.Context, groupType scommon.G
 		ownerID = u.ID
 	}
 
-	isProjectOwner, err := h.IsProjectOwner(ctx, ownerType, ownerID)
+	isProjectOwner, err := h.IsAuthUserProjectOwner(ctx, ownerType, ownerID)
 	if err != nil {
 		return false, "", errors.Wrapf(err, "failed to determine ownership")
 	}
@@ -217,7 +217,7 @@ func (h *ActionHandler) CanDoRunActions(ctx context.Context, groupType scommon.G
 	return true, refID, nil
 }
 
-func (h *ActionHandler) IsOrgMember(ctx context.Context, userRef, orgRef string) (bool, error) {
+func (h *ActionHandler) IsUserOrgMember(ctx context.Context, userRef, orgRef string) (bool, error) {
 	user, err := h.GetUser(ctx, userRef)
 	if err != nil {
 		return false, errors.Wrapf(err, "failed to get user %s:", userRef)

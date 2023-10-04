@@ -66,7 +66,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProje
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get project group %q", req.ParentRef))
 	}
 
-	isProjectOwner, err := h.IsProjectOwner(ctx, pg.OwnerType, pg.OwnerID)
+	isProjectOwner, err := h.IsAuthUserProjectOwner(ctx, pg.OwnerType, pg.OwnerID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to determine ownership")
 	}
@@ -117,7 +117,7 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, projectGroupRef 
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get project group %q", projectGroupRef))
 	}
 
-	isProjectOwner, err := h.IsProjectOwner(ctx, pg.OwnerType, pg.OwnerID)
+	isProjectOwner, err := h.IsAuthUserProjectOwner(ctx, pg.OwnerType, pg.OwnerID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to determine ownership")
 	}
@@ -157,7 +157,7 @@ func (h *ActionHandler) DeleteProjectGroup(ctx context.Context, projectRef strin
 		return util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get project %q", projectRef))
 	}
 
-	isProjectOwner, err := h.IsProjectOwner(ctx, p.OwnerType, p.OwnerID)
+	isProjectOwner, err := h.IsAuthUserProjectOwner(ctx, p.OwnerType, p.OwnerID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to determine ownership")
 	}
