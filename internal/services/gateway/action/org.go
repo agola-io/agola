@@ -31,6 +31,19 @@ func (h *ActionHandler) GetOrg(ctx context.Context, orgRef string) (*cstypes.Org
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
+
+	if org.Visibility == cstypes.VisibilityPublic {
+		return org, nil
+	}
+
+	isMember, err := h.IsAuthUserMember(ctx, cstypes.ObjectKindOrg, org.ID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to determine ownership")
+	}
+	if !isMember {
+		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
+	}
+
 	return org, nil
 }
 
@@ -160,7 +173,7 @@ func (h *ActionHandler) UpdateOrg(ctx context.Context, orgRef string, req *Updat
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
 
-	isOrgOwner, err := h.IsOrgOwner(ctx, org.ID)
+	isOrgOwner, err := h.IsAuthUserOrgOwner(ctx, org.ID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to determine ownership")
 	}
@@ -192,7 +205,7 @@ func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 		return util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
 
-	isOrgOwner, err := h.IsOrgOwner(ctx, org.ID)
+	isOrgOwner, err := h.IsAuthUserOrgOwner(ctx, org.ID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to determine ownership")
 	}
@@ -226,7 +239,7 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
 
-	isOrgOwner, err := h.IsOrgOwner(ctx, org.ID)
+	isOrgOwner, err := h.IsAuthUserOrgOwner(ctx, org.ID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to determine ownership")
 	}
@@ -252,7 +265,7 @@ func (h *ActionHandler) RemoveOrgMember(ctx context.Context, orgRef, userRef str
 		return util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
 
-	isOrgOwner, err := h.IsOrgOwner(ctx, org.ID)
+	isOrgOwner, err := h.IsAuthUserOrgOwner(ctx, org.ID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to determine ownership")
 	}
@@ -282,7 +295,7 @@ func (h *ActionHandler) GetOrgInvitations(ctx context.Context, orgRef string, li
 		return nil, errors.Wrapf(err, "failed to get org %s:", orgRef)
 	}
 
-	isOrgOwner, err := h.IsOrgOwner(ctx, org.ID)
+	isOrgOwner, err := h.IsAuthUserOrgOwner(ctx, org.ID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to determine ownership")
 	}
@@ -327,7 +340,7 @@ func (h *ActionHandler) CreateOrgInvitation(ctx context.Context, req *CreateOrgI
 		return nil, errors.Wrapf(err, "failed to get org %s:", req.OrganizationRef)
 	}
 
-	isOrgOwner, err := h.IsOrgOwner(ctx, org.ID)
+	isOrgOwner, err := h.IsAuthUserOrgOwner(ctx, org.ID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to determine ownership")
 	}
@@ -335,7 +348,7 @@ func (h *ActionHandler) CreateOrgInvitation(ctx context.Context, req *CreateOrgI
 		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
 	}
 
-	isOrgMember, err := h.IsOrgMember(ctx, req.UserRef, req.OrganizationRef)
+	isOrgMember, err := h.IsUserOrgMember(ctx, req.UserRef, req.OrganizationRef)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to determine membership")
 	}
@@ -430,7 +443,7 @@ func (h *ActionHandler) DeleteOrgInvitation(ctx context.Context, orgRef string, 
 		return err
 	}
 
-	isOrgOwner, err := h.IsOrgOwner(ctx, org.ID)
+	isOrgOwner, err := h.IsAuthUserOrgOwner(ctx, org.ID)
 	if err != nil {
 		return util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "failed to determine ownership"))
 	}

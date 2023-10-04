@@ -167,24 +167,24 @@ func (c *Client) GetProject(ctx context.Context, projectRef string) (*gwapitypes
 	return project, resp, errors.WithStack(err)
 }
 
-func (c *Client) CreateProjectGroup(ctx context.Context, req *gwapitypes.CreateProjectGroupRequest) (*gwapitypes.ProjectResponse, *Response, error) {
+func (c *Client) CreateProjectGroup(ctx context.Context, req *gwapitypes.CreateProjectGroupRequest) (*gwapitypes.ProjectGroupResponse, *Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
 	}
 
-	projectGroup := new(gwapitypes.ProjectResponse)
+	projectGroup := new(gwapitypes.ProjectGroupResponse)
 	resp, err := c.getParsedResponse(ctx, "POST", "/projectgroups", nil, jsonContent, bytes.NewReader(reqj), projectGroup)
 	return projectGroup, resp, errors.WithStack(err)
 }
 
-func (c *Client) UpdateProjectGroup(ctx context.Context, projectGroupRef string, req *gwapitypes.UpdateProjectGroupRequest) (*gwapitypes.ProjectResponse, *Response, error) {
+func (c *Client) UpdateProjectGroup(ctx context.Context, projectGroupRef string, req *gwapitypes.UpdateProjectGroupRequest) (*gwapitypes.ProjectGroupResponse, *Response, error) {
 	reqj, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
 	}
 
-	projectGroup := new(gwapitypes.ProjectResponse)
+	projectGroup := new(gwapitypes.ProjectGroupResponse)
 	resp, err := c.getParsedResponse(ctx, "PUT", path.Join("/projectgroups", url.PathEscape(projectGroupRef)), nil, jsonContent, bytes.NewReader(reqj), projectGroup)
 	return projectGroup, resp, errors.WithStack(err)
 }
