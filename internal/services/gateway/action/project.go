@@ -36,12 +36,13 @@ func (h *ActionHandler) GetProject(ctx context.Context, projectRef string) (*csa
 		return nil, errors.WithStack(err)
 	}
 
+	if project.GlobalVisibility == cstypes.VisibilityPublic {
+		return project, nil
+	}
+
 	isMember, err := h.IsAuthUserMember(ctx, project.OwnerType, project.OwnerID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to determine ownership")
-	}
-	if project.GlobalVisibility == cstypes.VisibilityPublic {
-		return project, nil
 	}
 	if !isMember {
 		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))

@@ -30,6 +30,19 @@ func (h *ActionHandler) GetProjectGroup(ctx context.Context, projectGroupRef str
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
+
+	if projectGroup.GlobalVisibility == cstypes.VisibilityPublic {
+		return projectGroup, nil
+	}
+
+	isMember, err := h.IsAuthUserMember(ctx, projectGroup.OwnerType, projectGroup.OwnerID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to determine ownership")
+	}
+	if !isMember {
+		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
+	}
+
 	return projectGroup, nil
 }
 

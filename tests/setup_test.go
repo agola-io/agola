@@ -99,6 +99,7 @@ const (
 )
 
 const (
+	remoteErrorNotExist   = "remote error notexist"
 	remoteErrorBadRequest = "remote error badrequest"
 )
 
@@ -323,7 +324,8 @@ func setup(ctx context.Context, t *testing.T, dir string, opts ...setupOption) *
 				Duration: 12 * time.Hour,
 				Key:      "supersecretsigningkey",
 			},
-			AdminToken: "admintoken",
+			AdminToken:                   "admintoken",
+			OrganizationMemberAddingMode: config.OrganizationMemberAddingModeDirect,
 		},
 		Scheduler: config.Scheduler{
 			Debug:         false,
@@ -3007,6 +3009,620 @@ func TestAddUpdateOrgUserMembers(t *testing.T) {
 	}
 }
 
+func TestGetOrg(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sc := setup(ctx, t, dir, withGitea(true))
+	defer sc.stop()
+
+	gwAdminClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
+
+	// create users
+	_, _, err := gwAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	tokenUser01, _, err := gwAdminClient.CreateUserToken(ctx, agolaUser01, &gwapitypes.CreateUserTokenRequest{TokenName: "test"})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	gwClientUser01 := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01.Token)
+
+	_, _, err = gwAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser02})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	tokenUser02, _, err := gwAdminClient.CreateUserToken(ctx, agolaUser02, &gwapitypes.CreateUserTokenRequest{TokenName: "test"})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	gwClientUser02 := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser02.Token)
+
+	_, _, err = gwAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser03})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	tokenUser03, _, err := gwAdminClient.CreateUserToken(ctx, agolaUser03, &gwapitypes.CreateUserTokenRequest{TokenName: "test"})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	gwClientUser03 := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser03.Token)
+
+	// create public org
+	pubOrg, _, err := gwClientUser01.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg01, Visibility: gwapitypes.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// create private org
+	privOrg, _, err := gwClientUser01.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg02, Visibility: gwapitypes.VisibilityPrivate})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// add user02 as member of priv org
+	_, _, err = gwClientUser01.AddOrgMember(ctx, privOrg.ID, agolaUser02, gwapitypes.MemberRoleMember)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	tests := []struct {
+		name   string
+		client *gwclient.Client
+		org    *gwapitypes.OrgResponse
+		err    string
+	}{
+		{
+			name:   "test user owner get pub org",
+			client: gwClientUser01,
+			org:    pubOrg,
+		},
+		{
+			name:   "test user member get pub org",
+			client: gwClientUser02,
+			org:    pubOrg,
+		},
+		{
+			name:   "test user not member get pub org",
+			client: gwClientUser03,
+			org:    pubOrg,
+		},
+		{
+			name:   "test user owner get priv org",
+			client: gwClientUser01,
+			org:    privOrg,
+		},
+		{
+			name:   "test user member get priv org",
+			client: gwClientUser02,
+			org:    privOrg,
+		},
+		{
+			name:   "test user not member get priv org",
+			client: gwClientUser03,
+			org:    privOrg,
+			err:    remoteErrorNotExist,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			org, _, err := tt.client.GetOrg(ctx, tt.org.ID)
+
+			if tt.err != "" {
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", tt.err)
+				}
+				if err.Error() != tt.err {
+					t.Fatalf("expected err %v, got err: %v", tt.err, err)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				if diff := cmp.Diff(tt.org, org); diff != "" {
+					t.Fatalf("org mismatch (-want +got):\n%s", diff)
+				}
+			}
+		})
+	}
+}
+
+func TestGetProjectGroup(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sc := setup(ctx, t, dir, withGitea(true))
+	defer sc.stop()
+
+	gwAdminClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
+
+	// create users
+	_, _, err := gwAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	tokenUser01, _, err := gwAdminClient.CreateUserToken(ctx, agolaUser01, &gwapitypes.CreateUserTokenRequest{TokenName: "test"})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	gwClientUser01 := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01.Token)
+
+	_, _, err = gwAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser02})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	tokenUser02, _, err := gwAdminClient.CreateUserToken(ctx, agolaUser02, &gwapitypes.CreateUserTokenRequest{TokenName: "test"})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	gwClientUser02 := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser02.Token)
+
+	_, _, err = gwAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser03})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	tokenUser03, _, err := gwAdminClient.CreateUserToken(ctx, agolaUser03, &gwapitypes.CreateUserTokenRequest{TokenName: "test"})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	gwClientUser03 := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser03.Token)
+
+	// create public org
+	pubOrg, _, err := gwClientUser01.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg01, Visibility: gwapitypes.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// create public org pub project group
+	pubOrgPubPG, _, err := gwClientUser01.CreateProjectGroup(ctx, &gwapitypes.CreateProjectGroupRequest{Name: "puborg-pubpg", ParentRef: path.Join("org", pubOrg.Name), Visibility: gwapitypes.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// create public org priv project group
+	pubOrgPrivPG, _, err := gwClientUser01.CreateProjectGroup(ctx, &gwapitypes.CreateProjectGroupRequest{Name: "puborg-privpg", ParentRef: path.Join("org", pubOrg.Name), Visibility: gwapitypes.VisibilityPrivate})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// create private org
+	privOrg, _, err := gwClientUser01.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg02, Visibility: gwapitypes.VisibilityPrivate})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// create priv org pub project group
+	privOrgPubPG, _, err := gwClientUser01.CreateProjectGroup(ctx, &gwapitypes.CreateProjectGroupRequest{Name: "privorg-pubpg", ParentRef: path.Join("org", privOrg.Name), Visibility: gwapitypes.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// create priv org priv project group
+	privOrgPrivPG, _, err := gwClientUser01.CreateProjectGroup(ctx, &gwapitypes.CreateProjectGroupRequest{Name: "privorg-privpg", ParentRef: path.Join("org", privOrg.Name), Visibility: gwapitypes.VisibilityPrivate})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// add user02 as member of pub org
+	_, _, err = gwClientUser01.AddOrgMember(ctx, pubOrg.ID, agolaUser02, gwapitypes.MemberRoleMember)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// add user02 as member of priv org
+	_, _, err = gwClientUser01.AddOrgMember(ctx, privOrg.ID, agolaUser02, gwapitypes.MemberRoleMember)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	tests := []struct {
+		name   string
+		client *gwclient.Client
+		pg     *gwapitypes.ProjectGroupResponse
+		err    string
+	}{
+		{
+			name:   "test user owner get pub org pub pg",
+			client: gwClientUser01,
+			pg:     pubOrgPubPG,
+		},
+		{
+			name:   "test user member get pub org pub pg",
+			client: gwClientUser02,
+			pg:     pubOrgPubPG,
+		},
+		{
+			name:   "test user not member get pub org pub pg",
+			client: gwClientUser03,
+			pg:     pubOrgPubPG,
+		},
+		{
+			name:   "test user owner get pub org priv pg",
+			client: gwClientUser01,
+			pg:     pubOrgPrivPG,
+		},
+		{
+			name:   "test user member get pub org priv pg",
+			client: gwClientUser02,
+			pg:     pubOrgPrivPG,
+		},
+		{
+			name:   "test user not member get pub org priv pg",
+			client: gwClientUser03,
+			pg:     pubOrgPrivPG,
+			err:    remoteErrorNotExist,
+		},
+		{
+			name:   "test user owner get priv org pub pg",
+			client: gwClientUser01,
+			pg:     privOrgPubPG,
+		},
+		{
+			name:   "test user member get priv org pub pg",
+			client: gwClientUser02,
+			pg:     privOrgPubPG,
+		},
+		{
+			name:   "test user not member get priv org pub pg",
+			client: gwClientUser03,
+			pg:     privOrgPubPG,
+			err:    remoteErrorNotExist,
+		},
+		{
+			name:   "test user owner get priv org priv pg",
+			client: gwClientUser01,
+			pg:     privOrgPrivPG,
+		},
+		{
+			name:   "test user member get priv org priv pg",
+			client: gwClientUser02,
+			pg:     privOrgPrivPG,
+		},
+		{
+			name:   "test user not member get priv org priv pg",
+			client: gwClientUser03,
+			pg:     privOrgPrivPG,
+			err:    remoteErrorNotExist,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			pg, _, err := tt.client.GetProjectGroup(ctx, tt.pg.ID)
+
+			if tt.err != "" {
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", tt.err)
+				}
+				if err.Error() != tt.err {
+					t.Fatalf("expected err %v, got err: %v", tt.err, err)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				if diff := cmp.Diff(tt.pg, pg); diff != "" {
+					t.Fatalf("pg mismatch (-want +got):\n%s", diff)
+				}
+			}
+		})
+	}
+}
+
+func TestGetProject(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sc := setup(ctx, t, dir, withGitea(true))
+	defer sc.stop()
+
+	gwAdminClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
+
+	giteaToken, tokenUser01 := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+
+	giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+
+	giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	gwClientUser01 := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01)
+
+	createProject(ctx, t, giteaClient, gwClientUser01)
+
+	// create other users
+	_, _, err = gwAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser02})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	tokenUser02, _, err := gwAdminClient.CreateUserToken(ctx, agolaUser02, &gwapitypes.CreateUserTokenRequest{TokenName: "test"})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	gwClientUser02 := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser02.Token)
+
+	_, _, err = gwAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser03})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	tokenUser03, _, err := gwAdminClient.CreateUserToken(ctx, agolaUser03, &gwapitypes.CreateUserTokenRequest{TokenName: "test"})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	gwClientUser03 := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser03.Token)
+
+	// create public org
+	pubOrg, _, err := gwClientUser01.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg01, Visibility: gwapitypes.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// create public org pub project group
+	pubOrgPubPG, _, err := gwClientUser01.CreateProjectGroup(ctx, &gwapitypes.CreateProjectGroupRequest{Name: "puborg-pubpg", ParentRef: path.Join("org", pubOrg.Name), Visibility: gwapitypes.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// create public org pub project group pub project
+	pubOrgPubPGPubProj, _, err := gwClientUser01.CreateProject(ctx, &gwapitypes.CreateProjectRequest{Name: "puborg-pubpg-pugproj", ParentRef: pubOrgPubPG.ID, Visibility: gwapitypes.VisibilityPublic, RemoteSourceName: "gitea", RepoPath: path.Join(giteaUser01, "repo01")})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// create public org pub project group priv project
+	pubOrgPubPGPrivProj, _, err := gwClientUser01.CreateProject(ctx, &gwapitypes.CreateProjectRequest{Name: "puborg-pubpg-privproj", ParentRef: pubOrgPubPG.ID, Visibility: gwapitypes.VisibilityPrivate, RemoteSourceName: "gitea", RepoPath: path.Join(giteaUser01, "repo01")})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// create public org priv project group
+	pubOrgPrivPG, _, err := gwClientUser01.CreateProjectGroup(ctx, &gwapitypes.CreateProjectGroupRequest{Name: "puborg-privpg", ParentRef: path.Join("org", pubOrg.Name), Visibility: gwapitypes.VisibilityPrivate})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// create public org priv project group pub project
+	pubOrgPrivPGPubProj, _, err := gwClientUser01.CreateProject(ctx, &gwapitypes.CreateProjectRequest{Name: "pubvorg-privpg-pugproj", ParentRef: pubOrgPrivPG.ID, Visibility: gwapitypes.VisibilityPublic, RemoteSourceName: "gitea", RepoPath: path.Join(giteaUser01, "repo01")})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// create public org priv project group priv project
+	pubOrgPrivPGPrivProj, _, err := gwClientUser01.CreateProject(ctx, &gwapitypes.CreateProjectRequest{Name: "pubvorg-privpg-privproj", ParentRef: pubOrgPrivPG.ID, Visibility: gwapitypes.VisibilityPrivate, RemoteSourceName: "gitea", RepoPath: path.Join(giteaUser01, "repo01")})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// create private org
+	privOrg, _, err := gwClientUser01.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg02, Visibility: gwapitypes.VisibilityPrivate})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// create priv org pub project group
+	privOrgPubPG, _, err := gwClientUser01.CreateProjectGroup(ctx, &gwapitypes.CreateProjectGroupRequest{Name: "privorg-pubpg", ParentRef: path.Join("org", privOrg.Name), Visibility: gwapitypes.VisibilityPublic})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// create priv org pub project group pub project
+	privOrgPubPGPubProj, _, err := gwClientUser01.CreateProject(ctx, &gwapitypes.CreateProjectRequest{Name: "privorg-pubpg-pugproj", ParentRef: privOrgPubPG.ID, Visibility: gwapitypes.VisibilityPublic, RemoteSourceName: "gitea", RepoPath: path.Join(giteaUser01, "repo01")})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// create priv org pub project group priv project
+	privOrgPubPGPrivProj, _, err := gwClientUser01.CreateProject(ctx, &gwapitypes.CreateProjectRequest{Name: "privorg-pubpg-privproj", ParentRef: privOrgPubPG.ID, Visibility: gwapitypes.VisibilityPrivate, RemoteSourceName: "gitea", RepoPath: path.Join(giteaUser01, "repo01")})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// create priv org priv project group
+	privOrgPrivPG, _, err := gwClientUser01.CreateProjectGroup(ctx, &gwapitypes.CreateProjectGroupRequest{Name: "privorg-privpg", ParentRef: path.Join("org", privOrg.Name), Visibility: gwapitypes.VisibilityPrivate})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// create priv org priv project group pub project
+	privOrgPrivPGPubProj, _, err := gwClientUser01.CreateProject(ctx, &gwapitypes.CreateProjectRequest{Name: "privorg-privpg-pubproj", ParentRef: privOrgPrivPG.ID, Visibility: gwapitypes.VisibilityPublic, RemoteSourceName: "gitea", RepoPath: path.Join(giteaUser01, "repo01")})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// create priv org priv project group priv project
+	privOrgPrivPGPrivProj, _, err := gwClientUser01.CreateProject(ctx, &gwapitypes.CreateProjectRequest{Name: "privorg-privpg-privproj", ParentRef: privOrgPrivPG.ID, Visibility: gwapitypes.VisibilityPrivate, RemoteSourceName: "gitea", RepoPath: path.Join(giteaUser01, "repo01")})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// add user02 as member of pub org
+	_, _, err = gwClientUser01.AddOrgMember(ctx, pubOrg.ID, agolaUser02, gwapitypes.MemberRoleMember)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	// add user02 as member of priv org
+	_, _, err = gwClientUser01.AddOrgMember(ctx, privOrg.ID, agolaUser02, gwapitypes.MemberRoleMember)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	tests := []struct {
+		name   string
+		client *gwclient.Client
+		proj   *gwapitypes.ProjectResponse
+		err    string
+	}{
+		{
+			name:   "test user owner get pub org pub pg pub proj",
+			client: gwClientUser01,
+			proj:   pubOrgPubPGPubProj,
+		},
+		{
+			name:   "test user member get pub org pub pg pub proj",
+			client: gwClientUser02,
+			proj:   pubOrgPubPGPubProj,
+		},
+		{
+			name:   "test user not member get pub org pub pg pub proj",
+			client: gwClientUser03,
+			proj:   pubOrgPubPGPubProj,
+		},
+		{
+			name:   "test user owner get pub org pub pg priv proj",
+			client: gwClientUser01,
+			proj:   pubOrgPubPGPrivProj,
+		},
+		{
+			name:   "test user member get pub org pub pg priv proj",
+			client: gwClientUser02,
+			proj:   pubOrgPubPGPrivProj,
+		},
+		{
+			name:   "test user not member get pub org pub pg priv proj",
+			client: gwClientUser03,
+			proj:   pubOrgPubPGPrivProj,
+			err:    remoteErrorNotExist,
+		},
+		{
+			name:   "test user owner get pub org priv pg pub proj",
+			client: gwClientUser01,
+			proj:   pubOrgPrivPGPubProj,
+		},
+		{
+			name:   "test user member get pub org priv pg pub proj",
+			client: gwClientUser02,
+			proj:   pubOrgPrivPGPubProj,
+		},
+		{
+			name:   "test user not member get pub org priv pg pub proj",
+			client: gwClientUser03,
+			proj:   pubOrgPrivPGPubProj,
+			err:    remoteErrorNotExist,
+		},
+		{
+			name:   "test user owner get pub org priv pg priv proj",
+			client: gwClientUser01,
+			proj:   pubOrgPrivPGPrivProj,
+		},
+		{
+			name:   "test user member get pub org priv pg priv proj",
+			client: gwClientUser02,
+			proj:   pubOrgPrivPGPrivProj,
+		},
+		{
+			name:   "test user not member get pub org priv pg priv proj",
+			client: gwClientUser03,
+			proj:   pubOrgPrivPGPrivProj,
+			err:    remoteErrorNotExist,
+		},
+		{
+			name:   "test user owner get priv org pub pg pub proj",
+			client: gwClientUser01,
+			proj:   privOrgPubPGPubProj,
+		},
+		{
+			name:   "test user member get priv org pub pg pub proj",
+			client: gwClientUser02,
+			proj:   privOrgPubPGPubProj,
+		},
+		{
+			name:   "test user not member get priv org pub pg pub proj",
+			client: gwClientUser03,
+			proj:   privOrgPubPGPubProj,
+			err:    remoteErrorNotExist,
+		},
+		{
+			name:   "test user owner get priv org pub pg priv proj",
+			client: gwClientUser01,
+			proj:   privOrgPubPGPrivProj,
+		},
+		{
+			name:   "test user member get priv org pub pg priv proj",
+			client: gwClientUser02,
+			proj:   privOrgPubPGPrivProj,
+		},
+		{
+			name:   "test user not member get priv org pub pg priv proj",
+			client: gwClientUser03,
+			proj:   privOrgPubPGPrivProj,
+			err:    remoteErrorNotExist,
+		},
+		{
+			name:   "test user owner get priv org priv pg pub proj",
+			client: gwClientUser01,
+			proj:   privOrgPrivPGPubProj,
+		},
+		{
+			name:   "test user member get priv org priv pg pub proj",
+			client: gwClientUser02,
+			proj:   privOrgPrivPGPubProj,
+		},
+		{
+			name:   "test user not member get priv org priv pg pub proj",
+			client: gwClientUser03,
+			proj:   privOrgPrivPGPubProj,
+			err:    remoteErrorNotExist,
+		},
+		{
+			name:   "test user owner get priv org priv pg priv proj",
+			client: gwClientUser01,
+			proj:   privOrgPrivPGPrivProj,
+		},
+		{
+			name:   "test user member get priv org priv pg priv proj",
+			client: gwClientUser02,
+			proj:   privOrgPrivPGPrivProj,
+		},
+		{
+			name:   "test user not member get priv org priv pg priv proj",
+			client: gwClientUser03,
+			proj:   privOrgPrivPGPrivProj,
+			err:    remoteErrorNotExist,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			pg, _, err := tt.client.GetProject(ctx, tt.proj.ID)
+
+			if tt.err != "" {
+				if err == nil {
+					t.Fatalf("expected error %v, got nil err", tt.err)
+				}
+				if err.Error() != tt.err {
+					t.Fatalf("expected err %v, got err: %v", tt.err, err)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				if diff := cmp.Diff(tt.proj, pg); diff != "" {
+					t.Fatalf("project mismatch (-want +got):\n%s", diff)
+				}
+			}
+		})
+	}
+}
+
 func TestUpdateOrganization(t *testing.T) {
 	t.Parallel()
 
@@ -3202,7 +3818,7 @@ func TestOrgInvitation(t *testing.T) {
 				}
 
 				_, _, err = tc.gwClientUser02.GetOrgInvitation(ctx, agolaOrg01, agolaUser02)
-				expectedErr := "remote error notexist"
+				expectedErr := remoteErrorNotExist
 				if err == nil {
 					t.Fatalf("expected error %v, got nil err", expectedErr)
 				}
@@ -3226,7 +3842,7 @@ func TestOrgInvitation(t *testing.T) {
 				}
 
 				_, _, err = tc.gwClientUser01.GetOrgInvitation(ctx, agolaOrg01, agolaUser02)
-				expectedErr := "remote error notexist"
+				expectedErr := remoteErrorNotExist
 				if err == nil {
 					t.Fatalf("expected error %v, got nil err", expectedErr)
 				}
@@ -3250,7 +3866,7 @@ func TestOrgInvitation(t *testing.T) {
 				}
 
 				_, _, err = tc.gwClientUser02.GetOrgInvitation(ctx, agolaOrg01, agolaUser02)
-				expectedErr := "remote error notexist"
+				expectedErr := remoteErrorNotExist
 				if err == nil {
 					t.Fatalf("expected error %v, got nil err", expectedErr)
 				}
@@ -3272,7 +3888,7 @@ func TestOrgInvitation(t *testing.T) {
 			orgInvitationEnabled: true,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg02, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser02, Role: cstypes.MemberRoleMember})
-				expectedErr := "remote error notexist"
+				expectedErr := remoteErrorNotExist
 				if err == nil {
 					t.Fatalf("expected error %v, got nil err", expectedErr)
 				}
@@ -3310,7 +3926,7 @@ func TestOrgInvitation(t *testing.T) {
 			orgInvitationEnabled: true,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser03, Role: cstypes.MemberRoleMember})
-				expectedErr := "remote error notexist"
+				expectedErr := remoteErrorNotExist
 				if err == nil {
 					t.Fatalf("expected error %v, got nil err", expectedErr)
 				}
@@ -3391,7 +4007,7 @@ func TestOrgInvitation(t *testing.T) {
 				}
 
 				_, _, err = gwClientUser01.GetOrgInvitation(ctx, agolaOrg01, agolaUser02)
-				expectedErr := "remote error notexist"
+				expectedErr := remoteErrorNotExist
 				if err == nil {
 					t.Fatalf("expected error %v, got nil err", expectedErr)
 				}

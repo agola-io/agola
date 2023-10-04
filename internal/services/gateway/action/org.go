@@ -31,6 +31,19 @@ func (h *ActionHandler) GetOrg(ctx context.Context, orgRef string) (*cstypes.Org
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
+
+	if org.Visibility == cstypes.VisibilityPublic {
+		return org, nil
+	}
+
+	isMember, err := h.IsAuthUserMember(ctx, cstypes.ObjectKindOrg, org.ID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to determine ownership")
+	}
+	if !isMember {
+		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
+	}
+
 	return org, nil
 }
 
