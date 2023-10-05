@@ -290,9 +290,9 @@ func (h *ActionHandler) GetOrgInvitations(ctx context.Context, orgRef string, li
 		return nil, errors.Errorf("user not logged in")
 	}
 
-	org, err := h.GetOrg(ctx, orgRef)
+	org, _, err := h.configstoreClient.GetOrg(ctx, orgRef)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get org %s:", orgRef)
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get org %s", orgRef))
 	}
 
 	isOrgOwner, err := h.IsAuthUserOrgOwner(ctx, org.ID)
@@ -335,9 +335,9 @@ func (h *ActionHandler) CreateOrgInvitation(ctx context.Context, req *CreateOrgI
 		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("role is required"))
 	}
 
-	org, err := h.GetOrg(ctx, req.OrganizationRef)
+	org, _, err := h.configstoreClient.GetOrg(ctx, req.OrganizationRef)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get org %s:", req.OrganizationRef)
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get org %s", req.OrganizationRef))
 	}
 
 	isOrgOwner, err := h.IsAuthUserOrgOwner(ctx, org.ID)
@@ -410,10 +410,11 @@ func (h *ActionHandler) OrgInvitationAction(ctx context.Context, req *OrgInvitat
 		return errors.Errorf("user not authorized")
 	}
 
-	org, err := h.GetOrg(ctx, req.OrgRef)
+	org, _, err := h.configstoreClient.GetOrg(ctx, req.OrgRef)
 	if err != nil {
-		return errors.Wrapf(err, "failed to get org %s:", req.OrgRef)
+		return util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get org %s", req.OrgRef))
 	}
+
 	if org == nil {
 		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("org %s not found", req.OrgRef))
 	}
@@ -438,9 +439,9 @@ func (h *ActionHandler) DeleteOrgInvitation(ctx context.Context, orgRef string, 
 		return util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
 
-	org, err := h.GetOrg(ctx, orgInvitation.OrganizationID)
+	org, _, err := h.configstoreClient.GetOrg(ctx, orgInvitation.OrganizationID)
 	if err != nil {
-		return err
+		return util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get org %s", orgInvitation.OrganizationID))
 	}
 
 	isOrgOwner, err := h.IsAuthUserOrgOwner(ctx, org.ID)
