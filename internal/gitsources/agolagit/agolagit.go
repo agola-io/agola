@@ -149,8 +149,8 @@ func (c *Client) DeleteRepoWebhook(repopath, u string) error {
 	return nil
 }
 
-func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource.CommitStatus, targetURL, description, context string) error {
-	return nil
+func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource.CommitStatus, targetURL, description, context string) (bool, error) {
+	return false, nil
 }
 
 func (c *Client) ListUserRepos() ([]*gitsource.RepoInfo, error) {

@@ -367,3 +367,175 @@ func createRunWebhookDelivery(t *testing.T, ctx context.Context, ns *Notificatio
 
 	return wd
 }
+
+func TestCommitStatusDelivery(t *testing.T) {
+	t.Parallel()
+
+	t.Run("test commit status delivery success", func(t *testing.T) {
+		dir := t.TempDir()
+		log := testutil.NewLogger(t)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		ns := setupNotificationService(ctx, t, log, dir)
+
+		t.Logf("starting ns")
+
+		cs := setupStubCommitStatusUpdater()
+		ns.u = cs
+
+		commitStatuses := make([]*types.CommitStatus, MaxCommitStatusDeliveriesQueryLimit+10)
+		for i := 0; i < len(commitStatuses); i++ {
+			commitStatuses[i] = createCommitStatus(t, ctx, ns, i)
+			createCommitStatusDelivery(t, ctx, ns, commitStatuses[i].ID, types.DeliveryStatusNotDelivered)
+		}
+
+		if err := ns.commitStatusDeliveriesHandler(ctx); err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		commitStatusDeliveries := getCommitStatusDeliveries(t, ctx, ns)
+		if len(commitStatusDeliveries) != len(commitStatuses) {
+			t.Fatalf("expected %d commitStatus deliveries got: %d", len(commitStatuses), len(commitStatusDeliveries))
+		}
+		for i := 0; i < len(commitStatusDeliveries); i++ {
+			if commitStatusDeliveries[i].DeliveryStatus != types.DeliveryStatusDelivered {
+				t.Fatalf("expected commitStatus delivery status %q, got %q", types.DeliveryStatusDelivered, commitStatusDeliveries[i].DeliveryStatus)
+			}
+		}
+
+		commitStatusesReceived, err := cs.commitStatuses.getCommitStatuses()
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if len(commitStatusesReceived) != len(commitStatuses) {
+			t.Fatalf("expected %d run commitStatus got: %d", len(commitStatuses), len(commitStatusesReceived))
+		}
+		for i := 0; i < len(commitStatuses); i++ {
+			if commitStatusesReceived[i].Context != commitStatuses[i].Context {
+				t.Fatalf("expected %s commitStatus context got: %s", commitStatuses[i].Context, commitStatusesReceived[i].Context)
+			}
+
+			if commitStatusesReceived[i].Description != commitStatuses[i].Description {
+				t.Fatalf("expected %s commitStatus description got: %s", commitStatuses[i].Description, commitStatusesReceived[i].Description)
+			}
+
+			if commitStatusesReceived[i].State != commitStatuses[i].State {
+				t.Fatalf("expected %s commitStatus sate got: %s", commitStatuses[i].State, commitStatusesReceived[i].State)
+			}
+		}
+
+		// test commitstatuses handled previously.
+
+		cs.commitStatuses.resetCommitStatuses()
+
+		if err := ns.commitStatusDeliveriesHandler(ctx); err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		commitStatusesReceived, err = cs.commitStatuses.getCommitStatuses()
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if len(commitStatusesReceived) != 0 {
+			t.Fatalf("expected %d commit status got: %d", 0, len(commitStatusesReceived))
+		}
+	})
+
+	t.Run("test commit status delivery fail", func(t *testing.T) {
+		dir := t.TempDir()
+		log := testutil.NewLogger(t)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		ns := setupNotificationService(ctx, t, log, dir)
+
+		t.Logf("starting ns")
+
+		s := setupStubCommitStatusUpdater()
+		s.setFailUpdateCommitStatus(true)
+		ns.u = s
+
+		commitStatus := createCommitStatus(t, ctx, ns, 1)
+		createCommitStatusDelivery(t, ctx, ns, commitStatus.ID, types.DeliveryStatusNotDelivered)
+
+		if err := ns.commitStatusDeliveriesHandler(ctx); err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		commitStatusDeliveries := getCommitStatusDeliveries(t, ctx, ns)
+		if len(commitStatusDeliveries) != 1 {
+			t.Fatalf("expected %d commitStatus deliveries got: %d", 1, len(commitStatusDeliveries))
+		}
+		if commitStatusDeliveries[0].DeliveryStatus != types.DeliveryStatusDeliveryError {
+			t.Fatalf("expected commitStatus delivery status %q, got %q", types.DeliveryStatusDeliveryError, commitStatusDeliveries[0].DeliveryStatus)
+		}
+	})
+}
+
+func createCommitStatus(t *testing.T, ctx context.Context, ns *NotificationService, n int) *types.CommitStatus {
+	var cs *types.CommitStatus
+
+	err := ns.d.Do(ctx, func(tx *sql.Tx) error {
+		cs = types.NewCommitStatus(tx)
+		cs.CommitSHA = fmt.Sprintf("commitSHA-%d", n)
+		cs.Context = fmt.Sprintf("context-%d", n)
+		cs.Description = "The run finished successfully"
+		cs.ProjectID = fmt.Sprintf("projectID-%d", n)
+		cs.RunCounter = uint64(n)
+		cs.State = types.CommitStateSuccess
+
+		if err := ns.d.InsertCommitStatus(tx, cs); err != nil {
+			return errors.WithStack(err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	return cs
+}
+
+func getCommitStatusDeliveries(t *testing.T, ctx context.Context, ns *NotificationService) []*types.CommitStatusDelivery {
+	var wd []*types.CommitStatusDelivery
+
+	err := ns.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		wd, err = ns.d.GetCommitStatusDeliveriesAfterSequence(tx, 0, "", 0)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	return wd
+}
+
+func createCommitStatusDelivery(t *testing.T, ctx context.Context, ns *NotificationService, commitStatusID string, deliveryStatus types.DeliveryStatus) *types.CommitStatusDelivery {
+	var delivery *types.CommitStatusDelivery
+
+	err := ns.d.Do(ctx, func(tx *sql.Tx) error {
+		delivery = types.NewCommitStatusDelivery(tx)
+		delivery.DeliveryStatus = deliveryStatus
+		delivery.CommitStatusID = commitStatusID
+
+		if err := ns.d.InsertCommitStatusDelivery(tx, delivery); err != nil {
+			return errors.WithStack(err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	return delivery
+}

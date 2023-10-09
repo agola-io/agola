@@ -339,18 +339,23 @@ func (c *Client) DeleteRepoWebhook(repopath, u string) error {
 	return nil
 }
 
-func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource.CommitStatus, targetURL, description, statusContext string) error {
+func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource.CommitStatus, targetURL, description, statusContext string) (bool, error) {
 	owner, reponame, err := parseRepoPath(repopath)
 	if err != nil {
-		return errors.WithStack(err)
+		return false, errors.WithStack(err)
 	}
-	_, _, err = c.client.Repositories.CreateStatus(context.TODO(), owner, reponame, commitSHA, &github.RepoStatus{
+	_, resp, err := c.client.Repositories.CreateStatus(context.TODO(), owner, reponame, commitSHA, &github.RepoStatus{
 		State:       github.String(fromCommitStatus(status)),
 		TargetURL:   github.String(targetURL),
 		Description: github.String(description),
 		Context:     github.String(statusContext),
 	})
-	return errors.WithStack(err)
+
+	var delivered bool
+	if resp != nil {
+		delivered = resp.StatusCode == http.StatusCreated
+	}
+	return delivered, errors.WithStack(err)
 }
 
 func (c *Client) ListUserRepos() ([]*gitsource.RepoInfo, error) {

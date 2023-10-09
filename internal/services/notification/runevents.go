@@ -116,12 +116,14 @@ func (n *NotificationService) runEventsHandler(ctx context.Context) error {
 			}
 
 			var webhookPayload []byte
+			var commitStatus *commitStatus
 
 			// Currently we're handling only events of type runphasechanged.
 			switch ev.RunEventType {
 			case rstypes.RunPhaseChanged:
-				if err := n.updateCommitStatus(ctx, ev); err != nil {
-					n.log.Error().Msgf("failed to update commit status")
+				commitStatus, err = n.generateCommitStatus(ctx, ev)
+				if err != nil {
+					n.log.Error().Msgf("failed to generate commit status")
 				}
 				if n.c.WebhookURL != "" {
 					runWebhook := n.generatewebhook(ctx, ev)
@@ -143,6 +145,28 @@ func (n *NotificationService) runEventsHandler(ctx context.Context) error {
 					if ev.Sequence <= lastRunEventSequence.Value {
 						n.log.Error().Msgf("runEvent sequence %d already processed", ev.Sequence)
 						return nil
+					}
+				}
+
+				if commitStatus != nil {
+					cs := types.NewCommitStatus(tx)
+					cs.ProjectID = commitStatus.ProjectID
+					cs.State = commitStatus.State
+					cs.RunCounter = commitStatus.RunCounter
+					cs.CommitSHA = commitStatus.CommitSHA
+					cs.Description = commitStatus.Description
+					cs.Context = commitStatus.Context
+
+					if err := n.d.InsertCommitStatus(tx, cs); err != nil {
+						return errors.WithStack(err)
+					}
+
+					commitStatusDelivery := types.NewCommitStatusDelivery(tx)
+					commitStatusDelivery.CommitStatusID = cs.ID
+					commitStatusDelivery.DeliveryStatus = types.DeliveryStatusNotDelivered
+
+					if err := n.d.InsertCommitStatusDelivery(tx, commitStatusDelivery); err != nil {
+						return errors.WithStack(err)
 					}
 				}
 

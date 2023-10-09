@@ -227,14 +227,18 @@ func (c *Client) DeleteRepoWebhook(repopath, u string) error {
 	return nil
 }
 
-func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource.CommitStatus, targetURL, description, context string) error {
-	_, _, err := c.client.Commits.SetCommitStatus(repopath, commitSHA, &gitlab.SetCommitStatusOptions{
+func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource.CommitStatus, targetURL, description, context string) (bool, error) {
+	_, resp, err := c.client.Commits.SetCommitStatus(repopath, commitSHA, &gitlab.SetCommitStatusOptions{
 		State:       fromCommitStatus(status),
 		TargetURL:   gitlab.String(targetURL),
 		Description: gitlab.String(description),
 		Context:     gitlab.String(context),
 	})
-	return errors.WithStack(err)
+	var delivered bool
+	if resp != nil {
+		delivered = resp.StatusCode == http.StatusCreated
+	}
+	return delivered, errors.WithStack(err)
 }
 
 func (c *Client) ListUserRepos() ([]*gitsource.RepoInfo, error) {
