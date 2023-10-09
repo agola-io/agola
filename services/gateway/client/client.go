@@ -503,6 +503,17 @@ func (c *Client) GetProjectRun(ctx context.Context, projectRef string, runNumber
 	return c.getRun(ctx, "projects", projectRef, runNumber)
 }
 
+func (c *Client) ProjectRunAction(ctx context.Context, projectRef string, runNumber uint64, req *gwapitypes.RunActionsRequest) (*gwapitypes.RunResponse, *Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+
+	tresp := new(gwapitypes.RunResponse)
+	resp, err := c.getParsedResponse(ctx, "PUT", fmt.Sprintf("/projects/%s/runs/%d/actions", url.PathEscape(projectRef), runNumber), nil, jsonContent, bytes.NewReader(reqj), tresp)
+	return tresp, resp, errors.WithStack(err)
+}
+
 func (c *Client) GetUserRun(ctx context.Context, userRef string, runNumber uint64) (*gwapitypes.RunResponse, *Response, error) {
 	return c.getRun(ctx, "users", userRef, runNumber)
 }

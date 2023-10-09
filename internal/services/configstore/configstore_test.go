@@ -662,6 +662,33 @@ func TestProjectUpdate(t *testing.T) {
 			t.Fatalf("unexpected err: %v", err)
 		}
 	})
+	t.Run("test user project MembersCanPerformRunActions parameter", func(t *testing.T) {
+		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot set MembersCanPerformRunActions on an user project."))
+		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{
+			Name:                        "project03",
+			Parent:                      types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)},
+			Visibility:                  types.VisibilityPublic,
+			RemoteRepositoryConfigType:  types.RemoteRepositoryConfigTypeManual,
+			MembersCanPerformRunActions: true,
+		})
+		if err == nil {
+			t.Fatalf("expected error %v, got nil err", expectedErr)
+		}
+		if err.Error() != expectedErr.Error() {
+			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+		}
+
+		// test update user project
+
+		p01.MembersCanPerformRunActions = true
+		_, err = cs.ah.UpdateProject(ctx, path.Join("user", user.Name, "project01"), p01)
+		if err == nil {
+			t.Fatalf("expected error %v, got nil err", expectedErr)
+		}
+		if err.Error() != expectedErr.Error() {
+			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+		}
+	})
 }
 
 func TestProjectGroupUpdate(t *testing.T) {

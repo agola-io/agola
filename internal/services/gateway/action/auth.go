@@ -22,6 +22,7 @@ import (
 	scommon "agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
+	csapitypes "agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"
 )
 
@@ -182,13 +183,23 @@ func (h *ActionHandler) CanAuthUserGetRun(ctx context.Context, groupType scommon
 	return true, refID, nil
 }
 
-func (h *ActionHandler) CanAuthUserDoRunActions(ctx context.Context, groupType scommon.GroupType, ref string) (bool, string, error) {
+type actionType string
+
+const (
+	actionTypeRunAction  actionType = "runaction"
+	actionTypeTaskAction actionType = "taskaction"
+	actionTypeDeleteLogs actionType = "deletelogs"
+)
+
+func (h *ActionHandler) CanAuthUserDoRunActions(ctx context.Context, groupType scommon.GroupType, ref string, actionType actionType) (bool, string, error) {
 	var ownerType cstypes.ObjectKind
 	var refID string
 	var ownerID string
+	var p *csapitypes.Project
 	switch groupType {
 	case scommon.GroupTypeProject:
-		p, _, err := h.configstoreClient.GetProject(ctx, ref)
+		var err error
+		p, _, err = h.configstoreClient.GetProject(ctx, ref)
 		if err != nil {
 			return false, "", util.NewAPIError(util.KindFromRemoteError(err), err)
 		}
@@ -211,10 +222,22 @@ func (h *ActionHandler) CanAuthUserDoRunActions(ctx context.Context, groupType s
 	if err != nil {
 		return false, "", errors.Wrapf(err, "failed to determine ownership")
 	}
-	if !isProjectOwner {
-		return false, "", nil
+	if isProjectOwner {
+		return true, refID, nil
 	}
-	return true, refID, nil
+
+	if actionType == actionTypeRunAction && ownerType == cstypes.ObjectKindOrg {
+		userID := common.CurrentUserID(ctx)
+		isUserOrgMember, err := h.IsUserOrgMember(ctx, userID, ownerID)
+		if err != nil {
+			return false, "", errors.Wrapf(err, "failed to determine ownership")
+		}
+		if isUserOrgMember && p.MembersCanPerformRunActions {
+			return true, refID, nil
+		}
+	}
+
+	return false, "", nil
 }
 
 func (h *ActionHandler) IsUserOrgMember(ctx context.Context, userRef, orgRef string) (bool, error) {

@@ -103,6 +103,7 @@ const (
 const (
 	remoteErrorNotExist   = "remote error notexist"
 	remoteErrorBadRequest = "remote error badrequest"
+	remoteErrorForbidden  = "remote error forbidden"
 )
 
 func setupGitea(t *testing.T, dir, dockerBridgeAddress string) *testutil.TestGitea {
@@ -1029,27 +1030,7 @@ func TestCreateProject(t *testing.T) {
 func TestUpdateProject(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name               string
-		passVarsToForkedPR bool
-		expectedPre        bool
-		expectedPost       bool
-	}{
-		{
-			name:               "test project update with pass-vars-to-forked-pr true",
-			passVarsToForkedPR: true,
-			expectedPre:        false,
-			expectedPost:       true,
-		},
-		{
-			name:               "test project update with pass-vars-to-forked-pr false",
-			passVarsToForkedPR: false,
-			expectedPre:        false,
-			expectedPost:       false,
-		},
-	}
-
-	for _, tt := range tests {
+	t.Run("test update PassVarsToForkedPR in users's project", func(t *testing.T) {
 		dir := t.TempDir()
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -1070,17 +1051,202 @@ func TestUpdateProject(t *testing.T) {
 		gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
 
 		_, project := createProject(ctx, t, giteaClient, gwClient)
-		if project.PassVarsToForkedPR != tt.expectedPre {
-			t.Fatalf("expected PassVarsToForkedPR %v, got %v (pre-update)", tt.expectedPre, project.PassVarsToForkedPR)
+		if project.PassVarsToForkedPR != false {
+			t.Fatalf("expected PassVarsToForkedPR false, got %v", project.PassVarsToForkedPR)
 		}
-		project = updateProject(ctx, t, giteaClient, gwClient, project.ID, tt.passVarsToForkedPR)
-		if project.PassVarsToForkedPR != tt.expectedPost {
-			t.Fatalf("expected PassVarsToForkedPR %v, got %v (port-update)", tt.expectedPost, project.PassVarsToForkedPR)
+
+		project, _, err = gwClient.UpdateProject(ctx, project.ID, &gwapitypes.UpdateProjectRequest{
+			PassVarsToForkedPR: util.BoolP(false),
+		})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
 		}
+		if project.PassVarsToForkedPR != false {
+			t.Fatalf("expected PassVarsToForkedPR false, got %v", project.PassVarsToForkedPR)
+		}
+
+		project, _, err = gwClient.UpdateProject(ctx, project.ID, &gwapitypes.UpdateProjectRequest{
+			PassVarsToForkedPR: util.BoolP(true),
+		})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if project.PassVarsToForkedPR != true {
+			t.Fatalf("expected PassVarsToForkedPR false, got %v", project.PassVarsToForkedPR)
+		}
+	})
+
+	t.Run("test create users's project with MembersCanPerformRunActions true", func(t *testing.T) {
+		dir := t.TempDir()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		sc := setup(ctx, t, dir, withGitea(true))
+		defer sc.stop()
+
+		giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+
+		giteaToken, token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+
+		giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
+
+		giteaRepo, _, err := giteaClient.CreateRepo(gitea.CreateRepoOption{
+			Name:    "repo01",
+			Private: false,
+		})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		t.Logf("created gitea repo: %s", giteaRepo.Name)
+
+		req := &gwapitypes.CreateProjectRequest{
+			Name:                        "project01",
+			RemoteSourceName:            "gitea",
+			RepoPath:                    path.Join(giteaUser01, "repo01"),
+			Visibility:                  gwapitypes.VisibilityPublic,
+			MembersCanPerformRunActions: true,
+		}
+
+		_, _, err = gwClient.CreateProject(ctx, req)
+		if err == nil {
+			t.Fatalf("expected error %v, got nil err", remoteErrorBadRequest)
+		}
+		if err.Error() != remoteErrorBadRequest {
+			t.Fatalf("expected err %v, got err: %v", remoteErrorBadRequest, err)
+		}
+	})
+
+	t.Run("test update users's project with MembersCanPerformRunActions true", func(t *testing.T) {
+		dir := t.TempDir()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		sc := setup(ctx, t, dir, withGitea(true))
+		defer sc.stop()
+
+		giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+
+		giteaToken, token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+
+		giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
+
+		_, project := createProject(ctx, t, giteaClient, gwClient)
+		if project.MembersCanPerformRunActions != false {
+			t.Fatalf("expected MembersCanPerformRunActions false, got %v", project.MembersCanPerformRunActions)
+		}
+
+		_, _, err = gwClient.UpdateProject(ctx, project.ID, &gwapitypes.UpdateProjectRequest{
+			Name:                        &project.Name,
+			MembersCanPerformRunActions: util.BoolP(true),
+		})
+		if err == nil {
+			t.Fatalf("expected error %v, got nil err", remoteErrorBadRequest)
+		}
+		if err.Error() != remoteErrorBadRequest {
+			t.Fatalf("expected err %v, got err: %v", remoteErrorBadRequest, err)
+		}
+	})
+
+	t.Run("test create/update orgs's project", func(t *testing.T) {
+		dir := t.TempDir()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		sc := setup(ctx, t, dir, withGitea(true))
+		defer sc.stop()
+
+		giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+
+		giteaToken, token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+
+		giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
+
+		_, _, err = gwClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg01, Visibility: gwapitypes.VisibilityPublic})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		// test create org project with MembersCanPerformRunActions false
+		_, project := createProject(ctx, t, giteaClient, gwClient, withParentRef(path.Join("org", agolaOrg01)))
+		if project.MembersCanPerformRunActions != false {
+			t.Fatalf("expected MembersCanPerformRunActions false, got %v", project.MembersCanPerformRunActions)
+		}
+
+		// test update org project with MembersCanPerformRunActions true
+		project, _, err = gwClient.UpdateProject(ctx, project.ID, &gwapitypes.UpdateProjectRequest{
+			Name:                        &project.Name,
+			MembersCanPerformRunActions: util.BoolP(true),
+		})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if project.MembersCanPerformRunActions != true {
+			t.Fatalf("expected MembersCanPerformRunActions true, got %v", project.MembersCanPerformRunActions)
+		}
+
+		// test create org project with MembersCanPerformRunActions true
+		project, _, err = gwClient.CreateProject(ctx, &gwapitypes.CreateProjectRequest{
+			Name:                        "project02",
+			RemoteSourceName:            "gitea",
+			RepoPath:                    path.Join(giteaUser01, "repo01"),
+			Visibility:                  gwapitypes.VisibilityPublic,
+			ParentRef:                   path.Join("org", agolaOrg01),
+			MembersCanPerformRunActions: true,
+		})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if project.MembersCanPerformRunActions != true {
+			t.Fatalf("expected MembersCanPerformRunActions true, got %v", project.MembersCanPerformRunActions)
+		}
+
+		// test update org project with MembersCanPerformRunActions false
+		project, _, err = gwClient.UpdateProject(ctx, project.ID, &gwapitypes.UpdateProjectRequest{
+			Name:                        &project.Name,
+			MembersCanPerformRunActions: util.BoolP(false),
+		})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if project.MembersCanPerformRunActions != false {
+			t.Fatalf("expected MembersCanPerformRunActions false, got %v", project.MembersCanPerformRunActions)
+		}
+	})
+}
+
+type createProjectSetupOption func(*gwapitypes.CreateProjectRequest)
+
+func withParentRef(parentRef string) func(*gwapitypes.CreateProjectRequest) {
+	return func(p *gwapitypes.CreateProjectRequest) {
+		p.ParentRef = parentRef
 	}
 }
 
-func createProject(ctx context.Context, t *testing.T, giteaClient *gitea.Client, gwClient *gwclient.Client) (*gitea.Repository, *gwapitypes.ProjectResponse) {
+func withMembersCanPerformRunActions(membersCanPerformRunActions bool) func(*gwapitypes.CreateProjectRequest) {
+	return func(p *gwapitypes.CreateProjectRequest) {
+		p.MembersCanPerformRunActions = membersCanPerformRunActions
+	}
+}
+
+func createProject(ctx context.Context, t *testing.T, giteaClient *gitea.Client, gwClient *gwclient.Client, opts ...createProjectSetupOption) (*gitea.Repository, *gwapitypes.ProjectResponse) {
 	giteaRepo, _, err := giteaClient.CreateRepo(gitea.CreateRepoOption{
 		Name:    "repo01",
 		Private: false,
@@ -1090,13 +1256,20 @@ func createProject(ctx context.Context, t *testing.T, giteaClient *gitea.Client,
 	}
 	t.Logf("created gitea repo: %s", giteaRepo.Name)
 
-	project, _, err := gwClient.CreateProject(ctx, &gwapitypes.CreateProjectRequest{
+	// TODO currently RepoPath is always fixed and related to giteaUser01. Add withRepoPath function to make it configurable
+	req := &gwapitypes.CreateProjectRequest{
 		Name:             "project01",
 		ParentRef:        path.Join("user", agolaUser01),
 		RemoteSourceName: "gitea",
 		RepoPath:         path.Join(giteaUser01, "repo01"),
 		Visibility:       gwapitypes.VisibilityPublic,
-	})
+	}
+
+	for _, o := range opts {
+		o(req)
+	}
+
+	project, _, err := gwClient.CreateProject(ctx, req)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -6050,4 +6223,264 @@ func TestCommitStatusDelivery(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestProjectRunActions(t *testing.T) {
+	t.Parallel()
+
+	config := `
+		{
+			runs: [
+			{
+				name: 'run01',
+				tasks: [
+				{
+					name: 'task01',
+					runtime: {
+					containers: [
+						{
+						image: 'alpine/git',
+						},
+					],
+					},
+					steps: [
+					{ type: 'run', command: 'env' },
+					],
+				},
+				],
+			},
+			],
+		}
+	`
+	expectedErr := remoteErrorForbidden
+
+	t.Run("test run actions on org's project", func(t *testing.T) {
+		dir := t.TempDir()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		sc := setup(ctx, t, dir, withGitea(true))
+		defer sc.stop()
+
+		giteaToken, tokenUser01 := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+
+		giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+
+		giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		gwAdminClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
+		gwUser01Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01)
+
+		_, _, err = gwAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser02})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		token, _, err := gwAdminClient.CreateUserToken(ctx, agolaUser02, &gwapitypes.CreateUserTokenRequest{TokenName: "testtoken"})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		gwUser02Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token.Token)
+
+		_, _, err = gwAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser03})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		token, _, err = gwAdminClient.CreateUserToken(ctx, agolaUser03, &gwapitypes.CreateUserTokenRequest{TokenName: "testtoken"})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		gwUser03Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token.Token)
+
+		_, _, err = gwUser01Client.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg01, Visibility: gwapitypes.VisibilityPublic})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		_, _, err = gwUser01Client.AddOrgMember(ctx, agolaOrg01, agolaUser02, gwapitypes.MemberRoleMember)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		giteaRepo, project := createProject(ctx, t, giteaClient, gwUser01Client, withParentRef(path.Join("org", agolaOrg01)), withMembersCanPerformRunActions(true))
+
+		push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
+
+		// test org run actions executed by an user that's organization owner
+
+		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+			if err != nil {
+				return false, nil
+			}
+
+			if len(runs) == 0 {
+				return false, nil
+			}
+			if runs[0].Phase != rstypes.RunPhaseFinished {
+				return false, nil
+			}
+
+			return true, nil
+		})
+
+		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if len(runs) != 1 {
+			t.Fatalf("expected %d run got: %d", 1, len(runs))
+		}
+
+		if runs[0].Phase != rstypes.RunPhaseFinished {
+			t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, runs[0].Phase)
+		}
+		if runs[0].Result != rstypes.RunResultSuccess {
+			t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, runs[0].Result)
+		}
+
+		_, _, err = gwUser01Client.ProjectRunAction(ctx, project.ID, runs[0].Number, &gwapitypes.RunActionsRequest{
+			ActionType: gwapitypes.RunActionTypeRestart,
+			FromStart:  true,
+		})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		// test org run actions executed by an organization member type with project MembersCanPerformRunActions set to true
+
+		_, _, err = gwUser02Client.ProjectRunAction(ctx, project.ID, runs[0].Number, &gwapitypes.RunActionsRequest{
+			ActionType: gwapitypes.RunActionTypeRestart,
+			FromStart:  true,
+		})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		// test org run actions executed by an user that isn't organization member
+
+		_, _, err = gwUser03Client.ProjectRunAction(ctx, project.ID, runs[0].Number, &gwapitypes.RunActionsRequest{
+			ActionType: gwapitypes.RunActionTypeRestart,
+			FromStart:  true,
+		})
+		if err == nil {
+			t.Fatalf("expected error %v, got nil err", expectedErr)
+		}
+		if err.Error() != expectedErr {
+			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+		}
+
+		// test org run actions executed by an organization member type with MembersCanPerformRunActions false
+
+		_, _, err = gwUser01Client.UpdateProject(ctx, project.ID, &gwapitypes.UpdateProjectRequest{
+			MembersCanPerformRunActions: util.BoolP(false),
+		})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		_, _, err = gwUser02Client.ProjectRunAction(ctx, project.ID, runs[0].Number, &gwapitypes.RunActionsRequest{
+			ActionType: gwapitypes.RunActionTypeRestart,
+			FromStart:  true,
+		})
+		if err == nil {
+			t.Fatalf("expected error %v, got nil err", expectedErr)
+		}
+		if err.Error() != expectedErr {
+			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+		}
+	})
+
+	t.Run("test run actions on user's project", func(t *testing.T) {
+		dir := t.TempDir()
+
+		// for user project MembersCanPerformRunActions will be ignored
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		sc := setup(ctx, t, dir, withGitea(true))
+		defer sc.stop()
+
+		giteaToken, tokenUser01 := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+
+		gwAdminClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
+		gwUser01Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01)
+
+		_, _, err := gwAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser02})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		token, _, err := gwAdminClient.CreateUserToken(ctx, agolaUser02, &gwapitypes.CreateUserTokenRequest{TokenName: "testtoken"})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		gwUser02Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token.Token)
+
+		giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+
+		giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		giteaRepo, project := createProject(ctx, t, giteaClient, gwUser01Client)
+
+		push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
+
+		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+			if err != nil {
+				return false, nil
+			}
+
+			if len(runs) == 0 {
+				return false, nil
+			}
+			if runs[0].Phase != rstypes.RunPhaseFinished {
+				return false, nil
+			}
+
+			return true, nil
+		})
+
+		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if len(runs) != 1 {
+			t.Fatalf("expected %d run got: %d", 1, len(runs))
+		}
+
+		if runs[0].Phase != rstypes.RunPhaseFinished {
+			t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, runs[0].Phase)
+		}
+		if runs[0].Result != rstypes.RunResultSuccess {
+			t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, runs[0].Result)
+		}
+
+		_, _, err = gwUser01Client.ProjectRunAction(ctx, project.ID, runs[0].Number, &gwapitypes.RunActionsRequest{
+			ActionType: gwapitypes.RunActionTypeRestart,
+			FromStart:  true,
+		})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		// test user run actions unauthorized
+
+		_, _, err = gwUser02Client.ProjectRunAction(ctx, project.ID, runs[0].Number, &gwapitypes.RunActionsRequest{
+			ActionType: gwapitypes.RunActionTypeRestart,
+			FromStart:  true,
+		})
+		if err == nil {
+			t.Fatalf("expected error %v, got nil err", expectedErr)
+		}
+		if err.Error() != expectedErr {
+			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+		}
+	})
 }

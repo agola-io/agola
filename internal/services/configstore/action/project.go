@@ -93,6 +93,8 @@ type CreateUpdateProjectRequest struct {
 	SkipSSHHostKeyCheck        bool
 	PassVarsToForkedPR         bool
 	DefaultBranch              string
+	// MembersCanPerformRunActions defines if project organization members can restart/stop/cancel a project run
+	MembersCanPerformRunActions bool
 }
 
 func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateUpdateProjectRequest) (*types.Project, error) {
@@ -111,6 +113,14 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateUpdateProj
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group with id %q doesn't exist", req.Parent.ID))
 		}
 		req.Parent.ID = group.ID
+
+		ownerType, _, err := h.d.GetProjectGroupOwnerID(tx, group)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if ownerType == types.ObjectKindUser && req.MembersCanPerformRunActions {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot set MembersCanPerformRunActions on an user project."))
+		}
 
 		groupPath, err := h.d.GetProjectGroupPath(tx, group)
 		if err != nil {
@@ -163,6 +173,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateUpdateProj
 		project.SkipSSHHostKeyCheck = req.SkipSSHHostKeyCheck
 		project.PassVarsToForkedPR = req.PassVarsToForkedPR
 		project.DefaultBranch = req.DefaultBranch
+		project.MembersCanPerformRunActions = req.MembersCanPerformRunActions
 
 		// generate the Secret and the WebhookSecret
 		// TODO(sgotti) move this to the gateway?
@@ -208,6 +219,14 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, curProjectRef string,
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group with id %q doesn't exist", req.Parent.ID))
 		}
 		req.Parent.ID = group.ID
+
+		ownerType, _, err := h.d.GetProjectGroupOwnerID(tx, group)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if ownerType == types.ObjectKindUser && req.MembersCanPerformRunActions {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot set MembersCanPerformRunActions on an user project."))
+		}
 
 		groupPath, err := h.d.GetProjectGroupPath(tx, group)
 		if err != nil {
@@ -273,6 +292,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, curProjectRef string,
 		project.SkipSSHHostKeyCheck = req.SkipSSHHostKeyCheck
 		project.PassVarsToForkedPR = req.PassVarsToForkedPR
 		project.DefaultBranch = req.DefaultBranch
+		project.MembersCanPerformRunActions = req.MembersCanPerformRunActions
 
 		if err := h.d.UpdateProject(tx, project); err != nil {
 			return errors.WithStack(err)

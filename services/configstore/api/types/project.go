@@ -19,18 +19,19 @@ import (
 )
 
 type CreateUpdateProjectRequest struct {
-	Name                       string
-	Parent                     cstypes.Parent
-	Visibility                 cstypes.Visibility
-	RemoteRepositoryConfigType cstypes.RemoteRepositoryConfigType
-	RemoteSourceID             string
-	LinkedAccountID            string
-	RepositoryID               string
-	RepositoryPath             string
-	SSHPrivateKey              string
-	SkipSSHHostKeyCheck        bool
-	PassVarsToForkedPR         bool
-	DefaultBranch              string
+	Name                        string
+	Parent                      cstypes.Parent
+	Visibility                  cstypes.Visibility
+	RemoteRepositoryConfigType  cstypes.RemoteRepositoryConfigType
+	RemoteSourceID              string
+	LinkedAccountID             string
+	RepositoryID                string
+	RepositoryPath              string
+	SSHPrivateKey               string
+	SkipSSHHostKeyCheck         bool
+	PassVarsToForkedPR          bool
+	DefaultBranch               string
+	MembersCanPerformRunActions bool
 }
 
 // Project augments cstypes.Project with dynamic data

@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	Version = uint(2)
+	Version = uint(3)
 )
 
 const TypesImport = "agola.io/agola/services/configstore/types"
@@ -105,6 +105,7 @@ var ObjectsInfo = []sqlg.ObjectInfo{
 			{Name: "WebhookSecret", Type: "string"},
 			{Name: "PassVarsToForkedPR", Type: "bool"},
 			{Name: "DefaultBranch", Type: "string"},
+			{Name: "MembersCanPerformRunActions", Type: "bool"},
 		},
 	},
 	{Name: "Secret", Table: "secret",
