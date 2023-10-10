@@ -672,6 +672,9 @@ func TestMigrate(t *testing.T, lastVersion uint, dataFixtures DataFixtures, setu
 
 				assert.Assert(t, len(diff) == 0, "schema of db created at version %d and db migrated from version %d to version %d is different:\n %s", migrateVersion, createVersion, migrateVersion, diff)
 
+				// set the db schema at the migrated version.
+				dc.Schema = createDataCreate.Tables
+
 				createExport := &bytes.Buffer{}
 				export := &bytes.Buffer{}
 
