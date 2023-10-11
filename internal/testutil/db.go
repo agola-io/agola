@@ -448,6 +448,24 @@ func (c *DBContext) Export(ctx context.Context, tables []string, w io.Writer) er
 						return errors.WithStack(err)
 					}
 					switch colType {
+					case ColTypeBool:
+						switch vt := v.(type) {
+						case bool:
+							data.Values[col] = vt
+						case int64:
+							if vt != 0 && vt != 1 {
+								return errors.Errorf("unknown type int64 value %d for bool column type", vt)
+							}
+							data.Values[col] = vt != 0
+						case []uint8:
+							bv, err := strconv.ParseBool(string(vt))
+							if err != nil {
+								return errors.WithStack(err)
+							}
+							data.Values[col] = bv
+						default:
+							return errors.Errorf("unknown type %T for bool column type", v)
+						}
 					case ColTypeJSON:
 						var vj any
 						if err := json.Unmarshal(v.([]byte), &vj); err != nil {
