@@ -36,10 +36,6 @@ import (
 	_ "ariga.io/atlas/sql/sqlite/sqlitecheck"
 )
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
-
 func DBType(t *testing.T) sql.Type {
 	var dbType sql.Type
 	switch os.Getenv("DB_TYPE") {
