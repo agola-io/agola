@@ -11,15 +11,10 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/sorintlab/errors"
 	"gotest.tools/assert"
 )
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 func SetupDB(t *testing.T, ctx context.Context, dir string) *DB {
 	var dbType Type
