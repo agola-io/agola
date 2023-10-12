@@ -95,6 +95,56 @@ func (h *ActionHandler) GetOrgMembers(ctx context.Context, req *GetOrgMembersReq
 	}, nil
 }
 
+type GetOrgsRequest struct {
+	StartOrgName string
+	Visibilities []types.Visibility
+
+	Limit         int
+	SortDirection types.SortDirection
+}
+
+type GetOrgsResponse struct {
+	Orgs []*types.Organization
+
+	HasMore bool
+}
+
+func (h *ActionHandler) GetOrgs(ctx context.Context, req *GetOrgsRequest) (*GetOrgsResponse, error) {
+	limit := req.Limit
+	if limit > 0 {
+		limit += 1
+	}
+
+	visibilities := req.Visibilities
+	if len(visibilities) == 0 {
+		// default to only public visibility
+		visibilities = []types.Visibility{types.VisibilityPublic}
+	}
+
+	var orgs []*types.Organization
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		orgs, err = h.d.GetOrgs(tx, req.StartOrgName, visibilities, limit, req.SortDirection)
+		return errors.WithStack(err)
+	})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	var hasMore bool
+	if req.Limit > 0 {
+		hasMore = len(orgs) > req.Limit
+		if hasMore {
+			orgs = orgs[0:req.Limit]
+		}
+	}
+
+	return &GetOrgsResponse{
+		Orgs:    orgs,
+		HasMore: hasMore,
+	}, nil
+}
+
 type CreateOrgRequest struct {
 	Name          string
 	Visibility    types.Visibility

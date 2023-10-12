@@ -105,7 +105,7 @@ func getOrgs(ctx context.Context, cs *Configstore) ([]*types.Organization, error
 	var orgs []*types.Organization
 	err := cs.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		orgs, err = cs.d.GetOrgs(tx, "", 0, true)
+		orgs, err = cs.d.GetOrgs(tx, "", nil, 0, types.SortDirectionAsc)
 		return errors.WithStack(err)
 	})
 
@@ -1259,11 +1259,213 @@ func TestGetUsers(t *testing.T) {
 		}
 
 		expectedUsers = 9
-		if len(users) != expectedUsers {
-			t.Fatalf("expected %d users, got %d users", expectedUsers, len(users))
+		if len(respAllUsers) != expectedUsers {
+			t.Fatalf("expected %d users, got %d users", expectedUsers, len(respAllUsers))
 		}
 
 		if diff := cmpDiffObject(users, respAllUsers); diff != "" {
+			t.Fatalf("mismatch (-want +got):\n%s", diff)
+		}
+	})
+}
+
+func TestGetOrgs(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	ctx := context.Background()
+	log := testutil.NewLogger(t)
+
+	cs := setupConfigstore(ctx, t, log, dir)
+
+	t.Logf("starting cs")
+	go func() { _ = cs.Run(ctx) }()
+
+	allOrgs := []*types.Organization{}
+	publicOrgs := []*types.Organization{}
+	for i := 1; i < 19; i++ {
+		// mix public with private visiblity
+		visibility := types.VisibilityPublic
+		if i%2 == 0 {
+			visibility = types.VisibilityPrivate
+		}
+		org, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: fmt.Sprintf("org%02d", i), Visibility: visibility})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		allOrgs = append(allOrgs, org)
+		if visibility == types.VisibilityPublic {
+			publicOrgs = append(publicOrgs, org)
+		}
+	}
+
+	t.Run("test get all public orgs", func(t *testing.T) {
+		res, err := cs.ah.GetOrgs(ctx, &action.GetOrgsRequest{SortDirection: types.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		expectedOrgs := 9
+		if len(res.Orgs) != expectedOrgs {
+			t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(res.Orgs))
+		}
+		if res.HasMore {
+			t.Fatalf("expected hasMore false, got %t", res.HasMore)
+		}
+
+		if diff := cmpDiffObject(publicOrgs[:expectedOrgs], res.Orgs); diff != "" {
+			t.Fatalf("mismatch (-want +got):\n%s", diff)
+		}
+	})
+
+	t.Run("test get all public/private orgs", func(t *testing.T) {
+		res, err := cs.ah.GetOrgs(ctx, &action.GetOrgsRequest{Visibilities: []types.Visibility{types.VisibilityPublic, types.VisibilityPrivate}, SortDirection: types.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		expectedOrgs := 18
+		if len(res.Orgs) != expectedOrgs {
+			t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(res.Orgs))
+		}
+		if res.HasMore {
+			t.Fatalf("expected hasMore false, got %t", res.HasMore)
+		}
+
+		if diff := cmpDiffObject(allOrgs[:expectedOrgs], res.Orgs); diff != "" {
+			t.Fatalf("mismatch (-want +got):\n%s", diff)
+		}
+	})
+
+	t.Run("test get public orgs with limit less than orgs", func(t *testing.T) {
+		res, err := cs.ah.GetOrgs(ctx, &action.GetOrgsRequest{Limit: 5, SortDirection: types.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		expectedOrgs := 5
+		if len(res.Orgs) != expectedOrgs {
+			t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(res.Orgs))
+		}
+		if !res.HasMore {
+			t.Fatalf("expected hasMore true, got %t", res.HasMore)
+		}
+
+		if diff := cmpDiffObject(publicOrgs[:expectedOrgs], res.Orgs); diff != "" {
+			t.Fatalf("mismatch (-want +got):\n%s", diff)
+		}
+	})
+
+	t.Run("test get public/private orgs with limit less than orgs", func(t *testing.T) {
+		res, err := cs.ah.GetOrgs(ctx, &action.GetOrgsRequest{Limit: 5, Visibilities: []types.Visibility{types.VisibilityPublic, types.VisibilityPrivate}, SortDirection: types.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		expectedOrgs := 5
+		if len(res.Orgs) != expectedOrgs {
+			t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(res.Orgs))
+		}
+		if !res.HasMore {
+			t.Fatalf("expected hasMore true, got %t", res.HasMore)
+		}
+
+		if diff := cmpDiffObject(allOrgs[:expectedOrgs], res.Orgs); diff != "" {
+			t.Fatalf("mismatch (-want +got):\n%s", diff)
+		}
+	})
+
+	t.Run("test get public orgs with limit less than orgs continuation", func(t *testing.T) {
+		respAllOrgs := []*types.Organization{}
+
+		res, err := cs.ah.GetOrgs(ctx, &action.GetOrgsRequest{Limit: 5, SortDirection: types.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		expectedOrgs := 5
+		if len(res.Orgs) != expectedOrgs {
+			t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(res.Orgs))
+		}
+		if !res.HasMore {
+			t.Fatalf("expected hasMore true, got %t", res.HasMore)
+		}
+
+		respAllOrgs = append(respAllOrgs, res.Orgs...)
+		lastOrg := res.Orgs[len(res.Orgs)-1]
+
+		// fetch next results
+		for {
+			res, err = cs.ah.GetOrgs(ctx, &action.GetOrgsRequest{StartOrgName: lastOrg.Name, Limit: 5, SortDirection: types.SortDirectionAsc})
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			expectedOrgs := 5
+			if res.HasMore && len(res.Orgs) != expectedOrgs {
+				t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(res.Orgs))
+			}
+
+			respAllOrgs = append(respAllOrgs, res.Orgs...)
+
+			if !res.HasMore {
+				break
+			}
+
+			lastOrg = res.Orgs[len(res.Orgs)-1]
+		}
+
+		expectedOrgs = 9
+		if len(respAllOrgs) != expectedOrgs {
+			t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(respAllOrgs))
+		}
+
+		if diff := cmpDiffObject(publicOrgs, respAllOrgs); diff != "" {
+			t.Fatalf("mismatch (-want +got):\n%s", diff)
+		}
+	})
+
+	t.Run("test get public/private orgs with limit less than orgs continuation", func(t *testing.T) {
+		respAllOrgs := []*types.Organization{}
+
+		res, err := cs.ah.GetOrgs(ctx, &action.GetOrgsRequest{Limit: 5, Visibilities: []types.Visibility{types.VisibilityPublic, types.VisibilityPrivate}, SortDirection: types.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		expectedOrgs := 5
+		if len(res.Orgs) != expectedOrgs {
+			t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(res.Orgs))
+		}
+		if !res.HasMore {
+			t.Fatalf("expected hasMore true, got %t", res.HasMore)
+		}
+
+		respAllOrgs = append(respAllOrgs, res.Orgs...)
+		lastOrg := res.Orgs[len(res.Orgs)-1]
+
+		// fetch next results
+		for {
+			res, err = cs.ah.GetOrgs(ctx, &action.GetOrgsRequest{StartOrgName: lastOrg.Name, Visibilities: []types.Visibility{types.VisibilityPublic, types.VisibilityPrivate}, Limit: 5, SortDirection: types.SortDirectionAsc})
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			expectedOrgs := 5
+			if res.HasMore && len(res.Orgs) != expectedOrgs {
+				t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(res.Orgs))
+			}
+
+			respAllOrgs = append(respAllOrgs, res.Orgs...)
+
+			if !res.HasMore {
+				break
+			}
+
+			lastOrg = res.Orgs[len(res.Orgs)-1]
+		}
+
+		expectedOrgs = 18
+		if len(respAllOrgs) != expectedOrgs {
+			t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(respAllOrgs))
+		}
+
+		if diff := cmpDiffObject(allOrgs, respAllOrgs); diff != "" {
 			t.Fatalf("mismatch (-want +got):\n%s", diff)
 		}
 	})

@@ -184,7 +184,7 @@ func (s *Configstore) setupDefaultRouter() http.Handler {
 	userOrgsHandler := api.NewUserOrgsHandler(s.log, s.ah)
 
 	orgHandler := api.NewOrgHandler(s.log, s.d)
-	orgsHandler := api.NewOrgsHandler(s.log, s.d)
+	orgsHandler := api.NewOrgsHandler(s.log, s.ah)
 	createOrgHandler := api.NewCreateOrgHandler(s.log, s.ah)
 	updateOrgHandler := api.NewUpdateOrgHandler(s.log, s.ah)
 	deleteOrgHandler := api.NewDeleteOrgHandler(s.log, s.ah)
