@@ -363,7 +363,7 @@ func (d *DockerDriver) GetPods(ctx context.Context, all bool) ([]Pod, error) {
 		return nil, errors.WithStack(err)
 	}
 
-	volumes, err := d.client.VolumeList(ctx, args)
+	volumes, err := d.client.VolumeList(ctx, volume.ListOptions{Filters: args})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
