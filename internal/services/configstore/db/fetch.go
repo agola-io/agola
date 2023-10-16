@@ -818,7 +818,7 @@ func (d *DB) scanProject(rows *stdsql.Rows, skipFieldsCount uint) (*types.Projec
 		x.Init()
 	}
 
-	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Name, &v.Parent.Kind, &v.Parent.ID, &v.Secret, &v.Visibility, &v.RemoteRepositoryConfigType, &v.RemoteSourceID, &v.LinkedAccountID, &v.RepositoryID, &v.RepositoryPath, &v.SSHPrivateKey, &v.SkipSSHHostKeyCheck, &v.WebhookSecret, &v.PassVarsToForkedPR, &v.DefaultBranch})
+	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Name, &v.Parent.Kind, &v.Parent.ID, &v.Secret, &v.Visibility, &v.RemoteRepositoryConfigType, &v.RemoteSourceID, &v.LinkedAccountID, &v.RepositoryID, &v.RepositoryPath, &v.SSHPrivateKey, &v.SkipSSHHostKeyCheck, &v.WebhookSecret, &v.PassVarsToForkedPR, &v.DefaultBranch, &v.MembersCanPerformRunActions})
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))
@@ -877,6 +877,7 @@ func (d *DB) ProjectArray() []any {
 	a = append(a, new(string))
 	a = append(a, new(bool))
 	a = append(a, new(string))
+	a = append(a, new(bool))
 
 	return a
 }
@@ -907,6 +908,7 @@ func (d *DB) ProjectFromArray(a []any, txID string) (*types.Project, string, err
 	v.WebhookSecret = *a[16].(*string)
 	v.PassVarsToForkedPR = *a[17].(*bool)
 	v.DefaultBranch = *a[18].(*string)
+	v.MembersCanPerformRunActions = *a[19].(*bool)
 
 	if x, ok := vi.(sqlg.PreJSONSetupper); ok {
 		if err := x.PreJSON(); err != nil {

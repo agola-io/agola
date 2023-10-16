@@ -167,7 +167,7 @@ type DeleteLogsRequest struct {
 }
 
 func (h *ActionHandler) DeleteLogs(ctx context.Context, req *DeleteLogsRequest) error {
-	canDoRunActions, groupID, err := h.CanAuthUserDoRunActions(ctx, req.GroupType, req.Ref)
+	canDoRunActions, groupID, err := h.CanAuthUserDoRunActions(ctx, req.GroupType, req.Ref, actionTypeDeleteLogs)
 	if err != nil {
 		return errors.Wrapf(err, "failed to determine permissions")
 	}
@@ -208,7 +208,7 @@ type RunActionsRequest struct {
 }
 
 func (h *ActionHandler) RunAction(ctx context.Context, req *RunActionsRequest) (*rsapitypes.RunResponse, error) {
-	canDoRunActions, groupID, err := h.CanAuthUserDoRunActions(ctx, req.GroupType, req.Ref)
+	canDoRunActions, groupID, err := h.CanAuthUserDoRunActions(ctx, req.GroupType, req.Ref, actionTypeRunAction)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to determine permissions")
 	}
@@ -278,7 +278,7 @@ type RunTaskActionsRequest struct {
 }
 
 func (h *ActionHandler) RunTaskAction(ctx context.Context, req *RunTaskActionsRequest) error {
-	canDoRunAction, groupID, err := h.CanAuthUserDoRunActions(ctx, req.GroupType, req.Ref)
+	canDoRunAction, groupID, err := h.CanAuthUserDoRunActions(ctx, req.GroupType, req.Ref, actionTypeTaskAction)
 	if err != nil {
 		return errors.Wrapf(err, "failed to determine permissions")
 	}

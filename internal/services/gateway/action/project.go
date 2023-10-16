@@ -52,13 +52,14 @@ func (h *ActionHandler) GetProject(ctx context.Context, projectRef string) (*csa
 }
 
 type CreateProjectRequest struct {
-	Name                string
-	ParentRef           string
-	Visibility          cstypes.Visibility
-	RemoteSourceName    string
-	RepoPath            string
-	SkipSSHHostKeyCheck bool
-	PassVarsToForkedPR  bool
+	Name                        string
+	ParentRef                   string
+	Visibility                  cstypes.Visibility
+	RemoteSourceName            string
+	RepoPath                    string
+	SkipSSHHostKeyCheck         bool
+	PassVarsToForkedPR          bool
+	MembersCanPerformRunActions bool
 }
 
 func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectRequest) (*csapitypes.Project, error) {
@@ -128,16 +129,17 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 			Kind: cstypes.ObjectKindProjectGroup,
 			ID:   parentRef,
 		},
-		Visibility:                 req.Visibility,
-		RemoteRepositoryConfigType: cstypes.RemoteRepositoryConfigTypeRemoteSource,
-		RemoteSourceID:             rs.ID,
-		LinkedAccountID:            la.ID,
-		RepositoryID:               repo.ID,
-		RepositoryPath:             req.RepoPath,
-		SSHPrivateKey:              string(privateKey),
-		SkipSSHHostKeyCheck:        req.SkipSSHHostKeyCheck,
-		PassVarsToForkedPR:         req.PassVarsToForkedPR,
-		DefaultBranch:              repo.DefaultBranch,
+		Visibility:                  req.Visibility,
+		RemoteRepositoryConfigType:  cstypes.RemoteRepositoryConfigTypeRemoteSource,
+		RemoteSourceID:              rs.ID,
+		LinkedAccountID:             la.ID,
+		RepositoryID:                repo.ID,
+		RepositoryPath:              req.RepoPath,
+		SSHPrivateKey:               string(privateKey),
+		SkipSSHHostKeyCheck:         req.SkipSSHHostKeyCheck,
+		PassVarsToForkedPR:          req.PassVarsToForkedPR,
+		DefaultBranch:               repo.DefaultBranch,
+		MembersCanPerformRunActions: req.MembersCanPerformRunActions,
 	}
 
 	h.log.Info().Msgf("creating project")
@@ -170,8 +172,9 @@ type UpdateProjectRequest struct {
 	Name      *string
 	ParentRef *string
 
-	Visibility         *cstypes.Visibility
-	PassVarsToForkedPR *bool
+	Visibility                  *cstypes.Visibility
+	PassVarsToForkedPR          *bool
+	MembersCanPerformRunActions *bool
 }
 
 func (h *ActionHandler) UpdateProject(ctx context.Context, projectRef string, req *UpdateProjectRequest) (*csapitypes.Project, error) {
@@ -200,20 +203,24 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, projectRef string, re
 	if req.PassVarsToForkedPR != nil {
 		p.PassVarsToForkedPR = *req.PassVarsToForkedPR
 	}
+	if req.MembersCanPerformRunActions != nil {
+		p.MembersCanPerformRunActions = *req.MembersCanPerformRunActions
+	}
 
 	creq := &csapitypes.CreateUpdateProjectRequest{
-		Name:                       p.Name,
-		Parent:                     p.Parent,
-		Visibility:                 p.Visibility,
-		RemoteRepositoryConfigType: p.RemoteRepositoryConfigType,
-		RemoteSourceID:             p.RemoteSourceID,
-		LinkedAccountID:            p.LinkedAccountID,
-		RepositoryID:               p.RepositoryID,
-		RepositoryPath:             p.RepositoryPath,
-		SSHPrivateKey:              p.SSHPrivateKey,
-		SkipSSHHostKeyCheck:        p.SkipSSHHostKeyCheck,
-		PassVarsToForkedPR:         p.PassVarsToForkedPR,
-		DefaultBranch:              p.DefaultBranch,
+		Name:                        p.Name,
+		Parent:                      p.Parent,
+		Visibility:                  p.Visibility,
+		RemoteRepositoryConfigType:  p.RemoteRepositoryConfigType,
+		RemoteSourceID:              p.RemoteSourceID,
+		LinkedAccountID:             p.LinkedAccountID,
+		RepositoryID:                p.RepositoryID,
+		RepositoryPath:              p.RepositoryPath,
+		SSHPrivateKey:               p.SSHPrivateKey,
+		SkipSSHHostKeyCheck:         p.SkipSSHHostKeyCheck,
+		PassVarsToForkedPR:          p.PassVarsToForkedPR,
+		DefaultBranch:               p.DefaultBranch,
+		MembersCanPerformRunActions: p.MembersCanPerformRunActions,
 	}
 
 	h.log.Info().Msgf("updating project")

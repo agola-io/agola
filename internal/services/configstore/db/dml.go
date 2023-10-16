@@ -949,7 +949,7 @@ func (d *DB) insertRawProjectGroup(tx *sql.Tx, v *types.ProjectGroup) error {
 
 var (
 	projectSelectColumns = func(additionalCols ...string) []string {
-		columns := []string{"project.id", "project.revision", "project.creation_time", "project.update_time", "project.name", "project.parent_kind", "project.parent_id", "project.secret", "project.visibility", "project.remote_repository_config_type", "project.remote_source_id", "project.linked_account_id", "project.repository_id", "project.repository_path", "project.ssh_private_key", "project.skip_ssh_host_key_check", "project.webhook_secret", "project.pass_vars_to_forked_pr", "project.default_branch"}
+		columns := []string{"project.id", "project.revision", "project.creation_time", "project.update_time", "project.name", "project.parent_kind", "project.parent_id", "project.secret", "project.visibility", "project.remote_repository_config_type", "project.remote_source_id", "project.linked_account_id", "project.repository_id", "project.repository_path", "project.ssh_private_key", "project.skip_ssh_host_key_check", "project.webhook_secret", "project.pass_vars_to_forked_pr", "project.default_branch", "project.members_can_perform_run_actions"}
 		columns = append(columns, additionalCols...)
 
 		return columns

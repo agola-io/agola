@@ -13,6 +13,7 @@ import (
 func (d *DB) MigrateFuncs() map[uint]sqlg.MigrateFunc {
 	return map[uint]sqlg.MigrateFunc{
 		2: d.migrateV2,
+		3: d.migrateV3,
 	}
 }
 
@@ -105,6 +106,37 @@ func (d *DB) migrateV2(tx *sql.Tx) error {
 	}
 	if err := d.cleanUnreferenced(tx, "orginvitation", "organization_id", "organization", "id"); err != nil {
 		return errors.WithStack(err)
+	}
+
+	for _, stmt := range stmts {
+		if _, err := tx.Exec(stmt); err != nil {
+			return errors.WithStack(err)
+		}
+	}
+
+	return nil
+}
+
+func (d *DB) migrateV3(tx *sql.Tx) error {
+	var ddlPostgres = []string{
+		"ALTER TABLE project ADD COLUMN members_can_perform_run_actions boolean",
+		"UPDATE project SET members_can_perform_run_actions=false",
+		"ALTER TABLE project ALTER COLUMN members_can_perform_run_actions SET NOT NULL",
+	}
+
+	var ddlSqlite3 = []string{
+		"CREATE TABLE new_project (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamp NOT NULL, update_time timestamp NOT NULL, name varchar NOT NULL, parent_kind varchar NOT NULL, parent_id varchar NOT NULL, secret varchar NOT NULL, visibility varchar NOT NULL, remote_repository_config_type varchar NOT NULL, remote_source_id varchar NOT NULL, linked_account_id varchar NOT NULL, repository_id varchar NOT NULL, repository_path varchar NOT NULL, ssh_private_key varchar NOT NULL, skip_ssh_host_key_check integer NOT NULL, webhook_secret varchar NOT NULL, pass_vars_to_forked_pr integer NOT NULL, default_branch varchar NOT NULL, members_can_perform_run_actions integer NOT NULL, PRIMARY KEY (id))",
+		"INSERT INTO new_project SELECT *, false AS members_can_perform_run_actions FROM project",
+		"DROP TABLE project",
+		"ALTER TABLE new_project RENAME TO project",
+	}
+
+	var stmts []string
+	switch d.sdb.Type() {
+	case sql.Postgres:
+		stmts = ddlPostgres
+	case sql.Sqlite3:
+		stmts = ddlSqlite3
 	}
 
 	for _, stmt := range stmts {

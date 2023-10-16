@@ -171,18 +171,19 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	}
 
 	areq := &action.CreateUpdateProjectRequest{
-		Name:                       req.Name,
-		Parent:                     req.Parent,
-		Visibility:                 req.Visibility,
-		RemoteRepositoryConfigType: req.RemoteRepositoryConfigType,
-		RemoteSourceID:             req.RemoteSourceID,
-		LinkedAccountID:            req.LinkedAccountID,
-		RepositoryID:               req.RepositoryID,
-		RepositoryPath:             req.RepositoryPath,
-		SSHPrivateKey:              req.SSHPrivateKey,
-		SkipSSHHostKeyCheck:        req.SkipSSHHostKeyCheck,
-		PassVarsToForkedPR:         req.PassVarsToForkedPR,
-		DefaultBranch:              req.DefaultBranch,
+		Name:                        req.Name,
+		Parent:                      req.Parent,
+		Visibility:                  req.Visibility,
+		RemoteRepositoryConfigType:  req.RemoteRepositoryConfigType,
+		RemoteSourceID:              req.RemoteSourceID,
+		LinkedAccountID:             req.LinkedAccountID,
+		RepositoryID:                req.RepositoryID,
+		RepositoryPath:              req.RepositoryPath,
+		SSHPrivateKey:               req.SSHPrivateKey,
+		SkipSSHHostKeyCheck:         req.SkipSSHHostKeyCheck,
+		PassVarsToForkedPR:          req.PassVarsToForkedPR,
+		DefaultBranch:               req.DefaultBranch,
+		MembersCanPerformRunActions: req.MembersCanPerformRunActions,
 	}
 
 	project, err := h.ah.CreateProject(ctx, areq)
@@ -230,18 +231,19 @@ func (h *UpdateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	}
 
 	areq := &action.CreateUpdateProjectRequest{
-		Name:                       req.Name,
-		Parent:                     req.Parent,
-		Visibility:                 req.Visibility,
-		RemoteRepositoryConfigType: req.RemoteRepositoryConfigType,
-		RemoteSourceID:             req.RemoteSourceID,
-		LinkedAccountID:            req.LinkedAccountID,
-		RepositoryID:               req.RepositoryID,
-		RepositoryPath:             req.RepositoryPath,
-		SSHPrivateKey:              req.SSHPrivateKey,
-		SkipSSHHostKeyCheck:        req.SkipSSHHostKeyCheck,
-		PassVarsToForkedPR:         req.PassVarsToForkedPR,
-		DefaultBranch:              req.DefaultBranch,
+		Name:                        req.Name,
+		Parent:                      req.Parent,
+		Visibility:                  req.Visibility,
+		RemoteRepositoryConfigType:  req.RemoteRepositoryConfigType,
+		RemoteSourceID:              req.RemoteSourceID,
+		LinkedAccountID:             req.LinkedAccountID,
+		RepositoryID:                req.RepositoryID,
+		RepositoryPath:              req.RepositoryPath,
+		SSHPrivateKey:               req.SSHPrivateKey,
+		SkipSSHHostKeyCheck:         req.SkipSSHHostKeyCheck,
+		PassVarsToForkedPR:          req.PassVarsToForkedPR,
+		DefaultBranch:               req.DefaultBranch,
+		MembersCanPerformRunActions: req.MembersCanPerformRunActions,
 	}
 
 	project, err := h.ah.UpdateProject(ctx, projectRef, areq)

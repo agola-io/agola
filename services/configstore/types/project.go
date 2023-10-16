@@ -81,6 +81,8 @@ type Project struct {
 	PassVarsToForkedPR bool `json:"pass_vars_to_forked_pr,omitempty"`
 
 	DefaultBranch string `json:"default_branch,omitempty"`
+
+	MembersCanPerformRunActions bool `json:"members_can_perform_run_actions,omitempty"`
 }
 
 func NewProject(tx *sql.Tx) *Project {
