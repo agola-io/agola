@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/sorintlab/errors"
-	yaml "gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v3"
 
 	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/internal/util"
