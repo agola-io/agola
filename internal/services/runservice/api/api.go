@@ -488,6 +488,18 @@ func NewRunByGroupHandler(log zerolog.Logger, d *db.DB, ah *action.ActionHandler
 }
 
 func (h *RunByGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(w, r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *RunByGroupHandler) do(w http.ResponseWriter, r *http.Request) (*rsapitypes.RunResponse, error) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 
@@ -496,22 +508,20 @@ func (h *RunByGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	group, err := url.PathUnescape(vars["group"])
 	if err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("group is empty")))
-		return
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("group is empty"))
 	}
 
 	runCounterStr := vars["runcounter"]
 
 	var runCounter uint64
 	if runCounterStr == "" {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("runcounter is empty")))
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("runcounter is empty"))
 	}
 	if runCounterStr != "" {
 		var err error
 		runCounter, err = strconv.ParseUint(runCounterStr, 10, 64)
 		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse runcounter")))
-			return
+			return nil, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse runcounter"))
 		}
 	}
 
@@ -539,23 +549,19 @@ func (h *RunByGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return errors.WithStack(err)
 	})
 	if err != nil {
-		h.log.Err(err).Send()
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return nil, errors.WithStack(err)
 	}
 	if run == nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("run for group %q with counter %d doesn't exist", group, runCounter)))
+		return nil, util.NewAPIError(util.ErrNotExist, errors.Errorf("run for group %q with counter %d doesn't exist", group, runCounter))
 	}
 
 	if rc == nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("run config for run with id %q doesn't exist", run.ID)))
-		return
+		return nil, util.NewAPIError(util.ErrNotExist, errors.Errorf("run config for run with id %q doesn't exist", run.ID))
 	}
 
 	cgts, err := types.MarshalChangeGroupsUpdateToken(cgt)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return nil, errors.WithStack(err)
 	}
 
 	res := &rsapitypes.RunResponse{
@@ -564,10 +570,7 @@ func (h *RunByGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ChangeGroupsUpdateToken: cgts,
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
-		h.log.Err(err).Send()
-	}
-
+	return res, nil
 }
 
 const (
