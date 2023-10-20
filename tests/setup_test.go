@@ -5780,6 +5780,39 @@ func TestGetProjectRuns(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("test get not existing run", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		sc := setup(ctx, t, dir, withGitea(true))
+		defer sc.stop()
+
+		giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+
+		giteaToken, token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+
+		giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
+
+		_, project := createProject(ctx, t, giteaClient, gwClient)
+
+		_, _, err = gwClient.GetProjectRun(ctx, project.ID, 1)
+		if err == nil {
+			t.Fatalf("expected error %v, got nil err", remoteErrorNotExist)
+		}
+		if err.Error() != remoteErrorNotExist {
+			t.Fatalf("expected err %v, got err: %v", remoteErrorNotExist, err)
+		}
+	})
 }
 
 func TestRunEventsNotification(t *testing.T) {
