@@ -343,6 +343,10 @@ func setup(ctx context.Context, t *testing.T, dir string, opts ...setupOption) *
 				Type:       dbType,
 				ConnString: notificationDBConnString,
 			},
+			Web: config.Web{
+				ListenAddress: ":4004",
+				TLS:           false,
+			},
 		},
 		Runservice: config.Runservice{
 			Debug:   false,
@@ -456,6 +460,10 @@ func setup(ctx context.Context, t *testing.T, dir string, opts ...setupOption) *
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
+	nsPort, err := testutil.GetFreePort(dockerBridgeAddress, true, false)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 	gitServerPort, err := testutil.GetFreePort(dockerBridgeAddress, true, false)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -470,6 +478,7 @@ func setup(ctx context.Context, t *testing.T, dir string, opts ...setupOption) *
 	sc.config.Configstore.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, csPort)
 	sc.config.Runservice.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, rsPort)
 	sc.config.Executor.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, exPort)
+	sc.config.Notification.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, nsPort)
 	sc.config.Gitserver.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, gitServerPort)
 
 	sc.config.Gateway.APIExposedURL = gwURL
