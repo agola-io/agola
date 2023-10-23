@@ -308,12 +308,13 @@ func setup(ctx context.Context, t *testing.T, dir string, opts ...setupOption) *
 	sc.config = &config.Config{
 		ID: "agola",
 		Gateway: config.Gateway{
-			Debug:          false,
-			APIExposedURL:  "",
-			WebExposedURL:  "",
-			RunserviceURL:  "",
-			ConfigstoreURL: "",
-			GitserverURL:   "",
+			Debug:           false,
+			APIExposedURL:   "",
+			WebExposedURL:   "",
+			RunserviceURL:   "",
+			ConfigstoreURL:  "",
+			GitserverURL:    "",
+			NotificationURL: "",
 			Web: config.Web{
 				ListenAddress: "",
 				TLS:           false,
@@ -342,6 +343,10 @@ func setup(ctx context.Context, t *testing.T, dir string, opts ...setupOption) *
 			DB: config.DB{
 				Type:       dbType,
 				ConnString: notificationDBConnString,
+			},
+			Web: config.Web{
+				ListenAddress: ":4004",
+				TLS:           false,
 			},
 		},
 		Runservice: config.Runservice{
@@ -419,10 +424,12 @@ func setup(ctx context.Context, t *testing.T, dir string, opts ...setupOption) *
 		executorAPIToken := "executorapitoken"
 		configstoreAPIToken := "configstoreapitoken"
 		gitserverAPIToken := "gitserverapitoken"
+		notificationAPIToken := "notificationserverapitoken"
 
 		sc.config.Gateway.RunserviceAPIToken = runserviceAPIToken
 		sc.config.Gateway.ConfigstoreAPIToken = configstoreAPIToken
 		sc.config.Gateway.GitserverAPIToken = gitserverAPIToken
+		sc.config.Gateway.NotificationAPIToken = notificationAPIToken
 
 		sc.config.Scheduler.RunserviceAPIToken = runserviceAPIToken
 
@@ -460,23 +467,30 @@ func setup(ctx context.Context, t *testing.T, dir string, opts ...setupOption) *
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
+	nsPort, err := testutil.GetFreePort(dockerBridgeAddress, true, false)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 
 	gwURL := fmt.Sprintf("http://%s:%s", dockerBridgeAddress, gwPort)
 	csURL := fmt.Sprintf("http://%s:%s", dockerBridgeAddress, csPort)
 	rsURL := fmt.Sprintf("http://%s:%s", dockerBridgeAddress, rsPort)
 	gitServerURL := fmt.Sprintf("http://%s:%s", dockerBridgeAddress, gitServerPort)
+	nsURL := fmt.Sprintf("http://%s:%s", dockerBridgeAddress, nsPort)
 
 	sc.config.Gateway.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, gwPort)
 	sc.config.Configstore.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, csPort)
 	sc.config.Runservice.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, rsPort)
 	sc.config.Executor.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, exPort)
 	sc.config.Gitserver.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, gitServerPort)
+	sc.config.Notification.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, nsPort)
 
 	sc.config.Gateway.APIExposedURL = gwURL
 	sc.config.Gateway.WebExposedURL = gwURL
 	sc.config.Gateway.RunserviceURL = rsURL
 	sc.config.Gateway.ConfigstoreURL = csURL
 	sc.config.Gateway.GitserverURL = gitServerURL
+	sc.config.Gateway.NotificationURL = nsURL
 
 	sc.config.Scheduler.RunserviceURL = rsURL
 

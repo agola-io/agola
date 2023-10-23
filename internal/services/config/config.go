@@ -53,9 +53,10 @@ type Config struct {
 	// This is used for generating the redirect_url in oauth2 redirects
 	WebExposedURL string `yaml:"webExposedURL"`
 
-	RunserviceURL  string `yaml:"runserviceURL"`
-	ConfigstoreURL string `yaml:"configstoreURL"`
-	GitserverURL   string `yaml:"gitserverURL"`
+	RunserviceURL   string `yaml:"runserviceURL"`
+	ConfigstoreURL  string `yaml:"configstoreURL"`
+	GitserverURL    string `yaml:"gitserverURL"`
+	NotificationURL string `yaml:"notificationURL"`
 
 	// InternalServicesAPIToken is a global api token for internal services (for
 	// both servers and clients)
@@ -65,10 +66,11 @@ type Config struct {
 	// Global internal services api tokens to avoid repeating them for every
 	// service (for both servers and clients)
 	// If empty their value will be set to InternalServicesAPIToken
-	RunserviceAPIToken  string `yaml:"runserviceAPIToken"`
-	ExecutorAPIToken    string `yaml:"executorAPIToken"`
-	ConfigstoreAPIToken string `yaml:"configstoreAPIToken"`
-	GitserverAPIToken   string `yaml:"gitserverAPIToken"`
+	RunserviceAPIToken   string `yaml:"runserviceAPIToken"`
+	ExecutorAPIToken     string `yaml:"executorAPIToken"`
+	ConfigstoreAPIToken  string `yaml:"configstoreAPIToken"`
+	GitserverAPIToken    string `yaml:"gitserverAPIToken"`
+	NotificationAPIToken string `yaml:"notificationAPIToken"`
 }
 
 type Gateway struct {
@@ -81,12 +83,14 @@ type Gateway struct {
 	// This is used for generating the redirect_url in oauth2 redirects
 	WebExposedURL string `yaml:"webExposedURL"`
 
-	RunserviceURL       string `yaml:"runserviceURL"`
-	RunserviceAPIToken  string `yaml:"runserviceAPIToken"`
-	ConfigstoreURL      string `yaml:"configstoreURL"`
-	ConfigstoreAPIToken string `yaml:"configstoreAPIToken"`
-	GitserverURL        string `yaml:"gitserverURL"`
-	GitserverAPIToken   string `yaml:"gitserverAPIToken"`
+	RunserviceURL        string `yaml:"runserviceURL"`
+	RunserviceAPIToken   string `yaml:"runserviceAPIToken"`
+	ConfigstoreURL       string `yaml:"configstoreURL"`
+	ConfigstoreAPIToken  string `yaml:"configstoreAPIToken"`
+	GitserverURL         string `yaml:"gitserverURL"`
+	GitserverAPIToken    string `yaml:"gitserverAPIToken"`
+	NotificationURL      string `yaml:"notificationURL"`
+	NotificationAPIToken string `yaml:"notificationAPIToken"`
 
 	Web           Web           `yaml:"web"`
 	ObjectStorage ObjectStorage `yaml:"objectStorage"`
@@ -123,6 +127,10 @@ type Notification struct {
 	ConfigstoreAPIToken string `yaml:"configstoreAPIToken"`
 
 	DB DB `yaml:"db"`
+
+	Web Web `yaml:"web"`
+
+	APIToken string `yaml:"apiToken"`
 
 	WebhookURL    string `yaml:"webhookURL"`
 	WebhookSecret string `yaml:"webhookSecret"`
@@ -377,6 +385,9 @@ func Parse(configFile string, componentsNames []string) (*Config, error) {
 	if c.GitserverAPIToken == "" {
 		c.GitserverAPIToken = c.InternalServicesAPIToken
 	}
+	if c.NotificationAPIToken == "" {
+		c.NotificationAPIToken = c.InternalServicesAPIToken
+	}
 
 	// Use global values if service values are empty
 	if c.Gateway.APIExposedURL == "" {
@@ -403,6 +414,12 @@ func Parse(configFile string, componentsNames []string) (*Config, error) {
 	if c.Gateway.GitserverAPIToken == "" {
 		c.Gateway.GitserverAPIToken = c.GitserverAPIToken
 	}
+	if c.Gateway.NotificationURL == "" {
+		c.Gateway.NotificationURL = c.NotificationURL
+	}
+	if c.Gateway.NotificationAPIToken == "" {
+		c.Gateway.NotificationAPIToken = c.NotificationAPIToken
+	}
 
 	if c.Runservice.APIToken == "" {
 		c.Runservice.APIToken = c.RunserviceAPIToken
@@ -422,6 +439,9 @@ func Parse(configFile string, componentsNames []string) (*Config, error) {
 		c.Scheduler.RunserviceAPIToken = c.RunserviceAPIToken
 	}
 
+	if c.Notification.APIToken == "" {
+		c.Notification.APIToken = c.NotificationAPIToken
+	}
 	if c.Notification.WebExposedURL == "" {
 		c.Notification.WebExposedURL = c.WebExposedURL
 	}
