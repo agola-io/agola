@@ -45,7 +45,7 @@ func (d *DB) scanRunWebhook(rows *stdsql.Rows, skipFieldsCount uint) (*types.Run
 		x.Init()
 	}
 
-	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Payload})
+	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Payload, &v.ProjectID})
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))
@@ -90,6 +90,7 @@ func (d *DB) RunWebhookArray() []any {
 	a = append(a, new(time.Time))
 	a = append(a, new(time.Time))
 	a = append(a, new([]byte))
+	a = append(a, new(string))
 
 	return a
 }
@@ -106,6 +107,7 @@ func (d *DB) RunWebhookFromArray(a []any, txID string) (*types.RunWebhook, strin
 	v.CreationTime = *a[2].(*time.Time)
 	v.UpdateTime = *a[3].(*time.Time)
 	v.Payload = *a[4].(*[]byte)
+	v.ProjectID = *a[5].(*string)
 
 	if x, ok := vi.(sqlg.PreJSONSetupper); ok {
 		if err := x.PreJSON(); err != nil {

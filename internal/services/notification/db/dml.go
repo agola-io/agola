@@ -18,7 +18,7 @@ import (
 
 var (
 	runWebhookSelectColumns = func(additionalCols ...string) []string {
-		columns := []string{"runwebhook.id", "runwebhook.revision", "runwebhook.creation_time", "runwebhook.update_time", "runwebhook.payload"}
+		columns := []string{"runwebhook.id", "runwebhook.revision", "runwebhook.creation_time", "runwebhook.update_time", "runwebhook.payload", "runwebhook.project_id"}
 		columns = append(columns, additionalCols...)
 
 		return columns

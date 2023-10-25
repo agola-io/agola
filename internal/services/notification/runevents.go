@@ -25,6 +25,7 @@ import (
 
 	"github.com/sorintlab/errors"
 
+	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/sqlg/lock"
 	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/services/notification/types"
@@ -171,8 +172,11 @@ func (n *NotificationService) runEventsHandler(ctx context.Context) error {
 				}
 
 				if webhookPayload != nil {
+					data := ev.Data.(*rstypes.RunEventData)
+
 					wh := types.NewRunWebhook(tx)
 					wh.Payload = webhookPayload
+					wh.ProjectID = data.Annotations[action.AnnotationProjectID]
 
 					if err := n.d.InsertRunWebhook(tx, wh); err != nil {
 						return errors.WithStack(err)

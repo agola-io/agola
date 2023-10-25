@@ -29,7 +29,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/sorintlab/errors"
 
-	"agola.io/agola/internal/services/notification"
+	"agola.io/agola/internal/services/notification/types"
 	"agola.io/agola/internal/testutil"
 	"agola.io/agola/internal/util"
 )
@@ -60,7 +60,7 @@ type webhooks struct {
 }
 
 type webhook struct {
-	webhookData *notification.RunWebhook
+	webhookData *types.RunWebhook
 	signature   string
 }
 
@@ -74,7 +74,7 @@ func (ws *webhooks) getWebhooks() ([]*webhook, error) {
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to copy webhooks")
 		}
-		v := nr.(*notification.RunWebhook)
+		v := nr.(*types.RunWebhook)
 
 		retVal[i] = &webhook{webhookData: v, signature: w.signature}
 	}
@@ -187,7 +187,7 @@ func newHandleWebhookHandler(log zerolog.Logger, webhooks *webhooks) *handleWebh
 }
 
 func (h *handleWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	var req *notification.RunWebhook
+	var req *types.RunWebhook
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
 		h.log.Err(err).Send()

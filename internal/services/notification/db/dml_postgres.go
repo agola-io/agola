@@ -13,23 +13,23 @@ import (
 	types "agola.io/agola/services/notification/types"
 )
 var (
-	runWebhookInsertPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inPayload []byte) *sq.InsertBuilder {
+	runWebhookInsertPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inPayload []byte, inProjectId string) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("runwebhook").Cols("id", "revision", "creation_time", "update_time", "payload").Values(inId, inRevision, inCreationTime, inUpdateTime, inPayload)
+		return ib.InsertInto("runwebhook").Cols("id", "revision", "creation_time", "update_time", "payload", "project_id").Values(inId, inRevision, inCreationTime, inUpdateTime, inPayload, inProjectId)
 	}
-	runWebhookUpdatePostgres = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inPayload []byte) *sq.UpdateBuilder {
+	runWebhookUpdatePostgres = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inPayload []byte, inProjectId string) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("runwebhook").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("payload", inPayload)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("runwebhook").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("payload", inPayload), ub.Assign("project_id", inProjectId)).Where(ub.E("id", inId), ub.E("revision", curRevision))
 	}
 
-	runWebhookInsertRawPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inPayload []byte) *sq.InsertBuilder {
+	runWebhookInsertRawPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inPayload []byte, inProjectId string) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("runwebhook").Cols("id", "revision", "creation_time", "update_time", "payload").SQL("OVERRIDING SYSTEM VALUE").Values(inId, inRevision, inCreationTime, inUpdateTime, inPayload)
+		return ib.InsertInto("runwebhook").Cols("id", "revision", "creation_time", "update_time", "payload", "project_id").SQL("OVERRIDING SYSTEM VALUE").Values(inId, inRevision, inCreationTime, inUpdateTime, inPayload, inProjectId)
 	}
 )
 
 func (d *DB) insertRunWebhookPostgres(tx *sql.Tx, runwebhook *types.RunWebhook) error {
-	q := runWebhookInsertPostgres(runwebhook.ID, runwebhook.Revision, runwebhook.CreationTime, runwebhook.UpdateTime, runwebhook.Payload)
+	q := runWebhookInsertPostgres(runwebhook.ID, runwebhook.Revision, runwebhook.CreationTime, runwebhook.UpdateTime, runwebhook.Payload, runwebhook.ProjectID)
 
 	if _, err := d.exec(tx, q); err != nil {
 		return errors.Wrap(err, "failed to insert runWebhook")
@@ -39,7 +39,7 @@ func (d *DB) insertRunWebhookPostgres(tx *sql.Tx, runwebhook *types.RunWebhook) 
 }
 
 func (d *DB) updateRunWebhookPostgres(tx *sql.Tx, curRevision uint64, runwebhook *types.RunWebhook) (stdsql.Result, error) {
-	q := runWebhookUpdatePostgres(curRevision, runwebhook.ID, runwebhook.Revision, runwebhook.CreationTime, runwebhook.UpdateTime, runwebhook.Payload)
+	q := runWebhookUpdatePostgres(curRevision, runwebhook.ID, runwebhook.Revision, runwebhook.CreationTime, runwebhook.UpdateTime, runwebhook.Payload, runwebhook.ProjectID)
 
 	res, err := d.exec(tx, q)
 	if err != nil {
@@ -50,7 +50,7 @@ func (d *DB) updateRunWebhookPostgres(tx *sql.Tx, curRevision uint64, runwebhook
 }
 
 func (d *DB) insertRawRunWebhookPostgres(tx *sql.Tx, runwebhook *types.RunWebhook) error {
-	q := runWebhookInsertRawPostgres(runwebhook.ID, runwebhook.Revision, runwebhook.CreationTime, runwebhook.UpdateTime, runwebhook.Payload)
+	q := runWebhookInsertRawPostgres(runwebhook.ID, runwebhook.Revision, runwebhook.CreationTime, runwebhook.UpdateTime, runwebhook.Payload, runwebhook.ProjectID)
 
 	if _, err := d.exec(tx, q); err != nil {
 		return errors.Wrap(err, "failed to insert runWebhook")
@@ -59,18 +59,18 @@ func (d *DB) insertRawRunWebhookPostgres(tx *sql.Tx, runwebhook *types.RunWebhoo
 	return nil
 }
 var (
-	runWebhookDeliveryInsertPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inRunWebhookID string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time, inStatusCode int) *sq.InsertBuilder {
+	runWebhookDeliveryInsertPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inRunWebhookId string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time, inStatusCode int) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("runwebhookdelivery").Cols("id", "revision", "creation_time", "update_time", "run_webhook_id", "delivery_status", "delivered_at", "status_code").Values(inId, inRevision, inCreationTime, inUpdateTime, inRunWebhookID, inDeliveryStatus, inDeliveredAt, inStatusCode)
+		return ib.InsertInto("runwebhookdelivery").Cols("id", "revision", "creation_time", "update_time", "run_webhook_id", "delivery_status", "delivered_at", "status_code").Values(inId, inRevision, inCreationTime, inUpdateTime, inRunWebhookId, inDeliveryStatus, inDeliveredAt, inStatusCode)
 	}
-	runWebhookDeliveryUpdatePostgres = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inRunWebhookID string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time, inStatusCode int) *sq.UpdateBuilder {
+	runWebhookDeliveryUpdatePostgres = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inRunWebhookId string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time, inStatusCode int) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("runwebhookdelivery").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("run_webhook_id", inRunWebhookID), ub.Assign("delivery_status", inDeliveryStatus), ub.Assign("delivered_at", inDeliveredAt), ub.Assign("status_code", inStatusCode)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("runwebhookdelivery").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("run_webhook_id", inRunWebhookId), ub.Assign("delivery_status", inDeliveryStatus), ub.Assign("delivered_at", inDeliveredAt), ub.Assign("status_code", inStatusCode)).Where(ub.E("id", inId), ub.E("revision", curRevision))
 	}
 
-	runWebhookDeliveryInsertRawPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inRunWebhookID string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time, inStatusCode int) *sq.InsertBuilder {
+	runWebhookDeliveryInsertRawPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inRunWebhookId string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time, inStatusCode int) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("runwebhookdelivery").Cols("id", "revision", "creation_time", "update_time", "sequence", "run_webhook_id", "delivery_status", "delivered_at", "status_code").SQL("OVERRIDING SYSTEM VALUE").Values(inId, inRevision, inCreationTime, inUpdateTime, inSequence, inRunWebhookID, inDeliveryStatus, inDeliveredAt, inStatusCode)
+		return ib.InsertInto("runwebhookdelivery").Cols("id", "revision", "creation_time", "update_time", "sequence", "run_webhook_id", "delivery_status", "delivered_at", "status_code").SQL("OVERRIDING SYSTEM VALUE").Values(inId, inRevision, inCreationTime, inUpdateTime, inSequence, inRunWebhookId, inDeliveryStatus, inDeliveredAt, inStatusCode)
 	}
 )
 
@@ -151,18 +151,18 @@ func (d *DB) insertRawLastRunEventSequencePostgres(tx *sql.Tx, lastruneventseque
 	return nil
 }
 var (
-	commitStatusInsertPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inProjectID string, inState types.CommitState, inCommitSHA string, inRunCounter uint64, inDescription string, inContext string) *sq.InsertBuilder {
+	commitStatusInsertPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inProjectId string, inState types.CommitState, inCommitSha string, inRunCounter uint64, inDescription string, inContext string) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("commitstatus").Cols("id", "revision", "creation_time", "update_time", "project_id", "state", "commit_sha", "run_counter", "description", "context").Values(inId, inRevision, inCreationTime, inUpdateTime, inProjectID, inState, inCommitSHA, inRunCounter, inDescription, inContext)
+		return ib.InsertInto("commitstatus").Cols("id", "revision", "creation_time", "update_time", "project_id", "state", "commit_sha", "run_counter", "description", "context").Values(inId, inRevision, inCreationTime, inUpdateTime, inProjectId, inState, inCommitSha, inRunCounter, inDescription, inContext)
 	}
-	commitStatusUpdatePostgres = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inProjectID string, inState types.CommitState, inCommitSHA string, inRunCounter uint64, inDescription string, inContext string) *sq.UpdateBuilder {
+	commitStatusUpdatePostgres = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inProjectId string, inState types.CommitState, inCommitSha string, inRunCounter uint64, inDescription string, inContext string) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("commitstatus").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("project_id", inProjectID), ub.Assign("state", inState), ub.Assign("commit_sha", inCommitSHA), ub.Assign("run_counter", inRunCounter), ub.Assign("description", inDescription), ub.Assign("context", inContext)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("commitstatus").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("project_id", inProjectId), ub.Assign("state", inState), ub.Assign("commit_sha", inCommitSha), ub.Assign("run_counter", inRunCounter), ub.Assign("description", inDescription), ub.Assign("context", inContext)).Where(ub.E("id", inId), ub.E("revision", curRevision))
 	}
 
-	commitStatusInsertRawPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inProjectID string, inState types.CommitState, inCommitSHA string, inRunCounter uint64, inDescription string, inContext string) *sq.InsertBuilder {
+	commitStatusInsertRawPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inProjectId string, inState types.CommitState, inCommitSha string, inRunCounter uint64, inDescription string, inContext string) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("commitstatus").Cols("id", "revision", "creation_time", "update_time", "project_id", "state", "commit_sha", "run_counter", "description", "context").SQL("OVERRIDING SYSTEM VALUE").Values(inId, inRevision, inCreationTime, inUpdateTime, inProjectID, inState, inCommitSHA, inRunCounter, inDescription, inContext)
+		return ib.InsertInto("commitstatus").Cols("id", "revision", "creation_time", "update_time", "project_id", "state", "commit_sha", "run_counter", "description", "context").SQL("OVERRIDING SYSTEM VALUE").Values(inId, inRevision, inCreationTime, inUpdateTime, inProjectId, inState, inCommitSha, inRunCounter, inDescription, inContext)
 	}
 )
 
@@ -197,18 +197,18 @@ func (d *DB) insertRawCommitStatusPostgres(tx *sql.Tx, commitstatus *types.Commi
 	return nil
 }
 var (
-	commitStatusDeliveryInsertPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inCommitStatusID string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time) *sq.InsertBuilder {
+	commitStatusDeliveryInsertPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inCommitStatusId string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("commitstatusdelivery").Cols("id", "revision", "creation_time", "update_time", "commit_status_id", "delivery_status", "delivered_at").Values(inId, inRevision, inCreationTime, inUpdateTime, inCommitStatusID, inDeliveryStatus, inDeliveredAt)
+		return ib.InsertInto("commitstatusdelivery").Cols("id", "revision", "creation_time", "update_time", "commit_status_id", "delivery_status", "delivered_at").Values(inId, inRevision, inCreationTime, inUpdateTime, inCommitStatusId, inDeliveryStatus, inDeliveredAt)
 	}
-	commitStatusDeliveryUpdatePostgres = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inCommitStatusID string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time) *sq.UpdateBuilder {
+	commitStatusDeliveryUpdatePostgres = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inCommitStatusId string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("commitstatusdelivery").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("commit_status_id", inCommitStatusID), ub.Assign("delivery_status", inDeliveryStatus), ub.Assign("delivered_at", inDeliveredAt)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("commitstatusdelivery").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("commit_status_id", inCommitStatusId), ub.Assign("delivery_status", inDeliveryStatus), ub.Assign("delivered_at", inDeliveredAt)).Where(ub.E("id", inId), ub.E("revision", curRevision))
 	}
 
-	commitStatusDeliveryInsertRawPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inCommitStatusID string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time) *sq.InsertBuilder {
+	commitStatusDeliveryInsertRawPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inCommitStatusId string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("commitstatusdelivery").Cols("id", "revision", "creation_time", "update_time", "sequence", "commit_status_id", "delivery_status", "delivered_at").SQL("OVERRIDING SYSTEM VALUE").Values(inId, inRevision, inCreationTime, inUpdateTime, inSequence, inCommitStatusID, inDeliveryStatus, inDeliveredAt)
+		return ib.InsertInto("commitstatusdelivery").Cols("id", "revision", "creation_time", "update_time", "sequence", "commit_status_id", "delivery_status", "delivered_at").SQL("OVERRIDING SYSTEM VALUE").Values(inId, inRevision, inCreationTime, inUpdateTime, inSequence, inCommitStatusId, inDeliveryStatus, inDeliveredAt)
 	}
 )
 

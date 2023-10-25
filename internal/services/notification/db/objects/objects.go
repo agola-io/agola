@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	Version = uint(3)
+	Version = uint(4)
 )
 
 const TypesImport = "agola.io/agola/services/notification/types"
@@ -17,6 +17,7 @@ var ObjectsInfo = []sqlg.ObjectInfo{
 		Name: "RunWebhook", Table: "runwebhook",
 		Fields: []sqlg.ObjectField{
 			{Name: "Payload", Type: "[]byte"},
+			{Name: "ProjectID", Type: "string"},
 		},
 	},
 	{
