@@ -28,6 +28,8 @@ import (
 	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/handlers"
+	"agola.io/agola/internal/services/notification/action"
+	"agola.io/agola/internal/services/notification/api"
 	"agola.io/agola/internal/services/notification/db"
 	"agola.io/agola/internal/sqlg/lock"
 	"agola.io/agola/internal/sqlg/manager"
@@ -44,6 +46,7 @@ type NotificationService struct {
 	c   *config.Notification
 	d   *db.DB
 	lf  lock.LockFactory
+	ah  *action.ActionHandler
 
 	runserviceClient  *rsclient.Client
 	configstoreClient *csclient.Client
@@ -110,10 +113,15 @@ func NewNotificationService(ctx context.Context, log zerolog.Logger, gc *config.
 		u:                 u,
 	}
 
+	ah := action.NewActionHandler(log, d, lf)
+	n.ah = ah
+
 	return n, nil
 }
 
 func (n *NotificationService) setupDefaultRouter() http.Handler {
+	runWebhookDeliveriesHandler := api.NewRunWebhookDeliveriesHandler(n.log, n.ah)
+
 	authHandler := handlers.NewInternalAuthChecker(n.log, n.c.APIToken)
 
 	router := mux.NewRouter().UseEncodedPath().SkipClean(true)
@@ -123,6 +131,8 @@ func (n *NotificationService) setupDefaultRouter() http.Handler {
 
 	// don't return 404 on a call to an undefined handler but 400 to distinguish between a non existent resource and a wrong method
 	apirouter.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusBadRequest) })
+
+	apirouter.Handle("/projects/{projectid}/runwebhookdeliveries", runWebhookDeliveriesHandler).Methods("GET")
 
 	mainrouter := mux.NewRouter().UseEncodedPath().SkipClean(true)
 	mainrouter.PathPrefix("/").Handler(router)

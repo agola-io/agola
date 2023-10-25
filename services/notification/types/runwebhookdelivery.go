@@ -3,6 +3,8 @@ package types
 import (
 	"time"
 
+	"github.com/sorintlab/errors"
+
 	"agola.io/agola/internal/sqlg"
 	"agola.io/agola/internal/sqlg/sql"
 )
@@ -14,6 +16,20 @@ const (
 	DeliveryStatusDelivered     DeliveryStatus = "delivered"
 	DeliveryStatusDeliveryError DeliveryStatus = "deliveryError"
 )
+
+func DeliveryStatusFromStringSlice(slice []string) ([]DeliveryStatus, error) {
+	dss := make([]DeliveryStatus, len(slice))
+	for i, s := range slice {
+		val := DeliveryStatus(s)
+		switch val {
+		case DeliveryStatusNotDelivered, DeliveryStatusDelivered, DeliveryStatusDeliveryError:
+			dss[i] = val
+		default:
+			return nil, errors.Errorf("invalid delivery status %q", val)
+		}
+	}
+	return dss, nil
+}
 
 type RunWebhookDelivery struct {
 	sqlg.ObjectMeta

@@ -71,7 +71,7 @@ func (n *NotificationService) runWebhookDeliveriesHandler(ctx context.Context) e
 
 		err := n.d.Do(ctx, func(tx *sql.Tx) error {
 			var err error
-			runWebhookDeliveries, err = n.d.GetRunWebhookDeliveriesAfterSequence(tx, curRunWebhookDeliverySequence, types.DeliveryStatusNotDelivered, MaxRunWebhookDeliveriesQueryLimit)
+			runWebhookDeliveries, err = n.d.GetProjectRunWebhookDeliveriesAfterSequenceByProjectID(tx, curRunWebhookDeliverySequence, "", []types.DeliveryStatus{types.DeliveryStatusNotDelivered}, MaxRunWebhookDeliveriesQueryLimit, types.SortDirectionAsc)
 			if err != nil {
 				return errors.WithStack(err)
 			}

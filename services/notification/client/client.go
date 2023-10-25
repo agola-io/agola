@@ -17,6 +17,7 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -26,11 +27,36 @@ import (
 
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/common"
+	"agola.io/agola/services/notification/types"
 )
 
 const (
 	agolaHasMoreHeader = "X-Agola-HasMore"
 )
+
+type ListOptions struct {
+	Limit         int
+	SortDirection types.SortDirection
+}
+
+func (o *ListOptions) Add(q url.Values) {
+	if o == nil {
+		return
+	}
+
+	if o.Limit != 0 {
+		q.Add("limit", strconv.Itoa(o.Limit))
+	}
+
+	switch o.SortDirection {
+	case types.SortDirectionDesc:
+		q.Add("sortdirection", "desc")
+	case types.SortDirectionAsc:
+		fallthrough
+	default:
+		q.Add("sortdirection", "asc")
+	}
+}
 
 type Response struct {
 	*http.Response
@@ -84,4 +110,32 @@ func (c *Client) GetParsedResponse(ctx context.Context, method, path string, que
 	d := json.NewDecoder(resp.Body)
 
 	return resp, errors.WithStack(d.Decode(obj))
+}
+
+type GetProjectRunWebhookDeliveriesOptions struct {
+	*ListOptions
+
+	StartSequence        uint64
+	DeliveryStatusFilter []string
+}
+
+func (o *GetProjectRunWebhookDeliveriesOptions) Add(q url.Values) {
+	o.ListOptions.Add(q)
+
+	if o.StartSequence > 0 {
+		q.Add("startsequence", strconv.FormatUint(o.StartSequence, 10))
+	}
+}
+
+func (c *Client) GetProjectRunWebhookDeliveries(ctx context.Context, projectID string, opts *GetProjectRunWebhookDeliveriesOptions) ([]*types.RunWebhookDelivery, *Response, error) {
+	q := url.Values{}
+	opts.Add(q)
+
+	for _, deliveryStatus := range opts.DeliveryStatusFilter {
+		q.Add("deliverystatus", deliveryStatus)
+	}
+
+	runWebhookDeliveries := []*types.RunWebhookDelivery{}
+	resp, err := c.GetParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s/runwebhookdeliveries", projectID), q, common.JSONContent, nil, &runWebhookDeliveries)
+	return runWebhookDeliveries, resp, errors.WithStack(err)
 }

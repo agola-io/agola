@@ -83,12 +83,40 @@ func mustSingleRow[T any](s []*T) (*T, error) {
 	return s[0], nil
 }
 
-func (d *DB) GetRunWebhookDeliveriesAfterSequence(tx *sql.Tx, afterSequence uint64, deliveryStatus types.DeliveryStatus, limit int) ([]*types.RunWebhookDelivery, error) {
+func (d *DB) GetProjectRunWebhookDeliveriesAfterSequence(tx *sql.Tx, afterSequence uint64, limit int) ([]*types.RunWebhookDelivery, error) {
 	q := runWebhookDeliverySelect().OrderBy("sequence").Asc()
-	if deliveryStatus != "" {
-		q.Where(q.E("delivery_status", deliveryStatus))
-	}
 	q.Where(q.G("sequence", afterSequence))
+	if limit > 0 {
+		q.Limit(limit)
+	}
+
+	runWebhookDeliveries, _, err := d.fetchRunWebhookDeliverys(tx, q)
+	return runWebhookDeliveries, errors.WithStack(err)
+}
+
+func (d *DB) GetProjectRunWebhookDeliveriesAfterSequenceByProjectID(tx *sql.Tx, afterSequence uint64, projectID string, deliveryStatusFilter []types.DeliveryStatus, limit int, sortDirection types.SortDirection) ([]*types.RunWebhookDelivery, error) {
+	q := runWebhookDeliverySelect().OrderBy("sequence")
+
+	if projectID != "" {
+		q.Join("runwebhook", "runwebhook.id = runwebhookdelivery.run_webhook_id")
+		q.Where(q.E("runwebhook.project_id", projectID))
+	}
+	if len(deliveryStatusFilter) > 0 {
+		q.Where(q.In("delivery_status", sq.Flatten(deliveryStatusFilter)...))
+	}
+
+	switch sortDirection {
+	case types.SortDirectionAsc:
+		q.Asc()
+	case types.SortDirectionDesc:
+		q.Desc()
+	}
+	switch sortDirection {
+	case types.SortDirectionAsc:
+		q.Where(q.G("sequence", afterSequence))
+	case types.SortDirectionDesc:
+		q.Where(q.L("sequence", afterSequence))
+	}
 
 	if limit > 0 {
 		q.Limit(limit)
