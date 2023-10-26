@@ -19,6 +19,7 @@ import (
 
 	scommon "agola.io/agola/internal/services/common"
 	csclient "agola.io/agola/services/configstore/client"
+	nsclient "agola.io/agola/services/notification/client"
 	rsclient "agola.io/agola/services/runservice/client"
 )
 
@@ -35,6 +36,7 @@ type ActionHandler struct {
 	sc                           *scommon.CookieSigningData
 	configstoreClient            *csclient.Client
 	runserviceClient             *rsclient.Client
+	notificationClient           *nsclient.Client
 	agolaID                      string
 	apiExposedURL                string
 	webExposedURL                string
@@ -49,13 +51,14 @@ const (
 	OrganizationMemberAddingModeInvitation OrganizationMemberAddingMode = "invitation"
 )
 
-func NewActionHandler(log zerolog.Logger, sd *scommon.TokenSigningData, sc *scommon.CookieSigningData, configstoreClient *csclient.Client, runserviceClient *rsclient.Client, agolaID, apiExposedURL, webExposedURL string, unsecureCookies bool, organizationMemberAddingMode OrganizationMemberAddingMode) *ActionHandler {
+func NewActionHandler(log zerolog.Logger, sd *scommon.TokenSigningData, sc *scommon.CookieSigningData, configstoreClient *csclient.Client, runserviceClient *rsclient.Client, notificationClient *nsclient.Client, agolaID, apiExposedURL, webExposedURL string, unsecureCookies bool, organizationMemberAddingMode OrganizationMemberAddingMode) *ActionHandler {
 	return &ActionHandler{
 		log:                          log,
 		sd:                           sd,
 		sc:                           sc,
 		configstoreClient:            configstoreClient,
 		runserviceClient:             runserviceClient,
+		notificationClient:           notificationClient,
 		agolaID:                      agolaID,
 		apiExposedURL:                apiExposedURL,
 		webExposedURL:                webExposedURL,

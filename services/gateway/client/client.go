@@ -29,6 +29,7 @@ import (
 	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/util"
+	"agola.io/agola/services/common"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 )
 
@@ -809,4 +810,17 @@ func (c *Client) Export(ctx context.Context, serviceName string) (*Response, err
 
 func (c *Client) Import(ctx context.Context, serviceName string, r io.Reader) (*Response, error) {
 	return c.getResponse(ctx, "POST", fmt.Sprintf("/import/%s", serviceName), nil, jsonContent, r)
+}
+
+func (c *Client) GetProjectRunWebhookDeliveries(ctx context.Context, projectRef string, deliveryStatusFilter []string, opts *ListOptions) ([]*gwapitypes.RunWebhookDeliveryResponse, *Response, error) {
+	q := url.Values{}
+	opts.Add(q)
+
+	for _, deliveryStatus := range deliveryStatusFilter {
+		q.Add("deliverystatus", deliveryStatus)
+	}
+
+	runWebhookDeliveries := []*gwapitypes.RunWebhookDeliveryResponse{}
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s/runwebhookdeliveries", url.PathEscape(projectRef)), q, common.JSONContent, nil, &runWebhookDeliveries)
+	return runWebhookDeliveries, resp, errors.WithStack(err)
 }

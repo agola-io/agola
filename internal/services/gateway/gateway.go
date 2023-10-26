@@ -39,6 +39,7 @@ import (
 	"agola.io/agola/internal/services/gateway/handlers"
 	"agola.io/agola/internal/util"
 	csclient "agola.io/agola/services/configstore/client"
+	nsclient "agola.io/agola/services/notification/client"
 	rsclient "agola.io/agola/services/runservice/client"
 )
 
@@ -50,12 +51,13 @@ type Gateway struct {
 	log zerolog.Logger
 	c   *config.Gateway
 
-	ost               *objectstorage.ObjStorage
-	runserviceClient  *rsclient.Client
-	configstoreClient *csclient.Client
-	ah                *action.ActionHandler
-	sd                *scommon.TokenSigningData
-	sc                *scommon.CookieSigningData
+	ost                *objectstorage.ObjStorage
+	runserviceClient   *rsclient.Client
+	configstoreClient  *csclient.Client
+	notificationClient *nsclient.Client
+	ah                 *action.ActionHandler
+	sd                 *scommon.TokenSigningData
+	sc                 *scommon.CookieSigningData
 }
 
 func NewGateway(ctx context.Context, log zerolog.Logger, gc *config.Config) (*Gateway, error) {
@@ -129,18 +131,20 @@ func NewGateway(ctx context.Context, log zerolog.Logger, gc *config.Config) (*Ga
 
 	configstoreClient := csclient.NewClient(c.ConfigstoreURL, c.ConfigstoreAPIToken)
 	runserviceClient := rsclient.NewClient(c.RunserviceURL, c.RunserviceAPIToken)
+	notificationClient := nsclient.NewClient(c.NotificationURL, c.NotificationAPIToken)
 
-	ah := action.NewActionHandler(log, sd, sc, configstoreClient, runserviceClient, gc.ID, c.APIExposedURL, c.WebExposedURL, c.UnsecureCookies, action.OrganizationMemberAddingMode(c.OrganizationMemberAddingMode))
+	ah := action.NewActionHandler(log, sd, sc, configstoreClient, runserviceClient, notificationClient, gc.ID, c.APIExposedURL, c.WebExposedURL, c.UnsecureCookies, action.OrganizationMemberAddingMode(c.OrganizationMemberAddingMode))
 
 	return &Gateway{
-		log:               log,
-		c:                 c,
-		ost:               ost,
-		runserviceClient:  runserviceClient,
-		configstoreClient: configstoreClient,
-		ah:                ah,
-		sd:                sd,
-		sc:                sc,
+		log:                log,
+		c:                  c,
+		ost:                ost,
+		runserviceClient:   runserviceClient,
+		configstoreClient:  configstoreClient,
+		notificationClient: notificationClient,
+		ah:                 ah,
+		sd:                 sd,
+		sc:                 sc,
 	}, nil
 }
 
@@ -195,6 +199,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	projectUpdateRepoLinkedAccountHandler := api.NewProjectUpdateRepoLinkedAccountHandler(g.log, g.ah)
 	projectCreateRunHandler := api.NewProjectCreateRunHandler(g.log, g.ah)
 	refreshRemoteRepositoryInfoHandler := api.NewRefreshRemoteRepositoryInfoHandler(g.log, g.ah)
+	projectRunWebhookDeliveriesHandler := api.NewProjectRunWebhookDeliveriesHandler(g.log, g.ah)
 
 	secretHandler := api.NewSecretHandler(g.log, g.ah)
 	createSecretHandler := api.NewCreateSecretHandler(g.log, g.ah)
@@ -314,6 +319,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/projects/{projectref}/runs/{runnumber}/tasks/{taskid}/logs", authOptionalHandler(projectRunLogsHandler)).Methods("GET")
 	apirouter.Handle("/projects/{projectref}/runs/{runnumber}/tasks/{taskid}/logs", authForcedHandler(projectRunLogsDeleteHandler)).Methods("DELETE")
 	apirouter.Handle("/projects/{projectref}/refreshremoterepo", authForcedHandler(refreshRemoteRepositoryInfoHandler)).Methods("POST")
+	apirouter.Handle("/projects/{projectref}/runwebhookdeliveries", authForcedHandler(projectRunWebhookDeliveriesHandler)).Methods("GET")
 
 	apirouter.Handle("/projectgroups/{projectgroupref}/secrets", authForcedHandler(secretHandler)).Methods("GET")
 	apirouter.Handle("/projects/{projectref}/secrets", authForcedHandler(secretHandler)).Methods("GET")

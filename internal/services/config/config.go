@@ -83,12 +83,14 @@ type Gateway struct {
 	// This is used for generating the redirect_url in oauth2 redirects
 	WebExposedURL string `yaml:"webExposedURL"`
 
-	RunserviceURL       string `yaml:"runserviceURL"`
-	RunserviceAPIToken  string `yaml:"runserviceAPIToken"`
-	ConfigstoreURL      string `yaml:"configstoreURL"`
-	ConfigstoreAPIToken string `yaml:"configstoreAPIToken"`
-	GitserverURL        string `yaml:"gitserverURL"`
-	GitserverAPIToken   string `yaml:"gitserverAPIToken"`
+	RunserviceURL        string `yaml:"runserviceURL"`
+	RunserviceAPIToken   string `yaml:"runserviceAPIToken"`
+	ConfigstoreURL       string `yaml:"configstoreURL"`
+	ConfigstoreAPIToken  string `yaml:"configstoreAPIToken"`
+	GitserverURL         string `yaml:"gitserverURL"`
+	GitserverAPIToken    string `yaml:"gitserverAPIToken"`
+	NotificationURL      string `yaml:"notificationURL"`
+	NotificationAPIToken string `yaml:"notificationAPIToken"`
 
 	Web           Web           `yaml:"web"`
 	ObjectStorage ObjectStorage `yaml:"objectStorage"`
@@ -411,6 +413,12 @@ func Parse(configFile string, componentsNames []string) (*Config, error) {
 	}
 	if c.Gateway.GitserverAPIToken == "" {
 		c.Gateway.GitserverAPIToken = c.GitserverAPIToken
+	}
+	if c.Gateway.NotificationURL == "" {
+		c.Gateway.NotificationURL = c.NotificationURL
+	}
+	if c.Gateway.NotificationAPIToken == "" {
+		c.Gateway.NotificationAPIToken = c.NotificationAPIToken
 	}
 
 	if c.Runservice.APIToken == "" {
