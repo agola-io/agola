@@ -71,13 +71,9 @@ func (d *DB) migrateV2(tx *sql.Tx) error {
 		stmts = ddlSqlite3
 	}
 
-	switch d.DBType() {
-	case sql.Postgres:
+	if d.sdb.Type() == sql.Postgres {
+		// defer constraints for postgres
 		if _, err := tx.Exec("SET CONSTRAINTS ALL DEFERRED"); err != nil {
-			return errors.WithStack(err)
-		}
-	case sql.Sqlite3:
-		if _, err := tx.Exec("PRAGMA defer_foreign_keys = ON"); err != nil {
 			return errors.WithStack(err)
 		}
 	}
