@@ -33,6 +33,10 @@ func (d *DB) DBType() sql.Type {
 	return d.sdb.Type()
 }
 
+func (d *DB) DB() *sql.DB {
+	return d.sdb
+}
+
 func (d *DB) Do(ctx context.Context, f func(tx *sql.Tx) error) error {
 	return errors.WithStack(d.sdb.Do(ctx, f))
 }

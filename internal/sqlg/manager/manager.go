@@ -37,6 +37,7 @@ var (
 
 type DB interface {
 	DBType() sql.Type
+	DB() *sql.DB
 	Version() uint
 
 	Do(ctx context.Context, f func(tx *sql.Tx) error) error

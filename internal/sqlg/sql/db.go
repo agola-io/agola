@@ -105,6 +105,11 @@ func (db *DB) Close() error {
 	return errors.WithStack(db.db.Close())
 }
 
+func (db *DB) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	r, err := db.db.ExecContext(ctx, query, db.data.translateArgs(args)...)
+	return r, errors.WithStack(err)
+}
+
 func (db *DB) Conn(ctx context.Context) (*sql.Conn, error) {
 	c, err := db.db.Conn(ctx)
 	return c, errors.WithStack(err)
