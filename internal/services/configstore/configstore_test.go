@@ -1187,8 +1187,8 @@ func TestGetRemoteSources(t *testing.T) {
 		}
 
 		expectedRemoteSources = 9
-		if len(remoteSources) != expectedRemoteSources {
-			t.Fatalf("expected %d remote sources, got %d remote sources", expectedRemoteSources, len(remoteSources))
+		if len(respAllRemoteSources) != expectedRemoteSources {
+			t.Fatalf("expected %d remote sources, got %d remote sources", expectedRemoteSources, len(respAllRemoteSources))
 		}
 
 		if diff := cmpDiffObject(remoteSources, respAllRemoteSources); diff != "" {
