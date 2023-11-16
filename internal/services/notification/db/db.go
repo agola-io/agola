@@ -126,6 +126,29 @@ func (d *DB) GetProjectRunWebhookDeliveriesAfterSequenceByProjectID(tx *sql.Tx, 
 	return runWebhookDeliveries, errors.WithStack(err)
 }
 
+func (d *DB) GetRunWebhookDeliveriesByRunWebhookID(tx *sql.Tx, runWebhookID string, deliveryStatusFilter []types.DeliveryStatus, limit int, sortDirection types.SortDirection) ([]*types.RunWebhookDelivery, error) {
+	q := runWebhookDeliverySelect().OrderBy("sequence")
+	q.Where(q.E("run_webhook_id", runWebhookID))
+
+	if len(deliveryStatusFilter) > 0 {
+		q.Where(q.In("delivery_status", sq.Flatten(deliveryStatusFilter)...))
+	}
+
+	switch sortDirection {
+	case types.SortDirectionAsc:
+		q.Asc()
+	case types.SortDirectionDesc:
+		q.Desc()
+	}
+
+	if limit > 0 {
+		q.Limit(limit)
+	}
+
+	runWebhookDeliveries, _, err := d.fetchRunWebhookDeliverys(tx, q)
+	return runWebhookDeliveries, errors.WithStack(err)
+}
+
 func (d *DB) GetRunWebhookDeliveryByID(tx *sql.Tx, runWebhookDeliveryID string) (*types.RunWebhookDelivery, error) {
 	q := runWebhookDeliverySelect()
 	q.Where(q.E("id", runWebhookDeliveryID))

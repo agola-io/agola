@@ -89,3 +89,39 @@ func (h *RunWebhookDeliveriesHandler) do(w http.ResponseWriter, r *http.Request)
 
 	return ares.RunWebhookDeliveries, nil
 }
+
+type RunWebhookRedeliveryHandler struct {
+	log zerolog.Logger
+	ah  *action.ActionHandler
+}
+
+func NewRunWebhookRedeliveryHandler(log zerolog.Logger, ah *action.ActionHandler) *RunWebhookRedeliveryHandler {
+	return &RunWebhookRedeliveryHandler{log: log, ah: ah}
+}
+
+func (h *RunWebhookRedeliveryHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.do(w, r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, nil); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *RunWebhookRedeliveryHandler) do(w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
+
+	vars := mux.Vars(r)
+	projectID := vars["projectid"]
+	runWebhookDeliveryID := vars["runwebhookdeliveryid"]
+
+	err := h.ah.RunWebhookRedelivery(ctx, projectID, runWebhookDeliveryID)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
+}
