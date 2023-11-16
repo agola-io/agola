@@ -824,3 +824,7 @@ func (c *Client) GetProjectRunWebhookDeliveries(ctx context.Context, projectRef 
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s/runwebhookdeliveries", url.PathEscape(projectRef)), q, common.JSONContent, nil, &runWebhookDeliveries)
 	return runWebhookDeliveries, resp, errors.WithStack(err)
 }
+
+func (c *Client) ProjectRunWebhookRedelivery(ctx context.Context, projectRef string, runWebhookDeliveryID string) (*Response, error) {
+	return c.getResponse(ctx, "PUT", fmt.Sprintf("/projects/%s/runwebhookdeliveries/%s/redelivery", projectRef, runWebhookDeliveryID), nil, jsonContent, nil)
+}

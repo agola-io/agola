@@ -82,3 +82,29 @@ func (h *ActionHandler) GetProjectRunWebhookDeliveries(ctx context.Context, req 
 
 	return res, nil
 }
+
+type ProjectRunWebhookRedeliveryRequest struct {
+	ProjectRef           string
+	RunWebhookDeliveryID string
+}
+
+func (h *ActionHandler) ProjectRunWebhookRedelivery(ctx context.Context, req *ProjectRunWebhookRedeliveryRequest) error {
+	project, _, err := h.configstoreClient.GetProject(ctx, req.ProjectRef)
+	if err != nil {
+		return util.NewAPIError(util.KindFromRemoteError(err), err)
+	}
+	isUserOwner, err := h.IsAuthUserProjectOwner(ctx, project.OwnerType, project.OwnerID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to determine permissions")
+	}
+	if !isUserOwner {
+		return util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
+	}
+
+	_, err = h.notificationClient.RunWebhookRedelivery(ctx, project.ID, req.RunWebhookDeliveryID)
+	if err != nil {
+		return util.NewAPIError(util.KindFromRemoteError(err), err)
+	}
+
+	return nil
+}

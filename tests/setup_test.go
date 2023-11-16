@@ -85,6 +85,8 @@ const (
 
 	configstoreService = "configstore"
 	runserviceService  = "runservice"
+
+	webhookSecret = "secretkey"
 )
 
 type ConfigFormat string
@@ -5938,7 +5940,7 @@ func TestRunEventsNotification(t *testing.T) {
 			wr := setupWebhooksReceiver(ctx, t, wrDir)
 			defer wr.stop()
 
-			sc := setup(ctx, t, dir, withGitea(true), withWebhooks(fmt.Sprintf("%s/%s", wr.exposedURL, "webhooks"), "secretkey"))
+			sc := setup(ctx, t, dir, withGitea(true), withWebhooks(fmt.Sprintf("%s/%s", wr.exposedURL, "webhooks"), webhookSecret))
 			defer sc.stop()
 
 			giteaToken, tokenUser01 := createLinkedAccount(ctx, t, sc.gitea, sc.config)
@@ -6577,7 +6579,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 	wr := setupWebhooksReceiver(ctx, t, wrDir)
 	defer wr.stop()
 
-	sc := setup(ctx, t, dir, withGitea(true), withWebhooks(fmt.Sprintf("%s/%s", wr.exposedURL, "webhooks"), "secretkey"))
+	sc := setup(ctx, t, dir, withGitea(true), withWebhooks(fmt.Sprintf("%s/%s", wr.exposedURL, "webhooks"), webhookSecret))
 	defer sc.stop()
 
 	giteaToken, tokenUser01 := createLinkedAccount(ctx, t, sc.gitea, sc.config)
@@ -6765,6 +6767,449 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 		}
 		if resp.Cursor != "" {
 			t.Fatalf("expected empty cursor, got %s", resp.Cursor)
+		}
+	})
+}
+
+func TestProjectRunWebhookRedelivery(t *testing.T) {
+	t.Parallel()
+
+	config := `
+		{
+			runs: [
+			{
+				name: 'run01',
+				tasks: [
+				{
+					name: 'task01',
+					runtime: {
+					containers: [
+						{
+						image: 'alpine/git',
+						},
+					],
+					},
+					steps: [
+					{ type: 'run', command: 'env' },
+					],
+				},
+				],
+			},
+			],
+		}
+	`
+
+	t.Run("test redelivery project run webhook delivery with deliverystatus = deliveryError", func(t *testing.T) {
+		dir := t.TempDir()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// set a fake webhookURL to make the delivery fail
+		sc := setup(ctx, t, dir, withGitea(true), withWebhooks("fakeWebhookURL", webhookSecret))
+		defer sc.stop()
+
+		giteaToken, tokenUser01 := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+		gwUser01Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01)
+		gwUserAdminClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
+
+		_, _, err := gwUserAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser02})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		user02Token, _, err := gwUserAdminClient.CreateUserToken(ctx, agolaUser02, &gwapitypes.CreateUserTokenRequest{TokenName: "token01"})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		gwUser02Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, user02Token.Token)
+
+		giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+
+		giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		giteaRepo, project := createProject(ctx, t, giteaClient, gwUser01Client, withVisibility(gwapitypes.VisibilityPrivate))
+
+		push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
+
+		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+			if err != nil {
+				return false, nil
+			}
+
+			if len(runs) == 0 {
+				return false, nil
+			}
+			if runs[0].Phase != rstypes.RunPhaseFinished {
+				return false, nil
+			}
+
+			return true, nil
+		})
+
+		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if len(runs) == 0 {
+			t.Fatalf("expected %d run got: %d", 1, len(runs))
+		}
+
+		if runs[0].Phase != rstypes.RunPhaseFinished {
+			t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, runs[0].Phase)
+		}
+		if runs[0].Result != rstypes.RunResultSuccess {
+			t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, runs[0].Result)
+		}
+
+		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+			if err != nil {
+				return false, nil
+			}
+
+			if len(runWebhookDeliveries) != 4 {
+				return false, nil
+			}
+			for _, r := range runWebhookDeliveries {
+				if r.DeliveryStatus != gwapitypes.DeliveryStatusDeliveryError {
+					return false, nil
+				}
+			}
+
+			return true, nil
+		})
+
+		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if len(runWebhookDeliveries) != 4 {
+			t.Fatalf("expected 4 runWebhookDeliveries got: %d", len(runWebhookDeliveries))
+		}
+		for _, r := range runWebhookDeliveries {
+			if r.DeliveryStatus != gwapitypes.DeliveryStatusDeliveryError {
+				t.Fatalf("expected DeliveryStatus deliveryError, got %s", r.DeliveryStatus)
+			}
+		}
+
+		_, err = gwUser01Client.ProjectRunWebhookRedelivery(ctx, project.ID, runWebhookDeliveries[0].ID)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+			if err != nil {
+				return false, nil
+			}
+
+			if len(runWebhookDeliveries) != 5 {
+				return false, nil
+			}
+
+			return true, nil
+		})
+		runWebhookDeliveries, _, err = gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if len(runWebhookDeliveries) != 5 {
+			t.Fatalf("expected 5 runWebhookDeliveries got: %d", len(runWebhookDeliveries))
+		}
+
+		_, err = gwUser02Client.ProjectRunWebhookRedelivery(ctx, project.ID, runWebhookDeliveries[0].ID)
+		expectedErr := remoteErrorForbidden
+		if err == nil {
+			t.Fatalf("expected error %v, got nil err", expectedErr)
+		}
+		if err.Error() != expectedErr {
+			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+		}
+	})
+
+	t.Run("test redelivery project run webhook delivery with deliverystatus = delivered", func(t *testing.T) {
+		dir := t.TempDir()
+		wrDir := t.TempDir()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		wr := setupWebhooksReceiver(ctx, t, wrDir)
+		defer wr.stop()
+
+		sc := setup(ctx, t, dir, withGitea(true), withWebhooks(fmt.Sprintf("%s/%s", wr.exposedURL, "webhooks"), webhookSecret))
+		defer sc.stop()
+
+		giteaToken, tokenUser01 := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+		gwUser01Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01)
+		gwUserAdminClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
+
+		_, _, err := gwUserAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser02})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		user02Token, _, err := gwUserAdminClient.CreateUserToken(ctx, agolaUser02, &gwapitypes.CreateUserTokenRequest{TokenName: "token01"})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		gwUser02Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, user02Token.Token)
+
+		giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+
+		giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		giteaRepo, project := createProject(ctx, t, giteaClient, gwUser01Client, withVisibility(gwapitypes.VisibilityPrivate))
+
+		push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
+
+		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+			if err != nil {
+				return false, nil
+			}
+
+			if len(runs) == 0 {
+				return false, nil
+			}
+			if runs[0].Phase != rstypes.RunPhaseFinished {
+				return false, nil
+			}
+
+			return true, nil
+		})
+
+		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if len(runs) == 0 {
+			t.Fatalf("expected %d run got: %d", 1, len(runs))
+		}
+
+		if runs[0].Phase != rstypes.RunPhaseFinished {
+			t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, runs[0].Phase)
+		}
+		if runs[0].Result != rstypes.RunResultSuccess {
+			t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, runs[0].Result)
+		}
+
+		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+			if err != nil {
+				return false, nil
+			}
+
+			if len(runWebhookDeliveries) != 4 {
+				return false, nil
+			}
+			for _, r := range runWebhookDeliveries {
+				if r.DeliveryStatus != gwapitypes.DeliveryStatusDelivered {
+					return false, nil
+				}
+			}
+
+			return true, nil
+		})
+
+		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if len(runWebhookDeliveries) != 4 {
+			t.Fatalf("expected 4 runWebhookDeliveries got: %d", len(runWebhookDeliveries))
+		}
+		for _, r := range runWebhookDeliveries {
+			if r.DeliveryStatus != gwapitypes.DeliveryStatusDelivered {
+				t.Fatalf("expected DeliveryStatus delivered, got %s", r.DeliveryStatus)
+			}
+		}
+
+		_, err = gwUser01Client.ProjectRunWebhookRedelivery(ctx, project.ID, runWebhookDeliveries[0].ID)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		runWebhookDeliveries, _, err = gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if len(runWebhookDeliveries) != 5 {
+			t.Fatalf("expected 5 runWebhookDeliveries got: %d", len(runWebhookDeliveries))
+		}
+
+		_, err = gwUser02Client.ProjectRunWebhookRedelivery(ctx, project.ID, runWebhookDeliveries[0].ID)
+		expectedErr := remoteErrorForbidden
+		if err == nil {
+			t.Fatalf("expected error %v, got nil err", expectedErr)
+		}
+		if err.Error() != expectedErr {
+			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+		}
+	})
+
+	t.Run("test redelivery project run webhook delivery with not existing project", func(t *testing.T) {
+		dir := t.TempDir()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		sc := setup(ctx, t, dir, withGitea(true))
+		defer sc.stop()
+
+		_, tokenUser01 := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+		gwUser01Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01)
+
+		_, err := gwUser01Client.ProjectRunWebhookRedelivery(ctx, "projecttestid", "runwebhookdeliverytestid")
+		expectedErr := remoteErrorNotExist
+		if err == nil {
+			t.Fatalf("expected error %v, got nil err", expectedErr)
+		}
+		if err.Error() != expectedErr {
+			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+		}
+	})
+
+	t.Run("test redelivery project run webhook delivery with not existing run webhook delivery", func(t *testing.T) {
+		dir := t.TempDir()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		sc := setup(ctx, t, dir, withGitea(true))
+		defer sc.stop()
+
+		giteaToken, tokenUser01 := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+		gwUser01Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01)
+
+		giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+
+		giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		_, project := createProject(ctx, t, giteaClient, gwUser01Client, withVisibility(gwapitypes.VisibilityPrivate))
+
+		_, err = gwUser01Client.ProjectRunWebhookRedelivery(ctx, project.ID, "runwebhookdeliverytestid")
+		expectedErr := remoteErrorNotExist
+		if err == nil {
+			t.Fatalf("expected error %v, got nil err", expectedErr)
+		}
+		if err.Error() != expectedErr {
+			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+		}
+	})
+
+	t.Run("test redelivery project run webhook delivery with projectRef that belong to another project", func(t *testing.T) {
+		dir := t.TempDir()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// set a fake webhookURL to make the delivery fail
+		sc := setup(ctx, t, dir, withGitea(true), withWebhooks("fakeWebhookURL", webhookSecret))
+		defer sc.stop()
+
+		giteaToken, tokenUser01 := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+		gwUser01Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01)
+
+		giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+
+		giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		giteaRepo, project01 := createProject(ctx, t, giteaClient, gwUser01Client, withVisibility(gwapitypes.VisibilityPrivate))
+
+		project02, _, err := gwUser01Client.CreateProject(ctx, &gwapitypes.CreateProjectRequest{
+			Name:             "project02",
+			ParentRef:        path.Join("user", agolaUser01),
+			RemoteSourceName: "gitea",
+			RepoPath:         path.Join(giteaUser01, "repo01"),
+			Visibility:       gwapitypes.VisibilityPublic,
+		})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
+
+		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project01.ID, nil, nil, 0, 0, false)
+			if err != nil {
+				return false, nil
+			}
+
+			if len(runs) == 0 {
+				return false, nil
+			}
+			if runs[0].Phase != rstypes.RunPhaseFinished {
+				return false, nil
+			}
+
+			return true, nil
+		})
+
+		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project01.ID, nil, nil, 0, 0, false)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if len(runs) == 0 {
+			t.Fatalf("expected %d run got: %d", 1, len(runs))
+		}
+
+		if runs[0].Phase != rstypes.RunPhaseFinished {
+			t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, runs[0].Phase)
+		}
+		if runs[0].Result != rstypes.RunResultSuccess {
+			t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, runs[0].Result)
+		}
+
+		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project01.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+			if err != nil {
+				return false, nil
+			}
+
+			if len(runWebhookDeliveries) != 4 {
+				return false, nil
+			}
+			for _, r := range runWebhookDeliveries {
+				if r.DeliveryStatus != gwapitypes.DeliveryStatusDeliveryError {
+					return false, nil
+				}
+			}
+
+			return true, nil
+		})
+
+		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project01.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if len(runWebhookDeliveries) != 4 {
+			t.Fatalf("expected 4 runWebhookDeliveries got: %d", len(runWebhookDeliveries))
+		}
+		for _, r := range runWebhookDeliveries {
+			if r.DeliveryStatus != gwapitypes.DeliveryStatusDeliveryError {
+				t.Fatalf("expected DeliveryStatus deliveryError, got %s", r.DeliveryStatus)
+			}
+		}
+
+		_, err = gwUser01Client.ProjectRunWebhookRedelivery(ctx, project02.ID, runWebhookDeliveries[0].ID)
+		expectedErr := remoteErrorNotExist
+		if err == nil {
+			t.Fatalf("expected error %v, got nil err", expectedErr)
+		}
+		if err.Error() != expectedErr {
+			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
 	})
 }
