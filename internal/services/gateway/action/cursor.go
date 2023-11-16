@@ -36,3 +36,9 @@ type StartCursor struct {
 
 	SortDirection SortDirection
 }
+
+type StartSequenceCursor struct {
+	StartSequence uint64
+
+	SortDirection SortDirection
+}

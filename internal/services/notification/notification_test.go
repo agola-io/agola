@@ -25,10 +25,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/rs/zerolog"
 	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/config"
+	"agola.io/agola/internal/services/notification/action"
+	"agola.io/agola/internal/sqlg"
 	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/internal/testutil"
 	"agola.io/agola/services/notification/types"
@@ -40,6 +44,8 @@ const (
 	webhookSecret  = "secretkey"
 	webhookPayload = "payloadtest"
 	webhookURL     = "testWebhookURL"
+	project01      = "project01id"
+	project02      = "project02id"
 )
 
 // setupNotificationService don't start the notification service but just create it to manually call its methods
@@ -90,7 +96,7 @@ func TestRunWebhookDelivery(t *testing.T) {
 
 		runWebhooks := make([]*types.RunWebhook, MaxRunWebhookDeliveriesQueryLimit+10)
 		for i := 0; i < len(runWebhooks); i++ {
-			runWebhooks[i] = createRunWebhook(t, ctx, ns)
+			runWebhooks[i] = createRunWebhook(t, ctx, ns, project01)
 			createRunWebhookDelivery(t, ctx, ns, runWebhooks[i].ID, types.DeliveryStatusNotDelivered)
 		}
 
@@ -161,7 +167,7 @@ func TestRunWebhookDelivery(t *testing.T) {
 
 		time.Sleep(1 * time.Second)
 
-		runWebhook := createRunWebhook(t, ctx, ns)
+		runWebhook := createRunWebhook(t, ctx, ns, project01)
 		createRunWebhookDelivery(t, ctx, ns, runWebhook.ID, types.DeliveryStatusNotDelivered)
 
 		if err := ns.runWebhookDeliveriesHandler(ctx); err != nil {
@@ -294,7 +300,7 @@ func getRunWebhookDeliveries(t *testing.T, ctx context.Context, ns *Notification
 
 	err := ns.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		wd, err = ns.d.GetRunWebhookDeliveriesAfterSequence(tx, 0, "", 0)
+		wd, err = ns.d.GetProjectRunWebhookDeliveriesAfterSequence(tx, 0, 0)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -308,12 +314,13 @@ func getRunWebhookDeliveries(t *testing.T, ctx context.Context, ns *Notification
 	return wd
 }
 
-func createRunWebhook(t *testing.T, ctx context.Context, ns *NotificationService) *types.RunWebhook {
+func createRunWebhook(t *testing.T, ctx context.Context, ns *NotificationService, projectID string) *types.RunWebhook {
 	var wh *types.RunWebhook
 
 	err := ns.d.Do(ctx, func(tx *sql.Tx) error {
 		wh = types.NewRunWebhook(tx)
 		wh.Payload = []byte(webhookPayload)
+		wh.ProjectID = projectID
 
 		if err := ns.d.InsertRunWebhook(tx, wh); err != nil {
 			return errors.WithStack(err)
@@ -538,4 +545,171 @@ func createCommitStatusDelivery(t *testing.T, ctx context.Context, ns *Notificat
 	}
 
 	return delivery
+}
+
+func TestGetProjectRunWebhookDeliveries(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	log := testutil.NewLogger(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ns := setupNotificationService(ctx, t, log, dir)
+
+	t.Logf("starting ns")
+
+	time.Sleep(1 * time.Second)
+
+	runWebhooks := make([]*types.RunWebhook, 10)
+	project01RunWebhookDeliveries := make([]*types.RunWebhookDelivery, 0)
+	for i := 0; i < len(runWebhooks); i++ {
+		runWebhooks[i] = createRunWebhook(t, ctx, ns, project01)
+		project01RunWebhookDeliveries = append(project01RunWebhookDeliveries, createRunWebhookDelivery(t, ctx, ns, runWebhooks[i].ID, types.DeliveryStatusDelivered))
+		project01RunWebhookDeliveries = append(project01RunWebhookDeliveries, createRunWebhookDelivery(t, ctx, ns, runWebhooks[i].ID, types.DeliveryStatusNotDelivered))
+	}
+
+	for i := 0; i < len(runWebhooks); i++ {
+		runWebhooks[i] = createRunWebhook(t, ctx, ns, project02)
+		createRunWebhookDelivery(t, ctx, ns, runWebhooks[i].ID, types.DeliveryStatusDelivered)
+		createRunWebhookDelivery(t, ctx, ns, runWebhooks[i].ID, types.DeliveryStatusNotDelivered)
+	}
+
+	t.Run("test get run webhook deliveries with limit = 0", func(t *testing.T) {
+		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, Limit: 0})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if res.HasMore != false {
+			t.Fatalf("unexpected HasMore true")
+		}
+		if len(res.RunWebhookDeliveries) != 20 {
+			t.Fatalf("unexpected 20 run webhook deliveries, got %d", len(res.RunWebhookDeliveries))
+		}
+	})
+
+	t.Run("test get run webhook deliveries with limit = 10", func(t *testing.T) {
+		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, Limit: 10})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if res.HasMore != true {
+			t.Fatalf("unexpected HasMore false")
+		}
+		if len(res.RunWebhookDeliveries) != 10 {
+			t.Fatalf("unexpected 10 run webhook deliveries, got %d", len(res.RunWebhookDeliveries))
+		}
+	})
+
+	t.Run("test get run webhook deliveries with deliverystatusfilter = delivered", func(t *testing.T) {
+		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, DeliveryStatusFilter: []types.DeliveryStatus{types.DeliveryStatusDelivered}, Limit: 0})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if res.HasMore != false {
+			t.Fatalf("unexpected HasMore true")
+		}
+		if len(res.RunWebhookDeliveries) != 10 {
+			t.Fatalf("unexpected 10 run webhook deliveries, got %d", len(res.RunWebhookDeliveries))
+		}
+	})
+
+	t.Run("test get run webhook deliveries with deliverystatusfilter = delivered and limit less than run webhook deliveries", func(t *testing.T) {
+		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, DeliveryStatusFilter: []types.DeliveryStatus{types.DeliveryStatusDelivered}, Limit: 5})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if res.HasMore != true {
+			t.Fatalf("unexpected HasMore false")
+		}
+		if len(res.RunWebhookDeliveries) != 5 {
+			t.Fatalf("unexpected 5 run webhook deliveries, got %d", len(res.RunWebhookDeliveries))
+		}
+	})
+
+	t.Run("test get run webhook deliveries with limit less than run webhook deliveries continuation", func(t *testing.T) {
+		respAllProjectRunWebhookDeliveries := []*types.RunWebhookDelivery{}
+
+		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, Limit: 5, SortDirection: types.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		expectedProjectRunWebhookDeliveries := 5
+		if len(res.RunWebhookDeliveries) != expectedProjectRunWebhookDeliveries {
+			t.Fatalf("expected %d project run webhook deliveries, got %d project run webhook deliveries", expectedProjectRunWebhookDeliveries, len(res.RunWebhookDeliveries))
+		}
+		if !res.HasMore {
+			t.Fatalf("expected hasMore true, got %t", res.HasMore)
+		}
+
+		respAllProjectRunWebhookDeliveries = append(respAllProjectRunWebhookDeliveries, res.RunWebhookDeliveries...)
+		lastProjectRunWebhookDelivery := res.RunWebhookDeliveries[len(res.RunWebhookDeliveries)-1]
+
+		// fetch next results
+		for {
+			res, err = ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, StartSequence: lastProjectRunWebhookDelivery.Sequence, Limit: 5, SortDirection: types.SortDirectionAsc})
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			if res.HasMore && len(res.RunWebhookDeliveries) != expectedProjectRunWebhookDeliveries {
+				t.Fatalf("expected %d project run webhook deliveries, got %d project run webhook deliveries", expectedProjectRunWebhookDeliveries, len(res.RunWebhookDeliveries))
+			}
+
+			respAllProjectRunWebhookDeliveries = append(respAllProjectRunWebhookDeliveries, res.RunWebhookDeliveries...)
+
+			if !res.HasMore {
+				break
+			}
+
+			lastProjectRunWebhookDelivery = res.RunWebhookDeliveries[len(res.RunWebhookDeliveries)-1]
+		}
+
+		expectedProjectRunWebhookDeliveries = 20
+		if len(respAllProjectRunWebhookDeliveries) != expectedProjectRunWebhookDeliveries {
+			t.Fatalf("expected %d project run webhook deliveries, got %d project run webhook deliveries", expectedProjectRunWebhookDeliveries, len(respAllProjectRunWebhookDeliveries))
+		}
+
+		if diff := cmpDiffObject(project01RunWebhookDeliveries, respAllProjectRunWebhookDeliveries); diff != "" {
+			t.Fatalf("mismatch (-want +got):\n%s", diff)
+		}
+	})
+}
+
+func TestDeliveryStatusFromStringSlice(t *testing.T) {
+	t.Parallel()
+
+	deliverystatus := []string{"notDelivered", "delivered", "deliveryError"}
+	expectedDeliveryStatus := []types.DeliveryStatus{
+		types.DeliveryStatusNotDelivered,
+		types.DeliveryStatusDelivered,
+		types.DeliveryStatusDeliveryError,
+	}
+
+	result, err := types.DeliveryStatusFromStringSlice(deliverystatus)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if diff := cmp.Diff(result, expectedDeliveryStatus); diff != "" {
+		t.Fatalf("mismatch (-want +got):\n%s", diff)
+	}
+
+	// test wrong deliverystatus
+	baddeliverystatus := "baddeliverystatus"
+	deliverystatus = []string{string(types.DeliveryStatusNotDelivered), string(types.DeliveryStatusDelivered), string(types.DeliveryStatusDeliveryError), baddeliverystatus}
+	_, err = types.DeliveryStatusFromStringSlice(deliverystatus)
+	expectedErr := fmt.Sprintf("invalid delivery status %q", baddeliverystatus)
+	if err == nil {
+		t.Fatalf("expected error %v, got nil err", expectedErr)
+	}
+	if err.Error() != expectedErr {
+		t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+	}
+}
+
+func cmpDiffObject(x, y interface{}) string {
+	// Since postgres has microsecond time precision while go has nanosecond time precision we should check times with a microsecond margin
+	return cmp.Diff(x, y, cmpopts.IgnoreFields(sqlg.ObjectMeta{}, "TxID"), cmpopts.EquateApproxTime(1*time.Microsecond))
 }

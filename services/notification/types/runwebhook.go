@@ -8,7 +8,8 @@ import (
 type RunWebhook struct {
 	sqlg.ObjectMeta
 
-	Payload []byte `json:"payload"`
+	Payload   []byte `json:"payload"`
+	ProjectID string `json:"project_id"`
 }
 
 func NewRunWebhook(tx *sql.Tx) *RunWebhook {

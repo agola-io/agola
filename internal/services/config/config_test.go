@@ -494,6 +494,7 @@ webExposedURL: "http://localhost:8000"
 runserviceURL: "http://localhost:4000"
 configstoreURL: "http://localhost:4002"
 gitserverURL: "http://localhost:4003"
+notificationURL: "http://localhost:4004"
 
 internalServicesAPIToken: "internalservicesapitoken"
 
@@ -510,6 +511,11 @@ gateway:
 scheduler:
 
 notification:
+  db:
+    type: sqlite3
+    connString: /data/agola/notification/db
+  web:
+    listenAddress: ":4004"
 
 configstore:
   dataDir: /data/agola/configstore
@@ -550,18 +556,20 @@ gitserver:
     listenAddress: ":4003"
 `,
 			out: &Config{
-				ID:             "agola",
-				APIExposedURL:  "http://localhost:8000",
-				WebExposedURL:  "http://localhost:8000",
-				RunserviceURL:  "http://localhost:4000",
-				ConfigstoreURL: "http://localhost:4002",
-				GitserverURL:   "http://localhost:4003",
+				ID:              "agola",
+				APIExposedURL:   "http://localhost:8000",
+				WebExposedURL:   "http://localhost:8000",
+				RunserviceURL:   "http://localhost:4000",
+				ConfigstoreURL:  "http://localhost:4002",
+				GitserverURL:    "http://localhost:4003",
+				NotificationURL: "http://localhost:4004",
 
 				InternalServicesAPIToken: "internalservicesapitoken",
 				RunserviceAPIToken:       "internalservicesapitoken",
 				ExecutorAPIToken:         "internalservicesapitoken",
 				ConfigstoreAPIToken:      "internalservicesapitoken",
 				GitserverAPIToken:        "internalservicesapitoken",
+				NotificationAPIToken:     "internalservicesapitoken",
 
 				Gateway: Gateway{
 					APIExposedURL:                "http://localhost:8000",
@@ -572,6 +580,8 @@ gitserver:
 					ConfigstoreAPIToken:          "internalservicesapitoken",
 					GitserverURL:                 "http://localhost:4003",
 					GitserverAPIToken:            "internalservicesapitoken",
+					NotificationURL:              "http://localhost:4004",
+					NotificationAPIToken:         "internalservicesapitoken",
 					Web:                          Web{ListenAddress: ":8000"},
 					TokenSigning:                 TokenSigning{Duration: 12 * time.Hour, Method: "hmac", Key: "supersecretsigningkey"},
 					CookieSigning:                CookieSigning{Duration: 12 * time.Hour, Key: "supersecretsigningkey"},
@@ -583,6 +593,9 @@ gitserver:
 					RunserviceAPIToken: "internalservicesapitoken",
 				},
 				Notification: Notification{
+					DB:                  DB{Type: "sqlite3", ConnString: "/data/agola/notification/db"},
+					Web:                 Web{ListenAddress: ":4004"},
+					APIToken:            "internalservicesapitoken",
 					WebExposedURL:       "http://localhost:8000",
 					RunserviceURL:       "http://localhost:4000",
 					RunserviceAPIToken:  "internalservicesapitoken",
@@ -637,12 +650,14 @@ webExposedURL: "http://localhost:8000"
 runserviceURL: "http://localhost:4000"
 configstoreURL: "http://localhost:4002"
 gitserverURL: "http://localhost:4003"
+notificationURL: "http://localhost:4004"
 
 internalServicesAPIToken: "internalservicesapitoken" # should not be used since custom token are defined for every service
 runserviceAPIToken: "runserviceapitoken"
 executorAPIToken: "executorapitoken"
 configstoreAPIToken: "configstoreapitoken"
 gitserverAPIToken: "gitserverapitoken"
+notificationAPIToken: "notificationapitoken"
 
 gateway:
   web:
@@ -657,6 +672,11 @@ gateway:
 scheduler:
 
 notification:
+  db:
+    type: sqlite3
+    connString: /data/agola/notification/db
+  web:
+    listenAddress: ":4004"
 
 configstore:
   dataDir: /data/agola/configstore
@@ -697,18 +717,20 @@ gitserver:
     listenAddress: ":4003"
 `,
 			out: &Config{
-				ID:             "agola",
-				APIExposedURL:  "http://localhost:8000",
-				WebExposedURL:  "http://localhost:8000",
-				RunserviceURL:  "http://localhost:4000",
-				ConfigstoreURL: "http://localhost:4002",
-				GitserverURL:   "http://localhost:4003",
+				ID:              "agola",
+				APIExposedURL:   "http://localhost:8000",
+				WebExposedURL:   "http://localhost:8000",
+				RunserviceURL:   "http://localhost:4000",
+				ConfigstoreURL:  "http://localhost:4002",
+				GitserverURL:    "http://localhost:4003",
+				NotificationURL: "http://localhost:4004",
 
 				InternalServicesAPIToken: "internalservicesapitoken",
 				RunserviceAPIToken:       "runserviceapitoken",
 				ExecutorAPIToken:         "executorapitoken",
 				ConfigstoreAPIToken:      "configstoreapitoken",
 				GitserverAPIToken:        "gitserverapitoken",
+				NotificationAPIToken:     "notificationapitoken",
 
 				Gateway: Gateway{
 					APIExposedURL:                "http://localhost:8000",
@@ -719,6 +741,8 @@ gitserver:
 					ConfigstoreAPIToken:          "configstoreapitoken",
 					GitserverURL:                 "http://localhost:4003",
 					GitserverAPIToken:            "gitserverapitoken",
+					NotificationURL:              "http://localhost:4004",
+					NotificationAPIToken:         "notificationapitoken",
 					Web:                          Web{ListenAddress: ":8000"},
 					TokenSigning:                 TokenSigning{Duration: 12 * time.Hour, Method: "hmac", Key: "supersecretsigningkey"},
 					CookieSigning:                CookieSigning{Duration: 12 * time.Hour, Key: "supersecretsigningkey"},
@@ -730,6 +754,9 @@ gitserver:
 					RunserviceAPIToken: "runserviceapitoken",
 				},
 				Notification: Notification{
+					DB:                  DB{Type: "sqlite3", ConnString: "/data/agola/notification/db"},
+					Web:                 Web{ListenAddress: ":4004"},
+					APIToken:            "notificationapitoken",
 					WebExposedURL:       "http://localhost:8000",
 					RunserviceURL:       "http://localhost:4000",
 					RunserviceAPIToken:  "runserviceapitoken",

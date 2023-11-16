@@ -16,10 +16,10 @@ package notification
 
 import (
 	"context"
-	"time"
 
 	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/gateway/action"
+	"agola.io/agola/internal/services/notification/types"
 	rstypes "agola.io/agola/services/runservice/types"
 )
 
@@ -39,68 +39,7 @@ const (
 	AgolaEventRun AgolaEventType = "run"
 )
 
-type RunWebhook struct {
-	// Version is the version of webhook struct data
-	Version uint64 `json:"version"`
-
-	// ProjectInfo is the info of the project
-	ProjectInfo ProjectInfo `json:"project_info"`
-
-	// Run is the current run status
-	Run *Run `json:"run"`
-
-	// TODO(alessandro.pinna) populate with action values
-	//Action string `json:"action"`
-}
-
-type ProjectInfo struct {
-	ProjectID string `json:"project_id"`
-}
-
-type Run struct {
-	ID          string              `json:"id"`
-	RefType     string              `json:"ref_type"`
-	Ref         string              `json:"ref"`
-	Name        string              `json:"name"`
-	Counter     uint64              `json:"counter"`
-	Phase       string              `json:"phase"`
-	Result      string              `json:"result"`
-	SetupErrors []string            `json:"setup_errors"`
-	Tasks       map[string]*RunTask `json:"tasks"`
-	EnqueueTime *time.Time          `json:"enqueue_time"`
-	StartTime   *time.Time          `json:"start_time"`
-	EndTime     *time.Time          `json:"end_time"`
-}
-
-type RunTask struct {
-	ID              string                    `json:"id"`
-	Name            string                    `json:"name"`
-	Level           int                       `json:"level"`
-	Skip            bool                      `json:"skip"`
-	Depends         map[string]*RunTaskDepend `json:"depends"`
-	Status          string                    `json:"status"`
-	Timedout        bool                      `json:"timedout"`
-	WaitingApproval bool                      `json:"waiting_approval"`
-	Approved        bool                      `json:"approved"`
-	SetupStep       RunTaskStep               `json:"setup_step"`
-	Steps           []*RunTaskStep            `json:"steps"`
-	StartTime       *time.Time                `json:"start_time"`
-	EndTime         *time.Time                `json:"end_time"`
-}
-
-type RunTaskStep struct {
-	Phase      string     `json:"phase"`
-	ExitStatus *int       `json:"exit_status"`
-	StartTime  *time.Time `json:"start_time"`
-	EndTime    *time.Time `json:"end_time"`
-}
-
-type RunTaskDepend struct {
-	TaskID     string   `json:"task_id"`
-	Conditions []string `json:"conditions"`
-}
-
-func (n *NotificationService) generatewebhook(ctx context.Context, ev *rstypes.RunEvent) *RunWebhook {
+func (n *NotificationService) generatewebhook(ctx context.Context, ev *rstypes.RunEvent) *types.RunWebhook {
 	data := ev.Data.(*rstypes.RunEventData)
 
 	// ignore user direct runs
@@ -108,12 +47,12 @@ func (n *NotificationService) generatewebhook(ctx context.Context, ev *rstypes.R
 		return nil
 	}
 
-	webhook := &RunWebhook{
+	webhook := &types.RunWebhook{
 		Version: webhookVersion,
-		ProjectInfo: ProjectInfo{
+		ProjectInfo: types.ProjectInfo{
 			ProjectID: data.Annotations[action.AnnotationProjectID],
 		},
-		Run: &Run{},
+		Run: &types.Run{},
 	}
 
 	webhook.Run.ID = data.ID
@@ -128,15 +67,15 @@ func (n *NotificationService) generatewebhook(ctx context.Context, ev *rstypes.R
 	webhook.Run.EndTime = data.EndTime
 	webhook.Run.EnqueueTime = data.EnqueueTime
 
-	webhook.Run.Tasks = make(map[string]*RunTask)
+	webhook.Run.Tasks = make(map[string]*types.RunTask)
 	for id, t := range data.Tasks {
-		task := &RunTask{}
+		task := &types.RunTask{}
 		task.ID = t.ID
 		task.Name = data.Tasks[t.ID].Name
 		task.Level = data.Tasks[t.ID].Level
-		task.Depends = make(map[string]*RunTaskDepend)
+		task.Depends = make(map[string]*types.RunTaskDepend)
 		for tdID, td := range data.Tasks[t.ID].Depends {
-			taskDepend := &RunTaskDepend{
+			taskDepend := &types.RunTaskDepend{
 				TaskID:     td.TaskID,
 				Conditions: make([]string, len(td.Conditions)),
 			}
@@ -152,16 +91,16 @@ func (n *NotificationService) generatewebhook(ctx context.Context, ev *rstypes.R
 		task.Approved = t.Approved
 		task.StartTime = t.StartTime
 		task.EndTime = t.EndTime
-		task.SetupStep = RunTaskStep{
+		task.SetupStep = types.RunTaskStep{
 			Phase:      string(t.SetupStep.Phase),
 			ExitStatus: t.SetupStep.ExitStatus,
 			StartTime:  t.SetupStep.StartTime,
 			EndTime:    t.SetupStep.EndTime,
 		}
 
-		steps := make([]*RunTaskStep, len(t.Steps))
+		steps := make([]*types.RunTaskStep, len(t.Steps))
 		for i, s := range t.Steps {
-			step := &RunTaskStep{
+			step := &types.RunTaskStep{
 				Phase:      string(s.Phase),
 				ExitStatus: s.ExitStatus,
 				StartTime:  s.StartTime,

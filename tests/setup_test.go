@@ -65,6 +65,7 @@ import (
 	cstypes "agola.io/agola/services/configstore/types"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
+	nstypes "agola.io/agola/services/notification/types"
 	rstypes "agola.io/agola/services/runservice/types"
 )
 
@@ -308,12 +309,13 @@ func setup(ctx context.Context, t *testing.T, dir string, opts ...setupOption) *
 	sc.config = &config.Config{
 		ID: "agola",
 		Gateway: config.Gateway{
-			Debug:          false,
-			APIExposedURL:  "",
-			WebExposedURL:  "",
-			RunserviceURL:  "",
-			ConfigstoreURL: "",
-			GitserverURL:   "",
+			Debug:           false,
+			APIExposedURL:   "",
+			WebExposedURL:   "",
+			RunserviceURL:   "",
+			ConfigstoreURL:  "",
+			GitserverURL:    "",
+			NotificationURL: "",
 			Web: config.Web{
 				ListenAddress: "",
 				TLS:           false,
@@ -342,6 +344,10 @@ func setup(ctx context.Context, t *testing.T, dir string, opts ...setupOption) *
 			DB: config.DB{
 				Type:       dbType,
 				ConnString: notificationDBConnString,
+			},
+			Web: config.Web{
+				ListenAddress: ":4004",
+				TLS:           false,
 			},
 		},
 		Runservice: config.Runservice{
@@ -419,10 +425,12 @@ func setup(ctx context.Context, t *testing.T, dir string, opts ...setupOption) *
 		executorAPIToken := "executorapitoken"
 		configstoreAPIToken := "configstoreapitoken"
 		gitserverAPIToken := "gitserverapitoken"
+		notificationAPIToken := "notificationserverapitoken"
 
 		sc.config.Gateway.RunserviceAPIToken = runserviceAPIToken
 		sc.config.Gateway.ConfigstoreAPIToken = configstoreAPIToken
 		sc.config.Gateway.GitserverAPIToken = gitserverAPIToken
+		sc.config.Gateway.NotificationAPIToken = notificationAPIToken
 
 		sc.config.Scheduler.RunserviceAPIToken = runserviceAPIToken
 
@@ -456,6 +464,10 @@ func setup(ctx context.Context, t *testing.T, dir string, opts ...setupOption) *
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
+	nsPort, err := testutil.GetFreePort(dockerBridgeAddress, true, false)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 	gitServerPort, err := testutil.GetFreePort(dockerBridgeAddress, true, false)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -465,18 +477,22 @@ func setup(ctx context.Context, t *testing.T, dir string, opts ...setupOption) *
 	csURL := fmt.Sprintf("http://%s:%s", dockerBridgeAddress, csPort)
 	rsURL := fmt.Sprintf("http://%s:%s", dockerBridgeAddress, rsPort)
 	gitServerURL := fmt.Sprintf("http://%s:%s", dockerBridgeAddress, gitServerPort)
+	nsURL := fmt.Sprintf("http://%s:%s", dockerBridgeAddress, nsPort)
 
 	sc.config.Gateway.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, gwPort)
 	sc.config.Configstore.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, csPort)
 	sc.config.Runservice.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, rsPort)
 	sc.config.Executor.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, exPort)
+	sc.config.Notification.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, nsPort)
 	sc.config.Gitserver.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, gitServerPort)
+	sc.config.Notification.Web.ListenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, nsPort)
 
 	sc.config.Gateway.APIExposedURL = gwURL
 	sc.config.Gateway.WebExposedURL = gwURL
 	sc.config.Gateway.RunserviceURL = rsURL
 	sc.config.Gateway.ConfigstoreURL = csURL
 	sc.config.Gateway.GitserverURL = gitServerURL
+	sc.config.Gateway.NotificationURL = nsURL
 
 	sc.config.Scheduler.RunserviceURL = rsURL
 
@@ -1243,6 +1259,12 @@ func withParentRef(parentRef string) func(*gwapitypes.CreateProjectRequest) {
 func withMembersCanPerformRunActions(membersCanPerformRunActions bool) func(*gwapitypes.CreateProjectRequest) {
 	return func(p *gwapitypes.CreateProjectRequest) {
 		p.MembersCanPerformRunActions = membersCanPerformRunActions
+	}
+}
+
+func withVisibility(visibility gwapitypes.Visibility) func(*gwapitypes.CreateProjectRequest) {
+	return func(p *gwapitypes.CreateProjectRequest) {
+		p.Visibility = visibility
 	}
 }
 
@@ -6514,6 +6536,235 @@ func TestProjectRunActions(t *testing.T) {
 		}
 		if err.Error() != expectedErr {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+		}
+	})
+}
+
+func TestGetProjectRunWebhookDeliveries(t *testing.T) {
+	t.Parallel()
+
+	config := `
+		{
+			runs: [
+			{
+				name: 'run01',
+				tasks: [
+				{
+					name: 'task01',
+					runtime: {
+					containers: [
+						{
+						image: 'alpine/git',
+						},
+					],
+					},
+					steps: [
+					{ type: 'run', command: 'env' },
+					],
+				},
+				],
+			},
+			],
+		}
+	`
+
+	dir := t.TempDir()
+	wrDir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	wr := setupWebhooksReceiver(ctx, t, wrDir)
+	defer wr.stop()
+
+	sc := setup(ctx, t, dir, withGitea(true), withWebhooks(fmt.Sprintf("%s/%s", wr.exposedURL, "webhooks"), "secretkey"))
+	defer sc.stop()
+
+	giteaToken, tokenUser01 := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+	gwUser01Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01)
+	gwUserAdminClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
+
+	_, _, err := gwUserAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser02})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	user02Token, _, err := gwUserAdminClient.CreateUserToken(ctx, agolaUser02, &gwapitypes.CreateUserTokenRequest{TokenName: "token01"})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	gwUser02Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, user02Token.Token)
+
+	giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+
+	giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	giteaRepo, project := createProject(ctx, t, giteaClient, gwUser01Client, withVisibility(gwapitypes.VisibilityPrivate))
+
+	push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
+
+	_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+		if err != nil {
+			return false, nil
+		}
+
+		if len(runs) == 0 {
+			return false, nil
+		}
+		if runs[0].Phase != rstypes.RunPhaseFinished {
+			return false, nil
+		}
+
+		return true, nil
+	})
+
+	runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(runs) == 0 {
+		t.Fatalf("expected %d run got: %d", 1, len(runs))
+	}
+
+	if runs[0].Phase != rstypes.RunPhaseFinished {
+		t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, runs[0].Phase)
+	}
+	if runs[0].Result != rstypes.RunResultSuccess {
+		t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, runs[0].Result)
+	}
+
+	_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+		if err != nil {
+			return false, nil
+		}
+
+		if len(runWebhookDeliveries) != 4 {
+			return false, nil
+		}
+		for _, r := range runWebhookDeliveries {
+			if r.DeliveryStatus != gwapitypes.DeliveryStatusDelivered {
+				return false, nil
+			}
+		}
+
+		return true, nil
+	})
+
+	t.Run("test get project run webhook deliveries", func(t *testing.T) {
+		runWebhookDeliveries, resp, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if len(runWebhookDeliveries) != 4 {
+			t.Fatalf("expected 4 runWebhookDeliveries got: %d", len(runWebhookDeliveries))
+		}
+		if resp.Cursor != "" {
+			t.Fatalf("expected empty cursor, got %s", resp.Cursor)
+		}
+		for _, r := range runWebhookDeliveries {
+			if r.DeliveryStatus != gwapitypes.DeliveryStatusDelivered {
+				t.Fatalf("expected DeliveryStatus delivered, got %s", r.DeliveryStatus)
+			}
+		}
+	})
+
+	t.Run("test get project run webhook deliveries with limit less than project run webhook deliveries continuation", func(t *testing.T) {
+		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		respAllRunWebhookDeliveries := []*gwapitypes.RunWebhookDeliveryResponse{}
+
+		respRunWebhookDeliveries, resp, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 1, SortDirection: gwapitypes.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		expectedRunWebhookDeliveries := 1
+		if len(respRunWebhookDeliveries) != expectedRunWebhookDeliveries {
+			t.Fatalf("expected %d project run webhook deliveries, got %d project run webhook deliveries", expectedRunWebhookDeliveries, len(respRunWebhookDeliveries))
+		}
+		if resp.Cursor == "" {
+			t.Fatalf("expected cursor, got no cursor")
+		}
+
+		respAllRunWebhookDeliveries = append(respAllRunWebhookDeliveries, respRunWebhookDeliveries...)
+
+		// fetch next results
+		for {
+			respRunWebhookDeliveries, resp, err = gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Cursor: resp.Cursor, Limit: 1})
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			if resp.Cursor != "" && len(respRunWebhookDeliveries) != expectedRunWebhookDeliveries {
+				t.Fatalf("expected %d project run webhook deliveries, got %d project run webhook deliveries", expectedRunWebhookDeliveries, len(respRunWebhookDeliveries))
+			}
+
+			respAllRunWebhookDeliveries = append(respAllRunWebhookDeliveries, respRunWebhookDeliveries...)
+
+			if resp.Cursor == "" {
+				break
+			}
+		}
+
+		expectedRunWebhookDeliveries = 4
+		if len(respAllRunWebhookDeliveries) != expectedRunWebhookDeliveries {
+			t.Fatalf("expected %d project run webhook deliveries, got %d project run webhook deliveries", expectedRunWebhookDeliveries, len(respAllRunWebhookDeliveries))
+		}
+
+		if diff := cmp.Diff(runWebhookDeliveries, respAllRunWebhookDeliveries); diff != "" {
+			t.Fatalf("mismatch (-want +got):\n%s", diff)
+		}
+	})
+
+	t.Run("test get project run webhook deliveries with user unauthorized", func(t *testing.T) {
+		_, _, err = gwUser02Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+		if err == nil {
+			t.Fatalf("expected error %v, got nil err", remoteErrorForbidden)
+		}
+		if err.Error() != remoteErrorForbidden {
+			t.Fatalf("expected err %v, got err: %v", remoteErrorForbidden, err)
+		}
+	})
+
+	t.Run("test get project run webhook deliveries with not existing project", func(t *testing.T) {
+		_, _, err = gwUser01Client.GetProjectRunWebhookDeliveries(ctx, "project02", nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+		if err == nil {
+			t.Fatalf("expected error %v, got nil err", remoteErrorNotExist)
+		}
+		if err.Error() != remoteErrorNotExist {
+			t.Fatalf("expected err %v, got err: %v", remoteErrorNotExist, err)
+		}
+	})
+
+	t.Run("test get project run webhook deliveries with deliverystatus = delivered", func(t *testing.T) {
+		runWebhookDeliveries, resp, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, []string{string(nstypes.DeliveryStatusDelivered)}, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if len(runWebhookDeliveries) != 4 {
+			t.Fatalf("expected 4 runWebhookDeliveries got: %d", len(runWebhookDeliveries))
+		}
+		if resp.Cursor != "" {
+			t.Fatalf("expected empty cursor, got %s", resp.Cursor)
+		}
+	})
+
+	t.Run("test get project run webhook deliveries with deliverystatus = deliveryError", func(t *testing.T) {
+		runWebhookDeliveries, resp, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, []string{string(nstypes.DeliveryStatusDeliveryError)}, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if len(runWebhookDeliveries) != 0 {
+			t.Fatalf("expected 0 runWebhookDeliveries got: %d", len(runWebhookDeliveries))
+		}
+		if resp.Cursor != "" {
+			t.Fatalf("expected empty cursor, got %s", resp.Cursor)
 		}
 	})
 }
