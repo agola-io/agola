@@ -16,10 +16,16 @@ package notification
 
 import (
 	"context"
+	"time"
+
+	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/services/notification/types"
+	"agola.io/agola/internal/sqlg/lock"
+	"agola.io/agola/internal/sqlg/sql"
+	nstypes "agola.io/agola/services/notification/types"
 	rstypes "agola.io/agola/services/runservice/types"
 )
 
@@ -31,6 +37,12 @@ const (
 	agolaDeliveryHeader = "X-Agola-Delivery"
 
 	webhookVersion = 1
+
+	webhooksCleanerLockKey = "webhookscleaner"
+
+	maxRunWebhooksQueryLimit = 40
+
+	runWebhooksCleanerInterval = 1 * 24 * time.Hour
 )
 
 type AgolaEventType string
@@ -114,4 +126,74 @@ func (n *NotificationService) generatewebhook(ctx context.Context, ev *rstypes.R
 	}
 
 	return webhook
+}
+
+func (n *NotificationService) runWebhooksCleanerLoop(ctx context.Context, runWebhookExpireInterval time.Duration) {
+	n.log.Debug().Msgf("webhookCleanerLoop")
+
+	for {
+		if err := n.runWebhooksCleaner(ctx, runWebhookExpireInterval); err != nil {
+			n.log.Warn().Err(err).Msgf("webhooksCleaner error")
+		}
+
+		sleepCh := time.NewTimer(runWebhooksCleanerInterval).C
+		select {
+		case <-ctx.Done():
+			return
+		case <-sleepCh:
+		}
+	}
+}
+
+func (n *NotificationService) runWebhooksCleaner(ctx context.Context, runWebhookExpireInterval time.Duration) error {
+	l := n.lf.NewLock(webhooksCleanerLockKey)
+	if err := l.TryLock(ctx); err != nil {
+		if errors.Is(err, lock.ErrLocked) {
+			return nil
+		}
+		return errors.WithStack(err)
+	}
+	defer func() { _ = l.Unlock() }()
+
+	for {
+		var runWebhooks []*nstypes.RunWebhook
+		var afterRunWebhookID string
+
+		err := n.d.Do(ctx, func(tx *sql.Tx) error {
+			var err error
+			runWebhooks, err = n.d.GetRunWebhooksAfterRunWebhookID(tx, afterRunWebhookID, maxRunWebhooksQueryLimit)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+
+			for _, r := range runWebhooks {
+				if time.Since(r.CreationTime) < runWebhookExpireInterval {
+					continue
+				}
+
+				err = n.d.DeleteRunWebhookDeliveriesByRunWebhookID(tx, r.ID)
+				if err != nil {
+					return errors.WithStack(err)
+				}
+
+				err = n.d.DeleteRunWebhook(tx, r.ID)
+				if err != nil {
+					return errors.WithStack(err)
+				}
+			}
+
+			return nil
+		})
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		if len(runWebhooks) < maxRunWebhooksQueryLimit {
+			break
+		}
+
+		afterRunWebhookID = runWebhooks[len(runWebhooks)-1].ID
+	}
+
+	return nil
 }

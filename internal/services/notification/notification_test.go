@@ -377,6 +377,26 @@ func createRunWebhookDelivery(t *testing.T, ctx context.Context, ns *Notificatio
 	return wd
 }
 
+func updateRunWebhookCreationDate(t *testing.T, ctx context.Context, ns *NotificationService, runWebhookID string, creationTime time.Time) {
+	err := ns.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		runWebhook, err := ns.d.GetRunWebhookByID(tx, runWebhookID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		runWebhook.CreationTime = creationTime
+		if err := ns.d.UpdateRunWebhook(tx, runWebhook); err != nil {
+			return errors.WithStack(err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+}
+
 func TestCommitStatusDelivery(t *testing.T) {
 	t.Parallel()
 
@@ -708,6 +728,72 @@ func TestDeliveryStatusFromStringSlice(t *testing.T) {
 	}
 	if err.Error() != expectedErr {
 		t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+	}
+}
+
+func TestRunWebhooksCleaner(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	log := testutil.NewLogger(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ns := setupNotificationService(ctx, t, log, dir)
+
+	t.Logf("starting ns")
+
+	expectedRunWebhooks := make([]*types.RunWebhook, 0)
+	expectedRunWebhookDeliveries := make([]*types.RunWebhookDelivery, 0)
+
+	for i := 0; i < 5; i++ {
+		runWebhook := createRunWebhook(t, ctx, ns, project01)
+		expectedRunWebhooks = append(expectedRunWebhooks, runWebhook)
+
+		expectedRunWebhookDeliveries = append(expectedRunWebhookDeliveries, createRunWebhookDelivery(t, ctx, ns, runWebhook.ID, types.DeliveryStatusDelivered))
+		expectedRunWebhookDeliveries = append(expectedRunWebhookDeliveries, createRunWebhookDelivery(t, ctx, ns, runWebhook.ID, types.DeliveryStatusNotDelivered))
+	}
+
+	for i := 0; i < 5; i++ {
+		runWebhook := createRunWebhook(t, ctx, ns, project02)
+		expectedRunWebhooks = append(expectedRunWebhooks, runWebhook)
+
+		expectedRunWebhookDeliveries = append(expectedRunWebhookDeliveries, createRunWebhookDelivery(t, ctx, ns, runWebhook.ID, types.DeliveryStatusDelivered))
+		expectedRunWebhookDeliveries = append(expectedRunWebhookDeliveries, createRunWebhookDelivery(t, ctx, ns, runWebhook.ID, types.DeliveryStatusNotDelivered))
+	}
+
+	runWebhookCreationTime := time.Now().Add(-1 * time.Hour)
+	for i := 0; i < 50; i++ {
+		runWebhook := createRunWebhook(t, ctx, ns, project01)
+		createRunWebhookDelivery(t, ctx, ns, runWebhook.ID, types.DeliveryStatusDelivered)
+		createRunWebhookDelivery(t, ctx, ns, runWebhook.ID, types.DeliveryStatusNotDelivered)
+
+		updateRunWebhookCreationDate(t, ctx, ns, runWebhook.ID, runWebhookCreationTime)
+	}
+
+	err := ns.runWebhooksCleaner(ctx, 30*time.Minute)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	runWebhooks := getRunWebhooks(t, ctx, ns)
+	if len(runWebhooks) != len(expectedRunWebhooks) {
+		t.Fatalf("expected %d run webhooks got: %d", len(expectedRunWebhooks), len(runWebhooks))
+	}
+	if diff := cmpDiffObject(runWebhooks, expectedRunWebhooks); diff != "" {
+		t.Fatalf("mismatch (-want +got):\n%s", diff)
+	}
+
+	runWebhookDeliveries := getRunWebhookDeliveries(t, ctx, ns)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(runWebhookDeliveries) != len(expectedRunWebhookDeliveries) {
+		t.Fatalf("expected %d run webhooks got: %d", len(expectedRunWebhookDeliveries), len(runWebhookDeliveries))
+	}
+	if diff := cmpDiffObject(runWebhookDeliveries, expectedRunWebhookDeliveries); diff != "" {
+		t.Fatalf("mismatch (-want +got):\n%s", diff)
 	}
 }
 
