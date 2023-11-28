@@ -35,17 +35,19 @@ import (
 	"agola.io/agola/internal/sqlg"
 	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/internal/testutil"
+	"agola.io/agola/internal/util"
 	"agola.io/agola/services/notification/types"
 	rsclient "agola.io/agola/services/runservice/client"
 	rstypes "agola.io/agola/services/runservice/types"
 )
 
 const (
-	webhookSecret  = "secretkey"
-	webhookPayload = "payloadtest"
-	webhookURL     = "testWebhookURL"
-	project01      = "project01id"
-	project02      = "project02id"
+	webhookSecret        = "secretkey"
+	webhookPayload       = "payloadtest"
+	webhookURL           = "testWebhookURL"
+	project01            = "project01id"
+	project02            = "project02id"
+	runWebhookDelivery01 = "runwebhookdelivery01id"
 )
 
 // setupNotificationService don't start the notification service but just create it to manually call its methods
@@ -712,4 +714,209 @@ func TestDeliveryStatusFromStringSlice(t *testing.T) {
 func cmpDiffObject(x, y interface{}) string {
 	// Since postgres has microsecond time precision while go has nanosecond time precision we should check times with a microsecond margin
 	return cmp.Diff(x, y, cmpopts.IgnoreFields(sqlg.ObjectMeta{}, "TxID"), cmpopts.EquateApproxTime(1*time.Microsecond))
+}
+
+func TestProjectRunWebhookRedelivery(t *testing.T) {
+	t.Parallel()
+
+	t.Run("test project run webhook redelivery with deliverystatus = deliveryError", func(t *testing.T) {
+		dir := t.TempDir()
+		log := testutil.NewLogger(t)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		ns := setupNotificationService(ctx, t, log, dir)
+
+		t.Logf("starting ns")
+
+		time.Sleep(1 * time.Second)
+
+		runWebhook := createRunWebhook(t, ctx, ns, project01)
+		runWebhookDelivery := createRunWebhookDelivery(t, ctx, ns, runWebhook.ID, types.DeliveryStatusDeliveryError)
+
+		wr := setupWebhooksReceiver(ctx, t)
+		defer wr.stop()
+
+		t.Logf("starting webhooks client")
+
+		ns.c.WebhookSecret = webhookSecret
+		ns.c.WebhookURL = fmt.Sprintf("%s/%s", wr.exposedURL, "webhooks")
+
+		err := ns.ah.RunWebhookRedelivery(ctx, runWebhook.ProjectID, runWebhookDelivery.ID)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		if err := ns.runWebhookDeliveriesHandler(ctx); err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, SortDirection: types.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if len(res.RunWebhookDeliveries) != 2 {
+			t.Fatalf("expected 2 RunWebhookDeliveries got: %d", len(res.RunWebhookDeliveries))
+		}
+		if res.RunWebhookDeliveries[0].DeliveryStatus != types.DeliveryStatusDeliveryError {
+			t.Fatalf("expected %q DeliveryStatus got: %q", types.DeliveryStatusDeliveryError, res.RunWebhookDeliveries[0].DeliveryStatus)
+		}
+		if res.RunWebhookDeliveries[1].DeliveryStatus != types.DeliveryStatusDelivered {
+			t.Fatalf("expected %q DeliveryStatus got: %q", types.DeliveryStatusDelivered, res.RunWebhookDeliveries[1].DeliveryStatus)
+		}
+	})
+
+	t.Run("test project run webhook redelivery with deliverystatus = delivered", func(t *testing.T) {
+		dir := t.TempDir()
+		log := testutil.NewLogger(t)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		ns := setupNotificationService(ctx, t, log, dir)
+
+		t.Logf("starting ns")
+
+		time.Sleep(1 * time.Second)
+
+		runWebhook := createRunWebhook(t, ctx, ns, project01)
+		runWebhookDelivery := createRunWebhookDelivery(t, ctx, ns, runWebhook.ID, types.DeliveryStatusDelivered)
+
+		wr := setupWebhooksReceiver(ctx, t)
+		defer wr.stop()
+
+		t.Logf("starting webhooks client")
+
+		ns.c.WebhookSecret = webhookSecret
+		ns.c.WebhookURL = fmt.Sprintf("%s/%s", wr.exposedURL, "webhooks")
+
+		err := ns.ah.RunWebhookRedelivery(ctx, runWebhook.ProjectID, runWebhookDelivery.ID)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		if err := ns.runWebhookDeliveriesHandler(ctx); err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, SortDirection: types.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if len(res.RunWebhookDeliveries) != 2 {
+			t.Fatalf("expected 2 RunWebhookDeliveries got: %d", len(res.RunWebhookDeliveries))
+		}
+		if res.RunWebhookDeliveries[0].DeliveryStatus != types.DeliveryStatusDelivered {
+			t.Fatalf("expected %q DeliveryStatus got: %q", types.DeliveryStatusDelivered, res.RunWebhookDeliveries[0].DeliveryStatus)
+		}
+		if res.RunWebhookDeliveries[1].DeliveryStatus != types.DeliveryStatusDelivered {
+			t.Fatalf("expected %q DeliveryStatus got: %q", types.DeliveryStatusDelivered, res.RunWebhookDeliveries[1].DeliveryStatus)
+		}
+	})
+
+	t.Run("test redelivery not existing project run webhook delivery", func(t *testing.T) {
+		dir := t.TempDir()
+		log := testutil.NewLogger(t)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		ns := setupNotificationService(ctx, t, log, dir)
+
+		t.Logf("starting ns")
+
+		time.Sleep(1 * time.Second)
+
+		runWebhook := createRunWebhook(t, ctx, ns, project01)
+
+		expectedErr := util.NewAPIError(util.ErrNotExist, errors.Errorf("runWebhookDelivery %q doesn't exist", runWebhookDelivery01))
+		err := ns.ah.RunWebhookRedelivery(ctx, runWebhook.ProjectID, runWebhookDelivery01)
+		if err == nil {
+			t.Fatalf("expected error %v, got nil err", expectedErr)
+		}
+		if err.Error() != expectedErr.Error() {
+			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+		}
+	})
+
+	t.Run("test project run webhook redelivery with projectID that belong to another project", func(t *testing.T) {
+		dir := t.TempDir()
+		log := testutil.NewLogger(t)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		ns := setupNotificationService(ctx, t, log, dir)
+
+		t.Logf("starting ns")
+
+		time.Sleep(1 * time.Second)
+
+		runWebhook := createRunWebhook(t, ctx, ns, project01)
+		runWebhookDelivery := createRunWebhookDelivery(t, ctx, ns, runWebhook.ID, types.DeliveryStatusDelivered)
+
+		runWebhook = createRunWebhook(t, ctx, ns, project02)
+		createRunWebhookDelivery(t, ctx, ns, runWebhook.ID, types.DeliveryStatusDelivered)
+
+		expectedErr := util.NewAPIError(util.ErrNotExist, errors.Errorf("runWebhookDelivery %q doesn't belong to project %q", runWebhookDelivery.ID, project02))
+
+		err := ns.ah.RunWebhookRedelivery(ctx, project02, runWebhookDelivery.ID)
+		if err == nil {
+			t.Fatalf("expected error %v, got nil err", expectedErr)
+		}
+		if err.Error() != expectedErr.Error() {
+			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+		}
+	})
+
+	t.Run("test project run webhook redelivery with the last delivery that hasn't been delivered", func(t *testing.T) {
+		dir := t.TempDir()
+		log := testutil.NewLogger(t)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		ns := setupNotificationService(ctx, t, log, dir)
+
+		t.Logf("starting ns")
+
+		time.Sleep(1 * time.Second)
+
+		runWebhook := createRunWebhook(t, ctx, ns, project01)
+		runWebhookDelivery := createRunWebhookDelivery(t, ctx, ns, runWebhook.ID, types.DeliveryStatusNotDelivered)
+
+		wr := setupWebhooksReceiver(ctx, t)
+		defer wr.stop()
+
+		t.Logf("starting webhooks client")
+
+		ns.c.WebhookSecret = webhookSecret
+		ns.c.WebhookURL = fmt.Sprintf("%s/%s", wr.exposedURL, "webhooks")
+
+		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("the previous delivery of run webhook %q hasn't already been delivered", runWebhookDelivery.RunWebhookID))
+
+		err := ns.ah.RunWebhookRedelivery(ctx, runWebhook.ProjectID, runWebhookDelivery.ID)
+		if err == nil {
+			t.Fatalf("expected error %v, got nil err", expectedErr)
+		}
+		if err.Error() != expectedErr.Error() {
+			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+		}
+
+		if err := ns.runWebhookDeliveriesHandler(ctx); err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, SortDirection: types.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if len(res.RunWebhookDeliveries) != 1 {
+			t.Fatalf("expected 1 RunWebhookDeliveries got: %d", len(res.RunWebhookDeliveries))
+		}
+		if res.RunWebhookDeliveries[0].DeliveryStatus != types.DeliveryStatusDelivered {
+			t.Fatalf("expected %q DeliveryStatus got: %q", types.DeliveryStatusDelivered, res.RunWebhookDeliveries[0].DeliveryStatus)
+		}
+	})
 }

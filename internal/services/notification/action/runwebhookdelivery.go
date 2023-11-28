@@ -20,6 +20,7 @@ import (
 	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/sqlg/sql"
+	"agola.io/agola/internal/util"
 	"agola.io/agola/services/notification/types"
 )
 
@@ -71,4 +72,52 @@ func (h *ActionHandler) GetProjectRunWebhookDeliveries(ctx context.Context, req 
 		RunWebhookDeliveries: runWebookDeliveries,
 		HasMore:              hasMore,
 	}, nil
+}
+
+func (h *ActionHandler) RunWebhookRedelivery(ctx context.Context, projectID string, runWebhookDeliveryID string) error {
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		runWebhookDelivery, err := h.d.GetRunWebhookDeliveryByID(tx, runWebhookDeliveryID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if runWebhookDelivery == nil {
+			return util.NewAPIError(util.ErrNotExist, errors.Errorf("runWebhookDelivery %q doesn't exist", runWebhookDeliveryID))
+		}
+
+		runWebhook, err := h.d.GetRunWebhookByID(tx, runWebhookDelivery.RunWebhookID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if runWebhook == nil {
+			return util.NewAPIError(util.ErrNotExist, errors.Errorf("runWebhook %q doesn't exist", runWebhookDelivery.RunWebhookID))
+		}
+		if runWebhook.ProjectID != projectID {
+			return util.NewAPIError(util.ErrNotExist, errors.Errorf("runWebhookDelivery %q doesn't belong to project %q", runWebhookDeliveryID, projectID))
+		}
+
+		runWebhookDeliveries, err := h.d.GetRunWebhookDeliveriesByRunWebhookID(tx, runWebhookDelivery.RunWebhookID, []types.DeliveryStatus{types.DeliveryStatusNotDelivered}, 1, types.SortDirectionDesc)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		// check if runWebhook has delivery not delivered
+		if len(runWebhookDeliveries) != 0 {
+			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("the previous delivery of run webhook %q hasn't already been delivered", runWebhookDelivery.RunWebhookID))
+		}
+
+		newRunWebhookDelivery := types.NewRunWebhookDelivery(tx)
+		newRunWebhookDelivery.DeliveryStatus = types.DeliveryStatusNotDelivered
+		newRunWebhookDelivery.RunWebhookID = runWebhookDelivery.RunWebhookID
+		err = h.d.InsertRunWebhookDelivery(tx, newRunWebhookDelivery)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
 }
