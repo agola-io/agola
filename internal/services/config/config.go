@@ -134,6 +134,8 @@ type Notification struct {
 
 	WebhookURL    string `yaml:"webhookURL"`
 	WebhookSecret string `yaml:"webhookSecret"`
+
+	RunWebhookExpireInterval time.Duration `yaml:"runWebhookExpireInterval"`
 }
 
 type Runservice struct {
@@ -357,6 +359,9 @@ var defaultConfig = func() *Config {
 		Gitserver: Gitserver{
 			RepositoryCleanupInterval:    24 * time.Hour,
 			RepositoryRefsExpireInterval: 30 * 24 * time.Hour,
+		},
+		Notification: Notification{
+			RunWebhookExpireInterval: 7 * 24 * time.Hour,
 		},
 	}
 }

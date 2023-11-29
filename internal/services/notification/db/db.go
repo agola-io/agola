@@ -186,6 +186,23 @@ func (d *DB) GetRunWebhooks(tx *sql.Tx, limit int) ([]*types.RunWebhook, error) 
 	return runWebhooks, errors.WithStack(err)
 }
 
+func (d *DB) GetRunWebhooksAfterRunWebhookID(tx *sql.Tx, afterRunWebhookID string, limit int) ([]*types.RunWebhook, error) {
+	q := runWebhookSelect().OrderBy("id")
+	if afterRunWebhookID != "" {
+		q.Where(q.G("id", afterRunWebhookID))
+	}
+
+	if limit > 0 {
+		q.Limit(limit)
+	}
+	runWebhooks, _, err := d.fetchRunWebhooks(tx, q)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return runWebhooks, errors.WithStack(err)
+}
+
 func (d *DB) GetLastRunEventSequence(tx *sql.Tx) (*types.LastRunEventSequence, error) {
 	q := lastRunEventSequenceSelect()
 	lastRunEventSequences, _, err := d.fetchLastRunEventSequences(tx, q)
@@ -247,4 +264,16 @@ func (d *DB) GetCommitStatuses(tx *sql.Tx, limit int) ([]*types.CommitStatus, er
 	}
 
 	return commitStatuses, errors.WithStack(err)
+}
+
+func (d *DB) DeleteRunWebhookDeliveriesByRunWebhookID(tx *sql.Tx, runWebhookID string) error {
+	q := sq.NewDeleteBuilder()
+	q.DeleteFrom("runwebhookdelivery")
+	q.Where(q.E("run_webhook_id", runWebhookID))
+
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to delete runWebhookdeliveries")
+	}
+
+	return nil
 }
