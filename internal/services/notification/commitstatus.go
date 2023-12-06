@@ -19,13 +19,24 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/gateway/action"
+	"agola.io/agola/internal/sqlg/lock"
+	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/services/notification/types"
 	rstypes "agola.io/agola/services/runservice/types"
+)
+
+const (
+	commitStatusesCleanerLockKey = "commitStatusesCleaner"
+
+	maxCommitStatusesQueryLimit = 40
+
+	commitStatusesCleanerInterval = 1 * 24 * time.Hour
 )
 
 type commitStatus struct {
@@ -121,4 +132,74 @@ func statusDescription(state types.CommitState) string {
 	default:
 		return ""
 	}
+}
+
+func (n *NotificationService) commitStatusesCleanerLoop(ctx context.Context, commitStatusExpireInterval time.Duration) {
+	n.log.Debug().Msgf("commitStatusesCleanerLoop")
+
+	for {
+		if err := n.commitStatusesCleaner(ctx, commitStatusExpireInterval); err != nil {
+			n.log.Warn().Err(err).Msgf("commitStatusesCleaner error")
+		}
+
+		sleepCh := time.NewTimer(commitStatusesCleanerInterval).C
+		select {
+		case <-ctx.Done():
+			return
+		case <-sleepCh:
+		}
+	}
+}
+
+func (n *NotificationService) commitStatusesCleaner(ctx context.Context, commitStatusExpireInterval time.Duration) error {
+	l := n.lf.NewLock(commitStatusesCleanerLockKey)
+	if err := l.TryLock(ctx); err != nil {
+		if errors.Is(err, lock.ErrLocked) {
+			return nil
+		}
+		return errors.WithStack(err)
+	}
+	defer func() { _ = l.Unlock() }()
+
+	for {
+		var commitStatuses []*types.CommitStatus
+		var afterCommitStatusID string
+
+		err := n.d.Do(ctx, func(tx *sql.Tx) error {
+			var err error
+			commitStatuses, err = n.d.GetCommitStatusesAfterCommitStatusID(tx, afterCommitStatusID, maxCommitStatusesQueryLimit)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+
+			for _, c := range commitStatuses {
+				if time.Since(c.CreationTime) < commitStatusExpireInterval {
+					continue
+				}
+
+				err = n.d.DeleteCommitStatusDeliveriesByCommitStatusID(tx, c.ID)
+				if err != nil {
+					return errors.WithStack(err)
+				}
+
+				err = n.d.DeleteCommitStatus(tx, c.ID)
+				if err != nil {
+					return errors.WithStack(err)
+				}
+			}
+
+			return nil
+		})
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		if len(commitStatuses) < maxCommitStatusesQueryLimit {
+			break
+		}
+
+		afterCommitStatusID = commitStatuses[len(commitStatuses)-1].ID
+	}
+
+	return nil
 }
