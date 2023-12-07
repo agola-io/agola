@@ -277,3 +277,32 @@ func (d *DB) DeleteRunWebhookDeliveriesByRunWebhookID(tx *sql.Tx, runWebhookID s
 
 	return nil
 }
+
+func (d *DB) GetCommitStatusesAfterCommitStatusID(tx *sql.Tx, afterCommitStatusID string, limit int) ([]*types.CommitStatus, error) {
+	q := commitStatusSelect().OrderBy("id")
+	if afterCommitStatusID != "" {
+		q.Where(q.G("id", afterCommitStatusID))
+	}
+
+	if limit > 0 {
+		q.Limit(limit)
+	}
+	commitStatuses, _, err := d.fetchCommitStatuss(tx, q)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return commitStatuses, errors.WithStack(err)
+}
+
+func (d *DB) DeleteCommitStatusDeliveriesByCommitStatusID(tx *sql.Tx, commitStatusID string) error {
+	q := sq.NewDeleteBuilder()
+	q.DeleteFrom("commitstatusdelivery")
+	q.Where(q.E("commit_status_id", commitStatusID))
+
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to delete commitStatus deliveries")
+	}
+
+	return nil
+}

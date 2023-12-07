@@ -351,7 +351,8 @@ func setup(ctx context.Context, t *testing.T, dir string, opts ...setupOption) *
 				ListenAddress: ":4004",
 				TLS:           false,
 			},
-			RunWebhookExpireInterval: 7 * 24 * time.Hour,
+			RunWebhookExpireInterval:   7 * 24 * time.Hour,
+			CommitStatusExpireInterval: 7 * 24 * time.Hour,
 		},
 		Runservice: config.Runservice{
 			Debug:   false,

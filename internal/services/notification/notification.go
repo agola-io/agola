@@ -180,6 +180,7 @@ func (n *NotificationService) run(ctx context.Context) error {
 	util.GoWait(&wg, func() { n.RunWebhookDeliveriesHandlerLoop(ctx) })
 	util.GoWait(&wg, func() { n.CommitStatusDeliveriesHandlerLoop(ctx) })
 	util.GoWait(&wg, func() { n.runWebhooksCleanerLoop(ctx, n.c.RunWebhookExpireInterval) })
+	util.GoWait(&wg, func() { n.commitStatusesCleanerLoop(ctx, n.c.CommitStatusExpireInterval) })
 
 	mainrouter := n.setupDefaultRouter()
 	httpServer := http.Server{

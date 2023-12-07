@@ -529,6 +529,45 @@ func createCommitStatus(t *testing.T, ctx context.Context, ns *NotificationServi
 	return cs
 }
 
+func updateCommitStatusCreationDate(t *testing.T, ctx context.Context, ns *NotificationService, commitStatusID string, creationTime time.Time) {
+	err := ns.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		commitStatus, err := ns.d.GetCommitStatusByID(tx, commitStatusID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		commitStatus.CreationTime = creationTime
+		if err := ns.d.UpdateCommitStatus(tx, commitStatus); err != nil {
+			return errors.WithStack(err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+}
+
+func getCommitStatuses(t *testing.T, ctx context.Context, ns *NotificationService) []*types.CommitStatus {
+	var commitStatuses []*types.CommitStatus
+
+	err := ns.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		commitStatuses, err = ns.d.GetCommitStatuses(tx, 0)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	return commitStatuses
+}
+
 func getCommitStatusDeliveries(t *testing.T, ctx context.Context, ns *NotificationService) []*types.CommitStatusDelivery {
 	var wd []*types.CommitStatusDelivery
 
@@ -1005,4 +1044,62 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 			t.Fatalf("expected %q DeliveryStatus got: %q", types.DeliveryStatusDelivered, res.RunWebhookDeliveries[0].DeliveryStatus)
 		}
 	})
+}
+
+func TestCommitStatusesCleaner(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	log := testutil.NewLogger(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ns := setupNotificationService(ctx, t, log, dir)
+
+	t.Logf("starting ns")
+
+	expectedCommitStatuses := make([]*types.CommitStatus, 0)
+	expectedCommitStatusDeliveries := make([]*types.CommitStatusDelivery, 0)
+
+	for i := 0; i < 5; i++ {
+		commitStatus := createCommitStatus(t, ctx, ns, 1)
+		expectedCommitStatuses = append(expectedCommitStatuses, commitStatus)
+
+		expectedCommitStatusDeliveries = append(expectedCommitStatusDeliveries, createCommitStatusDelivery(t, ctx, ns, commitStatus.ID, types.DeliveryStatusDelivered))
+		expectedCommitStatusDeliveries = append(expectedCommitStatusDeliveries, createCommitStatusDelivery(t, ctx, ns, commitStatus.ID, types.DeliveryStatusNotDelivered))
+	}
+
+	commitStatusCreationTime := time.Now().Add(-1 * time.Hour)
+	for i := 0; i < 50; i++ {
+		commitStatus := createCommitStatus(t, ctx, ns, i)
+		createCommitStatusDelivery(t, ctx, ns, commitStatus.ID, types.DeliveryStatusDelivered)
+		createCommitStatusDelivery(t, ctx, ns, commitStatus.ID, types.DeliveryStatusNotDelivered)
+
+		updateCommitStatusCreationDate(t, ctx, ns, commitStatus.ID, commitStatusCreationTime)
+	}
+
+	err := ns.commitStatusesCleaner(ctx, 30*time.Minute)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	commitStatuses := getCommitStatuses(t, ctx, ns)
+	if len(commitStatuses) != len(expectedCommitStatuses) {
+		t.Fatalf("expected %d run commitStatuses got: %d", len(expectedCommitStatuses), len(commitStatuses))
+	}
+	if diff := cmpDiffObject(commitStatuses, expectedCommitStatuses); diff != "" {
+		t.Fatalf("mismatch (-want +got):\n%s", diff)
+	}
+
+	commitStatusDeliveries := getCommitStatusDeliveries(t, ctx, ns)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(commitStatusDeliveries) != len(expectedCommitStatusDeliveries) {
+		t.Fatalf("expected %d run commitStatusDeliveries got: %d", len(expectedCommitStatusDeliveries), len(commitStatusDeliveries))
+	}
+	if diff := cmpDiffObject(commitStatusDeliveries, expectedCommitStatusDeliveries); diff != "" {
+		t.Fatalf("mismatch (-want +got):\n%s", diff)
+	}
 }

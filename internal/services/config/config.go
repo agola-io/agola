@@ -135,7 +135,8 @@ type Notification struct {
 	WebhookURL    string `yaml:"webhookURL"`
 	WebhookSecret string `yaml:"webhookSecret"`
 
-	RunWebhookExpireInterval time.Duration `yaml:"runWebhookExpireInterval"`
+	RunWebhookExpireInterval   time.Duration `yaml:"runWebhookExpireInterval"`
+	CommitStatusExpireInterval time.Duration `yaml:"commitStatusExpireInterval"`
 }
 
 type Runservice struct {
@@ -361,7 +362,8 @@ var defaultConfig = func() *Config {
 			RepositoryRefsExpireInterval: 30 * 24 * time.Hour,
 		},
 		Notification: Notification{
-			RunWebhookExpireInterval: 7 * 24 * time.Hour,
+			RunWebhookExpireInterval:   7 * 24 * time.Hour,
+			CommitStatusExpireInterval: 7 * 24 * time.Hour,
 		},
 	}
 }
