@@ -201,6 +201,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	refreshRemoteRepositoryInfoHandler := api.NewRefreshRemoteRepositoryInfoHandler(g.log, g.ah)
 	projectRunWebhookDeliveriesHandler := api.NewProjectRunWebhookDeliveriesHandler(g.log, g.ah)
 	projectRunWebhookRedeliveryHandler := api.NewProjectRunWebhookRedeliveryHandler(g.log, g.ah)
+	projectCommitStatusDeliveriesHandler := api.NewProjectCommitStatusDeliveriesHandler(g.log, g.ah)
 
 	secretHandler := api.NewSecretHandler(g.log, g.ah)
 	createSecretHandler := api.NewCreateSecretHandler(g.log, g.ah)
@@ -322,6 +323,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/projects/{projectref}/refreshremoterepo", authForcedHandler(refreshRemoteRepositoryInfoHandler)).Methods("POST")
 	apirouter.Handle("/projects/{projectref}/runwebhookdeliveries", authForcedHandler(projectRunWebhookDeliveriesHandler)).Methods("GET")
 	apirouter.Handle("/projects/{projectref}/runwebhookdeliveries/{runwebhookdeliveryid}/redelivery", authForcedHandler(projectRunWebhookRedeliveryHandler)).Methods("PUT")
+	apirouter.Handle("/projects/{projectref}/commitstatusdeliveries", authForcedHandler(projectCommitStatusDeliveriesHandler)).Methods("GET")
 
 	apirouter.Handle("/projectgroups/{projectgroupref}/secrets", authForcedHandler(secretHandler)).Methods("GET")
 	apirouter.Handle("/projects/{projectref}/secrets", authForcedHandler(secretHandler)).Methods("GET")

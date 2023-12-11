@@ -144,3 +144,31 @@ func (c *Client) RunWebhookRedelivery(ctx context.Context, projectID, runWebhook
 	resp, err := c.GetResponse(ctx, "PUT", fmt.Sprintf("/projects/%s/runwebhookdeliveries/%s/redelivery", projectID, runWebhookDeliveryID), nil, -1, common.JSONContent, nil)
 	return resp, errors.WithStack(err)
 }
+
+type GetProjectCommitStatusDeliveriesOptions struct {
+	*ListOptions
+
+	StartSequence        uint64
+	DeliveryStatusFilter []string
+}
+
+func (o *GetProjectCommitStatusDeliveriesOptions) Add(q url.Values) {
+	o.ListOptions.Add(q)
+
+	if o.StartSequence > 0 {
+		q.Add("startsequence", strconv.FormatUint(o.StartSequence, 10))
+	}
+}
+
+func (c *Client) GetProjectCommitStatusDeliveries(ctx context.Context, projectID string, opts *GetProjectCommitStatusDeliveriesOptions) ([]*types.CommitStatusDelivery, *Response, error) {
+	q := url.Values{}
+	opts.Add(q)
+
+	for _, deliveryStatus := range opts.DeliveryStatusFilter {
+		q.Add("deliverystatus", deliveryStatus)
+	}
+
+	commitStatusDeliveries := []*types.CommitStatusDelivery{}
+	resp, err := c.GetParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s/commitstatusdeliveries", projectID), q, common.JSONContent, nil, &commitStatusDeliveries)
+	return commitStatusDeliveries, resp, errors.WithStack(err)
+}
