@@ -71,7 +71,7 @@ func (n *NotificationService) commitStatusDeliveriesHandler(ctx context.Context)
 
 		err := n.d.Do(ctx, func(tx *sql.Tx) error {
 			var err error
-			commitStatusDeliveries, err = n.d.GetCommitStatusDeliveriesAfterSequence(tx, curCommitStatusDeliverySequence, types.DeliveryStatusNotDelivered, MaxCommitStatusDeliveriesQueryLimit)
+			commitStatusDeliveries, err = n.d.GetProjectCommitStatusDeliveriesAfterSequenceByProjectID(tx, curCommitStatusDeliverySequence, "", []types.DeliveryStatus{types.DeliveryStatusNotDelivered}, MaxCommitStatusDeliveriesQueryLimit, types.SortDirectionAsc)
 			if err != nil {
 				return errors.WithStack(err)
 			}

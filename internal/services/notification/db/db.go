@@ -161,6 +161,18 @@ func (d *DB) GetRunWebhookDeliveryByID(tx *sql.Tx, runWebhookDeliveryID string) 
 	return out, errors.WithStack(err)
 }
 
+func (d *DB) DeleteRunWebhookDeliveriesByRunWebhookID(tx *sql.Tx, runWebhookID string) error {
+	q := sq.NewDeleteBuilder()
+	q.DeleteFrom("runwebhookdelivery")
+	q.Where(q.E("run_webhook_id", runWebhookID))
+
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to delete runWebhookdeliveries")
+	}
+
+	return nil
+}
+
 func (d *DB) GetRunWebhookByID(tx *sql.Tx, runWebhookID string) (*types.RunWebhook, error) {
 	q := runWebhookSelect()
 	q.Where(q.E("id", runWebhookID))
@@ -214,11 +226,8 @@ func (d *DB) GetLastRunEventSequence(tx *sql.Tx) (*types.LastRunEventSequence, e
 	return out, errors.WithStack(err)
 }
 
-func (d *DB) GetCommitStatusDeliveriesAfterSequence(tx *sql.Tx, afterSequence uint64, deliveryStatus types.DeliveryStatus, limit int) ([]*types.CommitStatusDelivery, error) {
+func (d *DB) GetCommitStatusDeliveriesAfterSequence(tx *sql.Tx, afterSequence uint64, limit int) ([]*types.CommitStatusDelivery, error) {
 	q := commitStatusDeliverySelect().OrderBy("sequence").Asc()
-	if deliveryStatus != "" {
-		q.Where(q.E("delivery_status", deliveryStatus))
-	}
 	q.Where(q.G("sequence", afterSequence))
 
 	if limit > 0 {
@@ -266,18 +275,6 @@ func (d *DB) GetCommitStatuses(tx *sql.Tx, limit int) ([]*types.CommitStatus, er
 	return commitStatuses, errors.WithStack(err)
 }
 
-func (d *DB) DeleteRunWebhookDeliveriesByRunWebhookID(tx *sql.Tx, runWebhookID string) error {
-	q := sq.NewDeleteBuilder()
-	q.DeleteFrom("runwebhookdelivery")
-	q.Where(q.E("run_webhook_id", runWebhookID))
-
-	if _, err := d.exec(tx, q); err != nil {
-		return errors.Wrap(err, "failed to delete runWebhookdeliveries")
-	}
-
-	return nil
-}
-
 func (d *DB) GetCommitStatusesAfterCommitStatusID(tx *sql.Tx, afterCommitStatusID string, limit int) ([]*types.CommitStatus, error) {
 	q := commitStatusSelect().OrderBy("id")
 	if afterCommitStatusID != "" {
@@ -293,6 +290,38 @@ func (d *DB) GetCommitStatusesAfterCommitStatusID(tx *sql.Tx, afterCommitStatusI
 	}
 
 	return commitStatuses, errors.WithStack(err)
+}
+
+func (d *DB) GetProjectCommitStatusDeliveriesAfterSequenceByProjectID(tx *sql.Tx, afterSequence uint64, projectID string, deliveryStatusFilter []types.DeliveryStatus, limit int, sortDirection types.SortDirection) ([]*types.CommitStatusDelivery, error) {
+	q := commitStatusDeliverySelect().OrderBy("sequence")
+
+	if projectID != "" {
+		q.Join("commitstatus", "commitstatus.id = commitstatusdelivery.commit_status_id")
+		q.Where(q.E("commitstatus.project_id", projectID))
+	}
+	if len(deliveryStatusFilter) > 0 {
+		q.Where(q.In("delivery_status", sq.Flatten(deliveryStatusFilter)...))
+	}
+
+	switch sortDirection {
+	case types.SortDirectionAsc:
+		q.Asc()
+	case types.SortDirectionDesc:
+		q.Desc()
+	}
+	switch sortDirection {
+	case types.SortDirectionAsc:
+		q.Where(q.G("sequence", afterSequence))
+	case types.SortDirectionDesc:
+		q.Where(q.L("sequence", afterSequence))
+	}
+
+	if limit > 0 {
+		q.Limit(limit)
+	}
+
+	commitStatusDeliveries, _, err := d.fetchCommitStatusDeliverys(tx, q)
+	return commitStatusDeliveries, errors.WithStack(err)
 }
 
 func (d *DB) DeleteCommitStatusDeliveriesByCommitStatusID(tx *sql.Tx, commitStatusID string) error {

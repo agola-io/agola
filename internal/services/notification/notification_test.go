@@ -408,7 +408,7 @@ func TestCommitStatusDelivery(t *testing.T) {
 
 		commitStatuses := make([]*types.CommitStatus, MaxCommitStatusDeliveriesQueryLimit+10)
 		for i := 0; i < len(commitStatuses); i++ {
-			commitStatuses[i] = createCommitStatus(t, ctx, ns, i)
+			commitStatuses[i] = createCommitStatus(t, ctx, ns, i, fmt.Sprintf("projectID-%d", i))
 			createCommitStatusDelivery(t, ctx, ns, commitStatuses[i].ID, types.DeliveryStatusNotDelivered)
 		}
 
@@ -479,7 +479,7 @@ func TestCommitStatusDelivery(t *testing.T) {
 		s.setFailUpdateCommitStatus(true)
 		ns.u = s
 
-		commitStatus := createCommitStatus(t, ctx, ns, 1)
+		commitStatus := createCommitStatus(t, ctx, ns, 1, project01)
 		createCommitStatusDelivery(t, ctx, ns, commitStatus.ID, types.DeliveryStatusNotDelivered)
 
 		if err := ns.commitStatusDeliveriesHandler(ctx); err != nil {
@@ -496,16 +496,17 @@ func TestCommitStatusDelivery(t *testing.T) {
 	})
 }
 
-func createCommitStatus(t *testing.T, ctx context.Context, ns *NotificationService, n int) *types.CommitStatus {
+func createCommitStatus(t *testing.T, ctx context.Context, ns *NotificationService, runCounter int, projectID string) *types.CommitStatus {
 	var cs *types.CommitStatus
 
 	err := ns.d.Do(ctx, func(tx *sql.Tx) error {
 		cs = types.NewCommitStatus(tx)
-		cs.CommitSHA = fmt.Sprintf("commitSHA-%d", n)
-		cs.Context = fmt.Sprintf("context-%d", n)
+		// CommitSHAuse and Context use dumb values
+		cs.CommitSHA = fmt.Sprintf("commitSHA-%d", runCounter)
+		cs.Context = fmt.Sprintf("context-%d", runCounter)
 		cs.Description = "The run finished successfully"
-		cs.ProjectID = fmt.Sprintf("projectID-%d", n)
-		cs.RunCounter = uint64(n)
+		cs.ProjectID = projectID
+		cs.RunCounter = uint64(runCounter)
 		cs.State = types.CommitStateSuccess
 
 		if err := ns.d.InsertCommitStatus(tx, cs); err != nil {
@@ -565,7 +566,7 @@ func getCommitStatusDeliveries(t *testing.T, ctx context.Context, ns *Notificati
 
 	err := ns.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		wd, err = ns.d.GetCommitStatusDeliveriesAfterSequence(tx, 0, "", 0)
+		wd, err = ns.d.GetCommitStatusDeliveriesAfterSequence(tx, 0, 0)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -1031,7 +1032,7 @@ func TestCommitStatusesCleaner(t *testing.T) {
 	expectedCommitStatusDeliveries := make([]*types.CommitStatusDelivery, 0)
 
 	for i := 0; i < 5; i++ {
-		commitStatus := createCommitStatus(t, ctx, ns, 1)
+		commitStatus := createCommitStatus(t, ctx, ns, 1, fmt.Sprintf("projectID-%d", i))
 		expectedCommitStatuses = append(expectedCommitStatuses, commitStatus)
 
 		expectedCommitStatusDeliveries = append(expectedCommitStatusDeliveries, createCommitStatusDelivery(t, ctx, ns, commitStatus.ID, types.DeliveryStatusDelivered))
@@ -1040,7 +1041,7 @@ func TestCommitStatusesCleaner(t *testing.T) {
 
 	commitStatusCreationTime := time.Now().Add(-1 * time.Hour)
 	for i := 0; i < 50; i++ {
-		commitStatus := createCommitStatus(t, ctx, ns, i)
+		commitStatus := createCommitStatus(t, ctx, ns, i, fmt.Sprintf("projectID-%d", i))
 		createCommitStatusDelivery(t, ctx, ns, commitStatus.ID, types.DeliveryStatusDelivered)
 		createCommitStatusDelivery(t, ctx, ns, commitStatus.ID, types.DeliveryStatusNotDelivered)
 
@@ -1070,4 +1071,131 @@ func TestCommitStatusesCleaner(t *testing.T) {
 	if diff := cmpDiffObject(commitStatusDeliveries, expectedCommitStatusDeliveries); diff != "" {
 		t.Fatalf("mismatch (-want +got):\n%s", diff)
 	}
+}
+
+func TestGetProjectCommitStatusDeliveries(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	log := testutil.NewLogger(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ns := setupNotificationService(ctx, t, log, dir)
+
+	commitStatuses := make([]*types.CommitStatus, 10)
+	project01CommitStatusDeliveries := make([]*types.CommitStatusDelivery, 0)
+	for i := 0; i < len(commitStatuses); i++ {
+		commitStatuses[i] = createCommitStatus(t, ctx, ns, i, project01)
+		project01CommitStatusDeliveries = append(project01CommitStatusDeliveries, createCommitStatusDelivery(t, ctx, ns, commitStatuses[i].ID, types.DeliveryStatusDelivered))
+		project01CommitStatusDeliveries = append(project01CommitStatusDeliveries, createCommitStatusDelivery(t, ctx, ns, commitStatuses[i].ID, types.DeliveryStatusNotDelivered))
+	}
+
+	for i := 0; i < len(commitStatuses); i++ {
+		commitStatuses[i] = createCommitStatus(t, ctx, ns, i, project02)
+		createCommitStatusDelivery(t, ctx, ns, commitStatuses[i].ID, types.DeliveryStatusDelivered)
+		createCommitStatusDelivery(t, ctx, ns, commitStatuses[i].ID, types.DeliveryStatusNotDelivered)
+	}
+
+	t.Run("test get commit status deliveries with limit = 0", func(t *testing.T) {
+		res, err := ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{ProjectID: project01, Limit: 0})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if res.HasMore != false {
+			t.Fatalf("unexpected HasMore true")
+		}
+		if len(res.CommitStatusDeliveries) != 20 {
+			t.Fatalf("expected 20 commit status deliveries, got %d", len(res.CommitStatusDeliveries))
+		}
+	})
+
+	t.Run("test get commit status deliveries with limit = 10", func(t *testing.T) {
+		res, err := ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{ProjectID: project01, Limit: 10})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if res.HasMore != true {
+			t.Fatalf("unexpected HasMore false")
+		}
+		if len(res.CommitStatusDeliveries) != 10 {
+			t.Fatalf("expected 10 commit status deliveries, got %d", len(res.CommitStatusDeliveries))
+		}
+	})
+
+	t.Run("test get commit status deliveries with deliverystatusfilter = delivered", func(t *testing.T) {
+		res, err := ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{ProjectID: project01, DeliveryStatusFilter: []types.DeliveryStatus{types.DeliveryStatusDelivered}, Limit: 0})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if res.HasMore != false {
+			t.Fatalf("unexpected HasMore true")
+		}
+		if len(res.CommitStatusDeliveries) != 10 {
+			t.Fatalf("expected 10 commit status deliveries, got %d", len(res.CommitStatusDeliveries))
+		}
+	})
+
+	t.Run("test get commit status deliveries with deliverystatusfilter = delivered and limit less than commit status deliveries", func(t *testing.T) {
+		res, err := ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{ProjectID: project01, DeliveryStatusFilter: []types.DeliveryStatus{types.DeliveryStatusDelivered}, Limit: 5})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if res.HasMore != true {
+			t.Fatalf("unexpected HasMore false")
+		}
+		if len(res.CommitStatusDeliveries) != 5 {
+			t.Fatalf("expected 5 commit status deliveries, got %d", len(res.CommitStatusDeliveries))
+		}
+	})
+
+	t.Run("test get commit status deliveries with limit less than commit status deliveries continuation", func(t *testing.T) {
+		respAllProjectCommitStatusDeliveries := []*types.CommitStatusDelivery{}
+
+		res, err := ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{ProjectID: project01, Limit: 5, SortDirection: types.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		expectedProjectCommitStatusDeliveries := 5
+		if len(res.CommitStatusDeliveries) != expectedProjectCommitStatusDeliveries {
+			t.Fatalf("expected %d project commit status deliveries, got %d project commit status deliveries", expectedProjectCommitStatusDeliveries, len(res.CommitStatusDeliveries))
+		}
+		if !res.HasMore {
+			t.Fatalf("expected hasMore true, got %t", res.HasMore)
+		}
+
+		respAllProjectCommitStatusDeliveries = append(respAllProjectCommitStatusDeliveries, res.CommitStatusDeliveries...)
+		lastProjectCommitStatusDelivery := res.CommitStatusDeliveries[len(res.CommitStatusDeliveries)-1]
+
+		// fetch next results
+		for {
+			res, err = ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{ProjectID: project01, StartSequence: lastProjectCommitStatusDelivery.Sequence, Limit: 5, SortDirection: types.SortDirectionAsc})
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			if res.HasMore && len(res.CommitStatusDeliveries) != expectedProjectCommitStatusDeliveries {
+				t.Fatalf("expected %d project commit status deliveries, got %d project commit status deliveries", expectedProjectCommitStatusDeliveries, len(res.CommitStatusDeliveries))
+			}
+
+			respAllProjectCommitStatusDeliveries = append(respAllProjectCommitStatusDeliveries, res.CommitStatusDeliveries...)
+
+			if !res.HasMore {
+				break
+			}
+
+			lastProjectCommitStatusDelivery = res.CommitStatusDeliveries[len(res.CommitStatusDeliveries)-1]
+		}
+
+		expectedProjectCommitStatusDeliveries = 20
+		if len(respAllProjectCommitStatusDeliveries) != expectedProjectCommitStatusDeliveries {
+			t.Fatalf("expected %d project commit status deliveries, got %d project commit status deliveries", expectedProjectCommitStatusDeliveries, len(respAllProjectCommitStatusDeliveries))
+		}
+
+		if diff := cmpDiffObject(project01CommitStatusDeliveries, respAllProjectCommitStatusDeliveries); diff != "" {
+			t.Fatalf("mismatch (-want +got):\n%s", diff)
+		}
+	})
 }
