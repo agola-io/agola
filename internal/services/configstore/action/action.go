@@ -15,6 +15,8 @@
 package action
 
 import (
+	"sync"
+
 	"github.com/rs/zerolog"
 	"github.com/sorintlab/errors"
 
@@ -26,10 +28,11 @@ import (
 )
 
 type ActionHandler struct {
-	log             zerolog.Logger
-	d               *db.DB
-	lf              lock.LockFactory
-	maintenanceMode bool
+	log                  zerolog.Logger
+	d                    *db.DB
+	lf                   lock.LockFactory
+	maintenanceMode      bool
+	maintenanceModeMutex sync.Mutex
 }
 
 func NewActionHandler(log zerolog.Logger, d *db.DB, lf lock.LockFactory) *ActionHandler {
@@ -39,10 +42,6 @@ func NewActionHandler(log zerolog.Logger, d *db.DB, lf lock.LockFactory) *Action
 		lf:              lf,
 		maintenanceMode: false,
 	}
-}
-
-func (h *ActionHandler) SetMaintenanceMode(maintenanceMode bool) {
-	h.maintenanceMode = maintenanceMode
 }
 
 func (h *ActionHandler) ResolveObjectID(tx *sql.Tx, objectKind types.ObjectKind, ref string) (string, error) {
