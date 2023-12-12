@@ -84,10 +84,6 @@ func TestRunWebhookDelivery(t *testing.T) {
 
 		ns := setupNotificationService(ctx, t, log, dir)
 
-		t.Logf("starting ns")
-
-		time.Sleep(1 * time.Second)
-
 		wr := setupWebhooksReceiver(ctx, t)
 		defer wr.stop()
 
@@ -164,10 +160,6 @@ func TestRunWebhookDelivery(t *testing.T) {
 		defer cancel()
 
 		ns := setupNotificationService(ctx, t, log, dir)
-
-		t.Logf("starting ns")
-
-		time.Sleep(1 * time.Second)
 
 		runWebhook := createRunWebhook(t, ctx, ns, project01)
 		createRunWebhookDelivery(t, ctx, ns, runWebhook.ID, types.DeliveryStatusNotDelivered)
@@ -619,10 +611,6 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 
 	ns := setupNotificationService(ctx, t, log, dir)
 
-	t.Logf("starting ns")
-
-	time.Sleep(1 * time.Second)
-
 	runWebhooks := make([]*types.RunWebhook, 10)
 	project01RunWebhookDeliveries := make([]*types.RunWebhookDelivery, 0)
 	for i := 0; i < len(runWebhooks); i++ {
@@ -853,10 +841,6 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 
 		ns := setupNotificationService(ctx, t, log, dir)
 
-		t.Logf("starting ns")
-
-		time.Sleep(1 * time.Second)
-
 		runWebhook := createRunWebhook(t, ctx, ns, project01)
 		runWebhookDelivery := createRunWebhookDelivery(t, ctx, ns, runWebhook.ID, types.DeliveryStatusDeliveryError)
 
@@ -900,10 +884,6 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		defer cancel()
 
 		ns := setupNotificationService(ctx, t, log, dir)
-
-		t.Logf("starting ns")
-
-		time.Sleep(1 * time.Second)
 
 		runWebhook := createRunWebhook(t, ctx, ns, project01)
 		runWebhookDelivery := createRunWebhookDelivery(t, ctx, ns, runWebhook.ID, types.DeliveryStatusDelivered)
@@ -949,10 +929,6 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 
 		ns := setupNotificationService(ctx, t, log, dir)
 
-		t.Logf("starting ns")
-
-		time.Sleep(1 * time.Second)
-
 		runWebhook := createRunWebhook(t, ctx, ns, project01)
 
 		expectedErr := util.NewAPIError(util.ErrNotExist, errors.Errorf("runWebhookDelivery %q doesn't exist", runWebhookDelivery01))
@@ -973,10 +949,6 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		defer cancel()
 
 		ns := setupNotificationService(ctx, t, log, dir)
-
-		t.Logf("starting ns")
-
-		time.Sleep(1 * time.Second)
 
 		runWebhook := createRunWebhook(t, ctx, ns, project01)
 		runWebhookDelivery := createRunWebhookDelivery(t, ctx, ns, runWebhook.ID, types.DeliveryStatusDelivered)
@@ -1003,10 +975,6 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		defer cancel()
 
 		ns := setupNotificationService(ctx, t, log, dir)
-
-		t.Logf("starting ns")
-
-		time.Sleep(1 * time.Second)
 
 		runWebhook := createRunWebhook(t, ctx, ns, project01)
 		runWebhookDelivery := createRunWebhookDelivery(t, ctx, ns, runWebhook.ID, types.DeliveryStatusNotDelivered)
