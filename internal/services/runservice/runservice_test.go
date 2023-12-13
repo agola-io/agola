@@ -117,24 +117,11 @@ func TestExportImport(t *testing.T) {
 	t.Logf("starting rs")
 	go func() { _ = rs.Run(ctx) }()
 
-	time.Sleep(1 * time.Second)
-
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 20; i++ {
 		if _, err := rs.ah.CreateRun(ctx, &action.RunCreateRequest{Group: "/user/user01", RunConfigTasks: map[string]*types.RunConfigTask{"task01": {}}}); err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
 	}
-
-	time.Sleep(5 * time.Second)
-
-	// Do some more changes
-	for i := 10; i < 20; i++ {
-		if _, err := rs.ah.CreateRun(ctx, &action.RunCreateRequest{Group: "/user/user01", RunConfigTasks: map[string]*types.RunConfigTask{"task01": {}}}); err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
-	}
-
-	time.Sleep(5 * time.Second)
 
 	runs, err := getRuns(ctx, rs)
 	if err != nil {
@@ -150,21 +137,33 @@ func TestExportImport(t *testing.T) {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	if err := rs.ah.MaintenanceMode(ctx, true); err != nil {
+	if err := rs.ah.SetMaintenanceEnabled(ctx, true); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	time.Sleep(5 * time.Second)
+	_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		if !rs.ah.IsMaintenanceMode() {
+			return false, nil
+		}
+
+		return true, nil
+	})
 
 	if err := rs.ah.Import(ctx, &export); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	if err := rs.ah.MaintenanceMode(ctx, false); err != nil {
+	if err := rs.ah.SetMaintenanceEnabled(ctx, false); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	time.Sleep(5 * time.Second)
+	_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		if rs.ah.IsMaintenanceMode() {
+			return false, nil
+		}
+
+		return true, nil
+	})
 
 	newRuns, err := getRuns(ctx, rs)
 	if err != nil {
@@ -210,8 +209,6 @@ func TestConcurrentRunCreation(t *testing.T) {
 
 	t.Logf("starting rs")
 	go func() { _ = rs.Run(ctx) }()
-
-	time.Sleep(1 * time.Second)
 
 	startCh := make(chan struct{})
 	var startWg sync.WaitGroup
@@ -266,8 +263,6 @@ func TestGetRunsLastRun(t *testing.T) {
 
 	t.Logf("starting rs")
 	go func() { _ = rs.Run(ctx) }()
-
-	time.Sleep(1 * time.Second)
 
 	groups := []string{"/user/user01", "/user/user02"}
 
