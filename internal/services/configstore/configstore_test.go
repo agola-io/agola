@@ -173,8 +173,6 @@ func TestExportImport(t *testing.T) {
 	t.Logf("starting cs")
 	go func() { _ = cs.Run(ctx) }()
 
-	time.Sleep(1 * time.Second)
-
 	var expectedRemoteSourcesCount int
 	var expectedUsersCount int
 	var expectedOrgsCount int
@@ -188,18 +186,7 @@ func TestExportImport(t *testing.T) {
 	}
 	expectedRemoteSourcesCount++
 
-	for i := 0; i < 10; i++ {
-		if _, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)}); err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
-		expectedUsersCount++
-		expectedProjectGroupsCount++
-	}
-
-	time.Sleep(5 * time.Second)
-
-	// Do some more changes
-	for i := 10; i < 20; i++ {
+	for i := 0; i < 20; i++ {
 		if _, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)}); err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -314,21 +301,33 @@ func TestExportImport(t *testing.T) {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	if err := cs.ah.MaintenanceMode(ctx, true); err != nil {
+	if err := cs.ah.SetMaintenanceEnabled(ctx, true); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	time.Sleep(5 * time.Second)
+	_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		if !cs.ah.IsMaintenanceMode() {
+			return false, nil
+		}
+
+		return true, nil
+	})
 
 	if err := cs.ah.Import(ctx, &export); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	if err := cs.ah.MaintenanceMode(ctx, false); err != nil {
+	if err := cs.ah.SetMaintenanceEnabled(ctx, false); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 
-	time.Sleep(5 * time.Second)
+	_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		if cs.ah.IsMaintenanceMode() {
+			return false, nil
+		}
+
+		return true, nil
+	})
 
 	newRemoteSources, err := getRemoteSources(ctx, cs)
 	if err != nil {

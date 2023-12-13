@@ -39,6 +39,20 @@ var (
 	maintenanceTableDDL = fmt.Sprintf("create table if not exists %s (enabled boolean not null, time timestamptz not null)", maintenanceTableName)
 )
 
+func (h *ActionHandler) IsMaintenanceMode() bool {
+	h.maintenanceModeMutex.Lock()
+	defer h.maintenanceModeMutex.Unlock()
+
+	return h.maintenanceMode
+}
+
+func (h *ActionHandler) SetMaintenanceMode(maintenanceMode bool) {
+	h.maintenanceModeMutex.Lock()
+	defer h.maintenanceModeMutex.Unlock()
+
+	h.maintenanceMode = maintenanceMode
+}
+
 func isMaintenanceEnabled(d *db.DB, tx *sql.Tx) (bool, error) {
 	var enabled *bool
 	sb := sq.Select("enabled").From(maintenanceTableName)
@@ -76,7 +90,7 @@ func (h *ActionHandler) IsMaintenanceEnabled(ctx context.Context) (bool, error) 
 	return enabled, nil
 }
 
-func (h *ActionHandler) MaintenanceMode(ctx context.Context, enable bool) error {
+func (h *ActionHandler) SetMaintenanceEnabled(ctx context.Context, enable bool) error {
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		if _, err := tx.Exec(maintenanceTableDDL); err != nil {
 			return errors.Wrapf(err, "failed to create %s table", maintenanceTableName)

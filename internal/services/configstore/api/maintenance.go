@@ -25,13 +25,13 @@ import (
 )
 
 type MaintenanceStatusHandler struct {
-	log               zerolog.Logger
-	ah                *action.ActionHandler
-	maintenanceRouter bool
+	log                    zerolog.Logger
+	ah                     *action.ActionHandler
+	currentMaintenanceMode bool
 }
 
-func NewMaintenanceStatusHandler(log zerolog.Logger, ah *action.ActionHandler, maintenanceRouter bool) *MaintenanceStatusHandler {
-	return &MaintenanceStatusHandler{log: log, ah: ah, maintenanceRouter: maintenanceRouter}
+func NewMaintenanceStatusHandler(log zerolog.Logger, ah *action.ActionHandler, currentMaintenanceMode bool) *MaintenanceStatusHandler {
+	return &MaintenanceStatusHandler{log: log, ah: ah, currentMaintenanceMode: currentMaintenanceMode}
 }
 
 func (h *MaintenanceStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -44,7 +44,7 @@ func (h *MaintenanceStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	resp := csapitypes.MaintenanceStatusResponse{RequestedStatus: requestedStatus, CurrentStatus: h.maintenanceRouter}
+	resp := csapitypes.MaintenanceStatusResponse{RequestedStatus: requestedStatus, CurrentStatus: h.currentMaintenanceMode}
 	if err := util.HTTPResponse(w, http.StatusOK, resp); err != nil {
 		h.log.Err(err).Send()
 	}
@@ -70,7 +70,7 @@ func (h *MaintenanceModeHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		enable = false
 	}
 
-	err := h.ah.MaintenanceMode(ctx, enable)
+	err := h.ah.SetMaintenanceEnabled(ctx, enable)
 	if err != nil {
 		h.log.Err(err).Send()
 		util.HTTPError(w, err)
