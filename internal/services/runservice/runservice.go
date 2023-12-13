@@ -39,14 +39,14 @@ import (
 	"agola.io/agola/internal/util"
 )
 
-func (s *Runservice) maintenanceModeWatcherLoop(ctx context.Context, runCtxCancel context.CancelFunc, maintenanceModeEnabled bool) {
-	s.log.Info().Msgf("maintenance mode watcher: maintenance mode enabled: %t", maintenanceModeEnabled)
+func (s *Runservice) maintenanceModeWatcherLoop(ctx context.Context, runCtxCancel context.CancelFunc, maintenanceMode bool) {
+	s.log.Info().Msgf("maintenance mode watcher: maintenance mode enabled: %t", maintenanceMode)
 
 	for {
 		s.log.Debug().Msgf("maintenanceModeWatcherLoop")
 
 		// at first watch restart from previous processed revision
-		if err := s.maintenanceModeWatcher(ctx, runCtxCancel, maintenanceModeEnabled); err != nil {
+		if err := s.maintenanceModeWatcher(ctx, runCtxCancel, maintenanceMode); err != nil {
 			s.log.Err(err).Msgf("maintenance mode watcher error")
 		}
 
@@ -59,13 +59,13 @@ func (s *Runservice) maintenanceModeWatcherLoop(ctx context.Context, runCtxCance
 	}
 }
 
-func (s *Runservice) maintenanceModeWatcher(ctx context.Context, runCtxCancel context.CancelFunc, maintenanceModeEnabled bool) error {
+func (s *Runservice) maintenanceModeWatcher(ctx context.Context, runCtxCancel context.CancelFunc, maintenanceMode bool) error {
 	maintenanceEnabled, err := s.ah.IsMaintenanceEnabled(ctx)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	if maintenanceEnabled != maintenanceModeEnabled {
+	if maintenanceEnabled != maintenanceMode {
 		s.log.Info().Msgf("maintenance mode changed to %t", maintenanceEnabled)
 		runCtxCancel()
 	}

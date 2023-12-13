@@ -18,6 +18,7 @@ import (
 	"context"
 	"path"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/gofrs/uuid"
@@ -35,11 +36,12 @@ import (
 )
 
 type ActionHandler struct {
-	log             zerolog.Logger
-	d               *db.DB
-	ost             *objectstorage.ObjStorage
-	lf              lock.LockFactory
-	maintenanceMode bool
+	log                  zerolog.Logger
+	d                    *db.DB
+	ost                  *objectstorage.ObjStorage
+	lf                   lock.LockFactory
+	maintenanceMode      bool
+	maintenanceModeMutex sync.Mutex
 }
 
 func NewActionHandler(log zerolog.Logger, d *db.DB, ost *objectstorage.ObjStorage, lf lock.LockFactory) *ActionHandler {
@@ -50,10 +52,6 @@ func NewActionHandler(log zerolog.Logger, d *db.DB, ost *objectstorage.ObjStorag
 		lf:              lf,
 		maintenanceMode: false,
 	}
-}
-
-func (h *ActionHandler) SetMaintenanceMode(maintenanceMode bool) {
-	h.maintenanceMode = maintenanceMode
 }
 
 type RunChangePhaseRequest struct {
