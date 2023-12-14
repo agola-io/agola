@@ -828,3 +828,16 @@ func (c *Client) GetProjectRunWebhookDeliveries(ctx context.Context, projectRef 
 func (c *Client) ProjectRunWebhookRedelivery(ctx context.Context, projectRef string, runWebhookDeliveryID string) (*Response, error) {
 	return c.getResponse(ctx, "PUT", fmt.Sprintf("/projects/%s/runwebhookdeliveries/%s/redelivery", projectRef, runWebhookDeliveryID), nil, jsonContent, nil)
 }
+
+func (c *Client) GetProjectCommitStatusDeliveries(ctx context.Context, projectRef string, deliveryStatusFilter []string, opts *ListOptions) ([]*gwapitypes.CommitStatusDeliveryResponse, *Response, error) {
+	q := url.Values{}
+	opts.Add(q)
+
+	for _, deliveryStatus := range deliveryStatusFilter {
+		q.Add("deliverystatus", deliveryStatus)
+	}
+
+	commitStatusDeliveries := []*gwapitypes.CommitStatusDeliveryResponse{}
+	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s/commitstatusdeliveries", url.PathEscape(projectRef)), q, common.JSONContent, nil, &commitStatusDeliveries)
+	return commitStatusDeliveries, resp, errors.WithStack(err)
+}

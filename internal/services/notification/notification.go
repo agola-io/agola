@@ -122,6 +122,7 @@ func NewNotificationService(ctx context.Context, log zerolog.Logger, gc *config.
 func (n *NotificationService) setupDefaultRouter() http.Handler {
 	runWebhookDeliveriesHandler := api.NewRunWebhookDeliveriesHandler(n.log, n.ah)
 	runWebhookReliveryHandler := api.NewRunWebhookRedeliveryHandler(n.log, n.ah)
+	commitStatusDeliveriesHandler := api.NewCommitStatusDeliveriesHandler(n.log, n.ah)
 
 	authHandler := handlers.NewInternalAuthChecker(n.log, n.c.APIToken)
 
@@ -136,6 +137,8 @@ func (n *NotificationService) setupDefaultRouter() http.Handler {
 	apirouter.Handle("/projects/{projectid}/runwebhookdeliveries", runWebhookDeliveriesHandler).Methods("GET")
 
 	apirouter.Handle("/projects/{projectid}/runwebhookdeliveries/{runwebhookdeliveryid}/redelivery", runWebhookReliveryHandler).Methods("PUT")
+
+	apirouter.Handle("/projects/{projectid}/commitstatusdeliveries", commitStatusDeliveriesHandler).Methods("GET")
 
 	mainrouter := mux.NewRouter().UseEncodedPath().SkipClean(true)
 	mainrouter.PathPrefix("/").Handler(router)
