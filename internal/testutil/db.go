@@ -71,23 +71,23 @@ func CreateDBWithType(t *testing.T, log zerolog.Logger, ctx context.Context, dir
 		connString = filepath.Join(dir, dbName)
 
 		sdb, err = sql.NewDB("sqlite3", connString)
-		assert.NilError(t, err)
+		NilError(t, err)
 
 	case sql.Postgres:
 		dbName := "testdb" + strconv.FormatUint(uint64(rand.Uint32()), 10)
 		connString = fmt.Sprintf(pgConnString, dbName)
 
 		pgdb, err := stdsql.Open("postgres", fmt.Sprintf(pgConnString, "postgres"))
-		assert.NilError(t, err)
+		NilError(t, err)
 
 		_, err = pgdb.Exec(fmt.Sprintf("drop database if exists %s", dbName))
-		assert.NilError(t, err)
+		NilError(t, err)
 
 		_, err = pgdb.Exec(fmt.Sprintf("create database %s", dbName))
-		assert.NilError(t, err)
+		NilError(t, err)
 
 		sdb, err = sql.NewDB("postgres", connString)
-		assert.NilError(t, err)
+		NilError(t, err)
 
 	default:
 		t.Fatalf("unknown db type")
@@ -538,16 +538,16 @@ func TestCreate(t *testing.T, lastVersion uint, dataFixtures DataFixtures, setup
 				t.Fatalf("missing fixture for db version %d", createVersion)
 			}
 			dataFixture, err := os.ReadFile(filepath.Join("fixtures", "migrate", dataFixtureFile))
-			assert.NilError(t, err)
+			NilError(t, err)
 			dataFixture = jsonc.ToJSON(dataFixture)
 
 			createFixtureFile := fmt.Sprintf("v%d.json", createVersion)
 			createFixture, err := os.ReadFile(filepath.Join("fixtures", "create", createFixtureFile))
-			assert.NilError(t, err)
+			NilError(t, err)
 
 			var createData *CreateData
 			err = json.Unmarshal(createFixture, &createData)
-			assert.NilError(t, err)
+			NilError(t, err)
 
 			dc.Schema = createData.Tables
 			ddl := createData.DDL
@@ -561,13 +561,13 @@ func TestCreate(t *testing.T, lastVersion uint, dataFixtures DataFixtures, setup
 			}
 
 			err = dc.DBM.Setup(ctx)
-			assert.NilError(t, err, "setup db error")
+			NilError(t, err, "setup db error")
 
 			err = dc.DBM.Create(ctx, stmts, createVersion)
-			assert.NilError(t, err)
+			NilError(t, err)
 
 			err = dc.Import(ctx, bytes.NewBuffer(dataFixture), createData)
-			assert.NilError(t, err)
+			NilError(t, err)
 		})
 	}
 }
@@ -596,16 +596,16 @@ func TestMigrate(t *testing.T, lastVersion uint, dataFixtures DataFixtures, setu
 					t.Fatalf("missing data fixture for db version %d", migrateVersion)
 				}
 				dataFixtureCreate, err := os.ReadFile(filepath.Join("fixtures", "migrate", dataFixtureFileCreate))
-				assert.NilError(t, err)
+				NilError(t, err)
 				dataFixtureCreate = jsonc.ToJSON(dataFixtureCreate)
 
 				createFixtureFileCreate := fmt.Sprintf("v%d.json", migrateVersion)
 				createFixtureCreate, err := os.ReadFile(filepath.Join("fixtures", "create", createFixtureFileCreate))
-				assert.NilError(t, err)
+				NilError(t, err)
 
 				var createDataCreate *CreateData
 				err = json.Unmarshal(createFixtureCreate, &createDataCreate)
-				assert.NilError(t, err)
+				NilError(t, err)
 
 				createDC.Schema = createDataCreate.Tables
 				createDDL := createDataCreate.DDL
@@ -619,13 +619,13 @@ func TestMigrate(t *testing.T, lastVersion uint, dataFixtures DataFixtures, setu
 				}
 
 				err = createDC.DBM.Setup(ctx)
-				assert.NilError(t, err, "setup db error")
+				NilError(t, err, "setup db error")
 
 				err = createDC.DBM.Create(ctx, createStmts, migrateVersion)
-				assert.NilError(t, err)
+				NilError(t, err)
 
 				err = createDC.Import(ctx, bytes.NewBuffer(dataFixtureCreate), createDataCreate)
-				assert.NilError(t, err)
+				NilError(t, err)
 
 				// create db at create version to be migrated.
 				dc := setupDBFn(ctx, t, dir)
@@ -634,16 +634,16 @@ func TestMigrate(t *testing.T, lastVersion uint, dataFixtures DataFixtures, setu
 					t.Fatalf("missing fixture for db version %d", createVersion)
 				}
 				dataFixture, err := os.ReadFile(filepath.Join("fixtures", "migrate", dataFixtureFile))
-				assert.NilError(t, err)
+				NilError(t, err)
 				dataFixture = jsonc.ToJSON(dataFixture)
 
 				createFixtureFile := fmt.Sprintf("v%d.json", createVersion)
 				createFixture, err := os.ReadFile(filepath.Join("fixtures", "create", createFixtureFile))
-				assert.NilError(t, err)
+				NilError(t, err)
 
 				var createData *CreateData
 				err = json.Unmarshal(createFixture, &createData)
-				assert.NilError(t, err)
+				NilError(t, err)
 
 				dc.Schema = createData.Tables
 				ddl := createData.DDL
@@ -657,32 +657,32 @@ func TestMigrate(t *testing.T, lastVersion uint, dataFixtures DataFixtures, setu
 				}
 
 				err = dc.DBM.Setup(ctx)
-				assert.NilError(t, err, "setup db error")
+				NilError(t, err, "setup db error")
 
 				err = dc.DBM.Create(ctx, stmts, createVersion)
-				assert.NilError(t, err)
+				NilError(t, err)
 
 				err = dc.Import(ctx, bytes.NewBuffer(dataFixture), createData)
-				assert.NilError(t, err)
+				NilError(t, err)
 
 				err = dc.DBM.MigrateToVersion(ctx, migrateVersion)
-				assert.NilError(t, err)
+				NilError(t, err)
 
 				// Diff created and migrated schema
 				createAtlasClient, err := atlassqlclient.Open(ctx, createDC.AtlasConnString())
-				assert.NilError(t, err)
+				NilError(t, err)
 
 				atlasClient, err := atlassqlclient.Open(ctx, dc.AtlasConnString())
-				assert.NilError(t, err)
+				NilError(t, err)
 
 				createSchema, err := createAtlasClient.InspectSchema(ctx, "", nil)
-				assert.NilError(t, err)
+				NilError(t, err)
 
 				schema, err := atlasClient.InspectSchema(ctx, "", nil)
-				assert.NilError(t, err)
+				NilError(t, err)
 
 				diff, err := atlasClient.SchemaDiff(createSchema, schema)
-				assert.NilError(t, err)
+				NilError(t, err)
 
 				assert.Assert(t, len(diff) == 0, "schema of db created at version %d and db migrated from version %d to version %d is different:\n %s", migrateVersion, createVersion, migrateVersion, diff)
 
@@ -707,10 +707,10 @@ func TestMigrate(t *testing.T, lastVersion uint, dataFixtures DataFixtures, setu
 				}
 
 				err = createDC.Export(ctx, tableNames(createSchema), createExport)
-				assert.NilError(t, err)
+				NilError(t, err)
 
 				err = dc.Export(ctx, tableNames(schema), export)
-				assert.NilError(t, err)
+				NilError(t, err)
 
 				// Diff database data
 
@@ -733,10 +733,10 @@ func decodeExport(t *testing.T, d manager.DB, export []byte) []any {
 		if errors.Is(err, io.EOF) {
 			break
 		}
-		assert.NilError(t, err)
+		NilError(t, err)
 
 		obj, err := d.UnmarshalExportObject(jobj)
-		assert.NilError(t, err)
+		NilError(t, err)
 
 		objs = append(objs, obj)
 	}
@@ -759,15 +759,15 @@ func TestImportExport(t *testing.T, importFixtureFile string, setupDBFn SetupDBF
 	dc := setupDBFn(ctx, t, dir)
 
 	fixture, err := os.ReadFile(filepath.Join("fixtures", "import", importFixtureFile))
-	assert.NilError(t, err)
+	NilError(t, err)
 
 	stmts := dc.D.DDL()
 
 	err = dc.DBM.Create(ctx, stmts, dc.D.Version())
-	assert.NilError(t, err)
+	NilError(t, err)
 
 	err = dc.DBM.Import(ctx, bytes.NewBuffer(fixture))
-	assert.NilError(t, err)
+	NilError(t, err)
 
 	// check sequences
 	curSeqs := map[string]uint64{}
@@ -786,14 +786,14 @@ func TestImportExport(t *testing.T, importFixtureFile string, setupDBFn SetupDBF
 
 		return nil
 	})
-	assert.NilError(t, err)
+	NilError(t, err)
 
 	assert.DeepEqual(t, curSeqs, seqs)
 
 	export := &bytes.Buffer{}
 
 	err = dc.DBM.Export(ctx, sqlg.ObjectNames(dc.D.ObjectsInfo()), export)
-	assert.NilError(t, err)
+	NilError(t, err)
 
 	exportMap := decodeExport(t, dc.D, export.Bytes())
 	fixturesMap := decodeExport(t, dc.D, fixture)

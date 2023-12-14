@@ -41,18 +41,13 @@ import (
 
 func setupRunservice(ctx context.Context, t *testing.T, log zerolog.Logger, dir string) *Runservice {
 	port, err := testutil.GetFreePort("localhost", true, false)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	ostDir, err := os.MkdirTemp(dir, "ost")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	rsDir, err := os.MkdirTemp(dir, "rs")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	dbType := testutil.DBType(t)
 	_, _, dbConnString := testutil.CreateDB(t, log, ctx, dir)
@@ -73,9 +68,7 @@ func setupRunservice(ctx context.Context, t *testing.T, log zerolog.Logger, dir 
 	rsConfig.Web.ListenAddress = net.JoinHostPort("localhost", port)
 
 	rs, err := NewRunservice(ctx, log, &rsConfig)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	return rs
 }
@@ -118,28 +111,24 @@ func TestExportImport(t *testing.T) {
 	go func() { _ = rs.Run(ctx) }()
 
 	for i := 0; i < 20; i++ {
-		if _, err := rs.ah.CreateRun(ctx, &action.RunCreateRequest{Group: "/user/user01", RunConfigTasks: map[string]*types.RunConfigTask{"task01": {}}}); err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		_, err := rs.ah.CreateRun(ctx, &action.RunCreateRequest{Group: "/user/user01", RunConfigTasks: map[string]*types.RunConfigTask{"task01": {}}})
+		testutil.NilError(t, err)
 	}
 
 	runs, err := getRuns(ctx, rs)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	if len(runs) != 20 {
 		t.Logf("runs: %s", util.Dump(runs))
 		t.Fatalf("expected %d runs, got %d runs", 20, len(runs))
 	}
 
 	var export bytes.Buffer
-	if err := rs.ah.Export(ctx, &export); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	err = rs.ah.Export(ctx, &export)
+	testutil.NilError(t, err)
 
-	if err := rs.ah.SetMaintenanceEnabled(ctx, true); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	err = rs.ah.SetMaintenanceEnabled(ctx, true)
+	testutil.NilError(t, err)
 
 	_ = testutil.Wait(30*time.Second, func() (bool, error) {
 		if !rs.ah.IsMaintenanceMode() {
@@ -148,14 +137,11 @@ func TestExportImport(t *testing.T) {
 
 		return true, nil
 	})
+	err = rs.ah.Import(ctx, &export)
+	testutil.NilError(t, err)
 
-	if err := rs.ah.Import(ctx, &export); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-
-	if err := rs.ah.SetMaintenanceEnabled(ctx, false); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	err = rs.ah.SetMaintenanceEnabled(ctx, false)
+	testutil.NilError(t, err)
 
 	_ = testutil.Wait(30*time.Second, func() (bool, error) {
 		if rs.ah.IsMaintenanceMode() {
@@ -166,9 +152,7 @@ func TestExportImport(t *testing.T) {
 	})
 
 	newRuns, err := getRuns(ctx, rs)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	if !compareRuns(runs, newRuns) {
 		t.Logf("len(runs): %d", len(runs))
@@ -219,9 +203,9 @@ func TestConcurrentRunCreation(t *testing.T) {
 		go func() {
 			startWg.Done()
 			<-startCh
-			if _, err := rs.ah.CreateRun(ctx, &action.RunCreateRequest{Group: "/user/user01", RunConfigTasks: map[string]*types.RunConfigTask{"task01": {}}}); err != nil {
-				t.Errorf("unexpected err: %v", err)
-			}
+			_, err := rs.ah.CreateRun(ctx, &action.RunCreateRequest{Group: "/user/user01", RunConfigTasks: map[string]*types.RunConfigTask{"task01": {}}})
+			testutil.NilError(t, err)
+
 			endWg.Done()
 		}()
 	}
@@ -231,9 +215,8 @@ func TestConcurrentRunCreation(t *testing.T) {
 	endWg.Wait()
 
 	runs, err := getRuns(ctx, rs)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	if len(runs) != 10 {
 		t.Logf("runs: %s", util.Dump(runs))
 		t.Fatalf("expected %d runs, got %d runs", 10, len(runs))
@@ -271,9 +254,8 @@ func TestGetRunsLastRun(t *testing.T) {
 		var lastRun *types.Run
 		for i := 0; i < 10; i++ {
 			rb, err := rs.ah.CreateRun(ctx, &action.RunCreateRequest{Group: group, RunConfigTasks: map[string]*types.RunConfigTask{"task01": {}}})
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			testutil.NilError(t, err)
+
 			lastRun = rb.Run
 		}
 		expectedRuns[len(groups)-1-i] = lastRun
@@ -286,9 +268,7 @@ func TestGetRunsLastRun(t *testing.T) {
 
 		return errors.WithStack(err)
 	})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	if len(runs) != 2 {
 		t.Logf("runs: %s", util.Dump(runs))
@@ -321,21 +301,15 @@ func TestLogleaner(t *testing.T) {
 	logPath := store.OSTRunTaskStepLogPath("task01", 0)
 
 	err := rs.ost.WriteObject(logPath, body, -1, false)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	_, err = rs.ost.ReadObject(logPath)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	time.Sleep(1 * time.Second)
 
 	err = rs.objectsCleaner(ctx, store.OSTLogsBaseDir(), common.LogCleanerLockKey, 1*time.Millisecond)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	_, err = rs.ost.ReadObject(logPath)
 	if err == nil || !objectstorage.IsNotExist(err) {

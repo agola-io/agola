@@ -405,9 +405,8 @@ func TestAdvanceRunTasks(t *testing.T) {
 			t.Parallel()
 
 			r, err := advanceRunTasks(log, tt.r, tt.rc, tt.scheduledExecutorTasks)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			testutil.NilError(t, err)
+
 			if diff := cmp.Diff(tt.out, r); diff != "" {
 				t.Error(diff)
 			}
@@ -572,9 +571,8 @@ func TestGetTasksToRun(t *testing.T) {
 			t.Parallel()
 
 			tasks, err := getTasksToRun(log, tt.r, tt.rc)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			testutil.NilError(t, err)
+
 			outTasks := []string{}
 			for _, t := range tasks {
 				outTasks = append(outTasks, t.ID)

@@ -21,6 +21,7 @@ import (
 	"github.com/sorintlab/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 
+	"agola.io/agola/internal/testutil"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/types"
 )
@@ -604,9 +605,8 @@ func TestParseOutput(t *testing.T) {
 			t.Parallel()
 
 			out, err := ParseConfig([]byte(tt.in), ConfigFormatJSON, &ConfigContext{})
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			testutil.NilError(t, err)
+
 			if diff := cmp.Diff(tt.out, out, cmp.Comparer(func(x, y *resource.Quantity) bool {
 				if x == nil && y == nil {
 					return true

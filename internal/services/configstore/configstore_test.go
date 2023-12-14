@@ -41,18 +41,13 @@ import (
 
 func setupConfigstore(ctx context.Context, t *testing.T, log zerolog.Logger, dir string) *Configstore {
 	port, err := testutil.GetFreePort("localhost", true, false)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	ostDir, err := os.MkdirTemp(dir, "ost")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	csDir, err := os.MkdirTemp(dir, "cs")
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	dbType := testutil.DBType(t)
 	_, _, dbConnString := testutil.CreateDB(t, log, ctx, dir)
@@ -73,9 +68,7 @@ func setupConfigstore(ctx context.Context, t *testing.T, log zerolog.Logger, dir
 	csConfig.Web.ListenAddress = net.JoinHostPort("localhost", port)
 
 	cs, err := NewConfigstore(ctx, log, &csConfig)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	return cs
 }
@@ -181,91 +174,81 @@ func TestExportImport(t *testing.T) {
 	var expectedSecretsCount int
 	var expectedVariablesCount int
 
-	if _, err := cs.ah.CreateRemoteSource(ctx, &action.CreateUpdateRemoteSourceRequest{Name: "rs01", Type: types.RemoteSourceTypeGitea, AuthType: types.RemoteSourceAuthTypePassword, APIURL: "http://example.com"}); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	_, err := cs.ah.CreateRemoteSource(ctx, &action.CreateUpdateRemoteSourceRequest{Name: "rs01", Type: types.RemoteSourceTypeGitea, AuthType: types.RemoteSourceAuthTypePassword, APIURL: "http://example.com"})
+	testutil.NilError(t, err)
+
 	expectedRemoteSourcesCount++
 
 	for i := 0; i < 20; i++ {
-		if _, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)}); err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		_, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)})
+		testutil.NilError(t, err)
+
 		expectedUsersCount++
 		expectedProjectGroupsCount++
 	}
 
 	user, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	expectedUsersCount++
 	expectedProjectGroupsCount++
 
 	org, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: "org01", Visibility: types.VisibilityPublic})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	expectedOrgsCount++
 	expectedProjectGroupsCount++
 
-	if _, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	_, err = cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+	testutil.NilError(t, err)
+
 	expectedProjectsCount++
 
-	if _, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic}); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	_, err = cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic})
+	testutil.NilError(t, err)
+
 	expectedProjectGroupsCount++
 
-	if _, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	_, err = cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+	testutil.NilError(t, err)
+
 	expectedProjectsCount++
 
-	if _, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic}); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	_, err = cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
+	testutil.NilError(t, err)
+
 	expectedProjectGroupsCount++
 
-	if _, err := cs.ah.CreateSecret(ctx, &action.CreateUpdateSecretRequest{Name: "secret01", Parent: types.Parent{Kind: types.ObjectKindProject, ID: path.Join("user", user.Name, "projectgroup01", "project01")}, Type: types.SecretTypeInternal, Data: map[string]string{"secret01": "secretvar01"}}); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	_, err = cs.ah.CreateSecret(ctx, &action.CreateUpdateSecretRequest{Name: "secret01", Parent: types.Parent{Kind: types.ObjectKindProject, ID: path.Join("user", user.Name, "projectgroup01", "project01")}, Type: types.SecretTypeInternal, Data: map[string]string{"secret01": "secretvar01"}})
+	testutil.NilError(t, err)
+
 	expectedSecretsCount++
 
-	if _, err := cs.ah.CreateVariable(ctx, &action.CreateUpdateVariableRequest{Name: "variable01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Values: []types.VariableValue{{SecretName: "secret01", SecretVar: "secretvar01"}}}); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	_, err = cs.ah.CreateVariable(ctx, &action.CreateUpdateVariableRequest{Name: "variable01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Values: []types.VariableValue{{SecretName: "secret01", SecretVar: "secretvar01"}}})
+	testutil.NilError(t, err)
+
 	expectedVariablesCount++
 
 	remoteSources, err := getRemoteSources(ctx, cs)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	users, err := getUsers(ctx, cs)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	orgs, err := getOrgs(ctx, cs)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	projectGroups, err := getProjectGroups(ctx, cs)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	projects, err := getProjects(ctx, cs)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	secrets, err := getSecrets(ctx, cs)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	variables, err := getVariables(ctx, cs)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	if len(remoteSources) != expectedRemoteSourcesCount {
 		t.Logf("remoteSources: %s", util.Dump(remoteSources))
@@ -297,13 +280,11 @@ func TestExportImport(t *testing.T) {
 	}
 
 	var export bytes.Buffer
-	if err := cs.ah.Export(ctx, &export); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	err = cs.ah.Export(ctx, &export)
+	testutil.NilError(t, err)
 
-	if err := cs.ah.SetMaintenanceEnabled(ctx, true); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	err = cs.ah.SetMaintenanceEnabled(ctx, true)
+	testutil.NilError(t, err)
 
 	_ = testutil.Wait(30*time.Second, func() (bool, error) {
 		if !cs.ah.IsMaintenanceMode() {
@@ -313,13 +294,11 @@ func TestExportImport(t *testing.T) {
 		return true, nil
 	})
 
-	if err := cs.ah.Import(ctx, &export); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	err = cs.ah.Import(ctx, &export)
+	testutil.NilError(t, err)
 
-	if err := cs.ah.SetMaintenanceEnabled(ctx, false); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	err = cs.ah.SetMaintenanceEnabled(ctx, false)
+	testutil.NilError(t, err)
 
 	_ = testutil.Wait(30*time.Second, func() (bool, error) {
 		if cs.ah.IsMaintenanceMode() {
@@ -330,33 +309,25 @@ func TestExportImport(t *testing.T) {
 	})
 
 	newRemoteSources, err := getRemoteSources(ctx, cs)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	newUsers, err := getUsers(ctx, cs)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	newOrgs, err := getOrgs(ctx, cs)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	newProjectGroups, err := getProjectGroups(ctx, cs)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	newProjects, err := getProjects(ctx, cs)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	newSecrets, err := getSecrets(ctx, cs)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	newVariables, err := getVariables(ctx, cs)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	if diff := cmpDiffObject(remoteSources, newRemoteSources); diff != "" {
 		t.Fatalf("remoteSources mismatch (-want +got):\n%s", diff)
@@ -397,9 +368,7 @@ func TestUser(t *testing.T) {
 
 	t.Run("create user", func(t *testing.T) {
 		_, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 	})
 
 	t.Run("create duplicated user", func(t *testing.T) {
@@ -414,9 +383,7 @@ func TestUser(t *testing.T) {
 	})
 	t.Run("concurrent user with same name creation", func(t *testing.T) {
 		prevUsers, err := getUsers(ctx, cs)
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 
 		wg := sync.WaitGroup{}
 		for i := 0; i < 10; i++ {
@@ -429,9 +396,7 @@ func TestUser(t *testing.T) {
 		wg.Wait()
 
 		users, err := getUsers(ctx, cs)
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 
 		if len(users) != len(prevUsers)+1 {
 			t.Fatalf("expected %d users, got %d", len(prevUsers)+1, len(users))
@@ -440,14 +405,10 @@ func TestUser(t *testing.T) {
 
 	t.Run("delete user", func(t *testing.T) {
 		_, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user03"})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 
 		err = cs.ah.DeleteUser(ctx, "user03")
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 
 		var user *types.User
 		err = cs.d.Do(ctx, func(tx *sql.Tx) error {
@@ -455,9 +416,8 @@ func TestUser(t *testing.T) {
 			user, err = cs.d.GetUser(tx, "user03")
 			return errors.WithStack(err)
 		})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		if user != nil {
 			t.Fatalf("expected user nil, got: %v", user)
 		}
@@ -479,49 +439,34 @@ func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 	}()
 
 	user, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	org, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: "org01", Visibility: types.VisibilityPublic})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	t.Run("create a project in user root project group", func(t *testing.T) {
 		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 	})
 	t.Run("create a project in org root project group", func(t *testing.T) {
 		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 	})
 	t.Run("create a projectgroup in user root project group", func(t *testing.T) {
 		_, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 	})
 	t.Run("create a projectgroup in org root project group", func(t *testing.T) {
 		_, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 	})
 	t.Run("create a project in user non root project group with same name as a root project", func(t *testing.T) {
 		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 	})
 	t.Run("create a project in org non root project group with same name as a root project", func(t *testing.T) {
 		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 	})
 
 	t.Run("create duplicated project in user root project group", func(t *testing.T) {
@@ -575,9 +520,7 @@ func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 
 	t.Run("concurrent project with same name creation", func(t *testing.T) {
 		prevProjects, err := getProjects(ctx, cs)
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 
 		wg := sync.WaitGroup{}
 		for i := 0; i < 10; i++ {
@@ -590,9 +533,7 @@ func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 		wg.Wait()
 
 		projects, err := getProjects(ctx, cs)
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 
 		if len(projects) != len(prevProjects)+1 {
 			t.Fatalf("expected %d projects, got %d", len(prevProjects)+1, len(projects))
@@ -615,33 +556,28 @@ func TestProjectUpdate(t *testing.T) {
 	}()
 
 	user, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
-	if _, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic}); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	_, err = cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic})
+	testutil.NilError(t, err)
+
 	p01 := &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}
-	if _, err := cs.ah.CreateProject(ctx, p01); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	_, err = cs.ah.CreateProject(ctx, p01)
+	testutil.NilError(t, err)
+
 	p02 := &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}
-	if _, err := cs.ah.CreateProject(ctx, p02); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	_, err = cs.ah.CreateProject(ctx, p02)
+	testutil.NilError(t, err)
+
 	p03 := &action.CreateUpdateProjectRequest{Name: "project02", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}
-	if _, err := cs.ah.CreateProject(ctx, p03); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	_, err = cs.ah.CreateProject(ctx, p03)
+	testutil.NilError(t, err)
 
 	t.Run("rename project keeping same parent", func(t *testing.T) {
 		projectName := "project02"
 		p03.Name = "newproject02"
 		_, err := cs.ah.UpdateProject(ctx, path.Join("user", user.Name, "projectgroup01", projectName), p03)
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 	})
 	t.Run("move project to project group having project with same name", func(t *testing.T) {
 		projectName := "project01"
@@ -657,9 +593,7 @@ func TestProjectUpdate(t *testing.T) {
 		p02.Name = "newproject01"
 		p02.Parent.ID = path.Join("user", user.Name)
 		_, err := cs.ah.UpdateProject(ctx, path.Join("user", user.Name, "projectgroup01", projectName), p02)
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 	})
 	t.Run("test user project MembersCanPerformRunActions parameter", func(t *testing.T) {
 		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot set MembersCanPerformRunActions on an user project."))
@@ -705,43 +639,36 @@ func TestProjectGroupUpdate(t *testing.T) {
 	}()
 
 	user, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	rootPG, err := cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	pg01req := &action.CreateUpdateProjectGroupRequest{Name: "pg01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic}
-	if _, err := cs.ah.CreateProjectGroup(ctx, pg01req); err != nil {
-		log.Err(err).Send()
-		t.Fatalf("unexpected err: %v", err)
-	}
+	_, err = cs.ah.CreateProjectGroup(ctx, pg01req)
+	testutil.NilError(t, err)
+
 	pg02req := &action.CreateUpdateProjectGroupRequest{Name: "pg02", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic}
-	if _, err := cs.ah.CreateProjectGroup(ctx, pg02req); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	_, err = cs.ah.CreateProjectGroup(ctx, pg02req)
+	testutil.NilError(t, err)
+
 	pg03req := &action.CreateUpdateProjectGroupRequest{Name: "pg03", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic}
-	if _, err := cs.ah.CreateProjectGroup(ctx, pg03req); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	_, err = cs.ah.CreateProjectGroup(ctx, pg03req)
+	testutil.NilError(t, err)
+
 	pg04req := &action.CreateUpdateProjectGroupRequest{Name: "pg01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name, "pg01")}, Visibility: types.VisibilityPublic}
-	if _, err := cs.ah.CreateProjectGroup(ctx, pg04req); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	_, err = cs.ah.CreateProjectGroup(ctx, pg04req)
+	testutil.NilError(t, err)
+
 	pg05req := &action.CreateUpdateProjectGroupRequest{Name: "pg01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name, "pg02")}, Visibility: types.VisibilityPublic}
-	if _, err := cs.ah.CreateProjectGroup(ctx, pg05req); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	_, err = cs.ah.CreateProjectGroup(ctx, pg05req)
+	testutil.NilError(t, err)
 
 	t.Run("rename project group keeping same parent", func(t *testing.T) {
 		projectGroupName := "pg03"
 		pg03req.Name = "newpg03"
-		if _, err := cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name, projectGroupName), pg03req); err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		_, err := cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name, projectGroupName), pg03req)
+		testutil.NilError(t, err)
 	})
 	t.Run("move project to project group having project with same name", func(t *testing.T) {
 		projectGroupName := "pg01"
@@ -757,9 +684,8 @@ func TestProjectGroupUpdate(t *testing.T) {
 		pg05req.Name = "newpg01"
 		pg05req.Parent.ID = path.Join("user", user.Name)
 		pg05, err := cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name, "pg02", projectGroupName), pg05req)
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		if pg05.Parent.ID != rootPG.ID {
 			t.Fatalf("expected project group parent id as root project group id")
 		}
@@ -785,9 +711,8 @@ func TestProjectGroupUpdate(t *testing.T) {
 	t.Run("change root project group parent kind", func(t *testing.T) {
 		var rootPG *types.ProjectGroup
 		rootPG, err := cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		rootPG.Parent.Kind = types.ObjectKindProjectGroup
 		rootPG.Name = "rootpg"
 
@@ -800,9 +725,8 @@ func TestProjectGroupUpdate(t *testing.T) {
 	t.Run("change root project group parent id", func(t *testing.T) {
 		var rootPG *types.ProjectGroup
 		rootPG, err := cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		rootPG.Parent.ID = path.Join("user", user.Name, "pg01")
 
 		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot change root project group parent kind or id"))
@@ -814,9 +738,8 @@ func TestProjectGroupUpdate(t *testing.T) {
 	t.Run("change root project group name", func(t *testing.T) {
 		var rootPG *types.ProjectGroup
 		rootPG, err := cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		rootPG.Name = "rootpgnewname"
 
 		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group name for root project group must be empty"))
@@ -828,19 +751,16 @@ func TestProjectGroupUpdate(t *testing.T) {
 	t.Run("change root project group visibility", func(t *testing.T) {
 		var rootPG *types.ProjectGroup
 		rootPG, err := cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		rootPG.Visibility = types.VisibilityPrivate
 
-		if _, err := cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name), &action.CreateUpdateProjectGroupRequest{Name: rootPG.Name, Parent: rootPG.Parent, Visibility: rootPG.Visibility}); err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		_, err = cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name), &action.CreateUpdateProjectGroupRequest{Name: rootPG.Name, Parent: rootPG.Parent, Visibility: rootPG.Visibility})
+		testutil.NilError(t, err)
 
 		rootPG, err = cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		if rootPG.Visibility != types.VisibilityPrivate {
 			t.Fatalf("expected visiblity %q, got visibility: %q", types.VisibilityPublic, rootPG.Visibility)
 		}
@@ -862,20 +782,15 @@ func TestProjectGroupDelete(t *testing.T) {
 	}()
 
 	org, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: "org01", Visibility: types.VisibilityPublic})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	// create a projectgroup in org root project group
 	pg01, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	// create a child projectgroup in org root project group
-	if _, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "subprojectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: pg01.ID}, Visibility: types.VisibilityPublic}); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	_, err = cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "subprojectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: pg01.ID}, Visibility: types.VisibilityPublic})
+	testutil.NilError(t, err)
 
 	t.Run("delete root project group", func(t *testing.T) {
 		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot delete root project group"))
@@ -887,9 +802,7 @@ func TestProjectGroupDelete(t *testing.T) {
 
 	t.Run("delete project group", func(t *testing.T) {
 		err := cs.ah.DeleteProjectGroup(ctx, pg01.ID)
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 	})
 }
 
@@ -908,110 +821,88 @@ func TestProjectGroupDeleteDontSeeOldChildObjects(t *testing.T) {
 	}()
 
 	org, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: "org01", Visibility: types.VisibilityPublic})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	// create a projectgroup in org root project group
 	pg01, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	// create a child projectgroup in org root project group
 	spg01, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "subprojectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: pg01.ID}, Visibility: types.VisibilityPublic})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	// create a project inside child projectgroup
 	project, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: spg01.ID}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	// create project secret
-	if _, err := cs.ah.CreateSecret(ctx, &action.CreateUpdateSecretRequest{Name: "secret01", Parent: types.Parent{Kind: types.ObjectKindProject, ID: project.ID}, Type: types.SecretTypeInternal, Data: map[string]string{"secret01": "secretvar01"}}); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	_, err = cs.ah.CreateSecret(ctx, &action.CreateUpdateSecretRequest{Name: "secret01", Parent: types.Parent{Kind: types.ObjectKindProject, ID: project.ID}, Type: types.SecretTypeInternal, Data: map[string]string{"secret01": "secretvar01"}})
+	testutil.NilError(t, err)
+
 	// create project variable
-	if _, err = cs.ah.CreateVariable(ctx, &action.CreateUpdateVariableRequest{Name: "variable01", Parent: types.Parent{Kind: types.ObjectKindProject, ID: project.ID}, Values: []types.VariableValue{{SecretName: "secret01", SecretVar: "secretvar01"}}}); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	_, err = cs.ah.CreateVariable(ctx, &action.CreateUpdateVariableRequest{Name: "variable01", Parent: types.Parent{Kind: types.ObjectKindProject, ID: project.ID}, Values: []types.VariableValue{{SecretName: "secret01", SecretVar: "secretvar01"}}})
+	testutil.NilError(t, err)
 
 	// delete projectgroup
-	if err := cs.ah.DeleteProjectGroup(ctx, pg01.ID); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	err = cs.ah.DeleteProjectGroup(ctx, pg01.ID)
+	testutil.NilError(t, err)
 
 	// recreate the same hierarchj using the paths
 	pg01, err = cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	spg01, err = cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "subprojectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name, pg01.Name)}, Visibility: types.VisibilityPublic})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	project, err = cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name, pg01.Name, spg01.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	secret, err := cs.ah.CreateSecret(ctx, &action.CreateUpdateSecretRequest{Name: "secret01", Parent: types.Parent{Kind: types.ObjectKindProject, ID: path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name)}, Type: types.SecretTypeInternal, Data: map[string]string{"secret01": "secretvar01"}})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	variable, err := cs.ah.CreateVariable(ctx, &action.CreateUpdateVariableRequest{Name: "variable01", Parent: types.Parent{Kind: types.ObjectKindProject, ID: path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name)}, Values: []types.VariableValue{{SecretName: "secret01", SecretVar: "secretvar01"}}})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	// Get by projectgroup id
 	projects, err := cs.ah.GetProjectGroupProjects(ctx, spg01.ID)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	if diff := cmpDiffObject(projects, []*types.Project{project}); diff != "" {
 		t.Fatalf("mismatch (-want +got):\n%s", diff)
 	}
 
 	// Get by projectgroup path
 	projects, err = cs.ah.GetProjectGroupProjects(ctx, path.Join("org", org.Name, pg01.Name, spg01.Name))
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	if diff := cmpDiffObject(projects, []*types.Project{project}); diff != "" {
 		t.Fatalf("mismatch (-want +got):\n%s", diff)
 	}
 
 	secrets, err := cs.ah.GetSecrets(ctx, types.ObjectKindProject, project.ID, false)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	if diff := cmpDiffObject(secrets, []*types.Secret{secret}); diff != "" {
 		t.Fatalf("mismatch (-want +got):\n%s", diff)
 	}
 
 	secrets, err = cs.ah.GetSecrets(ctx, types.ObjectKindProject, path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name), false)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	if diff := cmpDiffObject(secrets, []*types.Secret{secret}); diff != "" {
 		t.Fatalf("mismatch (-want +got):\n%s", diff)
 	}
 
 	variables, err := cs.ah.GetVariables(ctx, types.ObjectKindProject, project.ID, false)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	if diff := cmpDiffObject(variables, []*types.Variable{variable}); diff != "" {
 		t.Fatalf("mismatch (-want +got):\n%s", diff)
 	}
 
 	variables, err = cs.ah.GetVariables(ctx, types.ObjectKindProject, path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name), false)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	if diff := cmpDiffObject(variables, []*types.Variable{variable}); diff != "" {
 		t.Fatalf("mismatch (-want +got):\n%s", diff)
 	}
@@ -1030,13 +921,10 @@ func TestOrgMembers(t *testing.T) {
 	go func() { _ = cs.Run(ctx) }()
 
 	user, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	org, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: "org01", Visibility: types.VisibilityPublic, CreatorUserID: user.ID})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	t.Run("test user org creator is org member with owner role", func(t *testing.T) {
 		expectedResponse := &action.GetUserOrgsResponse{
@@ -1048,9 +936,8 @@ func TestOrgMembers(t *testing.T) {
 			},
 		}
 		res, err := cs.ah.GetUserOrgs(ctx, &action.GetUserOrgsRequest{UserRef: user.ID})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		if diff := cmpDiffObject(res, expectedResponse); diff != "" {
 			t.Fatalf("mismatch (-want +got):\n%s", diff)
 		}
@@ -1059,16 +946,14 @@ func TestOrgMembers(t *testing.T) {
 	orgs := []*types.Organization{}
 	for i := 0; i < 10; i++ {
 		org, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: fmt.Sprintf("org%d", i), Visibility: types.VisibilityPublic, CreatorUserID: user.ID})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		orgs = append(orgs, org)
 	}
 
 	for i := 0; i < 5; i++ {
-		if err := cs.ah.DeleteOrg(ctx, fmt.Sprintf("org%d", i)); err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		err := cs.ah.DeleteOrg(ctx, fmt.Sprintf("org%d", i))
+		testutil.NilError(t, err)
 	}
 
 	// delete some org and check that if also orgmembers aren't yet cleaned only the existing orgs are reported
@@ -1088,9 +973,8 @@ func TestOrgMembers(t *testing.T) {
 			})
 		}
 		res, err := cs.ah.GetUserOrgs(ctx, &action.GetUserOrgsRequest{UserRef: user.ID})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		if diff := cmpDiffObject(res, expectedResponse); diff != "" {
 			t.Fatalf("mismatch (-want +got):\n%s", diff)
 		}
@@ -1112,17 +996,15 @@ func TestGetRemoteSources(t *testing.T) {
 	remoteSources := []*types.RemoteSource{}
 	for i := 1; i < 10; i++ {
 		remoteSource, err := cs.ah.CreateRemoteSource(ctx, &action.CreateUpdateRemoteSourceRequest{Name: fmt.Sprintf("rs%d", i), Type: types.RemoteSourceTypeGitea, AuthType: types.RemoteSourceAuthTypePassword, APIURL: "http://example.com"})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		remoteSources = append(remoteSources, remoteSource)
 	}
 
 	t.Run("test get all remote sources", func(t *testing.T) {
 		res, err := cs.ah.GetRemoteSources(ctx, &action.GetRemoteSourcesRequest{SortDirection: types.SortDirectionAsc})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		expectedRemoteSources := 9
 		if len(res.RemoteSources) != expectedRemoteSources {
 			t.Fatalf("expected %d remote sources, got %d remote sources", expectedRemoteSources, len(res.RemoteSources))
@@ -1134,9 +1016,8 @@ func TestGetRemoteSources(t *testing.T) {
 
 	t.Run("test get remote sources with limit less than remote sources", func(t *testing.T) {
 		res, err := cs.ah.GetRemoteSources(ctx, &action.GetRemoteSourcesRequest{Limit: 5, SortDirection: types.SortDirectionAsc})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		expectedRemoteSources := 5
 		if len(res.RemoteSources) != expectedRemoteSources {
 			t.Fatalf("expected %d remote sources, got %d remote sources", expectedRemoteSources, len(res.RemoteSources))
@@ -1150,9 +1031,7 @@ func TestGetRemoteSources(t *testing.T) {
 		respAllRemoteSources := []*types.RemoteSource{}
 
 		res, err := cs.ah.GetRemoteSources(ctx, &action.GetRemoteSourcesRequest{Limit: 5, SortDirection: types.SortDirectionAsc})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 
 		expectedRemoteSources := 5
 		if len(res.RemoteSources) != expectedRemoteSources {
@@ -1168,9 +1047,8 @@ func TestGetRemoteSources(t *testing.T) {
 		// fetch next results
 		for {
 			res, err = cs.ah.GetRemoteSources(ctx, &action.GetRemoteSourcesRequest{StartRemoteSourceName: lastRemoteSource.Name, Limit: 5, SortDirection: types.SortDirectionAsc})
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			testutil.NilError(t, err)
+
 			expectedRemoteSources := 5
 			if res.HasMore && len(res.RemoteSources) != expectedRemoteSources {
 				t.Fatalf("expected %d remote sources, got %d remote sources", expectedRemoteSources, len(res.RemoteSources))
@@ -1211,17 +1089,15 @@ func TestGetUsers(t *testing.T) {
 	users := []*types.User{}
 	for i := 1; i < 10; i++ {
 		user, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		users = append(users, user)
 	}
 
 	t.Run("test get all users", func(t *testing.T) {
 		res, err := cs.ah.GetUsers(ctx, &action.GetUsersRequest{SortDirection: types.SortDirectionAsc})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		expectedUsers := 9
 		if len(res.Users) != expectedUsers {
 			t.Fatalf("expected %d users, got %d users", expectedUsers, len(res.Users))
@@ -1233,9 +1109,8 @@ func TestGetUsers(t *testing.T) {
 
 	t.Run("test get users with limit less than users", func(t *testing.T) {
 		res, err := cs.ah.GetUsers(ctx, &action.GetUsersRequest{Limit: 5, SortDirection: types.SortDirectionAsc})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		expectedUsers := 5
 		if len(res.Users) != expectedUsers {
 			t.Fatalf("expected %d users, got %d users", expectedUsers, len(res.Users))
@@ -1249,9 +1124,7 @@ func TestGetUsers(t *testing.T) {
 		respAllUsers := []*types.User{}
 
 		res, err := cs.ah.GetUsers(ctx, &action.GetUsersRequest{Limit: 5, SortDirection: types.SortDirectionAsc})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 
 		expectedUsers := 5
 		if len(res.Users) != expectedUsers {
@@ -1267,9 +1140,8 @@ func TestGetUsers(t *testing.T) {
 		// fetch next results
 		for {
 			res, err = cs.ah.GetUsers(ctx, &action.GetUsersRequest{StartUserName: lastUser.Name, Limit: 5, SortDirection: types.SortDirectionAsc})
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			testutil.NilError(t, err)
+
 			expectedUsers := 5
 			if res.HasMore && len(res.Users) != expectedUsers {
 				t.Fatalf("expected %d users, got %d users", expectedUsers, len(res.Users))
@@ -1316,9 +1188,7 @@ func TestGetOrgs(t *testing.T) {
 			visibility = types.VisibilityPrivate
 		}
 		org, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: fmt.Sprintf("org%02d", i), Visibility: visibility})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 
 		allOrgs = append(allOrgs, org)
 		if visibility == types.VisibilityPublic {
@@ -1328,9 +1198,8 @@ func TestGetOrgs(t *testing.T) {
 
 	t.Run("test get all public orgs", func(t *testing.T) {
 		res, err := cs.ah.GetOrgs(ctx, &action.GetOrgsRequest{SortDirection: types.SortDirectionAsc})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		expectedOrgs := 9
 		if len(res.Orgs) != expectedOrgs {
 			t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(res.Orgs))
@@ -1346,9 +1215,8 @@ func TestGetOrgs(t *testing.T) {
 
 	t.Run("test get all public/private orgs", func(t *testing.T) {
 		res, err := cs.ah.GetOrgs(ctx, &action.GetOrgsRequest{Visibilities: []types.Visibility{types.VisibilityPublic, types.VisibilityPrivate}, SortDirection: types.SortDirectionAsc})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		expectedOrgs := 18
 		if len(res.Orgs) != expectedOrgs {
 			t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(res.Orgs))
@@ -1364,9 +1232,8 @@ func TestGetOrgs(t *testing.T) {
 
 	t.Run("test get public orgs with limit less than orgs", func(t *testing.T) {
 		res, err := cs.ah.GetOrgs(ctx, &action.GetOrgsRequest{Limit: 5, SortDirection: types.SortDirectionAsc})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		expectedOrgs := 5
 		if len(res.Orgs) != expectedOrgs {
 			t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(res.Orgs))
@@ -1382,9 +1249,8 @@ func TestGetOrgs(t *testing.T) {
 
 	t.Run("test get public/private orgs with limit less than orgs", func(t *testing.T) {
 		res, err := cs.ah.GetOrgs(ctx, &action.GetOrgsRequest{Limit: 5, Visibilities: []types.Visibility{types.VisibilityPublic, types.VisibilityPrivate}, SortDirection: types.SortDirectionAsc})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		expectedOrgs := 5
 		if len(res.Orgs) != expectedOrgs {
 			t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(res.Orgs))
@@ -1402,9 +1268,7 @@ func TestGetOrgs(t *testing.T) {
 		respAllOrgs := []*types.Organization{}
 
 		res, err := cs.ah.GetOrgs(ctx, &action.GetOrgsRequest{Limit: 5, SortDirection: types.SortDirectionAsc})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 
 		expectedOrgs := 5
 		if len(res.Orgs) != expectedOrgs {
@@ -1420,9 +1284,8 @@ func TestGetOrgs(t *testing.T) {
 		// fetch next results
 		for {
 			res, err = cs.ah.GetOrgs(ctx, &action.GetOrgsRequest{StartOrgName: lastOrg.Name, Limit: 5, SortDirection: types.SortDirectionAsc})
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			testutil.NilError(t, err)
+
 			expectedOrgs := 5
 			if res.HasMore && len(res.Orgs) != expectedOrgs {
 				t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(res.Orgs))
@@ -1451,9 +1314,7 @@ func TestGetOrgs(t *testing.T) {
 		respAllOrgs := []*types.Organization{}
 
 		res, err := cs.ah.GetOrgs(ctx, &action.GetOrgsRequest{Limit: 5, Visibilities: []types.Visibility{types.VisibilityPublic, types.VisibilityPrivate}, SortDirection: types.SortDirectionAsc})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 
 		expectedOrgs := 5
 		if len(res.Orgs) != expectedOrgs {
@@ -1469,9 +1330,8 @@ func TestGetOrgs(t *testing.T) {
 		// fetch next results
 		for {
 			res, err = cs.ah.GetOrgs(ctx, &action.GetOrgsRequest{StartOrgName: lastOrg.Name, Visibilities: []types.Visibility{types.VisibilityPublic, types.VisibilityPrivate}, Limit: 5, SortDirection: types.SortDirectionAsc})
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			testutil.NilError(t, err)
+
 			expectedOrgs := 5
 			if res.HasMore && len(res.Orgs) != expectedOrgs {
 				t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(res.Orgs))
@@ -1512,28 +1372,23 @@ func TestGetOrgMembers(t *testing.T) {
 	users := []*types.User{}
 	for i := 1; i < 10; i++ {
 		user, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		users = append(users, user)
 	}
 
 	org, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: "org01", Visibility: types.VisibilityPublic, CreatorUserID: users[0].ID})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	for _, user := range users {
-		if _, err := cs.ah.AddOrgMember(ctx, org.ID, user.ID, types.MemberRoleMember); err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		_, err := cs.ah.AddOrgMember(ctx, org.ID, user.ID, types.MemberRoleMember)
+		testutil.NilError(t, err)
 	}
 
 	t.Run("test get all org members", func(t *testing.T) {
 		res, err := cs.ah.GetOrgMembers(ctx, &action.GetOrgMembersRequest{OrgRef: org.ID, SortDirection: types.SortDirectionAsc})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		expectedOrgMembers := 9
 		if len(res.OrgMembers) != expectedOrgMembers {
 			t.Fatalf("expected %d org members, got %d org members", expectedOrgMembers, len(res.OrgMembers))
@@ -1545,9 +1400,8 @@ func TestGetOrgMembers(t *testing.T) {
 
 	t.Run("test get org members with limit less than org members", func(t *testing.T) {
 		res, err := cs.ah.GetOrgMembers(ctx, &action.GetOrgMembersRequest{OrgRef: org.ID, Limit: 5, SortDirection: types.SortDirectionAsc})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		expectedOrgMembers := 5
 		if len(res.OrgMembers) != expectedOrgMembers {
 			t.Fatalf("expected %d org members, got %d org members", expectedOrgMembers, len(res.OrgMembers))
@@ -1561,9 +1415,7 @@ func TestGetOrgMembers(t *testing.T) {
 		orgMembers := []*action.OrgMember{}
 
 		res, err := cs.ah.GetOrgMembers(ctx, &action.GetOrgMembersRequest{OrgRef: org.ID, Limit: 5, SortDirection: types.SortDirectionAsc})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 
 		expectedOrgMembers := 5
 		if len(res.OrgMembers) != expectedOrgMembers {
@@ -1579,9 +1431,8 @@ func TestGetOrgMembers(t *testing.T) {
 		// fetch next results
 		for {
 			res, err = cs.ah.GetOrgMembers(ctx, &action.GetOrgMembersRequest{OrgRef: org.ID, StartUserName: lastUser.User.Name, Limit: 5, SortDirection: types.SortDirectionAsc})
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			testutil.NilError(t, err)
+
 			expectedOrgMembers := 5
 			if res.HasMore && len(res.OrgMembers) != expectedOrgMembers {
 				t.Fatalf("expected %d org members, got %d org members", expectedOrgMembers, len(res.OrgMembers))
@@ -1625,30 +1476,25 @@ func TestGetUserOrgs(t *testing.T) {
 	go func() { _ = cs.Run(ctx) }()
 
 	user, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "orguser01"})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	orgs := []*types.Organization{}
 	for i := 1; i < 10; i++ {
 		org, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: fmt.Sprintf("org%d", i), Visibility: types.VisibilityPublic})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		orgs = append(orgs, org)
 	}
 
 	for _, org := range orgs {
-		if _, err := cs.ah.AddOrgMember(ctx, org.ID, user.ID, types.MemberRoleMember); err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		_, err := cs.ah.AddOrgMember(ctx, org.ID, user.ID, types.MemberRoleMember)
+		testutil.NilError(t, err)
 	}
 
 	t.Run("test get all user orgs", func(t *testing.T) {
 		res, err := cs.ah.GetUserOrgs(ctx, &action.GetUserOrgsRequest{UserRef: user.ID, SortDirection: types.SortDirectionAsc})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		expectedUserOrgs := 9
 		if len(res.UserOrgs) != expectedUserOrgs {
 			t.Fatalf("expected %d user orgs, got %d user orgs", expectedUserOrgs, len(res.UserOrgs))
@@ -1660,9 +1506,8 @@ func TestGetUserOrgs(t *testing.T) {
 
 	t.Run("test get user orgs with limit less than user orgs", func(t *testing.T) {
 		res, err := cs.ah.GetUserOrgs(ctx, &action.GetUserOrgsRequest{UserRef: user.ID, Limit: 5, SortDirection: types.SortDirectionAsc})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		expectedUserOrgs := 5
 		if len(res.UserOrgs) != expectedUserOrgs {
 			t.Fatalf("expected %d user orgs, got %d user orgs", expectedUserOrgs, len(res.UserOrgs))
@@ -1676,9 +1521,7 @@ func TestGetUserOrgs(t *testing.T) {
 		respAllUserOrgs := []*action.UserOrg{}
 
 		respUserOrgs, err := cs.ah.GetUserOrgs(ctx, &action.GetUserOrgsRequest{UserRef: user.ID, Limit: 5, SortDirection: types.SortDirectionAsc})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 
 		expectedUserOrgs := 5
 		if len(respUserOrgs.UserOrgs) != expectedUserOrgs {
@@ -1694,9 +1537,8 @@ func TestGetUserOrgs(t *testing.T) {
 		// fetch next results
 		for {
 			respUserOrgs, err = cs.ah.GetUserOrgs(ctx, &action.GetUserOrgsRequest{UserRef: user.ID, StartOrgName: lastUserOrg.Organization.Name, Limit: 5, SortDirection: types.SortDirectionAsc})
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			testutil.NilError(t, err)
+
 			expectedUserOrgs := 5
 			if respUserOrgs.HasMore && len(respUserOrgs.UserOrgs) != expectedUserOrgs {
 				t.Fatalf("expected %d user orgs, got %d user orgs", expectedUserOrgs, len(respUserOrgs.UserOrgs))
@@ -1747,9 +1589,8 @@ func TestRemoteSource(t *testing.T) {
 					Oauth2ClientID:     "clientid",
 					Oauth2ClientSecret: "clientsecret",
 				}
-				if _, err := cs.ah.CreateRemoteSource(ctx, rsreq); err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
+				_, err := cs.ah.CreateRemoteSource(ctx, rsreq)
+				testutil.NilError(t, err)
 			},
 		},
 		{
@@ -1763,12 +1604,11 @@ func TestRemoteSource(t *testing.T) {
 					Oauth2ClientID:     "clientid",
 					Oauth2ClientSecret: "clientsecret",
 				}
-				if _, err := cs.ah.CreateRemoteSource(ctx, rsreq); err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
+				_, err := cs.ah.CreateRemoteSource(ctx, rsreq)
+				testutil.NilError(t, err)
 
 				expectedError := util.NewAPIError(util.ErrBadRequest, errors.Errorf(`remotesource "rs01" already exists`))
-				_, err := cs.ah.CreateRemoteSource(ctx, rsreq)
+				_, err = cs.ah.CreateRemoteSource(ctx, rsreq)
 				if err.Error() != expectedError.Error() {
 					t.Fatalf("expected err: %v, got err: %v", expectedError.Error(), err.Error())
 				}
@@ -1785,14 +1625,12 @@ func TestRemoteSource(t *testing.T) {
 					Oauth2ClientID:     "clientid",
 					Oauth2ClientSecret: "clientsecret",
 				}
-				if _, err := cs.ah.CreateRemoteSource(ctx, rsreq); err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
+				_, err := cs.ah.CreateRemoteSource(ctx, rsreq)
+				testutil.NilError(t, err)
 
 				rsreq.Name = "rs02"
-				if _, err := cs.ah.UpdateRemoteSource(ctx, "rs01", rsreq); err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
+				_, err = cs.ah.UpdateRemoteSource(ctx, "rs01", rsreq)
+				testutil.NilError(t, err)
 			},
 		},
 		{
@@ -1806,14 +1644,12 @@ func TestRemoteSource(t *testing.T) {
 					Oauth2ClientID:     "clientid",
 					Oauth2ClientSecret: "clientsecret",
 				}
-				if _, err := cs.ah.CreateRemoteSource(ctx, rsreq); err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
+				_, err := cs.ah.CreateRemoteSource(ctx, rsreq)
+				testutil.NilError(t, err)
 
 				rsreq.APIURL = "https://api01.example.com"
-				if _, err := cs.ah.UpdateRemoteSource(ctx, "rs01", rsreq); err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
+				_, err = cs.ah.UpdateRemoteSource(ctx, "rs01", rsreq)
+				testutil.NilError(t, err)
 			},
 		},
 		{
@@ -1827,9 +1663,8 @@ func TestRemoteSource(t *testing.T) {
 					Oauth2ClientID:     "clientid",
 					Oauth2ClientSecret: "clientsecret",
 				}
-				if _, err := cs.ah.CreateRemoteSource(ctx, rs01req); err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
+				_, err := cs.ah.CreateRemoteSource(ctx, rs01req)
+				testutil.NilError(t, err)
 
 				rs02req := &action.CreateUpdateRemoteSourceRequest{
 					Name:               "rs02",
@@ -1839,13 +1674,12 @@ func TestRemoteSource(t *testing.T) {
 					Oauth2ClientID:     "clientid",
 					Oauth2ClientSecret: "clientsecret",
 				}
-				if _, err := cs.ah.CreateRemoteSource(ctx, rs02req); err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
+				_, err = cs.ah.CreateRemoteSource(ctx, rs02req)
+				testutil.NilError(t, err)
 
 				expectedError := util.NewAPIError(util.ErrBadRequest, errors.Errorf(`remotesource "rs02" already exists`))
 				rs01req.Name = "rs02"
-				_, err := cs.ah.UpdateRemoteSource(ctx, "rs01", rs01req)
+				_, err = cs.ah.UpdateRemoteSource(ctx, "rs01", rs01req)
 				if err.Error() != expectedError.Error() {
 					t.Fatalf("expected err: %v, got err: %v", expectedError.Error(), err.Error())
 				}
@@ -1882,27 +1716,20 @@ func TestDeleteUser(t *testing.T) {
 			name: "test delete user by id",
 			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
 				users, err := getUsers(ctx, cs)
-				if err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
+				testutil.NilError(t, err)
 
-				if err := cs.ah.DeleteUser(ctx, users[0].ID); err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
-
+				err = cs.ah.DeleteUser(ctx, users[0].ID)
+				testutil.NilError(t, err)
 			},
 		},
 		{
 			name: "test delete user by name",
 			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
 				users, err := getUsers(ctx, cs)
-				if err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
+				testutil.NilError(t, err)
 
-				if err := cs.ah.DeleteUser(ctx, users[0].Name); err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
+				err = cs.ah.DeleteUser(ctx, users[0].Name)
+				testutil.NilError(t, err)
 			},
 		},
 	}
@@ -1917,41 +1744,37 @@ func TestDeleteUser(t *testing.T) {
 
 			t.Logf("starting cs")
 
-			if _, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"}); err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			_, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"})
+			testutil.NilError(t, err)
 
 			// create related entries
 			// add new entries related to user when needed to properly test
 			// that all will be removed alongside the user
-			if _, err := cs.ah.CreateRemoteSource(ctx, &action.CreateUpdateRemoteSourceRequest{Name: "rs01", Type: types.RemoteSourceTypeGitea, AuthType: types.RemoteSourceAuthTypePassword, APIURL: "http://example.com"}); err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
-			if _, err := cs.ah.CreateUserLA(ctx, &action.CreateUserLARequest{UserRef: "user01", RemoteSourceName: "rs01"}); err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
-			if _, err := cs.ah.CreateUserToken(ctx, "user01", "token01"); err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			_, err = cs.ah.CreateRemoteSource(ctx, &action.CreateUpdateRemoteSourceRequest{Name: "rs01", Type: types.RemoteSourceTypeGitea, AuthType: types.RemoteSourceAuthTypePassword, APIURL: "http://example.com"})
+			testutil.NilError(t, err)
 
-			if _, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: "org01", Visibility: types.VisibilityPublic}); err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
-			if _, err := cs.ah.AddOrgMember(ctx, "org01", "user01", types.MemberRoleMember); err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
-			if _, err := cs.ah.CreateOrgInvitation(ctx, &action.CreateOrgInvitationRequest{OrganizationRef: "org01", UserRef: "user01", Role: types.MemberRoleMember}); err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			_, err = cs.ah.CreateUserLA(ctx, &action.CreateUserLARequest{UserRef: "user01", RemoteSourceName: "rs01"})
+			testutil.NilError(t, err)
+
+			_, err = cs.ah.CreateUserToken(ctx, "user01", "token01")
+			testutil.NilError(t, err)
+
+			_, err = cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: "org01", Visibility: types.VisibilityPublic})
+			testutil.NilError(t, err)
+
+			_, err = cs.ah.AddOrgMember(ctx, "org01", "user01", types.MemberRoleMember)
+			testutil.NilError(t, err)
+
+			_, err = cs.ah.CreateOrgInvitation(ctx, &action.CreateOrgInvitationRequest{OrganizationRef: "org01", UserRef: "user01", Role: types.MemberRoleMember})
+			testutil.NilError(t, err)
 
 			go func() { _ = cs.Run(ctx) }()
 
 			tt.f(ctx, t, cs)
 
 			users, err := getUsers(ctx, cs)
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			testutil.NilError(t, err)
+
 			if len(users) != 0 {
 				t.Fatalf("expected 0 users, got %d users", len(users))
 			}
@@ -1972,26 +1795,20 @@ func TestDeleteOrg(t *testing.T) {
 			name: "test delete org by id",
 			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
 				orgs, err := getOrgs(ctx, cs)
-				if err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
+				testutil.NilError(t, err)
 
-				if err := cs.ah.DeleteOrg(ctx, orgs[0].ID); err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
+				err = cs.ah.DeleteOrg(ctx, orgs[0].ID)
+				testutil.NilError(t, err)
 			},
 		},
 		{
 			name: "test delete org by name",
 			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
 				orgs, err := getOrgs(ctx, cs)
-				if err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
+				testutil.NilError(t, err)
 
-				if err := cs.ah.DeleteOrg(ctx, orgs[0].Name); err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
+				err = cs.ah.DeleteOrg(ctx, orgs[0].Name)
+				testutil.NilError(t, err)
 			},
 		},
 	}
@@ -2007,31 +1824,27 @@ func TestDeleteOrg(t *testing.T) {
 			t.Logf("starting cs")
 
 			_, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: "org01", Visibility: types.VisibilityPublic})
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			testutil.NilError(t, err)
 
 			// create related entries
 			// add new entries related to org when needed to properly test
 			// that all will be removed alongside the org
-			if _, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"}); err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
-			if _, err := cs.ah.AddOrgMember(ctx, "org01", "user01", types.MemberRoleMember); err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
-			if _, err := cs.ah.CreateOrgInvitation(ctx, &action.CreateOrgInvitationRequest{OrganizationRef: "org01", UserRef: "user01", Role: types.MemberRoleMember}); err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			_, err = cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"})
+			testutil.NilError(t, err)
+
+			_, err = cs.ah.AddOrgMember(ctx, "org01", "user01", types.MemberRoleMember)
+			testutil.NilError(t, err)
+
+			_, err = cs.ah.CreateOrgInvitation(ctx, &action.CreateOrgInvitationRequest{OrganizationRef: "org01", UserRef: "user01", Role: types.MemberRoleMember})
+			testutil.NilError(t, err)
 
 			go func() { _ = cs.Run(ctx) }()
 
 			tt.f(ctx, t, cs)
 
 			orgs, err := getOrgs(ctx, cs)
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			testutil.NilError(t, err)
+
 			if len(orgs) != 0 {
 				t.Fatalf("expected 0 orgs, got %d orgs", len(orgs))
 			}
@@ -2046,17 +1859,15 @@ func TestOrgInvitation(t *testing.T) {
 
 	setupUsers := func(t *testing.T, ctx context.Context, cs *Configstore) {
 		for i := 1; i < 5; i++ {
-			if _, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)}); err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			_, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)})
+			testutil.NilError(t, err)
 		}
 	}
 
 	setupOrgs := func(t *testing.T, ctx context.Context, cs *Configstore, creatorUserID string) {
 		for i := 1; i < 5; i++ {
-			if _, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: fmt.Sprintf("org%d", i), Visibility: "public", CreatorUserID: creatorUserID}); err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			_, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: fmt.Sprintf("org%d", i), Visibility: "public", CreatorUserID: creatorUserID})
+			testutil.NilError(t, err)
 		}
 	}
 
@@ -2088,9 +1899,8 @@ func TestOrgInvitation(t *testing.T) {
 					Role:            types.MemberRoleMember,
 				}
 				_, err = cs.ah.CreateOrgInvitation(ctx, rs)
-				if err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
+				testutil.NilError(t, err)
+
 				fmt.Println("err:", err)
 			},
 		},
@@ -2122,9 +1932,7 @@ func TestOrgInvitation(t *testing.T) {
 					Role:            types.MemberRoleMember,
 				}
 				_, err = cs.ah.CreateOrgInvitation(ctx, rs)
-				if err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
+				testutil.NilError(t, err)
 
 				expectedError := util.NewAPIError(util.ErrBadRequest, errors.Errorf("invitation already exists"))
 				_, err = cs.ah.CreateOrgInvitation(ctx, rs)
@@ -2157,19 +1965,14 @@ func TestOrgInvitation(t *testing.T) {
 					Role:            types.MemberRoleMember,
 				}
 				_, err = cs.ah.CreateOrgInvitation(ctx, rs)
-				if err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
+				testutil.NilError(t, err)
 
 				err = cs.ah.DeleteOrg(ctx, org.ID)
-				if err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
+				testutil.NilError(t, err)
 
 				orgInvitations, err := cs.ah.GetUserOrgInvitations(ctx, userInvitation.ID)
-				if err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
+				testutil.NilError(t, err)
+
 				if len(orgInvitations) != 0 {
 					t.Fatalf("expected 0 orgInvitations, got %d orgInvitations", len(orgInvitations))
 				}
@@ -2200,19 +2003,14 @@ func TestOrgInvitation(t *testing.T) {
 					Role:            types.MemberRoleMember,
 				}
 				_, err = cs.ah.CreateOrgInvitation(ctx, rs)
-				if err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
+				testutil.NilError(t, err)
 
 				err = cs.ah.DeleteUser(ctx, userInvitation.ID)
-				if err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
+				testutil.NilError(t, err)
 
 				orgInvitations, err := cs.ah.GetOrgInvitations(ctx, org.ID)
-				if err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
+				testutil.NilError(t, err)
+
 				if len(orgInvitations) != 0 {
 					t.Fatalf("expected 0 orgInvitations, got %d orgInvitations", len(orgInvitations))
 				}
@@ -2223,17 +2021,16 @@ func TestOrgInvitation(t *testing.T) {
 			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
 				setupUsers(t, ctx, cs)
 				users, err := getUsers(ctx, cs)
-				if err != nil {
-					t.Fatalf("err: %v", err)
-				}
+				testutil.NilError(t, err)
+
 				userOwner := users[0]
 				userInvitation := users[1]
 
 				setupOrgs(t, ctx, cs, userOwner.ID)
+
 				orgs, err := getOrgs(ctx, cs)
-				if err != nil {
-					t.Fatalf("err: %v", err)
-				}
+				testutil.NilError(t, err)
+
 				org := orgs[0]
 
 				rs := &action.CreateOrgInvitationRequest{
@@ -2242,19 +2039,14 @@ func TestOrgInvitation(t *testing.T) {
 					Role:            types.MemberRoleMember,
 				}
 				_, err = cs.ah.CreateOrgInvitation(ctx, rs)
-				if err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
+				testutil.NilError(t, err)
 
 				_, err = cs.ah.AddOrgMember(ctx, org.ID, userInvitation.ID, types.MemberRoleMember)
-				if err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
+				testutil.NilError(t, err)
 
 				orgInvitations, err := cs.ah.GetOrgInvitations(ctx, org.ID)
-				if err != nil {
-					t.Fatalf("unexpected err: %v", err)
-				}
+				testutil.NilError(t, err)
+
 				if len(orgInvitations) != 0 {
 					t.Fatalf("expected 0 orgInvitations, got %d orgInvitations", len(orgInvitations))
 				}

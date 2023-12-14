@@ -102,16 +102,13 @@ func setupWebhooksReceiver(pctx context.Context, t *testing.T, dir string) *webh
 	}
 
 	port, err := testutil.GetFreePort(dockerBridgeAddress, true, false)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	wr.listenAddress = fmt.Sprintf("%s:%s", dockerBridgeAddress, port)
 	wr.exposedURL = fmt.Sprintf("http://%s:%s", dockerBridgeAddress, port)
 
-	if err := wr.start(); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	err = wr.start()
+	testutil.NilError(t, err)
 
 	go func() {
 		<-ctx.Done()

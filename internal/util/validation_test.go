@@ -55,13 +55,13 @@ func TestValidateName(t *testing.T) {
 	for _, name := range goodNames {
 		ok := ValidateName(name)
 		if !ok {
-			t.Errorf("expect valid name for %q", name)
+			t.Fatalf("expect valid name for %q", name)
 		}
 	}
 	for _, name := range badNames {
 		ok := ValidateName(name)
 		if ok {
-			t.Errorf("expect invalid name for %q", name)
+			t.Fatalf("expect invalid name for %q", name)
 		}
 	}
 }

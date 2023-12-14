@@ -23,6 +23,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"agola.io/agola/internal/testutil"
 )
 
 func setupPosix(t *testing.T, dir string) (*PosixStorage, error) {
@@ -49,17 +51,13 @@ func TestList(t *testing.T) {
 	dir := t.TempDir()
 
 	ps, err := setupPosix(t, dir)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	pfs, err := setupPosixFlat(t, dir)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	s3s, err := setupS3(t, dir)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	type listop struct {
 		prefix    string
@@ -288,7 +286,7 @@ func TestList(t *testing.T) {
 						paths = append(paths, object.Path)
 					}
 					if !reflect.DeepEqual(op.expected, paths) {
-						t.Errorf("%s %d-%d expected paths %v got %v", sname, i, j, op.expected, paths)
+						t.Fatalf("%s %d-%d expected paths %v got %v", sname, i, j, op.expected, paths)
 					}
 				}
 			})
@@ -300,17 +298,13 @@ func TestWriteObject(t *testing.T) {
 	dir := t.TempDir()
 
 	ps, err := setupPosix(t, dir)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	pfs, err := setupPosixFlat(t, dir)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	s3s, err := setupS3(t, dir)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	newBuf := func(n int64) *bytes.Buffer {
 		testBytes := make([]byte, n)
@@ -335,13 +329,12 @@ func TestWriteObject(t *testing.T) {
 			// Test write without size. Should write whole buffer.
 			buf := newBuf(n)
 			objName := "obj01"
-			if err := os.WriteObject(objName, buf, -1, false); err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			err := os.WriteObject(objName, buf, -1, false)
+			testutil.NilError(t, err)
+
 			oi, err := os.Stat(objName)
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			testutil.NilError(t, err)
+
 			if oi.Size != n {
 				t.Fatalf("expected object size: %d, got %d", n, oi.Size)
 			}
@@ -349,13 +342,12 @@ func TestWriteObject(t *testing.T) {
 			// Test write with object size equal to buf size.
 			buf = newBuf(n)
 			objName = "obj02"
-			if err := os.WriteObject(objName, buf, n, false); err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			err = os.WriteObject(objName, buf, n, false)
+			testutil.NilError(t, err)
+
 			oi, err = os.Stat(objName)
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			testutil.NilError(t, err)
+
 			if oi.Size != n {
 				t.Fatalf("expected object size: %d, got %d", n, oi.Size)
 			}
@@ -364,13 +356,12 @@ func TestWriteObject(t *testing.T) {
 			buf = newBuf(n)
 			objName = "obj03"
 			size := int64(800)
-			if err := os.WriteObject(objName, buf, int64(size), false); err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			err = os.WriteObject(objName, buf, int64(size), false)
+			testutil.NilError(t, err)
+
 			oi, err = os.Stat(objName)
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			testutil.NilError(t, err)
+
 			if oi.Size != size {
 				t.Fatalf("expected object size: %d, got %d", size, oi.Size)
 			}

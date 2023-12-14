@@ -99,16 +99,12 @@ func setupWebhooksReceiver(pctx context.Context, t *testing.T) *webhooksReceiver
 	wr := &webhooksReceiver{ctx: ctx, t: t, log: log, cancel: cancel, webhooks: ws}
 
 	port, err := testutil.GetFreePort("localhost", true, false)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	wr.listenAddress = net.JoinHostPort("localhost", port)
 	wr.exposedURL = fmt.Sprintf("http://%s", net.JoinHostPort("localhost", port))
-
-	if err := wr.start(); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	err = wr.start()
+	testutil.NilError(t, err)
 
 	go func() {
 		<-ctx.Done()
