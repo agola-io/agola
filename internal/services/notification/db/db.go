@@ -83,7 +83,7 @@ func mustSingleRow[T any](s []*T) (*T, error) {
 	return s[0], nil
 }
 
-func (d *DB) GetProjectRunWebhookDeliveriesAfterSequence(tx *sql.Tx, afterSequence uint64, limit int) ([]*types.RunWebhookDelivery, error) {
+func (d *DB) GetRunWebhookDeliveriesAfterSequence(tx *sql.Tx, afterSequence uint64, limit int) ([]*types.RunWebhookDelivery, error) {
 	q := runWebhookDeliverySelect().OrderBy("sequence").Asc()
 	q.Where(q.G("sequence", afterSequence))
 	if limit > 0 {

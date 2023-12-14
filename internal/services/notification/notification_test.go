@@ -294,7 +294,7 @@ func getRunWebhookDeliveries(t *testing.T, ctx context.Context, ns *Notification
 
 	err := ns.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		wd, err = ns.d.GetProjectRunWebhookDeliveriesAfterSequence(tx, 0, 0)
+		wd, err = ns.d.GetRunWebhookDeliveriesAfterSequence(tx, 0, 0)
 		if err != nil {
 			return errors.WithStack(err)
 		}
