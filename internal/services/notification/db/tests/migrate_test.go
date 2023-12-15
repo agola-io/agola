@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
-	"gotest.tools/assert"
 
 	"agola.io/agola/internal/services/notification/db"
 	"agola.io/agola/internal/services/notification/db/objects"
@@ -20,12 +19,12 @@ func newSetupDBFn(log zerolog.Logger) testutil.SetupDBFn {
 		sdb, lf, dbConnString := testutil.CreateDB(t, log, ctx, dir)
 
 		d, err := db.NewDB(log, sdb)
-		assert.NilError(t, err, "new db error")
+		testutil.NilError(t, err, "new db error")
 
 		dbm := manager.NewDBManager(log, d, lf)
 
 		err = dbm.Setup(ctx)
-		assert.NilError(t, err, "setup db error")
+		testutil.NilError(t, err, "setup db error")
 
 		sc := &testutil.DBContext{D: d, DBM: dbm, LF: lf, DBConnString: dbConnString}
 

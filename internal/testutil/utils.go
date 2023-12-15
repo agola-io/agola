@@ -268,23 +268,17 @@ func NewTestGitea(t *testing.T, dir, dockerBridgeAddress string, a ...string) (*
     name = TestGitea
     email = testgitea@example.com
 `
-	if err := os.WriteFile(filepath.Join(giteaDir, ".gitconfig"), []byte(gitConfigData), 0644); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	err := os.WriteFile(filepath.Join(giteaDir, ".gitconfig"), []byte(gitConfigData), 0644)
+	NilError(t, err)
 
 	curUser, err := user.Current()
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	NilError(t, err)
 
 	httpPort, err := GetFreePort(dockerBridgeAddress, true, false)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	NilError(t, err)
+
 	sshPort, err := GetFreePort(dockerBridgeAddress, true, false)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	NilError(t, err)
 
 	giteaConfig := &GiteaConfig{
 		Data:              giteaDir,

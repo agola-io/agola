@@ -71,16 +71,12 @@ func setupRunEventsSender(pctx context.Context, t *testing.T) *runEventsSender {
 	es := &runEventsSender{ctx: ctx, t: t, log: log, cancel: cancel, runEvents: r}
 
 	port, err := testutil.GetFreePort("localhost", true, false)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	es.listenAddress = net.JoinHostPort("localhost", port)
 	es.exposedURL = fmt.Sprintf("http://%s", net.JoinHostPort("localhost", port))
-
-	if err := es.start(); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	err = es.start()
+	testutil.NilError(t, err)
 
 	go func() {
 		<-ctx.Done()

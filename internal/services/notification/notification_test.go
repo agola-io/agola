@@ -65,9 +65,7 @@ func setupNotificationService(ctx context.Context, t *testing.T, log zerolog.Log
 	}
 
 	ns, err := NewNotificationService(ctx, log, &c)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	return ns
 }
@@ -97,10 +95,8 @@ func TestRunWebhookDelivery(t *testing.T) {
 			runWebhooks[i] = createRunWebhook(t, ctx, ns, project01)
 			createRunWebhookDelivery(t, ctx, ns, runWebhooks[i].ID, types.DeliveryStatusNotDelivered)
 		}
-
-		if err := ns.runWebhookDeliveriesHandler(ctx); err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		err := ns.runWebhookDeliveriesHandler(ctx)
+		testutil.NilError(t, err)
 
 		runWebhookDeliveries := getRunWebhookDeliveries(t, ctx, ns)
 		if len(runWebhookDeliveries) != len(runWebhooks) {
@@ -113,9 +109,8 @@ func TestRunWebhookDelivery(t *testing.T) {
 		}
 
 		webhooks, err := wr.webhooks.getWebhooks()
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		if len(webhooks) != len(runWebhooks) {
 			t.Fatalf("expected %d run webhook got: %d", len(runWebhooks), len(webhooks))
 		}
@@ -125,9 +120,9 @@ func TestRunWebhookDelivery(t *testing.T) {
 			}
 
 			h256 := hmac.New(sha256.New, []byte(webhookSecret))
-			if _, err = h256.Write([]byte(runWebhooks[i].Payload)); err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			_, err = h256.Write([]byte(runWebhooks[i].Payload))
+			testutil.NilError(t, err)
+
 			expectedsignature := hex.EncodeToString(h256.Sum(nil))
 
 			if webhooks[i].Signature != expectedsignature {
@@ -139,14 +134,12 @@ func TestRunWebhookDelivery(t *testing.T) {
 
 		wr.webhooks.resetWebhooks()
 
-		if err := ns.runWebhookDeliveriesHandler(ctx); err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		err = ns.runWebhookDeliveriesHandler(ctx)
+		testutil.NilError(t, err)
 
 		webhooks, err = wr.webhooks.getWebhooks()
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		if len(webhooks) != 0 {
 			t.Fatalf("expected %d run webhook got: %d", 0, len(webhooks))
 		}
@@ -163,10 +156,8 @@ func TestRunWebhookDelivery(t *testing.T) {
 
 		runWebhook := createRunWebhook(t, ctx, ns, project01)
 		createRunWebhookDelivery(t, ctx, ns, runWebhook.ID, types.DeliveryStatusNotDelivered)
-
-		if err := ns.runWebhookDeliveriesHandler(ctx); err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		err := ns.runWebhookDeliveriesHandler(ctx)
+		testutil.NilError(t, err)
 
 		runWebhookDeliveries := getRunWebhookDeliveries(t, ctx, ns)
 		if len(runWebhookDeliveries) != 1 {
@@ -214,9 +205,7 @@ func TestLastRunEventSequence(t *testing.T) {
 	expectedLastRunEventSequenceValue := uint64(2)
 
 	err := ns.runEventsHandler(ctx)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	lastRunEventSequenceValue = getLastRunEventSequenceValue(t, ctx, ns)
 	if lastRunEventSequenceValue != expectedLastRunEventSequenceValue {
@@ -231,9 +220,7 @@ func TestLastRunEventSequence(t *testing.T) {
 	runEventsSender.runEvents.addRunEvent(runEvents[3])
 
 	err = ns.runEventsHandler(ctx)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	runWebhooks := getRunWebhooks(t, ctx, ns)
 	if len(runWebhooks) != len(runEvents) {
@@ -243,9 +230,7 @@ func TestLastRunEventSequence(t *testing.T) {
 	for i := range runEvents {
 		runWebhook := ns.generatewebhook(ctx, runEvents[i])
 		webhookPayload, err := json.Marshal(runWebhook)
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 
 		if !bytes.Equal(runWebhooks[i].Payload, webhookPayload) {
 			t.Fatalf("expected %s run webhook payload got: %s", runWebhooks[i].Payload, webhookPayload)
@@ -282,9 +267,7 @@ func getLastRunEventSequenceValue(t *testing.T, ctx context.Context, ns *Notific
 
 		return nil
 	})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	return lastRunEventSequence
 }
@@ -301,9 +284,7 @@ func getRunWebhookDeliveries(t *testing.T, ctx context.Context, ns *Notification
 
 		return nil
 	})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	return wd
 }
@@ -322,9 +303,7 @@ func createRunWebhook(t *testing.T, ctx context.Context, ns *NotificationService
 
 		return nil
 	})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	return wh
 }
@@ -341,9 +320,7 @@ func getRunWebhooks(t *testing.T, ctx context.Context, ns *NotificationService) 
 
 		return nil
 	})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	return runWebhooks
 }
@@ -362,9 +339,7 @@ func createRunWebhookDelivery(t *testing.T, ctx context.Context, ns *Notificatio
 
 		return nil
 	})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	return wd
 }
@@ -384,9 +359,7 @@ func updateRunWebhookCreationDate(t *testing.T, ctx context.Context, ns *Notific
 
 		return nil
 	})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 }
 
 func TestCommitStatusDelivery(t *testing.T) {
@@ -411,10 +384,8 @@ func TestCommitStatusDelivery(t *testing.T) {
 			commitStatuses[i] = createCommitStatus(t, ctx, ns, i, fmt.Sprintf("projectID-%d", i))
 			createCommitStatusDelivery(t, ctx, ns, commitStatuses[i].ID, types.DeliveryStatusNotDelivered)
 		}
-
-		if err := ns.commitStatusDeliveriesHandler(ctx); err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		err := ns.commitStatusDeliveriesHandler(ctx)
+		testutil.NilError(t, err)
 
 		commitStatusDeliveries := getCommitStatusDeliveries(t, ctx, ns)
 		if len(commitStatusDeliveries) != len(commitStatuses) {
@@ -427,9 +398,8 @@ func TestCommitStatusDelivery(t *testing.T) {
 		}
 
 		commitStatusesReceived, err := cs.commitStatuses.getCommitStatuses()
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		if len(commitStatusesReceived) != len(commitStatuses) {
 			t.Fatalf("expected %d run commitStatus got: %d", len(commitStatuses), len(commitStatusesReceived))
 		}
@@ -451,14 +421,12 @@ func TestCommitStatusDelivery(t *testing.T) {
 
 		cs.commitStatuses.resetCommitStatuses()
 
-		if err := ns.commitStatusDeliveriesHandler(ctx); err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		err = ns.commitStatusDeliveriesHandler(ctx)
+		testutil.NilError(t, err)
 
 		commitStatusesReceived, err = cs.commitStatuses.getCommitStatuses()
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		if len(commitStatusesReceived) != 0 {
 			t.Fatalf("expected %d commit status got: %d", 0, len(commitStatusesReceived))
 		}
@@ -481,10 +449,8 @@ func TestCommitStatusDelivery(t *testing.T) {
 
 		commitStatus := createCommitStatus(t, ctx, ns, 1, project01)
 		createCommitStatusDelivery(t, ctx, ns, commitStatus.ID, types.DeliveryStatusNotDelivered)
-
-		if err := ns.commitStatusDeliveriesHandler(ctx); err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		err := ns.commitStatusDeliveriesHandler(ctx)
+		testutil.NilError(t, err)
 
 		commitStatusDeliveries := getCommitStatusDeliveries(t, ctx, ns)
 		if len(commitStatusDeliveries) != 1 {
@@ -515,9 +481,7 @@ func createCommitStatus(t *testing.T, ctx context.Context, ns *NotificationServi
 
 		return nil
 	})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	return cs
 }
@@ -537,9 +501,7 @@ func updateCommitStatusCreationDate(t *testing.T, ctx context.Context, ns *Notif
 
 		return nil
 	})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 }
 
 func getCommitStatuses(t *testing.T, ctx context.Context, ns *NotificationService) []*types.CommitStatus {
@@ -554,9 +516,7 @@ func getCommitStatuses(t *testing.T, ctx context.Context, ns *NotificationServic
 
 		return nil
 	})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	return commitStatuses
 }
@@ -573,9 +533,7 @@ func getCommitStatusDeliveries(t *testing.T, ctx context.Context, ns *Notificati
 
 		return nil
 	})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	return wd
 }
@@ -594,9 +552,7 @@ func createCommitStatusDelivery(t *testing.T, ctx context.Context, ns *Notificat
 
 		return nil
 	})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	return delivery
 }
@@ -628,9 +584,8 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 
 	t.Run("test get run webhook deliveries with limit = 0", func(t *testing.T) {
 		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, Limit: 0})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		if res.HasMore != false {
 			t.Fatalf("unexpected HasMore true")
 		}
@@ -641,9 +596,8 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 
 	t.Run("test get run webhook deliveries with limit = 10", func(t *testing.T) {
 		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, Limit: 10})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		if res.HasMore != true {
 			t.Fatalf("unexpected HasMore false")
 		}
@@ -654,9 +608,8 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 
 	t.Run("test get run webhook deliveries with deliverystatusfilter = delivered", func(t *testing.T) {
 		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, DeliveryStatusFilter: []types.DeliveryStatus{types.DeliveryStatusDelivered}, Limit: 0})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		if res.HasMore != false {
 			t.Fatalf("unexpected HasMore true")
 		}
@@ -667,9 +620,8 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 
 	t.Run("test get run webhook deliveries with deliverystatusfilter = delivered and limit less than run webhook deliveries", func(t *testing.T) {
 		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, DeliveryStatusFilter: []types.DeliveryStatus{types.DeliveryStatusDelivered}, Limit: 5})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		if res.HasMore != true {
 			t.Fatalf("unexpected HasMore false")
 		}
@@ -682,9 +634,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 		respAllProjectRunWebhookDeliveries := []*types.RunWebhookDelivery{}
 
 		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, Limit: 5, SortDirection: types.SortDirectionAsc})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 
 		expectedProjectRunWebhookDeliveries := 5
 		if len(res.RunWebhookDeliveries) != expectedProjectRunWebhookDeliveries {
@@ -700,9 +650,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 		// fetch next results
 		for {
 			res, err = ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, StartSequence: lastProjectRunWebhookDelivery.Sequence, Limit: 5, SortDirection: types.SortDirectionAsc})
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			testutil.NilError(t, err)
 
 			if res.HasMore && len(res.RunWebhookDeliveries) != expectedProjectRunWebhookDeliveries {
 				t.Fatalf("expected %d project run webhook deliveries, got %d project run webhook deliveries", expectedProjectRunWebhookDeliveries, len(res.RunWebhookDeliveries))
@@ -739,9 +687,8 @@ func TestDeliveryStatusFromStringSlice(t *testing.T) {
 	}
 
 	result, err := types.DeliveryStatusFromStringSlice(deliverystatus)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	if diff := cmp.Diff(result, expectedDeliveryStatus); diff != "" {
 		t.Fatalf("mismatch (-want +got):\n%s", diff)
 	}
@@ -801,9 +748,7 @@ func TestRunWebhooksCleaner(t *testing.T) {
 	}
 
 	err := ns.runWebhooksCleaner(ctx, 30*time.Minute)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	runWebhooks := getRunWebhooks(t, ctx, ns)
 	if len(runWebhooks) != len(expectedRunWebhooks) {
@@ -814,9 +759,8 @@ func TestRunWebhooksCleaner(t *testing.T) {
 	}
 
 	runWebhookDeliveries := getRunWebhookDeliveries(t, ctx, ns)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	if len(runWebhookDeliveries) != len(expectedRunWebhookDeliveries) {
 		t.Fatalf("expected %d run webhooks got: %d", len(expectedRunWebhookDeliveries), len(runWebhookDeliveries))
 	}
@@ -854,18 +798,14 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		ns.c.WebhookURL = fmt.Sprintf("%s/%s", wr.exposedURL, "webhooks")
 
 		err := ns.ah.RunWebhookRedelivery(ctx, runWebhook.ProjectID, runWebhookDelivery.ID)
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 
-		if err := ns.runWebhookDeliveriesHandler(ctx); err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		err = ns.runWebhookDeliveriesHandler(ctx)
+		testutil.NilError(t, err)
 
 		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, SortDirection: types.SortDirectionAsc})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		if len(res.RunWebhookDeliveries) != 2 {
 			t.Fatalf("expected 2 RunWebhookDeliveries got: %d", len(res.RunWebhookDeliveries))
 		}
@@ -898,18 +838,14 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		ns.c.WebhookURL = fmt.Sprintf("%s/%s", wr.exposedURL, "webhooks")
 
 		err := ns.ah.RunWebhookRedelivery(ctx, runWebhook.ProjectID, runWebhookDelivery.ID)
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 
-		if err := ns.runWebhookDeliveriesHandler(ctx); err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		err = ns.runWebhookDeliveriesHandler(ctx)
+		testutil.NilError(t, err)
 
 		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, SortDirection: types.SortDirectionAsc})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		if len(res.RunWebhookDeliveries) != 2 {
 			t.Fatalf("expected 2 RunWebhookDeliveries got: %d", len(res.RunWebhookDeliveries))
 		}
@@ -998,14 +934,12 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
 		}
 
-		if err := ns.runWebhookDeliveriesHandler(ctx); err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		err = ns.runWebhookDeliveriesHandler(ctx)
+		testutil.NilError(t, err)
 
 		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, SortDirection: types.SortDirectionAsc})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		if len(res.RunWebhookDeliveries) != 1 {
 			t.Fatalf("expected 1 RunWebhookDeliveries got: %d", len(res.RunWebhookDeliveries))
 		}
@@ -1049,9 +983,7 @@ func TestCommitStatusesCleaner(t *testing.T) {
 	}
 
 	err := ns.commitStatusesCleaner(ctx, 30*time.Minute)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	commitStatuses := getCommitStatuses(t, ctx, ns)
 	if len(commitStatuses) != len(expectedCommitStatuses) {
@@ -1062,9 +994,8 @@ func TestCommitStatusesCleaner(t *testing.T) {
 	}
 
 	commitStatusDeliveries := getCommitStatusDeliveries(t, ctx, ns)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	if len(commitStatusDeliveries) != len(expectedCommitStatusDeliveries) {
 		t.Fatalf("expected %d run commitStatusDeliveries got: %d", len(expectedCommitStatusDeliveries), len(commitStatusDeliveries))
 	}
@@ -1100,9 +1031,8 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 
 	t.Run("test get commit status deliveries with limit = 0", func(t *testing.T) {
 		res, err := ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{ProjectID: project01, Limit: 0})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		if res.HasMore != false {
 			t.Fatalf("unexpected HasMore true")
 		}
@@ -1113,9 +1043,8 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 
 	t.Run("test get commit status deliveries with limit = 10", func(t *testing.T) {
 		res, err := ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{ProjectID: project01, Limit: 10})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		if res.HasMore != true {
 			t.Fatalf("unexpected HasMore false")
 		}
@@ -1126,9 +1055,8 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 
 	t.Run("test get commit status deliveries with deliverystatusfilter = delivered", func(t *testing.T) {
 		res, err := ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{ProjectID: project01, DeliveryStatusFilter: []types.DeliveryStatus{types.DeliveryStatusDelivered}, Limit: 0})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		if res.HasMore != false {
 			t.Fatalf("unexpected HasMore true")
 		}
@@ -1139,9 +1067,8 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 
 	t.Run("test get commit status deliveries with deliverystatusfilter = delivered and limit less than commit status deliveries", func(t *testing.T) {
 		res, err := ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{ProjectID: project01, DeliveryStatusFilter: []types.DeliveryStatus{types.DeliveryStatusDelivered}, Limit: 5})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		if res.HasMore != true {
 			t.Fatalf("unexpected HasMore false")
 		}
@@ -1154,9 +1081,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 		respAllProjectCommitStatusDeliveries := []*types.CommitStatusDelivery{}
 
 		res, err := ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{ProjectID: project01, Limit: 5, SortDirection: types.SortDirectionAsc})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 
 		expectedProjectCommitStatusDeliveries := 5
 		if len(res.CommitStatusDeliveries) != expectedProjectCommitStatusDeliveries {
@@ -1172,9 +1097,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 		// fetch next results
 		for {
 			res, err = ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{ProjectID: project01, StartSequence: lastProjectCommitStatusDelivery.Sequence, Limit: 5, SortDirection: types.SortDirectionAsc})
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			testutil.NilError(t, err)
 
 			if res.HasMore && len(res.CommitStatusDeliveries) != expectedProjectCommitStatusDeliveries {
 				t.Fatalf("expected %d project commit status deliveries, got %d project commit status deliveries", expectedProjectCommitStatusDeliveries, len(res.CommitStatusDeliveries))

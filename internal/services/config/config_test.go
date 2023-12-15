@@ -22,6 +22,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/sorintlab/errors"
+
+	"agola.io/agola/internal/testutil"
 )
 
 func TestParseConfig(t *testing.T) {
@@ -823,9 +825,8 @@ gitserver:
 
 			content := []byte(tt.in)
 			err := os.WriteFile(path.Join(dir, "config.yml"), content, 0644)
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
+			testutil.NilError(t, err)
+
 			c, err := Parse(path.Join(dir, "config.yml"), tt.services)
 			if err != nil {
 				if tt.err == nil {
@@ -840,7 +841,7 @@ gitserver:
 				}
 
 				if diff := cmp.Diff(tt.out, c); diff != "" {
-					t.Errorf("config mismatch (-want +got):\n%s", diff)
+					t.Fatalf("config mismatch (-want +got):\n%s", diff)
 				}
 			}
 		})

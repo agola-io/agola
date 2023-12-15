@@ -21,6 +21,8 @@ import (
 	"testing"
 
 	"github.com/sorintlab/errors"
+
+	"agola.io/agola/internal/testutil"
 )
 
 func TestEscapeUnescape(t *testing.T) {
@@ -58,21 +60,21 @@ func TestEscapeUnescape(t *testing.T) {
 	for i, tt := range tests {
 		out := escape(tt.in)
 		if out != tt.expected {
-			t.Errorf("%d: escape: expected %q got %q", i, tt.expected, out)
+			t.Fatalf("%d: escape: expected %q got %q", i, tt.expected, out)
 		}
 
 		unescaped, _, err := unescape(out)
 		if err != nil {
 			if tt.err == nil {
-				t.Errorf("%d: unescape: expected no error got %v", i, err)
+				t.Fatalf("%d: unescape: expected no error got %v", i, err)
 			} else if !errors.Is(tt.err, err) {
-				t.Errorf("%d: unescape: expected error %v got %v", i, tt.err, err)
+				t.Fatalf("%d: unescape: expected error %v got %v", i, tt.err, err)
 			}
 		} else {
 			if tt.err != nil {
-				t.Errorf("%d: unescape: expected error %v got no error", i, tt.err)
+				t.Fatalf("%d: unescape: expected error %v got no error", i, tt.err)
 			} else if unescaped != tt.in {
-				t.Errorf("%d: unescape: expected %q got %q", i, tt.in, unescaped)
+				t.Fatalf("%d: unescape: expected %q got %q", i, tt.in, unescaped)
 			}
 		}
 	}
@@ -84,28 +86,23 @@ func TestPosixFlatDeleteObject(t *testing.T) {
 	dir := t.TempDir()
 
 	ls, err := NewPosixFlat(dir)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
 
 	for _, obj := range objects {
-		if err := ls.WriteObject(obj, bytes.NewReader([]byte{}), 0, true); err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
-		if err := ls.DeleteObject(obj); err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		err := ls.WriteObject(obj, bytes.NewReader([]byte{}), 0, true)
+		testutil.NilError(t, err)
+
+		err = ls.DeleteObject(obj)
+		testutil.NilError(t, err)
 	}
 
 	// no files and directories should be left
 	bd, err := os.Open(filepath.Join(dir, dataDirName))
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	files, err := bd.Readdirnames(0)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
+	testutil.NilError(t, err)
+
 	if len(files) > 0 {
 		t.Fatalf("expected 0 files got %d files", len(files))
 	}

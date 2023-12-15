@@ -42,7 +42,7 @@ func TestPathList(t *testing.T) {
 		t.Run("test is parent path", func(t *testing.T) {
 			out := PathList(tt.in)
 			if !reflect.DeepEqual(out, tt.out) {
-				t.Errorf("got %q but wanted: %q", out, tt.out)
+				t.Fatalf("got %q but wanted: %q", out, tt.out)
 			}
 		})
 	}
@@ -66,7 +66,7 @@ func TestIsParentPath(t *testing.T) {
 		t.Run("test is parent path", func(t *testing.T) {
 			ok := IsParentPath(tt.parent, tt.p)
 			if ok != tt.ok {
-				t.Errorf("got %t but wanted: %t a: %v, b: %v", ok, tt.ok, tt.parent, tt.p)
+				t.Fatalf("got %t but wanted: %t a: %v, b: %v", ok, tt.ok, tt.parent, tt.p)
 			}
 		})
 	}
@@ -93,7 +93,7 @@ func TestIsSameOrParentPath(t *testing.T) {
 		t.Run("test is parent path", func(t *testing.T) {
 			ok := IsSameOrParentPath(tt.parent, tt.p)
 			if ok != tt.ok {
-				t.Errorf("got %t but wanted: %t a: %v, b: %v", ok, tt.ok, tt.parent, tt.p)
+				t.Fatalf("got %t but wanted: %t a: %v, b: %v", ok, tt.ok, tt.parent, tt.p)
 			}
 		})
 	}
