@@ -85,3 +85,29 @@ func (h *ActionHandler) GetProjectCommitStatusDeliveries(ctx context.Context, re
 
 	return res, nil
 }
+
+type ProjectCommitStatusRedeliveryRequest struct {
+	ProjectRef             string
+	CommitStatusDeliveryID string
+}
+
+func (h *ActionHandler) ProjectCommitStatusRedelivery(ctx context.Context, req *ProjectCommitStatusRedeliveryRequest) error {
+	project, _, err := h.configstoreClient.GetProject(ctx, req.ProjectRef)
+	if err != nil {
+		return util.NewAPIError(util.KindFromRemoteError(err), err)
+	}
+	isUserOwner, err := h.IsAuthUserProjectOwner(ctx, project.OwnerType, project.OwnerID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to determine permissions")
+	}
+	if !isUserOwner {
+		return util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
+	}
+
+	_, err = h.notificationClient.CommitStatusRedelivery(ctx, project.ID, req.CommitStatusDeliveryID)
+	if err != nil {
+		return util.NewAPIError(util.KindFromRemoteError(err), err)
+	}
+
+	return nil
+}
