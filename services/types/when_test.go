@@ -17,6 +17,8 @@ package types
 import (
 	"testing"
 
+	"gotest.tools/assert"
+
 	itypes "agola.io/agola/internal/services/types"
 )
 
@@ -318,9 +320,7 @@ func TestMatchWhen(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			out := MatchWhen(tt.when, tt.refType, tt.branch, tt.tag, tt.ref)
-			if tt.out != out {
-				t.Fatalf("expected match: %t, got: %t", tt.out, out)
-			}
+			assert.Equal(t, out, tt.out)
 		})
 	}
 }

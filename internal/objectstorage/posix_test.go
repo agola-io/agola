@@ -20,6 +20,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"gotest.tools/assert"
+	"gotest.tools/assert/cmp"
+
 	"agola.io/agola/internal/testutil"
 )
 
@@ -46,7 +49,5 @@ func TestPosixDeleteObject(t *testing.T) {
 	files, err := bd.Readdirnames(0)
 	testutil.NilError(t, err)
 
-	if len(files) > 0 {
-		t.Fatalf("expected 0 files got %d files", len(files))
-	}
+	assert.Assert(t, cmp.Len(files, 0), "number of files")
 }

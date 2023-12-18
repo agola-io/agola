@@ -30,7 +30,6 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -46,9 +45,10 @@ import (
 	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/storage/filesystem"
 	"github.com/go-git/go-git/v5/storage/memory"
-	"github.com/google/go-cmp/cmp"
 	"github.com/rs/zerolog"
 	"github.com/sorintlab/errors"
+	"gotest.tools/assert"
+	"gotest.tools/assert/cmp"
 
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/configstore"
@@ -104,9 +104,11 @@ const (
 )
 
 const (
-	remoteErrorNotExist   = "remote error notexist"
-	remoteErrorBadRequest = "remote error badrequest"
-	remoteErrorForbidden  = "remote error forbidden"
+	remoteErrorInternal     = "remote error internal"
+	remoteErrorNotExist     = "remote error notexist"
+	remoteErrorBadRequest   = "remote error badrequest"
+	remoteErrorUnauthorized = "remote error unauthorized"
+	remoteErrorForbidden    = "remote error forbidden"
 )
 
 func setupGitea(t *testing.T, dir, dockerBridgeAddress string) *testutil.TestGitea {
@@ -283,9 +285,7 @@ func setup(ctx context.Context, t *testing.T, dir string, opts ...setupOption) *
 		dockerBridgeAddress = "172.17.0.1"
 	}
 	agolaBinDir := os.Getenv("AGOLA_BIN_DIR")
-	if agolaBinDir == "" {
-		t.Fatalf("env var AGOLA_BIN_DIR is undefined")
-	}
+	assert.Assert(t, agolaBinDir != "", "env var AGOLA_BIN_DIR is undefined")
 
 	dbType := testutil.DBType(t)
 	_, _, rsDBConnString := testutil.CreateDB(t, log, ctx, dir)
@@ -626,12 +626,7 @@ func TestPasswordRegisterUser(t *testing.T) {
 		},
 	})
 	expectedErr := remoteErrorBadRequest
-	if err == nil {
-		t.Fatalf("expected error %v, got nil err", expectedErr)
-	}
-	if err.Error() != expectedErr {
-		t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-	}
+	assert.Error(t, err, expectedErr)
 
 	// Remove user
 	_, err = adminGWClient.DeleteUser(ctx, loginUserResponse.User.ID)
@@ -727,12 +722,7 @@ func TestPasswordLogin(t *testing.T) {
 	// should fails since the registered token has been removed
 	_, _, err = tokenGWClient.GetUserRemoteRepos(ctx, rs.ID)
 	expectedErr := remoteErrorBadRequest
-	if err == nil {
-		t.Fatalf("expected error %v, got nil err", expectedErr)
-	}
-	if err.Error() != expectedErr {
-		t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-	}
+	assert.Error(t, err, expectedErr)
 
 	// redo login. Should create a new gitea user access token
 	_, _, err = loginGWClient.Login(ctx, &gwapitypes.LoginUserRequest{
@@ -787,13 +777,8 @@ func TestCookieAuth(t *testing.T) {
 	}
 
 	_, _, err = gwCookieClient.GetCurrentUser(ctx, cookies)
-	expectedErr := "remote error unauthorized"
-	if err == nil {
-		t.Fatalf("expected error %v, got nil err", expectedErr)
-	}
-	if err.Error() != expectedErr {
-		t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-	}
+	expectedErr := remoteErrorUnauthorized
+	assert.Error(t, err, expectedErr)
 
 	// Don't send secondary authcookie
 	cookies = []*http.Cookie{}
@@ -805,13 +790,8 @@ func TestCookieAuth(t *testing.T) {
 	}
 
 	_, _, err = gwCookieClient.GetCurrentUser(ctx, cookies)
-	expectedErr = "remote error unauthorized"
-	if err == nil {
-		t.Fatalf("expected error %v, got nil err", expectedErr)
-	}
-	if err.Error() != expectedErr {
-		t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-	}
+	expectedErr = remoteErrorUnauthorized
+	assert.Error(t, err, expectedErr)
 }
 
 func TestCSRF(t *testing.T) {
@@ -855,12 +835,7 @@ func TestCSRF(t *testing.T) {
 	// Don't send csrf token in request headers. Should return 403 (forbidden)
 	_, _, err = gwCookieClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg02, Visibility: gwapitypes.VisibilityPublic}, http.Header{}, cookies)
 	expectedErr := "unknown api error (status: 403)"
-	if err == nil {
-		t.Fatalf("expected error %v, got nil err", expectedErr)
-	}
-	if err.Error() != expectedErr {
-		t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-	}
+	assert.Error(t, err, expectedErr)
 
 	csrfCookieName := common.CSRFCookieName(false)
 	noCSRFCookies := []*http.Cookie{}
@@ -874,12 +849,7 @@ func TestCSRF(t *testing.T) {
 	// Don't send csrf cookie. Should return 403 (forbidden)
 	_, _, err = gwCookieClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg02, Visibility: gwapitypes.VisibilityPublic}, header, noCSRFCookies)
 	expectedErr = "unknown api error (status: 403)"
-	if err == nil {
-		t.Fatalf("expected error %v, got nil err", expectedErr)
-	}
-	if err.Error() != expectedErr {
-		t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-	}
+	assert.Error(t, err, expectedErr)
 
 	// Send also an Authorization token that won't match to check that csrf check is done
 	header.Set("Authorization", "Token unexistenttoken")
@@ -889,13 +859,8 @@ func TestCSRF(t *testing.T) {
 	// the user for the token doesn't exist. In future we could add ways to
 	// continue other auth checkers. The error should then be the commented one.
 	// expectedErr = "unknown api error (status: 403)"
-	expectedErr = "remote error unauthorized"
-	if err == nil {
-		t.Fatalf("expected error %v, got nil err", expectedErr)
-	}
-	if err.Error() != expectedErr {
-		t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-	}
+	expectedErr = remoteErrorUnauthorized
+	assert.Error(t, err, expectedErr)
 }
 
 func TestCreateLinkedAccount(t *testing.T) {
@@ -1011,27 +976,21 @@ func TestUpdateProject(t *testing.T) {
 		gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
 
 		_, project := createProject(ctx, t, giteaClient, gwClient)
-		if project.PassVarsToForkedPR != false {
-			t.Fatalf("expected PassVarsToForkedPR false, got %v", project.PassVarsToForkedPR)
-		}
+		assert.Assert(t, !project.PassVarsToForkedPR)
 
 		project, _, err = gwClient.UpdateProject(ctx, project.ID, &gwapitypes.UpdateProjectRequest{
 			PassVarsToForkedPR: util.BoolP(false),
 		})
 		testutil.NilError(t, err)
 
-		if project.PassVarsToForkedPR != false {
-			t.Fatalf("expected PassVarsToForkedPR false, got %v", project.PassVarsToForkedPR)
-		}
+		assert.Assert(t, !project.PassVarsToForkedPR)
 
 		project, _, err = gwClient.UpdateProject(ctx, project.ID, &gwapitypes.UpdateProjectRequest{
 			PassVarsToForkedPR: util.BoolP(true),
 		})
 		testutil.NilError(t, err)
 
-		if project.PassVarsToForkedPR != true {
-			t.Fatalf("expected PassVarsToForkedPR false, got %v", project.PassVarsToForkedPR)
-		}
+		assert.Assert(t, project.PassVarsToForkedPR)
 	})
 
 	t.Run("test create users's project with MembersCanPerformRunActions true", func(t *testing.T) {
@@ -1069,12 +1028,7 @@ func TestUpdateProject(t *testing.T) {
 		}
 
 		_, _, err = gwClient.CreateProject(ctx, req)
-		if err == nil {
-			t.Fatalf("expected error %v, got nil err", remoteErrorBadRequest)
-		}
-		if err.Error() != remoteErrorBadRequest {
-			t.Fatalf("expected err %v, got err: %v", remoteErrorBadRequest, err)
-		}
+		assert.Error(t, err, remoteErrorBadRequest)
 	})
 
 	t.Run("test update users's project with MembersCanPerformRunActions true", func(t *testing.T) {
@@ -1096,20 +1050,13 @@ func TestUpdateProject(t *testing.T) {
 		gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
 
 		_, project := createProject(ctx, t, giteaClient, gwClient)
-		if project.MembersCanPerformRunActions != false {
-			t.Fatalf("expected MembersCanPerformRunActions false, got %v", project.MembersCanPerformRunActions)
-		}
+		assert.Assert(t, !project.MembersCanPerformRunActions)
 
 		_, _, err = gwClient.UpdateProject(ctx, project.ID, &gwapitypes.UpdateProjectRequest{
 			Name:                        &project.Name,
 			MembersCanPerformRunActions: util.BoolP(true),
 		})
-		if err == nil {
-			t.Fatalf("expected error %v, got nil err", remoteErrorBadRequest)
-		}
-		if err.Error() != remoteErrorBadRequest {
-			t.Fatalf("expected err %v, got err: %v", remoteErrorBadRequest, err)
-		}
+		assert.Error(t, err, remoteErrorBadRequest)
 	})
 
 	t.Run("test create/update orgs's project", func(t *testing.T) {
@@ -1135,9 +1082,7 @@ func TestUpdateProject(t *testing.T) {
 
 		// test create org project with MembersCanPerformRunActions false
 		_, project := createProject(ctx, t, giteaClient, gwClient, withParentRef(path.Join("org", agolaOrg01)))
-		if project.MembersCanPerformRunActions != false {
-			t.Fatalf("expected MembersCanPerformRunActions false, got %v", project.MembersCanPerformRunActions)
-		}
+		assert.Assert(t, !project.MembersCanPerformRunActions)
 
 		// test update org project with MembersCanPerformRunActions true
 		project, _, err = gwClient.UpdateProject(ctx, project.ID, &gwapitypes.UpdateProjectRequest{
@@ -1146,9 +1091,7 @@ func TestUpdateProject(t *testing.T) {
 		})
 		testutil.NilError(t, err)
 
-		if project.MembersCanPerformRunActions != true {
-			t.Fatalf("expected MembersCanPerformRunActions true, got %v", project.MembersCanPerformRunActions)
-		}
+		assert.Assert(t, project.MembersCanPerformRunActions)
 
 		// test create org project with MembersCanPerformRunActions true
 		project, _, err = gwClient.CreateProject(ctx, &gwapitypes.CreateProjectRequest{
@@ -1161,9 +1104,7 @@ func TestUpdateProject(t *testing.T) {
 		})
 		testutil.NilError(t, err)
 
-		if project.MembersCanPerformRunActions != true {
-			t.Fatalf("expected MembersCanPerformRunActions true, got %v", project.MembersCanPerformRunActions)
-		}
+		assert.Assert(t, project.MembersCanPerformRunActions)
 
 		// test update org project with MembersCanPerformRunActions false
 		project, _, err = gwClient.UpdateProject(ctx, project.ID, &gwapitypes.UpdateProjectRequest{
@@ -1172,9 +1113,7 @@ func TestUpdateProject(t *testing.T) {
 		})
 		testutil.NilError(t, err)
 
-		if project.MembersCanPerformRunActions != false {
-			t.Fatalf("expected MembersCanPerformRunActions false, got %v", project.MembersCanPerformRunActions)
-		}
+		assert.Assert(t, !project.MembersCanPerformRunActions)
 	})
 }
 
@@ -1504,34 +1443,24 @@ func TestPush(t *testing.T) {
 
 			t.Logf("runs: %s", util.Dump(runs))
 
-			if len(runs) != tt.num {
-				t.Fatalf("expected %d run got: %d", tt.num, len(runs))
-			}
+			assert.Assert(t, cmp.Len(runs, tt.num))
 
 			if len(runs) > 0 {
 				run := runs[0]
-				if run.Phase != rstypes.RunPhaseFinished {
-					t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, run.Phase)
-				}
-				if run.Result != rstypes.RunResultSuccess {
-					t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, run.Result)
-				}
+				assert.Equal(t, run.Phase, rstypes.RunPhaseFinished)
+				assert.Equal(t, run.Result, rstypes.RunResultSuccess)
 				for k, v := range tt.annotations {
-					if run.Annotations[k] != v {
-						t.Fatalf("expected run annotation %q value %q, got %q", k, v, run.Annotations[k])
-					}
+					assert.Equal(t, run.Annotations[k], v)
 				}
 			}
-
 		})
 	}
 }
 
 func directRun(t *testing.T, dir, config string, configFormat ConfigFormat, gatewayURL, token string, args ...string) {
 	agolaBinDir := os.Getenv("AGOLA_BIN_DIR")
-	if agolaBinDir == "" {
-		t.Fatalf("env var AGOLA_BIN_DIR is undefined")
-	}
+	assert.Assert(t, agolaBinDir != "", "env var AGOLA_BIN_DIR is undefined")
+
 	agolaBinDir, err := filepath.Abs(agolaBinDir)
 	testutil.NilError(t, err)
 
@@ -1711,21 +1640,14 @@ func testDirectRun(t *testing.T, internalServicesAuth bool) {
 
 			t.Logf("runs: %s", util.Dump(runs))
 
-			if len(runs) != 1 {
-				t.Fatalf("expected 1 run got: %d", len(runs))
-			}
+			assert.Assert(t, cmp.Len(runs, 1))
 
 			run := runs[0]
-			if run.Phase != rstypes.RunPhaseFinished {
-				t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, run.Phase)
-			}
-			if run.Result != rstypes.RunResultSuccess {
-				t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, run.Result)
-			}
+			assert.Equal(t, run.Phase, rstypes.RunPhaseFinished)
+			assert.Equal(t, run.Result, rstypes.RunResultSuccess)
+
 			for k, v := range tt.annotations {
-				if run.Annotations[k] != v {
-					t.Fatalf("expected run annotation %q value %q, got %q", k, v, run.Annotations[k])
-				}
+				assert.Equal(t, run.Annotations[k], v)
 			}
 		})
 	}
@@ -1860,19 +1782,13 @@ func TestDirectRunVariables(t *testing.T) {
 
 			t.Logf("runs: %s", util.Dump(runs))
 
-			if len(runs) != 1 {
-				t.Fatalf("expected 1 run got: %d", len(runs))
-			}
+			assert.Assert(t, cmp.Len(runs, 1))
 
 			run, _, err := gwClient.GetUserRun(ctx, user.ID, runs[0].Number)
 			testutil.NilError(t, err)
 
-			if run.Phase != rstypes.RunPhaseFinished {
-				t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, run.Phase)
-			}
-			if run.Result != rstypes.RunResultSuccess {
-				t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, run.Result)
-			}
+			assert.Equal(t, run.Phase, rstypes.RunPhaseFinished)
+			assert.Equal(t, run.Result, rstypes.RunResultSuccess)
 
 			var task *gwapitypes.RunResponseTask
 			for _, t := range run.Tasks {
@@ -1894,13 +1810,9 @@ func TestDirectRunVariables(t *testing.T) {
 			testutil.NilError(t, err)
 
 			for n, e := range tt.env {
-				if ce, ok := curEnv[n]; !ok {
-					t.Fatalf("missing env var %s", n)
-				} else {
-					if ce != e {
-						t.Fatalf("different env var %s value, want: %q, got %q", n, e, ce)
-					}
-				}
+				ce, ok := curEnv[n]
+				assert.Assert(t, ok, "missing env var %s", n)
+				assert.Equal(t, ce, e, "different env var %s value, want: %q, got %q", n, e, ce)
 			}
 		})
 	}
@@ -1940,7 +1852,7 @@ func TestDirectRunLogs(t *testing.T) {
 		setup  bool
 		step   int
 		delete bool
-		err    error
+		err    string
 	}{
 		{
 			name: "test get log step 1",
@@ -1953,7 +1865,7 @@ func TestDirectRunLogs(t *testing.T) {
 		{
 			name: "test get log with unexisting step",
 			step: 99,
-			err:  util.NewRemoteError(util.ErrNotExist, "", ""),
+			err:  "remote error notexist",
 		},
 		{
 			name:   "test delete log step 1",
@@ -1969,7 +1881,7 @@ func TestDirectRunLogs(t *testing.T) {
 			name:   "test delete log with unexisting step",
 			step:   99,
 			delete: true,
-			err:    util.NewRemoteError(util.ErrNotExist, "", ""),
+			err:    "remote error notexist",
 		},
 	}
 
@@ -2022,19 +1934,13 @@ func TestDirectRunLogs(t *testing.T) {
 
 			t.Logf("runs: %s", util.Dump(runs))
 
-			if len(runs) != 1 {
-				t.Fatalf("expected 1 run got: %d", len(runs))
-			}
+			assert.Assert(t, cmp.Len(runs, 1))
 
 			run, _, err := gwClient.GetUserRun(ctx, user.ID, runs[0].Number)
 			testutil.NilError(t, err)
 
-			if run.Phase != rstypes.RunPhaseFinished {
-				t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, run.Phase)
-			}
-			if run.Result != rstypes.RunResultSuccess {
-				t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, run.Result)
-			}
+			assert.Equal(t, run.Phase, rstypes.RunPhaseFinished)
+			assert.Equal(t, run.Result, rstypes.RunResultSuccess)
 
 			var task *gwapitypes.RunResponseTask
 			for _, t := range run.Tasks {
@@ -2064,17 +1970,10 @@ func TestDirectRunLogs(t *testing.T) {
 				_, err = gwClient.GetUserLogs(ctx, user.ID, run.Number, task.ID, tt.setup, tt.step, false)
 			}
 
-			if err != nil {
-				if tt.err == nil {
-					t.Fatalf("got error: %v, expected no error", err)
-				}
-				if !strings.HasPrefix(err.Error(), tt.err.Error()) {
-					t.Fatalf("got error: %v, want error: %v", err, tt.err)
-				}
+			if tt.err != "" {
+				assert.Error(t, err, tt.err)
 			} else {
-				if tt.err != nil {
-					t.Fatalf("got nil error, want error: %v", tt.err)
-				}
+				testutil.NilError(t, err)
 			}
 		})
 	}
@@ -2181,9 +2080,7 @@ func TestPullRequest(t *testing.T) {
 			}
 
 			secret, _, err := gwClient.CreateProjectSecret(context.TODO(), project.ID, sreq)
-			if err != nil {
-				t.Fatalf("failed to create project secret: %v", err)
-			}
+			testutil.NilError(t, err, "failed to create project secret")
 
 			// create project variable
 			rvalues := []gwapitypes.VariableValueRequest{}
@@ -2198,9 +2095,7 @@ func TestPullRequest(t *testing.T) {
 			}
 
 			_, _, err = gwClient.CreateProjectVariable(context.TODO(), project.ID, vreq)
-			if err != nil {
-				t.Fatalf("failed to create project variable: %v", err)
-			}
+			testutil.NilError(t, err, "failed to create project variable")
 
 			if tt.prFromSameRepo {
 				// create PR from branch on same repo
@@ -2227,9 +2122,7 @@ func TestPullRequest(t *testing.T) {
 
 					return true, nil
 				})
-				if err != nil {
-					t.Fatalf("failed to create pull request: %v", err)
-				}
+				testutil.NilError(t, err, "failed to create pull request")
 			} else {
 				// create PR from forked repo
 				push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
@@ -2241,23 +2134,17 @@ func TestPullRequest(t *testing.T) {
 					MustChangePassword: util.BoolP(false),
 				}
 				_, _, err := giteaClient.AdminCreateUser(userOpts)
-				if err != nil {
-					t.Fatalf("failed to create user02: %v", err)
-				}
+				testutil.NilError(t, err, "failed to create user02")
 
 				giteaClient.SetBasicAuth(giteaUser02, giteaUser02Password)
 				giteaUser02Token, _, err := giteaClient.CreateAccessToken(gitea.CreateAccessTokenOption{Name: "token01"})
-				if err != nil {
-					t.Fatalf("failed to create token for user02: %v", err)
-				}
+				testutil.NilError(t, err, "failed to create token for user02")
 
 				giteaUser02Client, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaUser02Token.Token))
 				testutil.NilError(t, err)
 
 				giteaForkedRepo, _, err := giteaUser02Client.CreateFork(giteaUser01, "repo01", gitea.CreateForkOption{})
-				if err != nil {
-					t.Fatalf("failed to fork repo01: %v", err)
-				}
+				testutil.NilError(t, err, "failed to fork repo01")
 
 				gitfs := memfs.New()
 				r, err := git.Clone(memory.NewStorage(), gitfs, &git.CloneOptions{
@@ -2267,9 +2154,7 @@ func TestPullRequest(t *testing.T) {
 					},
 					URL: giteaForkedRepo.CloneURL,
 				})
-				if err != nil {
-					t.Fatalf("failed to clone forked repo: %v", err)
-				}
+				testutil.NilError(t, err, "failed to clone forked repo")
 
 				wt, err := r.Worktree()
 				testutil.NilError(t, err)
@@ -2309,9 +2194,7 @@ func TestPullRequest(t *testing.T) {
 					Title: "add file1 from master on forked repo",
 				}
 				_, _, err = giteaUser02Client.CreatePullRequest(giteaUser01, "repo01", prOpts)
-				if err != nil {
-					t.Fatalf("failed to create pull request: %v", err)
-				}
+				testutil.NilError(t, err, "failed to create pull request")
 			}
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
 				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
@@ -2348,25 +2231,16 @@ func TestPullRequest(t *testing.T) {
 
 			if len(runs) > 0 {
 				run := runs[0]
-				if run.Phase != rstypes.RunPhaseFinished {
-					t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, run.Phase)
-				}
-				if run.Result != rstypes.RunResultSuccess {
-					t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, run.Result)
-				}
+				assert.Equal(t, run.Phase, rstypes.RunPhaseFinished)
+				assert.Equal(t, run.Result, rstypes.RunResultSuccess)
+
 				resp, err := gwClient.GetProjectLogs(ctx, project.ID, run.Number, task.ID, false, 1, false)
-				if err != nil {
-					t.Fatalf("failed to get log: %v", err)
-				}
+				testutil.NilError(t, err, "failed to get log")
 				defer resp.Body.Close()
 
 				mypassword, err := io.ReadAll(resp.Body)
-				if err != nil {
-					t.Fatalf("failed to read log: %v", err)
-				}
-				if tt.expected != string(mypassword) {
-					t.Fatalf("expected mypassword %q, got %q", tt.expected, string(mypassword))
-				}
+				testutil.NilError(t, err, "failed to read log: %v")
+				assert.Equal(t, tt.expected, string(mypassword))
 			}
 		})
 	}
@@ -2546,19 +2420,13 @@ def main(ctx):
 
 				t.Logf("runs: %s", util.Dump(runs))
 
-				if len(runs) != 1 {
-					t.Fatalf("expected 1 run got: %d", len(runs))
-				}
+				assert.Assert(t, cmp.Len(runs, 1))
 
 				run, _, err := gwClient.GetUserRun(ctx, user.ID, runs[0].Number)
 				testutil.NilError(t, err)
 
-				if run.Phase != rstypes.RunPhaseFinished {
-					t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, run.Phase)
-				}
-				if run.Result != rstypes.RunResultSuccess {
-					t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, run.Result)
-				}
+				assert.Equal(t, run.Phase, rstypes.RunPhaseFinished)
+				assert.Equal(t, run.Result, rstypes.RunResultSuccess)
 
 				var task *gwapitypes.RunResponseTask
 				for _, t := range run.Tasks {
@@ -2583,13 +2451,9 @@ def main(ctx):
 				tt.env["COMMIT_SHA"] = run.Annotations["commit_sha"]
 
 				for n, e := range tt.env {
-					if ce, ok := curEnv[n]; !ok {
-						t.Fatalf("missing env var %s", n)
-					} else {
-						if ce != e {
-							t.Fatalf("different env var %s value, want: %q, got %q", n, e, ce)
-						}
-					}
+					ce, ok := curEnv[n]
+					assert.Assert(t, ok, "missing env var %s", n)
+					assert.Equal(t, ce, e, "different env var %s value, want: %q, got %q", n, e, ce)
 				}
 			})
 		}
@@ -2643,9 +2507,7 @@ func TestUserOrgs(t *testing.T) {
 		},
 	}
 
-	if diff := cmp.Diff(expectedOrgs, orgs); diff != "" {
-		t.Fatalf("user orgs mismatch (-want +got):\n%s", diff)
-	}
+	assert.DeepEqual(t, expectedOrgs, orgs)
 }
 
 func TestTaskTimeout(t *testing.T) {
@@ -2902,25 +2764,13 @@ func TestTaskTimeout(t *testing.T) {
 
 			t.Logf("runs: %s", util.Dump(run))
 
-			if run == nil {
-				t.Fatalf("user run not found")
-			}
-			if run.Phase != rstypes.RunPhaseFinished {
-				t.Fatalf("expected run finished got: %s", run.Phase)
-			}
-			if run.Result != rstypes.RunResultFailed {
-				t.Fatalf("expected run failed")
-			}
-			if len(run.Tasks) != len(tt.tasksResultExpected) {
-				t.Fatalf("expected 1 task got: %d", len(run.Tasks))
-			}
+			assert.Assert(t, run != nil)
+			assert.Equal(t, run.Phase, rstypes.RunPhaseFinished)
+			assert.Equal(t, run.Result, rstypes.RunResultFailed)
+			assert.Assert(t, cmp.Len(run.Tasks, len(tt.tasksResultExpected)))
 			for _, task := range run.Tasks {
-				if task.Status != tt.tasksResultExpected[task.Name] {
-					t.Fatalf("expected task status %s got: %s", tt.tasksResultExpected[task.Name], task.Status)
-				}
-				if task.Timedout != tt.taskTimedoutExpected[task.Name] {
-					t.Fatalf("expected task timedout %v got: %v", tt.taskTimedoutExpected[task.Name], task.Timedout)
-				}
+				assert.Equal(t, task.Status, tt.tasksResultExpected[task.Name])
+				assert.Equal(t, task.Timedout, tt.taskTimedoutExpected[task.Name])
 			}
 		})
 	}
@@ -2948,9 +2798,7 @@ func TestRefreshRemoteRepositoryInfo(t *testing.T) {
 
 	giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)
 
-	if project.DefaultBranch != "master" {
-		t.Fatalf("expected DefaultBranch master got: %s", project.DefaultBranch)
-	}
+	assert.Equal(t, project.DefaultBranch, "master")
 
 	_, _, err = giteaClient.EditRepo(giteaRepo.Owner.UserName, giteaRepo.Name, gitea.EditRepoOption{DefaultBranch: util.StringP("testbranch")})
 	testutil.NilError(t, err)
@@ -2958,16 +2806,12 @@ func TestRefreshRemoteRepositoryInfo(t *testing.T) {
 	project, _, err = gwClient.RefreshRemoteRepo(ctx, project.ID)
 	testutil.NilError(t, err)
 
-	if project.DefaultBranch != "testbranch" {
-		t.Fatalf("expected DefaultBranch testbranch got: %s", project.DefaultBranch)
-	}
+	assert.Equal(t, project.DefaultBranch, "testbranch")
 
 	p, _, err := gwClient.GetProject(ctx, project.ID)
 	testutil.NilError(t, err)
 
-	if diff := cmp.Diff(project, p); diff != "" {
-		t.Fatalf("projects mismatch (-expected +got):\n%s", diff)
-	}
+	assert.DeepEqual(t, project, p)
 }
 
 func TestAddUpdateOrgUserMembers(t *testing.T) {
@@ -3001,15 +2845,8 @@ func TestAddUpdateOrgUserMembers(t *testing.T) {
 	orgMembers, _, err := gwClient.GetOrgMembers(ctx, agolaOrg01, nil)
 	testutil.NilError(t, err)
 
-	if orgMembers == nil {
-		t.Fatal("unexpected members nil")
-	}
-	if len(orgMembers.Members) != 1 {
-		t.Fatalf("expected Members len 1, got: %d", len(orgMembers.Members))
-	}
-	if diff := cmp.Diff(*orgMembers.Members[0], expectedOrgMember); diff != "" {
-		t.Fatalf("org member mismatch (-expected +got):\n%s", diff)
-	}
+	assert.Assert(t, cmp.Len(orgMembers.Members, 1))
+	assert.DeepEqual(t, *orgMembers.Members[0], expectedOrgMember)
 
 	//test update org member role owner
 	_, _, err = gwClient.AddOrgMember(ctx, agolaOrg01, agolaUser01, gwapitypes.MemberRoleOwner)
@@ -3020,15 +2857,8 @@ func TestAddUpdateOrgUserMembers(t *testing.T) {
 	orgMembers, _, err = gwClient.GetOrgMembers(ctx, agolaOrg01, nil)
 	testutil.NilError(t, err)
 
-	if orgMembers == nil {
-		t.Fatal("unexpected members nil")
-	}
-	if len(orgMembers.Members) != 1 {
-		t.Fatalf("expected Members len 1, got: %d", len(orgMembers.Members))
-	}
-	if diff := cmp.Diff(*orgMembers.Members[0], expectedOrgMember); diff != "" {
-		t.Fatalf("org member mismatch (-expected +got):\n%s", diff)
-	}
+	assert.Assert(t, cmp.Len(orgMembers.Members, 1))
+	assert.DeepEqual(t, *orgMembers.Members[0], expectedOrgMember)
 }
 
 func TestGetOrg(t *testing.T) {
@@ -3126,18 +2956,11 @@ func TestGetOrg(t *testing.T) {
 			org, _, err := tt.client.GetOrg(ctx, tt.org.ID)
 
 			if tt.err != "" {
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", tt.err)
-				}
-				if err.Error() != tt.err {
-					t.Fatalf("expected err %v, got err: %v", tt.err, err)
-				}
+				assert.Error(t, err, tt.err)
 			} else {
 				testutil.NilError(t, err)
 
-				if diff := cmp.Diff(tt.org, org); diff != "" {
-					t.Fatalf("org mismatch (-want +got):\n%s", diff)
-				}
+				assert.DeepEqual(t, tt.org, org)
 			}
 		})
 	}
@@ -3290,18 +3113,11 @@ func TestGetProjectGroup(t *testing.T) {
 			pg, _, err := tt.client.GetProjectGroup(ctx, tt.pg.ID)
 
 			if tt.err != "" {
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", tt.err)
-				}
-				if err.Error() != tt.err {
-					t.Fatalf("expected err %v, got err: %v", tt.err, err)
-				}
+				assert.Error(t, err, tt.err)
 			} else {
 				testutil.NilError(t, err)
 
-				if diff := cmp.Diff(tt.pg, pg); diff != "" {
-					t.Fatalf("pg mismatch (-want +got):\n%s", diff)
-				}
+				assert.DeepEqual(t, tt.pg, pg)
 			}
 		})
 	}
@@ -3553,18 +3369,11 @@ func TestGetProject(t *testing.T) {
 			pg, _, err := tt.client.GetProject(ctx, tt.proj.ID)
 
 			if tt.err != "" {
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", tt.err)
-				}
-				if err.Error() != tt.err {
-					t.Fatalf("expected err %v, got err: %v", tt.err, err)
-				}
+				assert.Error(t, err, tt.err)
 			} else {
 				testutil.NilError(t, err)
 
-				if diff := cmp.Diff(tt.proj, pg); diff != "" {
-					t.Fatalf("project mismatch (-want +got):\n%s", diff)
-				}
+				assert.DeepEqual(t, tt.proj, pg)
 			}
 		})
 	}
@@ -3611,34 +3420,23 @@ func TestUpdateOrganization(t *testing.T) {
 	updatedOrg, _, err := gwClientUser01.UpdateOrg(ctx, agolaOrg01, &gwapitypes.UpdateOrgRequest{Visibility: &visibility})
 	testutil.NilError(t, err)
 
-	if diff := cmp.Diff(updatedOrg, expectedOrgResponse); diff != "" {
-		t.Fatalf("org mismatch (-want +got):\n%s", diff)
-	}
+	assert.DeepEqual(t, updatedOrg, expectedOrgResponse)
 
 	org, _, err = gwClientUser01.GetOrg(ctx, agolaOrg01)
 	testutil.NilError(t, err)
 
-	if diff := cmp.Diff(expectedOrgResponse, org); diff != "" {
-		t.Fatalf("org mismatch (-want +got):\n%s", diff)
-	}
+	assert.DeepEqual(t, expectedOrgResponse, org)
 
 	//user member update org
 	visibility = gwapitypes.VisibilityPrivate
 	_, _, err = gwClientUser02.UpdateOrg(ctx, agolaOrg01, &gwapitypes.UpdateOrgRequest{Visibility: &visibility})
-	expectedErr := "remote error forbidden"
-	if err == nil {
-		t.Fatalf("expected error %v, got nil err", expectedErr)
-	}
-	if err.Error() != expectedErr {
-		t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-	}
+	expectedErr := remoteErrorForbidden
+	assert.Error(t, err, expectedErr)
 
 	org, _, err = gwClientUser01.GetOrg(ctx, agolaOrg01)
 	testutil.NilError(t, err)
 
-	if diff := cmp.Diff(expectedOrgResponse, org); diff != "" {
-		t.Fatalf("org mismatch (-want +got):\n%s", diff)
-	}
+	assert.DeepEqual(t, expectedOrgResponse, org)
 }
 
 type testOrgInvitationConfig struct {
@@ -3668,9 +3466,7 @@ func TestOrgInvitation(t *testing.T) {
 				i, _, err := tc.gwClientUser01.GetOrgInvitation(ctx, agolaOrg01, agolaUser02)
 				testutil.NilError(t, err)
 
-				if diff := cmp.Diff(i, invitation); diff != "" {
-					t.Fatalf("invitation mismatch (-want +got):\n%s", diff)
-				}
+				assert.DeepEqual(t, i, invitation)
 			},
 		},
 		{
@@ -3681,13 +3477,8 @@ func TestOrgInvitation(t *testing.T) {
 				testutil.NilError(t, err)
 
 				_, _, err = tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser02, Role: cstypes.MemberRoleMember})
-				expectedErr := "remote error internal"
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", expectedErr)
-				}
-				if err.Error() != expectedErr {
-					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-				}
+				expectedErr := remoteErrorInternal
+				assert.Error(t, err, expectedErr)
 			},
 		},
 		{
@@ -3707,12 +3498,8 @@ func TestOrgInvitation(t *testing.T) {
 				expectedUserInvitations := []*gwapitypes.OrgInvitationResponse{invitation}
 				testutil.NilError(t, err)
 
-				if len(userInvitations) != 1 {
-					t.Fatalf("expected 1 invitation got: %d", len(userInvitations))
-				}
-				if diff := cmp.Diff(expectedUserInvitations, userInvitations); diff != "" {
-					t.Fatalf("user invitations mismatch (-want +got):\n%s", diff)
-				}
+				assert.Assert(t, cmp.Len(userInvitations, 1))
+				assert.DeepEqual(t, expectedUserInvitations, userInvitations)
 			},
 		},
 		{
@@ -3720,13 +3507,8 @@ func TestOrgInvitation(t *testing.T) {
 			orgInvitationEnabled: true,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser02.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser01, Role: cstypes.MemberRoleMember})
-				expectedErr := "remote error forbidden"
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", expectedErr)
-				}
-				if err.Error() != expectedErr {
-					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-				}
+				expectedErr := remoteErrorForbidden
+				assert.Error(t, err, expectedErr)
 			},
 		},
 		{
@@ -3741,12 +3523,7 @@ func TestOrgInvitation(t *testing.T) {
 
 				_, _, err = tc.gwClientUser02.GetOrgInvitation(ctx, agolaOrg01, agolaUser02)
 				expectedErr := remoteErrorNotExist
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", expectedErr)
-				}
-				if err.Error() != expectedErr {
-					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-				}
+				assert.Error(t, err, expectedErr)
 			},
 		},
 		{
@@ -3761,12 +3538,7 @@ func TestOrgInvitation(t *testing.T) {
 
 				_, _, err = tc.gwClientUser01.GetOrgInvitation(ctx, agolaOrg01, agolaUser02)
 				expectedErr := remoteErrorNotExist
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", expectedErr)
-				}
-				if err.Error() != expectedErr {
-					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-				}
+				assert.Error(t, err, expectedErr)
 			},
 		},
 		{
@@ -3781,19 +3553,12 @@ func TestOrgInvitation(t *testing.T) {
 
 				_, _, err = tc.gwClientUser02.GetOrgInvitation(ctx, agolaOrg01, agolaUser02)
 				expectedErr := remoteErrorNotExist
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", expectedErr)
-				}
-				if err.Error() != expectedErr {
-					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-				}
+				assert.Error(t, err, expectedErr)
 
 				org01Members, _, err := tc.gwClientUser01.GetOrgMembers(ctx, agolaOrg01, nil)
 				testutil.NilError(t, err)
 
-				if len(org01Members.Members) != 2 {
-					t.Fatalf("expected 2 members got: %d", len(org01Members.Members))
-				}
+				assert.Assert(t, cmp.Len(org01Members.Members, 2))
 			},
 		},
 		{
@@ -3802,12 +3567,7 @@ func TestOrgInvitation(t *testing.T) {
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg02, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser02, Role: cstypes.MemberRoleMember})
 				expectedErr := remoteErrorNotExist
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", expectedErr)
-				}
-				if err.Error() != expectedErr {
-					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-				}
+				assert.Error(t, err, expectedErr)
 			},
 		},
 		{
@@ -3821,13 +3581,8 @@ func TestOrgInvitation(t *testing.T) {
 				testutil.NilError(t, err)
 
 				_, _, err = tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser02, Role: cstypes.MemberRoleMember})
-				expectedErr := "remote error internal"
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", expectedErr)
-				}
-				if err.Error() != expectedErr {
-					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-				}
+				expectedErr := remoteErrorInternal
+				assert.Error(t, err, expectedErr)
 			},
 		},
 		{
@@ -3836,12 +3591,7 @@ func TestOrgInvitation(t *testing.T) {
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser03, Role: cstypes.MemberRoleMember})
 				expectedErr := remoteErrorNotExist
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", expectedErr)
-				}
-				if err.Error() != expectedErr {
-					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-				}
+				assert.Error(t, err, expectedErr)
 			},
 		},
 		{
@@ -3857,9 +3607,7 @@ func TestOrgInvitation(t *testing.T) {
 				org01Invitations, _, err := tc.gwClientUser01.GetOrgInvitations(ctx, agolaOrg01)
 				testutil.NilError(t, err)
 
-				if len(org01Invitations) != 0 {
-					t.Fatalf("expected org01 invitations len 0, found: %d", len(org01Invitations))
-				}
+				assert.Assert(t, cmp.Len(org01Invitations, 0))
 			},
 		},
 		{
@@ -3873,13 +3621,9 @@ func TestOrgInvitation(t *testing.T) {
 				testutil.NilError(t, err)
 
 				orgInvitations, _, err := tc.gwClientUser01.GetOrgInvitations(ctx, agolaOrg01)
-				expectedErr := "remote error internal"
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", expectedErr)
-				}
-				if len(orgInvitations) != 0 {
-					t.Fatalf("expected org invitations len 0, found: %d", len(orgInvitations))
-				}
+				expectedErr := remoteErrorNotExist
+				assert.Error(t, err, expectedErr)
+				assert.Assert(t, cmp.Len(orgInvitations, 0))
 			},
 		},
 		{
@@ -3902,19 +3646,12 @@ func TestOrgInvitation(t *testing.T) {
 
 				_, _, err = gwClientUser01.GetOrgInvitation(ctx, agolaOrg01, agolaUser02)
 				expectedErr := remoteErrorNotExist
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", expectedErr)
-				}
-				if err.Error() != expectedErr {
-					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-				}
+				assert.Error(t, err, expectedErr)
 
 				orgMembers, _, err := gwClientUser01.GetOrgMembers(ctx, agolaOrg01, nil)
 				testutil.NilError(t, err)
 
-				if len(orgMembers.Members) != 2 {
-					t.Fatalf("expected 2 members got: %d", len(orgMembers.Members))
-				}
+				assert.Assert(t, cmp.Len(orgMembers.Members, 2))
 			},
 		},
 		{
@@ -3923,12 +3660,7 @@ func TestOrgInvitation(t *testing.T) {
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser02, Role: cstypes.MemberRoleMember})
 				expectedErr := remoteErrorBadRequest
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", expectedErr)
-				}
-				if err.Error() != expectedErr {
-					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-				}
+				assert.Error(t, err, expectedErr)
 			},
 		},
 		{
@@ -3937,12 +3669,7 @@ func TestOrgInvitation(t *testing.T) {
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser01.AddOrgMember(ctx, agolaOrg01, agolaUser02, gwapitypes.MemberRoleMember)
 				expectedErr := remoteErrorBadRequest
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", expectedErr)
-				}
-				if err.Error() != expectedErr {
-					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-				}
+				assert.Error(t, err, expectedErr)
 			},
 		},
 		{
@@ -3965,9 +3692,7 @@ func TestOrgInvitation(t *testing.T) {
 				orgInvitations, _, err := gwClientUser01.GetOrgInvitations(ctx, agolaOrg01)
 				testutil.NilError(t, err)
 
-				if len(orgInvitations) != 0 {
-					t.Fatalf("expected org invitations len 0, found: %d", len(orgInvitations))
-				}
+				assert.Assert(t, cmp.Len(orgInvitations, 0))
 			},
 		},
 		{
@@ -3983,9 +3708,7 @@ func TestOrgInvitation(t *testing.T) {
 				orgInvitations, _, err := tc.gwClientUser01.GetOrgInvitations(ctx, agolaOrg01)
 				testutil.NilError(t, err)
 
-				if len(orgInvitations) != 0 {
-					t.Fatalf("expected org invitations len 0, found: %d", len(orgInvitations))
-				}
+				assert.Assert(t, cmp.Len(orgInvitations, 0))
 			},
 		},
 		{
@@ -4004,18 +3727,11 @@ func TestOrgInvitation(t *testing.T) {
 				orgInvitations, _, err := tc.gwClientUser01.GetOrgInvitations(ctx, agolaOrg01)
 				testutil.NilError(t, err)
 
-				if len(orgInvitations) != 2 {
-					t.Fatalf("expected org invitations len 1, found: %d", len(orgInvitations))
-				}
+				assert.Assert(t, cmp.Len(orgInvitations, 2))
 
 				_, _, err = tc.gwClientUser02.GetOrgInvitations(ctx, agolaOrg01)
-				expectedErr := "remote error forbidden"
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", expectedErr)
-				}
-				if err.Error() != expectedErr {
-					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-				}
+				expectedErr := remoteErrorForbidden
+				assert.Error(t, err, expectedErr)
 			},
 		},
 	}
@@ -4091,9 +3807,7 @@ func TestGetUsersPermissions(t *testing.T) {
 				user, _, err := gwClient.GetUserByLinkedAccountRemoteUserAndSource(ctx, "1", "gitea")
 				testutil.NilError(t, err)
 
-				if user.UserName != giteaUser01 {
-					t.Fatalf("expected username %s, got %s", giteaUser01, user.UserName)
-				}
+				assert.Equal(t, user.UserName, giteaUser01)
 			},
 		},
 		{
@@ -4104,13 +3818,8 @@ func TestGetUsersPermissions(t *testing.T) {
 				gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, user01Token)
 
 				_, _, err := gwClient.GetUserByLinkedAccountRemoteUserAndSource(ctx, "1", "gitea")
-				expectedErr := "remote error unauthorized"
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", expectedErr)
-				}
-				if err.Error() != expectedErr {
-					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-				}
+				expectedErr := remoteErrorUnauthorized
+				assert.Error(t, err, expectedErr)
 			},
 		},
 		{
@@ -4131,9 +3840,7 @@ func TestGetUsersPermissions(t *testing.T) {
 				users, _, err := gwClient.GetUsers(ctx, nil)
 				testutil.NilError(t, err)
 
-				if diff := cmp.Diff(expectedUsers, users); diff != "" {
-					t.Fatalf("users mismatch (-want +got):\n%s", diff)
-				}
+				assert.DeepEqual(t, expectedUsers, users)
 			},
 		},
 		{
@@ -4144,13 +3851,8 @@ func TestGetUsersPermissions(t *testing.T) {
 				gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, user01Token)
 
 				_, _, err := gwClient.GetUsers(ctx, nil)
-				expectedErr := "remote error unauthorized"
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", expectedErr)
-				}
-				if err.Error() != expectedErr {
-					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-				}
+				expectedErr := remoteErrorUnauthorized
+				assert.Error(t, err, expectedErr)
 			},
 		},
 	}
@@ -4204,12 +3906,8 @@ func TestGetRemoteSources(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedRemoteSources := 9
-		if len(remoteSources) != expectedRemoteSources {
-			t.Fatalf("expected %d members, got %d members", expectedRemoteSources, len(remoteSources))
-		}
-		if resp.Cursor != "" {
-			t.Fatalf("expected no cursor, got cursor %q", resp.Cursor)
-		}
+		assert.Assert(t, cmp.Len(remoteSources, expectedRemoteSources))
+		assert.Assert(t, resp.Cursor == "")
 	})
 
 	t.Run("test get remote sources with limit less than remote sources", func(t *testing.T) {
@@ -4217,12 +3915,8 @@ func TestGetRemoteSources(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedRemoteSources := 5
-		if len(remoteSources) != expectedRemoteSources {
-			t.Fatalf("expected %d remote sources, got %d remote sources", expectedRemoteSources, len(remoteSources))
-		}
-		if resp.Cursor == "" {
-			t.Fatalf("expected cursor, got no cursor")
-		}
+		assert.Assert(t, cmp.Len(remoteSources, expectedRemoteSources))
+		assert.Assert(t, resp.Cursor != "")
 	})
 
 	t.Run("test get remote sources with limit less than remote sources continuation", func(t *testing.T) {
@@ -4232,12 +3926,8 @@ func TestGetRemoteSources(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedRemoteSources := 5
-		if len(respRemoteSources) != expectedRemoteSources {
-			t.Fatalf("expected %d remote sources, got %d remote sources", expectedRemoteSources, len(respRemoteSources))
-		}
-		if resp.Cursor == "" {
-			t.Fatalf("expected cursor, got no cursor")
-		}
+		assert.Assert(t, cmp.Len(respRemoteSources, expectedRemoteSources))
+		assert.Assert(t, resp.Cursor != "")
 
 		respAllRemoteSources = append(respAllRemoteSources, respRemoteSources...)
 
@@ -4247,9 +3937,7 @@ func TestGetRemoteSources(t *testing.T) {
 			testutil.NilError(t, err)
 
 			expectedRemoteSources := 5
-			if resp.Cursor != "" && len(respRemoteSources) != expectedRemoteSources {
-				t.Fatalf("expected %d remote sources, got %d remote sources", expectedRemoteSources, len(respRemoteSources))
-			}
+			assert.Assert(t, resp.Cursor == "" || (len(respRemoteSources) == expectedRemoteSources))
 
 			respAllRemoteSources = append(respAllRemoteSources, respRemoteSources...)
 
@@ -4259,13 +3947,9 @@ func TestGetRemoteSources(t *testing.T) {
 		}
 
 		expectedRemoteSources = 9
-		if len(respAllRemoteSources) != expectedRemoteSources {
-			t.Fatalf("expected %d remote sources, got %d remote sources", expectedRemoteSources, len(respAllRemoteSources))
-		}
+		assert.Assert(t, cmp.Len(respAllRemoteSources, expectedRemoteSources))
 
-		if diff := cmp.Diff(remoteSources, respAllRemoteSources); diff != "" {
-			t.Fatalf("mismatch (-want +got):\n%s", diff)
-		}
+		assert.DeepEqual(t, remoteSources, respAllRemoteSources)
 	})
 }
 
@@ -4295,12 +3979,8 @@ func TestGetUsers(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedUsers := 9
-		if len(users) != expectedUsers {
-			t.Fatalf("expected %d members, got %d members", expectedUsers, len(users))
-		}
-		if resp.Cursor != "" {
-			t.Fatalf("expected no cursor, got cursor %q", resp.Cursor)
-		}
+		assert.Assert(t, cmp.Len(users, expectedUsers))
+		assert.Assert(t, resp.Cursor == "")
 	})
 
 	t.Run("test get users with limit less than users", func(t *testing.T) {
@@ -4308,12 +3988,8 @@ func TestGetUsers(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedUsers := 5
-		if len(users) != expectedUsers {
-			t.Fatalf("expected %d users, got %d users", expectedUsers, len(users))
-		}
-		if resp.Cursor == "" {
-			t.Fatalf("expected cursor, got no cursor")
-		}
+		assert.Assert(t, cmp.Len(users, expectedUsers))
+		assert.Assert(t, resp.Cursor != "")
 	})
 
 	t.Run("test get users with limit less than users continuation", func(t *testing.T) {
@@ -4323,12 +3999,8 @@ func TestGetUsers(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedUsers := 5
-		if len(respUsers) != expectedUsers {
-			t.Fatalf("expected %d users, got %d users", expectedUsers, len(respUsers))
-		}
-		if resp.Cursor == "" {
-			t.Fatalf("expected cursor, got no cursor")
-		}
+		assert.Assert(t, cmp.Len(respUsers, expectedUsers))
+		assert.Assert(t, resp.Cursor != "")
 
 		for _, respUser := range respUsers {
 			respAllUsers = append(respAllUsers, &gwapitypes.UserResponse{ID: respUser.ID, UserName: respUser.UserName})
@@ -4340,9 +4012,7 @@ func TestGetUsers(t *testing.T) {
 			testutil.NilError(t, err)
 
 			expectedUsers := 5
-			if resp.Cursor != "" && len(respUsers) != expectedUsers {
-				t.Fatalf("expected %d users, got %d users", expectedUsers, len(respUsers))
-			}
+			assert.Assert(t, resp.Cursor == "" || (len(respUsers) == expectedUsers))
 
 			for _, respUser := range respUsers {
 				respAllUsers = append(respAllUsers, &gwapitypes.UserResponse{ID: respUser.ID, UserName: respUser.UserName})
@@ -4354,13 +4024,9 @@ func TestGetUsers(t *testing.T) {
 		}
 
 		expectedUsers = 9
-		if len(respAllUsers) != expectedUsers {
-			t.Fatalf("expected %d users, got %d users", expectedUsers, len(respAllUsers))
-		}
+		assert.Assert(t, cmp.Len(respAllUsers, expectedUsers))
 
-		if diff := cmp.Diff(users, respAllUsers); diff != "" {
-			t.Fatalf("mismatch (-want +got):\n%s", diff)
-		}
+		assert.DeepEqual(t, users, respAllUsers)
 	})
 }
 
@@ -4408,16 +4074,10 @@ func TestGetOrgs(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedOrgs := 9
-		if len(orgs) != expectedOrgs {
-			t.Fatalf("expected %d members, got %d members", expectedOrgs, len(orgs))
-		}
-		if resp.Cursor != "" {
-			t.Fatalf("expected no cursor, got cursor %q", resp.Cursor)
-		}
+		assert.Assert(t, cmp.Len(orgs, expectedOrgs))
+		assert.Assert(t, resp.Cursor == "")
 
-		if diff := cmp.Diff(publicOrgs[:expectedOrgs], orgs); diff != "" {
-			t.Fatalf("mismatch (-want +got):\n%s", diff)
-		}
+		assert.DeepEqual(t, publicOrgs[:expectedOrgs], orgs)
 	})
 
 	t.Run("test get public/private orgs with default limit greater than orgs", func(t *testing.T) {
@@ -4425,12 +4085,8 @@ func TestGetOrgs(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedOrgs := 18
-		if len(orgs) != expectedOrgs {
-			t.Fatalf("expected %d members, got %d members", expectedOrgs, len(orgs))
-		}
-		if resp.Cursor != "" {
-			t.Fatalf("expected no cursor, got cursor %q", resp.Cursor)
-		}
+		assert.Assert(t, cmp.Len(orgs, expectedOrgs))
+		assert.Assert(t, resp.Cursor == "")
 	})
 
 	t.Run("test get public orgs with limit less than orgs", func(t *testing.T) {
@@ -4438,12 +4094,8 @@ func TestGetOrgs(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedOrgs := 5
-		if len(orgs) != expectedOrgs {
-			t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(orgs))
-		}
-		if resp.Cursor == "" {
-			t.Fatalf("expected cursor, got no cursor")
-		}
+		assert.Assert(t, cmp.Len(orgs, expectedOrgs))
+		assert.Assert(t, resp.Cursor != "")
 	})
 
 	t.Run("test get public/private orgs with limit less than orgs", func(t *testing.T) {
@@ -4451,12 +4103,8 @@ func TestGetOrgs(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedOrgs := 5
-		if len(orgs) != expectedOrgs {
-			t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(orgs))
-		}
-		if resp.Cursor == "" {
-			t.Fatalf("expected cursor, got no cursor")
-		}
+		assert.Assert(t, cmp.Len(orgs, expectedOrgs))
+		assert.Assert(t, resp.Cursor != "")
 	})
 
 	t.Run("test get public orgs with limit less than orgs continuation", func(t *testing.T) {
@@ -4466,12 +4114,8 @@ func TestGetOrgs(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedOrgs := 5
-		if len(respOrgs) != expectedOrgs {
-			t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(respOrgs))
-		}
-		if resp.Cursor == "" {
-			t.Fatalf("expected cursor, got no cursor")
-		}
+		assert.Assert(t, cmp.Len(respOrgs, expectedOrgs))
+		assert.Assert(t, resp.Cursor != "")
 
 		respAllOrgs = append(respAllOrgs, respOrgs...)
 
@@ -4481,9 +4125,7 @@ func TestGetOrgs(t *testing.T) {
 			testutil.NilError(t, err)
 
 			expectedOrgs := 5
-			if resp.Cursor != "" && len(respOrgs) != expectedOrgs {
-				t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(respOrgs))
-			}
+			assert.Assert(t, resp.Cursor == "" || (len(respOrgs) == expectedOrgs))
 
 			respAllOrgs = append(respAllOrgs, respOrgs...)
 
@@ -4493,13 +4135,9 @@ func TestGetOrgs(t *testing.T) {
 		}
 
 		expectedOrgs = 9
-		if len(respAllOrgs) != expectedOrgs {
-			t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(respAllOrgs))
-		}
+		assert.Assert(t, cmp.Len(respAllOrgs, expectedOrgs))
 
-		if diff := cmp.Diff(publicOrgs, respAllOrgs); diff != "" {
-			t.Fatalf("mismatch (-want +got):\n%s", diff)
-		}
+		assert.DeepEqual(t, publicOrgs, respAllOrgs)
 	})
 
 	t.Run("test get public/private orgs with limit less than orgs continuation", func(t *testing.T) {
@@ -4509,12 +4147,8 @@ func TestGetOrgs(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedOrgs := 5
-		if len(respOrgs) != expectedOrgs {
-			t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(respOrgs))
-		}
-		if resp.Cursor == "" {
-			t.Fatalf("expected cursor, got no cursor")
-		}
+		assert.Assert(t, cmp.Len(respOrgs, expectedOrgs))
+		assert.Assert(t, resp.Cursor != "")
 
 		respAllOrgs = append(respAllOrgs, respOrgs...)
 
@@ -4524,9 +4158,7 @@ func TestGetOrgs(t *testing.T) {
 			testutil.NilError(t, err)
 
 			expectedOrgs := 5
-			if resp.Cursor != "" && len(respOrgs) != expectedOrgs {
-				t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(respOrgs))
-			}
+			assert.Assert(t, resp.Cursor == "" || (len(respOrgs) == expectedOrgs))
 
 			respAllOrgs = append(respAllOrgs, respOrgs...)
 
@@ -4536,13 +4168,9 @@ func TestGetOrgs(t *testing.T) {
 		}
 
 		expectedOrgs = 18
-		if len(respAllOrgs) != expectedOrgs {
-			t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(respAllOrgs))
-		}
+		assert.Assert(t, cmp.Len(respAllOrgs, expectedOrgs))
 
-		if diff := cmp.Diff(allOrgs, respAllOrgs); diff != "" {
-			t.Fatalf("mismatch (-want +got):\n%s", diff)
-		}
+		assert.DeepEqual(t, allOrgs, respAllOrgs)
 	})
 }
 
@@ -4581,12 +4209,8 @@ func TestGetOrgMembers(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedOrgMembers := 9
-		if len(res.Members) != expectedOrgMembers {
-			t.Fatalf("expected %d members, got %d members", expectedOrgMembers, len(res.Members))
-		}
-		if resp.Cursor != "" {
-			t.Fatalf("expected no cursor, got cursor %q", resp.Cursor)
-		}
+		assert.Assert(t, cmp.Len(res.Members, expectedOrgMembers))
+		assert.Assert(t, resp.Cursor == "")
 	})
 
 	t.Run("test get org members with limit less than org members", func(t *testing.T) {
@@ -4594,12 +4218,8 @@ func TestGetOrgMembers(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedOrgMembers := 5
-		if len(res.Members) != expectedOrgMembers {
-			t.Fatalf("expected %d org members, got %d org members", expectedOrgMembers, len(res.Members))
-		}
-		if resp.Cursor == "" {
-			t.Fatalf("expected cursor, got no cursor")
-		}
+		assert.Assert(t, cmp.Len(res.Members, expectedOrgMembers))
+		assert.Assert(t, resp.Cursor != "")
 	})
 
 	t.Run("test get org members with limit less than org members continuation", func(t *testing.T) {
@@ -4609,12 +4229,8 @@ func TestGetOrgMembers(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedOrgMembers := 5
-		if len(res.Members) != expectedOrgMembers {
-			t.Fatalf("expected %d org members, got %d org members", expectedOrgMembers, len(res.Members))
-		}
-		if resp.Cursor == "" {
-			t.Fatalf("expected cursor, got no cursor")
-		}
+		assert.Assert(t, cmp.Len(res.Members, expectedOrgMembers))
+		assert.Assert(t, resp.Cursor != "")
 
 		orgMembers = append(orgMembers, res.Members...)
 
@@ -4624,9 +4240,7 @@ func TestGetOrgMembers(t *testing.T) {
 			testutil.NilError(t, err)
 
 			expectedOrgMembers := 5
-			if resp.Cursor != "" && len(res.Members) != expectedOrgMembers {
-				t.Fatalf("expected %d org members, got %d org members", expectedOrgMembers, len(res.Members))
-			}
+			assert.Assert(t, resp.Cursor == "" || (len(res.Members) == expectedOrgMembers))
 
 			orgMembers = append(orgMembers, res.Members...)
 
@@ -4636,17 +4250,13 @@ func TestGetOrgMembers(t *testing.T) {
 		}
 
 		expectedOrgMembers = 9
-		if len(orgMembers) != expectedOrgMembers {
-			t.Fatalf("expected %d org members, got %d org members", expectedOrgMembers, len(orgMembers))
-		}
+		assert.Assert(t, cmp.Len(orgMembers, expectedOrgMembers))
 
 		orgMemberUsers := []*gwapitypes.UserResponse{}
 		for _, orgMember := range orgMembers {
 			orgMemberUsers = append(orgMemberUsers, orgMember.User)
 		}
-		if diff := cmp.Diff(users, orgMemberUsers); diff != "" {
-			t.Fatalf("mismatch (-want +got):\n%s", diff)
-		}
+		assert.DeepEqual(t, users, orgMemberUsers)
 	})
 }
 
@@ -4690,12 +4300,8 @@ func TestGetUserOrgs(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedUserOrgs := 9
-		if len(userOrgs) != expectedUserOrgs {
-			t.Fatalf("expected %d members, got %d members", expectedUserOrgs, len(userOrgs))
-		}
-		if resp.Cursor != "" {
-			t.Fatalf("expected no cursor, got cursor %q", resp.Cursor)
-		}
+		assert.Assert(t, cmp.Len(userOrgs, expectedUserOrgs))
+		assert.Assert(t, resp.Cursor == "")
 	})
 
 	t.Run("test get user orgs with limit less than user orgs", func(t *testing.T) {
@@ -4703,12 +4309,8 @@ func TestGetUserOrgs(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedUserOrgs := 5
-		if len(res) != expectedUserOrgs {
-			t.Fatalf("expected %d user orgs, got %d user orgs", expectedUserOrgs, len(res))
-		}
-		if resp.Cursor == "" {
-			t.Fatalf("expected cursor, got no cursor")
-		}
+		assert.Assert(t, cmp.Len(res, expectedUserOrgs))
+		assert.Assert(t, resp.Cursor != "")
 	})
 
 	t.Run("test get user orgs with limit less than user orgs continuation", func(t *testing.T) {
@@ -4718,12 +4320,8 @@ func TestGetUserOrgs(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedUserOrgs := 5
-		if len(respUserOrgs) != expectedUserOrgs {
-			t.Fatalf("expected %d user orgs, got %d user orgs", expectedUserOrgs, len(respUserOrgs))
-		}
-		if resp.Cursor == "" {
-			t.Fatalf("expected cursor, got no cursor")
-		}
+		assert.Assert(t, cmp.Len(respUserOrgs, expectedUserOrgs))
+		assert.Assert(t, resp.Cursor != "")
 
 		respAllUserOrgs = append(respAllUserOrgs, respUserOrgs...)
 
@@ -4733,9 +4331,7 @@ func TestGetUserOrgs(t *testing.T) {
 			testutil.NilError(t, err)
 
 			expectedUserOrgs := 5
-			if resp.Cursor != "" && len(respUserOrgs) != expectedUserOrgs {
-				t.Fatalf("expected %d user orgs, got %d user orgs", expectedUserOrgs, len(respUserOrgs))
-			}
+			assert.Assert(t, resp.Cursor == "" || (len(respUserOrgs) == expectedUserOrgs))
 
 			respAllUserOrgs = append(respAllUserOrgs, respUserOrgs...)
 
@@ -4745,17 +4341,13 @@ func TestGetUserOrgs(t *testing.T) {
 		}
 
 		expectedUserOrgs = 9
-		if len(respAllUserOrgs) != expectedUserOrgs {
-			t.Fatalf("expected %d user orgs, got %d user orgs", expectedUserOrgs, len(respAllUserOrgs))
-		}
+		assert.Assert(t, cmp.Len(respAllUserOrgs, expectedUserOrgs))
 
 		userOrgs := []*gwapitypes.OrgResponse{}
 		for _, userOrg := range respAllUserOrgs {
 			userOrgs = append(userOrgs, userOrg.Organization)
 		}
-		if diff := cmp.Diff(orgs, userOrgs); diff != "" {
-			t.Fatalf("mismatch (-want +got):\n%s", diff)
-		}
+		assert.DeepEqual(t, orgs, userOrgs)
 	})
 }
 
@@ -4793,22 +4385,12 @@ func TestMaintenance(t *testing.T) {
 
 				gwClient = gwclient.NewClient(sc.config.Gateway.APIExposedURL, token.Token)
 
-				expectedErr := "remote error unauthorized"
+				expectedErr := remoteErrorUnauthorized
 				_, err = gwClient.EnableMaintenance(ctx, configstoreService)
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", expectedErr)
-				}
-				if err.Error() != expectedErr {
-					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-				}
+				assert.Error(t, err, expectedErr)
 
 				_, err = gwClient.EnableMaintenance(ctx, runserviceService)
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", expectedErr)
-				}
-				if err.Error() != expectedErr {
-					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-				}
+				assert.Error(t, err, expectedErr)
 			},
 		},
 		{
@@ -4824,22 +4406,12 @@ func TestMaintenance(t *testing.T) {
 
 				gwClient = gwclient.NewClient(sc.config.Gateway.APIExposedURL, token.Token)
 
-				expectedErr := "remote error unauthorized"
+				expectedErr := remoteErrorUnauthorized
 				_, err = gwClient.DisableMaintenance(ctx, configstoreService)
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", expectedErr)
-				}
-				if err.Error() != expectedErr {
-					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-				}
+				assert.Error(t, err, expectedErr)
 
 				_, err = gwClient.DisableMaintenance(ctx, runserviceService)
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", expectedErr)
-				}
-				if err.Error() != expectedErr {
-					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-				}
+				assert.Error(t, err, expectedErr)
 			},
 		},
 		{
@@ -4875,20 +4447,10 @@ func TestMaintenance(t *testing.T) {
 
 				expectedErr := remoteErrorBadRequest
 				_, err = gwClient.EnableMaintenance(ctx, configstoreService)
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", expectedErr)
-				}
-				if err.Error() != expectedErr {
-					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-				}
+				assert.Error(t, err, expectedErr)
 
 				_, err = gwClient.EnableMaintenance(ctx, runserviceService)
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", expectedErr)
-				}
-				if err.Error() != expectedErr {
-					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-				}
+				assert.Error(t, err, expectedErr)
 			},
 		},
 		{
@@ -4940,20 +4502,10 @@ func TestMaintenance(t *testing.T) {
 
 				expectedErr := remoteErrorBadRequest
 				_, err := gwClient.DisableMaintenance(ctx, configstoreService)
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", expectedErr)
-				}
-				if err.Error() != expectedErr {
-					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-				}
+				assert.Error(t, err, expectedErr)
 
 				_, err = gwClient.DisableMaintenance(ctx, runserviceService)
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", expectedErr)
-				}
-				if err.Error() != expectedErr {
-					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-				}
+				assert.Error(t, err, expectedErr)
 			},
 		},
 		{
@@ -4963,20 +4515,10 @@ func TestMaintenance(t *testing.T) {
 
 				expectedErr := remoteErrorBadRequest
 				_, err := gwClient.EnableMaintenance(ctx, "test")
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", expectedErr)
-				}
-				if err.Error() != expectedErr {
-					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-				}
+				assert.Error(t, err, expectedErr)
 
 				_, err = gwClient.DisableMaintenance(ctx, "test")
-				if err == nil {
-					t.Fatalf("expected error %v, got nil err", expectedErr)
-				}
-				if err.Error() != expectedErr {
-					t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-				}
+				assert.Error(t, err, expectedErr)
 			},
 		},
 	}
@@ -5065,9 +4607,7 @@ func TestExportImport(t *testing.T) {
 	runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 	testutil.NilError(t, err)
 
-	if len(runs) != 1 {
-		t.Fatalf("expected %d run got: %d", 1, len(runs))
-	}
+	assert.Assert(t, cmp.Len(runs, 1))
 
 	gwClient = gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
 
@@ -5182,44 +4722,32 @@ func TestExportImport(t *testing.T) {
 	impUsers, _, err := gwClient.GetUsers(ctx, nil)
 	testutil.NilError(t, err)
 
-	if diff := cmp.Diff(users, impUsers); diff != "" {
-		t.Fatalf("users mismatch (-want +got):\n%s", diff)
-	}
+	assert.DeepEqual(t, users, impUsers)
 
 	impProjectgroup, _, err := gwClient.GetProjectGroup(ctx, "user/user01")
 	testutil.NilError(t, err)
 
-	if diff := cmp.Diff(projectgroup, impProjectgroup); diff != "" {
-		t.Fatalf("projectgroup mismatch (-want +got):\n%s", diff)
-	}
+	assert.DeepEqual(t, projectgroup, impProjectgroup)
 
 	impRemotesources, _, err := gwClient.GetRemoteSources(ctx, nil)
 	testutil.NilError(t, err)
 
-	if diff := cmp.Diff(remotesources, impRemotesources); diff != "" {
-		t.Fatalf("remotesources mismatch (-want +got):\n%s", diff)
-	}
+	assert.DeepEqual(t, remotesources, impRemotesources)
 
 	impUser01Projects, _, err := gwClient.GetProjectGroupProjects(ctx, "user/user01")
 	testutil.NilError(t, err)
 
-	if diff := cmp.Diff(user01Projects, impUser01Projects); diff != "" {
-		t.Fatalf("user01 projects mismatch (-want +got):\n%s", diff)
-	}
+	assert.DeepEqual(t, user01Projects, impUser01Projects)
 
 	impRuns, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 	testutil.NilError(t, err)
 
-	if diff := cmp.Diff(runs, impRuns); diff != "" {
-		t.Fatalf("runs mismatch (-want +got):\n%s", diff)
-	}
+	assert.DeepEqual(t, runs, impRuns)
 
 	orgs, _, err := gwClient.GetOrgs(ctx, nil)
 	testutil.NilError(t, err)
 
-	if len(orgs) != 0 {
-		t.Fatalf("expected 0 orgs got: %d", len(orgs))
-	}
+	assert.Assert(t, cmp.Len(orgs, 0))
 }
 
 func TestGetProjectRuns(t *testing.T) {
@@ -5333,18 +4861,12 @@ func TestGetProjectRuns(t *testing.T) {
 
 			t.Logf("runs: %s", util.Dump(runs))
 
-			if len(runs) != tt.num {
-				t.Fatalf("expected %d run got: %d", tt.num, len(runs))
-			}
+			assert.Assert(t, cmp.Len(runs, tt.num))
 
 			if len(runs) > 0 {
 				run := runs[0]
-				if run.Phase != rstypes.RunPhaseFinished {
-					t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, run.Phase)
-				}
-				if run.Result != rstypes.RunResultSuccess {
-					t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, run.Result)
-				}
+				assert.Equal(t, run.Phase, rstypes.RunPhaseFinished)
+				assert.Equal(t, run.Result, rstypes.RunResultSuccess)
 			}
 		})
 	}
@@ -5372,12 +4894,7 @@ func TestGetProjectRuns(t *testing.T) {
 		_, project := createProject(ctx, t, giteaClient, gwClient)
 
 		_, _, err = gwClient.GetProjectRun(ctx, project.ID, 1)
-		if err == nil {
-			t.Fatalf("expected error %v, got nil err", remoteErrorNotExist)
-		}
-		if err.Error() != remoteErrorNotExist {
-			t.Fatalf("expected err %v, got err: %v", remoteErrorNotExist, err)
-		}
+		assert.Error(t, err, remoteErrorNotExist)
 	})
 }
 
@@ -5517,16 +5034,10 @@ func TestRunEventsNotification(t *testing.T) {
 			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 			testutil.NilError(t, err)
 
-			if len(runs) != 1 {
-				t.Fatalf("expected %d run got: %d", 1, len(runs))
-			}
+			assert.Assert(t, cmp.Len(runs, 1))
 
-			if runs[0].Phase != tt.expectedRunPhase {
-				t.Fatalf("expected run phase %q, got %q", tt.expectedRunPhase, runs[0].Phase)
-			}
-			if runs[0].Result != tt.expectedRunResult {
-				t.Fatalf("expected run result %q, got %q", tt.expectedRunResult, runs[0].Result)
-			}
+			assert.Equal(t, runs[0].Phase, tt.expectedRunPhase)
+			assert.Equal(t, runs[0].Result, tt.expectedRunResult)
 
 			run, _, err := gwClient.GetProjectRun(ctx, project.ID, runs[0].Number)
 			testutil.NilError(t, err)
@@ -5554,22 +5065,12 @@ func TestRunEventsNotification(t *testing.T) {
 				testutil.NilError(t, err)
 
 				signatureSHA256 := hex.EncodeToString(sig256.Sum(nil))
-				if signatureSHA256 != w.signature {
-					t.Fatalf("expected webhook signature %q, got %q", signatureSHA256, w.signature)
-				}
+				assert.Equal(t, signatureSHA256, w.signature)
 
-				if w.webhookData.Run.Counter != run.Number {
-					t.Fatalf("expected webhook run counter %q, got %q", run.Number, w.webhookData.Run.Counter)
-				}
-				if w.webhookData.Run.Name != run.Name {
-					t.Fatalf("expected webhook run name %q, got %q", run.Name, w.webhookData.Run.Name)
-				}
-				if w.webhookData.Run.Phase != string(tt.expectedRunPhaseEvents[i]) {
-					t.Fatalf("expected webhook run phase %q, got %q", tt.expectedRunPhaseEvents[i], w.webhookData.Run.Phase)
-				}
-				if len(w.webhookData.Run.Tasks) != len(run.Tasks) {
-					t.Fatalf("expected %d webhook run tasks got: %d", 1, len(w.webhookData.Run.Tasks))
-				}
+				assert.Equal(t, w.webhookData.Run.Counter, run.Number)
+				assert.Equal(t, w.webhookData.Run.Name, run.Name)
+				assert.Equal(t, w.webhookData.Run.Phase, string(tt.expectedRunPhaseEvents[i]))
+				assert.Assert(t, cmp.Len(w.webhookData.Run.Tasks, len(run.Tasks)))
 
 				if len(run.Tasks) > 0 {
 					var taskID string
@@ -5579,33 +5080,15 @@ func TestRunEventsNotification(t *testing.T) {
 					whTask := w.webhookData.Run.Tasks[taskID]
 					task := run.Tasks[taskID]
 
-					if whTask.ID != task.ID {
-						t.Fatalf("expected webhook run task id %q, got %q", task.ID, whTask.ID)
-					}
-					if whTask.Name != task.Name {
-						t.Fatalf("expected webhook run task name %q, got %q", task.Name, whTask.Name)
-					}
-					if whTask.Status != string(tt.expectedRunTaskStatus[i]) {
-						t.Fatalf("expected webhook run task status %q, got %q", string(tt.expectedRunTaskStatus[i]), whTask.Status)
-					}
-					if whTask.Approved != false {
-						t.Fatalf("expected webhook run task approved %t, got %t", false, whTask.Approved)
-					}
-					if whTask.Skip != false {
-						t.Fatalf("expected webhook run task skip %t, got %t", false, whTask.Skip)
-					}
-					if whTask.Timedout != false {
-						t.Fatalf("expected webhook run task timedout %t, got %t", false, whTask.Timedout)
-					}
-					if whTask.WaitingApproval != false {
-						t.Fatalf("expected webhook run task waitingApproval %t, got %t", false, whTask.Timedout)
-					}
-					if len(whTask.Steps) != 1 {
-						t.Fatalf("expected %d webhook run task steps got: %d", 1, len(whTask.Steps))
-					}
-					if whTask.Level != 0 {
-						t.Fatalf("expected %d webhook run task level got: %d", 1, whTask.Level)
-					}
+					assert.Equal(t, whTask.ID, task.ID)
+					assert.Equal(t, whTask.Name, task.Name)
+					assert.Equal(t, whTask.Status, string(tt.expectedRunTaskStatus[i]))
+					assert.Assert(t, !whTask.Approved)
+					assert.Assert(t, !whTask.Skip)
+					assert.Assert(t, !whTask.Timedout)
+					assert.Assert(t, !whTask.WaitingApproval)
+					assert.Assert(t, cmp.Len(whTask.Steps, 1))
+					assert.Equal(t, whTask.Level, 0)
 				}
 			}
 		})
@@ -5761,16 +5244,10 @@ func TestCommitStatusDelivery(t *testing.T) {
 			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 			testutil.NilError(t, err)
 
-			if len(runs) != 1 {
-				t.Fatalf("expected %d run got: %d", 1, len(runs))
-			}
+			assert.Assert(t, cmp.Len(runs, 1))
 
-			if runs[0].Phase != tt.expectedRunPhase {
-				t.Fatalf("expected run phase %q, got %q", tt.expectedRunPhase, runs[0].Phase)
-			}
-			if runs[0].Result != tt.expectedRunResult {
-				t.Fatalf("expected run result %q, got %q", tt.expectedRunResult, runs[0].Result)
-			}
+			assert.Equal(t, runs[0].Phase, tt.expectedRunPhase)
+			assert.Equal(t, runs[0].Result, tt.expectedRunResult)
 
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
 				combinedStatus, _, err := giteaClient.GetCombinedStatus(agolaUser01, giteaRepo.Name, "master")
@@ -5791,18 +5268,10 @@ func TestCommitStatusDelivery(t *testing.T) {
 			combinedStatus, _, err := giteaClient.GetCombinedStatus(agolaUser01, giteaRepo.Name, "master")
 			testutil.NilError(t, err)
 
-			if combinedStatus.State != tt.expectedGiteaStatusState {
-				t.Fatalf("expected commit state %q, got %q", tt.expectedGiteaStatusState, combinedStatus.State)
-			}
-			if combinedStatus.Statuses[0].Description != tt.expectedGiteaDescription {
-				t.Fatalf("expected commit state description %q, got %q", tt.expectedGiteaDescription, combinedStatus.Statuses[0].Description)
-			}
-			if combinedStatus.Statuses[0].Context != tt.expectedGiteaContext {
-				t.Fatalf("expected commit state context %q, got %q", tt.expectedGiteaContext, combinedStatus.Statuses[0].Context)
-			}
-			if combinedStatus.Statuses[0].TargetURL != targetURL {
-				t.Fatalf("expected commit state targetURL %q, got %q", targetURL, combinedStatus.Statuses[0].TargetURL)
-			}
+			assert.Equal(t, combinedStatus.State, tt.expectedGiteaStatusState)
+			assert.Equal(t, combinedStatus.Statuses[0].Description, tt.expectedGiteaDescription)
+			assert.Equal(t, combinedStatus.Statuses[0].Context, tt.expectedGiteaContext)
+			assert.Equal(t, combinedStatus.Statuses[0].TargetURL, targetURL)
 		})
 	}
 }
@@ -5902,16 +5371,10 @@ func TestProjectRunActions(t *testing.T) {
 		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 		testutil.NilError(t, err)
 
-		if len(runs) != 1 {
-			t.Fatalf("expected %d run got: %d", 1, len(runs))
-		}
+		assert.Assert(t, cmp.Len(runs, 1))
 
-		if runs[0].Phase != rstypes.RunPhaseFinished {
-			t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, runs[0].Phase)
-		}
-		if runs[0].Result != rstypes.RunResultSuccess {
-			t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, runs[0].Result)
-		}
+		assert.Equal(t, runs[0].Phase, rstypes.RunPhaseFinished)
+		assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
 
 		_, _, err = gwUser01Client.ProjectRunAction(ctx, project.ID, runs[0].Number, &gwapitypes.RunActionsRequest{
 			ActionType: gwapitypes.RunActionTypeRestart,
@@ -5933,12 +5396,7 @@ func TestProjectRunActions(t *testing.T) {
 			ActionType: gwapitypes.RunActionTypeRestart,
 			FromStart:  true,
 		})
-		if err == nil {
-			t.Fatalf("expected error %v, got nil err", expectedErr)
-		}
-		if err.Error() != expectedErr {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr)
 
 		// test org run actions executed by an organization member type with MembersCanPerformRunActions false
 
@@ -5951,12 +5409,7 @@ func TestProjectRunActions(t *testing.T) {
 			ActionType: gwapitypes.RunActionTypeRestart,
 			FromStart:  true,
 		})
-		if err == nil {
-			t.Fatalf("expected error %v, got nil err", expectedErr)
-		}
-		if err.Error() != expectedErr {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr)
 	})
 
 	t.Run("test run actions on user's project", func(t *testing.T) {
@@ -6011,16 +5464,10 @@ func TestProjectRunActions(t *testing.T) {
 		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 		testutil.NilError(t, err)
 
-		if len(runs) != 1 {
-			t.Fatalf("expected %d run got: %d", 1, len(runs))
-		}
+		assert.Assert(t, cmp.Len(runs, 1))
 
-		if runs[0].Phase != rstypes.RunPhaseFinished {
-			t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, runs[0].Phase)
-		}
-		if runs[0].Result != rstypes.RunResultSuccess {
-			t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, runs[0].Result)
-		}
+		assert.Equal(t, runs[0].Phase, rstypes.RunPhaseFinished)
+		assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
 
 		_, _, err = gwUser01Client.ProjectRunAction(ctx, project.ID, runs[0].Number, &gwapitypes.RunActionsRequest{
 			ActionType: gwapitypes.RunActionTypeRestart,
@@ -6034,12 +5481,7 @@ func TestProjectRunActions(t *testing.T) {
 			ActionType: gwapitypes.RunActionTypeRestart,
 			FromStart:  true,
 		})
-		if err == nil {
-			t.Fatalf("expected error %v, got nil err", expectedErr)
-		}
-		if err.Error() != expectedErr {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr)
 	})
 }
 
@@ -6123,16 +5565,10 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 	runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 	testutil.NilError(t, err)
 
-	if len(runs) == 0 {
-		t.Fatalf("expected %d run got: %d", 1, len(runs))
-	}
+	assert.Assert(t, len(runs) != 0)
 
-	if runs[0].Phase != rstypes.RunPhaseFinished {
-		t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, runs[0].Phase)
-	}
-	if runs[0].Result != rstypes.RunResultSuccess {
-		t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, runs[0].Result)
-	}
+	assert.Equal(t, runs[0].Phase, rstypes.RunPhaseFinished)
+	assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
 
 	_ = testutil.Wait(30*time.Second, func() (bool, error) {
 		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
@@ -6156,16 +5592,10 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 		runWebhookDeliveries, resp, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
 		testutil.NilError(t, err)
 
-		if len(runWebhookDeliveries) != 4 {
-			t.Fatalf("expected 4 runWebhookDeliveries got: %d", len(runWebhookDeliveries))
-		}
-		if resp.Cursor != "" {
-			t.Fatalf("expected empty cursor, got %s", resp.Cursor)
-		}
+		assert.Assert(t, cmp.Len(runWebhookDeliveries, 4))
+		assert.Assert(t, resp.Cursor == "")
 		for _, r := range runWebhookDeliveries {
-			if r.DeliveryStatus != gwapitypes.DeliveryStatusDelivered {
-				t.Fatalf("expected DeliveryStatus delivered, got %s", r.DeliveryStatus)
-			}
+			assert.Equal(t, r.DeliveryStatus, gwapitypes.DeliveryStatusDelivered)
 		}
 	})
 
@@ -6179,12 +5609,8 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedRunWebhookDeliveries := 1
-		if len(respRunWebhookDeliveries) != expectedRunWebhookDeliveries {
-			t.Fatalf("expected %d project run webhook deliveries, got %d project run webhook deliveries", expectedRunWebhookDeliveries, len(respRunWebhookDeliveries))
-		}
-		if resp.Cursor == "" {
-			t.Fatalf("expected cursor, got no cursor")
-		}
+		assert.Assert(t, cmp.Len(respRunWebhookDeliveries, expectedRunWebhookDeliveries))
+		assert.Assert(t, resp.Cursor != "")
 
 		respAllRunWebhookDeliveries = append(respAllRunWebhookDeliveries, respRunWebhookDeliveries...)
 
@@ -6193,9 +5619,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 			respRunWebhookDeliveries, resp, err = gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Cursor: resp.Cursor, Limit: 1})
 			testutil.NilError(t, err)
 
-			if resp.Cursor != "" && len(respRunWebhookDeliveries) != expectedRunWebhookDeliveries {
-				t.Fatalf("expected %d project run webhook deliveries, got %d project run webhook deliveries", expectedRunWebhookDeliveries, len(respRunWebhookDeliveries))
-			}
+			assert.Assert(t, resp.Cursor == "" || (len(respRunWebhookDeliveries) == expectedRunWebhookDeliveries))
 
 			respAllRunWebhookDeliveries = append(respAllRunWebhookDeliveries, respRunWebhookDeliveries...)
 
@@ -6205,57 +5629,35 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 		}
 
 		expectedRunWebhookDeliveries = 4
-		if len(respAllRunWebhookDeliveries) != expectedRunWebhookDeliveries {
-			t.Fatalf("expected %d project run webhook deliveries, got %d project run webhook deliveries", expectedRunWebhookDeliveries, len(respAllRunWebhookDeliveries))
-		}
+		assert.Assert(t, cmp.Len(respAllRunWebhookDeliveries, expectedRunWebhookDeliveries))
 
-		if diff := cmp.Diff(runWebhookDeliveries, respAllRunWebhookDeliveries); diff != "" {
-			t.Fatalf("mismatch (-want +got):\n%s", diff)
-		}
+		assert.DeepEqual(t, runWebhookDeliveries, respAllRunWebhookDeliveries)
 	})
 
 	t.Run("test get project run webhook deliveries with user unauthorized", func(t *testing.T) {
 		_, _, err = gwUser02Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
-		if err == nil {
-			t.Fatalf("expected error %v, got nil err", remoteErrorForbidden)
-		}
-		if err.Error() != remoteErrorForbidden {
-			t.Fatalf("expected err %v, got err: %v", remoteErrorForbidden, err)
-		}
+		assert.Error(t, err, remoteErrorForbidden)
 	})
 
 	t.Run("test get project run webhook deliveries with not existing project", func(t *testing.T) {
 		_, _, err = gwUser01Client.GetProjectRunWebhookDeliveries(ctx, "project02", nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
-		if err == nil {
-			t.Fatalf("expected error %v, got nil err", remoteErrorNotExist)
-		}
-		if err.Error() != remoteErrorNotExist {
-			t.Fatalf("expected err %v, got err: %v", remoteErrorNotExist, err)
-		}
+		assert.Error(t, err, remoteErrorNotExist)
 	})
 
 	t.Run("test get project run webhook deliveries with deliverystatus = delivered", func(t *testing.T) {
 		runWebhookDeliveries, resp, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, []string{string(nstypes.DeliveryStatusDelivered)}, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
 		testutil.NilError(t, err)
 
-		if len(runWebhookDeliveries) != 4 {
-			t.Fatalf("expected 4 runWebhookDeliveries got: %d", len(runWebhookDeliveries))
-		}
-		if resp.Cursor != "" {
-			t.Fatalf("expected empty cursor, got %s", resp.Cursor)
-		}
+		assert.Assert(t, cmp.Len(runWebhookDeliveries, 4))
+		assert.Assert(t, resp.Cursor == "")
 	})
 
 	t.Run("test get project run webhook deliveries with deliverystatus = deliveryError", func(t *testing.T) {
 		runWebhookDeliveries, resp, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, []string{string(nstypes.DeliveryStatusDeliveryError)}, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
 		testutil.NilError(t, err)
 
-		if len(runWebhookDeliveries) != 0 {
-			t.Fatalf("expected 0 runWebhookDeliveries got: %d", len(runWebhookDeliveries))
-		}
-		if resp.Cursor != "" {
-			t.Fatalf("expected empty cursor, got %s", resp.Cursor)
-		}
+		assert.Assert(t, cmp.Len(runWebhookDeliveries, 0))
+		assert.Assert(t, resp.Cursor == "")
 	})
 }
 
@@ -6337,16 +5739,10 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 		testutil.NilError(t, err)
 
-		if len(runs) == 0 {
-			t.Fatalf("expected %d run got: %d", 1, len(runs))
-		}
+		assert.Assert(t, len(runs) != 0)
 
-		if runs[0].Phase != rstypes.RunPhaseFinished {
-			t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, runs[0].Phase)
-		}
-		if runs[0].Result != rstypes.RunResultSuccess {
-			t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, runs[0].Result)
-		}
+		assert.Equal(t, runs[0].Phase, rstypes.RunPhaseFinished)
+		assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
 
 		_ = testutil.Wait(30*time.Second, func() (bool, error) {
 			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
@@ -6369,13 +5765,9 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
 		testutil.NilError(t, err)
 
-		if len(runWebhookDeliveries) != 4 {
-			t.Fatalf("expected 4 runWebhookDeliveries got: %d", len(runWebhookDeliveries))
-		}
+		assert.Assert(t, cmp.Len(runWebhookDeliveries, 4))
 		for _, r := range runWebhookDeliveries {
-			if r.DeliveryStatus != gwapitypes.DeliveryStatusDeliveryError {
-				t.Fatalf("expected DeliveryStatus deliveryError, got %s", r.DeliveryStatus)
-			}
+			assert.Equal(t, r.DeliveryStatus, gwapitypes.DeliveryStatusDeliveryError)
 		}
 
 		_, err = gwUser01Client.ProjectRunWebhookRedelivery(ctx, project.ID, runWebhookDeliveries[0].ID)
@@ -6396,18 +5788,11 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		runWebhookDeliveries, _, err = gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
 		testutil.NilError(t, err)
 
-		if len(runWebhookDeliveries) != 5 {
-			t.Fatalf("expected 5 runWebhookDeliveries got: %d", len(runWebhookDeliveries))
-		}
+		assert.Assert(t, cmp.Len(runWebhookDeliveries, 5))
 
 		_, err = gwUser02Client.ProjectRunWebhookRedelivery(ctx, project.ID, runWebhookDeliveries[0].ID)
 		expectedErr := remoteErrorForbidden
-		if err == nil {
-			t.Fatalf("expected error %v, got nil err", expectedErr)
-		}
-		if err.Error() != expectedErr {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr)
 	})
 
 	t.Run("test redelivery project run webhook delivery with deliverystatus = delivered", func(t *testing.T) {
@@ -6463,16 +5848,10 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 		testutil.NilError(t, err)
 
-		if len(runs) == 0 {
-			t.Fatalf("expected %d run got: %d", 1, len(runs))
-		}
+		assert.Assert(t, len(runs) > 0)
 
-		if runs[0].Phase != rstypes.RunPhaseFinished {
-			t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, runs[0].Phase)
-		}
-		if runs[0].Result != rstypes.RunResultSuccess {
-			t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, runs[0].Result)
-		}
+		assert.Equal(t, runs[0].Phase, rstypes.RunPhaseFinished)
+		assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
 
 		_ = testutil.Wait(30*time.Second, func() (bool, error) {
 			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
@@ -6495,13 +5874,9 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
 		testutil.NilError(t, err)
 
-		if len(runWebhookDeliveries) != 4 {
-			t.Fatalf("expected 4 runWebhookDeliveries got: %d", len(runWebhookDeliveries))
-		}
+		assert.Assert(t, cmp.Len(runWebhookDeliveries, 4))
 		for _, r := range runWebhookDeliveries {
-			if r.DeliveryStatus != gwapitypes.DeliveryStatusDelivered {
-				t.Fatalf("expected DeliveryStatus delivered, got %s", r.DeliveryStatus)
-			}
+			assert.Equal(t, r.DeliveryStatus, gwapitypes.DeliveryStatusDelivered)
 		}
 
 		_, err = gwUser01Client.ProjectRunWebhookRedelivery(ctx, project.ID, runWebhookDeliveries[0].ID)
@@ -6510,18 +5885,11 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		runWebhookDeliveries, _, err = gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
 		testutil.NilError(t, err)
 
-		if len(runWebhookDeliveries) != 5 {
-			t.Fatalf("expected 5 runWebhookDeliveries got: %d", len(runWebhookDeliveries))
-		}
+		assert.Assert(t, cmp.Len(runWebhookDeliveries, 5))
 
 		_, err = gwUser02Client.ProjectRunWebhookRedelivery(ctx, project.ID, runWebhookDeliveries[0].ID)
 		expectedErr := remoteErrorForbidden
-		if err == nil {
-			t.Fatalf("expected error %v, got nil err", expectedErr)
-		}
-		if err.Error() != expectedErr {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr)
 	})
 
 	t.Run("test redelivery project run webhook delivery with not existing project", func(t *testing.T) {
@@ -6538,12 +5906,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 
 		_, err := gwUser01Client.ProjectRunWebhookRedelivery(ctx, "projecttestid", "runwebhookdeliverytestid")
 		expectedErr := remoteErrorNotExist
-		if err == nil {
-			t.Fatalf("expected error %v, got nil err", expectedErr)
-		}
-		if err.Error() != expectedErr {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr)
 	})
 
 	t.Run("test redelivery project run webhook delivery with not existing run webhook delivery", func(t *testing.T) {
@@ -6567,12 +5930,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 
 		_, err = gwUser01Client.ProjectRunWebhookRedelivery(ctx, project.ID, "runwebhookdeliverytestid")
 		expectedErr := remoteErrorNotExist
-		if err == nil {
-			t.Fatalf("expected error %v, got nil err", expectedErr)
-		}
-		if err.Error() != expectedErr {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr)
 	})
 
 	t.Run("test redelivery project run webhook delivery with projectRef that belong to another project", func(t *testing.T) {
@@ -6625,16 +5983,10 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project01.ID, nil, nil, 0, 0, false)
 		testutil.NilError(t, err)
 
-		if len(runs) == 0 {
-			t.Fatalf("expected %d run got: %d", 1, len(runs))
-		}
+		assert.Assert(t, len(runs) > 0)
 
-		if runs[0].Phase != rstypes.RunPhaseFinished {
-			t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, runs[0].Phase)
-		}
-		if runs[0].Result != rstypes.RunResultSuccess {
-			t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, runs[0].Result)
-		}
+		assert.Equal(t, runs[0].Phase, rstypes.RunPhaseFinished)
+		assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
 
 		_ = testutil.Wait(30*time.Second, func() (bool, error) {
 			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project01.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
@@ -6657,23 +6009,14 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project01.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
 		testutil.NilError(t, err)
 
-		if len(runWebhookDeliveries) != 4 {
-			t.Fatalf("expected 4 runWebhookDeliveries got: %d", len(runWebhookDeliveries))
-		}
+		assert.Assert(t, cmp.Len(runWebhookDeliveries, 4))
 		for _, r := range runWebhookDeliveries {
-			if r.DeliveryStatus != gwapitypes.DeliveryStatusDeliveryError {
-				t.Fatalf("expected DeliveryStatus deliveryError, got %s", r.DeliveryStatus)
-			}
+			assert.Equal(t, r.DeliveryStatus, gwapitypes.DeliveryStatusDeliveryError)
 		}
 
 		_, err = gwUser01Client.ProjectRunWebhookRedelivery(ctx, project02.ID, runWebhookDeliveries[0].ID)
 		expectedErr := remoteErrorNotExist
-		if err == nil {
-			t.Fatalf("expected error %v, got nil err", expectedErr)
-		}
-		if err.Error() != expectedErr {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr)
 	})
 }
 
@@ -6760,16 +6103,10 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 	runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, true)
 	testutil.NilError(t, err)
 
-	if len(runs) != runCount {
-		t.Fatalf("expected %d run got: %d", runCount, len(runs))
-	}
+	assert.Assert(t, cmp.Len(runs, runCount))
 	for i := 0; i < runCount; i++ {
-		if runs[i].Phase != rstypes.RunPhaseFinished {
-			t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, runs[i].Phase)
-		}
-		if runs[i].Result != rstypes.RunResultSuccess {
-			t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, runs[i].Result)
-		}
+		assert.Equal(t, runs[i].Phase, rstypes.RunPhaseFinished)
+		assert.Equal(t, runs[i].Result, rstypes.RunResultSuccess)
 	}
 
 	_ = testutil.Wait(30*time.Second, func() (bool, error) {
@@ -6794,16 +6131,10 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 		commitStatusDeliveries, resp, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
 		testutil.NilError(t, err)
 
-		if len(commitStatusDeliveries) != 2*runCount {
-			t.Fatalf("expected %d commitStatusDeliveries got: %d", 2*runCount, len(commitStatusDeliveries))
-		}
-		if resp.Cursor != "" {
-			t.Fatalf("expected empty cursor, got %s", resp.Cursor)
-		}
+		assert.Assert(t, cmp.Len(commitStatusDeliveries, 2*runCount))
+		assert.Assert(t, resp.Cursor == "")
 		for _, r := range commitStatusDeliveries {
-			if r.DeliveryStatus != gwapitypes.DeliveryStatusDelivered {
-				t.Fatalf("expected DeliveryStatus delivered, got %s", r.DeliveryStatus)
-			}
+			assert.Equal(t, r.DeliveryStatus, gwapitypes.DeliveryStatusDelivered)
 		}
 	})
 
@@ -6817,12 +6148,8 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedCommitStatusDeliveries := 1
-		if len(respCommitStatusDeliveries) != expectedCommitStatusDeliveries {
-			t.Fatalf("expected %d project commit status deliveries, got %d project commit status deliveries", expectedCommitStatusDeliveries, len(respCommitStatusDeliveries))
-		}
-		if resp.Cursor == "" {
-			t.Fatalf("expected cursor, got no cursor")
-		}
+		assert.Assert(t, cmp.Len(respCommitStatusDeliveries, expectedCommitStatusDeliveries))
+		assert.Assert(t, resp.Cursor != "")
 
 		respAllCommitStatusDeliveries = append(respAllCommitStatusDeliveries, respCommitStatusDeliveries...)
 
@@ -6831,9 +6158,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 			respCommitStatusDeliveries, resp, err = gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Cursor: resp.Cursor, Limit: 1})
 			testutil.NilError(t, err)
 
-			if resp.Cursor != "" && len(respCommitStatusDeliveries) != expectedCommitStatusDeliveries {
-				t.Fatalf("expected %d project commit status deliveries, got %d project commit status deliveries", expectedCommitStatusDeliveries, len(respCommitStatusDeliveries))
-			}
+			assert.Assert(t, resp.Cursor == "" || (len(respCommitStatusDeliveries) == expectedCommitStatusDeliveries))
 
 			respAllCommitStatusDeliveries = append(respAllCommitStatusDeliveries, respCommitStatusDeliveries...)
 
@@ -6843,56 +6168,34 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 		}
 
 		expectedCommitStatusDeliveries = 2 * runCount
-		if len(respAllCommitStatusDeliveries) != expectedCommitStatusDeliveries {
-			t.Fatalf("expected %d project commit status deliveries, got %d project commit status deliveries", expectedCommitStatusDeliveries, len(respAllCommitStatusDeliveries))
-		}
+		assert.Assert(t, cmp.Len(respAllCommitStatusDeliveries, expectedCommitStatusDeliveries))
 
-		if diff := cmp.Diff(commitStatusDeliveries, respAllCommitStatusDeliveries); diff != "" {
-			t.Fatalf("mismatch (-want +got):\n%s", diff)
-		}
+		assert.DeepEqual(t, commitStatusDeliveries, respAllCommitStatusDeliveries)
 	})
 
 	t.Run("test get project commit status deliveries with user unauthorized", func(t *testing.T) {
 		_, _, err = gwUser02Client.GetProjectCommitStatusDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
-		if err == nil {
-			t.Fatalf("expected error %v, got nil err", remoteErrorForbidden)
-		}
-		if err.Error() != remoteErrorForbidden {
-			t.Fatalf("expected err %v, got err: %v", remoteErrorForbidden, err)
-		}
+		assert.Error(t, err, remoteErrorForbidden)
 	})
 
 	t.Run("test get project commit status deliveries with not existing project", func(t *testing.T) {
 		_, _, err = gwUser01Client.GetProjectCommitStatusDeliveries(ctx, "project02", nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
-		if err == nil {
-			t.Fatalf("expected error %v, got nil err", remoteErrorNotExist)
-		}
-		if err.Error() != remoteErrorNotExist {
-			t.Fatalf("expected err %v, got err: %v", remoteErrorNotExist, err)
-		}
+		assert.Error(t, err, remoteErrorNotExist)
 	})
 
 	t.Run("test get project commit status deliveries with deliverystatus = delivered", func(t *testing.T) {
 		commitStatusDeliveries, resp, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, []string{string(nstypes.DeliveryStatusDelivered)}, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
 		testutil.NilError(t, err)
 
-		if len(commitStatusDeliveries) != 2*runCount {
-			t.Fatalf("expected %d commitStatusDeliveries got: %d", 2*runCount, len(commitStatusDeliveries))
-		}
-		if resp.Cursor != "" {
-			t.Fatalf("expected empty cursor, got %s", resp.Cursor)
-		}
+		assert.Assert(t, cmp.Len(commitStatusDeliveries, 2*runCount))
+		assert.Assert(t, resp.Cursor == "")
 	})
 
 	t.Run("test get project commit status deliveries with deliverystatus = deliveryError", func(t *testing.T) {
 		commitStatusDeliveries, resp, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, []string{string(nstypes.DeliveryStatusDeliveryError)}, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
 		testutil.NilError(t, err)
 
-		if len(commitStatusDeliveries) != 0 {
-			t.Fatalf("expected 0 commitStatusDeliveries got: %d", len(commitStatusDeliveries))
-		}
-		if resp.Cursor != "" {
-			t.Fatalf("expected empty cursor, got %s", resp.Cursor)
-		}
+		assert.Assert(t, cmp.Len(commitStatusDeliveries, 0))
+		assert.Assert(t, resp.Cursor == "")
 	})
 }

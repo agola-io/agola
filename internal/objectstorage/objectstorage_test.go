@@ -24,6 +24,8 @@ import (
 	"strings"
 	"testing"
 
+	"gotest.tools/assert"
+
 	"agola.io/agola/internal/testutil"
 )
 
@@ -335,9 +337,7 @@ func TestWriteObject(t *testing.T) {
 			oi, err := os.Stat(objName)
 			testutil.NilError(t, err)
 
-			if oi.Size != n {
-				t.Fatalf("expected object size: %d, got %d", n, oi.Size)
-			}
+			assert.Equal(t, oi.Size, n, "expected object size")
 
 			// Test write with object size equal to buf size.
 			buf = newBuf(n)
@@ -348,9 +348,7 @@ func TestWriteObject(t *testing.T) {
 			oi, err = os.Stat(objName)
 			testutil.NilError(t, err)
 
-			if oi.Size != n {
-				t.Fatalf("expected object size: %d, got %d", n, oi.Size)
-			}
+			assert.Equal(t, oi.Size, n, "expected object size")
 
 			// Test write with object size less than buf size.
 			buf = newBuf(n)
@@ -362,13 +360,10 @@ func TestWriteObject(t *testing.T) {
 			oi, err = os.Stat(objName)
 			testutil.NilError(t, err)
 
-			if oi.Size != size {
-				t.Fatalf("expected object size: %d, got %d", size, oi.Size)
-			}
+			assert.Equal(t, oi.Size, size, "expected object size")
+
 			// remaining buf len should be n-size
-			if int64(buf.Len()) != n-size {
-				t.Fatalf("expected buf lenght: %d, got %d", n-size, buf.Len())
-			}
+			assert.Equal(t, int64(buf.Len()), n-size, "expected buf length")
 		})
 	}
 }

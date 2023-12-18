@@ -19,9 +19,11 @@ import (
 	"math"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/sorintlab/errors"
 	"go.starlark.net/starlark"
+	"gotest.tools/assert"
+
+	"agola.io/agola/internal/testutil"
 )
 
 func TestStarlarkJSON(t *testing.T) {
@@ -78,23 +80,13 @@ func TestStarlarkJSON(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			out := new(bytes.Buffer)
-			if err := starlarkJSON(out, tt.in); err != nil {
-				if tt.err == nil {
-					t.Fatalf("got error: %v, expected no error", err)
-				}
-				if err.Error() != tt.err.Error() {
-					t.Fatalf("got error: %v, want error: %v", err, tt.err)
-				}
+			err := starlarkJSON(out, tt.in)
+			if tt.err != nil {
+				assert.Error(t, err, tt.err.Error())
 			} else {
-				if tt.err != nil {
-					t.Fatalf("got nil error, want error: %v", tt.err)
-				}
-			}
+				testutil.NilError(t, err)
 
-			if tt.err == nil {
-				if diff := cmp.Diff(tt.out, out.String()); diff != "" {
-					t.Fatalf(diff)
-				}
+				assert.DeepEqual(t, tt.out, out.String())
 			}
 		})
 	}

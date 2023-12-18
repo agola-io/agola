@@ -32,6 +32,7 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/sgotti/gexpect"
 	"github.com/sorintlab/errors"
+	"gotest.tools/assert"
 )
 
 const (
@@ -245,9 +246,7 @@ func NewTestGitea(t *testing.T, dir, dockerBridgeAddress string, a ...string) (*
 	uid := fmt.Sprintf("%x", u[:4])
 
 	giteaPath := os.Getenv("GITEA_PATH")
-	if giteaPath == "" {
-		t.Fatalf("env var GITEA_PATH is undefined")
-	}
+	assert.Assert(t, giteaPath != "", "env var GITEA_PATH is undefined")
 
 	giteaDir := filepath.Join(dir, "gitea")
 

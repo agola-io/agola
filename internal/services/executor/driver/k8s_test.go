@@ -19,11 +19,11 @@ import (
 	"context"
 	"io"
 	"os"
-	"reflect"
 	"testing"
 	"time"
 
 	"github.com/gofrs/uuid"
+	"gotest.tools/assert"
 
 	"agola.io/agola/internal/testutil"
 )
@@ -33,9 +33,7 @@ func TestK8sPod(t *testing.T) {
 		t.Skip("skipping since env var SKIP_K8S_TESTS is 1")
 	}
 	toolboxPath := os.Getenv("AGOLA_TOOLBOX_PATH")
-	if toolboxPath == "" {
-		t.Fatalf("env var AGOLA_TOOLBOX_PATH is undefined")
-	}
+	assert.Assert(t, toolboxPath != "", "env var AGOLA_TOOLBOX_PATH is undefined")
 
 	log := testutil.NewLogger(t)
 
@@ -91,9 +89,7 @@ func TestK8sPod(t *testing.T) {
 		code, err := ce.Wait(ctx)
 		testutil.NilError(t, err)
 
-		if code != 0 {
-			t.Fatalf("unexpected exit code: %d", code)
-		}
+		assert.Equal(t, code, 0)
 	})
 
 	t.Run("test pod environment", func(t *testing.T) {
@@ -129,21 +125,15 @@ func TestK8sPod(t *testing.T) {
 		code, err := ce.Wait(ctx)
 		testutil.NilError(t, err)
 
-		if code != 0 {
-			t.Fatalf("unexpected exit code: %d", code)
-		}
+		assert.Equal(t, code, 0)
 
 		curEnv, err := testutil.ParseEnvs(bytes.NewReader(buf.Bytes()))
 		testutil.NilError(t, err)
 
 		for n, e := range env {
-			if ce, ok := curEnv[n]; !ok {
-				t.Fatalf("missing env var %s", n)
-			} else {
-				if ce != e {
-					t.Fatalf("different env var %s value, want: %q, got %q", n, e, ce)
-				}
-			}
+			ce, ok := curEnv[n]
+			assert.Assert(t, ok, "missing env var %s", n)
+			assert.Equal(t, ce, e, "different env var %s value, want: %q, got %q", n, e, ce)
 		}
 	})
 
@@ -199,9 +189,7 @@ func TestK8sPod(t *testing.T) {
 		code, err := ce.Wait(ctx)
 		testutil.NilError(t, err)
 
-		if code != 0 {
-			t.Fatalf("unexpected exit code: %d", code)
-		}
+		assert.Equal(t, code, 0)
 	})
 
 	t.Run("test get pods", func(t *testing.T) {
@@ -269,9 +257,7 @@ func TestK8sPod(t *testing.T) {
 		code, err := ce.Wait(ctx)
 		testutil.NilError(t, err)
 
-		if code != 0 {
-			t.Fatalf("unexpected exit code: %d", code)
-		}
+		assert.Equal(t, code, 0)
 	})
 
 	t.Run("test pod with two tmpfs volumes", func(t *testing.T) {
@@ -315,9 +301,7 @@ func TestK8sPod(t *testing.T) {
 		code, err := ce.Wait(ctx)
 		testutil.NilError(t, err)
 
-		if code != 0 {
-			t.Fatalf("unexpected exit code: %d", code)
-		}
+		assert.Equal(t, code, 0)
 	})
 }
 
@@ -352,19 +336,13 @@ func TestParseGitVersion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run("", func(t *testing.T) {
 			sv, err := parseGitVersion(tt.gitVersion)
-			if err != nil {
-				if !tt.err {
-					t.Fatalf("got error, want no error")
-				}
+			if tt.err {
+				assert.Assert(t, err != nil)
 			} else {
-				if tt.err {
-					t.Fatalf("got no error, want error")
-				}
+				testutil.NilError(t, err)
 			}
 
-			if !reflect.DeepEqual(sv, tt.out) {
-				t.Fatalf("expected %v, got %v", tt.out, sv)
-			}
+			assert.DeepEqual(t, sv, tt.out)
 		})
 	}
 }

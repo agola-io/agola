@@ -27,6 +27,8 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/sorintlab/errors"
+	"gotest.tools/assert"
+	"gotest.tools/assert/cmp"
 
 	"agola.io/agola/internal/objectstorage"
 	"agola.io/agola/internal/services/config"
@@ -118,10 +120,7 @@ func TestExportImport(t *testing.T) {
 	runs, err := getRuns(ctx, rs)
 	testutil.NilError(t, err)
 
-	if len(runs) != 20 {
-		t.Logf("runs: %s", util.Dump(runs))
-		t.Fatalf("expected %d runs, got %d runs", 20, len(runs))
-	}
+	assert.Assert(t, cmp.Len(runs, 20))
 
 	var export bytes.Buffer
 	err = rs.ah.Export(ctx, &export)
@@ -217,21 +216,14 @@ func TestConcurrentRunCreation(t *testing.T) {
 	runs, err := getRuns(ctx, rs)
 	testutil.NilError(t, err)
 
-	if len(runs) != 10 {
-		t.Logf("runs: %s", util.Dump(runs))
-		t.Fatalf("expected %d runs, got %d runs", 10, len(runs))
-	}
+	assert.Assert(t, cmp.Len(runs, 10))
 
 	for i, r := range runs {
 		expectedCounter := uint64(i + 1)
-		if r.Counter != expectedCounter {
-			t.Fatalf("expected run counter %d runs, got %d", expectedCounter, r.Counter)
-		}
+		assert.Equal(t, r.Counter, expectedCounter)
 
 		expectedSequence := uint64(i + 1)
-		if r.Sequence != expectedSequence {
-			t.Fatalf("expected run sequence %d runs, got %d", expectedSequence, r.Sequence)
-		}
+		assert.Equal(t, r.Sequence, expectedSequence)
 	}
 }
 
@@ -270,20 +262,13 @@ func TestGetRunsLastRun(t *testing.T) {
 	})
 	testutil.NilError(t, err)
 
-	if len(runs) != 2 {
-		t.Logf("runs: %s", util.Dump(runs))
-		t.Fatalf("expected %d runs, got %d runs", 2, len(runs))
-	}
+	assert.Assert(t, cmp.Len(runs, 2))
 
 	for i, er := range expectedRuns {
 		r := runs[i]
-		if r.Group != er.Group {
-			t.Fatalf("expected run group %q, got %q", r.Group, er.Group)
-		}
+		assert.Equal(t, r.Group, er.Group)
 
-		if r.Sequence != er.Sequence {
-			t.Fatalf("expected run sequence %d, got %d", er.Sequence, r.Sequence)
-		}
+		assert.Equal(t, r.Sequence, er.Sequence)
 	}
 }
 
@@ -312,7 +297,5 @@ func TestLogleaner(t *testing.T) {
 	testutil.NilError(t, err)
 
 	_, err = rs.ost.ReadObject(logPath)
-	if err == nil || !objectstorage.IsNotExist(err) {
-		t.Fatalf("expected err NotExists, got: %v", err)
-	}
+	assert.ErrorType(t, err, objectstorage.IsNotExist)
 }

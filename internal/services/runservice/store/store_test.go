@@ -18,6 +18,9 @@ import (
 	"testing"
 
 	"github.com/sorintlab/errors"
+	"gotest.tools/assert"
+
+	"agola.io/agola/internal/testutil"
 )
 
 func TestOSTRunTaskIDFromArchivePath(t *testing.T) {
@@ -67,20 +70,12 @@ func TestOSTRunTaskIDFromArchivePath(t *testing.T) {
 			t.Parallel()
 
 			id, err := OSTRunTaskIDFromPath(tt.archivePath)
-			if err != nil {
-				if tt.err == nil {
-					t.Fatalf("got error: %v, expected no error", err)
-				}
-				if err.Error() != tt.err.Error() {
-					t.Fatalf("got error: %v, want error: %v", err, tt.err)
-				}
+			if tt.err != nil {
+				assert.Error(t, err, tt.err.Error())
 			} else {
-				if tt.err != nil {
-					t.Fatalf("got nil error, want error: %v", tt.err)
-				}
-				if id != tt.out {
-					t.Fatalf("got id: %q, want id: %q", id, tt.out)
-				}
+				testutil.NilError(t, err)
+
+				assert.Equal(t, id, tt.out)
 			}
 		})
 	}

@@ -25,10 +25,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/rs/zerolog"
 	"github.com/sorintlab/errors"
+	"gotest.tools/assert"
+	"gotest.tools/assert/cmp"
 
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/notification/action"
@@ -99,25 +100,17 @@ func TestRunWebhookDelivery(t *testing.T) {
 		testutil.NilError(t, err)
 
 		runWebhookDeliveries := getRunWebhookDeliveries(t, ctx, ns)
-		if len(runWebhookDeliveries) != len(runWebhooks) {
-			t.Fatalf("expected %d runWebhook deliveries got: %d", len(runWebhooks), len(runWebhookDeliveries))
-		}
+		assert.Assert(t, cmp.Len(runWebhookDeliveries, len(runWebhooks)))
 		for i := 0; i < len(runWebhookDeliveries); i++ {
-			if runWebhookDeliveries[i].DeliveryStatus != types.DeliveryStatusDelivered {
-				t.Fatalf("expected runWebhook delivery status %q, got %q", types.DeliveryStatusDelivered, runWebhookDeliveries[i].DeliveryStatus)
-			}
+			assert.Equal(t, runWebhookDeliveries[i].DeliveryStatus, types.DeliveryStatusDelivered)
 		}
 
 		webhooks, err := wr.webhooks.getWebhooks()
 		testutil.NilError(t, err)
 
-		if len(webhooks) != len(runWebhooks) {
-			t.Fatalf("expected %d run webhook got: %d", len(runWebhooks), len(webhooks))
-		}
+		assert.Assert(t, cmp.Len(webhooks, len(runWebhooks)))
 		for i := 0; i < len(runWebhookDeliveries); i++ {
-			if !bytes.Equal(webhooks[i].Payload, runWebhooks[i].Payload) {
-				t.Fatalf("expected %s run webhook payload got: %s", runWebhooks[i].Payload, webhooks[i].Payload)
-			}
+			assert.Assert(t, bytes.Equal(webhooks[i].Payload, runWebhooks[i].Payload))
 
 			h256 := hmac.New(sha256.New, []byte(webhookSecret))
 			_, err = h256.Write([]byte(runWebhooks[i].Payload))
@@ -125,9 +118,7 @@ func TestRunWebhookDelivery(t *testing.T) {
 
 			expectedsignature := hex.EncodeToString(h256.Sum(nil))
 
-			if webhooks[i].Signature != expectedsignature {
-				t.Fatalf("expected %s run webhook signature got: %s", expectedsignature, webhooks[i].Signature)
-			}
+			assert.Equal(t, webhooks[i].Signature, expectedsignature)
 		}
 
 		// test run webhooks handled previously.
@@ -140,9 +131,7 @@ func TestRunWebhookDelivery(t *testing.T) {
 		webhooks, err = wr.webhooks.getWebhooks()
 		testutil.NilError(t, err)
 
-		if len(webhooks) != 0 {
-			t.Fatalf("expected %d run webhook got: %d", 0, len(webhooks))
-		}
+		assert.Assert(t, cmp.Len(webhooks, 0))
 	})
 
 	t.Run("test run webhook delivery fail", func(t *testing.T) {
@@ -160,12 +149,8 @@ func TestRunWebhookDelivery(t *testing.T) {
 		testutil.NilError(t, err)
 
 		runWebhookDeliveries := getRunWebhookDeliveries(t, ctx, ns)
-		if len(runWebhookDeliveries) != 1 {
-			t.Fatalf("expected %d runWebhook deliveries got: %d", 1, len(runWebhookDeliveries))
-		}
-		if runWebhookDeliveries[0].DeliveryStatus != types.DeliveryStatusDeliveryError {
-			t.Fatalf("expected runWebhook delivery status %q, got %q", types.DeliveryStatusDeliveryError, runWebhookDeliveries[0].DeliveryStatus)
-		}
+		assert.Assert(t, cmp.Len(runWebhookDeliveries, 1))
+		assert.Equal(t, runWebhookDeliveries[0].DeliveryStatus, types.DeliveryStatusDeliveryError)
 	})
 }
 
@@ -181,8 +166,6 @@ func TestLastRunEventSequence(t *testing.T) {
 	ns := setupNotificationService(ctx, t, log, dir)
 	ns.c.WebhookURL = webhookURL
 
-	t.Logf("starting ns")
-
 	runEventsSender := setupRunEventsSender(ctx, t)
 	defer runEventsSender.stop()
 
@@ -191,9 +174,7 @@ func TestLastRunEventSequence(t *testing.T) {
 	ns.runserviceClient = rsclient.NewClient(runEventsSender.exposedURL, "")
 
 	lastRunEventSequenceValue := getLastRunEventSequenceValue(t, ctx, ns)
-	if lastRunEventSequenceValue != 0 {
-		t.Fatalf("expected lastRunEventSequence %d, got: %d", 0, lastRunEventSequenceValue)
-	}
+	assert.Equal(t, lastRunEventSequenceValue, uint64(0))
 
 	// test runEventsHandler start from sequence 0
 	runEvents := make([]*rstypes.RunEvent, 0)
@@ -208,9 +189,7 @@ func TestLastRunEventSequence(t *testing.T) {
 	testutil.NilError(t, err)
 
 	lastRunEventSequenceValue = getLastRunEventSequenceValue(t, ctx, ns)
-	if lastRunEventSequenceValue != expectedLastRunEventSequenceValue {
-		t.Fatalf("expected %d last run event got: %d", expectedLastRunEventSequenceValue, lastRunEventSequenceValue)
-	}
+	assert.Equal(t, lastRunEventSequenceValue, expectedLastRunEventSequenceValue)
 
 	// test new events
 	runEvents = append(runEvents, generateRunEvent(3, rstypes.RunPhaseChanged))
@@ -223,25 +202,19 @@ func TestLastRunEventSequence(t *testing.T) {
 	testutil.NilError(t, err)
 
 	runWebhooks := getRunWebhooks(t, ctx, ns)
-	if len(runWebhooks) != len(runEvents) {
-		t.Fatalf("expected %d runWebhooks got: %d", len(runEvents), len(runWebhooks))
-	}
+	assert.Assert(t, cmp.Len(runWebhooks, len(runEvents)))
 
 	for i := range runEvents {
 		runWebhook := ns.generatewebhook(ctx, runEvents[i])
 		webhookPayload, err := json.Marshal(runWebhook)
 		testutil.NilError(t, err)
 
-		if !bytes.Equal(runWebhooks[i].Payload, webhookPayload) {
-			t.Fatalf("expected %s run webhook payload got: %s", runWebhooks[i].Payload, webhookPayload)
-		}
+		assert.Assert(t, bytes.Equal(runWebhooks[i].Payload, webhookPayload))
 	}
 
 	expectedLastRunEventSequenceValue = 4
 	lastRunEventSequenceValue = getLastRunEventSequenceValue(t, ctx, ns)
-	if lastRunEventSequenceValue != expectedLastRunEventSequenceValue {
-		t.Fatalf("expected %d last run event sequence got: %d", expectedLastRunEventSequenceValue, lastRunEventSequenceValue)
-	}
+	assert.Equal(t, lastRunEventSequenceValue, expectedLastRunEventSequenceValue)
 }
 
 func generateRunEvent(sequence uint64, runEventType rstypes.RunEventType) *rstypes.RunEvent {
@@ -374,8 +347,6 @@ func TestCommitStatusDelivery(t *testing.T) {
 
 		ns := setupNotificationService(ctx, t, log, dir)
 
-		t.Logf("starting ns")
-
 		cs := setupStubCommitStatusUpdater()
 		ns.u = cs
 
@@ -388,33 +359,19 @@ func TestCommitStatusDelivery(t *testing.T) {
 		testutil.NilError(t, err)
 
 		commitStatusDeliveries := getCommitStatusDeliveries(t, ctx, ns)
-		if len(commitStatusDeliveries) != len(commitStatuses) {
-			t.Fatalf("expected %d commitStatus deliveries got: %d", len(commitStatuses), len(commitStatusDeliveries))
-		}
+		assert.Assert(t, cmp.Len(commitStatusDeliveries, len(commitStatuses)))
 		for i := 0; i < len(commitStatusDeliveries); i++ {
-			if commitStatusDeliveries[i].DeliveryStatus != types.DeliveryStatusDelivered {
-				t.Fatalf("expected commitStatus delivery status %q, got %q", types.DeliveryStatusDelivered, commitStatusDeliveries[i].DeliveryStatus)
-			}
+			assert.Equal(t, commitStatusDeliveries[i].DeliveryStatus, types.DeliveryStatusDelivered)
 		}
 
 		commitStatusesReceived, err := cs.commitStatuses.getCommitStatuses()
 		testutil.NilError(t, err)
 
-		if len(commitStatusesReceived) != len(commitStatuses) {
-			t.Fatalf("expected %d run commitStatus got: %d", len(commitStatuses), len(commitStatusesReceived))
-		}
+		assert.Assert(t, cmp.Len(commitStatusesReceived, len(commitStatuses)))
 		for i := 0; i < len(commitStatuses); i++ {
-			if commitStatusesReceived[i].Context != commitStatuses[i].Context {
-				t.Fatalf("expected %s commitStatus context got: %s", commitStatuses[i].Context, commitStatusesReceived[i].Context)
-			}
-
-			if commitStatusesReceived[i].Description != commitStatuses[i].Description {
-				t.Fatalf("expected %s commitStatus description got: %s", commitStatuses[i].Description, commitStatusesReceived[i].Description)
-			}
-
-			if commitStatusesReceived[i].State != commitStatuses[i].State {
-				t.Fatalf("expected %s commitStatus sate got: %s", commitStatuses[i].State, commitStatusesReceived[i].State)
-			}
+			assert.Equal(t, commitStatusesReceived[i].Context, commitStatuses[i].Context)
+			assert.Equal(t, commitStatusesReceived[i].Description, commitStatuses[i].Description)
+			assert.Equal(t, commitStatusesReceived[i].State, commitStatuses[i].State)
 		}
 
 		// test commitstatuses handled previously.
@@ -427,9 +384,7 @@ func TestCommitStatusDelivery(t *testing.T) {
 		commitStatusesReceived, err = cs.commitStatuses.getCommitStatuses()
 		testutil.NilError(t, err)
 
-		if len(commitStatusesReceived) != 0 {
-			t.Fatalf("expected %d commit status got: %d", 0, len(commitStatusesReceived))
-		}
+		assert.Assert(t, cmp.Len(commitStatusesReceived, 0))
 	})
 
 	t.Run("test commit status delivery fail", func(t *testing.T) {
@@ -441,8 +396,6 @@ func TestCommitStatusDelivery(t *testing.T) {
 
 		ns := setupNotificationService(ctx, t, log, dir)
 
-		t.Logf("starting ns")
-
 		s := setupStubCommitStatusUpdater()
 		s.setFailUpdateCommitStatus(true)
 		ns.u = s
@@ -453,12 +406,8 @@ func TestCommitStatusDelivery(t *testing.T) {
 		testutil.NilError(t, err)
 
 		commitStatusDeliveries := getCommitStatusDeliveries(t, ctx, ns)
-		if len(commitStatusDeliveries) != 1 {
-			t.Fatalf("expected %d commitStatus deliveries got: %d", 1, len(commitStatusDeliveries))
-		}
-		if commitStatusDeliveries[0].DeliveryStatus != types.DeliveryStatusDeliveryError {
-			t.Fatalf("expected commitStatus delivery status %q, got %q", types.DeliveryStatusDeliveryError, commitStatusDeliveries[0].DeliveryStatus)
-		}
+		assert.Assert(t, cmp.Len(commitStatusDeliveries, 1))
+		assert.Equal(t, commitStatusDeliveries[0].DeliveryStatus, types.DeliveryStatusDeliveryError)
 	})
 }
 
@@ -586,48 +535,32 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, Limit: 0})
 		testutil.NilError(t, err)
 
-		if res.HasMore != false {
-			t.Fatalf("unexpected HasMore true")
-		}
-		if len(res.RunWebhookDeliveries) != 20 {
-			t.Fatalf("unexpected 20 run webhook deliveries, got %d", len(res.RunWebhookDeliveries))
-		}
+		assert.Assert(t, !res.HasMore)
+		assert.Assert(t, cmp.Len(res.RunWebhookDeliveries, 20))
 	})
 
 	t.Run("test get run webhook deliveries with limit = 10", func(t *testing.T) {
 		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, Limit: 10})
 		testutil.NilError(t, err)
 
-		if res.HasMore != true {
-			t.Fatalf("unexpected HasMore false")
-		}
-		if len(res.RunWebhookDeliveries) != 10 {
-			t.Fatalf("unexpected 10 run webhook deliveries, got %d", len(res.RunWebhookDeliveries))
-		}
+		assert.Assert(t, res.HasMore)
+		assert.Assert(t, cmp.Len(res.RunWebhookDeliveries, 10))
 	})
 
 	t.Run("test get run webhook deliveries with deliverystatusfilter = delivered", func(t *testing.T) {
 		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, DeliveryStatusFilter: []types.DeliveryStatus{types.DeliveryStatusDelivered}, Limit: 0})
 		testutil.NilError(t, err)
 
-		if res.HasMore != false {
-			t.Fatalf("unexpected HasMore true")
-		}
-		if len(res.RunWebhookDeliveries) != 10 {
-			t.Fatalf("unexpected 10 run webhook deliveries, got %d", len(res.RunWebhookDeliveries))
-		}
+		assert.Assert(t, !res.HasMore)
+		assert.Assert(t, cmp.Len(res.RunWebhookDeliveries, 10))
 	})
 
 	t.Run("test get run webhook deliveries with deliverystatusfilter = delivered and limit less than run webhook deliveries", func(t *testing.T) {
 		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, DeliveryStatusFilter: []types.DeliveryStatus{types.DeliveryStatusDelivered}, Limit: 5})
 		testutil.NilError(t, err)
 
-		if res.HasMore != true {
-			t.Fatalf("unexpected HasMore false")
-		}
-		if len(res.RunWebhookDeliveries) != 5 {
-			t.Fatalf("unexpected 5 run webhook deliveries, got %d", len(res.RunWebhookDeliveries))
-		}
+		assert.Assert(t, res.HasMore)
+		assert.Assert(t, cmp.Len(res.RunWebhookDeliveries, 5))
 	})
 
 	t.Run("test get run webhook deliveries with limit less than run webhook deliveries continuation", func(t *testing.T) {
@@ -637,12 +570,8 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedProjectRunWebhookDeliveries := 5
-		if len(res.RunWebhookDeliveries) != expectedProjectRunWebhookDeliveries {
-			t.Fatalf("expected %d project run webhook deliveries, got %d project run webhook deliveries", expectedProjectRunWebhookDeliveries, len(res.RunWebhookDeliveries))
-		}
-		if !res.HasMore {
-			t.Fatalf("expected hasMore true, got %t", res.HasMore)
-		}
+		assert.Assert(t, cmp.Len(res.RunWebhookDeliveries, expectedProjectRunWebhookDeliveries))
+		assert.Assert(t, res.HasMore)
 
 		respAllProjectRunWebhookDeliveries = append(respAllProjectRunWebhookDeliveries, res.RunWebhookDeliveries...)
 		lastProjectRunWebhookDelivery := res.RunWebhookDeliveries[len(res.RunWebhookDeliveries)-1]
@@ -652,9 +581,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 			res, err = ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, StartSequence: lastProjectRunWebhookDelivery.Sequence, Limit: 5, SortDirection: types.SortDirectionAsc})
 			testutil.NilError(t, err)
 
-			if res.HasMore && len(res.RunWebhookDeliveries) != expectedProjectRunWebhookDeliveries {
-				t.Fatalf("expected %d project run webhook deliveries, got %d project run webhook deliveries", expectedProjectRunWebhookDeliveries, len(res.RunWebhookDeliveries))
-			}
+			assert.Assert(t, !res.HasMore || (len(res.RunWebhookDeliveries) == expectedProjectRunWebhookDeliveries))
 
 			respAllProjectRunWebhookDeliveries = append(respAllProjectRunWebhookDeliveries, res.RunWebhookDeliveries...)
 
@@ -666,13 +593,9 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 		}
 
 		expectedProjectRunWebhookDeliveries = 20
-		if len(respAllProjectRunWebhookDeliveries) != expectedProjectRunWebhookDeliveries {
-			t.Fatalf("expected %d project run webhook deliveries, got %d project run webhook deliveries", expectedProjectRunWebhookDeliveries, len(respAllProjectRunWebhookDeliveries))
-		}
+		assert.Assert(t, cmp.Len(respAllProjectRunWebhookDeliveries, expectedProjectRunWebhookDeliveries))
 
-		if diff := cmpDiffObject(project01RunWebhookDeliveries, respAllProjectRunWebhookDeliveries); diff != "" {
-			t.Fatalf("mismatch (-want +got):\n%s", diff)
-		}
+		assert.Assert(t, cmpDiffObject(project01RunWebhookDeliveries, respAllProjectRunWebhookDeliveries))
 	})
 }
 
@@ -689,21 +612,14 @@ func TestDeliveryStatusFromStringSlice(t *testing.T) {
 	result, err := types.DeliveryStatusFromStringSlice(deliverystatus)
 	testutil.NilError(t, err)
 
-	if diff := cmp.Diff(result, expectedDeliveryStatus); diff != "" {
-		t.Fatalf("mismatch (-want +got):\n%s", diff)
-	}
+	assert.DeepEqual(t, result, expectedDeliveryStatus)
 
 	// test wrong deliverystatus
 	baddeliverystatus := "baddeliverystatus"
 	deliverystatus = []string{string(types.DeliveryStatusNotDelivered), string(types.DeliveryStatusDelivered), string(types.DeliveryStatusDeliveryError), baddeliverystatus}
 	_, err = types.DeliveryStatusFromStringSlice(deliverystatus)
 	expectedErr := fmt.Sprintf("invalid delivery status %q", baddeliverystatus)
-	if err == nil {
-		t.Fatalf("expected error %v, got nil err", expectedErr)
-	}
-	if err.Error() != expectedErr {
-		t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-	}
+	assert.Error(t, err, expectedErr)
 }
 
 func TestRunWebhooksCleaner(t *testing.T) {
@@ -716,8 +632,6 @@ func TestRunWebhooksCleaner(t *testing.T) {
 	defer cancel()
 
 	ns := setupNotificationService(ctx, t, log, dir)
-
-	t.Logf("starting ns")
 
 	expectedRunWebhooks := make([]*types.RunWebhook, 0)
 	expectedRunWebhookDeliveries := make([]*types.RunWebhookDelivery, 0)
@@ -751,27 +665,19 @@ func TestRunWebhooksCleaner(t *testing.T) {
 	testutil.NilError(t, err)
 
 	runWebhooks := getRunWebhooks(t, ctx, ns)
-	if len(runWebhooks) != len(expectedRunWebhooks) {
-		t.Fatalf("expected %d run webhooks got: %d", len(expectedRunWebhooks), len(runWebhooks))
-	}
-	if diff := cmpDiffObject(runWebhooks, expectedRunWebhooks); diff != "" {
-		t.Fatalf("mismatch (-want +got):\n%s", diff)
-	}
+	assert.Assert(t, cmp.Len(runWebhooks, len(expectedRunWebhooks)))
+	assert.Assert(t, cmpDiffObject(runWebhooks, expectedRunWebhooks))
 
 	runWebhookDeliveries := getRunWebhookDeliveries(t, ctx, ns)
 	testutil.NilError(t, err)
 
-	if len(runWebhookDeliveries) != len(expectedRunWebhookDeliveries) {
-		t.Fatalf("expected %d run webhooks got: %d", len(expectedRunWebhookDeliveries), len(runWebhookDeliveries))
-	}
-	if diff := cmpDiffObject(runWebhookDeliveries, expectedRunWebhookDeliveries); diff != "" {
-		t.Fatalf("mismatch (-want +got):\n%s", diff)
-	}
+	assert.Assert(t, cmp.Len(runWebhookDeliveries, len(expectedRunWebhookDeliveries)))
+	assert.Assert(t, cmpDiffObject(runWebhookDeliveries, expectedRunWebhookDeliveries))
 }
 
-func cmpDiffObject(x, y interface{}) string {
+func cmpDiffObject(x, y interface{}) cmp.Comparison {
 	// Since postgres has microsecond time precision while go has nanosecond time precision we should check times with a microsecond margin
-	return cmp.Diff(x, y, cmpopts.IgnoreFields(sqlg.ObjectMeta{}, "TxID"), cmpopts.EquateApproxTime(1*time.Microsecond))
+	return cmp.DeepEqual(x, y, cmpopts.IgnoreFields(sqlg.ObjectMeta{}, "TxID"), cmpopts.EquateApproxTime(1*time.Microsecond))
 }
 
 func TestProjectRunWebhookRedelivery(t *testing.T) {
@@ -806,15 +712,9 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, SortDirection: types.SortDirectionAsc})
 		testutil.NilError(t, err)
 
-		if len(res.RunWebhookDeliveries) != 2 {
-			t.Fatalf("expected 2 RunWebhookDeliveries got: %d", len(res.RunWebhookDeliveries))
-		}
-		if res.RunWebhookDeliveries[0].DeliveryStatus != types.DeliveryStatusDeliveryError {
-			t.Fatalf("expected %q DeliveryStatus got: %q", types.DeliveryStatusDeliveryError, res.RunWebhookDeliveries[0].DeliveryStatus)
-		}
-		if res.RunWebhookDeliveries[1].DeliveryStatus != types.DeliveryStatusDelivered {
-			t.Fatalf("expected %q DeliveryStatus got: %q", types.DeliveryStatusDelivered, res.RunWebhookDeliveries[1].DeliveryStatus)
-		}
+		assert.Assert(t, cmp.Len(res.RunWebhookDeliveries, 2))
+		assert.Assert(t, res.RunWebhookDeliveries[0].DeliveryStatus == types.DeliveryStatusDeliveryError)
+		assert.Assert(t, res.RunWebhookDeliveries[1].DeliveryStatus == types.DeliveryStatusDelivered)
 	})
 
 	t.Run("test project run webhook redelivery with deliverystatus = delivered", func(t *testing.T) {
@@ -846,15 +746,9 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, SortDirection: types.SortDirectionAsc})
 		testutil.NilError(t, err)
 
-		if len(res.RunWebhookDeliveries) != 2 {
-			t.Fatalf("expected 2 RunWebhookDeliveries got: %d", len(res.RunWebhookDeliveries))
-		}
-		if res.RunWebhookDeliveries[0].DeliveryStatus != types.DeliveryStatusDelivered {
-			t.Fatalf("expected %q DeliveryStatus got: %q", types.DeliveryStatusDelivered, res.RunWebhookDeliveries[0].DeliveryStatus)
-		}
-		if res.RunWebhookDeliveries[1].DeliveryStatus != types.DeliveryStatusDelivered {
-			t.Fatalf("expected %q DeliveryStatus got: %q", types.DeliveryStatusDelivered, res.RunWebhookDeliveries[1].DeliveryStatus)
-		}
+		assert.Assert(t, cmp.Len(res.RunWebhookDeliveries, 2))
+		assert.Assert(t, res.RunWebhookDeliveries[0].DeliveryStatus == types.DeliveryStatusDelivered)
+		assert.Assert(t, res.RunWebhookDeliveries[1].DeliveryStatus == types.DeliveryStatusDelivered)
 	})
 
 	t.Run("test redelivery not existing project run webhook delivery", func(t *testing.T) {
@@ -870,12 +764,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 
 		expectedErr := util.NewAPIError(util.ErrNotExist, errors.Errorf("runWebhookDelivery %q doesn't exist", runWebhookDelivery01))
 		err := ns.ah.RunWebhookRedelivery(ctx, runWebhook.ProjectID, runWebhookDelivery01)
-		if err == nil {
-			t.Fatalf("expected error %v, got nil err", expectedErr)
-		}
-		if err.Error() != expectedErr.Error() {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr.Error())
 	})
 
 	t.Run("test project run webhook redelivery with projectID that belong to another project", func(t *testing.T) {
@@ -896,12 +785,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		expectedErr := util.NewAPIError(util.ErrNotExist, errors.Errorf("runWebhookDelivery %q doesn't belong to project %q", runWebhookDelivery.ID, project02))
 
 		err := ns.ah.RunWebhookRedelivery(ctx, project02, runWebhookDelivery.ID)
-		if err == nil {
-			t.Fatalf("expected error %v, got nil err", expectedErr)
-		}
-		if err.Error() != expectedErr.Error() {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr.Error())
 	})
 
 	t.Run("test project run webhook redelivery with the last delivery that hasn't been delivered", func(t *testing.T) {
@@ -927,12 +811,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("the previous delivery of run webhook %q hasn't already been delivered", runWebhookDelivery.RunWebhookID))
 
 		err := ns.ah.RunWebhookRedelivery(ctx, runWebhook.ProjectID, runWebhookDelivery.ID)
-		if err == nil {
-			t.Fatalf("expected error %v, got nil err", expectedErr)
-		}
-		if err.Error() != expectedErr.Error() {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr.Error())
 
 		err = ns.runWebhookDeliveriesHandler(ctx)
 		testutil.NilError(t, err)
@@ -940,12 +819,8 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, SortDirection: types.SortDirectionAsc})
 		testutil.NilError(t, err)
 
-		if len(res.RunWebhookDeliveries) != 1 {
-			t.Fatalf("expected 1 RunWebhookDeliveries got: %d", len(res.RunWebhookDeliveries))
-		}
-		if res.RunWebhookDeliveries[0].DeliveryStatus != types.DeliveryStatusDelivered {
-			t.Fatalf("expected %q DeliveryStatus got: %q", types.DeliveryStatusDelivered, res.RunWebhookDeliveries[0].DeliveryStatus)
-		}
+		assert.Assert(t, cmp.Len(res.RunWebhookDeliveries, 1))
+		assert.Assert(t, res.RunWebhookDeliveries[0].DeliveryStatus == types.DeliveryStatusDelivered)
 	})
 }
 
@@ -959,8 +834,6 @@ func TestCommitStatusesCleaner(t *testing.T) {
 	defer cancel()
 
 	ns := setupNotificationService(ctx, t, log, dir)
-
-	t.Logf("starting ns")
 
 	expectedCommitStatuses := make([]*types.CommitStatus, 0)
 	expectedCommitStatusDeliveries := make([]*types.CommitStatusDelivery, 0)
@@ -986,22 +859,14 @@ func TestCommitStatusesCleaner(t *testing.T) {
 	testutil.NilError(t, err)
 
 	commitStatuses := getCommitStatuses(t, ctx, ns)
-	if len(commitStatuses) != len(expectedCommitStatuses) {
-		t.Fatalf("expected %d run commitStatuses got: %d", len(expectedCommitStatuses), len(commitStatuses))
-	}
-	if diff := cmpDiffObject(commitStatuses, expectedCommitStatuses); diff != "" {
-		t.Fatalf("mismatch (-want +got):\n%s", diff)
-	}
+	assert.Assert(t, cmp.Len(commitStatuses, len(expectedCommitStatuses)))
+	assert.Assert(t, cmpDiffObject(commitStatuses, expectedCommitStatuses))
 
 	commitStatusDeliveries := getCommitStatusDeliveries(t, ctx, ns)
 	testutil.NilError(t, err)
 
-	if len(commitStatusDeliveries) != len(expectedCommitStatusDeliveries) {
-		t.Fatalf("expected %d run commitStatusDeliveries got: %d", len(expectedCommitStatusDeliveries), len(commitStatusDeliveries))
-	}
-	if diff := cmpDiffObject(commitStatusDeliveries, expectedCommitStatusDeliveries); diff != "" {
-		t.Fatalf("mismatch (-want +got):\n%s", diff)
-	}
+	assert.Assert(t, cmp.Len(commitStatusDeliveries, len(expectedCommitStatusDeliveries)))
+	assert.Assert(t, cmpDiffObject(commitStatusDeliveries, expectedCommitStatusDeliveries))
 }
 
 func TestGetProjectCommitStatusDeliveries(t *testing.T) {
@@ -1033,48 +898,32 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 		res, err := ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{ProjectID: project01, Limit: 0})
 		testutil.NilError(t, err)
 
-		if res.HasMore != false {
-			t.Fatalf("unexpected HasMore true")
-		}
-		if len(res.CommitStatusDeliveries) != 20 {
-			t.Fatalf("expected 20 commit status deliveries, got %d", len(res.CommitStatusDeliveries))
-		}
+		assert.Assert(t, !res.HasMore)
+		assert.Assert(t, cmp.Len(res.CommitStatusDeliveries, 20))
 	})
 
 	t.Run("test get commit status deliveries with limit = 10", func(t *testing.T) {
 		res, err := ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{ProjectID: project01, Limit: 10})
 		testutil.NilError(t, err)
 
-		if res.HasMore != true {
-			t.Fatalf("unexpected HasMore false")
-		}
-		if len(res.CommitStatusDeliveries) != 10 {
-			t.Fatalf("expected 10 commit status deliveries, got %d", len(res.CommitStatusDeliveries))
-		}
+		assert.Assert(t, res.HasMore)
+		assert.Assert(t, cmp.Len(res.CommitStatusDeliveries, 10))
 	})
 
 	t.Run("test get commit status deliveries with deliverystatusfilter = delivered", func(t *testing.T) {
 		res, err := ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{ProjectID: project01, DeliveryStatusFilter: []types.DeliveryStatus{types.DeliveryStatusDelivered}, Limit: 0})
 		testutil.NilError(t, err)
 
-		if res.HasMore != false {
-			t.Fatalf("unexpected HasMore true")
-		}
-		if len(res.CommitStatusDeliveries) != 10 {
-			t.Fatalf("expected 10 commit status deliveries, got %d", len(res.CommitStatusDeliveries))
-		}
+		assert.Assert(t, !res.HasMore)
+		assert.Assert(t, cmp.Len(res.CommitStatusDeliveries, 10))
 	})
 
 	t.Run("test get commit status deliveries with deliverystatusfilter = delivered and limit less than commit status deliveries", func(t *testing.T) {
 		res, err := ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{ProjectID: project01, DeliveryStatusFilter: []types.DeliveryStatus{types.DeliveryStatusDelivered}, Limit: 5})
 		testutil.NilError(t, err)
 
-		if res.HasMore != true {
-			t.Fatalf("unexpected HasMore false")
-		}
-		if len(res.CommitStatusDeliveries) != 5 {
-			t.Fatalf("expected 5 commit status deliveries, got %d", len(res.CommitStatusDeliveries))
-		}
+		assert.Assert(t, res.HasMore)
+		assert.Assert(t, cmp.Len(res.CommitStatusDeliveries, 5))
 	})
 
 	t.Run("test get commit status deliveries with limit less than commit status deliveries continuation", func(t *testing.T) {
@@ -1084,12 +933,8 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedProjectCommitStatusDeliveries := 5
-		if len(res.CommitStatusDeliveries) != expectedProjectCommitStatusDeliveries {
-			t.Fatalf("expected %d project commit status deliveries, got %d project commit status deliveries", expectedProjectCommitStatusDeliveries, len(res.CommitStatusDeliveries))
-		}
-		if !res.HasMore {
-			t.Fatalf("expected hasMore true, got %t", res.HasMore)
-		}
+		assert.Assert(t, cmp.Len(res.CommitStatusDeliveries, expectedProjectCommitStatusDeliveries))
+		assert.Assert(t, res.HasMore)
 
 		respAllProjectCommitStatusDeliveries = append(respAllProjectCommitStatusDeliveries, res.CommitStatusDeliveries...)
 		lastProjectCommitStatusDelivery := res.CommitStatusDeliveries[len(res.CommitStatusDeliveries)-1]
@@ -1099,9 +944,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 			res, err = ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{ProjectID: project01, StartSequence: lastProjectCommitStatusDelivery.Sequence, Limit: 5, SortDirection: types.SortDirectionAsc})
 			testutil.NilError(t, err)
 
-			if res.HasMore && len(res.CommitStatusDeliveries) != expectedProjectCommitStatusDeliveries {
-				t.Fatalf("expected %d project commit status deliveries, got %d project commit status deliveries", expectedProjectCommitStatusDeliveries, len(res.CommitStatusDeliveries))
-			}
+			assert.Assert(t, !res.HasMore || (len(res.CommitStatusDeliveries) == expectedProjectCommitStatusDeliveries))
 
 			respAllProjectCommitStatusDeliveries = append(respAllProjectCommitStatusDeliveries, res.CommitStatusDeliveries...)
 
@@ -1113,12 +956,8 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 		}
 
 		expectedProjectCommitStatusDeliveries = 20
-		if len(respAllProjectCommitStatusDeliveries) != expectedProjectCommitStatusDeliveries {
-			t.Fatalf("expected %d project commit status deliveries, got %d project commit status deliveries", expectedProjectCommitStatusDeliveries, len(respAllProjectCommitStatusDeliveries))
-		}
+		assert.Assert(t, cmp.Len(respAllProjectCommitStatusDeliveries, expectedProjectCommitStatusDeliveries))
 
-		if diff := cmpDiffObject(project01CommitStatusDeliveries, respAllProjectCommitStatusDeliveries); diff != "" {
-			t.Fatalf("mismatch (-want +got):\n%s", diff)
-		}
+		assert.Assert(t, cmpDiffObject(project01CommitStatusDeliveries, respAllProjectCommitStatusDeliveries))
 	})
 }

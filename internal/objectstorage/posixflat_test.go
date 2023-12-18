@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/sorintlab/errors"
+	"gotest.tools/assert"
 
 	"agola.io/agola/internal/testutil"
 )
@@ -103,7 +104,5 @@ func TestPosixFlatDeleteObject(t *testing.T) {
 	files, err := bd.Readdirnames(0)
 	testutil.NilError(t, err)
 
-	if len(files) > 0 {
-		t.Fatalf("expected 0 files got %d files", len(files))
-	}
+	assert.Equal(t, len(files), 0)
 }

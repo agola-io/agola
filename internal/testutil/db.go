@@ -23,6 +23,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/sorintlab/errors"
 	"gotest.tools/assert"
+	"gotest.tools/assert/cmp"
 	"muzzammil.xyz/jsonc"
 
 	"agola.io/agola/internal/sqlg"
@@ -684,7 +685,7 @@ func TestMigrate(t *testing.T, lastVersion uint, dataFixtures DataFixtures, setu
 				diff, err := atlasClient.SchemaDiff(createSchema, schema)
 				NilError(t, err)
 
-				assert.Assert(t, len(diff) == 0, "schema of db created at version %d and db migrated from version %d to version %d is different:\n %s", migrateVersion, createVersion, migrateVersion, diff)
+				assert.Assert(t, cmp.Len(diff, 0), "schema of db created at version %d and db migrated from version %d to version %d is different:\n %s", migrateVersion, createVersion, migrateVersion, diff)
 
 				// set the db schema at the migrated version.
 				dc.Schema = createDataCreate.Tables

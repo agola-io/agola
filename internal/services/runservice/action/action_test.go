@@ -17,7 +17,7 @@ package action
 import (
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
+	"gotest.tools/assert"
 
 	"agola.io/agola/internal/sqlg"
 	"agola.io/agola/internal/util"
@@ -279,12 +279,8 @@ func TestRecreateRun(t *testing.T) {
 			newRunID := outuuid("newrun")
 			newRunConfigID := outuuid("newrunconfig")
 			rb := recreateRun(u, tt.r, tt.rc, newRunID, newRunConfigID, tt.req)
-			if diff := cmp.Diff(tt.outrc, rb.Rc); diff != "" {
-				t.Error(diff)
-			}
-			if diff := cmp.Diff(tt.outr, rb.Run); diff != "" {
-				t.Error(diff)
-			}
+			assert.DeepEqual(t, tt.outrc, rb.Rc)
+			assert.DeepEqual(t, tt.outr, rb.Run)
 		})
 	}
 }

@@ -19,6 +19,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/sorintlab/errors"
+	"gotest.tools/assert"
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	"agola.io/agola/internal/testutil"
@@ -208,24 +209,16 @@ func TestParseConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			if _, err := ParseConfig([]byte(tt.in), ConfigFormatJSON, &ConfigContext{}); err != nil {
-				if tt.err == nil {
-					t.Fatalf("got error: %v, expected no error", err)
-				}
+			_, err := ParseConfig([]byte(tt.in), ConfigFormatJSON, &ConfigContext{})
+			if tt.err != nil {
 				var errs *util.Errors
 				if errors.As(err, &errs) {
-					if !errs.Equal(tt.err) {
-						t.Fatalf("got error: %v, want error: %v", err, tt.err)
-					}
+					assert.Assert(t, errs.Equal(tt.err))
 				} else {
-					if err.Error() != tt.err.Error() {
-						t.Fatalf("got error: %v, want error: %v", err, tt.err)
-					}
+					assert.Error(t, err, tt.err.Error())
 				}
 			} else {
-				if tt.err != nil {
-					t.Fatalf("got nil error, want error: %v", tt.err)
-				}
+				testutil.NilError(t, err)
 			}
 		})
 	}
@@ -607,7 +600,7 @@ func TestParseOutput(t *testing.T) {
 			out, err := ParseConfig([]byte(tt.in), ConfigFormatJSON, &ConfigContext{})
 			testutil.NilError(t, err)
 
-			if diff := cmp.Diff(tt.out, out, cmp.Comparer(func(x, y *resource.Quantity) bool {
+			assert.DeepEqual(t, tt.out, out, cmp.Comparer(func(x, y *resource.Quantity) bool {
 				if x == nil && y == nil {
 					return true
 				}
@@ -616,9 +609,7 @@ func TestParseOutput(t *testing.T) {
 				}
 
 				return false
-			})); diff != "" {
-				t.Error(diff)
-			}
+			}))
 		})
 	}
 }

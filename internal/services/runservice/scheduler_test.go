@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
+	"gotest.tools/assert"
 
 	"agola.io/agola/internal/sqlg"
 	"agola.io/agola/internal/testutil"
@@ -407,9 +407,7 @@ func TestAdvanceRunTasks(t *testing.T) {
 			r, err := advanceRunTasks(log, tt.r, tt.rc, tt.scheduledExecutorTasks)
 			testutil.NilError(t, err)
 
-			if diff := cmp.Diff(tt.out, r); diff != "" {
-				t.Error(diff)
-			}
+			assert.DeepEqual(t, tt.out, r)
 		})
 	}
 }
@@ -580,9 +578,7 @@ func TestGetTasksToRun(t *testing.T) {
 			sort.Strings(tt.out)
 			sort.Strings(outTasks)
 
-			if diff := cmp.Diff(tt.out, outTasks); diff != "" {
-				t.Error(diff)
-			}
+			assert.DeepEqual(t, tt.out, outTasks)
 		})
 	}
 }
@@ -712,18 +708,8 @@ func TestChooseExecutor(t *testing.T) {
 			t.Parallel()
 
 			e := chooseExecutor(tt.executors, map[string]int{}, tt.rct)
-			if e == nil && tt.out == nil {
-				return
-			}
-			if e == nil && tt.out != nil {
-				t.Fatalf("expected executor with id: %s, go no executor selected", tt.out.ID)
-			}
-			if e != nil && tt.out == nil {
-				t.Fatalf("expected no executor selected, got executor with id: %s", e.ID)
-			}
-			if e != tt.out {
-				t.Fatalf("wrong executor ID, expected %s, got: %s", tt.out.ID, e.ID)
-			}
+
+			assert.Equal(t, e, tt.out)
 		})
 	}
 }
