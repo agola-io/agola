@@ -25,10 +25,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/rs/zerolog"
 	"github.com/sorintlab/errors"
+	"gotest.tools/assert"
+	"gotest.tools/assert/cmp"
 
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/configstore/action"
@@ -149,9 +150,9 @@ func getVariables(ctx context.Context, cs *Configstore) ([]*types.Variable, erro
 	return variables, errors.WithStack(err)
 }
 
-func cmpDiffObject(x, y interface{}) string {
+func cmpDiffObject(x, y interface{}) cmp.Comparison {
 	// Since postgres has microsecond time precision while go has nanosecond time precision we should check times with a microsecond margin
-	return cmp.Diff(x, y, cmpopts.IgnoreFields(sqlg.ObjectMeta{}, "TxID"), cmpopts.EquateApproxTime(1*time.Microsecond))
+	return cmp.DeepEqual(x, y, cmpopts.IgnoreFields(sqlg.ObjectMeta{}, "TxID"), cmpopts.EquateApproxTime(1*time.Microsecond))
 }
 
 func TestExportImport(t *testing.T) {
@@ -250,34 +251,13 @@ func TestExportImport(t *testing.T) {
 	variables, err := getVariables(ctx, cs)
 	testutil.NilError(t, err)
 
-	if len(remoteSources) != expectedRemoteSourcesCount {
-		t.Logf("remoteSources: %s", util.Dump(remoteSources))
-		t.Fatalf("expected %d remoteSources, got %d remoteSources", expectedRemoteSourcesCount, len(remoteSources))
-	}
-	if len(users) != expectedUsersCount {
-		t.Logf("users: %s", util.Dump(users))
-		t.Fatalf("expected %d users, got %d users", expectedUsersCount, len(users))
-	}
-	if len(orgs) != expectedOrgsCount {
-		t.Logf("orgs: %s", util.Dump(orgs))
-		t.Fatalf("expected %d orgs, got %d orgs", expectedOrgsCount, len(orgs))
-	}
-	if len(projectGroups) != expectedProjectGroupsCount {
-		t.Logf("projectGroups: %s", util.Dump(projectGroups))
-		t.Fatalf("expected %d projectGroups, got %d projectGroups", expectedProjectGroupsCount, len(projectGroups))
-	}
-	if len(projects) != expectedProjectsCount {
-		t.Logf("projects: %s", util.Dump(projects))
-		t.Fatalf("expected %d projects, got %d projects", expectedProjectsCount, len(projects))
-	}
-	if len(secrets) != expectedSecretsCount {
-		t.Logf("secrets: %s", util.Dump(secrets))
-		t.Fatalf("expected %d secrets, got %d secrets", expectedSecretsCount, len(secrets))
-	}
-	if len(variables) != expectedVariablesCount {
-		t.Logf("variables: %s", util.Dump(variables))
-		t.Fatalf("expected %d variables, got %d variables", expectedVariablesCount, len(variables))
-	}
+	assert.Assert(t, cmp.Len(remoteSources, expectedRemoteSourcesCount))
+	assert.Assert(t, cmp.Len(users, expectedUsersCount))
+	assert.Assert(t, cmp.Len(orgs, expectedOrgsCount))
+	assert.Assert(t, cmp.Len(projectGroups, expectedProjectGroupsCount))
+	assert.Assert(t, cmp.Len(projects, expectedProjectsCount))
+	assert.Assert(t, cmp.Len(secrets, expectedSecretsCount))
+	assert.Assert(t, cmp.Len(variables, expectedVariablesCount))
 
 	var export bytes.Buffer
 	err = cs.ah.Export(ctx, &export)
@@ -329,27 +309,13 @@ func TestExportImport(t *testing.T) {
 	newVariables, err := getVariables(ctx, cs)
 	testutil.NilError(t, err)
 
-	if diff := cmpDiffObject(remoteSources, newRemoteSources); diff != "" {
-		t.Fatalf("remoteSources mismatch (-want +got):\n%s", diff)
-	}
-	if diff := cmpDiffObject(users, newUsers); diff != "" {
-		t.Fatalf("users mismatch (-want +got):\n%s", diff)
-	}
-	if diff := cmpDiffObject(orgs, newOrgs); diff != "" {
-		t.Fatalf("orgs mismatch (-want +got):\n%s", diff)
-	}
-	if diff := cmpDiffObject(projectGroups, newProjectGroups); diff != "" {
-		t.Fatalf("projectGroups mismatch (-want +got):\n%s", diff)
-	}
-	if diff := cmpDiffObject(projects, newProjects); diff != "" {
-		t.Fatalf("projects mismatch (-want +got):\n%s", diff)
-	}
-	if diff := cmpDiffObject(secrets, newSecrets); diff != "" {
-		t.Fatalf("secrets mismatch (-want +got):\n%s", diff)
-	}
-	if diff := cmpDiffObject(variables, newVariables); diff != "" {
-		t.Fatalf("variables mismatch (-want +got):\n%s", diff)
-	}
+	assert.Assert(t, cmpDiffObject(remoteSources, newRemoteSources))
+	assert.Assert(t, cmpDiffObject(users, newUsers))
+	assert.Assert(t, cmpDiffObject(orgs, newOrgs))
+	assert.Assert(t, cmpDiffObject(projectGroups, newProjectGroups))
+	assert.Assert(t, cmpDiffObject(projects, newProjects))
+	assert.Assert(t, cmpDiffObject(secrets, newSecrets))
+	assert.Assert(t, cmpDiffObject(variables, newVariables))
 }
 
 func TestUser(t *testing.T) {
@@ -374,12 +340,7 @@ func TestUser(t *testing.T) {
 	t.Run("create duplicated user", func(t *testing.T) {
 		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("user with name %q already exists", "user01"))
 		_, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"})
-		if err == nil {
-			t.Fatalf("expected error %v, got nil err", expectedErr)
-		}
-		if err.Error() != expectedErr.Error() {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr.Error())
 	})
 	t.Run("concurrent user with same name creation", func(t *testing.T) {
 		prevUsers, err := getUsers(ctx, cs)
@@ -398,9 +359,7 @@ func TestUser(t *testing.T) {
 		users, err := getUsers(ctx, cs)
 		testutil.NilError(t, err)
 
-		if len(users) != len(prevUsers)+1 {
-			t.Fatalf("expected %d users, got %d", len(prevUsers)+1, len(users))
-		}
+		assert.Assert(t, cmp.Len(users, len(prevUsers)+1))
 	})
 
 	t.Run("delete user", func(t *testing.T) {
@@ -418,9 +377,7 @@ func TestUser(t *testing.T) {
 		})
 		testutil.NilError(t, err)
 
-		if user != nil {
-			t.Fatalf("expected user nil, got: %v", user)
-		}
+		assert.Assert(t, cmp.Nil(user))
 	})
 }
 
@@ -473,49 +430,37 @@ func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 		projectName := "project01"
 		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("project with name %q, path %q already exists", projectName, path.Join("user", user.Name, projectName)))
 		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: projectName, Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
-		if err.Error() != expectedErr.Error() {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr.Error())
 	})
 	t.Run("create duplicated project in org root project group", func(t *testing.T) {
 		projectName := "project01"
 		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("project with name %q, path %q already exists", projectName, path.Join("org", org.Name, projectName)))
 		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: projectName, Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
-		if err.Error() != expectedErr.Error() {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr.Error())
 	})
 
 	t.Run("create duplicated project in user non root project group", func(t *testing.T) {
 		projectName := "project01"
 		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("project with name %q, path %q already exists", projectName, path.Join("user", user.Name, "projectgroup01", projectName)))
 		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: projectName, Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
-		if err.Error() != expectedErr.Error() {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr.Error())
 	})
 	t.Run("create duplicated project in org non root project group", func(t *testing.T) {
 		projectName := "project01"
 		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("project with name %q, path %q already exists", projectName, path.Join("org", org.Name, "projectgroup01", projectName)))
 		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: projectName, Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
-		if err.Error() != expectedErr.Error() {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr.Error())
 	})
 
 	t.Run("create project in unexistent project group", func(t *testing.T) {
 		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf(`project group with id "unexistentid" doesn't exist`))
 		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: "unexistentid"}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
-		if err.Error() != expectedErr.Error() {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr.Error())
 	})
 	t.Run("create project without parent id specified", func(t *testing.T) {
 		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("project parent id required"))
 		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
-		if err.Error() != expectedErr.Error() {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr.Error())
 	})
 
 	t.Run("concurrent project with same name creation", func(t *testing.T) {
@@ -535,9 +480,7 @@ func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 		projects, err := getProjects(ctx, cs)
 		testutil.NilError(t, err)
 
-		if len(projects) != len(prevProjects)+1 {
-			t.Fatalf("expected %d projects, got %d", len(prevProjects)+1, len(projects))
-		}
+		assert.Assert(t, cmp.Len(projects, len(prevProjects)+1))
 	})
 }
 
@@ -584,9 +527,7 @@ func TestProjectUpdate(t *testing.T) {
 		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("project with name %q, path %q already exists", projectName, path.Join("user", user.Name, projectName)))
 		p02.Parent.ID = path.Join("user", user.Name)
 		_, err := cs.ah.UpdateProject(ctx, path.Join("user", user.Name, "projectgroup01", projectName), p02)
-		if err.Error() != expectedErr.Error() {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr.Error())
 	})
 	t.Run("move project to project group changing name", func(t *testing.T) {
 		projectName := "project01"
@@ -604,23 +545,13 @@ func TestProjectUpdate(t *testing.T) {
 			RemoteRepositoryConfigType:  types.RemoteRepositoryConfigTypeManual,
 			MembersCanPerformRunActions: true,
 		})
-		if err == nil {
-			t.Fatalf("expected error %v, got nil err", expectedErr)
-		}
-		if err.Error() != expectedErr.Error() {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr.Error())
 
 		// test update user project
 
 		p01.MembersCanPerformRunActions = true
 		_, err = cs.ah.UpdateProject(ctx, path.Join("user", user.Name, "project01"), p01)
-		if err == nil {
-			t.Fatalf("expected error %v, got nil err", expectedErr)
-		}
-		if err.Error() != expectedErr.Error() {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr.Error())
 	})
 }
 
@@ -675,9 +606,7 @@ func TestProjectGroupUpdate(t *testing.T) {
 		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group with name %q, path %q already exists", projectGroupName, path.Join("user", user.Name, projectGroupName)))
 		pg05req.Parent.ID = path.Join("user", user.Name)
 		_, err := cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name, "pg02", projectGroupName), pg05req)
-		if err.Error() != expectedErr.Error() {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr.Error())
 	})
 	t.Run("move project group to root project group changing name", func(t *testing.T) {
 		projectGroupName := "pg01"
@@ -686,27 +615,21 @@ func TestProjectGroupUpdate(t *testing.T) {
 		pg05, err := cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name, "pg02", projectGroupName), pg05req)
 		testutil.NilError(t, err)
 
-		if pg05.Parent.ID != rootPG.ID {
-			t.Fatalf("expected project group parent id as root project group id")
-		}
+		assert.Equal(t, pg05.Parent.ID, rootPG.ID)
 	})
 	t.Run("move project group inside itself", func(t *testing.T) {
 		projectGroupName := "pg02"
 		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot move project group inside itself or child project group"))
 		pg02req.Parent.ID = path.Join("user", user.Name, "pg02")
 		_, err := cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name, projectGroupName), pg02req)
-		if err.Error() != expectedErr.Error() {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr.Error())
 	})
 	t.Run("move project group to child project group", func(t *testing.T) {
 		projectGroupName := "pg01"
 		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot move project group inside itself or child project group"))
 		pg01req.Parent.ID = path.Join("user", user.Name, "pg01", "pg01")
 		_, err := cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name, projectGroupName), pg01req)
-		if err.Error() != expectedErr.Error() {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr.Error())
 	})
 	t.Run("change root project group parent kind", func(t *testing.T) {
 		var rootPG *types.ProjectGroup
@@ -718,9 +641,7 @@ func TestProjectGroupUpdate(t *testing.T) {
 
 		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("changing project group parent kind isn't supported"))
 		_, err = cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name), &action.CreateUpdateProjectGroupRequest{Name: rootPG.Name, Parent: rootPG.Parent, Visibility: rootPG.Visibility})
-		if err.Error() != expectedErr.Error() {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr.Error())
 	})
 	t.Run("change root project group parent id", func(t *testing.T) {
 		var rootPG *types.ProjectGroup
@@ -731,9 +652,7 @@ func TestProjectGroupUpdate(t *testing.T) {
 
 		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot change root project group parent kind or id"))
 		_, err = cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name), &action.CreateUpdateProjectGroupRequest{Name: rootPG.Name, Parent: rootPG.Parent, Visibility: rootPG.Visibility})
-		if err.Error() != expectedErr.Error() {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr.Error())
 	})
 	t.Run("change root project group name", func(t *testing.T) {
 		var rootPG *types.ProjectGroup
@@ -744,9 +663,7 @@ func TestProjectGroupUpdate(t *testing.T) {
 
 		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group name for root project group must be empty"))
 		_, err = cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name), &action.CreateUpdateProjectGroupRequest{Name: rootPG.Name, Parent: rootPG.Parent, Visibility: rootPG.Visibility})
-		if err.Error() != expectedErr.Error() {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr.Error())
 	})
 	t.Run("change root project group visibility", func(t *testing.T) {
 		var rootPG *types.ProjectGroup
@@ -761,9 +678,7 @@ func TestProjectGroupUpdate(t *testing.T) {
 		rootPG, err = cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
 		testutil.NilError(t, err)
 
-		if rootPG.Visibility != types.VisibilityPrivate {
-			t.Fatalf("expected visiblity %q, got visibility: %q", types.VisibilityPublic, rootPG.Visibility)
-		}
+		assert.Equal(t, rootPG.Visibility, types.VisibilityPrivate)
 	})
 }
 
@@ -795,9 +710,7 @@ func TestProjectGroupDelete(t *testing.T) {
 	t.Run("delete root project group", func(t *testing.T) {
 		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot delete root project group"))
 		err := cs.ah.DeleteProjectGroup(ctx, path.Join("org", org.Name))
-		if err.Error() != expectedErr.Error() {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr.Error())
 	})
 
 	t.Run("delete project group", func(t *testing.T) {
@@ -867,45 +780,33 @@ func TestProjectGroupDeleteDontSeeOldChildObjects(t *testing.T) {
 	projects, err := cs.ah.GetProjectGroupProjects(ctx, spg01.ID)
 	testutil.NilError(t, err)
 
-	if diff := cmpDiffObject(projects, []*types.Project{project}); diff != "" {
-		t.Fatalf("mismatch (-want +got):\n%s", diff)
-	}
+	assert.Assert(t, cmpDiffObject(projects, []*types.Project{project}))
 
 	// Get by projectgroup path
 	projects, err = cs.ah.GetProjectGroupProjects(ctx, path.Join("org", org.Name, pg01.Name, spg01.Name))
 	testutil.NilError(t, err)
 
-	if diff := cmpDiffObject(projects, []*types.Project{project}); diff != "" {
-		t.Fatalf("mismatch (-want +got):\n%s", diff)
-	}
+	assert.Assert(t, cmpDiffObject(projects, []*types.Project{project}))
 
 	secrets, err := cs.ah.GetSecrets(ctx, types.ObjectKindProject, project.ID, false)
 	testutil.NilError(t, err)
 
-	if diff := cmpDiffObject(secrets, []*types.Secret{secret}); diff != "" {
-		t.Fatalf("mismatch (-want +got):\n%s", diff)
-	}
+	assert.Assert(t, cmpDiffObject(secrets, []*types.Secret{secret}))
 
 	secrets, err = cs.ah.GetSecrets(ctx, types.ObjectKindProject, path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name), false)
 	testutil.NilError(t, err)
 
-	if diff := cmpDiffObject(secrets, []*types.Secret{secret}); diff != "" {
-		t.Fatalf("mismatch (-want +got):\n%s", diff)
-	}
+	assert.Assert(t, cmpDiffObject(secrets, []*types.Secret{secret}))
 
 	variables, err := cs.ah.GetVariables(ctx, types.ObjectKindProject, project.ID, false)
 	testutil.NilError(t, err)
 
-	if diff := cmpDiffObject(variables, []*types.Variable{variable}); diff != "" {
-		t.Fatalf("mismatch (-want +got):\n%s", diff)
-	}
+	assert.Assert(t, cmpDiffObject(variables, []*types.Variable{variable}))
 
 	variables, err = cs.ah.GetVariables(ctx, types.ObjectKindProject, path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name), false)
 	testutil.NilError(t, err)
 
-	if diff := cmpDiffObject(variables, []*types.Variable{variable}); diff != "" {
-		t.Fatalf("mismatch (-want +got):\n%s", diff)
-	}
+	assert.Assert(t, cmpDiffObject(variables, []*types.Variable{variable}))
 }
 
 func TestOrgMembers(t *testing.T) {
@@ -938,9 +839,7 @@ func TestOrgMembers(t *testing.T) {
 		res, err := cs.ah.GetUserOrgs(ctx, &action.GetUserOrgsRequest{UserRef: user.ID})
 		testutil.NilError(t, err)
 
-		if diff := cmpDiffObject(res, expectedResponse); diff != "" {
-			t.Fatalf("mismatch (-want +got):\n%s", diff)
-		}
+		assert.Assert(t, cmpDiffObject(res, expectedResponse))
 	})
 
 	orgs := []*types.Organization{}
@@ -975,9 +874,7 @@ func TestOrgMembers(t *testing.T) {
 		res, err := cs.ah.GetUserOrgs(ctx, &action.GetUserOrgsRequest{UserRef: user.ID})
 		testutil.NilError(t, err)
 
-		if diff := cmpDiffObject(res, expectedResponse); diff != "" {
-			t.Fatalf("mismatch (-want +got):\n%s", diff)
-		}
+		assert.Assert(t, cmpDiffObject(res, expectedResponse))
 	})
 }
 
@@ -1006,12 +903,8 @@ func TestGetRemoteSources(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedRemoteSources := 9
-		if len(res.RemoteSources) != expectedRemoteSources {
-			t.Fatalf("expected %d remote sources, got %d remote sources", expectedRemoteSources, len(res.RemoteSources))
-		}
-		if res.HasMore {
-			t.Fatalf("expected hasMore false, got %t", res.HasMore)
-		}
+		assert.Assert(t, cmp.Len(res.RemoteSources, expectedRemoteSources))
+		assert.Assert(t, !res.HasMore)
 	})
 
 	t.Run("test get remote sources with limit less than remote sources", func(t *testing.T) {
@@ -1019,12 +912,8 @@ func TestGetRemoteSources(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedRemoteSources := 5
-		if len(res.RemoteSources) != expectedRemoteSources {
-			t.Fatalf("expected %d remote sources, got %d remote sources", expectedRemoteSources, len(res.RemoteSources))
-		}
-		if !res.HasMore {
-			t.Fatalf("expected hasMore true, got %t", res.HasMore)
-		}
+		assert.Assert(t, cmp.Len(res.RemoteSources, expectedRemoteSources))
+		assert.Assert(t, res.HasMore)
 	})
 
 	t.Run("test get remote sources with limit less than remote sources continuation", func(t *testing.T) {
@@ -1034,12 +923,8 @@ func TestGetRemoteSources(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedRemoteSources := 5
-		if len(res.RemoteSources) != expectedRemoteSources {
-			t.Fatalf("expected %d remote sources, got %d remote sources", expectedRemoteSources, len(res.RemoteSources))
-		}
-		if !res.HasMore {
-			t.Fatalf("expected hasMore true, got %t", res.HasMore)
-		}
+		assert.Assert(t, cmp.Len(res.RemoteSources, expectedRemoteSources))
+		assert.Assert(t, res.HasMore)
 
 		respAllRemoteSources = append(respAllRemoteSources, res.RemoteSources...)
 		lastRemoteSource := res.RemoteSources[len(res.RemoteSources)-1]
@@ -1050,9 +935,7 @@ func TestGetRemoteSources(t *testing.T) {
 			testutil.NilError(t, err)
 
 			expectedRemoteSources := 5
-			if res.HasMore && len(res.RemoteSources) != expectedRemoteSources {
-				t.Fatalf("expected %d remote sources, got %d remote sources", expectedRemoteSources, len(res.RemoteSources))
-			}
+			assert.Assert(t, !res.HasMore || (len(res.RemoteSources) == expectedRemoteSources))
 
 			respAllRemoteSources = append(respAllRemoteSources, res.RemoteSources...)
 
@@ -1064,13 +947,9 @@ func TestGetRemoteSources(t *testing.T) {
 		}
 
 		expectedRemoteSources = 9
-		if len(respAllRemoteSources) != expectedRemoteSources {
-			t.Fatalf("expected %d remote sources, got %d remote sources", expectedRemoteSources, len(respAllRemoteSources))
-		}
+		assert.Assert(t, cmp.Len(respAllRemoteSources, expectedRemoteSources))
 
-		if diff := cmpDiffObject(remoteSources, respAllRemoteSources); diff != "" {
-			t.Fatalf("mismatch (-want +got):\n%s", diff)
-		}
+		assert.Assert(t, cmpDiffObject(remoteSources, respAllRemoteSources))
 	})
 }
 
@@ -1099,12 +978,8 @@ func TestGetUsers(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedUsers := 9
-		if len(res.Users) != expectedUsers {
-			t.Fatalf("expected %d users, got %d users", expectedUsers, len(res.Users))
-		}
-		if res.HasMore {
-			t.Fatalf("expected hasMore false, got %t", res.HasMore)
-		}
+		assert.Assert(t, cmp.Len(res.Users, expectedUsers))
+		assert.Assert(t, !res.HasMore)
 	})
 
 	t.Run("test get users with limit less than users", func(t *testing.T) {
@@ -1112,12 +987,8 @@ func TestGetUsers(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedUsers := 5
-		if len(res.Users) != expectedUsers {
-			t.Fatalf("expected %d users, got %d users", expectedUsers, len(res.Users))
-		}
-		if !res.HasMore {
-			t.Fatalf("expected hasMore true, got %t", res.HasMore)
-		}
+		assert.Assert(t, cmp.Len(res.Users, expectedUsers))
+		assert.Assert(t, res.HasMore)
 	})
 
 	t.Run("test get users with limit less than users continuation", func(t *testing.T) {
@@ -1127,12 +998,8 @@ func TestGetUsers(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedUsers := 5
-		if len(res.Users) != expectedUsers {
-			t.Fatalf("expected %d users, got %d users", expectedUsers, len(res.Users))
-		}
-		if !res.HasMore {
-			t.Fatalf("expected hasMore true, got %t", res.HasMore)
-		}
+		assert.Assert(t, cmp.Len(res.Users, expectedUsers))
+		assert.Assert(t, res.HasMore)
 
 		respAllUsers = append(respAllUsers, res.Users...)
 		lastUser := res.Users[len(res.Users)-1]
@@ -1143,9 +1010,7 @@ func TestGetUsers(t *testing.T) {
 			testutil.NilError(t, err)
 
 			expectedUsers := 5
-			if res.HasMore && len(res.Users) != expectedUsers {
-				t.Fatalf("expected %d users, got %d users", expectedUsers, len(res.Users))
-			}
+			assert.Assert(t, !res.HasMore || (len(res.Users) == expectedUsers))
 
 			respAllUsers = append(respAllUsers, res.Users...)
 
@@ -1157,13 +1022,9 @@ func TestGetUsers(t *testing.T) {
 		}
 
 		expectedUsers = 9
-		if len(respAllUsers) != expectedUsers {
-			t.Fatalf("expected %d users, got %d users", expectedUsers, len(respAllUsers))
-		}
+		assert.Assert(t, cmp.Len(respAllUsers, expectedUsers))
 
-		if diff := cmpDiffObject(users, respAllUsers); diff != "" {
-			t.Fatalf("mismatch (-want +got):\n%s", diff)
-		}
+		assert.Assert(t, cmpDiffObject(users, respAllUsers))
 	})
 }
 
@@ -1201,16 +1062,10 @@ func TestGetOrgs(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedOrgs := 9
-		if len(res.Orgs) != expectedOrgs {
-			t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(res.Orgs))
-		}
-		if res.HasMore {
-			t.Fatalf("expected hasMore false, got %t", res.HasMore)
-		}
+		assert.Assert(t, cmp.Len(res.Orgs, expectedOrgs))
+		assert.Assert(t, !res.HasMore)
 
-		if diff := cmpDiffObject(publicOrgs[:expectedOrgs], res.Orgs); diff != "" {
-			t.Fatalf("mismatch (-want +got):\n%s", diff)
-		}
+		assert.Assert(t, cmpDiffObject(publicOrgs[:expectedOrgs], res.Orgs))
 	})
 
 	t.Run("test get all public/private orgs", func(t *testing.T) {
@@ -1218,16 +1073,10 @@ func TestGetOrgs(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedOrgs := 18
-		if len(res.Orgs) != expectedOrgs {
-			t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(res.Orgs))
-		}
-		if res.HasMore {
-			t.Fatalf("expected hasMore false, got %t", res.HasMore)
-		}
+		assert.Assert(t, cmp.Len(res.Orgs, expectedOrgs))
+		assert.Assert(t, !res.HasMore)
 
-		if diff := cmpDiffObject(allOrgs[:expectedOrgs], res.Orgs); diff != "" {
-			t.Fatalf("mismatch (-want +got):\n%s", diff)
-		}
+		assert.Assert(t, cmpDiffObject(allOrgs[:expectedOrgs], res.Orgs))
 	})
 
 	t.Run("test get public orgs with limit less than orgs", func(t *testing.T) {
@@ -1235,16 +1084,10 @@ func TestGetOrgs(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedOrgs := 5
-		if len(res.Orgs) != expectedOrgs {
-			t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(res.Orgs))
-		}
-		if !res.HasMore {
-			t.Fatalf("expected hasMore true, got %t", res.HasMore)
-		}
+		assert.Assert(t, cmp.Len(res.Orgs, expectedOrgs))
+		assert.Assert(t, res.HasMore)
 
-		if diff := cmpDiffObject(publicOrgs[:expectedOrgs], res.Orgs); diff != "" {
-			t.Fatalf("mismatch (-want +got):\n%s", diff)
-		}
+		assert.Assert(t, cmpDiffObject(publicOrgs[:expectedOrgs], res.Orgs))
 	})
 
 	t.Run("test get public/private orgs with limit less than orgs", func(t *testing.T) {
@@ -1252,16 +1095,10 @@ func TestGetOrgs(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedOrgs := 5
-		if len(res.Orgs) != expectedOrgs {
-			t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(res.Orgs))
-		}
-		if !res.HasMore {
-			t.Fatalf("expected hasMore true, got %t", res.HasMore)
-		}
+		assert.Assert(t, cmp.Len(res.Orgs, expectedOrgs))
+		assert.Assert(t, res.HasMore)
 
-		if diff := cmpDiffObject(allOrgs[:expectedOrgs], res.Orgs); diff != "" {
-			t.Fatalf("mismatch (-want +got):\n%s", diff)
-		}
+		assert.Assert(t, cmpDiffObject(allOrgs[:expectedOrgs], res.Orgs))
 	})
 
 	t.Run("test get public orgs with limit less than orgs continuation", func(t *testing.T) {
@@ -1271,12 +1108,8 @@ func TestGetOrgs(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedOrgs := 5
-		if len(res.Orgs) != expectedOrgs {
-			t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(res.Orgs))
-		}
-		if !res.HasMore {
-			t.Fatalf("expected hasMore true, got %t", res.HasMore)
-		}
+		assert.Assert(t, cmp.Len(res.Orgs, expectedOrgs))
+		assert.Assert(t, res.HasMore)
 
 		respAllOrgs = append(respAllOrgs, res.Orgs...)
 		lastOrg := res.Orgs[len(res.Orgs)-1]
@@ -1287,9 +1120,7 @@ func TestGetOrgs(t *testing.T) {
 			testutil.NilError(t, err)
 
 			expectedOrgs := 5
-			if res.HasMore && len(res.Orgs) != expectedOrgs {
-				t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(res.Orgs))
-			}
+			assert.Assert(t, !res.HasMore || (len(res.Orgs) == expectedOrgs))
 
 			respAllOrgs = append(respAllOrgs, res.Orgs...)
 
@@ -1301,13 +1132,9 @@ func TestGetOrgs(t *testing.T) {
 		}
 
 		expectedOrgs = 9
-		if len(respAllOrgs) != expectedOrgs {
-			t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(respAllOrgs))
-		}
+		assert.Assert(t, cmp.Len(respAllOrgs, expectedOrgs))
 
-		if diff := cmpDiffObject(publicOrgs, respAllOrgs); diff != "" {
-			t.Fatalf("mismatch (-want +got):\n%s", diff)
-		}
+		assert.Assert(t, cmpDiffObject(publicOrgs, respAllOrgs))
 	})
 
 	t.Run("test get public/private orgs with limit less than orgs continuation", func(t *testing.T) {
@@ -1317,12 +1144,8 @@ func TestGetOrgs(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedOrgs := 5
-		if len(res.Orgs) != expectedOrgs {
-			t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(res.Orgs))
-		}
-		if !res.HasMore {
-			t.Fatalf("expected hasMore true, got %t", res.HasMore)
-		}
+		assert.Assert(t, cmp.Len(res.Orgs, expectedOrgs))
+		assert.Assert(t, res.HasMore)
 
 		respAllOrgs = append(respAllOrgs, res.Orgs...)
 		lastOrg := res.Orgs[len(res.Orgs)-1]
@@ -1333,9 +1156,7 @@ func TestGetOrgs(t *testing.T) {
 			testutil.NilError(t, err)
 
 			expectedOrgs := 5
-			if res.HasMore && len(res.Orgs) != expectedOrgs {
-				t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(res.Orgs))
-			}
+			assert.Assert(t, !res.HasMore || (len(res.Orgs) == expectedOrgs))
 
 			respAllOrgs = append(respAllOrgs, res.Orgs...)
 
@@ -1347,13 +1168,9 @@ func TestGetOrgs(t *testing.T) {
 		}
 
 		expectedOrgs = 18
-		if len(respAllOrgs) != expectedOrgs {
-			t.Fatalf("expected %d orgs, got %d orgs", expectedOrgs, len(respAllOrgs))
-		}
+		assert.Assert(t, cmp.Len(respAllOrgs, expectedOrgs))
 
-		if diff := cmpDiffObject(allOrgs, respAllOrgs); diff != "" {
-			t.Fatalf("mismatch (-want +got):\n%s", diff)
-		}
+		assert.Assert(t, cmpDiffObject(allOrgs, respAllOrgs))
 	})
 }
 
@@ -1390,12 +1207,8 @@ func TestGetOrgMembers(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedOrgMembers := 9
-		if len(res.OrgMembers) != expectedOrgMembers {
-			t.Fatalf("expected %d org members, got %d org members", expectedOrgMembers, len(res.OrgMembers))
-		}
-		if res.HasMore {
-			t.Fatalf("expected hasMore false, got %t", res.HasMore)
-		}
+		assert.Assert(t, cmp.Len(res.OrgMembers, expectedOrgMembers))
+		assert.Assert(t, !res.HasMore)
 	})
 
 	t.Run("test get org members with limit less than org members", func(t *testing.T) {
@@ -1403,12 +1216,8 @@ func TestGetOrgMembers(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedOrgMembers := 5
-		if len(res.OrgMembers) != expectedOrgMembers {
-			t.Fatalf("expected %d org members, got %d org members", expectedOrgMembers, len(res.OrgMembers))
-		}
-		if !res.HasMore {
-			t.Fatalf("expected hasMore true, got %t", res.HasMore)
-		}
+		assert.Assert(t, cmp.Len(res.OrgMembers, expectedOrgMembers))
+		assert.Assert(t, res.HasMore)
 	})
 
 	t.Run("test get org members with limit less than org members continuation", func(t *testing.T) {
@@ -1418,12 +1227,8 @@ func TestGetOrgMembers(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedOrgMembers := 5
-		if len(res.OrgMembers) != expectedOrgMembers {
-			t.Fatalf("expected %d org members, got %d org members", expectedOrgMembers, len(res.OrgMembers))
-		}
-		if !res.HasMore {
-			t.Fatalf("expected hasMore true, got %t", res.HasMore)
-		}
+		assert.Assert(t, cmp.Len(res.OrgMembers, expectedOrgMembers))
+		assert.Assert(t, res.HasMore)
 
 		orgMembers = append(orgMembers, res.OrgMembers...)
 		lastUser := res.OrgMembers[len(res.OrgMembers)-1]
@@ -1434,9 +1239,7 @@ func TestGetOrgMembers(t *testing.T) {
 			testutil.NilError(t, err)
 
 			expectedOrgMembers := 5
-			if res.HasMore && len(res.OrgMembers) != expectedOrgMembers {
-				t.Fatalf("expected %d org members, got %d org members", expectedOrgMembers, len(res.OrgMembers))
-			}
+			assert.Assert(t, !res.HasMore || (len(res.OrgMembers) == expectedOrgMembers))
 
 			orgMembers = append(orgMembers, res.OrgMembers...)
 
@@ -1448,18 +1251,14 @@ func TestGetOrgMembers(t *testing.T) {
 		}
 
 		expectedOrgMembers = 9
-		if len(orgMembers) != expectedOrgMembers {
-			t.Fatalf("expected %d org members, got %d org members", expectedOrgMembers, len(orgMembers))
-		}
+		assert.Assert(t, cmp.Len(orgMembers, expectedOrgMembers))
 
 		orgMemberUsers := []*types.User{}
 		for _, orgMember := range orgMembers {
 			orgMemberUsers = append(orgMemberUsers, orgMember.User)
 
 		}
-		if diff := cmpDiffObject(users, orgMemberUsers); diff != "" {
-			t.Fatalf("mismatch (-want +got):\n%s", diff)
-		}
+		assert.Assert(t, cmpDiffObject(users, orgMemberUsers))
 	})
 }
 
@@ -1496,12 +1295,8 @@ func TestGetUserOrgs(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedUserOrgs := 9
-		if len(res.UserOrgs) != expectedUserOrgs {
-			t.Fatalf("expected %d user orgs, got %d user orgs", expectedUserOrgs, len(res.UserOrgs))
-		}
-		if res.HasMore {
-			t.Fatalf("expected hasMore false, got %t", res.HasMore)
-		}
+		assert.Assert(t, cmp.Len(res.UserOrgs, expectedUserOrgs))
+		assert.Assert(t, !res.HasMore)
 	})
 
 	t.Run("test get user orgs with limit less than user orgs", func(t *testing.T) {
@@ -1509,12 +1304,8 @@ func TestGetUserOrgs(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedUserOrgs := 5
-		if len(res.UserOrgs) != expectedUserOrgs {
-			t.Fatalf("expected %d user orgs, got %d user orgs", expectedUserOrgs, len(res.UserOrgs))
-		}
-		if !res.HasMore {
-			t.Fatalf("expected hasMore true, got %t", res.HasMore)
-		}
+		assert.Assert(t, cmp.Len(res.UserOrgs, expectedUserOrgs))
+		assert.Assert(t, res.HasMore)
 	})
 
 	t.Run("test get user orgs with limit less than user orgs continuation", func(t *testing.T) {
@@ -1524,12 +1315,8 @@ func TestGetUserOrgs(t *testing.T) {
 		testutil.NilError(t, err)
 
 		expectedUserOrgs := 5
-		if len(respUserOrgs.UserOrgs) != expectedUserOrgs {
-			t.Fatalf("expected %d user orgs, got %d user orgs", expectedUserOrgs, len(respUserOrgs.UserOrgs))
-		}
-		if !respUserOrgs.HasMore {
-			t.Fatalf("expected hasMore true, got %t", respUserOrgs.HasMore)
-		}
+		assert.Assert(t, cmp.Len(respUserOrgs.UserOrgs, expectedUserOrgs))
+		assert.Assert(t, respUserOrgs.HasMore)
 
 		respAllUserOrgs = append(respAllUserOrgs, respUserOrgs.UserOrgs...)
 		lastUserOrg := respUserOrgs.UserOrgs[len(respUserOrgs.UserOrgs)-1]
@@ -1540,9 +1327,7 @@ func TestGetUserOrgs(t *testing.T) {
 			testutil.NilError(t, err)
 
 			expectedUserOrgs := 5
-			if respUserOrgs.HasMore && len(respUserOrgs.UserOrgs) != expectedUserOrgs {
-				t.Fatalf("expected %d user orgs, got %d user orgs", expectedUserOrgs, len(respUserOrgs.UserOrgs))
-			}
+			assert.Assert(t, !respUserOrgs.HasMore || (len(respUserOrgs.UserOrgs) == expectedUserOrgs))
 
 			respAllUserOrgs = append(respAllUserOrgs, respUserOrgs.UserOrgs...)
 
@@ -1554,18 +1339,14 @@ func TestGetUserOrgs(t *testing.T) {
 		}
 
 		expectedUserOrgs = 9
-		if len(respAllUserOrgs) != expectedUserOrgs {
-			t.Fatalf("expected %d user orgs, got %d user orgs", expectedUserOrgs, len(respAllUserOrgs))
-		}
+		assert.Assert(t, cmp.Len(respAllUserOrgs, expectedUserOrgs))
 
 		userOrgs := []*types.Organization{}
 		for _, userOrg := range respAllUserOrgs {
 			userOrgs = append(userOrgs, userOrg.Organization)
 
 		}
-		if diff := cmpDiffObject(orgs, userOrgs); diff != "" {
-			t.Fatalf("mismatch (-want +got):\n%s", diff)
-		}
+		assert.Assert(t, cmpDiffObject(orgs, userOrgs))
 	})
 }
 
@@ -1607,11 +1388,9 @@ func TestRemoteSource(t *testing.T) {
 				_, err := cs.ah.CreateRemoteSource(ctx, rsreq)
 				testutil.NilError(t, err)
 
-				expectedError := util.NewAPIError(util.ErrBadRequest, errors.Errorf(`remotesource "rs01" already exists`))
+				expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf(`remotesource "rs01" already exists`))
 				_, err = cs.ah.CreateRemoteSource(ctx, rsreq)
-				if err.Error() != expectedError.Error() {
-					t.Fatalf("expected err: %v, got err: %v", expectedError.Error(), err.Error())
-				}
+				assert.Error(t, err, expectedErr.Error())
 			},
 		},
 		{
@@ -1677,12 +1456,10 @@ func TestRemoteSource(t *testing.T) {
 				_, err = cs.ah.CreateRemoteSource(ctx, rs02req)
 				testutil.NilError(t, err)
 
-				expectedError := util.NewAPIError(util.ErrBadRequest, errors.Errorf(`remotesource "rs02" already exists`))
+				expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf(`remotesource "rs02" already exists`))
 				rs01req.Name = "rs02"
 				_, err = cs.ah.UpdateRemoteSource(ctx, "rs01", rs01req)
-				if err.Error() != expectedError.Error() {
-					t.Fatalf("expected err: %v, got err: %v", expectedError.Error(), err.Error())
-				}
+				assert.Error(t, err, expectedErr.Error())
 			},
 		},
 	}
@@ -1775,9 +1552,7 @@ func TestDeleteUser(t *testing.T) {
 			users, err := getUsers(ctx, cs)
 			testutil.NilError(t, err)
 
-			if len(users) != 0 {
-				t.Fatalf("expected 0 users, got %d users", len(users))
-			}
+			assert.Assert(t, cmp.Len(users, 0))
 		})
 	}
 }
@@ -1845,9 +1620,7 @@ func TestDeleteOrg(t *testing.T) {
 			orgs, err := getOrgs(ctx, cs)
 			testutil.NilError(t, err)
 
-			if len(orgs) != 0 {
-				t.Fatalf("expected 0 orgs, got %d orgs", len(orgs))
-			}
+			assert.Assert(t, cmp.Len(orgs, 0))
 		})
 	}
 }
@@ -1880,17 +1653,15 @@ func TestOrgInvitation(t *testing.T) {
 			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
 				setupUsers(t, ctx, cs)
 				users, err := getUsers(ctx, cs)
-				if err != nil {
-					t.Fatalf("err: %v", err)
-				}
+				testutil.NilError(t, err)
+
 				userOwner := users[0]
 				userInvitation := users[1]
 
 				setupOrgs(t, ctx, cs, userOwner.ID)
 				orgs, err := getOrgs(ctx, cs)
-				if err != nil {
-					t.Fatalf("err: %v", err)
-				}
+				testutil.NilError(t, err)
+
 				org := orgs[0]
 
 				rs := &action.CreateOrgInvitationRequest{
@@ -1909,21 +1680,15 @@ func TestOrgInvitation(t *testing.T) {
 			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
 				setupUsers(t, ctx, cs)
 				users, err := getUsers(ctx, cs)
-				if err != nil {
-					t.Fatalf("err: %v", err)
-				}
+				testutil.NilError(t, err)
 
 				userOwner := users[0]
 				userInvitation := users[1]
 
 				setupOrgs(t, ctx, cs, userOwner.ID)
 				orgs, err := getOrgs(ctx, cs)
-				if err != nil {
-					t.Fatalf("err: %v", err)
-				}
-				if len(users) == 0 {
-					t.Fatalf("err: users empty")
-				}
+				testutil.NilError(t, err)
+
 				org := orgs[0]
 
 				rs := &action.CreateOrgInvitationRequest{
@@ -1934,11 +1699,9 @@ func TestOrgInvitation(t *testing.T) {
 				_, err = cs.ah.CreateOrgInvitation(ctx, rs)
 				testutil.NilError(t, err)
 
-				expectedError := util.NewAPIError(util.ErrBadRequest, errors.Errorf("invitation already exists"))
+				expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("invitation already exists"))
 				_, err = cs.ah.CreateOrgInvitation(ctx, rs)
-				if err.Error() != expectedError.Error() {
-					t.Fatalf("expected err: %v, got err: %v", expectedError.Error(), err.Error())
-				}
+				assert.Error(t, err, expectedErr.Error())
 			},
 		},
 		{
@@ -1946,17 +1709,15 @@ func TestOrgInvitation(t *testing.T) {
 			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
 				setupUsers(t, ctx, cs)
 				users, err := getUsers(ctx, cs)
-				if err != nil {
-					t.Fatalf("err: %v", err)
-				}
+				testutil.NilError(t, err)
+
 				userOwner := users[0]
 				userInvitation := users[1]
 
 				setupOrgs(t, ctx, cs, userOwner.ID)
 				orgs, err := getOrgs(ctx, cs)
-				if err != nil {
-					t.Fatalf("err: %v", err)
-				}
+				testutil.NilError(t, err)
+
 				org := orgs[0]
 
 				rs := &action.CreateOrgInvitationRequest{
@@ -1973,10 +1734,7 @@ func TestOrgInvitation(t *testing.T) {
 				orgInvitations, err := cs.ah.GetUserOrgInvitations(ctx, userInvitation.ID)
 				testutil.NilError(t, err)
 
-				if len(orgInvitations) != 0 {
-					t.Fatalf("expected 0 orgInvitations, got %d orgInvitations", len(orgInvitations))
-				}
-
+				assert.Assert(t, cmp.Len(orgInvitations, 0))
 			},
 		},
 		{
@@ -1984,17 +1742,15 @@ func TestOrgInvitation(t *testing.T) {
 			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
 				setupUsers(t, ctx, cs)
 				users, err := getUsers(ctx, cs)
-				if err != nil {
-					t.Fatalf("err: %v", err)
-				}
+				testutil.NilError(t, err)
+
 				userOwner := users[0]
 				userInvitation := users[1]
 
 				setupOrgs(t, ctx, cs, userOwner.ID)
 				orgs, err := getOrgs(ctx, cs)
-				if err != nil {
-					t.Fatalf("err: %v", err)
-				}
+				testutil.NilError(t, err)
+
 				org := orgs[0]
 
 				rs := &action.CreateOrgInvitationRequest{
@@ -2011,9 +1767,7 @@ func TestOrgInvitation(t *testing.T) {
 				orgInvitations, err := cs.ah.GetOrgInvitations(ctx, org.ID)
 				testutil.NilError(t, err)
 
-				if len(orgInvitations) != 0 {
-					t.Fatalf("expected 0 orgInvitations, got %d orgInvitations", len(orgInvitations))
-				}
+				assert.Assert(t, cmp.Len(orgInvitations, 0))
 			},
 		},
 		{
@@ -2047,9 +1801,7 @@ func TestOrgInvitation(t *testing.T) {
 				orgInvitations, err := cs.ah.GetOrgInvitations(ctx, org.ID)
 				testutil.NilError(t, err)
 
-				if len(orgInvitations) != 0 {
-					t.Fatalf("expected 0 orgInvitations, got %d orgInvitations", len(orgInvitations))
-				}
+				assert.Assert(t, cmp.Len(orgInvitations, 0))
 			},
 		},
 	}

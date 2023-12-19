@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sorintlab/errors"
+	"gotest.tools/assert"
 
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/testutil"
@@ -137,9 +137,7 @@ func TestRepoCleaner(t *testing.T) {
 
 			if tt.branchOldTime && tt.tagOldTime {
 				_, err = os.Open(userDirRepo)
-				if !errors.Is(err, os.ErrNotExist) {
-					t.Fatalf("got %v error, want error: %v", err, os.ErrNotExist)
-				}
+				assert.ErrorType(t, err, os.IsNotExist)
 
 				return
 			}
@@ -154,12 +152,8 @@ func TestRepoCleaner(t *testing.T) {
 					break
 				}
 			}
-			if tt.branchOldTime && found {
-				t.Fatalf("expected branch %s deleted", branchName)
-			}
-			if !tt.branchOldTime && !found {
-				t.Fatalf("expected branch %s", branchName)
-			}
+			assert.Assert(t, !tt.branchOldTime || !found, "expected branch %s deleted", branchName)
+			assert.Assert(t, tt.branchOldTime || found, "expected branch %s", branchName)
 
 			tags, err := gs.getTags(git, ctx)
 			testutil.NilError(t, err)
@@ -171,12 +165,8 @@ func TestRepoCleaner(t *testing.T) {
 					break
 				}
 			}
-			if tt.tagOldTime && found {
-				t.Fatalf("expected tag %s deleted", tagName)
-			}
-			if !tt.tagOldTime && !found {
-				t.Fatalf("expected tag %s", tagName)
-			}
+			assert.Assert(t, !tt.tagOldTime || !found, "expected tag %s deleted", tagName)
+			assert.Assert(t, tt.tagOldTime || found, "expected tag %s", tagName)
 		})
 	}
 }

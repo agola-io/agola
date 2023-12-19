@@ -16,15 +16,15 @@ package runconfig
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/sorintlab/errors"
+	"gotest.tools/assert"
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	"agola.io/agola/internal/config"
+	"agola.io/agola/internal/testutil"
 	"agola.io/agola/internal/util"
 	rstypes "agola.io/agola/services/runservice/types"
 	"agola.io/agola/services/types"
@@ -206,17 +206,13 @@ func TestGenTasksLevels(t *testing.T) {
 				}
 
 			}
-			if err := GenTasksLevels(inRcts); err != nil {
-				if err.Error() != tt.err.Error() {
-					t.Fatalf("got error: %v, want error: %v", err, tt.err)
-				}
-				return
-			}
+			err := GenTasksLevels(inRcts)
 			if tt.err != nil {
-				t.Fatalf("got nil error, want error: %v", tt.err)
-			}
-			if !reflect.DeepEqual(inRcts, outRcts) {
-				t.Fatalf("got %s, expected %s", util.Dump(inRcts), util.Dump(outRcts))
+				assert.Error(t, err, tt.err.Error())
+			} else {
+				testutil.NilError(t, err)
+
+				assert.DeepEqual(t, inRcts, outRcts)
 			}
 		})
 	}
@@ -445,9 +441,7 @@ func TestGetAllParents(t *testing.T) {
 				for _, p := range allParents {
 					allParentsList = append(allParentsList, p.ID)
 				}
-				if !util.CompareStringSliceNoOrder(tt.out[task.ID], allParentsList) {
-					t.Fatalf("task: %s, got %s, expected %s", task.ID, util.Dump(allParentsList), util.Dump(tt.out[task.ID]))
-				}
+				assert.Assert(t, util.CompareStringSliceNoOrder(tt.out[task.ID], allParentsList), "task: %s, want: %s, got: %s", task.ID, util.Dump(tt.out[task.ID]), util.Dump(allParentsList))
 			}
 		})
 	}
@@ -663,21 +657,16 @@ func TestCheckRunConfig(t *testing.T) {
 
 			}
 
-			if err := CheckRunConfigTasks(inRcts); err != nil {
+			err := CheckRunConfigTasks(inRcts)
+			if tt.err != nil {
 				var errs *util.Errors
 				if errors.As(err, &errs) {
-					if !errs.Equal(tt.err) {
-						t.Fatalf("got error: %v, want error: %v", err, tt.err)
-					}
+					assert.Assert(t, errs.Equal(tt.err))
 				} else {
-					if err.Error() != tt.err.Error() {
-						t.Fatalf("got error: %v, want error: %v", err, tt.err)
-					}
+					assert.Error(t, err, tt.err.Error())
 				}
-				return
-			}
-			if tt.err != nil {
-				t.Fatalf("got nil error, want error: %v", tt.err)
+			} else {
+				testutil.NilError(t, err)
 			}
 		})
 	}
@@ -1521,9 +1510,7 @@ func TestGenRunConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			out := GenRunConfigTasks(uuid, tt.in, "run01", tt.variables, "", "", "", "")
 
-			if diff := cmp.Diff(tt.out, out); diff != "" {
-				t.Error(diff)
-			}
+			assert.DeepEqual(t, tt.out, out)
 		})
 	}
 }

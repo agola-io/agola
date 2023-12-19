@@ -20,8 +20,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/sorintlab/errors"
+	"gotest.tools/assert"
 
 	"agola.io/agola/internal/testutil"
 )
@@ -828,21 +828,12 @@ gitserver:
 			testutil.NilError(t, err)
 
 			c, err := Parse(path.Join(dir, "config.yml"), tt.services)
-			if err != nil {
-				if tt.err == nil {
-					t.Fatalf("got error: %v, expected no error", err)
-				}
-				if err.Error() != tt.err.Error() {
-					t.Fatalf("got error: %v, want error: %v", err, tt.err)
-				}
+			if tt.err != nil {
+				assert.Error(t, err, tt.err.Error())
 			} else {
-				if tt.err != nil {
-					t.Fatalf("got nil error, want error: %v", tt.err)
-				}
+				testutil.NilError(t, err)
 
-				if diff := cmp.Diff(tt.out, c); diff != "" {
-					t.Fatalf("config mismatch (-want +got):\n%s", diff)
-				}
+				assert.DeepEqual(t, tt.out, c)
 			}
 		})
 	}

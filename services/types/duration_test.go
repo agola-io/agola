@@ -19,7 +19,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
+	"gotest.tools/assert"
+
+	"agola.io/agola/internal/testutil"
 )
 
 func TestDurationUnmarshalJSON(t *testing.T) {
@@ -42,13 +44,10 @@ func TestDurationUnmarshalJSON(t *testing.T) {
 
 	for _, tt := range tests {
 		var result testDurationType
-		if err := json.Unmarshal([]byte(tt.jsonDuration), &result); err != nil {
-			t.Fatalf("failed to unmarshal json: %v", err)
-		}
+		err := json.Unmarshal([]byte(tt.jsonDuration), &result)
+		testutil.NilError(t, err)
 
-		if diff := cmp.Diff(result.Duration, tt.expected); diff != "" {
-			t.Fatalf("durations mismatch (-want +got):\n%s", diff)
-		}
+		assert.DeepEqual(t, result.Duration, tt.expected)
 	}
 }
 
@@ -67,13 +66,9 @@ func TestDurationMarshalJSON(t *testing.T) {
 
 	for _, tt := range tests {
 		result, err := json.Marshal(tt.duration)
-		if err != nil {
-			t.Fatalf("failed to marshal duration: %v", err)
-		}
+		testutil.NilError(t, err)
 
-		if diff := cmp.Diff(string(result), tt.expected); diff != "" {
-			t.Fatalf("jsons mismatch (-want +got):\n%s", diff)
-		}
+		assert.Equal(t, string(result), tt.expected)
 	}
 }
 

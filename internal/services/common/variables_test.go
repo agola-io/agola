@@ -17,7 +17,7 @@ package common
 import (
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
+	"gotest.tools/assert"
 
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"
@@ -109,9 +109,7 @@ func TestFilterOverriddenVariables(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			out := FilterOverriddenVariables(tt.variables)
 
-			if diff := cmp.Diff(tt.out, out); diff != "" {
-				t.Error(diff)
-			}
+			assert.DeepEqual(t, tt.out, out)
 		})
 	}
 }
@@ -277,9 +275,7 @@ func TestGetVarValueMatchingSecret(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			out := GetVarValueMatchingSecret(tt.varValue, tt.varParentPath, tt.secrets)
 
-			if diff := cmp.Diff(tt.out, out); diff != "" {
-				t.Error(diff)
-			}
+			assert.DeepEqual(t, tt.out, out)
 		})
 	}
 }

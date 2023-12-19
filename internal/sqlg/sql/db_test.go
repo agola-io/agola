@@ -14,6 +14,7 @@ import (
 
 	"github.com/sorintlab/errors"
 	"gotest.tools/assert"
+	"gotest.tools/assert/cmp"
 
 	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/internal/testutil"
@@ -154,7 +155,7 @@ func TestPGSerializationError(t *testing.T) {
 	close(ch)
 
 	wg.Wait()
-	assert.Assert(t, len(txErrors) == 0)
+	assert.Assert(t, cmp.Len(txErrors, 0))
 
 	var entries []string
 	err = sdb.Do(ctx, func(tx *sql.Tx) error {
@@ -164,8 +165,8 @@ func TestPGSerializationError(t *testing.T) {
 	})
 	testutil.NilError(t, err)
 
-	assert.Assert(t, len(entries) == 1, "entries = %d", len(entries))
+	assert.Assert(t, cmp.Len(entries, 1))
 
 	// there must be at least one retried tx, so at least n + 1 transactions
-	assert.Assert(t, txCount >= uint32(n), "txCount = %d", txCount)
+	assert.Assert(t, txCount >= uint32(n))
 }

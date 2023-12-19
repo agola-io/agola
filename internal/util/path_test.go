@@ -15,8 +15,9 @@
 package util
 
 import (
-	"reflect"
 	"testing"
+
+	"gotest.tools/assert"
 )
 
 func TestPathList(t *testing.T) {
@@ -41,9 +42,7 @@ func TestPathList(t *testing.T) {
 	for _, tt := range tests {
 		t.Run("test is parent path", func(t *testing.T) {
 			out := PathList(tt.in)
-			if !reflect.DeepEqual(out, tt.out) {
-				t.Fatalf("got %q but wanted: %q", out, tt.out)
-			}
+			assert.DeepEqual(t, out, tt.out)
 		})
 	}
 }
@@ -65,9 +64,7 @@ func TestIsParentPath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run("test is parent path", func(t *testing.T) {
 			ok := IsParentPath(tt.parent, tt.p)
-			if ok != tt.ok {
-				t.Fatalf("got %t but wanted: %t a: %v, b: %v", ok, tt.ok, tt.parent, tt.p)
-			}
+			assert.Equal(t, ok, tt.ok, "got %t but wanted: %t a: %v, b: %v", ok, tt.ok, tt.parent, tt.p)
 		})
 	}
 }
@@ -92,9 +89,7 @@ func TestIsSameOrParentPath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run("test is parent path", func(t *testing.T) {
 			ok := IsSameOrParentPath(tt.parent, tt.p)
-			if ok != tt.ok {
-				t.Fatalf("got %t but wanted: %t a: %v, b: %v", ok, tt.ok, tt.parent, tt.p)
-			}
+			assert.Equal(t, ok, tt.ok, "got %t but wanted: %t a: %v, b: %v", ok, tt.ok, tt.parent, tt.p)
 		})
 	}
 }
