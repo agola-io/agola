@@ -894,70 +894,135 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 		createCommitStatusDelivery(t, ctx, ns, commitStatuses[i].ID, types.DeliveryStatusNotDelivered)
 	}
 
-	t.Run("test get commit status deliveries with limit = 0", func(t *testing.T) {
-		res, err := ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{ProjectID: project01, Limit: 0})
-		testutil.NilError(t, err)
+	tests := []struct {
+		name                                 string
+		limit                                int
+		sortDirection                        types.SortDirection
+		deliveryStatusFilter                 []types.DeliveryStatus
+		expectedCommitStatusDeliveriesNumber int
+		expectedCallsNumber                  int
+	}{
+		{
+			name:                                 "test get commit status deliveries with limit = 0",
+			sortDirection:                        types.SortDirectionAsc,
+			expectedCommitStatusDeliveriesNumber: 20,
+			expectedCallsNumber:                  1,
+		},
+		{
+			name:                                 "test get commit status deliveries with deliverystatusfilter = delivered",
+			sortDirection:                        types.SortDirectionAsc,
+			deliveryStatusFilter:                 []types.DeliveryStatus{types.DeliveryStatusDelivered},
+			expectedCommitStatusDeliveriesNumber: 10,
+			expectedCallsNumber:                  1,
+		},
+		{
+			name:                                 "test get commit status deliveries with deliverystatusfilter = delivered and limit less than commit status deliveries",
+			limit:                                2,
+			sortDirection:                        types.SortDirectionAsc,
+			deliveryStatusFilter:                 []types.DeliveryStatus{types.DeliveryStatusDelivered},
+			expectedCommitStatusDeliveriesNumber: 10,
+			expectedCallsNumber:                  5,
+		},
+		{
+			name:                                 "test get commit status deliveries with limit less than commit status deliveries continuation",
+			sortDirection:                        types.SortDirectionAsc,
+			limit:                                5,
+			expectedCommitStatusDeliveriesNumber: 20,
+			expectedCallsNumber:                  4,
+		},
+		{
+			name:                                 "test get commit status deliveries with limit = 0 and sortDirection desc",
+			sortDirection:                        types.SortDirectionDesc,
+			expectedCommitStatusDeliveriesNumber: 20,
+			expectedCallsNumber:                  1,
+		},
+		{
+			name:                                 "test get commit status deliveries with deliverystatusfilter = delivered and sortDirection desc",
+			sortDirection:                        types.SortDirectionDesc,
+			deliveryStatusFilter:                 []types.DeliveryStatus{types.DeliveryStatusDelivered},
+			expectedCommitStatusDeliveriesNumber: 10,
+			expectedCallsNumber:                  1,
+		},
+		{
+			name:                                 "test get commit status deliveries with deliverystatusfilter = delivered and limit less than commit status deliveries and sortDirection desc",
+			limit:                                2,
+			sortDirection:                        types.SortDirectionDesc,
+			deliveryStatusFilter:                 []types.DeliveryStatus{types.DeliveryStatusDelivered},
+			expectedCommitStatusDeliveriesNumber: 10,
+			expectedCallsNumber:                  5,
+		},
+		{
+			name:                                 "test get commit status deliveries with limit less than commit status deliveries continuation and sortDirection desc",
+			sortDirection:                        types.SortDirectionDesc,
+			limit:                                5,
+			expectedCommitStatusDeliveriesNumber: 20,
+			expectedCallsNumber:                  4,
+		},
+	}
 
-		assert.Assert(t, !res.HasMore)
-		assert.Assert(t, cmp.Len(res.CommitStatusDeliveries, 20))
-	})
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	t.Run("test get commit status deliveries with limit = 10", func(t *testing.T) {
-		res, err := ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{ProjectID: project01, Limit: 10})
-		testutil.NilError(t, err)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-		assert.Assert(t, res.HasMore)
-		assert.Assert(t, cmp.Len(res.CommitStatusDeliveries, 10))
-	})
-
-	t.Run("test get commit status deliveries with deliverystatusfilter = delivered", func(t *testing.T) {
-		res, err := ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{ProjectID: project01, DeliveryStatusFilter: []types.DeliveryStatus{types.DeliveryStatusDelivered}, Limit: 0})
-		testutil.NilError(t, err)
-
-		assert.Assert(t, !res.HasMore)
-		assert.Assert(t, cmp.Len(res.CommitStatusDeliveries, 10))
-	})
-
-	t.Run("test get commit status deliveries with deliverystatusfilter = delivered and limit less than commit status deliveries", func(t *testing.T) {
-		res, err := ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{ProjectID: project01, DeliveryStatusFilter: []types.DeliveryStatus{types.DeliveryStatusDelivered}, Limit: 5})
-		testutil.NilError(t, err)
-
-		assert.Assert(t, res.HasMore)
-		assert.Assert(t, cmp.Len(res.CommitStatusDeliveries, 5))
-	})
-
-	t.Run("test get commit status deliveries with limit less than commit status deliveries continuation", func(t *testing.T) {
-		respAllProjectCommitStatusDeliveries := []*types.CommitStatusDelivery{}
-
-		res, err := ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{ProjectID: project01, Limit: 5, SortDirection: types.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedProjectCommitStatusDeliveries := 5
-		assert.Assert(t, cmp.Len(res.CommitStatusDeliveries, expectedProjectCommitStatusDeliveries))
-		assert.Assert(t, res.HasMore)
-
-		respAllProjectCommitStatusDeliveries = append(respAllProjectCommitStatusDeliveries, res.CommitStatusDeliveries...)
-		lastProjectCommitStatusDelivery := res.CommitStatusDeliveries[len(res.CommitStatusDeliveries)-1]
-
-		// fetch next results
-		for {
-			res, err = ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{ProjectID: project01, StartSequence: lastProjectCommitStatusDelivery.Sequence, Limit: 5, SortDirection: types.SortDirectionAsc})
-			testutil.NilError(t, err)
-
-			assert.Assert(t, !res.HasMore || (len(res.CommitStatusDeliveries) == expectedProjectCommitStatusDeliveries))
-
-			respAllProjectCommitStatusDeliveries = append(respAllProjectCommitStatusDeliveries, res.CommitStatusDeliveries...)
-
-			if !res.HasMore {
-				break
+			// populate the expected commit status deliveries
+			expectedProject01CommitStatusDeliveries := []*types.CommitStatusDelivery{}
+			for _, c := range project01CommitStatusDeliveries {
+				if len(tt.deliveryStatusFilter) > 0 && !deliveryStatusInSlice(tt.deliveryStatusFilter, c.DeliveryStatus) {
+					continue
+				}
+				expectedProject01CommitStatusDeliveries = append(expectedProject01CommitStatusDeliveries, c)
 			}
 
-			lastProjectCommitStatusDelivery = res.CommitStatusDeliveries[len(res.CommitStatusDeliveries)-1]
+			var respAllProjectCommitStatusDeliveries []*types.CommitStatusDelivery
+			var lastProjectCommitStatusDelivery uint64
+			var callsNumber int
+
+			// fetch next results
+			for {
+				res, err := ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{
+					ProjectID:            project01,
+					Limit:                tt.limit,
+					SortDirection:        tt.sortDirection,
+					DeliveryStatusFilter: tt.deliveryStatusFilter,
+					StartSequence:        lastProjectCommitStatusDelivery,
+				})
+				testutil.NilError(t, err)
+
+				callsNumber++
+
+				respAllProjectCommitStatusDeliveries = append(respAllProjectCommitStatusDeliveries, res.CommitStatusDeliveries...)
+				if res.HasMore == false {
+					break
+				}
+
+				lastProjectCommitStatusDelivery = respAllProjectCommitStatusDeliveries[len(respAllProjectCommitStatusDeliveries)-1].Sequence
+			}
+
+			// reverse if sortDirection is desc
+			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
+			if tt.sortDirection == types.SortDirectionDesc {
+				for i, j := 0, len(expectedProject01CommitStatusDeliveries)-1; i < j; i, j = i+1, j-1 {
+					expectedProject01CommitStatusDeliveries[i], expectedProject01CommitStatusDeliveries[j] = expectedProject01CommitStatusDeliveries[j], expectedProject01CommitStatusDeliveries[i]
+				}
+			}
+
+			assert.Assert(t, cmp.Len(respAllProjectCommitStatusDeliveries, tt.expectedCommitStatusDeliveriesNumber))
+			assert.Assert(t, cmpDiffObject(respAllProjectCommitStatusDeliveries, expectedProject01CommitStatusDeliveries))
+			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
+		})
+	}
+}
+
+// TODO(sgotti) use go 1.21 generics slices.Contains when removing support for go < 1.21
+func deliveryStatusInSlice(deliveryStatuses []types.DeliveryStatus, deliveryStatus types.DeliveryStatus) bool {
+	for _, s := range deliveryStatuses {
+		if deliveryStatus == s {
+			return true
 		}
-
-		expectedProjectCommitStatusDeliveries = 20
-		assert.Assert(t, cmp.Len(respAllProjectCommitStatusDeliveries, expectedProjectCommitStatusDeliveries))
-
-		assert.Assert(t, cmpDiffObject(project01CommitStatusDeliveries, respAllProjectCommitStatusDeliveries))
-	})
+	}
+	return false
 }
