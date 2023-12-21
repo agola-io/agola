@@ -531,72 +531,127 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 		createRunWebhookDelivery(t, ctx, ns, runWebhooks[i].ID, types.DeliveryStatusNotDelivered)
 	}
 
-	t.Run("test get run webhook deliveries with limit = 0", func(t *testing.T) {
-		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, Limit: 0})
-		testutil.NilError(t, err)
+	tests := []struct {
+		name                               string
+		limit                              int
+		sortDirection                      types.SortDirection
+		deliveryStatusFilter               []types.DeliveryStatus
+		expectedRunWebhookDeliveriesNumber int
+		expectedCallsNumber                int
+	}{
+		{
+			name:                               "test get run webhook deliveries with limit = 0",
+			sortDirection:                      types.SortDirectionAsc,
+			expectedRunWebhookDeliveriesNumber: 20,
+			expectedCallsNumber:                1,
+		},
+		{
+			name:                               "test get run webhook deliveries with deliverystatusfilter = delivered",
+			sortDirection:                      types.SortDirectionAsc,
+			deliveryStatusFilter:               []types.DeliveryStatus{types.DeliveryStatusDelivered},
+			expectedRunWebhookDeliveriesNumber: 10,
+			expectedCallsNumber:                1,
+		},
+		{
+			name:                               "test get run webhook deliveries with deliverystatusfilter = delivered and limit less than run webhook deliveries",
+			limit:                              2,
+			sortDirection:                      types.SortDirectionAsc,
+			deliveryStatusFilter:               []types.DeliveryStatus{types.DeliveryStatusDelivered},
+			expectedRunWebhookDeliveriesNumber: 10,
+			expectedCallsNumber:                5,
+		},
+		{
+			name:                               "test get run webhook deliveries with limit less than run webhook deliveries continuation",
+			sortDirection:                      types.SortDirectionAsc,
+			limit:                              5,
+			expectedRunWebhookDeliveriesNumber: 20,
+			expectedCallsNumber:                4,
+		},
+		{
+			name:                               "test get run webhook deliveries with limit = 0 and sortDirection desc",
+			sortDirection:                      types.SortDirectionDesc,
+			expectedRunWebhookDeliveriesNumber: 20,
+			expectedCallsNumber:                1,
+		},
+		{
+			name:                               "test get run webhook deliveries with deliverystatusfilter = delivered and sortDirection desc",
+			sortDirection:                      types.SortDirectionDesc,
+			deliveryStatusFilter:               []types.DeliveryStatus{types.DeliveryStatusDelivered},
+			expectedRunWebhookDeliveriesNumber: 10,
+			expectedCallsNumber:                1,
+		},
+		{
+			name:                               "test get run webhook deliveries with deliverystatusfilter = delivered and limit less than run webhook deliveries and sortDirection desc",
+			limit:                              2,
+			sortDirection:                      types.SortDirectionDesc,
+			deliveryStatusFilter:               []types.DeliveryStatus{types.DeliveryStatusDelivered},
+			expectedRunWebhookDeliveriesNumber: 10,
+			expectedCallsNumber:                5,
+		},
+		{
+			name:                               "test get run webhook deliveries with limit less than run webhook deliveries continuation and sortDirection desc",
+			sortDirection:                      types.SortDirectionDesc,
+			limit:                              5,
+			expectedRunWebhookDeliveriesNumber: 20,
+			expectedCallsNumber:                4,
+		},
+	}
 
-		assert.Assert(t, !res.HasMore)
-		assert.Assert(t, cmp.Len(res.RunWebhookDeliveries, 20))
-	})
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	t.Run("test get run webhook deliveries with limit = 10", func(t *testing.T) {
-		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, Limit: 10})
-		testutil.NilError(t, err)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-		assert.Assert(t, res.HasMore)
-		assert.Assert(t, cmp.Len(res.RunWebhookDeliveries, 10))
-	})
-
-	t.Run("test get run webhook deliveries with deliverystatusfilter = delivered", func(t *testing.T) {
-		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, DeliveryStatusFilter: []types.DeliveryStatus{types.DeliveryStatusDelivered}, Limit: 0})
-		testutil.NilError(t, err)
-
-		assert.Assert(t, !res.HasMore)
-		assert.Assert(t, cmp.Len(res.RunWebhookDeliveries, 10))
-	})
-
-	t.Run("test get run webhook deliveries with deliverystatusfilter = delivered and limit less than run webhook deliveries", func(t *testing.T) {
-		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, DeliveryStatusFilter: []types.DeliveryStatus{types.DeliveryStatusDelivered}, Limit: 5})
-		testutil.NilError(t, err)
-
-		assert.Assert(t, res.HasMore)
-		assert.Assert(t, cmp.Len(res.RunWebhookDeliveries, 5))
-	})
-
-	t.Run("test get run webhook deliveries with limit less than run webhook deliveries continuation", func(t *testing.T) {
-		respAllProjectRunWebhookDeliveries := []*types.RunWebhookDelivery{}
-
-		res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, Limit: 5, SortDirection: types.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedProjectRunWebhookDeliveries := 5
-		assert.Assert(t, cmp.Len(res.RunWebhookDeliveries, expectedProjectRunWebhookDeliveries))
-		assert.Assert(t, res.HasMore)
-
-		respAllProjectRunWebhookDeliveries = append(respAllProjectRunWebhookDeliveries, res.RunWebhookDeliveries...)
-		lastProjectRunWebhookDelivery := res.RunWebhookDeliveries[len(res.RunWebhookDeliveries)-1]
-
-		// fetch next results
-		for {
-			res, err = ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{ProjectID: project01, StartSequence: lastProjectRunWebhookDelivery.Sequence, Limit: 5, SortDirection: types.SortDirectionAsc})
-			testutil.NilError(t, err)
-
-			assert.Assert(t, !res.HasMore || (len(res.RunWebhookDeliveries) == expectedProjectRunWebhookDeliveries))
-
-			respAllProjectRunWebhookDeliveries = append(respAllProjectRunWebhookDeliveries, res.RunWebhookDeliveries...)
-
-			if !res.HasMore {
-				break
+			// populate the expected run webhook deliveries
+			expectedProject01RunWebhookDeliveries := []*types.RunWebhookDelivery{}
+			for _, c := range project01RunWebhookDeliveries {
+				if len(tt.deliveryStatusFilter) > 0 && !deliveryStatusInSlice(tt.deliveryStatusFilter, c.DeliveryStatus) {
+					continue
+				}
+				expectedProject01RunWebhookDeliveries = append(expectedProject01RunWebhookDeliveries, c)
 			}
 
-			lastProjectRunWebhookDelivery = res.RunWebhookDeliveries[len(res.RunWebhookDeliveries)-1]
-		}
+			var respAllProjectRunWebhookDeliveries []*types.RunWebhookDelivery
+			var lastProjectRunWebhookDelivery uint64
+			var callsNumber int
 
-		expectedProjectRunWebhookDeliveries = 20
-		assert.Assert(t, cmp.Len(respAllProjectRunWebhookDeliveries, expectedProjectRunWebhookDeliveries))
+			// fetch next results
+			for {
+				res, err := ns.ah.GetProjectRunWebhookDeliveries(ctx, &action.GetProjectRunWebhookDeliveriesRequest{
+					ProjectID:            project01,
+					Limit:                tt.limit,
+					SortDirection:        tt.sortDirection,
+					DeliveryStatusFilter: tt.deliveryStatusFilter,
+					StartSequence:        lastProjectRunWebhookDelivery,
+				})
+				testutil.NilError(t, err)
 
-		assert.Assert(t, cmpDiffObject(project01RunWebhookDeliveries, respAllProjectRunWebhookDeliveries))
-	})
+				callsNumber++
+
+				respAllProjectRunWebhookDeliveries = append(respAllProjectRunWebhookDeliveries, res.RunWebhookDeliveries...)
+				if res.HasMore == false {
+					break
+				}
+
+				lastProjectRunWebhookDelivery = respAllProjectRunWebhookDeliveries[len(respAllProjectRunWebhookDeliveries)-1].Sequence
+			}
+
+			// reverse if sortDirection is desc
+			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
+			if tt.sortDirection == types.SortDirectionDesc {
+				for i, j := 0, len(expectedProject01RunWebhookDeliveries)-1; i < j; i, j = i+1, j-1 {
+					expectedProject01RunWebhookDeliveries[i], expectedProject01RunWebhookDeliveries[j] = expectedProject01RunWebhookDeliveries[j], expectedProject01RunWebhookDeliveries[i]
+				}
+			}
+
+			assert.Assert(t, cmp.Len(respAllProjectRunWebhookDeliveries, tt.expectedRunWebhookDeliveriesNumber))
+			assert.Assert(t, cmpDiffObject(respAllProjectRunWebhookDeliveries, expectedProject01RunWebhookDeliveries))
+			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
+		})
+	}
 }
 
 func TestDeliveryStatusFromStringSlice(t *testing.T) {

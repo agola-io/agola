@@ -111,11 +111,13 @@ func (d *DB) GetProjectRunWebhookDeliveriesAfterSequenceByProjectID(tx *sql.Tx, 
 	case types.SortDirectionDesc:
 		q.Desc()
 	}
-	switch sortDirection {
-	case types.SortDirectionAsc:
-		q.Where(q.G("sequence", afterSequence))
-	case types.SortDirectionDesc:
-		q.Where(q.L("sequence", afterSequence))
+	if afterSequence > 0 {
+		switch sortDirection {
+		case types.SortDirectionAsc:
+			q.Where(q.G("sequence", afterSequence))
+		case types.SortDirectionDesc:
+			q.Where(q.L("sequence", afterSequence))
+		}
 	}
 
 	if limit > 0 {
