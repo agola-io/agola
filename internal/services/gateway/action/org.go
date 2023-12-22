@@ -149,7 +149,10 @@ func (h *ActionHandler) GetOrgMembers(ctx context.Context, req *GetOrgMembersReq
 	var outCursor string
 	if resp.HasMore && len(orgMembers) > 0 {
 		lastUserName := orgMembers[len(orgMembers)-1].User.Name
-		outCursor, err = MarshalCursor(&StartCursor{Start: lastUserName})
+		outCursor, err = MarshalCursor(&StartCursor{
+			Start:         lastUserName,
+			SortDirection: sortDirection,
+		})
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}

@@ -4226,76 +4226,107 @@ func TestGetOrgMembers(t *testing.T) {
 	createLinkedAccount(ctx, t, sc.gitea, sc.config)
 	gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
 
-	users := []*gwapitypes.UserResponse{}
 	for i := 1; i < 10; i++ {
-		user, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: fmt.Sprintf("orguser%d", i)})
+		_, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: fmt.Sprintf("orguser%d", i)})
 		testutil.NilError(t, err)
-
-		users = append(users, user)
 	}
 
 	org, _, err := gwClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg01, Visibility: gwapitypes.VisibilityPublic})
 	testutil.NilError(t, err)
 
-	for _, user := range users {
-		_, _, err := gwClient.AddOrgMember(ctx, agolaOrg01, user.ID, gwapitypes.MemberRoleMember)
+	var allOrgMembers []*gwapitypes.OrgMemberResponse
+	for i := 1; i < 10; i++ {
+		orgMember, _, err := gwClient.AddOrgMember(ctx, agolaOrg01, fmt.Sprintf("orguser%d", i), gwapitypes.MemberRoleMember)
 		testutil.NilError(t, err)
+
+		allOrgMembers = append(allOrgMembers, &orgMember.OrgMemberResponse)
 	}
 
-	t.Run("test get org members with default limit greater than org members", func(t *testing.T) {
-		res, resp, err := gwClient.GetOrgMembers(ctx, org.ID, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+	tests := []struct {
+		name                string
+		limit               int
+		sortDirection       gwapitypes.SortDirection
+		expectedCallsNumber int
+	}{
+		{
+			name:                "test get org members with limit = 0",
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get org members with limit less than org members continuation",
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get org members with limit greater than org members",
+			limit:               10,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get org members with limit = 0 and sortDirection desc",
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get org members with limit less than org members continuation and sortDirection desc",
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get org members with limit greater than org members and sortDirection desc",
+			limit:               10,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+	}
 
-		expectedOrgMembers := 9
-		assert.Assert(t, cmp.Len(res.Members, expectedOrgMembers))
-		assert.Assert(t, resp.Cursor == "")
-	})
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			expectedOrgMembers := append([]*gwapitypes.OrgMemberResponse{}, allOrgMembers...)
+			// reverse if sortDirection is desc
+			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
+			if tt.sortDirection == gwapitypes.SortDirectionDesc {
+				for i, j := 0, len(expectedOrgMembers)-1; i < j; i, j = i+1, j-1 {
+					expectedOrgMembers[i], expectedOrgMembers[j] = expectedOrgMembers[j], expectedOrgMembers[i]
+				}
+			}
 
-	t.Run("test get org members with limit less than org members", func(t *testing.T) {
-		res, resp, err := gwClient.GetOrgMembers(ctx, org.ID, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+			var respAllOrgMembers []*gwapitypes.OrgMemberResponse
 
-		expectedOrgMembers := 5
-		assert.Assert(t, cmp.Len(res.Members, expectedOrgMembers))
-		assert.Assert(t, resp.Cursor != "")
-	})
-
-	t.Run("test get org members with limit less than org members continuation", func(t *testing.T) {
-		orgMembers := []*gwapitypes.OrgMemberResponse{}
-
-		res, resp, err := gwClient.GetOrgMembers(ctx, org.ID, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedOrgMembers := 5
-		assert.Assert(t, cmp.Len(res.Members, expectedOrgMembers))
-		assert.Assert(t, resp.Cursor != "")
-
-		orgMembers = append(orgMembers, res.Members...)
-
-		// fetch next results
-		for {
-			res, resp, err = gwClient.GetOrgMembers(ctx, org.ID, &gwclient.ListOptions{Cursor: resp.Cursor, Limit: 5})
+			respOrgMembers, res, err := gwClient.GetOrgMembers(ctx, org.ID, &gwclient.ListOptions{
+				Limit: tt.limit, SortDirection: tt.sortDirection,
+			})
 			testutil.NilError(t, err)
 
-			expectedOrgMembers := 5
-			assert.Assert(t, resp.Cursor == "" || (len(res.Members) == expectedOrgMembers))
+			respAllOrgMembers = append(respAllOrgMembers, respOrgMembers.Members...)
+			callsNumber := 1
 
-			orgMembers = append(orgMembers, res.Members...)
+			// fetch next results
+			for {
+				if res.Cursor == "" {
+					break
+				}
 
-			if resp.Cursor == "" {
-				break
+				respOrgMembers, res, err = gwClient.GetOrgMembers(ctx, org.ID, &gwclient.ListOptions{
+					Cursor: res.Cursor, Limit: tt.limit,
+				})
+				testutil.NilError(t, err)
+
+				callsNumber++
+
+				respAllOrgMembers = append(respAllOrgMembers, respOrgMembers.Members...)
 			}
-		}
 
-		expectedOrgMembers = 9
-		assert.Assert(t, cmp.Len(orgMembers, expectedOrgMembers))
-
-		orgMemberUsers := []*gwapitypes.UserResponse{}
-		for _, orgMember := range orgMembers {
-			orgMemberUsers = append(orgMemberUsers, orgMember.User)
-		}
-		assert.DeepEqual(t, users, orgMemberUsers)
-	})
+			assert.Assert(t, cmp.Len(respAllOrgMembers, len(expectedOrgMembers)))
+			assert.DeepEqual(t, respAllOrgMembers, expectedOrgMembers)
+			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
+		})
+	}
 }
 
 func TestGetUserOrgs(t *testing.T) {
