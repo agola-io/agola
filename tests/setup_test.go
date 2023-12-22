@@ -4043,14 +4043,13 @@ func TestGetOrgs(t *testing.T) {
 
 	gwAdminClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
 
-	// create users
 	_, _, err := gwAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
 	testutil.NilError(t, err)
 
 	tokenUser01, _, err := gwAdminClient.CreateUserToken(ctx, agolaUser01, &gwapitypes.CreateUserTokenRequest{TokenName: "test"})
 	testutil.NilError(t, err)
 
-	gwClientUser01 := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01.Token)
+	gwUser01Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01.Token)
 
 	allOrgs := []*gwapitypes.OrgResponse{}
 	publicOrgs := []*gwapitypes.OrgResponse{}
@@ -4069,109 +4068,148 @@ func TestGetOrgs(t *testing.T) {
 		}
 	}
 
-	t.Run("test get public orgs with default limit greater than orgs", func(t *testing.T) {
-		orgs, resp, err := gwClientUser01.GetOrgs(ctx, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+	tests := []struct {
+		name                string
+		getPublicOrgsOnly   bool
+		limit               int
+		sortDirection       gwapitypes.SortDirection
+		expectedCallsNumber int
+	}{
+		{
+			name:                "test get public orgs with limit = 0",
+			getPublicOrgsOnly:   true,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get public/private orgs with limit = 0",
+			getPublicOrgsOnly:   false,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get public orgs with limit less than orgs",
+			getPublicOrgsOnly:   true,
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get public orgs with limit greater than orgs",
+			getPublicOrgsOnly:   true,
+			limit:               10,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get public orgs with limit less than orgs continuation",
+			getPublicOrgsOnly:   true,
+			limit:               3,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 3,
+		},
+		{
+			name:                "test get public/private orgs with limit less than orgs continuation",
+			getPublicOrgsOnly:   false,
+			limit:               3,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 6,
+		},
+		{
+			name:                "test get public orgs with limit = 0 and sortDirection desc",
+			getPublicOrgsOnly:   true,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get public/private orgs with limit = 0 and sortDirection desc",
+			getPublicOrgsOnly:   false,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get public orgs with limit less than orgs and sortDirection desc",
+			getPublicOrgsOnly:   true,
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get public orgs with limit greater than orgs and sortDirection desc",
+			getPublicOrgsOnly:   true,
+			limit:               10,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get public orgs with limit less than orgs continuation and sortDirection desc",
+			getPublicOrgsOnly:   true,
+			limit:               3,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 3,
+		},
+		{
+			name:                "test get public/private orgs with limit less than orgs continuation and sortDirection desc",
+			getPublicOrgsOnly:   false,
+			limit:               3,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 6,
+		},
+	}
 
-		expectedOrgs := 9
-		assert.Assert(t, cmp.Len(orgs, expectedOrgs))
-		assert.Assert(t, resp.Cursor == "")
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			// populate the expected orgs and client
+			var expectedOrgs []*gwapitypes.OrgResponse
+			var client *gwclient.Client
+			if tt.getPublicOrgsOnly {
+				expectedOrgs = append(expectedOrgs, publicOrgs...)
+				client = gwUser01Client
+			} else {
+				expectedOrgs = append(expectedOrgs, allOrgs...)
+				client = gwAdminClient
+			}
 
-		assert.DeepEqual(t, publicOrgs[:expectedOrgs], orgs)
-	})
+			// reverse if sortDirection is desc
+			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
+			if tt.sortDirection == gwapitypes.SortDirectionDesc {
+				for i, j := 0, len(expectedOrgs)-1; i < j; i, j = i+1, j-1 {
+					expectedOrgs[i], expectedOrgs[j] = expectedOrgs[j], expectedOrgs[i]
+				}
+			}
 
-	t.Run("test get public/private orgs with default limit greater than orgs", func(t *testing.T) {
-		orgs, resp, err := gwAdminClient.GetOrgs(ctx, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+			var respAllOrgs []*gwapitypes.OrgResponse
 
-		expectedOrgs := 18
-		assert.Assert(t, cmp.Len(orgs, expectedOrgs))
-		assert.Assert(t, resp.Cursor == "")
-	})
-
-	t.Run("test get public orgs with limit less than orgs", func(t *testing.T) {
-		orgs, resp, err := gwClientUser01.GetOrgs(ctx, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedOrgs := 5
-		assert.Assert(t, cmp.Len(orgs, expectedOrgs))
-		assert.Assert(t, resp.Cursor != "")
-	})
-
-	t.Run("test get public/private orgs with limit less than orgs", func(t *testing.T) {
-		orgs, resp, err := gwAdminClient.GetOrgs(ctx, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedOrgs := 5
-		assert.Assert(t, cmp.Len(orgs, expectedOrgs))
-		assert.Assert(t, resp.Cursor != "")
-	})
-
-	t.Run("test get public orgs with limit less than orgs continuation", func(t *testing.T) {
-		respAllOrgs := []*gwapitypes.OrgResponse{}
-
-		respOrgs, resp, err := gwClientUser01.GetOrgs(ctx, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedOrgs := 5
-		assert.Assert(t, cmp.Len(respOrgs, expectedOrgs))
-		assert.Assert(t, resp.Cursor != "")
-
-		respAllOrgs = append(respAllOrgs, respOrgs...)
-
-		// fetch next results
-		for {
-			respOrgs, resp, err = gwClientUser01.GetOrgs(ctx, &gwclient.ListOptions{Cursor: resp.Cursor, Limit: 5})
+			respOrgs, res, err := client.GetOrgs(ctx, &gwclient.ListOptions{
+				Limit: tt.limit, SortDirection: tt.sortDirection,
+			})
 			testutil.NilError(t, err)
 
-			expectedOrgs := 5
-			assert.Assert(t, resp.Cursor == "" || (len(respOrgs) == expectedOrgs))
-
 			respAllOrgs = append(respAllOrgs, respOrgs...)
+			callsNumber := 1
 
-			if resp.Cursor == "" {
-				break
+			// fetch next results
+			for {
+				if res.Cursor == "" {
+					break
+				}
+
+				respOrgs, res, err = client.GetOrgs(ctx, &gwclient.ListOptions{
+					Cursor: res.Cursor, Limit: tt.limit,
+				})
+				testutil.NilError(t, err)
+
+				callsNumber++
+
+				respAllOrgs = append(respAllOrgs, respOrgs...)
 			}
-		}
 
-		expectedOrgs = 9
-		assert.Assert(t, cmp.Len(respAllOrgs, expectedOrgs))
-
-		assert.DeepEqual(t, publicOrgs, respAllOrgs)
-	})
-
-	t.Run("test get public/private orgs with limit less than orgs continuation", func(t *testing.T) {
-		respAllOrgs := []*gwapitypes.OrgResponse{}
-
-		respOrgs, resp, err := gwAdminClient.GetOrgs(ctx, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedOrgs := 5
-		assert.Assert(t, cmp.Len(respOrgs, expectedOrgs))
-		assert.Assert(t, resp.Cursor != "")
-
-		respAllOrgs = append(respAllOrgs, respOrgs...)
-
-		// fetch next results
-		for {
-			respOrgs, resp, err = gwAdminClient.GetOrgs(ctx, &gwclient.ListOptions{Cursor: resp.Cursor, Limit: 5})
-			testutil.NilError(t, err)
-
-			expectedOrgs := 5
-			assert.Assert(t, resp.Cursor == "" || (len(respOrgs) == expectedOrgs))
-
-			respAllOrgs = append(respAllOrgs, respOrgs...)
-
-			if resp.Cursor == "" {
-				break
-			}
-		}
-
-		expectedOrgs = 18
-		assert.Assert(t, cmp.Len(respAllOrgs, expectedOrgs))
-
-		assert.DeepEqual(t, allOrgs, respAllOrgs)
-	})
+			assert.Assert(t, cmp.Len(respAllOrgs, len(expectedOrgs)))
+			assert.DeepEqual(t, respAllOrgs, expectedOrgs)
+			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
+		})
+	}
 }
 
 func TestGetOrgMembers(t *testing.T) {
