@@ -4434,60 +4434,95 @@ func TestGetUserOrgs(t *testing.T) {
 
 	gwClient = gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser.Token)
 
-	t.Run("test get user orgs with default limit greater than user orgs", func(t *testing.T) {
-		userOrgs, resp, err := gwClient.GetUserOrgs(ctx, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+	tests := []struct {
+		name                string
+		limit               int
+		sortDirection       gwapitypes.SortDirection
+		expectedCallsNumber int
+	}{
+		{
+			name:                "test get user orgs with limit = 0",
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get user orgs with limit less than user orgs continuation",
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get user orgs with limit greater than user orgs",
+			limit:               10,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get user orgs with limit = 0 and sortDirection desc",
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get user orgs with limit less than user orgs continuation and sortDirection desc",
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get user orgs with limit greater than user orgs and sortDirection desc",
+			limit:               10,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+	}
 
-		expectedUserOrgs := 9
-		assert.Assert(t, cmp.Len(userOrgs, expectedUserOrgs))
-		assert.Assert(t, resp.Cursor == "")
-	})
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			expectedUserOrgs := append([]*gwapitypes.OrgResponse{}, orgs...)
+			// reverse if sortDirection is desc
+			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
+			if tt.sortDirection == gwapitypes.SortDirectionDesc {
+				for i, j := 0, len(expectedUserOrgs)-1; i < j; i, j = i+1, j-1 {
+					expectedUserOrgs[i], expectedUserOrgs[j] = expectedUserOrgs[j], expectedUserOrgs[i]
+				}
+			}
 
-	t.Run("test get user orgs with limit less than user orgs", func(t *testing.T) {
-		res, resp, err := gwClient.GetUserOrgs(ctx, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+			var respAllUserOrgs []*gwapitypes.OrgResponse
 
-		expectedUserOrgs := 5
-		assert.Assert(t, cmp.Len(res, expectedUserOrgs))
-		assert.Assert(t, resp.Cursor != "")
-	})
-
-	t.Run("test get user orgs with limit less than user orgs continuation", func(t *testing.T) {
-		respAllUserOrgs := []*gwapitypes.UserOrgResponse{}
-
-		respUserOrgs, resp, err := gwClient.GetUserOrgs(ctx, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedUserOrgs := 5
-		assert.Assert(t, cmp.Len(respUserOrgs, expectedUserOrgs))
-		assert.Assert(t, resp.Cursor != "")
-
-		respAllUserOrgs = append(respAllUserOrgs, respUserOrgs...)
-
-		// fetch next results
-		for {
-			respUserOrgs, resp, err = gwClient.GetUserOrgs(ctx, &gwclient.ListOptions{Cursor: resp.Cursor, Limit: 5})
+			respUserOrgs, res, err := gwClient.GetUserOrgs(ctx, &gwclient.ListOptions{
+				Limit: tt.limit, SortDirection: tt.sortDirection,
+			})
 			testutil.NilError(t, err)
 
-			expectedUserOrgs := 5
-			assert.Assert(t, resp.Cursor == "" || (len(respUserOrgs) == expectedUserOrgs))
-
-			respAllUserOrgs = append(respAllUserOrgs, respUserOrgs...)
-
-			if resp.Cursor == "" {
-				break
+			for _, userOrg := range respUserOrgs {
+				respAllUserOrgs = append(respAllUserOrgs, userOrg.Organization)
 			}
-		}
+			callsNumber := 1
 
-		expectedUserOrgs = 9
-		assert.Assert(t, cmp.Len(respAllUserOrgs, expectedUserOrgs))
+			// fetch next results
+			for {
+				if res.Cursor == "" {
+					break
+				}
 
-		userOrgs := []*gwapitypes.OrgResponse{}
-		for _, userOrg := range respAllUserOrgs {
-			userOrgs = append(userOrgs, userOrg.Organization)
-		}
-		assert.DeepEqual(t, orgs, userOrgs)
-	})
+				respUserOrgs, res, err = gwClient.GetUserOrgs(ctx, &gwclient.ListOptions{
+					Cursor: res.Cursor, Limit: tt.limit,
+				})
+				testutil.NilError(t, err)
+
+				callsNumber++
+
+				for _, userOrg := range respUserOrgs {
+					respAllUserOrgs = append(respAllUserOrgs, userOrg.Organization)
+				}
+			}
+
+			assert.Assert(t, cmp.Len(respAllUserOrgs, len(expectedUserOrgs)))
+			assert.DeepEqual(t, respAllUserOrgs, expectedUserOrgs)
+			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
+		})
+	}
 }
 
 func TestMaintenance(t *testing.T) {
