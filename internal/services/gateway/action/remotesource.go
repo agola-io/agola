@@ -64,7 +64,10 @@ func (h *ActionHandler) GetRemoteSources(ctx context.Context, req *GetRemoteSour
 	var outCursor string
 	if resp.HasMore && len(remoteSources) > 0 {
 		lastRemoteSourceName := remoteSources[len(remoteSources)-1].Name
-		outCursor, err = MarshalCursor(&StartCursor{Start: lastRemoteSourceName})
+		outCursor, err = MarshalCursor(&StartCursor{
+			Start:         lastRemoteSourceName,
+			SortDirection: sortDirection,
+		})
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}

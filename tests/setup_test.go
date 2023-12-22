@@ -3901,56 +3901,91 @@ func TestGetRemoteSources(t *testing.T) {
 		remoteSources = append(remoteSources, remoteSource)
 	}
 
-	t.Run("test get remote sources with default limit greater than remote sources", func(t *testing.T) {
-		remoteSources, resp, err := gwClient.GetRemoteSources(ctx, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+	tests := []struct {
+		name                string
+		limit               int
+		sortDirection       gwapitypes.SortDirection
+		expectedCallsNumber int
+	}{
+		{
+			name:                "test get remote sources with limit = 0",
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get remote sources with limit less than remote sources continuation",
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get remote sources with limit greater than remote sources",
+			limit:               10,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get remote sources with limit = 0 and sortDirection desc",
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get remote sources with limit less than remote sources continuation and sortDirection desc",
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get remote sources with limit greater than remote sources and sortDirection desc",
+			limit:               10,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+	}
 
-		expectedRemoteSources := 9
-		assert.Assert(t, cmp.Len(remoteSources, expectedRemoteSources))
-		assert.Assert(t, resp.Cursor == "")
-	})
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			expectedRemoteSources := append([]*gwapitypes.RemoteSourceResponse{}, remoteSources...)
+			// reverse if sortDirection is desc
+			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
+			if tt.sortDirection == gwapitypes.SortDirectionDesc {
+				for i, j := 0, len(expectedRemoteSources)-1; i < j; i, j = i+1, j-1 {
+					expectedRemoteSources[i], expectedRemoteSources[j] = expectedRemoteSources[j], expectedRemoteSources[i]
+				}
+			}
 
-	t.Run("test get remote sources with limit less than remote sources", func(t *testing.T) {
-		remoteSources, resp, err := gwClient.GetRemoteSources(ctx, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+			var respAllRemoteSources []*gwapitypes.RemoteSourceResponse
 
-		expectedRemoteSources := 5
-		assert.Assert(t, cmp.Len(remoteSources, expectedRemoteSources))
-		assert.Assert(t, resp.Cursor != "")
-	})
-
-	t.Run("test get remote sources with limit less than remote sources continuation", func(t *testing.T) {
-		respAllRemoteSources := []*gwapitypes.RemoteSourceResponse{}
-
-		respRemoteSources, resp, err := gwClient.GetRemoteSources(ctx, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedRemoteSources := 5
-		assert.Assert(t, cmp.Len(respRemoteSources, expectedRemoteSources))
-		assert.Assert(t, resp.Cursor != "")
-
-		respAllRemoteSources = append(respAllRemoteSources, respRemoteSources...)
-
-		// fetch next results
-		for {
-			respRemoteSources, resp, err = gwClient.GetRemoteSources(ctx, &gwclient.ListOptions{Cursor: resp.Cursor, Limit: 5})
+			respRemoteSources, res, err := gwClient.GetRemoteSources(ctx, &gwclient.ListOptions{
+				Limit: tt.limit, SortDirection: tt.sortDirection,
+			})
 			testutil.NilError(t, err)
 
-			expectedRemoteSources := 5
-			assert.Assert(t, resp.Cursor == "" || (len(respRemoteSources) == expectedRemoteSources))
-
 			respAllRemoteSources = append(respAllRemoteSources, respRemoteSources...)
+			callsNumber := 1
 
-			if resp.Cursor == "" {
-				break
+			// fetch next results
+			for {
+				if res.Cursor == "" {
+					break
+				}
+
+				respRemoteSources, res, err = gwClient.GetRemoteSources(ctx, &gwclient.ListOptions{
+					Cursor: res.Cursor, Limit: tt.limit,
+				})
+				testutil.NilError(t, err)
+
+				callsNumber++
+
+				respAllRemoteSources = append(respAllRemoteSources, respRemoteSources...)
 			}
-		}
 
-		expectedRemoteSources = 9
-		assert.Assert(t, cmp.Len(respAllRemoteSources, expectedRemoteSources))
-
-		assert.DeepEqual(t, remoteSources, respAllRemoteSources)
-	})
+			assert.Assert(t, cmp.Len(respAllRemoteSources, len(expectedRemoteSources)))
+			assert.DeepEqual(t, respAllRemoteSources, expectedRemoteSources)
+			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
+		})
+	}
 }
 
 func TestGetUsers(t *testing.T) {
