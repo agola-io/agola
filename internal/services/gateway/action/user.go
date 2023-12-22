@@ -174,7 +174,10 @@ func (h *ActionHandler) GetUsers(ctx context.Context, req *GetUsersRequest) (*Ge
 	var outCursor string
 	if resp.HasMore && len(csusers) > 0 {
 		lastUserName := csusers[len(csusers)-1].Name
-		outCursor, err = MarshalCursor(&StartCursor{Start: lastUserName})
+		outCursor, err = MarshalCursor(&StartCursor{
+			Start:         lastUserName,
+			SortDirection: sortDirection,
+		})
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
