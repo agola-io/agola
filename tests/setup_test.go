@@ -65,7 +65,6 @@ import (
 	cstypes "agola.io/agola/services/configstore/types"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
-	nstypes "agola.io/agola/services/notification/types"
 	rstypes "agola.io/agola/services/runservice/types"
 )
 
@@ -5762,77 +5761,151 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 		return true, nil
 	})
 
-	t.Run("test get project run webhook deliveries", func(t *testing.T) {
-		runWebhookDeliveries, resp, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+	runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+	testutil.NilError(t, err)
 
-		assert.Assert(t, cmp.Len(runWebhookDeliveries, 4))
-		assert.Assert(t, resp.Cursor == "")
-		for _, r := range runWebhookDeliveries {
-			assert.Equal(t, r.DeliveryStatus, gwapitypes.DeliveryStatusDelivered)
-		}
-	})
+	tests := []struct {
+		name                 string
+		client               *gwclient.Client
+		projectRef           string
+		limit                int
+		sortDirection        gwapitypes.SortDirection
+		deliveryStatusFilter []string
+		expectedCallsNumber  int
+		expectedErr          string
+	}{
+		{
+			name:                "test get project run webhook deliveries with limit = 0",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get project run webhook deliveries with limit less than project run webhook deliveries continuation",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 2,
+		},
+		{
+			name:                "test get project run webhook deliveries with limit greater than project run webhook deliveries",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			limit:               5,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get project run webhook deliveries with limit = 0 and sortDirection desc",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get project run webhook deliveries with limit less than project run webhook deliveries continuation and sortDirection desc",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 2,
+		},
+		{
+			name:                "test get project run webhook deliveries with limit greater than project run webhook deliveries and sortDirection desc",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			limit:               5,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:          "test get project run webhook deliveries with user unauthorized",
+			client:        gwUser02Client,
+			projectRef:    project.ID,
+			sortDirection: gwapitypes.SortDirectionAsc,
+			expectedErr:   remoteErrorForbidden,
+		},
+		{
+			name:          "test get project run webhook deliveries with not existing project",
+			client:        gwUser01Client,
+			projectRef:    "project02",
+			sortDirection: gwapitypes.SortDirectionAsc,
+			expectedErr:   remoteErrorNotExist,
+		},
+		{
+			name:                "test get project run webhook deliveries with deliverystatus = delivered",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get project run webhook deliveries with deliverystatus = deliveryError",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+	}
 
-	t.Run("test get project run webhook deliveries with limit less than project run webhook deliveries continuation", func(t *testing.T) {
-		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			// populate the expected commit status deliveries
+			expectedProject01RunWebhookDeliveries := []*gwapitypes.RunWebhookDeliveryResponse{}
+			for _, r := range runWebhookDeliveries {
+				if len(tt.deliveryStatusFilter) > 0 && !util.StringInSlice(tt.deliveryStatusFilter, string(r.DeliveryStatus)) {
+					continue
+				}
+				expectedProject01RunWebhookDeliveries = append(expectedProject01RunWebhookDeliveries, r)
+			}
 
-		respAllRunWebhookDeliveries := []*gwapitypes.RunWebhookDeliveryResponse{}
+			// reverse if sortDirection is desc
+			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
+			if tt.sortDirection == gwapitypes.SortDirectionDesc {
+				for i, j := 0, len(expectedProject01RunWebhookDeliveries)-1; i < j; i, j = i+1, j-1 {
+					expectedProject01RunWebhookDeliveries[i], expectedProject01RunWebhookDeliveries[j] = expectedProject01RunWebhookDeliveries[j], expectedProject01RunWebhookDeliveries[i]
+				}
+			}
 
-		respRunWebhookDeliveries, resp, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 1, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+			var respAllRunWebhookDeliveries []*gwapitypes.RunWebhookDeliveryResponse
 
-		expectedRunWebhookDeliveries := 1
-		assert.Assert(t, cmp.Len(respRunWebhookDeliveries, expectedRunWebhookDeliveries))
-		assert.Assert(t, resp.Cursor != "")
-
-		respAllRunWebhookDeliveries = append(respAllRunWebhookDeliveries, respRunWebhookDeliveries...)
-
-		// fetch next results
-		for {
-			respRunWebhookDeliveries, resp, err = gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Cursor: resp.Cursor, Limit: 1})
-			testutil.NilError(t, err)
-
-			assert.Assert(t, resp.Cursor == "" || (len(respRunWebhookDeliveries) == expectedRunWebhookDeliveries))
+			respRunWebhookDeliveries, res, err := tt.client.GetProjectRunWebhookDeliveries(ctx, tt.projectRef, tt.deliveryStatusFilter, &gwclient.ListOptions{
+				Limit: tt.limit, SortDirection: tt.sortDirection,
+			})
+			if tt.expectedErr == "" {
+				testutil.NilError(t, err)
+			} else {
+				assert.Error(t, err, tt.expectedErr)
+				return
+			}
 
 			respAllRunWebhookDeliveries = append(respAllRunWebhookDeliveries, respRunWebhookDeliveries...)
+			callsNumber := 1
 
-			if resp.Cursor == "" {
-				break
+			// fetch next results
+			for {
+				if res.Cursor == "" {
+					break
+				}
+
+				respRunWebhookDeliveries, res, err = tt.client.GetProjectRunWebhookDeliveries(ctx, tt.projectRef, tt.deliveryStatusFilter, &gwclient.ListOptions{
+					Cursor: res.Cursor, Limit: tt.limit,
+				})
+				testutil.NilError(t, err)
+
+				callsNumber++
+
+				respAllRunWebhookDeliveries = append(respAllRunWebhookDeliveries, respRunWebhookDeliveries...)
 			}
-		}
 
-		expectedRunWebhookDeliveries = 4
-		assert.Assert(t, cmp.Len(respAllRunWebhookDeliveries, expectedRunWebhookDeliveries))
-
-		assert.DeepEqual(t, runWebhookDeliveries, respAllRunWebhookDeliveries)
-	})
-
-	t.Run("test get project run webhook deliveries with user unauthorized", func(t *testing.T) {
-		_, _, err = gwUser02Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
-		assert.Error(t, err, remoteErrorForbidden)
-	})
-
-	t.Run("test get project run webhook deliveries with not existing project", func(t *testing.T) {
-		_, _, err = gwUser01Client.GetProjectRunWebhookDeliveries(ctx, "project02", nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
-		assert.Error(t, err, remoteErrorNotExist)
-	})
-
-	t.Run("test get project run webhook deliveries with deliverystatus = delivered", func(t *testing.T) {
-		runWebhookDeliveries, resp, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, []string{string(nstypes.DeliveryStatusDelivered)}, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		assert.Assert(t, cmp.Len(runWebhookDeliveries, 4))
-		assert.Assert(t, resp.Cursor == "")
-	})
-
-	t.Run("test get project run webhook deliveries with deliverystatus = deliveryError", func(t *testing.T) {
-		runWebhookDeliveries, resp, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, []string{string(nstypes.DeliveryStatusDeliveryError)}, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		assert.Assert(t, cmp.Len(runWebhookDeliveries, 0))
-		assert.Assert(t, resp.Cursor == "")
-	})
+			assert.Assert(t, cmp.Len(respAllRunWebhookDeliveries, len(expectedProject01RunWebhookDeliveries)))
+			assert.DeepEqual(t, respAllRunWebhookDeliveries, expectedProject01RunWebhookDeliveries)
+			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
+		})
+	}
 }
 
 func TestProjectRunWebhookRedelivery(t *testing.T) {

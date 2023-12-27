@@ -69,7 +69,10 @@ func (h *ActionHandler) GetProjectRunWebhookDeliveries(ctx context.Context, req 
 	var outCursor string
 	if resp.HasMore && len(runWebhookDeliveries) > 0 {
 		lastRunWebhookDeliverySequence := runWebhookDeliveries[len(runWebhookDeliveries)-1].Sequence
-		outCursor, err = MarshalCursor(&StartSequenceCursor{StartSequence: lastRunWebhookDeliverySequence})
+		outCursor, err = MarshalCursor(&StartSequenceCursor{
+			StartSequence: lastRunWebhookDeliverySequence,
+			SortDirection: sortDirection,
+		})
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
