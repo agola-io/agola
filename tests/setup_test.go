@@ -6301,75 +6301,155 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 		return true, nil
 	})
 
-	t.Run("test get project commit status deliveries", func(t *testing.T) {
-		commitStatusDeliveries, resp, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+	commitStatusDeliveries, resp, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
+	testutil.NilError(t, err)
 
-		assert.Assert(t, cmp.Len(commitStatusDeliveries, 2*runCount))
-		assert.Assert(t, resp.Cursor == "")
-		for _, r := range commitStatusDeliveries {
-			assert.Equal(t, r.DeliveryStatus, gwapitypes.DeliveryStatusDelivered)
-		}
-	})
+	assert.Assert(t, cmp.Len(commitStatusDeliveries, 2*runCount))
+	assert.Assert(t, resp.Cursor == "")
+	for _, r := range commitStatusDeliveries {
+		assert.Assert(t, cmp.Equal(r.DeliveryStatus, gwapitypes.DeliveryStatusDelivered))
+	}
 
-	t.Run("test get project commit status deliveries with limit less than project commit status deliveries continuation", func(t *testing.T) {
-		commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+	tests := []struct {
+		name                 string
+		client               *gwclient.Client
+		projectRef           string
+		limit                int
+		sortDirection        gwapitypes.SortDirection
+		deliveryStatusFilter []string
+		expectedCallsNumber  int
+		expectedErr          string
+	}{
+		{
+			name:                "test get project commit status deliveries with limit = 0",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get project commit status deliveries with limit less than project commit status deliveries continuation",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: runCount,
+		},
+		{
+			name:                "test get project commit status deliveries with limit greater than project commit status deliveries",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			limit:               10,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get project commit status deliveries with limit = 0 and sortDirection desc",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get project commit status deliveries with limit less than project commit status deliveries continuation and sortDirection desc",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: runCount,
+		},
+		{
+			name:                "test get project commit status deliveries with limit greater than project commit status deliveries and sortDirection desc",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			limit:               10,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:          "test get project commit status deliveries with user unauthorized",
+			client:        gwUser02Client,
+			projectRef:    project.ID,
+			sortDirection: gwapitypes.SortDirectionAsc,
+			expectedErr:   remoteErrorForbidden,
+		},
+		{
+			name:          "test get project commit status deliveries with not existing project",
+			client:        gwUser01Client,
+			projectRef:    "project02",
+			sortDirection: gwapitypes.SortDirectionAsc,
+			expectedErr:   remoteErrorNotExist,
+		},
+		{
+			name:                "test get project commit status deliveries with deliverystatus = delivered",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get project commit status deliveries with deliverystatus = deliveryError",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+	}
 
-		respAllCommitStatusDeliveries := []*gwapitypes.CommitStatusDeliveryResponse{}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			// populate the expected commit status deliveries
+			expectedProject01CommitStatusDeliveries := []*gwapitypes.CommitStatusDeliveryResponse{}
+			for _, c := range commitStatusDeliveries {
+				if len(tt.deliveryStatusFilter) > 0 && !util.StringInSlice(tt.deliveryStatusFilter, string(c.DeliveryStatus)) {
+					continue
+				}
+				expectedProject01CommitStatusDeliveries = append(expectedProject01CommitStatusDeliveries, c)
+			}
 
-		respCommitStatusDeliveries, resp, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 1, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+			// reverse if sortDirection is desc
+			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
+			if tt.sortDirection == gwapitypes.SortDirectionDesc {
+				for i, j := 0, len(expectedProject01CommitStatusDeliveries)-1; i < j; i, j = i+1, j-1 {
+					expectedProject01CommitStatusDeliveries[i], expectedProject01CommitStatusDeliveries[j] = expectedProject01CommitStatusDeliveries[j], expectedProject01CommitStatusDeliveries[i]
+				}
+			}
 
-		expectedCommitStatusDeliveries := 1
-		assert.Assert(t, cmp.Len(respCommitStatusDeliveries, expectedCommitStatusDeliveries))
-		assert.Assert(t, resp.Cursor != "")
+			var respAllCommitStatusDeliveries []*gwapitypes.CommitStatusDeliveryResponse
 
-		respAllCommitStatusDeliveries = append(respAllCommitStatusDeliveries, respCommitStatusDeliveries...)
-
-		// fetch next results
-		for {
-			respCommitStatusDeliveries, resp, err = gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Cursor: resp.Cursor, Limit: 1})
-			testutil.NilError(t, err)
-
-			assert.Assert(t, resp.Cursor == "" || (len(respCommitStatusDeliveries) == expectedCommitStatusDeliveries))
+			respCommitStatusDeliveries, res, err := tt.client.GetProjectCommitStatusDeliveries(ctx, tt.projectRef, tt.deliveryStatusFilter, &gwclient.ListOptions{
+				Limit: tt.limit, SortDirection: tt.sortDirection,
+			})
+			if tt.expectedErr == "" {
+				testutil.NilError(t, err)
+			} else {
+				assert.Error(t, err, tt.expectedErr)
+				return
+			}
 
 			respAllCommitStatusDeliveries = append(respAllCommitStatusDeliveries, respCommitStatusDeliveries...)
+			callsNumber := 1
 
-			if resp.Cursor == "" {
-				break
+			// fetch next results
+			for {
+				if res.Cursor == "" {
+					break
+				}
+
+				respCommitStatusDeliveries, res, err = tt.client.GetProjectCommitStatusDeliveries(ctx, tt.projectRef, tt.deliveryStatusFilter, &gwclient.ListOptions{
+					Cursor: res.Cursor, Limit: tt.limit,
+				})
+				testutil.NilError(t, err)
+
+				callsNumber++
+
+				respAllCommitStatusDeliveries = append(respAllCommitStatusDeliveries, respCommitStatusDeliveries...)
 			}
-		}
 
-		expectedCommitStatusDeliveries = 2 * runCount
-		assert.Assert(t, cmp.Len(respAllCommitStatusDeliveries, expectedCommitStatusDeliveries))
-
-		assert.DeepEqual(t, commitStatusDeliveries, respAllCommitStatusDeliveries)
-	})
-
-	t.Run("test get project commit status deliveries with user unauthorized", func(t *testing.T) {
-		_, _, err = gwUser02Client.GetProjectCommitStatusDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
-		assert.Error(t, err, remoteErrorForbidden)
-	})
-
-	t.Run("test get project commit status deliveries with not existing project", func(t *testing.T) {
-		_, _, err = gwUser01Client.GetProjectCommitStatusDeliveries(ctx, "project02", nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
-		assert.Error(t, err, remoteErrorNotExist)
-	})
-
-	t.Run("test get project commit status deliveries with deliverystatus = delivered", func(t *testing.T) {
-		commitStatusDeliveries, resp, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, []string{string(nstypes.DeliveryStatusDelivered)}, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		assert.Assert(t, cmp.Len(commitStatusDeliveries, 2*runCount))
-		assert.Assert(t, resp.Cursor == "")
-	})
-
-	t.Run("test get project commit status deliveries with deliverystatus = deliveryError", func(t *testing.T) {
-		commitStatusDeliveries, resp, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, []string{string(nstypes.DeliveryStatusDeliveryError)}, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		assert.Assert(t, cmp.Len(commitStatusDeliveries, 0))
-		assert.Assert(t, resp.Cursor == "")
-	})
+			assert.Assert(t, cmp.Len(respAllCommitStatusDeliveries, len(expectedProject01CommitStatusDeliveries)))
+			assert.DeepEqual(t, respAllCommitStatusDeliveries, expectedProject01CommitStatusDeliveries)
+			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
+		})
+	}
 }

@@ -69,7 +69,10 @@ func (h *ActionHandler) GetProjectCommitStatusDeliveries(ctx context.Context, re
 	var outCursor string
 	if resp.HasMore && len(commitStatusDeliveries) > 0 {
 		lastCommitStatusDeliverySequence := commitStatusDeliveries[len(commitStatusDeliveries)-1].Sequence
-		outCursor, err = MarshalCursor(&StartSequenceCursor{StartSequence: lastCommitStatusDeliverySequence})
+		outCursor, err = MarshalCursor(&StartSequenceCursor{
+			StartSequence: lastCommitStatusDeliverySequence,
+			SortDirection: sortDirection,
+		})
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
