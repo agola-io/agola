@@ -125,7 +125,10 @@ func (h *ActionHandler) GetUserOrgs(ctx context.Context, req *GetUserOrgsRequest
 	var outCursor string
 	if resp.HasMore && len(orgs) > 0 {
 		lastOrgName := orgs[len(orgs)-1].Organization.Name
-		outCursor, err = MarshalCursor(&StartCursor{Start: lastOrgName})
+		outCursor, err = MarshalCursor(&StartCursor{
+			Start:         lastOrgName,
+			SortDirection: sortDirection,
+		})
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
@@ -174,7 +177,10 @@ func (h *ActionHandler) GetUsers(ctx context.Context, req *GetUsersRequest) (*Ge
 	var outCursor string
 	if resp.HasMore && len(csusers) > 0 {
 		lastUserName := csusers[len(csusers)-1].Name
-		outCursor, err = MarshalCursor(&StartCursor{Start: lastUserName})
+		outCursor, err = MarshalCursor(&StartCursor{
+			Start:         lastUserName,
+			SortDirection: sortDirection,
+		})
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}

@@ -65,7 +65,6 @@ import (
 	cstypes "agola.io/agola/services/configstore/types"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
-	nstypes "agola.io/agola/services/notification/types"
 	rstypes "agola.io/agola/services/runservice/types"
 )
 
@@ -3901,56 +3900,91 @@ func TestGetRemoteSources(t *testing.T) {
 		remoteSources = append(remoteSources, remoteSource)
 	}
 
-	t.Run("test get remote sources with default limit greater than remote sources", func(t *testing.T) {
-		remoteSources, resp, err := gwClient.GetRemoteSources(ctx, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+	tests := []struct {
+		name                string
+		limit               int
+		sortDirection       gwapitypes.SortDirection
+		expectedCallsNumber int
+	}{
+		{
+			name:                "test get remote sources with limit = 0",
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get remote sources with limit less than remote sources continuation",
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get remote sources with limit greater than remote sources",
+			limit:               10,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get remote sources with limit = 0 and sortDirection desc",
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get remote sources with limit less than remote sources continuation and sortDirection desc",
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get remote sources with limit greater than remote sources and sortDirection desc",
+			limit:               10,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+	}
 
-		expectedRemoteSources := 9
-		assert.Assert(t, cmp.Len(remoteSources, expectedRemoteSources))
-		assert.Assert(t, resp.Cursor == "")
-	})
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			expectedRemoteSources := append([]*gwapitypes.RemoteSourceResponse{}, remoteSources...)
+			// reverse if sortDirection is desc
+			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
+			if tt.sortDirection == gwapitypes.SortDirectionDesc {
+				for i, j := 0, len(expectedRemoteSources)-1; i < j; i, j = i+1, j-1 {
+					expectedRemoteSources[i], expectedRemoteSources[j] = expectedRemoteSources[j], expectedRemoteSources[i]
+				}
+			}
 
-	t.Run("test get remote sources with limit less than remote sources", func(t *testing.T) {
-		remoteSources, resp, err := gwClient.GetRemoteSources(ctx, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+			var respAllRemoteSources []*gwapitypes.RemoteSourceResponse
 
-		expectedRemoteSources := 5
-		assert.Assert(t, cmp.Len(remoteSources, expectedRemoteSources))
-		assert.Assert(t, resp.Cursor != "")
-	})
-
-	t.Run("test get remote sources with limit less than remote sources continuation", func(t *testing.T) {
-		respAllRemoteSources := []*gwapitypes.RemoteSourceResponse{}
-
-		respRemoteSources, resp, err := gwClient.GetRemoteSources(ctx, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedRemoteSources := 5
-		assert.Assert(t, cmp.Len(respRemoteSources, expectedRemoteSources))
-		assert.Assert(t, resp.Cursor != "")
-
-		respAllRemoteSources = append(respAllRemoteSources, respRemoteSources...)
-
-		// fetch next results
-		for {
-			respRemoteSources, resp, err = gwClient.GetRemoteSources(ctx, &gwclient.ListOptions{Cursor: resp.Cursor, Limit: 5})
+			respRemoteSources, res, err := gwClient.GetRemoteSources(ctx, &gwclient.ListOptions{
+				Limit: tt.limit, SortDirection: tt.sortDirection,
+			})
 			testutil.NilError(t, err)
 
-			expectedRemoteSources := 5
-			assert.Assert(t, resp.Cursor == "" || (len(respRemoteSources) == expectedRemoteSources))
-
 			respAllRemoteSources = append(respAllRemoteSources, respRemoteSources...)
+			callsNumber := 1
 
-			if resp.Cursor == "" {
-				break
+			// fetch next results
+			for {
+				if res.Cursor == "" {
+					break
+				}
+
+				respRemoteSources, res, err = gwClient.GetRemoteSources(ctx, &gwclient.ListOptions{
+					Cursor: res.Cursor, Limit: tt.limit,
+				})
+				testutil.NilError(t, err)
+
+				callsNumber++
+
+				respAllRemoteSources = append(respAllRemoteSources, respRemoteSources...)
 			}
-		}
 
-		expectedRemoteSources = 9
-		assert.Assert(t, cmp.Len(respAllRemoteSources, expectedRemoteSources))
-
-		assert.DeepEqual(t, remoteSources, respAllRemoteSources)
-	})
+			assert.Assert(t, cmp.Len(respAllRemoteSources, len(expectedRemoteSources)))
+			assert.DeepEqual(t, respAllRemoteSources, expectedRemoteSources)
+			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
+		})
+	}
 }
 
 func TestGetUsers(t *testing.T) {
@@ -3974,60 +4008,95 @@ func TestGetUsers(t *testing.T) {
 		users = append(users, user)
 	}
 
-	t.Run("test get users with default limit greater than users", func(t *testing.T) {
-		users, resp, err := gwClient.GetUsers(ctx, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+	tests := []struct {
+		name                string
+		limit               int
+		sortDirection       gwapitypes.SortDirection
+		expectedCallsNumber int
+	}{
+		{
+			name:                "test get users with limit = 0",
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get users with limit less than users continuation",
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get users with limit greater than users",
+			limit:               10,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get users with limit = 0 and sortDirection desc",
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get users with limit less than users continuation and sortDirection desc",
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get users with limit greater than users and sortDirection desc",
+			limit:               10,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+	}
 
-		expectedUsers := 9
-		assert.Assert(t, cmp.Len(users, expectedUsers))
-		assert.Assert(t, resp.Cursor == "")
-	})
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			expectedUsers := append([]*gwapitypes.UserResponse{}, users...)
+			// reverse if sortDirection is desc
+			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
+			if tt.sortDirection == gwapitypes.SortDirectionDesc {
+				for i, j := 0, len(expectedUsers)-1; i < j; i, j = i+1, j-1 {
+					expectedUsers[i], expectedUsers[j] = expectedUsers[j], expectedUsers[i]
+				}
+			}
 
-	t.Run("test get users with limit less than users", func(t *testing.T) {
-		users, resp, err := gwClient.GetUsers(ctx, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+			var respAllUsers []*gwapitypes.UserResponse
 
-		expectedUsers := 5
-		assert.Assert(t, cmp.Len(users, expectedUsers))
-		assert.Assert(t, resp.Cursor != "")
-	})
-
-	t.Run("test get users with limit less than users continuation", func(t *testing.T) {
-		respAllUsers := []*gwapitypes.UserResponse{}
-
-		respUsers, resp, err := gwClient.GetUsers(ctx, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedUsers := 5
-		assert.Assert(t, cmp.Len(respUsers, expectedUsers))
-		assert.Assert(t, resp.Cursor != "")
-
-		for _, respUser := range respUsers {
-			respAllUsers = append(respAllUsers, &gwapitypes.UserResponse{ID: respUser.ID, UserName: respUser.UserName})
-		}
-
-		// fetch next results
-		for {
-			respUsers, resp, err = gwClient.GetUsers(ctx, &gwclient.ListOptions{Cursor: resp.Cursor, Limit: 5})
+			respUsers, res, err := gwClient.GetUsers(ctx, &gwclient.ListOptions{
+				Limit: tt.limit, SortDirection: tt.sortDirection,
+			})
 			testutil.NilError(t, err)
-
-			expectedUsers := 5
-			assert.Assert(t, resp.Cursor == "" || (len(respUsers) == expectedUsers))
 
 			for _, respUser := range respUsers {
 				respAllUsers = append(respAllUsers, &gwapitypes.UserResponse{ID: respUser.ID, UserName: respUser.UserName})
 			}
+			callsNumber := 1
 
-			if resp.Cursor == "" {
-				break
+			// fetch next results
+			for {
+				if res.Cursor == "" {
+					break
+				}
+
+				respUsers, res, err = gwClient.GetUsers(ctx, &gwclient.ListOptions{
+					Cursor: res.Cursor, Limit: tt.limit,
+				})
+				testutil.NilError(t, err)
+
+				callsNumber++
+
+				for _, respUser := range respUsers {
+					respAllUsers = append(respAllUsers, &gwapitypes.UserResponse{ID: respUser.ID, UserName: respUser.UserName})
+				}
 			}
-		}
 
-		expectedUsers = 9
-		assert.Assert(t, cmp.Len(respAllUsers, expectedUsers))
-
-		assert.DeepEqual(t, users, respAllUsers)
-	})
+			assert.Assert(t, cmp.Len(respAllUsers, len(expectedUsers)))
+			assert.DeepEqual(t, respAllUsers, expectedUsers)
+			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
+		})
+	}
 }
 
 func TestGetOrgs(t *testing.T) {
@@ -4043,14 +4112,13 @@ func TestGetOrgs(t *testing.T) {
 
 	gwAdminClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
 
-	// create users
 	_, _, err := gwAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
 	testutil.NilError(t, err)
 
 	tokenUser01, _, err := gwAdminClient.CreateUserToken(ctx, agolaUser01, &gwapitypes.CreateUserTokenRequest{TokenName: "test"})
 	testutil.NilError(t, err)
 
-	gwClientUser01 := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01.Token)
+	gwUser01Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01.Token)
 
 	allOrgs := []*gwapitypes.OrgResponse{}
 	publicOrgs := []*gwapitypes.OrgResponse{}
@@ -4069,109 +4137,148 @@ func TestGetOrgs(t *testing.T) {
 		}
 	}
 
-	t.Run("test get public orgs with default limit greater than orgs", func(t *testing.T) {
-		orgs, resp, err := gwClientUser01.GetOrgs(ctx, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+	tests := []struct {
+		name                string
+		getPublicOrgsOnly   bool
+		limit               int
+		sortDirection       gwapitypes.SortDirection
+		expectedCallsNumber int
+	}{
+		{
+			name:                "test get public orgs with limit = 0",
+			getPublicOrgsOnly:   true,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get public/private orgs with limit = 0",
+			getPublicOrgsOnly:   false,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get public orgs with limit less than orgs",
+			getPublicOrgsOnly:   true,
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get public orgs with limit greater than orgs",
+			getPublicOrgsOnly:   true,
+			limit:               10,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get public orgs with limit less than orgs continuation",
+			getPublicOrgsOnly:   true,
+			limit:               3,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 3,
+		},
+		{
+			name:                "test get public/private orgs with limit less than orgs continuation",
+			getPublicOrgsOnly:   false,
+			limit:               3,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 6,
+		},
+		{
+			name:                "test get public orgs with limit = 0 and sortDirection desc",
+			getPublicOrgsOnly:   true,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get public/private orgs with limit = 0 and sortDirection desc",
+			getPublicOrgsOnly:   false,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get public orgs with limit less than orgs and sortDirection desc",
+			getPublicOrgsOnly:   true,
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get public orgs with limit greater than orgs and sortDirection desc",
+			getPublicOrgsOnly:   true,
+			limit:               10,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get public orgs with limit less than orgs continuation and sortDirection desc",
+			getPublicOrgsOnly:   true,
+			limit:               3,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 3,
+		},
+		{
+			name:                "test get public/private orgs with limit less than orgs continuation and sortDirection desc",
+			getPublicOrgsOnly:   false,
+			limit:               3,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 6,
+		},
+	}
 
-		expectedOrgs := 9
-		assert.Assert(t, cmp.Len(orgs, expectedOrgs))
-		assert.Assert(t, resp.Cursor == "")
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			// populate the expected orgs and client
+			var expectedOrgs []*gwapitypes.OrgResponse
+			var client *gwclient.Client
+			if tt.getPublicOrgsOnly {
+				expectedOrgs = append(expectedOrgs, publicOrgs...)
+				client = gwUser01Client
+			} else {
+				expectedOrgs = append(expectedOrgs, allOrgs...)
+				client = gwAdminClient
+			}
 
-		assert.DeepEqual(t, publicOrgs[:expectedOrgs], orgs)
-	})
+			// reverse if sortDirection is desc
+			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
+			if tt.sortDirection == gwapitypes.SortDirectionDesc {
+				for i, j := 0, len(expectedOrgs)-1; i < j; i, j = i+1, j-1 {
+					expectedOrgs[i], expectedOrgs[j] = expectedOrgs[j], expectedOrgs[i]
+				}
+			}
 
-	t.Run("test get public/private orgs with default limit greater than orgs", func(t *testing.T) {
-		orgs, resp, err := gwAdminClient.GetOrgs(ctx, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+			var respAllOrgs []*gwapitypes.OrgResponse
 
-		expectedOrgs := 18
-		assert.Assert(t, cmp.Len(orgs, expectedOrgs))
-		assert.Assert(t, resp.Cursor == "")
-	})
-
-	t.Run("test get public orgs with limit less than orgs", func(t *testing.T) {
-		orgs, resp, err := gwClientUser01.GetOrgs(ctx, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedOrgs := 5
-		assert.Assert(t, cmp.Len(orgs, expectedOrgs))
-		assert.Assert(t, resp.Cursor != "")
-	})
-
-	t.Run("test get public/private orgs with limit less than orgs", func(t *testing.T) {
-		orgs, resp, err := gwAdminClient.GetOrgs(ctx, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedOrgs := 5
-		assert.Assert(t, cmp.Len(orgs, expectedOrgs))
-		assert.Assert(t, resp.Cursor != "")
-	})
-
-	t.Run("test get public orgs with limit less than orgs continuation", func(t *testing.T) {
-		respAllOrgs := []*gwapitypes.OrgResponse{}
-
-		respOrgs, resp, err := gwClientUser01.GetOrgs(ctx, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedOrgs := 5
-		assert.Assert(t, cmp.Len(respOrgs, expectedOrgs))
-		assert.Assert(t, resp.Cursor != "")
-
-		respAllOrgs = append(respAllOrgs, respOrgs...)
-
-		// fetch next results
-		for {
-			respOrgs, resp, err = gwClientUser01.GetOrgs(ctx, &gwclient.ListOptions{Cursor: resp.Cursor, Limit: 5})
+			respOrgs, res, err := client.GetOrgs(ctx, &gwclient.ListOptions{
+				Limit: tt.limit, SortDirection: tt.sortDirection,
+			})
 			testutil.NilError(t, err)
 
-			expectedOrgs := 5
-			assert.Assert(t, resp.Cursor == "" || (len(respOrgs) == expectedOrgs))
-
 			respAllOrgs = append(respAllOrgs, respOrgs...)
+			callsNumber := 1
 
-			if resp.Cursor == "" {
-				break
+			// fetch next results
+			for {
+				if res.Cursor == "" {
+					break
+				}
+
+				respOrgs, res, err = client.GetOrgs(ctx, &gwclient.ListOptions{
+					Cursor: res.Cursor, Limit: tt.limit,
+				})
+				testutil.NilError(t, err)
+
+				callsNumber++
+
+				respAllOrgs = append(respAllOrgs, respOrgs...)
 			}
-		}
 
-		expectedOrgs = 9
-		assert.Assert(t, cmp.Len(respAllOrgs, expectedOrgs))
-
-		assert.DeepEqual(t, publicOrgs, respAllOrgs)
-	})
-
-	t.Run("test get public/private orgs with limit less than orgs continuation", func(t *testing.T) {
-		respAllOrgs := []*gwapitypes.OrgResponse{}
-
-		respOrgs, resp, err := gwAdminClient.GetOrgs(ctx, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedOrgs := 5
-		assert.Assert(t, cmp.Len(respOrgs, expectedOrgs))
-		assert.Assert(t, resp.Cursor != "")
-
-		respAllOrgs = append(respAllOrgs, respOrgs...)
-
-		// fetch next results
-		for {
-			respOrgs, resp, err = gwAdminClient.GetOrgs(ctx, &gwclient.ListOptions{Cursor: resp.Cursor, Limit: 5})
-			testutil.NilError(t, err)
-
-			expectedOrgs := 5
-			assert.Assert(t, resp.Cursor == "" || (len(respOrgs) == expectedOrgs))
-
-			respAllOrgs = append(respAllOrgs, respOrgs...)
-
-			if resp.Cursor == "" {
-				break
-			}
-		}
-
-		expectedOrgs = 18
-		assert.Assert(t, cmp.Len(respAllOrgs, expectedOrgs))
-
-		assert.DeepEqual(t, allOrgs, respAllOrgs)
-	})
+			assert.Assert(t, cmp.Len(respAllOrgs, len(expectedOrgs)))
+			assert.DeepEqual(t, respAllOrgs, expectedOrgs)
+			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
+		})
+	}
 }
 
 func TestGetOrgMembers(t *testing.T) {
@@ -4188,76 +4295,107 @@ func TestGetOrgMembers(t *testing.T) {
 	createLinkedAccount(ctx, t, sc.gitea, sc.config)
 	gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
 
-	users := []*gwapitypes.UserResponse{}
 	for i := 1; i < 10; i++ {
-		user, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: fmt.Sprintf("orguser%d", i)})
+		_, _, err := gwClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: fmt.Sprintf("orguser%d", i)})
 		testutil.NilError(t, err)
-
-		users = append(users, user)
 	}
 
 	org, _, err := gwClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg01, Visibility: gwapitypes.VisibilityPublic})
 	testutil.NilError(t, err)
 
-	for _, user := range users {
-		_, _, err := gwClient.AddOrgMember(ctx, agolaOrg01, user.ID, gwapitypes.MemberRoleMember)
+	var allOrgMembers []*gwapitypes.OrgMemberResponse
+	for i := 1; i < 10; i++ {
+		orgMember, _, err := gwClient.AddOrgMember(ctx, agolaOrg01, fmt.Sprintf("orguser%d", i), gwapitypes.MemberRoleMember)
 		testutil.NilError(t, err)
+
+		allOrgMembers = append(allOrgMembers, &orgMember.OrgMemberResponse)
 	}
 
-	t.Run("test get org members with default limit greater than org members", func(t *testing.T) {
-		res, resp, err := gwClient.GetOrgMembers(ctx, org.ID, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+	tests := []struct {
+		name                string
+		limit               int
+		sortDirection       gwapitypes.SortDirection
+		expectedCallsNumber int
+	}{
+		{
+			name:                "test get org members with limit = 0",
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get org members with limit less than org members continuation",
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get org members with limit greater than org members",
+			limit:               10,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get org members with limit = 0 and sortDirection desc",
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get org members with limit less than org members continuation and sortDirection desc",
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get org members with limit greater than org members and sortDirection desc",
+			limit:               10,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+	}
 
-		expectedOrgMembers := 9
-		assert.Assert(t, cmp.Len(res.Members, expectedOrgMembers))
-		assert.Assert(t, resp.Cursor == "")
-	})
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			expectedOrgMembers := append([]*gwapitypes.OrgMemberResponse{}, allOrgMembers...)
+			// reverse if sortDirection is desc
+			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
+			if tt.sortDirection == gwapitypes.SortDirectionDesc {
+				for i, j := 0, len(expectedOrgMembers)-1; i < j; i, j = i+1, j-1 {
+					expectedOrgMembers[i], expectedOrgMembers[j] = expectedOrgMembers[j], expectedOrgMembers[i]
+				}
+			}
 
-	t.Run("test get org members with limit less than org members", func(t *testing.T) {
-		res, resp, err := gwClient.GetOrgMembers(ctx, org.ID, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+			var respAllOrgMembers []*gwapitypes.OrgMemberResponse
 
-		expectedOrgMembers := 5
-		assert.Assert(t, cmp.Len(res.Members, expectedOrgMembers))
-		assert.Assert(t, resp.Cursor != "")
-	})
-
-	t.Run("test get org members with limit less than org members continuation", func(t *testing.T) {
-		orgMembers := []*gwapitypes.OrgMemberResponse{}
-
-		res, resp, err := gwClient.GetOrgMembers(ctx, org.ID, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedOrgMembers := 5
-		assert.Assert(t, cmp.Len(res.Members, expectedOrgMembers))
-		assert.Assert(t, resp.Cursor != "")
-
-		orgMembers = append(orgMembers, res.Members...)
-
-		// fetch next results
-		for {
-			res, resp, err = gwClient.GetOrgMembers(ctx, org.ID, &gwclient.ListOptions{Cursor: resp.Cursor, Limit: 5})
+			respOrgMembers, res, err := gwClient.GetOrgMembers(ctx, org.ID, &gwclient.ListOptions{
+				Limit: tt.limit, SortDirection: tt.sortDirection,
+			})
 			testutil.NilError(t, err)
 
-			expectedOrgMembers := 5
-			assert.Assert(t, resp.Cursor == "" || (len(res.Members) == expectedOrgMembers))
+			respAllOrgMembers = append(respAllOrgMembers, respOrgMembers.Members...)
+			callsNumber := 1
 
-			orgMembers = append(orgMembers, res.Members...)
+			// fetch next results
+			for {
+				if res.Cursor == "" {
+					break
+				}
 
-			if resp.Cursor == "" {
-				break
+				respOrgMembers, res, err = gwClient.GetOrgMembers(ctx, org.ID, &gwclient.ListOptions{
+					Cursor: res.Cursor, Limit: tt.limit,
+				})
+				testutil.NilError(t, err)
+
+				callsNumber++
+
+				respAllOrgMembers = append(respAllOrgMembers, respOrgMembers.Members...)
 			}
-		}
 
-		expectedOrgMembers = 9
-		assert.Assert(t, cmp.Len(orgMembers, expectedOrgMembers))
-
-		orgMemberUsers := []*gwapitypes.UserResponse{}
-		for _, orgMember := range orgMembers {
-			orgMemberUsers = append(orgMemberUsers, orgMember.User)
-		}
-		assert.DeepEqual(t, users, orgMemberUsers)
-	})
+			assert.Assert(t, cmp.Len(respAllOrgMembers, len(expectedOrgMembers)))
+			assert.DeepEqual(t, respAllOrgMembers, expectedOrgMembers)
+			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
+		})
+	}
 }
 
 func TestGetUserOrgs(t *testing.T) {
@@ -4295,60 +4433,95 @@ func TestGetUserOrgs(t *testing.T) {
 
 	gwClient = gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser.Token)
 
-	t.Run("test get user orgs with default limit greater than user orgs", func(t *testing.T) {
-		userOrgs, resp, err := gwClient.GetUserOrgs(ctx, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+	tests := []struct {
+		name                string
+		limit               int
+		sortDirection       gwapitypes.SortDirection
+		expectedCallsNumber int
+	}{
+		{
+			name:                "test get user orgs with limit = 0",
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get user orgs with limit less than user orgs continuation",
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get user orgs with limit greater than user orgs",
+			limit:               10,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get user orgs with limit = 0 and sortDirection desc",
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get user orgs with limit less than user orgs continuation and sortDirection desc",
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get user orgs with limit greater than user orgs and sortDirection desc",
+			limit:               10,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+	}
 
-		expectedUserOrgs := 9
-		assert.Assert(t, cmp.Len(userOrgs, expectedUserOrgs))
-		assert.Assert(t, resp.Cursor == "")
-	})
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			expectedUserOrgs := append([]*gwapitypes.OrgResponse{}, orgs...)
+			// reverse if sortDirection is desc
+			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
+			if tt.sortDirection == gwapitypes.SortDirectionDesc {
+				for i, j := 0, len(expectedUserOrgs)-1; i < j; i, j = i+1, j-1 {
+					expectedUserOrgs[i], expectedUserOrgs[j] = expectedUserOrgs[j], expectedUserOrgs[i]
+				}
+			}
 
-	t.Run("test get user orgs with limit less than user orgs", func(t *testing.T) {
-		res, resp, err := gwClient.GetUserOrgs(ctx, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+			var respAllUserOrgs []*gwapitypes.OrgResponse
 
-		expectedUserOrgs := 5
-		assert.Assert(t, cmp.Len(res, expectedUserOrgs))
-		assert.Assert(t, resp.Cursor != "")
-	})
-
-	t.Run("test get user orgs with limit less than user orgs continuation", func(t *testing.T) {
-		respAllUserOrgs := []*gwapitypes.UserOrgResponse{}
-
-		respUserOrgs, resp, err := gwClient.GetUserOrgs(ctx, &gwclient.ListOptions{Limit: 5, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedUserOrgs := 5
-		assert.Assert(t, cmp.Len(respUserOrgs, expectedUserOrgs))
-		assert.Assert(t, resp.Cursor != "")
-
-		respAllUserOrgs = append(respAllUserOrgs, respUserOrgs...)
-
-		// fetch next results
-		for {
-			respUserOrgs, resp, err = gwClient.GetUserOrgs(ctx, &gwclient.ListOptions{Cursor: resp.Cursor, Limit: 5})
+			respUserOrgs, res, err := gwClient.GetUserOrgs(ctx, &gwclient.ListOptions{
+				Limit: tt.limit, SortDirection: tt.sortDirection,
+			})
 			testutil.NilError(t, err)
 
-			expectedUserOrgs := 5
-			assert.Assert(t, resp.Cursor == "" || (len(respUserOrgs) == expectedUserOrgs))
-
-			respAllUserOrgs = append(respAllUserOrgs, respUserOrgs...)
-
-			if resp.Cursor == "" {
-				break
+			for _, userOrg := range respUserOrgs {
+				respAllUserOrgs = append(respAllUserOrgs, userOrg.Organization)
 			}
-		}
+			callsNumber := 1
 
-		expectedUserOrgs = 9
-		assert.Assert(t, cmp.Len(respAllUserOrgs, expectedUserOrgs))
+			// fetch next results
+			for {
+				if res.Cursor == "" {
+					break
+				}
 
-		userOrgs := []*gwapitypes.OrgResponse{}
-		for _, userOrg := range respAllUserOrgs {
-			userOrgs = append(userOrgs, userOrg.Organization)
-		}
-		assert.DeepEqual(t, orgs, userOrgs)
-	})
+				respUserOrgs, res, err = gwClient.GetUserOrgs(ctx, &gwclient.ListOptions{
+					Cursor: res.Cursor, Limit: tt.limit,
+				})
+				testutil.NilError(t, err)
+
+				callsNumber++
+
+				for _, userOrg := range respUserOrgs {
+					respAllUserOrgs = append(respAllUserOrgs, userOrg.Organization)
+				}
+			}
+
+			assert.Assert(t, cmp.Len(respAllUserOrgs, len(expectedUserOrgs)))
+			assert.DeepEqual(t, respAllUserOrgs, expectedUserOrgs)
+			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
+		})
+	}
 }
 
 func TestMaintenance(t *testing.T) {
@@ -5588,77 +5761,151 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 		return true, nil
 	})
 
-	t.Run("test get project run webhook deliveries", func(t *testing.T) {
-		runWebhookDeliveries, resp, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+	runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+	testutil.NilError(t, err)
 
-		assert.Assert(t, cmp.Len(runWebhookDeliveries, 4))
-		assert.Assert(t, resp.Cursor == "")
-		for _, r := range runWebhookDeliveries {
-			assert.Equal(t, r.DeliveryStatus, gwapitypes.DeliveryStatusDelivered)
-		}
-	})
+	tests := []struct {
+		name                 string
+		client               *gwclient.Client
+		projectRef           string
+		limit                int
+		sortDirection        gwapitypes.SortDirection
+		deliveryStatusFilter []string
+		expectedCallsNumber  int
+		expectedErr          string
+	}{
+		{
+			name:                "test get project run webhook deliveries with limit = 0",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get project run webhook deliveries with limit less than project run webhook deliveries continuation",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 2,
+		},
+		{
+			name:                "test get project run webhook deliveries with limit greater than project run webhook deliveries",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			limit:               5,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get project run webhook deliveries with limit = 0 and sortDirection desc",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get project run webhook deliveries with limit less than project run webhook deliveries continuation and sortDirection desc",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 2,
+		},
+		{
+			name:                "test get project run webhook deliveries with limit greater than project run webhook deliveries and sortDirection desc",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			limit:               5,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:          "test get project run webhook deliveries with user unauthorized",
+			client:        gwUser02Client,
+			projectRef:    project.ID,
+			sortDirection: gwapitypes.SortDirectionAsc,
+			expectedErr:   remoteErrorForbidden,
+		},
+		{
+			name:          "test get project run webhook deliveries with not existing project",
+			client:        gwUser01Client,
+			projectRef:    "project02",
+			sortDirection: gwapitypes.SortDirectionAsc,
+			expectedErr:   remoteErrorNotExist,
+		},
+		{
+			name:                "test get project run webhook deliveries with deliverystatus = delivered",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get project run webhook deliveries with deliverystatus = deliveryError",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+	}
 
-	t.Run("test get project run webhook deliveries with limit less than project run webhook deliveries continuation", func(t *testing.T) {
-		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			// populate the expected commit status deliveries
+			expectedProject01RunWebhookDeliveries := []*gwapitypes.RunWebhookDeliveryResponse{}
+			for _, r := range runWebhookDeliveries {
+				if len(tt.deliveryStatusFilter) > 0 && !util.StringInSlice(tt.deliveryStatusFilter, string(r.DeliveryStatus)) {
+					continue
+				}
+				expectedProject01RunWebhookDeliveries = append(expectedProject01RunWebhookDeliveries, r)
+			}
 
-		respAllRunWebhookDeliveries := []*gwapitypes.RunWebhookDeliveryResponse{}
+			// reverse if sortDirection is desc
+			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
+			if tt.sortDirection == gwapitypes.SortDirectionDesc {
+				for i, j := 0, len(expectedProject01RunWebhookDeliveries)-1; i < j; i, j = i+1, j-1 {
+					expectedProject01RunWebhookDeliveries[i], expectedProject01RunWebhookDeliveries[j] = expectedProject01RunWebhookDeliveries[j], expectedProject01RunWebhookDeliveries[i]
+				}
+			}
 
-		respRunWebhookDeliveries, resp, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 1, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+			var respAllRunWebhookDeliveries []*gwapitypes.RunWebhookDeliveryResponse
 
-		expectedRunWebhookDeliveries := 1
-		assert.Assert(t, cmp.Len(respRunWebhookDeliveries, expectedRunWebhookDeliveries))
-		assert.Assert(t, resp.Cursor != "")
-
-		respAllRunWebhookDeliveries = append(respAllRunWebhookDeliveries, respRunWebhookDeliveries...)
-
-		// fetch next results
-		for {
-			respRunWebhookDeliveries, resp, err = gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Cursor: resp.Cursor, Limit: 1})
-			testutil.NilError(t, err)
-
-			assert.Assert(t, resp.Cursor == "" || (len(respRunWebhookDeliveries) == expectedRunWebhookDeliveries))
+			respRunWebhookDeliveries, res, err := tt.client.GetProjectRunWebhookDeliveries(ctx, tt.projectRef, tt.deliveryStatusFilter, &gwclient.ListOptions{
+				Limit: tt.limit, SortDirection: tt.sortDirection,
+			})
+			if tt.expectedErr == "" {
+				testutil.NilError(t, err)
+			} else {
+				assert.Error(t, err, tt.expectedErr)
+				return
+			}
 
 			respAllRunWebhookDeliveries = append(respAllRunWebhookDeliveries, respRunWebhookDeliveries...)
+			callsNumber := 1
 
-			if resp.Cursor == "" {
-				break
+			// fetch next results
+			for {
+				if res.Cursor == "" {
+					break
+				}
+
+				respRunWebhookDeliveries, res, err = tt.client.GetProjectRunWebhookDeliveries(ctx, tt.projectRef, tt.deliveryStatusFilter, &gwclient.ListOptions{
+					Cursor: res.Cursor, Limit: tt.limit,
+				})
+				testutil.NilError(t, err)
+
+				callsNumber++
+
+				respAllRunWebhookDeliveries = append(respAllRunWebhookDeliveries, respRunWebhookDeliveries...)
 			}
-		}
 
-		expectedRunWebhookDeliveries = 4
-		assert.Assert(t, cmp.Len(respAllRunWebhookDeliveries, expectedRunWebhookDeliveries))
-
-		assert.DeepEqual(t, runWebhookDeliveries, respAllRunWebhookDeliveries)
-	})
-
-	t.Run("test get project run webhook deliveries with user unauthorized", func(t *testing.T) {
-		_, _, err = gwUser02Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
-		assert.Error(t, err, remoteErrorForbidden)
-	})
-
-	t.Run("test get project run webhook deliveries with not existing project", func(t *testing.T) {
-		_, _, err = gwUser01Client.GetProjectRunWebhookDeliveries(ctx, "project02", nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
-		assert.Error(t, err, remoteErrorNotExist)
-	})
-
-	t.Run("test get project run webhook deliveries with deliverystatus = delivered", func(t *testing.T) {
-		runWebhookDeliveries, resp, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, []string{string(nstypes.DeliveryStatusDelivered)}, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		assert.Assert(t, cmp.Len(runWebhookDeliveries, 4))
-		assert.Assert(t, resp.Cursor == "")
-	})
-
-	t.Run("test get project run webhook deliveries with deliverystatus = deliveryError", func(t *testing.T) {
-		runWebhookDeliveries, resp, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, []string{string(nstypes.DeliveryStatusDeliveryError)}, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		assert.Assert(t, cmp.Len(runWebhookDeliveries, 0))
-		assert.Assert(t, resp.Cursor == "")
-	})
+			assert.Assert(t, cmp.Len(respAllRunWebhookDeliveries, len(expectedProject01RunWebhookDeliveries)))
+			assert.DeepEqual(t, respAllRunWebhookDeliveries, expectedProject01RunWebhookDeliveries)
+			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
+		})
+	}
 }
 
 func TestProjectRunWebhookRedelivery(t *testing.T) {
@@ -6127,75 +6374,155 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 		return true, nil
 	})
 
-	t.Run("test get project commit status deliveries", func(t *testing.T) {
-		commitStatusDeliveries, resp, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+	commitStatusDeliveries, resp, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
+	testutil.NilError(t, err)
 
-		assert.Assert(t, cmp.Len(commitStatusDeliveries, 2*runCount))
-		assert.Assert(t, resp.Cursor == "")
-		for _, r := range commitStatusDeliveries {
-			assert.Equal(t, r.DeliveryStatus, gwapitypes.DeliveryStatusDelivered)
-		}
-	})
+	assert.Assert(t, cmp.Len(commitStatusDeliveries, 2*runCount))
+	assert.Assert(t, resp.Cursor == "")
+	for _, r := range commitStatusDeliveries {
+		assert.Assert(t, cmp.Equal(r.DeliveryStatus, gwapitypes.DeliveryStatusDelivered))
+	}
 
-	t.Run("test get project commit status deliveries with limit less than project commit status deliveries continuation", func(t *testing.T) {
-		commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+	tests := []struct {
+		name                 string
+		client               *gwclient.Client
+		projectRef           string
+		limit                int
+		sortDirection        gwapitypes.SortDirection
+		deliveryStatusFilter []string
+		expectedCallsNumber  int
+		expectedErr          string
+	}{
+		{
+			name:                "test get project commit status deliveries with limit = 0",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get project commit status deliveries with limit less than project commit status deliveries continuation",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: runCount,
+		},
+		{
+			name:                "test get project commit status deliveries with limit greater than project commit status deliveries",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			limit:               10,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get project commit status deliveries with limit = 0 and sortDirection desc",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get project commit status deliveries with limit less than project commit status deliveries continuation and sortDirection desc",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: runCount,
+		},
+		{
+			name:                "test get project commit status deliveries with limit greater than project commit status deliveries and sortDirection desc",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			limit:               10,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:          "test get project commit status deliveries with user unauthorized",
+			client:        gwUser02Client,
+			projectRef:    project.ID,
+			sortDirection: gwapitypes.SortDirectionAsc,
+			expectedErr:   remoteErrorForbidden,
+		},
+		{
+			name:          "test get project commit status deliveries with not existing project",
+			client:        gwUser01Client,
+			projectRef:    "project02",
+			sortDirection: gwapitypes.SortDirectionAsc,
+			expectedErr:   remoteErrorNotExist,
+		},
+		{
+			name:                "test get project commit status deliveries with deliverystatus = delivered",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get project commit status deliveries with deliverystatus = deliveryError",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+	}
 
-		respAllCommitStatusDeliveries := []*gwapitypes.CommitStatusDeliveryResponse{}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			// populate the expected commit status deliveries
+			expectedProject01CommitStatusDeliveries := []*gwapitypes.CommitStatusDeliveryResponse{}
+			for _, c := range commitStatusDeliveries {
+				if len(tt.deliveryStatusFilter) > 0 && !util.StringInSlice(tt.deliveryStatusFilter, string(c.DeliveryStatus)) {
+					continue
+				}
+				expectedProject01CommitStatusDeliveries = append(expectedProject01CommitStatusDeliveries, c)
+			}
 
-		respCommitStatusDeliveries, resp, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 1, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
+			// reverse if sortDirection is desc
+			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
+			if tt.sortDirection == gwapitypes.SortDirectionDesc {
+				for i, j := 0, len(expectedProject01CommitStatusDeliveries)-1; i < j; i, j = i+1, j-1 {
+					expectedProject01CommitStatusDeliveries[i], expectedProject01CommitStatusDeliveries[j] = expectedProject01CommitStatusDeliveries[j], expectedProject01CommitStatusDeliveries[i]
+				}
+			}
 
-		expectedCommitStatusDeliveries := 1
-		assert.Assert(t, cmp.Len(respCommitStatusDeliveries, expectedCommitStatusDeliveries))
-		assert.Assert(t, resp.Cursor != "")
+			var respAllCommitStatusDeliveries []*gwapitypes.CommitStatusDeliveryResponse
 
-		respAllCommitStatusDeliveries = append(respAllCommitStatusDeliveries, respCommitStatusDeliveries...)
-
-		// fetch next results
-		for {
-			respCommitStatusDeliveries, resp, err = gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Cursor: resp.Cursor, Limit: 1})
-			testutil.NilError(t, err)
-
-			assert.Assert(t, resp.Cursor == "" || (len(respCommitStatusDeliveries) == expectedCommitStatusDeliveries))
+			respCommitStatusDeliveries, res, err := tt.client.GetProjectCommitStatusDeliveries(ctx, tt.projectRef, tt.deliveryStatusFilter, &gwclient.ListOptions{
+				Limit: tt.limit, SortDirection: tt.sortDirection,
+			})
+			if tt.expectedErr == "" {
+				testutil.NilError(t, err)
+			} else {
+				assert.Error(t, err, tt.expectedErr)
+				return
+			}
 
 			respAllCommitStatusDeliveries = append(respAllCommitStatusDeliveries, respCommitStatusDeliveries...)
+			callsNumber := 1
 
-			if resp.Cursor == "" {
-				break
+			// fetch next results
+			for {
+				if res.Cursor == "" {
+					break
+				}
+
+				respCommitStatusDeliveries, res, err = tt.client.GetProjectCommitStatusDeliveries(ctx, tt.projectRef, tt.deliveryStatusFilter, &gwclient.ListOptions{
+					Cursor: res.Cursor, Limit: tt.limit,
+				})
+				testutil.NilError(t, err)
+
+				callsNumber++
+
+				respAllCommitStatusDeliveries = append(respAllCommitStatusDeliveries, respCommitStatusDeliveries...)
 			}
-		}
 
-		expectedCommitStatusDeliveries = 2 * runCount
-		assert.Assert(t, cmp.Len(respAllCommitStatusDeliveries, expectedCommitStatusDeliveries))
-
-		assert.DeepEqual(t, commitStatusDeliveries, respAllCommitStatusDeliveries)
-	})
-
-	t.Run("test get project commit status deliveries with user unauthorized", func(t *testing.T) {
-		_, _, err = gwUser02Client.GetProjectCommitStatusDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
-		assert.Error(t, err, remoteErrorForbidden)
-	})
-
-	t.Run("test get project commit status deliveries with not existing project", func(t *testing.T) {
-		_, _, err = gwUser01Client.GetProjectCommitStatusDeliveries(ctx, "project02", nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
-		assert.Error(t, err, remoteErrorNotExist)
-	})
-
-	t.Run("test get project commit status deliveries with deliverystatus = delivered", func(t *testing.T) {
-		commitStatusDeliveries, resp, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, []string{string(nstypes.DeliveryStatusDelivered)}, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		assert.Assert(t, cmp.Len(commitStatusDeliveries, 2*runCount))
-		assert.Assert(t, resp.Cursor == "")
-	})
-
-	t.Run("test get project commit status deliveries with deliverystatus = deliveryError", func(t *testing.T) {
-		commitStatusDeliveries, resp, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, []string{string(nstypes.DeliveryStatusDeliveryError)}, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		assert.Assert(t, cmp.Len(commitStatusDeliveries, 0))
-		assert.Assert(t, resp.Cursor == "")
-	})
+			assert.Assert(t, cmp.Len(respAllCommitStatusDeliveries, len(expectedProject01CommitStatusDeliveries)))
+			assert.DeepEqual(t, respAllCommitStatusDeliveries, expectedProject01CommitStatusDeliveries)
+			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
+		})
+	}
 }
