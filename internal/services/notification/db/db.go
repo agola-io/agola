@@ -328,6 +328,29 @@ func (d *DB) GetProjectCommitStatusDeliveriesAfterSequenceByProjectID(tx *sql.Tx
 	return commitStatusDeliveries, errors.WithStack(err)
 }
 
+func (d *DB) GetCommitStatusDeliveriesByCommitStatusID(tx *sql.Tx, commitStatusID string, deliveryStatusFilter []types.DeliveryStatus, limit int, sortDirection types.SortDirection) ([]*types.CommitStatusDelivery, error) {
+	q := commitStatusDeliverySelect().OrderBy("sequence")
+	q.Where(q.E("commit_status_id", commitStatusID))
+
+	if len(deliveryStatusFilter) > 0 {
+		q.Where(q.In("delivery_status", sq.Flatten(deliveryStatusFilter)...))
+	}
+
+	switch sortDirection {
+	case types.SortDirectionAsc:
+		q.Asc()
+	case types.SortDirectionDesc:
+		q.Desc()
+	}
+
+	if limit > 0 {
+		q.Limit(limit)
+	}
+
+	commitStatusDeliveries, _, err := d.fetchCommitStatusDeliverys(tx, q)
+	return commitStatusDeliveries, errors.WithStack(err)
+}
+
 func (d *DB) DeleteCommitStatusDeliveriesByCommitStatusID(tx *sql.Tx, commitStatusID string) error {
 	q := sq.NewDeleteBuilder()
 	q.DeleteFrom("commitstatusdelivery")

@@ -43,12 +43,13 @@ import (
 )
 
 const (
-	webhookSecret        = "secretkey"
-	webhookPayload       = "payloadtest"
-	webhookURL           = "testWebhookURL"
-	project01            = "project01id"
-	project02            = "project02id"
-	runWebhookDelivery01 = "runwebhookdelivery01id"
+	webhookSecret          = "secretkey"
+	webhookPayload         = "payloadtest"
+	webhookURL             = "testWebhookURL"
+	project01              = "project01id"
+	project02              = "project02id"
+	runWebhookDelivery01   = "runwebhookdelivery01id"
+	commitStatusDelivery01 = "commitstatusdelivery01id"
 )
 
 // setupNotificationService don't start the notification service but just create it to manually call its methods
@@ -1080,4 +1081,180 @@ func deliveryStatusInSlice(deliveryStatuses []types.DeliveryStatus, deliveryStat
 		}
 	}
 	return false
+}
+
+func TestProjectCommitStatusRedelivery(t *testing.T) {
+	t.Parallel()
+
+	t.Run("test project commit status redelivery with deliverystatus = deliveryError", func(t *testing.T) {
+		dir := t.TempDir()
+		log := testutil.NewLogger(t)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		ns := setupNotificationService(ctx, t, log, dir)
+
+		commitStatus := createCommitStatus(t, ctx, ns, 1, project01)
+		commitStatusDelivery := createCommitStatusDelivery(t, ctx, ns, commitStatus.ID, types.DeliveryStatusDeliveryError)
+
+		t.Logf("starting ns")
+
+		cs := setupStubCommitStatusUpdater()
+		ns.u = cs
+
+		err := ns.ah.CommitStatusRedelivery(ctx, commitStatus.ProjectID, commitStatusDelivery.ID)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		if err := ns.commitStatusDeliveriesHandler(ctx); err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		res, err := ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{ProjectID: project01, SortDirection: types.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if len(res.CommitStatusDeliveries) != 2 {
+			t.Fatalf("expected 2 CommitStatusDeliveries got: %d", len(res.CommitStatusDeliveries))
+		}
+		if res.CommitStatusDeliveries[0].DeliveryStatus != types.DeliveryStatusDeliveryError {
+			t.Fatalf("expected %q DeliveryStatus got: %q", types.DeliveryStatusDeliveryError, res.CommitStatusDeliveries[0].DeliveryStatus)
+		}
+		if res.CommitStatusDeliveries[1].DeliveryStatus != types.DeliveryStatusDelivered {
+			t.Fatalf("expected %q DeliveryStatus got: %q", types.DeliveryStatusDelivered, res.CommitStatusDeliveries[1].DeliveryStatus)
+		}
+	})
+
+	t.Run("test project commit status redelivery with deliverystatus = delivered", func(t *testing.T) {
+		dir := t.TempDir()
+		log := testutil.NewLogger(t)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		ns := setupNotificationService(ctx, t, log, dir)
+
+		commitStatus := createCommitStatus(t, ctx, ns, 1, project01)
+		commitStatusDelivery := createCommitStatusDelivery(t, ctx, ns, commitStatus.ID, types.DeliveryStatusDelivered)
+
+		t.Logf("starting ns")
+
+		cs := setupStubCommitStatusUpdater()
+		ns.u = cs
+
+		err := ns.ah.CommitStatusRedelivery(ctx, commitStatus.ProjectID, commitStatusDelivery.ID)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		if err := ns.commitStatusDeliveriesHandler(ctx); err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		res, err := ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{ProjectID: project01, SortDirection: types.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if len(res.CommitStatusDeliveries) != 2 {
+			t.Fatalf("expected 2 CommitStatusDeliveries got: %d", len(res.CommitStatusDeliveries))
+		}
+		if res.CommitStatusDeliveries[0].DeliveryStatus != types.DeliveryStatusDelivered {
+			t.Fatalf("expected %q DeliveryStatus got: %q", types.DeliveryStatusDelivered, res.CommitStatusDeliveries[0].DeliveryStatus)
+		}
+		if res.CommitStatusDeliveries[1].DeliveryStatus != types.DeliveryStatusDelivered {
+			t.Fatalf("expected %q DeliveryStatus got: %q", types.DeliveryStatusDelivered, res.CommitStatusDeliveries[1].DeliveryStatus)
+		}
+	})
+
+	t.Run("test redelivery not existing project commit status delivery", func(t *testing.T) {
+		dir := t.TempDir()
+		log := testutil.NewLogger(t)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		ns := setupNotificationService(ctx, t, log, dir)
+
+		commitStatus := createCommitStatus(t, ctx, ns, 1, project01)
+
+		expectedErr := util.NewAPIError(util.ErrNotExist, errors.Errorf("commitStatusDelivery %q doesn't exist", commitStatusDelivery01))
+		err := ns.ah.CommitStatusRedelivery(ctx, commitStatus.ProjectID, commitStatusDelivery01)
+		if err == nil {
+			t.Fatalf("expected error %v, got nil err", expectedErr)
+		}
+		if err.Error() != expectedErr.Error() {
+			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+		}
+	})
+
+	t.Run("test project commit status redelivery with projectID that belong to another project", func(t *testing.T) {
+		dir := t.TempDir()
+		log := testutil.NewLogger(t)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		ns := setupNotificationService(ctx, t, log, dir)
+
+		commitStatus := createCommitStatus(t, ctx, ns, 1, project01)
+		commitStatusDelivery := createCommitStatusDelivery(t, ctx, ns, commitStatus.ID, types.DeliveryStatusDelivered)
+
+		commitStatus = createCommitStatus(t, ctx, ns, 1, project02)
+		createCommitStatusDelivery(t, ctx, ns, commitStatus.ID, types.DeliveryStatusDelivered)
+
+		expectedErr := util.NewAPIError(util.ErrNotExist, errors.Errorf("commitStatusDelivery %q doesn't belong to project %q", commitStatusDelivery.ID, project02))
+
+		err := ns.ah.CommitStatusRedelivery(ctx, project02, commitStatusDelivery.ID)
+		if err == nil {
+			t.Fatalf("expected error %v, got nil err", expectedErr)
+		}
+		if err.Error() != expectedErr.Error() {
+			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+		}
+	})
+
+	t.Run("test project commit status redelivery with the last delivery that hasn't been delivered", func(t *testing.T) {
+		dir := t.TempDir()
+		log := testutil.NewLogger(t)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		ns := setupNotificationService(ctx, t, log, dir)
+
+		commitStatus := createCommitStatus(t, ctx, ns, 1, project01)
+		commitStatusDelivery := createCommitStatusDelivery(t, ctx, ns, commitStatus.ID, types.DeliveryStatusNotDelivered)
+
+		t.Logf("starting ns")
+
+		cs := setupStubCommitStatusUpdater()
+		ns.u = cs
+
+		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("the previous delivery of commit status %q hasn't already been delivered", commitStatusDelivery.CommitStatusID))
+
+		err := ns.ah.CommitStatusRedelivery(ctx, commitStatus.ProjectID, commitStatusDelivery.ID)
+		if err == nil {
+			t.Fatalf("expected error %v, got nil err", expectedErr)
+		}
+		if err.Error() != expectedErr.Error() {
+			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
+		}
+
+		if err := ns.commitStatusDeliveriesHandler(ctx); err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		res, err := ns.ah.GetProjectCommitStatusDeliveries(ctx, &action.GetProjectCommitStatusDeliveriesRequest{ProjectID: project01, SortDirection: types.SortDirectionAsc})
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if len(res.CommitStatusDeliveries) != 1 {
+			t.Fatalf("expected 1 CommitStatusDeliveries got: %d", len(res.CommitStatusDeliveries))
+		}
+		if res.CommitStatusDeliveries[0].DeliveryStatus != types.DeliveryStatusDelivered {
+			t.Fatalf("expected %q DeliveryStatus got: %q", types.DeliveryStatusDelivered, res.CommitStatusDeliveries[0].DeliveryStatus)
+		}
+	})
 }

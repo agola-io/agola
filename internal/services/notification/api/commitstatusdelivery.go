@@ -89,3 +89,39 @@ func (h *CommitStatusDeliveriesHandler) do(w http.ResponseWriter, r *http.Reques
 
 	return ares.CommitStatusDeliveries, nil
 }
+
+type CommitStatusRedeliveryHandler struct {
+	log zerolog.Logger
+	ah  *action.ActionHandler
+}
+
+func NewCommitStatusRedeliveryHandler(log zerolog.Logger, ah *action.ActionHandler) *CommitStatusRedeliveryHandler {
+	return &CommitStatusRedeliveryHandler{log: log, ah: ah}
+}
+
+func (h *CommitStatusRedeliveryHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.do(w, r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, nil); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *CommitStatusRedeliveryHandler) do(w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
+
+	vars := mux.Vars(r)
+	projectID := vars["projectid"]
+	commitStatusDeliveryID := vars["commitstatusdeliveryid"]
+
+	err := h.ah.CommitStatusRedelivery(ctx, projectID, commitStatusDeliveryID)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
+}

@@ -841,3 +841,7 @@ func (c *Client) GetProjectCommitStatusDeliveries(ctx context.Context, projectRe
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s/commitstatusdeliveries", url.PathEscape(projectRef)), q, common.JSONContent, nil, &commitStatusDeliveries)
 	return commitStatusDeliveries, resp, errors.WithStack(err)
 }
+
+func (c *Client) ProjectCommitStatusRedelivery(ctx context.Context, projectRef string, commitStatusDeliveryID string) (*Response, error) {
+	return c.getResponse(ctx, "PUT", fmt.Sprintf("/projects/%s/commitstatusdeliveries/%s/redelivery", projectRef, commitStatusDeliveryID), nil, jsonContent, nil)
+}
