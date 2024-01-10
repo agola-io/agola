@@ -7008,3 +7008,136 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		}
 	})
 }
+
+func TestRunRequiredEnvVariables(t *testing.T) {
+	t.Parallel()
+
+	config := `
+		{
+			runs: [
+			{
+				name: 'run01',
+				tasks: [
+				{
+					name: 'task01',
+					runtime: {
+					containers: [
+						{
+						image: 'alpine/git',
+						},
+					],
+					},
+					steps: [
+					  { type: 'run', command: 'env -u AGOLA_SSHPRIVKEY' },
+					],
+				},
+				],
+			},
+			],
+		}
+	`
+
+	tests := []struct {
+		name string
+		env  map[string]string
+	}{
+		{
+			name: "test push with run count 1",
+			env: map[string]string{
+				"AGOLA_GIT_REF_TYPE": "branch",
+				"AGOLA_GIT_REF":      "refs/heads/master",
+				"AGOLA_GIT_BRANCH":   "master",
+				"AGOLA_GIT_TAG":      "",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			dir := t.TempDir()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			sc := setup(ctx, t, dir, withGitea(true))
+			defer sc.stop()
+
+			giteaToken, tokenUser01 := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+			gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01)
+
+			giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+
+			giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+			testutil.NilError(t, err)
+
+			giteaRepo, project := createProject(ctx, t, giteaClient, gwClient, withVisibility(gwapitypes.VisibilityPrivate))
+
+			push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
+
+			// TODO(sgotti) add an util to wait for a run phase
+			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+				if err != nil {
+					return false, nil
+				}
+
+				if len(runs) != 1 {
+					return false, nil
+				}
+
+				run := runs[0]
+				if run.Phase != rstypes.RunPhaseFinished {
+					return false, nil
+				}
+
+				return true, nil
+			})
+
+			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+			testutil.NilError(t, err)
+
+			t.Logf("runs: %s", util.Dump(runs))
+
+			assert.Assert(t, cmp.Len(runs, 1))
+
+			run, _, err := gwClient.GetProjectRun(ctx, project.ID, runs[0].Number)
+			testutil.NilError(t, err)
+
+			assert.Equal(t, run.Phase, rstypes.RunPhaseFinished)
+			assert.Equal(t, run.Result, rstypes.RunResultSuccess)
+
+			// update commit sha from annotations since it will change at every test
+			tt.env["AGOLA_GIT_COMMITSHA"] = run.Annotations["commit_sha"]
+
+			tt.env["AGOLA_RUN_COUNTER"] = strconv.FormatUint(run.Number, 10)
+
+			var task *gwapitypes.RunResponseTask
+			for _, t := range run.Tasks {
+				if t.Name == "task01" {
+					task = t
+					break
+				}
+			}
+
+			resp, err := gwClient.GetProjectLogs(ctx, project.ID, run.Number, task.ID, false, 0, false)
+			testutil.NilError(t, err)
+
+			defer resp.Body.Close()
+
+			logs, err := io.ReadAll(resp.Body)
+			testutil.NilError(t, err)
+
+			curEnv, err := testutil.ParseEnvs(bytes.NewReader(logs))
+			testutil.NilError(t, err)
+
+			for n, e := range tt.env {
+				ce, ok := curEnv[n]
+				assert.Assert(t, ok, "missing env var %s", n)
+				assert.Equal(t, ce, e, "different env var %s value, want: %q, got %q", n, e, ce)
+			}
+		})
+	}
+}
