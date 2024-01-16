@@ -17,6 +17,7 @@ package common
 import (
 	"path"
 	"sort"
+	"strconv"
 
 	"github.com/sorintlab/errors"
 
@@ -126,6 +127,9 @@ func GenExecutorTaskSpecData(r *types.Run, rt *types.RunTask, rc *types.RunConfi
 	mergeEnv(environment, rc.StaticEnvironment)
 	// run config Environment variables ovverride every other environment variable
 	mergeEnv(environment, rc.Environment)
+
+	// The AGOLA_RUN_COUNTER environment variable is not saved in the runconfig StaticEnvironment map but populated here using the run counter
+	environment["AGOLA_RUN_COUNTER"] = strconv.FormatUint(r.Counter, 10)
 
 	cachePrefix := OSTRootGroup(r.Group)
 	if rc.CacheGroup != "" {
