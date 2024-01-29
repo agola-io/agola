@@ -38,6 +38,51 @@ import (
 	"agola.io/agola/services/runservice/types"
 )
 
+const (
+	agolaHasMoreHeader = "X-Agola-HasMore"
+)
+
+type requestOptions struct {
+	Limit         int
+	SortDirection types.SortDirection
+}
+
+func parseRequestOptions(r *http.Request) (*requestOptions, error) {
+	query := r.URL.Query()
+
+	limit := 0
+	limitS := query.Get("limit")
+	if limitS != "" {
+		var err error
+		limit, err = strconv.Atoi(limitS)
+		if err != nil {
+			return nil, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit"))
+		}
+	}
+	if limit < 0 {
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0"))
+	}
+
+	sortDirection := types.SortDirection(query.Get("sortdirection"))
+	if sortDirection != "" {
+		switch sortDirection {
+		case types.SortDirectionAsc:
+		case types.SortDirectionDesc:
+		default:
+			return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("wrong sort direction %q", sortDirection))
+		}
+	}
+
+	return &requestOptions{
+		Limit:         limit,
+		SortDirection: sortDirection,
+	}, nil
+}
+
+func addHasMoreHeader(w http.ResponseWriter, hasMore bool) {
+	w.Header().Add(agolaHasMoreHeader, strconv.FormatBool(hasMore))
+}
+
 type LogsHandler struct {
 	log zerolog.Logger
 	d   *db.DB
@@ -595,6 +640,18 @@ func NewRunsHandler(log zerolog.Logger, d *db.DB, ah *action.ActionHandler) *Run
 }
 
 func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(w, r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *RunsHandler) do(w http.ResponseWriter, r *http.Request) (*rsapitypes.GetGroupRunsResponse, error) {
 	ctx := r.Context()
 	query := r.URL.Query()
 	phaseFilter := types.RunPhaseFromStringSlice(query["phase"])
@@ -604,45 +661,32 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	groups := query["group"]
 	_, lastRun := query["lastrun"]
 
-	limitS := query.Get("limit")
-	limit := DefaultRunsLimit
-	if limitS != "" {
-		var err error
-		limit, err = strconv.Atoi(limitS)
-		if err != nil {
-			http.Error(w, "", http.StatusBadRequest)
-			return
-		}
-	}
-	if limit < 0 {
-		http.Error(w, "limit must be greater or equal than 0", http.StatusBadRequest)
-		return
-	}
-	if limit > MaxRunsLimit {
-		limit = MaxRunsLimit
-	}
-	sortOrder := types.SortOrderDesc
-	if _, ok := query["asc"]; ok {
-		sortOrder = types.SortOrderAsc
-	}
-
 	var startRunSequence uint64
 	startRunSequenceStr := query.Get("start")
 	if startRunSequenceStr != "" {
 		var err error
 		startRunSequence, err = strconv.ParseUint(startRunSequenceStr, 10, 64)
 		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse run sequence")))
-			return
+			return nil, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse run sequence"))
 		}
+	}
+
+	ropts, err := parseRequestOptions(r)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	limit := ropts.Limit
+	if limit > 0 {
+		limit += 1
 	}
 
 	var runs []*types.Run
 	var cgt *types.ChangeGroupsUpdateToken
 
-	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+	err = h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		runs, err = h.d.GetRuns(tx, groups, lastRun, phaseFilter, resultFilter, startRunSequence, limit, sortOrder)
+		runs, err = h.d.GetRuns(tx, groups, lastRun, phaseFilter, resultFilter, startRunSequence, limit, ropts.SortDirection)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -651,25 +695,30 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return errors.WithStack(err)
 	})
 	if err != nil {
-		h.log.Err(err).Send()
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return nil, util.NewAPIError(util.ErrInternal, err)
 	}
 
 	cgts, err := types.MarshalChangeGroupsUpdateToken(cgt)
 	if err != nil {
-		h.log.Err(err).Send()
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return nil, util.NewAPIError(util.ErrInternal, err)
+	}
+
+	var hasMore bool
+	if ropts.Limit > 0 {
+		hasMore = len(runs) > ropts.Limit
+		if hasMore {
+			runs = runs[0:ropts.Limit]
+		}
 	}
 
 	res := &rsapitypes.GetGroupRunsResponse{
 		Runs:                    runs,
 		ChangeGroupsUpdateToken: cgts,
 	}
-	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
-		h.log.Err(err).Send()
-	}
+
+	addHasMoreHeader(w, hasMore)
+
+	return res, nil
 }
 
 type RunsByGroupHandler struct {

@@ -32,8 +32,38 @@ import (
 	rstypes "agola.io/agola/services/runservice/types"
 )
 
+const (
+	agolaHasMoreHeader = "X-Agola-HasMore"
+)
+
+type ListOptions struct {
+	Limit         int
+	SortDirection rstypes.SortDirection
+}
+
+func (o *ListOptions) Add(q url.Values) {
+	if o == nil {
+		return
+	}
+
+	if o.Limit != 0 {
+		q.Add("limit", strconv.Itoa(o.Limit))
+	}
+
+	switch o.SortDirection {
+	case rstypes.SortDirectionDesc:
+		q.Add("sortdirection", "desc")
+	case rstypes.SortDirectionAsc:
+		fallthrough
+	default:
+		q.Add("sortdirection", "asc")
+	}
+}
+
 type Response struct {
 	*http.Response
+
+	HasMore bool
 }
 
 type Client struct {
@@ -57,6 +87,17 @@ func (c *Client) GetResponse(ctx context.Context, method, path string, query url
 	if err := util.ErrFromRemote(resp.Response); err != nil {
 		return resp, errors.WithStack(err)
 	}
+
+	hasMore := false
+	hasMoreValue := resp.Header.Get(agolaHasMoreHeader)
+	if hasMoreValue != "" {
+		hasMore, err = strconv.ParseBool(hasMoreValue)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+	}
+
+	resp.HasMore = hasMore
 
 	return resp, nil
 }
@@ -140,33 +181,43 @@ func (c *Client) PutCache(ctx context.Context, key string, size int64, r io.Read
 	return resp, errors.WithStack(err)
 }
 
-func (c *Client) GetRuns(ctx context.Context, phaseFilter, resultFilter, groups []string, lastRun bool, changeGroups []string, startRunSequence uint64, limit int, asc bool) (*rsapitypes.GetGroupRunsResponse, *Response, error) {
-	q := url.Values{}
-	for _, phase := range phaseFilter {
+type GetRunsOptions struct {
+	*ListOptions
+
+	PhaseFilter      []string
+	ResultFilter     []string
+	Groups           []string
+	LastRun          bool
+	ChangeGroups     []string
+	StartRunSequence uint64
+}
+
+func (o *GetRunsOptions) Add(q url.Values) {
+	o.ListOptions.Add(q)
+
+	for _, phase := range o.PhaseFilter {
 		q.Add("phase", phase)
 	}
-	for _, result := range resultFilter {
+	for _, result := range o.ResultFilter {
 		q.Add("result", result)
 	}
-	for _, group := range groups {
+	for _, group := range o.Groups {
 		q.Add("group", group)
 	}
-	if lastRun {
+	if o.LastRun {
 		q.Add("lastrun", "")
 	}
-	for _, changeGroup := range changeGroups {
+	for _, changeGroup := range o.ChangeGroups {
 		q.Add("changegroup", changeGroup)
 	}
-	if startRunSequence > 0 {
-		q.Add("start", strconv.FormatUint(startRunSequence, 10))
+	if o.StartRunSequence > 0 {
+		q.Add("start", strconv.FormatUint(o.StartRunSequence, 10))
 	}
+}
 
-	if limit > 0 {
-		q.Add("limit", strconv.Itoa(limit))
-	}
-	if asc {
-		q.Add("asc", "")
-	}
+func (c *Client) GetRuns(ctx context.Context, opts *GetRunsOptions) (*rsapitypes.GetGroupRunsResponse, *Response, error) {
+	q := url.Values{}
+	opts.Add(q)
 
 	getRunsResponse := new(rsapitypes.GetGroupRunsResponse)
 	resp, err := c.GetParsedResponse(ctx, "GET", "/runs", q, common.JSONContent, nil, getRunsResponse)
@@ -174,27 +225,68 @@ func (c *Client) GetRuns(ctx context.Context, phaseFilter, resultFilter, groups 
 }
 
 func (c *Client) GetQueuedRuns(ctx context.Context, startRunSequence uint64, limit int, changeGroups []string) (*rsapitypes.GetGroupRunsResponse, *Response, error) {
-	return c.GetRuns(ctx, []string{"queued"}, nil, []string{}, false, changeGroups, startRunSequence, limit, true)
+	opts := &GetRunsOptions{
+		PhaseFilter:      []string{"queued"},
+		ChangeGroups:     changeGroups,
+		StartRunSequence: startRunSequence,
+		ListOptions:      &ListOptions{Limit: limit, SortDirection: rstypes.SortDirectionAsc},
+	}
+
+	return c.GetRuns(ctx, opts)
 }
 
 func (c *Client) GetRunningRuns(ctx context.Context, startRunSequence uint64, limit int, changeGroups []string) (*rsapitypes.GetGroupRunsResponse, *Response, error) {
-	return c.GetRuns(ctx, []string{"running"}, nil, []string{}, false, changeGroups, startRunSequence, limit, true)
+	opts := &GetRunsOptions{
+		PhaseFilter:      []string{"running"},
+		ChangeGroups:     changeGroups,
+		StartRunSequence: startRunSequence,
+		ListOptions:      &ListOptions{Limit: limit, SortDirection: rstypes.SortDirectionAsc},
+	}
+
+	return c.GetRuns(ctx, opts)
 }
 
 func (c *Client) GetGroupQueuedRuns(ctx context.Context, group string, limit int, changeGroups []string) (*rsapitypes.GetGroupRunsResponse, *Response, error) {
-	return c.GetRuns(ctx, []string{"queued"}, nil, []string{group}, false, changeGroups, 0, limit, false)
+	opts := &GetRunsOptions{
+		PhaseFilter:  []string{"queued"},
+		Groups:       []string{group},
+		ChangeGroups: changeGroups,
+		ListOptions:  &ListOptions{Limit: limit, SortDirection: rstypes.SortDirectionDesc},
+	}
+
+	return c.GetRuns(ctx, opts)
 }
 
 func (c *Client) GetGroupRunningRuns(ctx context.Context, group string, limit int, changeGroups []string) (*rsapitypes.GetGroupRunsResponse, *Response, error) {
-	return c.GetRuns(ctx, []string{"running"}, nil, []string{group}, false, changeGroups, 0, limit, false)
+	opts := &GetRunsOptions{
+		PhaseFilter:  []string{"running"},
+		Groups:       []string{group},
+		ChangeGroups: changeGroups,
+		ListOptions:  &ListOptions{Limit: limit, SortDirection: rstypes.SortDirectionDesc},
+	}
+
+	return c.GetRuns(ctx, opts)
 }
 
 func (c *Client) GetGroupFirstQueuedRuns(ctx context.Context, group string, changeGroups []string) (*rsapitypes.GetGroupRunsResponse, *Response, error) {
-	return c.GetRuns(ctx, []string{"queued"}, nil, []string{group}, false, changeGroups, 0, 1, true)
+	opts := &GetRunsOptions{
+		PhaseFilter:  []string{"queued"},
+		Groups:       []string{group},
+		ChangeGroups: changeGroups,
+		ListOptions:  &ListOptions{Limit: 1, SortDirection: rstypes.SortDirectionAsc},
+	}
+
+	return c.GetRuns(ctx, opts)
 }
 
 func (c *Client) GetGroupLastRun(ctx context.Context, group string, changeGroups []string) (*rsapitypes.GetGroupRunsResponse, *Response, error) {
-	return c.GetRuns(ctx, nil, nil, []string{group}, false, changeGroups, 0, 1, false)
+	opts := &GetRunsOptions{
+		Groups:       []string{group},
+		ChangeGroups: changeGroups,
+		ListOptions:  &ListOptions{Limit: 1, SortDirection: rstypes.SortDirectionDesc},
+	}
+
+	return c.GetRuns(ctx, opts)
 }
 
 func (c *Client) GetGroupRuns(ctx context.Context, phaseFilter, resultFilter []string, group string, changeGroups []string, startRunCounter uint64, limit int, asc bool) (*rsapitypes.GetGroupRunsResponse, *Response, error) {

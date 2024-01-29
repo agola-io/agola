@@ -32,6 +32,7 @@ import (
 	"agola.io/agola/internal/util"
 	cstypes "agola.io/agola/services/configstore/types"
 	rsapitypes "agola.io/agola/services/runservice/api/types"
+	"agola.io/agola/services/runservice/client"
 	rstypes "agola.io/agola/services/runservice/types"
 	"agola.io/agola/services/types"
 )
@@ -121,6 +122,66 @@ func (h *ActionHandler) GetGroupRuns(ctx context.Context, req *GetGroupRunsReque
 	}
 
 	return runsResp, nil
+}
+
+type GetRunsRequest struct {
+	Cursor string
+
+	Limit         int
+	SortDirection SortDirection
+
+	PhaseFilter  []string
+	ResultFilter []string
+}
+
+type GetRunsResponse struct {
+	RunsResponse *rsapitypes.GetGroupRunsResponse
+	Cursor       string
+}
+
+func (h *ActionHandler) GetRuns(ctx context.Context, req *GetRunsRequest) (*GetRunsResponse, error) {
+	if !common.IsUserAdmin(ctx) {
+		return nil, util.NewAPIError(util.ErrUnauthorized, errors.Errorf("user not admin"))
+	}
+
+	inCursor := &GetRunsCursor{}
+	sortDirection := req.SortDirection
+	phaseFilter := req.PhaseFilter
+	resultFilter := req.ResultFilter
+	if req.Cursor != "" {
+		if err := UnmarshalCursor(req.Cursor, inCursor); err != nil {
+			return nil, errors.WithStack(err)
+		}
+		sortDirection = inCursor.SortDirection
+		phaseFilter = inCursor.PhaseFilter
+		resultFilter = inCursor.ResultFilter
+	}
+
+	runsResp, resp, err := h.runserviceClient.GetRuns(ctx, &client.GetRunsOptions{ListOptions: &client.ListOptions{Limit: req.Limit, SortDirection: rstypes.SortDirection(sortDirection)}, StartRunSequence: inCursor.StartSequence, PhaseFilter: phaseFilter, ResultFilter: resultFilter})
+	if err != nil {
+		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
+	}
+
+	var outCursor string
+	if resp.HasMore && len(runsResp.Runs) > 0 {
+		lastRunSequence := runsResp.Runs[len(runsResp.Runs)-1].Sequence
+		outCursor, err = MarshalCursor(&GetRunsCursor{
+			StartSequence: lastRunSequence,
+			SortDirection: sortDirection,
+			PhaseFilter:   phaseFilter,
+			ResultFilter:  resultFilter,
+		})
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+	}
+
+	res := &GetRunsResponse{
+		RunsResponse: runsResp,
+		Cursor:       outCursor,
+	}
+
+	return res, nil
 }
 
 type GetLogsRequest struct {

@@ -267,6 +267,8 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	userRemoteReposHandler := api.NewUserRemoteReposHandler(g.log, g.ah, g.configstoreClient)
 
+	runsHandler := api.NewRunsHandler(g.log, g.ah)
+
 	badgeHandler := api.NewBadgeHandler(g.log, g.ah)
 
 	versionHandler := api.NewVersionHandler(g.log, g.ah)
@@ -388,6 +390,8 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/orgs/{orgref}/invitations/{userref}", authForcedHandler(deleteOrgInvitationHandler)).Methods("DELETE")
 
 	apirouter.Handle("/user/remoterepos/{remotesourceref}", authForcedHandler(userRemoteReposHandler)).Methods("GET")
+
+	apirouter.Handle("/runs", authForcedHandler(runsHandler)).Methods("GET")
 
 	apirouter.Handle("/badges/{projectref}", badgeHandler).Methods("GET")
 

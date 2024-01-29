@@ -395,6 +395,61 @@ func (h *GroupRunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type RunsHandler struct {
+	log zerolog.Logger
+	ah  *action.ActionHandler
+}
+
+func NewRunsHandler(log zerolog.Logger, ah *action.ActionHandler) *RunsHandler {
+	return &RunsHandler{log: log, ah: ah}
+}
+
+func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(w, r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *RunsHandler) do(w http.ResponseWriter, r *http.Request) ([]*gwapitypes.RunsResponse, error) {
+	ctx := r.Context()
+	q := r.URL.Query()
+
+	phaseFilter := q["phase"]
+	resultFilter := q["result"]
+
+	ropts, err := parseRequestOptions(r)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	areq := &action.GetRunsRequest{
+		Cursor:        ropts.Cursor,
+		PhaseFilter:   phaseFilter,
+		ResultFilter:  resultFilter,
+		Limit:         ropts.Limit,
+		SortDirection: action.SortDirection(ropts.SortDirection),
+	}
+	ares, err := h.ah.GetRuns(ctx, areq)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	runs := make([]*gwapitypes.RunsResponse, len(ares.RunsResponse.Runs))
+	for i, r := range ares.RunsResponse.Runs {
+		runs[i] = createRunsResponse(r)
+	}
+
+	addCursorHeader(w, ares.Cursor)
+
+	return runs, nil
+}
+
 type RunActionsHandler struct {
 	log       zerolog.Logger
 	ah        *action.ActionHandler

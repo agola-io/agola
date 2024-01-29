@@ -42,3 +42,12 @@ type StartSequenceCursor struct {
 
 	SortDirection SortDirection
 }
+
+type GetRunsCursor struct {
+	StartSequence uint64
+
+	SortDirection SortDirection
+
+	PhaseFilter  []string
+	ResultFilter []string
+}

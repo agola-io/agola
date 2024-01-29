@@ -130,11 +130,11 @@ func (d *DB) GetRunByGroup(tx *sql.Tx, groupPath string, runCounter uint64) (*ty
 	return out, errors.WithStack(err)
 }
 
-func (d *DB) GetRuns(tx *sql.Tx, groups []string, lastRun bool, phaseFilter []types.RunPhase, resultFilter []types.RunResult, startRunSequence uint64, limit int, sortOrder types.SortOrder) ([]*types.Run, error) {
-	return d.getRunsFiltered(tx, groups, lastRun, phaseFilter, resultFilter, startRunSequence, limit, sortOrder)
+func (d *DB) GetRuns(tx *sql.Tx, groups []string, lastRun bool, phaseFilter []types.RunPhase, resultFilter []types.RunResult, startRunSequence uint64, limit int, sortDirection types.SortDirection) ([]*types.Run, error) {
+	return d.getRunsFiltered(tx, groups, lastRun, phaseFilter, resultFilter, startRunSequence, limit, sortDirection)
 }
 
-func (d *DB) getRunsFilteredQuery(phaseFilter []types.RunPhase, resultFilter []types.RunResult, groups []string, lastRun bool, startRunSequence uint64, limit int, sortOrder types.SortOrder) *sq.SelectBuilder {
+func (d *DB) getRunsFilteredQuery(phaseFilter []types.RunPhase, resultFilter []types.RunResult, groups []string, lastRun bool, startRunSequence uint64, limit int, sortDirection types.SortDirection) *sq.SelectBuilder {
 	useSubquery := false
 	if len(groups) > 0 && lastRun {
 		useSubquery = true
@@ -155,17 +155,17 @@ func (d *DB) getRunsFilteredQuery(phaseFilter []types.RunPhase, resultFilter []t
 	}
 	if startRunSequence > 0 {
 		if lastRun {
-			switch sortOrder {
-			case types.SortOrderAsc:
+			switch sortDirection {
+			case types.SortDirectionAsc:
 				having = append(having, q.G("run.sequence", startRunSequence))
-			case types.SortOrderDesc:
+			case types.SortDirectionDesc:
 				having = append(having, q.L("run.sequence", startRunSequence))
 			}
 		} else {
-			switch sortOrder {
-			case types.SortOrderAsc:
+			switch sortDirection {
+			case types.SortDirectionAsc:
 				w = append(w, q.G("run.sequence", startRunSequence))
-			case types.SortOrderDesc:
+			case types.SortDirectionDesc:
 				w = append(w, q.L("run.sequence", startRunSequence))
 			}
 		}
@@ -196,27 +196,27 @@ func (d *DB) getRunsFilteredQuery(phaseFilter []types.RunPhase, resultFilter []t
 		sq := runSelect()
 		sq.Where(sq.In("run.sequence", q))
 
-		switch sortOrder {
-		case types.SortOrderAsc:
+		switch sortDirection {
+		case types.SortDirectionAsc:
 			sq.OrderBy("run.sequence").Asc()
-		case types.SortOrderDesc:
+		case types.SortDirectionDesc:
 			sq.OrderBy("run.sequence").Desc()
 		}
 		return sq
 	}
 
-	switch sortOrder {
-	case types.SortOrderAsc:
+	switch sortDirection {
+	case types.SortDirectionAsc:
 		q.OrderBy("run.sequence").Asc()
-	case types.SortOrderDesc:
+	case types.SortDirectionDesc:
 		q.OrderBy("run.sequence").Desc()
 	}
 
 	return q
 }
 
-func (d *DB) getRunsFiltered(tx *sql.Tx, groups []string, lastRun bool, phaseFilter []types.RunPhase, resultFilter []types.RunResult, startRunSequence uint64, limit int, sortOrder types.SortOrder) ([]*types.Run, error) {
-	q := d.getRunsFilteredQuery(phaseFilter, resultFilter, groups, lastRun, startRunSequence, limit, sortOrder)
+func (d *DB) getRunsFiltered(tx *sql.Tx, groups []string, lastRun bool, phaseFilter []types.RunPhase, resultFilter []types.RunResult, startRunSequence uint64, limit int, sortDirection types.SortDirection) ([]*types.Run, error) {
+	q := d.getRunsFilteredQuery(phaseFilter, resultFilter, groups, lastRun, startRunSequence, limit, sortDirection)
 
 	runs, _, err := d.fetchRuns(tx, q)
 

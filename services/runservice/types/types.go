@@ -66,3 +66,10 @@ func UnmarshalChangeGroupsUpdateToken(s string) (*ChangeGroupsUpdateToken, error
 	}
 	return t, nil
 }
+
+type SortDirection string
+
+const (
+	SortDirectionAsc  SortDirection = "asc"
+	SortDirectionDesc SortDirection = "desc"
+)

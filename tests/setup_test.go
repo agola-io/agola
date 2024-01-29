@@ -7141,3 +7141,309 @@ func TestRunRequiredEnvVariables(t *testing.T) {
 		})
 	}
 }
+
+func TestGetRuns(t *testing.T) {
+	t.Parallel()
+
+	config := `
+	    {
+			runs: [
+			  {
+				name: 'run01',
+				tasks: [
+				  {
+					name: 'task01',
+					runtime: {
+					  containers: [
+						{
+						  image: 'alpine/git',
+						},
+					  ],
+					},
+					steps: [
+					  { type: 'run', command: 'env' },
+					],
+				  },
+				],
+			  },
+			],
+		}
+		`
+
+	dir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sc := setup(ctx, t, dir, withGitea(true))
+	defer sc.stop()
+
+	giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+
+	giteaToken, token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+
+	giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+	testutil.NilError(t, err)
+
+	gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
+	adminGWClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, "admintoken")
+
+	giteaRepo, _, err := giteaClient.CreateRepo(gitea.CreateRepoOption{
+		Name:    "repo01",
+		Private: false,
+	})
+	testutil.NilError(t, err)
+
+	t.Logf("created gitea repo: %s", giteaRepo.Name)
+
+	_, _, err = gwClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{
+		Name:       agolaOrg01,
+		Visibility: gwapitypes.VisibilityPublic,
+	})
+	testutil.NilError(t, err)
+
+	_, _, err = gwClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{
+		Name:       agolaOrg02,
+		Visibility: gwapitypes.VisibilityPublic,
+	})
+	testutil.NilError(t, err)
+
+	for i := 1; i <= 5; i++ {
+		_, _, err := gwClient.CreateProject(ctx, &gwapitypes.CreateProjectRequest{
+			Name:             fmt.Sprintf("project%d", i),
+			ParentRef:        path.Join("org", agolaOrg01),
+			RemoteSourceName: "gitea",
+			RepoPath:         path.Join(giteaUser01, "repo01"),
+			Visibility:       gwapitypes.VisibilityPublic,
+		})
+		testutil.NilError(t, err)
+	}
+
+	for i := 1; i <= 5; i++ {
+		_, _, err := gwClient.CreateProject(ctx, &gwapitypes.CreateProjectRequest{
+			Name:             fmt.Sprintf("project%d", i),
+			ParentRef:        path.Join("org", agolaOrg02),
+			RemoteSourceName: "gitea",
+			RepoPath:         path.Join(giteaUser01, "repo01"),
+			Visibility:       gwapitypes.VisibilityPublic,
+		})
+		testutil.NilError(t, err)
+	}
+
+	push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
+
+	_ = testutil.Wait(120*time.Second, func() (bool, error) {
+		runs, _, err := adminGWClient.GetRuns(ctx, nil, nil, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
+		if err != nil {
+			return false, nil
+		}
+
+		if len(runs) != 10 {
+			return false, nil
+		}
+		for _, run := range runs {
+			if run.Phase != rstypes.RunPhaseFinished {
+				return false, nil
+			}
+		}
+
+		return true, nil
+	})
+
+	allRuns, _, err := adminGWClient.GetRuns(ctx, nil, nil, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
+	testutil.NilError(t, err)
+
+	t.Logf("runs: %s", util.Dump(allRuns))
+
+	assert.Assert(t, cmp.Len(allRuns, 10))
+
+	for _, run := range allRuns {
+		assert.Equal(t, run.Phase, rstypes.RunPhaseFinished)
+		assert.Equal(t, run.Result, rstypes.RunResultSuccess)
+	}
+
+	tests := []struct {
+		name                   string
+		limit                  int
+		sortDirection          gwapitypes.SortDirection
+		phaseFilter            []string
+		resultFilter           []string
+		expectedCallsNumber    int
+		getRunResultSuccessRun bool
+	}{
+		{
+			name:                   "test get runs with limit = 0",
+			sortDirection:          gwapitypes.SortDirectionAsc,
+			expectedCallsNumber:    1,
+			getRunResultSuccessRun: true,
+		},
+		{
+			name:                   "test get runs with limit less than runs continuation",
+			limit:                  2,
+			sortDirection:          gwapitypes.SortDirectionAsc,
+			expectedCallsNumber:    5,
+			getRunResultSuccessRun: true,
+		},
+		{
+			name:                   "test get runs with limit greater than runs",
+			limit:                  10,
+			sortDirection:          gwapitypes.SortDirectionAsc,
+			expectedCallsNumber:    1,
+			getRunResultSuccessRun: true,
+		},
+		{
+			name:                   "test get runs with limit = 0 and sortDirection desc",
+			sortDirection:          gwapitypes.SortDirectionDesc,
+			expectedCallsNumber:    1,
+			getRunResultSuccessRun: true,
+		},
+		{
+			name:                   "test get runs with limit less than runs continuation and sortDirection desc",
+			limit:                  2,
+			sortDirection:          gwapitypes.SortDirectionDesc,
+			expectedCallsNumber:    5,
+			getRunResultSuccessRun: true,
+		},
+		{
+			name:                   "test get runs with limit greater than runs and sortDirection desc",
+			limit:                  10,
+			sortDirection:          gwapitypes.SortDirectionDesc,
+			expectedCallsNumber:    1,
+			getRunResultSuccessRun: true,
+		},
+		{
+			name:                   "test get runs with phase filter finished",
+			sortDirection:          gwapitypes.SortDirectionAsc,
+			expectedCallsNumber:    1,
+			getRunResultSuccessRun: true,
+			phaseFilter:            []string{"finished"},
+		},
+		{
+			name:                   "test get runs with phase filter finished and limit less than runs continuation",
+			limit:                  2,
+			sortDirection:          gwapitypes.SortDirectionAsc,
+			expectedCallsNumber:    5,
+			getRunResultSuccessRun: true,
+			phaseFilter:            []string{"finished"},
+		},
+		{
+			name:                "test get runs with phase filter running",
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+			phaseFilter:         []string{"running"},
+		},
+		{
+			name:                "test get runs with phase filter running and limit less than runs continuation",
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+			phaseFilter:         []string{"running"},
+		},
+		{
+			name:                   "test get runs with result success",
+			sortDirection:          gwapitypes.SortDirectionAsc,
+			expectedCallsNumber:    1,
+			getRunResultSuccessRun: true,
+			resultFilter:           []string{"success"},
+		},
+		{
+			name:                   "test get runs with phase result success and limit less than runs continuation",
+			limit:                  2,
+			sortDirection:          gwapitypes.SortDirectionAsc,
+			expectedCallsNumber:    5,
+			getRunResultSuccessRun: true,
+			resultFilter:           []string{"success"},
+		},
+		{
+			name:                "test get runs with result failed",
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+			resultFilter:        []string{"failed"},
+		},
+		{
+			name:                "test get runs with phase result failed and limit less than runs continuation",
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+			resultFilter:        []string{"failed"},
+		},
+		{
+			name:                   "test get runs with all filters",
+			sortDirection:          gwapitypes.SortDirectionAsc,
+			expectedCallsNumber:    1,
+			getRunResultSuccessRun: true,
+			phaseFilter:            []string{"setuperror", "queued", "cancelled", "running", "finished"},
+			resultFilter:           []string{"unknown", "stopped", "success", "failed"},
+		},
+		{
+			name:                   "test get runs with all filters and limit less than runs continuation",
+			limit:                  2,
+			sortDirection:          gwapitypes.SortDirectionAsc,
+			expectedCallsNumber:    5,
+			getRunResultSuccessRun: true,
+			phaseFilter:            []string{"setuperror", "queued", "cancelled", "running", "finished"},
+			resultFilter:           []string{"unknown", "stopped", "success", "failed"},
+		},
+		{
+			name:                   "test get runs with all filters and limit greater than runs",
+			limit:                  10,
+			sortDirection:          gwapitypes.SortDirectionAsc,
+			expectedCallsNumber:    1,
+			getRunResultSuccessRun: true,
+			phaseFilter:            []string{"setuperror", "queued", "cancelled", "running", "finished"},
+			resultFilter:           []string{"unknown", "stopped", "success", "failed"},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			var expectedRuns []*gwapitypes.RunsResponse
+			if tt.getRunResultSuccessRun {
+				expectedRuns = append([]*gwapitypes.RunsResponse{}, allRuns...)
+			}
+			// reverse if sortDirection is desc
+			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
+			if tt.sortDirection == gwapitypes.SortDirectionDesc {
+				for i, j := 0, len(expectedRuns)-1; i < j; i, j = i+1, j-1 {
+					expectedRuns[i], expectedRuns[j] = expectedRuns[j], expectedRuns[i]
+				}
+			}
+
+			var respAllRuns []*gwapitypes.RunsResponse
+
+			respRuns, res, err := adminGWClient.GetRuns(ctx, tt.phaseFilter, tt.resultFilter, &gwclient.ListOptions{
+				Limit: tt.limit, SortDirection: tt.sortDirection,
+			})
+			testutil.NilError(t, err)
+
+			respAllRuns = append(respAllRuns, respRuns...)
+			callsNumber := 1
+
+			// fetch next results
+			for {
+				if res.Cursor == "" {
+					break
+				}
+
+				respRuns, res, err = adminGWClient.GetRuns(ctx, nil, nil, &gwclient.ListOptions{
+					Cursor: res.Cursor, Limit: tt.limit,
+				})
+				testutil.NilError(t, err)
+
+				callsNumber++
+
+				respAllRuns = append(respAllRuns, respRuns...)
+			}
+
+			assert.Assert(t, cmp.Len(respAllRuns, len(expectedRuns)))
+			assert.DeepEqual(t, respAllRuns, expectedRuns)
+			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
+		})
+	}
+
+	t.Run("test user01 unauthorized", func(t *testing.T) {
+		_, _, err = gwClient.GetRuns(ctx, nil, nil, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
+		assert.Error(t, err, remoteErrorUnauthorized)
+	})
+}

@@ -547,6 +547,22 @@ func (c *Client) GetUserRuns(ctx context.Context, userRef string, phaseFilter, r
 	return c.getRuns(ctx, "users", userRef, phaseFilter, resultFilter, start, limit, asc)
 }
 
+func (c *Client) GetRuns(ctx context.Context, phaseFilter, resultFilter []string, opts *ListOptions) ([]*gwapitypes.RunsResponse, *Response, error) {
+	q := url.Values{}
+	opts.Add(q)
+
+	for _, phase := range phaseFilter {
+		q.Add("phase", phase)
+	}
+	for _, result := range resultFilter {
+		q.Add("result", result)
+	}
+
+	getRunsResponse := []*gwapitypes.RunsResponse{}
+	resp, err := c.getParsedResponse(ctx, "GET", "/runs", q, jsonContent, nil, &getRunsResponse)
+	return getRunsResponse, resp, errors.WithStack(err)
+}
+
 func (c *Client) getRuns(ctx context.Context, groupType, groupRef string, phaseFilter, resultFilter []string, start uint64, limit int, asc bool) ([]*gwapitypes.RunsResponse, *Response, error) {
 	q := url.Values{}
 	for _, phase := range phaseFilter {

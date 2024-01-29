@@ -52,7 +52,7 @@ func (s *Scheduler) schedule(ctx context.Context) error {
 
 	var lastRunSequence uint64
 	for {
-		queuedRunsResponse, _, err := s.runserviceClient.GetQueuedRuns(ctx, lastRunSequence, 0, nil)
+		queuedRunsResponse, res, err := s.runserviceClient.GetQueuedRuns(ctx, lastRunSequence, 0, nil)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get queued runs")
 		}
@@ -61,7 +61,7 @@ func (s *Scheduler) schedule(ctx context.Context) error {
 			groups[run.Group] = struct{}{}
 		}
 
-		if len(queuedRunsResponse.Runs) == 0 {
+		if !res.HasMore {
 			break
 		}
 
@@ -122,12 +122,12 @@ func (s *Scheduler) approveLoop(ctx context.Context) {
 func (s *Scheduler) approve(ctx context.Context) error {
 	var lastRunSequence uint64
 	for {
-		runningRunsResponse, _, err := s.runserviceClient.GetRunningRuns(ctx, lastRunSequence, 0, nil)
+		runningRunsResponse, res, err := s.runserviceClient.GetRunningRuns(ctx, lastRunSequence, 0, nil)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get running runs")
 		}
 
-		if len(runningRunsResponse.Runs) == 0 {
+		if !res.HasMore {
 			break
 		}
 

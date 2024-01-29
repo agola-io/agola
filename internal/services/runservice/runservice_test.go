@@ -79,7 +79,7 @@ func getRuns(ctx context.Context, rs *Runservice) ([]*types.Run, error) {
 	var runs []*types.Run
 	err := rs.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		runs, err = rs.d.GetRuns(tx, nil, false, nil, nil, 0, 0, types.SortOrderAsc)
+		runs, err = rs.d.GetRuns(tx, nil, false, nil, nil, 0, 0, types.SortDirectionAsc)
 		return errors.WithStack(err)
 	})
 
@@ -256,7 +256,7 @@ func TestGetRunsLastRun(t *testing.T) {
 	var runs []*types.Run
 	err := rs.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		runs, err = rs.d.GetRuns(tx, groups, true, nil, nil, 0, 0, types.SortOrderDesc)
+		runs, err = rs.d.GetRuns(tx, groups, true, nil, nil, 0, 0, types.SortDirectionDesc)
 
 		return errors.WithStack(err)
 	})
