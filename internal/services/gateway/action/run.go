@@ -92,7 +92,7 @@ func (h *ActionHandler) GetRun(ctx context.Context, groupType scommon.GroupType,
 	return runResp, nil
 }
 
-type GetRunsRequest struct {
+type GetGroupRunsRequest struct {
 	GroupType       scommon.GroupType
 	Ref             string
 	SubGroup        string
@@ -103,7 +103,7 @@ type GetRunsRequest struct {
 	Asc             bool
 }
 
-func (h *ActionHandler) GetRuns(ctx context.Context, req *GetRunsRequest) (*rsapitypes.GetRunsResponse, error) {
+func (h *ActionHandler) GetGroupRuns(ctx context.Context, req *GetGroupRunsRequest) (*rsapitypes.GetGroupRunsResponse, error) {
 	canGetRun, groupID, err := h.CanAuthUserGetRun(ctx, req.GroupType, req.Ref)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to determine permissions")

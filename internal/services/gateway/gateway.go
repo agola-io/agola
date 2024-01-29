@@ -249,7 +249,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	addOrgMemberHandler := api.NewAddOrgMemberHandler(g.log, g.ah)
 	removeOrgMemberHandler := api.NewRemoveOrgMemberHandler(g.log, g.ah)
 
-	projectRunsHandler := api.NewRunsHandler(g.log, g.ah, scommon.GroupTypeProject)
+	projectRunsHandler := api.NewGroupRunsHandler(g.log, g.ah, scommon.GroupTypeProject)
 	projectRunHandler := api.NewRunHandler(g.log, g.ah, scommon.GroupTypeProject)
 	projectRuntaskHandler := api.NewRuntaskHandler(g.log, g.ah, scommon.GroupTypeProject)
 	projectRunActionsHandler := api.NewRunActionsHandler(g.log, g.ah, scommon.GroupTypeProject)
@@ -257,7 +257,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	projectRunLogsHandler := api.NewLogsHandler(g.log, g.ah, scommon.GroupTypeProject)
 	projectRunLogsDeleteHandler := api.NewLogsDeleteHandler(g.log, g.ah, scommon.GroupTypeProject)
 
-	userRunsHandler := api.NewRunsHandler(g.log, g.ah, scommon.GroupTypeUser)
+	userRunsHandler := api.NewGroupRunsHandler(g.log, g.ah, scommon.GroupTypeUser)
 	userRunHandler := api.NewRunHandler(g.log, g.ah, scommon.GroupTypeUser)
 	userRuntaskHandler := api.NewRuntaskHandler(g.log, g.ah, scommon.GroupTypeUser)
 	userRunActionsHandler := api.NewRunActionsHandler(g.log, g.ah, scommon.GroupTypeUser)

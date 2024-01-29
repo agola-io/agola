@@ -663,7 +663,7 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res := &rsapitypes.GetRunsResponse{
+	res := &rsapitypes.GetGroupRunsResponse{
 		Runs:                    runs,
 		ChangeGroupsUpdateToken: cgts,
 	}
@@ -759,7 +759,7 @@ func (h *RunsByGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res := &rsapitypes.GetRunsResponse{
+	res := &rsapitypes.GetGroupRunsResponse{
 		Runs:                    runs,
 		ChangeGroupsUpdateToken: cgts,
 	}

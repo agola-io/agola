@@ -304,17 +304,17 @@ func createRunsResponse(r *rstypes.Run) *gwapitypes.RunsResponse {
 	return run
 }
 
-type RunsHandler struct {
+type GroupRunsHandler struct {
 	log       zerolog.Logger
 	ah        *action.ActionHandler
 	groupType common.GroupType
 }
 
-func NewRunsHandler(log zerolog.Logger, ah *action.ActionHandler, groupType common.GroupType) *RunsHandler {
-	return &RunsHandler{log: log, ah: ah, groupType: groupType}
+func NewGroupRunsHandler(log zerolog.Logger, ah *action.ActionHandler, groupType common.GroupType) *GroupRunsHandler {
+	return &GroupRunsHandler{log: log, ah: ah, groupType: groupType}
 }
 
-func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *GroupRunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 	q := r.URL.Query()
@@ -370,7 +370,7 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	areq := &action.GetRunsRequest{
+	areq := &action.GetGroupRunsRequest{
 		GroupType:       h.groupType,
 		Ref:             ref,
 		SubGroup:        subGroup,
@@ -380,7 +380,7 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Limit:           limit,
 		Asc:             asc,
 	}
-	runsResp, err := h.ah.GetRuns(ctx, areq)
+	runsResp, err := h.ah.GetGroupRuns(ctx, areq)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return

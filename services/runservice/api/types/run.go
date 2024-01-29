@@ -24,7 +24,7 @@ type RunResponse struct {
 	ChangeGroupsUpdateToken string             `json:"change_groups_update_tokens"`
 }
 
-type GetRunsResponse struct {
+type GetGroupRunsResponse struct {
 	Runs                    []*rstypes.Run `json:"runs"`
 	ChangeGroupsUpdateToken string         `json:"change_groups_update_tokens"`
 }
