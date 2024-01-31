@@ -108,12 +108,12 @@ func runList(cmd *cobra.Command, args []string) error {
 	var runsResp []*gwapitypes.RunsResponse
 	var err error
 	if isProject {
-		runsResp, _, err = gwClient.GetProjectRuns(context.TODO(), runListOpts.projectRef, runListOpts.phaseFilter, nil, runListOpts.start, runListOpts.limit, false)
+		runsResp, _, err = gwClient.GetProjectRuns(context.TODO(), runListOpts.projectRef, runListOpts.phaseFilter, nil, runListOpts.start, &gwclient.ListOptions{Limit: runListOpts.limit, SortDirection: gwapitypes.SortDirectionDesc})
 	} else {
-		runsResp, _, err = gwClient.GetUserRuns(context.TODO(), runListOpts.username, runListOpts.phaseFilter, nil, runListOpts.start, runListOpts.limit, false)
+		runsResp, _, err = gwClient.GetUserRuns(context.TODO(), runListOpts.username, runListOpts.phaseFilter, nil, runListOpts.start, &gwclient.ListOptions{Limit: runListOpts.limit, SortDirection: gwapitypes.SortDirectionDesc})
 	}
 	if err != nil {
-		return errors.WithStack(err)
+		return errors.Wrapf(err, "failed to get runs")
 	}
 
 	runs := make([]*runDetails, len(runsResp))

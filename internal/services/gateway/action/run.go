@@ -32,6 +32,7 @@ import (
 	"agola.io/agola/internal/util"
 	cstypes "agola.io/agola/services/configstore/types"
 	rsapitypes "agola.io/agola/services/runservice/api/types"
+	"agola.io/agola/services/runservice/client"
 	rstypes "agola.io/agola/services/runservice/types"
 	"agola.io/agola/services/types"
 )
@@ -99,11 +100,36 @@ type GetRunsRequest struct {
 	PhaseFilter     []string
 	ResultFilter    []string
 	StartRunCounter uint64
-	Limit           int
-	Asc             bool
+
+	Cursor string
+
+	Limit         int
+	SortDirection SortDirection
 }
 
-func (h *ActionHandler) GetRuns(ctx context.Context, req *GetRunsRequest) (*rsapitypes.GetRunsResponse, error) {
+type GetRunsResponse struct {
+	RunsResponse *rsapitypes.GetRunsResponse
+	Cursor       string
+}
+
+func (h *ActionHandler) GroupRunsHandler(ctx context.Context, req *GetRunsRequest) (*GetRunsResponse, error) {
+	inCursor := &GroupRunsStartCursor{}
+	sortDirection := req.SortDirection
+	start := req.StartRunCounter
+	subGroup := req.SubGroup
+	phaseFilter := req.PhaseFilter
+	resultFilter := req.ResultFilter
+	if req.Cursor != "" {
+		if err := UnmarshalCursor(req.Cursor, inCursor); err != nil {
+			return nil, errors.WithStack(err)
+		}
+		sortDirection = inCursor.SortDirection
+		start = inCursor.StartSequence
+		subGroup = inCursor.SubGroup
+		phaseFilter = inCursor.PhaseFilter
+		resultFilter = inCursor.ResultFilter
+	}
+
 	canGetRun, groupID, err := h.CanAuthUserGetRun(ctx, req.GroupType, req.Ref)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to determine permissions")
@@ -113,14 +139,34 @@ func (h *ActionHandler) GetRuns(ctx context.Context, req *GetRunsRequest) (*rsap
 	}
 
 	group := scommon.GenBaseRunGroup(req.GroupType, groupID)
-	group = path.Join(group, req.SubGroup)
+	group = path.Join(group, subGroup)
 
-	runsResp, _, err := h.runserviceClient.GetGroupRuns(ctx, req.PhaseFilter, req.ResultFilter, group, nil, req.StartRunCounter, req.Limit, req.Asc)
+	runsResp, resp, err := h.runserviceClient.GetGroupRuns(ctx, group, &client.GetGroupRunsOptions{ListOptions: &client.ListOptions{Limit: req.Limit, SortDirection: rstypes.SortDirection(sortDirection)}, PhaseFilter: phaseFilter, ResultFilter: resultFilter, Group: group, StartRunCounter: start})
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
 
-	return runsResp, nil
+	var outCursor string
+	if resp.HasMore && len(runsResp.Runs) > 0 {
+		lastRunSequence := runsResp.Runs[len(runsResp.Runs)-1].Sequence
+		outCursor, err = MarshalCursor(&GroupRunsStartCursor{
+			StartSequence: lastRunSequence,
+			SortDirection: sortDirection,
+			SubGroup:      subGroup,
+			PhaseFilter:   phaseFilter,
+			ResultFilter:  resultFilter,
+		})
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+	}
+
+	res := &GetRunsResponse{
+		RunsResponse: runsResp,
+		Cursor:       outCursor,
+	}
+
+	return res, nil
 }
 
 type GetLogsRequest struct {

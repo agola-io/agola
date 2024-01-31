@@ -539,16 +539,18 @@ func (c *Client) getRunTask(ctx context.Context, groupType, groupRef string, run
 	return task, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetProjectRuns(ctx context.Context, projectRef string, phaseFilter, resultFilter []string, start uint64, limit int, asc bool) ([]*gwapitypes.RunsResponse, *Response, error) {
-	return c.getRuns(ctx, "projects", projectRef, phaseFilter, resultFilter, start, limit, asc)
+func (c *Client) GetProjectRuns(ctx context.Context, projectRef string, phaseFilter, resultFilter []string, start uint64, opts *ListOptions) ([]*gwapitypes.RunsResponse, *Response, error) {
+	return c.getGroupRuns(ctx, "projects", projectRef, phaseFilter, resultFilter, start, opts)
 }
 
-func (c *Client) GetUserRuns(ctx context.Context, userRef string, phaseFilter, resultFilter []string, start uint64, limit int, asc bool) ([]*gwapitypes.RunsResponse, *Response, error) {
-	return c.getRuns(ctx, "users", userRef, phaseFilter, resultFilter, start, limit, asc)
+func (c *Client) GetUserRuns(ctx context.Context, userRef string, phaseFilter, resultFilter []string, start uint64, opts *ListOptions) ([]*gwapitypes.RunsResponse, *Response, error) {
+	return c.getGroupRuns(ctx, "users", userRef, phaseFilter, resultFilter, start, opts)
 }
 
-func (c *Client) getRuns(ctx context.Context, groupType, groupRef string, phaseFilter, resultFilter []string, start uint64, limit int, asc bool) ([]*gwapitypes.RunsResponse, *Response, error) {
+func (c *Client) getGroupRuns(ctx context.Context, groupType, groupRef string, phaseFilter, resultFilter []string, start uint64, opts *ListOptions) ([]*gwapitypes.RunsResponse, *Response, error) {
 	q := url.Values{}
+	opts.Add(q)
+
 	for _, phase := range phaseFilter {
 		q.Add("phase", phase)
 	}
@@ -557,12 +559,6 @@ func (c *Client) getRuns(ctx context.Context, groupType, groupRef string, phaseF
 	}
 	if start > 0 {
 		q.Add("start", strconv.FormatUint(start, 10))
-	}
-	if limit > 0 {
-		q.Add("limit", strconv.Itoa(limit))
-	}
-	if asc {
-		q.Add("asc", "")
 	}
 
 	getRunsResponse := []*gwapitypes.RunsResponse{}

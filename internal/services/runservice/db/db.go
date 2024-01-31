@@ -232,17 +232,17 @@ func (d *DB) GetUnarchivedRuns(tx *sql.Tx) ([]*types.Run, error) {
 	return runs, errors.WithStack(err)
 }
 
-func (d *DB) GetGroupRuns(tx *sql.Tx, group string, phaseFilter []types.RunPhase, resultFilter []types.RunResult, startRunCounter uint64, limit int, sortOrder types.SortOrder) ([]*types.Run, error) {
-	return d.getGroupRunsFiltered(tx, group, phaseFilter, resultFilter, startRunCounter, limit, sortOrder)
+func (d *DB) GetGroupRuns(tx *sql.Tx, group string, phaseFilter []types.RunPhase, resultFilter []types.RunResult, startRunCounter uint64, limit int, sortDirection types.SortDirection) ([]*types.Run, error) {
+	return d.getGroupRunsFiltered(tx, group, phaseFilter, resultFilter, startRunCounter, limit, sortDirection)
 }
 
-func (d *DB) getGroupRunsFilteredQuery(phaseFilter []types.RunPhase, resultFilter []types.RunResult, groupPath string, startRunCounter uint64, limit int, sortOrder types.SortOrder, objectstorage bool) *sq.SelectBuilder {
+func (d *DB) getGroupRunsFilteredQuery(phaseFilter []types.RunPhase, resultFilter []types.RunResult, groupPath string, startRunCounter uint64, limit int, sortDirection types.SortDirection, objectstorage bool) *sq.SelectBuilder {
 	q := runSelect()
 
-	switch sortOrder {
-	case types.SortOrderAsc:
+	switch sortDirection {
+	case types.SortDirectionAsc:
 		q.OrderBy("run.counter").Asc()
-	case types.SortOrderDesc:
+	case types.SortDirectionDesc:
 		q.OrderBy("run.counter").Desc()
 	}
 	if len(phaseFilter) > 0 {
@@ -252,10 +252,10 @@ func (d *DB) getGroupRunsFilteredQuery(phaseFilter []types.RunPhase, resultFilte
 		q.Where(q.In("result", sq.Flatten(resultFilter)...))
 	}
 	if startRunCounter > 0 {
-		switch sortOrder {
-		case types.SortOrderAsc:
+		switch sortDirection {
+		case types.SortDirectionAsc:
 			q.Where(q.G("run.counter", startRunCounter))
-		case types.SortOrderDesc:
+		case types.SortDirectionDesc:
 			q.Where(q.L("run.counter", startRunCounter))
 		}
 	}
@@ -271,8 +271,8 @@ func (d *DB) getGroupRunsFilteredQuery(phaseFilter []types.RunPhase, resultFilte
 	return q
 }
 
-func (d *DB) getGroupRunsFiltered(tx *sql.Tx, group string, phaseFilter []types.RunPhase, resultFilter []types.RunResult, startRunCounter uint64, limit int, sortOrder types.SortOrder) ([]*types.Run, error) {
-	q := d.getGroupRunsFilteredQuery(phaseFilter, resultFilter, group, startRunCounter, limit, sortOrder, false)
+func (d *DB) getGroupRunsFiltered(tx *sql.Tx, group string, phaseFilter []types.RunPhase, resultFilter []types.RunResult, startRunCounter uint64, limit int, sortDirection types.SortDirection) ([]*types.Run, error) {
+	q := d.getGroupRunsFilteredQuery(phaseFilter, resultFilter, group, startRunCounter, limit, sortDirection, false)
 
 	runs, _, err := d.fetchRuns(tx, q)
 

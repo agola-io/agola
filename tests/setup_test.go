@@ -1421,7 +1421,7 @@ func TestPush(t *testing.T) {
 			push(t, tt.config, giteaRepo.CloneURL, giteaToken, tt.message, false)
 
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 				if err != nil {
 					return false, nil
 				}
@@ -1437,7 +1437,7 @@ func TestPush(t *testing.T) {
 				return true, nil
 			})
 
-			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 			testutil.NilError(t, err)
 
 			t.Logf("runs: %s", util.Dump(runs))
@@ -1617,7 +1617,7 @@ func testDirectRun(t *testing.T, internalServicesAuth bool) {
 			directRun(t, dir, config, ConfigFormatJsonnet, sc.config.Gateway.APIExposedURL, token, tt.args...)
 
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
+				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 				if err != nil {
 					return false, nil
 				}
@@ -1634,7 +1634,7 @@ func testDirectRun(t *testing.T, internalServicesAuth bool) {
 				return true, nil
 			})
 
-			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 			testutil.NilError(t, err)
 
 			t.Logf("runs: %s", util.Dump(runs))
@@ -1759,7 +1759,7 @@ func TestDirectRunVariables(t *testing.T) {
 
 			// TODO(sgotti) add an util to wait for a run phase
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
+				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 				if err != nil {
 					return false, nil
 				}
@@ -1776,7 +1776,7 @@ func TestDirectRunVariables(t *testing.T) {
 				return true, nil
 			})
 
-			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 			testutil.NilError(t, err)
 
 			t.Logf("runs: %s", util.Dump(runs))
@@ -1911,7 +1911,7 @@ func TestDirectRunLogs(t *testing.T) {
 			directRun(t, dir, config, ConfigFormatJsonnet, sc.config.Gateway.APIExposedURL, token)
 
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
+				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 				if err != nil {
 					return false, nil
 				}
@@ -1928,7 +1928,7 @@ func TestDirectRunLogs(t *testing.T) {
 				return true, nil
 			})
 
-			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 			testutil.NilError(t, err)
 
 			t.Logf("runs: %s", util.Dump(runs))
@@ -2196,7 +2196,7 @@ func TestPullRequest(t *testing.T) {
 				testutil.NilError(t, err, "failed to create pull request")
 			}
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 				if err != nil {
 					return false, nil
 				}
@@ -2212,7 +2212,7 @@ func TestPullRequest(t *testing.T) {
 				return true, nil
 			})
 
-			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 			testutil.NilError(t, err)
 
 			t.Logf("runs: %s", util.Dump(runs))
@@ -2397,7 +2397,7 @@ def main(ctx):
 
 				// TODO(sgotti) add an util to wait for a run phase
 				_ = testutil.Wait(30*time.Second, func() (bool, error) {
-					runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
+					runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 					if err != nil {
 						return false, nil
 					}
@@ -2414,7 +2414,7 @@ def main(ctx):
 					return true, nil
 				})
 
-				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
+				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 				testutil.NilError(t, err)
 
 				t.Logf("runs: %s", util.Dump(runs))
@@ -4761,7 +4761,7 @@ func TestExportImport(t *testing.T) {
 	push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
 	_ = testutil.Wait(30*time.Second, func() (bool, error) {
-		runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+		runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 		if err != nil {
 			return false, nil
 		}
@@ -4777,7 +4777,7 @@ func TestExportImport(t *testing.T) {
 		return true, nil
 	})
 
-	runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+	runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 	testutil.NilError(t, err)
 
 	assert.Assert(t, cmp.Len(runs, 1))
@@ -4912,7 +4912,7 @@ func TestExportImport(t *testing.T) {
 
 	assert.DeepEqual(t, user01Projects, impUser01Projects)
 
-	impRuns, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+	impRuns, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 	testutil.NilError(t, err)
 
 	assert.DeepEqual(t, runs, impRuns)
@@ -4944,6 +4944,7 @@ func TestGetProjectRuns(t *testing.T) {
 				steps: [
 				  { type: 'clone' },
 				  { type: 'run', command: 'env' },
+				  { type: 'run', command: 'echo %d' }
 				],
 			  },
 			],
@@ -4951,122 +4952,233 @@ func TestGetProjectRuns(t *testing.T) {
 		],
 	}
 	`
+	dir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sc := setup(ctx, t, dir, withGitea(true))
+	defer sc.stop()
+
+	giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+
+	giteaToken, token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+
+	giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+	testutil.NilError(t, err)
+
+	gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
+
+	giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)
+
+	runNumbers := 10
+	for i := 1; i <= runNumbers; i++ {
+		push(t, fmt.Sprintf(config, i), giteaRepo.CloneURL, giteaToken, "commit", false)
+	}
+
+	_ = testutil.Wait(120*time.Second, func() (bool, error) {
+		runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
+		if err != nil {
+			return false, nil
+		}
+
+		if len(runs) != runNumbers {
+			return false, nil
+		}
+
+		for _, run := range runs {
+			if run.Phase != rstypes.RunPhaseFinished {
+				return false, nil
+			}
+		}
+
+		return true, nil
+	})
+
+	runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
+	testutil.NilError(t, err)
+
+	t.Logf("runs: %s", util.Dump(runs))
+
+	assert.Assert(t, cmp.Len(runs, runNumbers))
+
+	for _, run := range runs {
+		assert.Equal(t, run.Phase, rstypes.RunPhaseFinished)
+		assert.Equal(t, run.Result, rstypes.RunResultSuccess)
+	}
 
 	tests := []struct {
-		name         string
-		phaseFilter  []string
-		resultFilter []string
-		num          int
+		name                   string
+		phaseFilter            []string
+		resultFilter           []string
+		limit                  int
+		sortDirection          gwapitypes.SortDirection
+		expectedCallsNumber    int
+		getRunResultSuccessRun bool
 	}{
 		{
-			name: "test get all runs",
-			num:  1,
+			name:                   "test get runs with limit = 0",
+			sortDirection:          gwapitypes.SortDirectionAsc,
+			expectedCallsNumber:    1,
+			getRunResultSuccessRun: true,
 		},
 		{
-			name:         "test get runs phase finished and result success",
-			phaseFilter:  []string{"finished"},
-			resultFilter: []string{"success"},
-			num:          1,
+			name:                   "test get runs with limit less than runs continuation",
+			limit:                  2,
+			sortDirection:          gwapitypes.SortDirectionAsc,
+			expectedCallsNumber:    5,
+			getRunResultSuccessRun: true,
 		},
 		{
-			name:        "test get runs phase running",
-			phaseFilter: []string{"running"},
-			num:         0,
+			name:                   "test get runs with limit greater than runs",
+			limit:                  11,
+			sortDirection:          gwapitypes.SortDirectionAsc,
+			expectedCallsNumber:    1,
+			getRunResultSuccessRun: true,
 		},
 		{
-			name:         "test get runs result failed",
-			resultFilter: []string{"failed"},
-			num:          0,
+			name:                   "test get runs with limit = 0 and sortDirection desc",
+			sortDirection:          gwapitypes.SortDirectionDesc,
+			expectedCallsNumber:    1,
+			getRunResultSuccessRun: true,
 		},
 		{
-			name:         "test get runs with all filters",
-			phaseFilter:  []string{"setuperror", "queued", "cancelled", "running", "finished"},
-			resultFilter: []string{"unknown", "stopped", "success", "failed"},
-			num:          1,
+			name:                   "test get runs with limit less than runs continuation and sortDirection desc",
+			limit:                  2,
+			sortDirection:          gwapitypes.SortDirectionDesc,
+			expectedCallsNumber:    5,
+			getRunResultSuccessRun: true,
+		},
+		{
+			name:                   "test get runs with limit greater than runs and sortDirection desc",
+			limit:                  11,
+			sortDirection:          gwapitypes.SortDirectionDesc,
+			expectedCallsNumber:    1,
+			getRunResultSuccessRun: true,
+		},
+		{
+			name:                   "test get runs phase finished and result success",
+			sortDirection:          gwapitypes.SortDirectionAsc,
+			phaseFilter:            []string{"finished"},
+			resultFilter:           []string{"success"},
+			expectedCallsNumber:    1,
+			getRunResultSuccessRun: true,
+		},
+		{
+			name:                "test get runs phase running",
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			phaseFilter:         []string{"running"},
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get runs result failed",
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			resultFilter:        []string{"failed"},
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                   "test get runs with all filters",
+			sortDirection:          gwapitypes.SortDirectionAsc,
+			phaseFilter:            []string{"setuperror", "queued", "cancelled", "running", "finished"},
+			resultFilter:           []string{"unknown", "stopped", "success", "failed"},
+			expectedCallsNumber:    1,
+			getRunResultSuccessRun: true,
+		},
+		{
+			name:                   "test get runs with all filters and limit less than runs continuation",
+			limit:                  2,
+			sortDirection:          gwapitypes.SortDirectionAsc,
+			phaseFilter:            []string{"setuperror", "queued", "cancelled", "running", "finished"},
+			resultFilter:           []string{"unknown", "stopped", "success", "failed"},
+			expectedCallsNumber:    5,
+			getRunResultSuccessRun: true,
+		},
+		{
+			name:                   "test get runs with all filters and sortDirection desc",
+			sortDirection:          gwapitypes.SortDirectionDesc,
+			phaseFilter:            []string{"setuperror", "queued", "cancelled", "running", "finished"},
+			resultFilter:           []string{"unknown", "stopped", "success", "failed"},
+			expectedCallsNumber:    1,
+			getRunResultSuccessRun: true,
+		},
+		{
+			name:                   "test get runs with all filters and limit less than runs continuation and sortDirection desc",
+			limit:                  2,
+			sortDirection:          gwapitypes.SortDirectionDesc,
+			phaseFilter:            []string{"setuperror", "queued", "cancelled", "running", "finished"},
+			resultFilter:           []string{"unknown", "stopped", "success", "failed"},
+			expectedCallsNumber:    5,
+			getRunResultSuccessRun: true,
+		},
+		{
+			name:                   "test get runs with all filters and limit greater than runs",
+			limit:                  11,
+			sortDirection:          gwapitypes.SortDirectionAsc,
+			phaseFilter:            []string{"setuperror", "queued", "cancelled", "running", "finished"},
+			resultFilter:           []string{"unknown", "stopped", "success", "failed"},
+			expectedCallsNumber:    1,
+			getRunResultSuccessRun: true,
+		},
+		{
+			name:                   "test get runs with all filters and limit greater than runs and sortDirection desc",
+			limit:                  11,
+			sortDirection:          gwapitypes.SortDirectionDesc,
+			phaseFilter:            []string{"setuperror", "queued", "cancelled", "running", "finished"},
+			resultFilter:           []string{"unknown", "stopped", "success", "failed"},
+			expectedCallsNumber:    1,
+			getRunResultSuccessRun: true,
 		},
 	}
 
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			dir := t.TempDir()
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			sc := setup(ctx, t, dir, withGitea(true))
-			defer sc.stop()
-
-			giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
-
-			giteaToken, token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
-
-			giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
-			testutil.NilError(t, err)
-
-			gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
-
-			giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)
-
-			push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
-
-			_ = testutil.Wait(30*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
-				if err != nil {
-					return false, nil
-				}
-
-				if len(runs) == 0 {
-					return false, nil
-				}
-				run := runs[0]
-				if run.Phase != rstypes.RunPhaseFinished {
-					return false, nil
-				}
-
-				return true, nil
-			})
-
-			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, tt.phaseFilter, tt.resultFilter, 0, 0, false)
-			testutil.NilError(t, err)
-
-			t.Logf("runs: %s", util.Dump(runs))
-
-			assert.Assert(t, cmp.Len(runs, tt.num))
-
-			if len(runs) > 0 {
-				run := runs[0]
-				assert.Equal(t, run.Phase, rstypes.RunPhaseFinished)
-				assert.Equal(t, run.Result, rstypes.RunResultSuccess)
+			var expectedRuns []*gwapitypes.RunsResponse
+			if tt.getRunResultSuccessRun {
+				expectedRuns = append([]*gwapitypes.RunsResponse{}, runs...)
 			}
+			// reverse if sortDirection is desc
+			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
+			if tt.sortDirection == gwapitypes.SortDirectionDesc {
+				for i, j := 0, len(expectedRuns)-1; i < j; i, j = i+1, j-1 {
+					expectedRuns[i], expectedRuns[j] = expectedRuns[j], expectedRuns[i]
+				}
+			}
+
+			var respAllRuns []*gwapitypes.RunsResponse
+
+			respRuns, res, err := gwClient.GetProjectRuns(ctx, project.ID, tt.phaseFilter, tt.resultFilter, 0, &gwclient.ListOptions{
+				Limit: tt.limit, SortDirection: tt.sortDirection,
+			})
+			testutil.NilError(t, err)
+
+			respAllRuns = append(respAllRuns, respRuns...)
+			callsNumber := 1
+
+			// fetch next results
+			for {
+				if res.Cursor == "" {
+					break
+				}
+
+				respRuns, res, err = gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{
+					Cursor: res.Cursor, Limit: tt.limit,
+				})
+				testutil.NilError(t, err)
+
+				callsNumber++
+
+				respAllRuns = append(respAllRuns, respRuns...)
+			}
+
+			assert.Assert(t, cmp.Len(respAllRuns, len(expectedRuns)))
+			assert.DeepEqual(t, respAllRuns, expectedRuns)
+			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
 		})
 	}
 
 	t.Run("test get not existing run", func(t *testing.T) {
-		t.Parallel()
-
-		dir := t.TempDir()
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		sc := setup(ctx, t, dir, withGitea(true))
-		defer sc.stop()
-
-		giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
-
-		giteaToken, token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
-
-		giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
-		testutil.NilError(t, err)
-
-		gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token)
-
-		_, project := createProject(ctx, t, giteaClient, gwClient)
-
-		_, _, err = gwClient.GetProjectRun(ctx, project.ID, 1)
+		_, _, err = gwClient.GetProjectRun(ctx, project.ID, 11)
 		assert.Error(t, err, remoteErrorNotExist)
 	})
 }
@@ -5189,7 +5301,7 @@ func TestRunEventsNotification(t *testing.T) {
 			push(t, tt.config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 				if err != nil {
 					return false, nil
 				}
@@ -5204,7 +5316,7 @@ func TestRunEventsNotification(t *testing.T) {
 				return true, nil
 			})
 
-			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 			testutil.NilError(t, err)
 
 			assert.Assert(t, cmp.Len(runs, 1))
@@ -5399,7 +5511,7 @@ func TestCommitStatusDelivery(t *testing.T) {
 			push(t, tt.config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 				if err != nil {
 					return false, nil
 				}
@@ -5414,7 +5526,7 @@ func TestCommitStatusDelivery(t *testing.T) {
 				return true, nil
 			})
 
-			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 			testutil.NilError(t, err)
 
 			assert.Assert(t, cmp.Len(runs, 1))
@@ -5526,7 +5638,7 @@ func TestProjectRunActions(t *testing.T) {
 		// test org run actions executed by an user that's organization owner
 
 		_ = testutil.Wait(30*time.Second, func() (bool, error) {
-			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 			if err != nil {
 				return false, nil
 			}
@@ -5541,7 +5653,7 @@ func TestProjectRunActions(t *testing.T) {
 			return true, nil
 		})
 
-		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 		testutil.NilError(t, err)
 
 		assert.Assert(t, cmp.Len(runs, 1))
@@ -5619,7 +5731,7 @@ func TestProjectRunActions(t *testing.T) {
 		push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
 		_ = testutil.Wait(30*time.Second, func() (bool, error) {
-			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 			if err != nil {
 				return false, nil
 			}
@@ -5634,7 +5746,7 @@ func TestProjectRunActions(t *testing.T) {
 			return true, nil
 		})
 
-		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 		testutil.NilError(t, err)
 
 		assert.Assert(t, cmp.Len(runs, 1))
@@ -5720,7 +5832,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 	push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
 	_ = testutil.Wait(30*time.Second, func() (bool, error) {
-		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 		if err != nil {
 			return false, nil
 		}
@@ -5735,7 +5847,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 		return true, nil
 	})
 
-	runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+	runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 	testutil.NilError(t, err)
 
 	assert.Assert(t, len(runs) != 0)
@@ -5968,7 +6080,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
 		_ = testutil.Wait(30*time.Second, func() (bool, error) {
-			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 			if err != nil {
 				return false, nil
 			}
@@ -5983,7 +6095,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 			return true, nil
 		})
 
-		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 		testutil.NilError(t, err)
 
 		assert.Assert(t, len(runs) != 0)
@@ -6077,7 +6189,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
 		_ = testutil.Wait(30*time.Second, func() (bool, error) {
-			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 			if err != nil {
 				return false, nil
 			}
@@ -6092,7 +6204,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 			return true, nil
 		})
 
-		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 		testutil.NilError(t, err)
 
 		assert.Assert(t, len(runs) > 0)
@@ -6212,7 +6324,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
 		_ = testutil.Wait(30*time.Second, func() (bool, error) {
-			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project01.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project01.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 			if err != nil {
 				return false, nil
 			}
@@ -6227,7 +6339,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 			return true, nil
 		})
 
-		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project01.ID, nil, nil, 0, 0, false)
+		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project01.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 		testutil.NilError(t, err)
 
 		assert.Assert(t, len(runs) > 0)
@@ -6330,7 +6442,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 	}
 
 	_ = testutil.Wait(60*time.Second, func() (bool, error) {
-		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, true)
+		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
 		if err != nil {
 			return false, nil
 		}
@@ -6347,7 +6459,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 		return true, nil
 	})
 
-	runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, true)
+	runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
 	testutil.NilError(t, err)
 
 	assert.Assert(t, cmp.Len(runs, runCount))
@@ -6590,7 +6702,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
 		_ = testutil.Wait(30*time.Second, func() (bool, error) {
-			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 			if err != nil {
 				return false, nil
 			}
@@ -6605,7 +6717,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 			return true, nil
 		})
 
-		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -6764,7 +6876,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
 		_ = testutil.Wait(30*time.Second, func() (bool, error) {
-			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 			if err != nil {
 				return false, nil
 			}
@@ -6779,7 +6891,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 			return true, nil
 		})
 
-		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -6937,7 +7049,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
 		_ = testutil.Wait(30*time.Second, func() (bool, error) {
-			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project01.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project01.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 			if err != nil {
 				return false, nil
 			}
@@ -6952,7 +7064,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 			return true, nil
 		})
 
-		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project01.ID, nil, nil, 0, 0, false)
+		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project01.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -7079,7 +7191,7 @@ func TestRunRequiredEnvVariables(t *testing.T) {
 
 			// TODO(sgotti) add an util to wait for a run phase
 			_ = testutil.Wait(30*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 				if err != nil {
 					return false, nil
 				}
@@ -7096,7 +7208,7 @@ func TestRunRequiredEnvVariables(t *testing.T) {
 				return true, nil
 			})
 
-			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
 			testutil.NilError(t, err)
 
 			t.Logf("runs: %s", util.Dump(runs))
@@ -7140,4 +7252,263 @@ func TestRunRequiredEnvVariables(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetUserRuns(t *testing.T) {
+	t.Parallel()
+
+	config := `
+    {
+		runs: [
+		  {
+			name: 'run01',
+			tasks: [
+			  {
+				name: 'task01',
+				runtime: {
+				  containers: [
+					{
+					  image: 'alpine/git',
+					},
+				  ],
+				},
+				steps: [
+				  { type: 'clone' },
+				  { type: 'run', command: 'env' },
+				  { type: 'run', command: 'echo %d' }
+				],
+			  },
+			],
+		  },
+		],
+	}
+	`
+	dir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sc := setup(ctx, t, dir)
+	defer sc.stop()
+
+	gwAdminClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
+
+	_, _, err := gwAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser01})
+	testutil.NilError(t, err)
+
+	token, _, err := gwAdminClient.CreateUserToken(ctx, agolaUser01, &gwapitypes.CreateUserTokenRequest{TokenName: "token01"})
+	testutil.NilError(t, err)
+
+	gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, token.Token)
+
+	runNumbers := 10
+	for i := 1; i <= runNumbers; i++ {
+		directRun(t, dir, fmt.Sprintf(config, i), ConfigFormatJsonnet, sc.config.Gateway.APIExposedURL, token.Token)
+	}
+
+	_ = testutil.Wait(120*time.Second, func() (bool, error) {
+		runs, _, err := gwClient.GetUserRuns(ctx, agolaUser01, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc})
+		if err != nil {
+			return false, nil
+		}
+
+		if len(runs) != runNumbers {
+			return false, nil
+		}
+
+		for _, run := range runs {
+			if run.Phase != rstypes.RunPhaseFinished {
+				return false, nil
+			}
+		}
+
+		return true, nil
+	})
+
+	runs, _, err := gwClient.GetUserRuns(ctx, agolaUser01, nil, nil, 0, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
+	testutil.NilError(t, err)
+
+	t.Logf("runs: %s", util.Dump(runs))
+
+	assert.Assert(t, cmp.Len(runs, runNumbers))
+
+	for _, run := range runs {
+		assert.Equal(t, run.Phase, rstypes.RunPhaseFinished)
+		assert.Equal(t, run.Result, rstypes.RunResultSuccess)
+	}
+
+	tests := []struct {
+		name                   string
+		phaseFilter            []string
+		resultFilter           []string
+		limit                  int
+		sortDirection          gwapitypes.SortDirection
+		expectedCallsNumber    int
+		getRunResultSuccessRun bool
+	}{
+		{
+			name:                   "test get runs with limit = 0",
+			sortDirection:          gwapitypes.SortDirectionAsc,
+			expectedCallsNumber:    1,
+			getRunResultSuccessRun: true,
+		},
+		{
+			name:                   "test get runs with limit less than runs continuation",
+			limit:                  2,
+			sortDirection:          gwapitypes.SortDirectionAsc,
+			expectedCallsNumber:    5,
+			getRunResultSuccessRun: true,
+		},
+		{
+			name:                   "test get runs with limit greater than runs",
+			limit:                  11,
+			sortDirection:          gwapitypes.SortDirectionAsc,
+			expectedCallsNumber:    1,
+			getRunResultSuccessRun: true,
+		},
+		{
+			name:                   "test get runs with limit = 0 and sortDirection desc",
+			sortDirection:          gwapitypes.SortDirectionDesc,
+			expectedCallsNumber:    1,
+			getRunResultSuccessRun: true,
+		},
+		{
+			name:                   "test get runs with limit less than runs continuation and sortDirection desc",
+			limit:                  2,
+			sortDirection:          gwapitypes.SortDirectionDesc,
+			expectedCallsNumber:    5,
+			getRunResultSuccessRun: true,
+		},
+		{
+			name:                   "test get runs with limit greater than runs and sortDirection desc",
+			limit:                  11,
+			sortDirection:          gwapitypes.SortDirectionDesc,
+			expectedCallsNumber:    1,
+			getRunResultSuccessRun: true,
+		},
+		{
+			name:                   "test get runs phase finished and result success",
+			sortDirection:          gwapitypes.SortDirectionAsc,
+			phaseFilter:            []string{"finished"},
+			resultFilter:           []string{"success"},
+			expectedCallsNumber:    1,
+			getRunResultSuccessRun: true,
+		},
+		{
+			name:                "test get runs phase running",
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			phaseFilter:         []string{"running"},
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get runs result failed",
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			resultFilter:        []string{"failed"},
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                   "test get runs with all filters",
+			sortDirection:          gwapitypes.SortDirectionAsc,
+			phaseFilter:            []string{"setuperror", "queued", "cancelled", "running", "finished"},
+			resultFilter:           []string{"unknown", "stopped", "success", "failed"},
+			expectedCallsNumber:    1,
+			getRunResultSuccessRun: true,
+		},
+		{
+			name:                   "test get runs with all filters and limit less than runs continuation",
+			limit:                  2,
+			sortDirection:          gwapitypes.SortDirectionAsc,
+			phaseFilter:            []string{"setuperror", "queued", "cancelled", "running", "finished"},
+			resultFilter:           []string{"unknown", "stopped", "success", "failed"},
+			expectedCallsNumber:    5,
+			getRunResultSuccessRun: true,
+		},
+		{
+			name:                   "test get runs with all filters and sortDirection desc",
+			sortDirection:          gwapitypes.SortDirectionDesc,
+			phaseFilter:            []string{"setuperror", "queued", "cancelled", "running", "finished"},
+			resultFilter:           []string{"unknown", "stopped", "success", "failed"},
+			expectedCallsNumber:    1,
+			getRunResultSuccessRun: true,
+		},
+		{
+			name:                   "test get runs with all filters and limit less than runs continuation and sortDirection desc",
+			limit:                  2,
+			sortDirection:          gwapitypes.SortDirectionDesc,
+			phaseFilter:            []string{"setuperror", "queued", "cancelled", "running", "finished"},
+			resultFilter:           []string{"unknown", "stopped", "success", "failed"},
+			expectedCallsNumber:    5,
+			getRunResultSuccessRun: true,
+		},
+		{
+			name:                   "test get runs with all filters and limit greater than runs",
+			limit:                  11,
+			sortDirection:          gwapitypes.SortDirectionAsc,
+			phaseFilter:            []string{"setuperror", "queued", "cancelled", "running", "finished"},
+			resultFilter:           []string{"unknown", "stopped", "success", "failed"},
+			expectedCallsNumber:    1,
+			getRunResultSuccessRun: true,
+		},
+		{
+			name:                   "test get runs with all filters and limit greater than runs and sortDirection desc",
+			limit:                  11,
+			sortDirection:          gwapitypes.SortDirectionDesc,
+			phaseFilter:            []string{"setuperror", "queued", "cancelled", "running", "finished"},
+			resultFilter:           []string{"unknown", "stopped", "success", "failed"},
+			expectedCallsNumber:    1,
+			getRunResultSuccessRun: true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			var expectedRuns []*gwapitypes.RunsResponse
+			if tt.getRunResultSuccessRun {
+				expectedRuns = append([]*gwapitypes.RunsResponse{}, runs...)
+			}
+			// reverse if sortDirection is desc
+			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
+			if tt.sortDirection == gwapitypes.SortDirectionDesc {
+				for i, j := 0, len(expectedRuns)-1; i < j; i, j = i+1, j-1 {
+					expectedRuns[i], expectedRuns[j] = expectedRuns[j], expectedRuns[i]
+				}
+			}
+
+			var respAllRuns []*gwapitypes.RunsResponse
+
+			respRuns, res, err := gwClient.GetUserRuns(ctx, agolaUser01, tt.phaseFilter, tt.resultFilter, 0, &gwclient.ListOptions{
+				Limit: tt.limit, SortDirection: tt.sortDirection,
+			})
+			testutil.NilError(t, err)
+
+			respAllRuns = append(respAllRuns, respRuns...)
+			callsNumber := 1
+
+			// fetch next results
+			for {
+				if res.Cursor == "" {
+					break
+				}
+
+				respRuns, res, err = gwClient.GetUserRuns(ctx, agolaUser01, nil, nil, 0, &gwclient.ListOptions{
+					Cursor: res.Cursor, Limit: tt.limit,
+				})
+				testutil.NilError(t, err)
+
+				callsNumber++
+
+				respAllRuns = append(respAllRuns, respRuns...)
+			}
+
+			assert.Assert(t, cmp.Len(respAllRuns, len(expectedRuns)))
+			assert.DeepEqual(t, respAllRuns, expectedRuns)
+			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
+		})
+	}
+
+	t.Run("test get not existing run", func(t *testing.T) {
+		_, _, err = gwClient.GetUserRun(ctx, agolaUser01, 11)
+		assert.Error(t, err, remoteErrorNotExist)
+	})
 }
