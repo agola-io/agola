@@ -52,8 +52,6 @@ func (o *ListOptions) Add(q url.Values) {
 	case types.SortDirectionDesc:
 		q.Add("sortdirection", "desc")
 	case types.SortDirectionAsc:
-		fallthrough
-	default:
 		q.Add("sortdirection", "asc")
 	}
 }

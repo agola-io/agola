@@ -57,6 +57,9 @@ func (h *ActionHandler) GetOrgMembers(ctx context.Context, req *GetOrgMembersReq
 	if limit > 0 {
 		limit += 1
 	}
+	if req.SortDirection == "" {
+		req.SortDirection = types.SortDirectionAsc
+	}
 
 	var dbOrgMembers []*db.OrgUser
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
@@ -113,6 +116,9 @@ func (h *ActionHandler) GetOrgs(ctx context.Context, req *GetOrgsRequest) (*GetO
 	limit := req.Limit
 	if limit > 0 {
 		limit += 1
+	}
+	if req.SortDirection == "" {
+		req.SortDirection = types.SortDirectionAsc
 	}
 
 	visibilities := req.Visibilities

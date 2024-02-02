@@ -55,6 +55,9 @@ func (h *ActionHandler) GetRemoteSources(ctx context.Context, req *GetRemoteSour
 		}
 		sortDirection = inCursor.SortDirection
 	}
+	if sortDirection == "" {
+		sortDirection = SortDirectionAsc
+	}
 
 	remoteSources, resp, err := h.configstoreClient.GetRemoteSources(ctx, &client.GetRemoteSourcesOptions{ListOptions: &client.ListOptions{Limit: req.Limit, SortDirection: cstypes.SortDirection(sortDirection)}, StartRemoteSourceName: inCursor.Start})
 	if err != nil {

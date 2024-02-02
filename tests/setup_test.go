@@ -3907,6 +3907,10 @@ func TestGetRemoteSources(t *testing.T) {
 		expectedCallsNumber int
 	}{
 		{
+			name:                "test get remote sources with limit = 0 and no sortdirection",
+			expectedCallsNumber: 1,
+		},
+		{
 			name:                "test get remote sources with limit = 0",
 			sortDirection:       gwapitypes.SortDirectionAsc,
 			expectedCallsNumber: 1,
@@ -3946,6 +3950,8 @@ func TestGetRemoteSources(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			expectedRemoteSources := append([]*gwapitypes.RemoteSourceResponse{}, remoteSources...)
+			// default sortdirection is asc
+
 			// reverse if sortDirection is desc
 			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
 			if tt.sortDirection == gwapitypes.SortDirectionDesc {
@@ -4008,6 +4014,10 @@ func TestGetUsers(t *testing.T) {
 		expectedCallsNumber int
 	}{
 		{
+			name:                "test get users with limit = 0 and no sortdirection",
+			expectedCallsNumber: 1,
+		},
+		{
 			name:                "test get users with limit = 0",
 			sortDirection:       gwapitypes.SortDirectionAsc,
 			expectedCallsNumber: 1,
@@ -4047,6 +4057,8 @@ func TestGetUsers(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			expectedUsers := append([]*gwapitypes.UserResponse{}, users...)
+			// default sortdirection is asc
+
 			// reverse if sortDirection is desc
 			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
 			if tt.sortDirection == gwapitypes.SortDirectionDesc {
@@ -4128,6 +4140,11 @@ func TestGetOrgs(t *testing.T) {
 		sortDirection       gwapitypes.SortDirection
 		expectedCallsNumber int
 	}{
+		{
+			name:                "test get public orgs with limit = 0 and no sortdirection",
+			getPublicOrgsOnly:   true,
+			expectedCallsNumber: 1,
+		},
 		{
 			name:                "test get public orgs with limit = 0",
 			getPublicOrgsOnly:   true,
@@ -4223,6 +4240,7 @@ func TestGetOrgs(t *testing.T) {
 				expectedOrgs = append(expectedOrgs, allOrgs...)
 				client = gwAdminClient
 			}
+			// default sortdirection is asc
 
 			// reverse if sortDirection is desc
 			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
@@ -4295,6 +4313,10 @@ func TestGetOrgMembers(t *testing.T) {
 		expectedCallsNumber int
 	}{
 		{
+			name:                "test get org members with limit = 0 and no sortdirection",
+			expectedCallsNumber: 1,
+		},
+		{
 			name:                "test get org members with limit = 0",
 			sortDirection:       gwapitypes.SortDirectionAsc,
 			expectedCallsNumber: 1,
@@ -4334,6 +4356,8 @@ func TestGetOrgMembers(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			expectedOrgMembers := append([]*gwapitypes.OrgMemberResponse{}, allOrgMembers...)
+			// default sortdirection is asc
+
 			// reverse if sortDirection is desc
 			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
 			if tt.sortDirection == gwapitypes.SortDirectionDesc {
@@ -4410,6 +4434,10 @@ func TestGetUserOrgs(t *testing.T) {
 		expectedCallsNumber int
 	}{
 		{
+			name:                "test get user orgs with limit = 0 and no sortdirection",
+			expectedCallsNumber: 1,
+		},
+		{
 			name:                "test get user orgs with limit = 0",
 			sortDirection:       gwapitypes.SortDirectionAsc,
 			expectedCallsNumber: 1,
@@ -4449,6 +4477,8 @@ func TestGetUserOrgs(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			expectedUserOrgs := append([]*gwapitypes.OrgResponse{}, orgs...)
+			// default sortdirection is asc
+
 			// reverse if sortDirection is desc
 			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
 			if tt.sortDirection == gwapitypes.SortDirectionDesc {
@@ -5736,6 +5766,12 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 		expectedErr          string
 	}{
 		{
+			name:                "test get project run webhook deliveries with limit = 0 and no sortdirection",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			expectedCallsNumber: 1,
+		},
+		{
 			name:                "test get project run webhook deliveries with limit = 0",
 			client:              gwUser01Client,
 			projectRef:          project.ID,
@@ -5822,6 +5858,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 				}
 				expectedProject01RunWebhookDeliveries = append(expectedProject01RunWebhookDeliveries, r)
 			}
+			// default sortdirection is asc
 
 			// reverse if sortDirection is desc
 			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
@@ -6348,6 +6385,12 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 		expectedErr          string
 	}{
 		{
+			name:                "test get project commit status deliveries with limit = 0 and no sortdirection",
+			client:              gwUser01Client,
+			projectRef:          project.ID,
+			expectedCallsNumber: 1,
+		},
+		{
 			name:                "test get project commit status deliveries with limit = 0",
 			client:              gwUser01Client,
 			projectRef:          project.ID,
@@ -6434,6 +6477,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 				}
 				expectedProject01CommitStatusDeliveries = append(expectedProject01CommitStatusDeliveries, c)
 			}
+			// default sortdirection is asc
 
 			// reverse if sortDirection is desc
 			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21

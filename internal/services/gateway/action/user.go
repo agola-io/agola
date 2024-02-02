@@ -116,6 +116,9 @@ func (h *ActionHandler) GetUserOrgs(ctx context.Context, req *GetUserOrgsRequest
 		}
 		sortDirection = inCursor.SortDirection
 	}
+	if sortDirection == "" {
+		sortDirection = SortDirectionAsc
+	}
 
 	orgs, resp, err := h.configstoreClient.GetUserOrgs(ctx, req.UserRef, &client.GetUserOrgsOptions{ListOptions: &client.ListOptions{Limit: req.Limit, SortDirection: cstypes.SortDirection(sortDirection)}, StartOrgName: inCursor.Start})
 	if err != nil {
@@ -167,6 +170,9 @@ func (h *ActionHandler) GetUsers(ctx context.Context, req *GetUsersRequest) (*Ge
 			return nil, errors.WithStack(err)
 		}
 		sortDirection = inCursor.SortDirection
+	}
+	if sortDirection == "" {
+		sortDirection = SortDirectionAsc
 	}
 
 	csusers, resp, err := h.configstoreClient.GetUsers(ctx, &client.GetUsersOptions{ListOptions: &client.ListOptions{Limit: req.Limit, SortDirection: cstypes.SortDirection(sortDirection)}, StartUserName: inCursor.Start})

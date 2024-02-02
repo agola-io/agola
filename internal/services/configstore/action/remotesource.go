@@ -42,6 +42,9 @@ func (h *ActionHandler) GetRemoteSources(ctx context.Context, req *GetRemoteSour
 	if limit > 0 {
 		limit += 1
 	}
+	if req.SortDirection == "" {
+		req.SortDirection = types.SortDirectionAsc
+	}
 
 	var remoteSources []*types.RemoteSource
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {

@@ -905,6 +905,10 @@ func TestGetRemoteSources(t *testing.T) {
 		expectedCallsNumber int
 	}{
 		{
+			name:                "test get remote sources with limit = 0 and no sortdirection",
+			expectedCallsNumber: 1,
+		},
+		{
 			name:                "test get remote sources with limit = 0",
 			sortDirection:       types.SortDirectionAsc,
 			expectedCallsNumber: 1,
@@ -944,6 +948,8 @@ func TestGetRemoteSources(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			expectedRemoteSources := append([]*types.RemoteSource{}, remoteSources...)
+			// default sortdirection is asc
+
 			// reverse if sortDirection is desc
 			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
 			if tt.sortDirection == types.SortDirectionDesc {
@@ -1005,6 +1011,10 @@ func TestGetUsers(t *testing.T) {
 		expectedCallsNumber int
 	}{
 		{
+			name:                "test get users with limit = 0 and no sortdirection",
+			expectedCallsNumber: 1,
+		},
+		{
 			name:                "test get users with limit = 0",
 			sortDirection:       types.SortDirectionAsc,
 			expectedCallsNumber: 1,
@@ -1044,6 +1054,8 @@ func TestGetUsers(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			expectedUsers := append([]*types.User{}, users...)
+			// default sortdirection is asc
+
 			// reverse if sortDirection is desc
 			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
 			if tt.sortDirection == types.SortDirectionDesc {
@@ -1114,6 +1126,11 @@ func TestGetOrgs(t *testing.T) {
 		sortDirection       types.SortDirection
 		expectedCallsNumber int
 	}{
+		{
+			name:                "test get public orgs with limit = 0 and no sortdirection",
+			getPublicOrgsOnly:   true,
+			expectedCallsNumber: 1,
+		},
 		{
 			name:                "test get public orgs with limit = 0",
 			getPublicOrgsOnly:   true,
@@ -1208,6 +1225,7 @@ func TestGetOrgs(t *testing.T) {
 				expectedOrgs = append(expectedOrgs, allOrgs...)
 				visibilities = append(visibilities, types.VisibilityPrivate)
 			}
+			// default sortdirection is asc
 
 			// reverse if sortDirection is desc
 			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
@@ -1278,6 +1296,10 @@ func TestGetOrgMembers(t *testing.T) {
 		expectedCallsNumber int
 	}{
 		{
+			name:                "test get org members with limit = 0 and no sortdirection",
+			expectedCallsNumber: 1,
+		},
+		{
 			name:                "test get org members with limit = 0",
 			sortDirection:       types.SortDirectionAsc,
 			expectedCallsNumber: 1,
@@ -1317,6 +1339,8 @@ func TestGetOrgMembers(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			expectedUsers := append([]*types.User{}, users...)
+			// default sortdirection is asc
+
 			// reverse if sortDirection is desc
 			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
 			if tt.sortDirection == types.SortDirectionDesc {
@@ -1391,6 +1415,10 @@ func TestGetUserOrgs(t *testing.T) {
 		expectedCallsNumber int
 	}{
 		{
+			name:                "test get user orgs with limit = 0 and no sortdirection",
+			expectedCallsNumber: 1,
+		},
+		{
 			name:                "test get user orgs with limit = 0",
 			sortDirection:       types.SortDirectionAsc,
 			expectedCallsNumber: 1,
@@ -1430,6 +1458,8 @@ func TestGetUserOrgs(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			expectedOrgs := append([]*types.Organization{}, orgs...)
+			// default sortdirection is asc
+
 			// reverse if sortDirection is desc
 			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
 			if tt.sortDirection == types.SortDirectionDesc {
