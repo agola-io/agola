@@ -539,31 +539,47 @@ func (c *Client) getRunTask(ctx context.Context, groupType, groupRef string, run
 	return task, resp, errors.WithStack(err)
 }
 
-func (c *Client) GetProjectRuns(ctx context.Context, projectRef string, phaseFilter, resultFilter []string, start uint64, limit int, asc bool) ([]*gwapitypes.RunsResponse, *Response, error) {
-	return c.getRuns(ctx, "projects", projectRef, phaseFilter, resultFilter, start, limit, asc)
+func (c *Client) GetProjectRuns(ctx context.Context, projectRef string, opts *GetRunsOptions) ([]*gwapitypes.RunsResponse, *Response, error) {
+	return c.getGroupRuns(ctx, "projects", projectRef, opts)
 }
 
-func (c *Client) GetUserRuns(ctx context.Context, userRef string, phaseFilter, resultFilter []string, start uint64, limit int, asc bool) ([]*gwapitypes.RunsResponse, *Response, error) {
-	return c.getRuns(ctx, "users", userRef, phaseFilter, resultFilter, start, limit, asc)
+func (c *Client) GetUserRuns(ctx context.Context, userRef string, opts *GetRunsOptions) ([]*gwapitypes.RunsResponse, *Response, error) {
+	return c.getGroupRuns(ctx, "users", userRef, opts)
 }
 
-func (c *Client) getRuns(ctx context.Context, groupType, groupRef string, phaseFilter, resultFilter []string, start uint64, limit int, asc bool) ([]*gwapitypes.RunsResponse, *Response, error) {
-	q := url.Values{}
-	for _, phase := range phaseFilter {
+type GetRunsOptions struct {
+	*ListOptions
+
+	StartRunCounter uint64
+	SubGroup        string
+	PhaseFilter     []string
+	ResultFilter    []string
+}
+
+func (o *GetRunsOptions) Add(q url.Values) {
+	if o == nil {
+		return
+	}
+
+	o.ListOptions.Add(q)
+
+	if o.StartRunCounter > 0 {
+		q.Add("start", strconv.FormatUint(o.StartRunCounter, 10))
+	}
+	if o.SubGroup != "" {
+		q.Add("subgroup", o.SubGroup)
+	}
+	for _, phase := range o.PhaseFilter {
 		q.Add("phase", phase)
 	}
-	for _, result := range resultFilter {
+	for _, result := range o.ResultFilter {
 		q.Add("result", result)
 	}
-	if start > 0 {
-		q.Add("start", strconv.FormatUint(start, 10))
-	}
-	if limit > 0 {
-		q.Add("limit", strconv.Itoa(limit))
-	}
-	if asc {
-		q.Add("asc", "")
-	}
+}
+
+func (c *Client) getGroupRuns(ctx context.Context, groupType, groupRef string, opts *GetRunsOptions) ([]*gwapitypes.RunsResponse, *Response, error) {
+	q := url.Values{}
+	opts.Add(q)
 
 	getRunsResponse := []*gwapitypes.RunsResponse{}
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/%s/%s/runs", groupType, url.PathEscape(groupRef)), q, jsonContent, nil, &getRunsResponse)

@@ -167,17 +167,17 @@ func createRunTaskResponse(rt *rstypes.RunTask, rct *rstypes.RunConfigTask) *gwa
 	return t
 }
 
-type RunHandler struct {
+type GroupRunHandler struct {
 	log       zerolog.Logger
 	ah        *action.ActionHandler
 	groupType common.GroupType
 }
 
-func NewRunHandler(log zerolog.Logger, ah *action.ActionHandler, groupType common.GroupType) *RunHandler {
-	return &RunHandler{log: log, ah: ah, groupType: groupType}
+func NewGroupRunHandler(log zerolog.Logger, ah *action.ActionHandler, groupType common.GroupType) *GroupRunHandler {
+	return &GroupRunHandler{log: log, ah: ah, groupType: groupType}
 }
 
-func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *GroupRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 
@@ -281,11 +281,6 @@ func (h *RuntaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-const (
-	DefaultRunsLimit = 25
-	MaxRunsLimit     = 40
-)
-
 func createRunsResponse(r *rstypes.Run) *gwapitypes.RunsResponse {
 	run := &gwapitypes.RunsResponse{
 		Number:      r.Counter,
@@ -304,95 +299,76 @@ func createRunsResponse(r *rstypes.Run) *gwapitypes.RunsResponse {
 	return run
 }
 
-type RunsHandler struct {
+type GroupRunsHandler struct {
 	log       zerolog.Logger
 	ah        *action.ActionHandler
 	groupType common.GroupType
 }
 
-func NewRunsHandler(log zerolog.Logger, ah *action.ActionHandler, groupType common.GroupType) *RunsHandler {
-	return &RunsHandler{log: log, ah: ah, groupType: groupType}
+func NewGroupRunsHandler(log zerolog.Logger, ah *action.ActionHandler, groupType common.GroupType) *GroupRunsHandler {
+	return &GroupRunsHandler{log: log, ah: ah, groupType: groupType}
 }
 
-func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	vars := mux.Vars(r)
-	q := r.URL.Query()
-
-	var err error
-	var ref string
-	switch h.groupType {
-	case common.GroupTypeProject:
-		ref, err = url.PathUnescape(vars["projectref"])
-		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("projectref is empty")))
-			return
-		}
-	case common.GroupTypeUser:
-		ref = vars["userref"]
-	}
-
-	subGroup := q.Get("subgroup")
-	phaseFilter := q["phase"]
-	resultFilter := q["result"]
-
-	limitS := q.Get("limit")
-	limit := DefaultRunsLimit
-	if limitS != "" {
-		var err error
-		limit, err = strconv.Atoi(limitS)
-		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit")))
-			return
-		}
-	}
-	if limit < 0 {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0")))
-		return
-	}
-	if limit > MaxRunsLimit {
-		limit = MaxRunsLimit
-	}
-	asc := false
-	if _, ok := q["asc"]; ok {
-		asc = true
-	}
-
-	startRunNumberStr := q.Get("start")
-
-	var startRunNumber uint64
-	if startRunNumberStr != "" {
-		var err error
-		startRunNumber, err = strconv.ParseUint(startRunNumberStr, 10, 64)
-		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse run number")))
-			return
-		}
-	}
-
-	areq := &action.GetRunsRequest{
-		GroupType:       h.groupType,
-		Ref:             ref,
-		SubGroup:        subGroup,
-		PhaseFilter:     phaseFilter,
-		ResultFilter:    resultFilter,
-		StartRunCounter: startRunNumber,
-		Limit:           limit,
-		Asc:             asc,
-	}
-	runsResp, err := h.ah.GetRuns(ctx, areq)
+func (h *GroupRunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(w, r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	runs := make([]*gwapitypes.RunsResponse, len(runsResp.Runs))
-	for i, r := range runsResp.Runs {
-		runs[i] = createRunsResponse(r)
-	}
-	if err := util.HTTPResponse(w, http.StatusOK, runs); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
 		h.log.Err(err).Send()
 	}
+}
+
+func (h *GroupRunsHandler) do(w http.ResponseWriter, r *http.Request) ([]*gwapitypes.RunsResponse, error) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+
+	ropts, err := parseGroupRunsRequestOptions(r)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	var ref string
+	switch h.groupType {
+	case common.GroupTypeProject:
+		ref, err = url.PathUnescape(vars["projectref"])
+		if err != nil {
+			return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("projectref is empty"))
+		}
+	case common.GroupTypeUser:
+		ref = vars["userref"]
+	}
+
+	areq := &action.GetGroupRunsRequest{
+		GroupType: h.groupType,
+		Ref:       ref,
+
+		Cursor: ropts.Cursor,
+
+		Limit:         ropts.Limit,
+		SortDirection: action.SortDirection(ropts.SortDirection),
+
+		StartRunCounter: ropts.StartRunCounter,
+		SubGroup:        ropts.SubGroup,
+		PhaseFilter:     ropts.PhaseFilter,
+		ResultFilter:    ropts.ResultFilter,
+	}
+
+	ares, err := h.ah.GetGroupRuns(ctx, areq)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	res := make([]*gwapitypes.RunsResponse, len(ares.Runs))
+	for i, r := range ares.Runs {
+		res[i] = createRunsResponse(r)
+	}
+
+	addCursorHeader(w, ares.Cursor)
+
+	return res, nil
 }
 
 type RunActionsHandler struct {

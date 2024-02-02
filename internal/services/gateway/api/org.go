@@ -399,7 +399,7 @@ func (h *OrgInvitationsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	orgRef := vars["orgref"]
 
 	limitS := query.Get("limit")
-	limit := DefaultRunsLimit
+	limit := DefaultLimit
 	if limitS != "" {
 		var err error
 		limit, err = strconv.Atoi(limitS)

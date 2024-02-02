@@ -159,7 +159,7 @@ func (s *Runservice) setupDefaultRouter(etCh chan string) http.Handler {
 	runByGroupHandler := api.NewRunByGroupHandler(s.log, s.d, s.ah)
 	runTaskActionsHandler := api.NewRunTaskActionsHandler(s.log, s.ah)
 	runsHandler := api.NewRunsHandler(s.log, s.d, s.ah)
-	runsByGroupHandler := api.NewRunsByGroupHandler(s.log, s.d, s.ah)
+	runsByGroupHandler := api.NewGroupRunsHandler(s.log, s.d, s.ah)
 	runActionsHandler := api.NewRunActionsHandler(s.log, s.ah)
 	runCreateHandler := api.NewRunCreateHandler(s.log, s.ah)
 	runEventsHandler := api.NewRunEventsHandler(s.log, s.d, s.ost)

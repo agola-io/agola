@@ -32,8 +32,36 @@ import (
 	rstypes "agola.io/agola/services/runservice/types"
 )
 
+const (
+	agolaHasMoreHeader = "X-Agola-HasMore"
+)
+
+type ListOptions struct {
+	Limit         int
+	SortDirection rstypes.SortDirection
+}
+
+func (o *ListOptions) Add(q url.Values) {
+	if o == nil {
+		return
+	}
+
+	if o.Limit != 0 {
+		q.Add("limit", strconv.Itoa(o.Limit))
+	}
+
+	switch o.SortDirection {
+	case rstypes.SortDirectionDesc:
+		q.Add("sortdirection", "desc")
+	case rstypes.SortDirectionAsc:
+		q.Add("sortdirection", "asc")
+	}
+}
+
 type Response struct {
 	*http.Response
+
+	HasMore bool
 }
 
 type Client struct {
@@ -57,6 +85,17 @@ func (c *Client) GetResponse(ctx context.Context, method, path string, query url
 	if err := util.ErrFromRemote(resp.Response); err != nil {
 		return resp, errors.WithStack(err)
 	}
+
+	hasMore := false
+	hasMoreValue := resp.Header.Get(agolaHasMoreHeader)
+	if hasMoreValue != "" {
+		hasMore, err = strconv.ParseBool(hasMoreValue)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+	}
+
+	resp.HasMore = hasMore
 
 	return resp, nil
 }
@@ -197,26 +236,39 @@ func (c *Client) GetGroupLastRun(ctx context.Context, group string, changeGroups
 	return c.GetRuns(ctx, nil, nil, []string{group}, false, changeGroups, 0, 1, false)
 }
 
-func (c *Client) GetGroupRuns(ctx context.Context, phaseFilter, resultFilter []string, group string, changeGroups []string, startRunCounter uint64, limit int, asc bool) (*rsapitypes.GetRunsResponse, *Response, error) {
-	q := url.Values{}
-	for _, phase := range phaseFilter {
+type GetGroupRunsOptions struct {
+	*ListOptions
+
+	StartRunCounter uint64
+	PhaseFilter     []string
+	ResultFilter    []string
+	ChangeGroups    []string
+}
+
+func (o *GetGroupRunsOptions) Add(q url.Values) {
+	if o == nil {
+		return
+	}
+
+	o.ListOptions.Add(q)
+
+	if o.StartRunCounter > 0 {
+		q.Add("start", strconv.FormatUint(o.StartRunCounter, 10))
+	}
+	for _, phase := range o.PhaseFilter {
 		q.Add("phase", phase)
 	}
-	for _, result := range resultFilter {
+	for _, result := range o.ResultFilter {
 		q.Add("result", result)
 	}
-	for _, changeGroup := range changeGroups {
+	for _, changeGroup := range o.ChangeGroups {
 		q.Add("changegroup", changeGroup)
 	}
-	if startRunCounter > 0 {
-		q.Add("start", strconv.FormatUint(startRunCounter, 10))
-	}
-	if limit > 0 {
-		q.Add("limit", strconv.Itoa(limit))
-	}
-	if asc {
-		q.Add("asc", "")
-	}
+}
+
+func (c *Client) GetGroupRuns(ctx context.Context, group string, opts *GetGroupRunsOptions) (*rsapitypes.GetRunsResponse, *Response, error) {
+	q := url.Values{}
+	opts.Add(q)
 
 	getRunsResponse := new(rsapitypes.GetRunsResponse)
 	resp, err := c.GetParsedResponse(ctx, "GET", fmt.Sprintf("/runs/group/%s", url.PathEscape(group)), q, common.JSONContent, nil, getRunsResponse)

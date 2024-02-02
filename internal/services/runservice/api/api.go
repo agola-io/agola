@@ -1,4 +1,4 @@
-// Copyright 2019 Sorint.lab
+// Copyright 2024 Sorint.lab
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,6 +37,51 @@ import (
 	rsapitypes "agola.io/agola/services/runservice/api/types"
 	"agola.io/agola/services/runservice/types"
 )
+
+const (
+	agolaHasMoreHeader = "X-Agola-HasMore"
+)
+
+type requestOptions struct {
+	Limit         int
+	SortDirection types.SortDirection
+}
+
+func parseRequestOptions(r *http.Request) (*requestOptions, error) {
+	query := r.URL.Query()
+
+	limit := 0
+	limitS := query.Get("limit")
+	if limitS != "" {
+		var err error
+		limit, err = strconv.Atoi(limitS)
+		if err != nil {
+			return nil, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit"))
+		}
+	}
+	if limit < 0 {
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0"))
+	}
+
+	sortDirection := types.SortDirection(query.Get("sortdirection"))
+	if sortDirection != "" {
+		switch sortDirection {
+		case types.SortDirectionAsc:
+		case types.SortDirectionDesc:
+		default:
+			return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("wrong sort direction %q", sortDirection))
+		}
+	}
+
+	return &requestOptions{
+		Limit:         limit,
+		SortDirection: sortDirection,
+	}, nil
+}
+
+func addHasMoreHeader(w http.ResponseWriter, hasMore bool) {
+	w.Header().Add(agolaHasMoreHeader, strconv.FormatBool(hasMore))
+}
 
 type LogsHandler struct {
 	log zerolog.Logger
@@ -621,9 +666,9 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if limit > MaxRunsLimit {
 		limit = MaxRunsLimit
 	}
-	sortOrder := types.SortOrderDesc
+	sortDirection := types.SortDirectionDesc
 	if _, ok := query["asc"]; ok {
-		sortOrder = types.SortOrderAsc
+		sortDirection = types.SortDirectionAsc
 	}
 
 	var startRunSequence uint64
@@ -642,7 +687,7 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		runs, err = h.d.GetRuns(tx, groups, lastRun, phaseFilter, resultFilter, startRunSequence, limit, sortOrder)
+		runs, err = h.d.GetRuns(tx, groups, lastRun, phaseFilter, resultFilter, startRunSequence, limit, sortDirection)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -672,24 +717,42 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type RunsByGroupHandler struct {
+type GroupRunsHandler struct {
 	log zerolog.Logger
 	d   *db.DB
 	ah  *action.ActionHandler
 }
 
-func NewRunsByGroupHandler(log zerolog.Logger, d *db.DB, ah *action.ActionHandler) *RunsByGroupHandler {
-	return &RunsByGroupHandler{
+func NewGroupRunsHandler(log zerolog.Logger, d *db.DB, ah *action.ActionHandler) *GroupRunsHandler {
+	return &GroupRunsHandler{
 		log: log,
 		d:   d,
 		ah:  ah,
 	}
 }
 
-func (h *RunsByGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *GroupRunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(w, r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *GroupRunsHandler) do(w http.ResponseWriter, r *http.Request) (*rsapitypes.GetRunsResponse, error) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 	query := r.URL.Query()
+
+	ropts, err := parseRequestOptions(r)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
 	phaseFilter := types.RunPhaseFromStringSlice(query["phase"])
 	resultFilter := types.RunResultFromStringSlice(query["result"])
 
@@ -697,30 +760,7 @@ func (h *RunsByGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	group, err := url.PathUnescape(vars["group"])
 	if err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("group is empty")))
-		return
-	}
-
-	limitS := query.Get("limit")
-	limit := DefaultRunsLimit
-	if limitS != "" {
-		var err error
-		limit, err = strconv.Atoi(limitS)
-		if err != nil {
-			http.Error(w, "", http.StatusBadRequest)
-			return
-		}
-	}
-	if limit < 0 {
-		http.Error(w, "limit must be greater or equal than 0", http.StatusBadRequest)
-		return
-	}
-	if limit > MaxRunsLimit {
-		limit = MaxRunsLimit
-	}
-	sortOrder := types.SortOrderDesc
-	if _, ok := query["asc"]; ok {
-		sortOrder = types.SortOrderAsc
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("group is empty"))
 	}
 
 	var startRunCounter uint64
@@ -729,43 +769,23 @@ func (h *RunsByGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		startRunCounter, err = strconv.ParseUint(startRunCounterStr, 10, 64)
 		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse runcounter")))
-			return
+			return nil, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse runcounter"))
 		}
 	}
 
-	var runs []*types.Run
-	var cgt *types.ChangeGroupsUpdateToken
-
-	err = h.d.Do(ctx, func(tx *sql.Tx) error {
-		var err error
-		runs, err = h.d.GetGroupRuns(tx, group, phaseFilter, resultFilter, startRunCounter, limit, sortOrder)
-		if err != nil {
-			h.log.Err(err).Send()
-			return errors.WithStack(err)
-		}
-
-		cgt, err = h.ah.GetChangeGroupsUpdateTokens(tx, changeGroups)
-		return errors.WithStack(err)
-	})
+	ares, err := h.ah.GetGroupRuns(ctx, &action.GetGroupRunsRequest{Group: group, Limit: ropts.Limit, SortDirection: ropts.SortDirection, ChangeGroups: changeGroups, StartRunCounter: startRunCounter, PhaseFilter: phaseFilter, ResultFilter: resultFilter})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	cgts, err := types.MarshalChangeGroupsUpdateToken(cgt)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return nil, errors.WithStack(err)
 	}
 
 	res := &rsapitypes.GetRunsResponse{
-		Runs:                    runs,
-		ChangeGroupsUpdateToken: cgts,
+		Runs:                    ares.Runs,
+		ChangeGroupsUpdateToken: ares.ChangeGroupsUpdateToken,
 	}
-	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
-		h.log.Err(err).Send()
-	}
+
+	addHasMoreHeader(w, ares.HasMore)
+
+	return res, nil
 }
 
 type RunCreateHandler struct {

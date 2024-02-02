@@ -21,10 +21,12 @@ import (
 	"net"
 	"os"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/rs/zerolog"
 	"github.com/sorintlab/errors"
 	"gotest.tools/assert"
@@ -35,6 +37,7 @@ import (
 	"agola.io/agola/internal/services/runservice/action"
 	"agola.io/agola/internal/services/runservice/common"
 	"agola.io/agola/internal/services/runservice/store"
+	"agola.io/agola/internal/sqlg"
 	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/internal/testutil"
 	"agola.io/agola/internal/util"
@@ -79,14 +82,14 @@ func getRuns(ctx context.Context, rs *Runservice) ([]*types.Run, error) {
 	var runs []*types.Run
 	err := rs.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		runs, err = rs.d.GetRuns(tx, nil, false, nil, nil, 0, 0, types.SortOrderAsc)
+		runs, err = rs.d.GetRuns(tx, nil, false, nil, nil, 0, 0, types.SortDirectionAsc)
 		return errors.WithStack(err)
 	})
 
 	return runs, errors.WithStack(err)
 }
 
-func compareRuns(r1, r2 []*types.Run) bool {
+func compareRunsIDs(r1, r2 []*types.Run) bool {
 	r1ids := map[string]struct{}{}
 	r2ids := map[string]struct{}{}
 
@@ -98,6 +101,11 @@ func compareRuns(r1, r2 []*types.Run) bool {
 	}
 
 	return reflect.DeepEqual(r1ids, r2ids)
+}
+
+func cmpDiffObject(x, y interface{}) cmp.Comparison {
+	// Since postgres has microsecond time precision while go has nanosecond time precision we should check times with a microsecond margin
+	return cmp.DeepEqual(x, y, cmpopts.IgnoreFields(sqlg.ObjectMeta{}, "TxID"), cmpopts.EquateApproxTime(1*time.Microsecond))
 }
 
 func TestExportImport(t *testing.T) {
@@ -156,7 +164,7 @@ func TestExportImport(t *testing.T) {
 	newRuns, err := getRuns(ctx, rs)
 	testutil.NilError(t, err)
 
-	if !compareRuns(runs, newRuns) {
+	if !compareRunsIDs(runs, newRuns) {
 		t.Logf("len(runs): %d", len(runs))
 		t.Logf("len(newRuns): %d", len(newRuns))
 		t.Logf("runs: %s", util.Dump(runs))
@@ -259,7 +267,7 @@ func TestGetRunsLastRun(t *testing.T) {
 	var runs []*types.Run
 	err := rs.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		runs, err = rs.d.GetRuns(tx, groups, true, nil, nil, 0, 0, types.SortOrderDesc)
+		runs, err = rs.d.GetRuns(tx, groups, true, nil, nil, 0, 0, types.SortDirectionDesc)
 
 		return errors.WithStack(err)
 	})
@@ -301,4 +309,360 @@ func TestLogleaner(t *testing.T) {
 
 	_, err = rs.ost.ReadObject(logPath)
 	assert.ErrorType(t, err, objectstorage.IsNotExist)
+}
+
+func TestGetGroupRuns(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	ctx := context.Background()
+	log := testutil.NewLogger(t)
+
+	rs := setupRunservice(ctx, t, log, dir)
+
+	group01All := "/user/user01"
+	group01Branch01 := "/user/user01/branch01"
+	group01Pr01 := "/user/user01/pr01"
+
+	runCount := 10
+	for i := 0; i < runCount; i++ {
+		c := i % 2
+		group := group01Branch01
+		if c == 1 {
+			group = group01Pr01
+		}
+
+		_, err := rs.ah.CreateRun(ctx, &action.RunCreateRequest{Group: group, RunConfigTasks: map[string]*types.RunConfigTask{"task01": {}}})
+		testutil.NilError(t, err)
+	}
+
+	var runs []*types.Run
+	err := rs.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		runs, err = rs.d.GetRuns(tx, []string{group01All}, false, nil, nil, 0, 0, types.SortDirectionAsc)
+
+		return errors.WithStack(err)
+	})
+	testutil.NilError(t, err)
+
+	for i, run := range runs {
+		c := i % 3
+
+		if c == 0 {
+			continue
+		}
+
+		err := rs.d.Do(ctx, func(tx *sql.Tx) error {
+			var err error
+			run, err := rs.d.GetRun(tx, run.ID)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+
+			// mark some runs as finished/success
+			if c == 1 {
+				run.Phase = types.RunPhaseFinished
+				run.Result = types.RunResultSuccess
+			}
+			// mark some runs as finished/failed
+			if c == 2 {
+				run.Phase = types.RunPhaseFinished
+				run.Result = types.RunResultFailed
+			}
+			if err := rs.d.UpdateRun(tx, run); err != nil {
+				return errors.WithStack(err)
+			}
+
+			return nil
+		})
+		testutil.NilError(t, err)
+	}
+
+	err = rs.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		runs, err = rs.d.GetRuns(tx, []string{group01All}, false, nil, nil, 0, 0, types.SortDirectionAsc)
+
+		return errors.WithStack(err)
+	})
+	testutil.NilError(t, err)
+
+	tests := []struct {
+		name                string
+		limit               int
+		sortDirection       types.SortDirection
+		group               string
+		startRunCounter     uint64
+		phaseFilter         []types.RunPhase
+		resultFilter        []types.RunResult
+		expectedRunsNumber  int
+		expectedCallsNumber int
+	}{
+		{
+			name:                "get runs with limit = 0, no sortdirection",
+			group:               group01All,
+			expectedRunsNumber:  10,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "get runs with limit = 0",
+			group:               group01All,
+			sortDirection:       types.SortDirectionAsc,
+			expectedRunsNumber:  10,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "get runs with limit less than runs",
+			group:               group01All,
+			limit:               2,
+			sortDirection:       types.SortDirectionAsc,
+			expectedRunsNumber:  10,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "get runs with limit greater than runs",
+			group:               group01All,
+			limit:               10,
+			sortDirection:       types.SortDirectionAsc,
+			expectedRunsNumber:  10,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "get runs with limit = 0, startCounter = 3",
+			group:               group01All,
+			sortDirection:       types.SortDirectionAsc,
+			startRunCounter:     3,
+			expectedRunsNumber:  7,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "get runs with limit less than runs, startCounter = 3",
+			group:               group01All,
+			limit:               2,
+			sortDirection:       types.SortDirectionAsc,
+			startRunCounter:     3,
+			expectedRunsNumber:  7,
+			expectedCallsNumber: 4,
+		},
+		{
+			name:                "get runs with limit less than runs, phaseFilter finished",
+			group:               group01All,
+			limit:               2,
+			sortDirection:       types.SortDirectionAsc,
+			phaseFilter:         []types.RunPhase{types.RunPhaseFinished},
+			expectedRunsNumber:  6,
+			expectedCallsNumber: 3,
+		},
+		{
+			name:                "get runs with limit less than runs, resultFilter failed",
+			group:               group01All,
+			limit:               2,
+			sortDirection:       types.SortDirectionAsc,
+			resultFilter:        []types.RunResult{types.RunResultFailed},
+			expectedRunsNumber:  3,
+			expectedCallsNumber: 2,
+		},
+		{
+			name:                "get runs with limit less than runs, phaseFilter finished, resultFilter failed",
+			group:               group01All,
+			limit:               2,
+			sortDirection:       types.SortDirectionAsc,
+			phaseFilter:         []types.RunPhase{types.RunPhaseFinished},
+			resultFilter:        []types.RunResult{types.RunResultFailed},
+			expectedRunsNumber:  3,
+			expectedCallsNumber: 2,
+		},
+		{
+			name:                "get runs with limit less than runs, phaseFilter finished, resultFilter success or failed",
+			group:               group01All,
+			limit:               2,
+			sortDirection:       types.SortDirectionAsc,
+			phaseFilter:         []types.RunPhase{types.RunPhaseFinished},
+			resultFilter:        []types.RunResult{types.RunResultSuccess, types.RunResultFailed},
+			expectedRunsNumber:  6,
+			expectedCallsNumber: 3,
+		},
+		{
+			name:                "get runs with limit = 0, sortDirection desc",
+			group:               group01All,
+			sortDirection:       types.SortDirectionDesc,
+			expectedRunsNumber:  10,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "get runs with limit less than runs, sortDirection desc",
+			group:               group01All,
+			limit:               2,
+			sortDirection:       types.SortDirectionDesc,
+			expectedRunsNumber:  10,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "get runs with limit greater than runs, sortDirection desc",
+			group:               group01All,
+			limit:               10,
+			sortDirection:       types.SortDirectionDesc,
+			expectedRunsNumber:  10,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "get runs with limit = 0, startCounter = 3, sortDirection desc",
+			group:               group01All,
+			sortDirection:       types.SortDirectionDesc,
+			startRunCounter:     3,
+			expectedRunsNumber:  2,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "get runs with limit less than runs, startCounter = 3, sortDirection desc",
+			group:               group01All,
+			limit:               2,
+			sortDirection:       types.SortDirectionDesc,
+			startRunCounter:     3,
+			expectedRunsNumber:  2,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "get runs with limit less than runs, phaseFilter finished, sortDirection desc",
+			group:               group01All,
+			limit:               2,
+			sortDirection:       types.SortDirectionDesc,
+			phaseFilter:         []types.RunPhase{types.RunPhaseFinished},
+			expectedRunsNumber:  6,
+			expectedCallsNumber: 3,
+		},
+		{
+			name:                "get runs with limit less than runs, resultFilter failed, sortDirection desc",
+			group:               group01All,
+			limit:               2,
+			sortDirection:       types.SortDirectionDesc,
+			resultFilter:        []types.RunResult{types.RunResultFailed},
+			expectedRunsNumber:  3,
+			expectedCallsNumber: 2,
+		},
+		{
+			name:                "get runs with limit less than runs, phaseFilter finished, resultFilter failed, sortDirection desc",
+			group:               group01All,
+			limit:               2,
+			sortDirection:       types.SortDirectionDesc,
+			phaseFilter:         []types.RunPhase{types.RunPhaseFinished},
+			resultFilter:        []types.RunResult{types.RunResultFailed},
+			expectedRunsNumber:  3,
+			expectedCallsNumber: 2,
+		},
+		{
+			name:                "get runs with limit less than runs, phaseFilter finished, resultFilter success or failed, sortDirection desc",
+			group:               group01All,
+			limit:               2,
+			sortDirection:       types.SortDirectionDesc,
+			phaseFilter:         []types.RunPhase{types.RunPhaseFinished},
+			resultFilter:        []types.RunResult{types.RunResultSuccess, types.RunResultFailed},
+			expectedRunsNumber:  6,
+			expectedCallsNumber: 3,
+		},
+		{
+			name:                "get runs with group /user/user01/branch01, limit less than runs",
+			group:               group01Branch01,
+			limit:               2,
+			sortDirection:       types.SortDirectionAsc,
+			expectedRunsNumber:  5,
+			expectedCallsNumber: 3,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			// default sortdirection is desc
+
+			curRuns := append([]*types.Run{}, runs...)
+			expectedRuns := []*types.Run{}
+			for _, run := range curRuns {
+				if tt.startRunCounter > 0 {
+					if tt.sortDirection == types.SortDirectionDesc || tt.sortDirection == "" {
+						// keep only runs with runCounter < startRunCounter
+						if run.Counter >= tt.startRunCounter {
+							continue
+						}
+					} else {
+						// keep only runs with runCounter > startRunCounter
+						if run.Counter <= tt.startRunCounter {
+							continue
+						}
+					}
+				}
+
+				group := tt.group
+				runGroup := run.Group
+				if !strings.HasSuffix(group, "/") {
+					group += "/"
+				}
+				if !strings.HasSuffix(runGroup, "/") {
+					runGroup += "/"
+				}
+				if !strings.HasPrefix(runGroup, group) {
+					continue
+				}
+
+				if len(tt.phaseFilter) > 0 && !phaseInSlice(tt.phaseFilter, run.Phase) {
+					continue
+				}
+				if len(tt.resultFilter) > 0 && !resultInSlice(tt.resultFilter, run.Result) {
+					continue
+				}
+				expectedRuns = append(expectedRuns, run)
+			}
+
+			// reverse if sortDirection is desc
+			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
+			if tt.sortDirection == types.SortDirectionDesc || tt.sortDirection == "" {
+				for i, j := 0, len(expectedRuns)-1; i < j; i, j = i+1, j-1 {
+					expectedRuns[i], expectedRuns[j] = expectedRuns[j], expectedRuns[i]
+				}
+			}
+
+			callsNumber := 0
+			var respAllRuns []*types.Run
+			startRunCounter := tt.startRunCounter
+
+			for {
+				res, err := rs.ah.GetGroupRuns(ctx, &action.GetGroupRunsRequest{Group: tt.group, StartRunCounter: startRunCounter, Limit: tt.limit, SortDirection: tt.sortDirection, PhaseFilter: tt.phaseFilter, ResultFilter: tt.resultFilter})
+				testutil.NilError(t, err)
+
+				callsNumber++
+
+				respAllRuns = append(respAllRuns, res.Runs...)
+
+				if !res.HasMore {
+					break
+				}
+
+				lastRun := res.Runs[len(res.Runs)-1]
+				startRunCounter = lastRun.Counter
+			}
+
+			assert.Assert(t, cmp.Len(respAllRuns, tt.expectedRunsNumber))
+			assert.Assert(t, cmpDiffObject(expectedRuns, respAllRuns))
+			assert.Equal(t, callsNumber, tt.expectedCallsNumber)
+		})
+	}
+}
+
+// TODO(sgotti) use go 1.21 generics slices.Contains when removing support for go < 1.21
+func phaseInSlice(phases []types.RunPhase, phase types.RunPhase) bool {
+	for _, s := range phases {
+		if phase == s {
+			return true
+		}
+	}
+	return false
+}
+
+// TODO(sgotti) use go 1.21 generics slices.Contains when removing support for go < 1.21
+func resultInSlice(results []types.RunResult, result types.RunResult) bool {
+	for _, s := range results {
+		if result == s {
+			return true
+		}
+	}
+	return false
 }

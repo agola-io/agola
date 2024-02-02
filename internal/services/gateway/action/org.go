@@ -91,9 +91,9 @@ func (h *ActionHandler) GetOrgs(ctx context.Context, req *GetOrgsRequest) (*GetO
 
 	var outCursor string
 	if resp.HasMore && len(orgs) > 0 {
-		lastRemoteSourceName := orgs[len(orgs)-1].Name
+		lastOrgName := orgs[len(orgs)-1].Name
 		outCursor, err = MarshalCursor(&StartCursor{
-			Start:         lastRemoteSourceName,
+			Start:         lastOrgName,
 			SortDirection: sortDirection,
 		})
 		if err != nil {

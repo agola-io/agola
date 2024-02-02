@@ -25,11 +25,11 @@ const (
 	RunGenericSetupErrorName = "Setup Error"
 )
 
-type SortOrder int
+type SortDirection string
 
 const (
-	SortOrderAsc SortOrder = iota
-	SortOrderDesc
+	SortDirectionAsc  SortDirection = "asc"
+	SortDirectionDesc SortDirection = "desc"
 )
 
 type RunBundle struct {
