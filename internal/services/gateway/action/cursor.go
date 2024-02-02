@@ -37,8 +37,10 @@ type StartCursor struct {
 	SortDirection SortDirection
 }
 
-type StartSequenceCursor struct {
+type DeliveryCursor struct {
 	StartSequence uint64
 
 	SortDirection SortDirection
+
+	DeliveryStatusFilter []string
 }

@@ -52,16 +52,18 @@ func (h *ActionHandler) GetProjectCommitStatusDeliveries(ctx context.Context, re
 		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
 	}
 
-	inCursor := &StartSequenceCursor{}
+	inCursor := &DeliveryCursor{}
 	sortDirection := req.SortDirection
+	deliveryStatusFilter := req.DeliveryStatusFilter
 	if req.Cursor != "" {
 		if err := UnmarshalCursor(req.Cursor, inCursor); err != nil {
 			return nil, errors.WithStack(err)
 		}
 		sortDirection = inCursor.SortDirection
+		deliveryStatusFilter = inCursor.DeliveryStatusFilter
 	}
 
-	commitStatusDeliveries, resp, err := h.notificationClient.GetProjectCommitStatusDeliveries(ctx, project.ID, &client.GetProjectCommitStatusDeliveriesOptions{ListOptions: &client.ListOptions{Limit: req.Limit, SortDirection: nstypes.SortDirection(sortDirection)}, StartSequence: inCursor.StartSequence, DeliveryStatusFilter: req.DeliveryStatusFilter})
+	commitStatusDeliveries, resp, err := h.notificationClient.GetProjectCommitStatusDeliveries(ctx, project.ID, &client.GetProjectCommitStatusDeliveriesOptions{ListOptions: &client.ListOptions{Limit: req.Limit, SortDirection: nstypes.SortDirection(sortDirection)}, StartSequence: inCursor.StartSequence, DeliveryStatusFilter: deliveryStatusFilter})
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
@@ -69,9 +71,11 @@ func (h *ActionHandler) GetProjectCommitStatusDeliveries(ctx context.Context, re
 	var outCursor string
 	if resp.HasMore && len(commitStatusDeliveries) > 0 {
 		lastCommitStatusDeliverySequence := commitStatusDeliveries[len(commitStatusDeliveries)-1].Sequence
-		outCursor, err = MarshalCursor(&StartSequenceCursor{
+		outCursor, err = MarshalCursor(&DeliveryCursor{
 			StartSequence: lastCommitStatusDeliverySequence,
 			SortDirection: sortDirection,
+
+			DeliveryStatusFilter: deliveryStatusFilter,
 		})
 		if err != nil {
 			return nil, errors.WithStack(err)

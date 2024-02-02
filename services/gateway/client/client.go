@@ -812,13 +812,27 @@ func (c *Client) Import(ctx context.Context, serviceName string, r io.Reader) (*
 	return c.getResponse(ctx, "POST", fmt.Sprintf("/import/%s", serviceName), nil, jsonContent, r)
 }
 
-func (c *Client) GetProjectRunWebhookDeliveries(ctx context.Context, projectRef string, deliveryStatusFilter []string, opts *ListOptions) ([]*gwapitypes.RunWebhookDeliveryResponse, *Response, error) {
-	q := url.Values{}
-	opts.Add(q)
+type DeliveriesOptions struct {
+	*ListOptions
 
-	for _, deliveryStatus := range deliveryStatusFilter {
+	DeliveryStatusFilter []string
+}
+
+func (o *DeliveriesOptions) Add(q url.Values) {
+	if o == nil {
+		return
+	}
+
+	o.ListOptions.Add(q)
+
+	for _, deliveryStatus := range o.DeliveryStatusFilter {
 		q.Add("deliverystatus", deliveryStatus)
 	}
+}
+
+func (c *Client) GetProjectRunWebhookDeliveries(ctx context.Context, projectRef string, opts *DeliveriesOptions) ([]*gwapitypes.RunWebhookDeliveryResponse, *Response, error) {
+	q := url.Values{}
+	opts.Add(q)
 
 	runWebhookDeliveries := []*gwapitypes.RunWebhookDeliveryResponse{}
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s/runwebhookdeliveries", url.PathEscape(projectRef)), q, common.JSONContent, nil, &runWebhookDeliveries)
@@ -829,13 +843,9 @@ func (c *Client) ProjectRunWebhookRedelivery(ctx context.Context, projectRef str
 	return c.getResponse(ctx, "PUT", fmt.Sprintf("/projects/%s/runwebhookdeliveries/%s/redelivery", projectRef, runWebhookDeliveryID), nil, jsonContent, nil)
 }
 
-func (c *Client) GetProjectCommitStatusDeliveries(ctx context.Context, projectRef string, deliveryStatusFilter []string, opts *ListOptions) ([]*gwapitypes.CommitStatusDeliveryResponse, *Response, error) {
+func (c *Client) GetProjectCommitStatusDeliveries(ctx context.Context, projectRef string, opts *DeliveriesOptions) ([]*gwapitypes.CommitStatusDeliveryResponse, *Response, error) {
 	q := url.Values{}
 	opts.Add(q)
-
-	for _, deliveryStatus := range deliveryStatusFilter {
-		q.Add("deliverystatus", deliveryStatus)
-	}
 
 	commitStatusDeliveries := []*gwapitypes.CommitStatusDeliveryResponse{}
 	resp, err := c.getParsedResponse(ctx, "GET", fmt.Sprintf("/projects/%s/commitstatusdeliveries", url.PathEscape(projectRef)), q, common.JSONContent, nil, &commitStatusDeliveries)

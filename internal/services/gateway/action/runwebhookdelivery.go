@@ -52,16 +52,18 @@ func (h *ActionHandler) GetProjectRunWebhookDeliveries(ctx context.Context, req 
 		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
 	}
 
-	inCursor := &StartSequenceCursor{}
+	inCursor := &DeliveryCursor{}
 	sortDirection := req.SortDirection
+	deliveryStatusFilter := req.DeliveryStatusFilter
 	if req.Cursor != "" {
 		if err := UnmarshalCursor(req.Cursor, inCursor); err != nil {
 			return nil, errors.WithStack(err)
 		}
 		sortDirection = inCursor.SortDirection
+		deliveryStatusFilter = inCursor.DeliveryStatusFilter
 	}
 
-	runWebhookDeliveries, resp, err := h.notificationClient.GetProjectRunWebhookDeliveries(ctx, project.ID, &client.GetProjectRunWebhookDeliveriesOptions{ListOptions: &client.ListOptions{Limit: req.Limit, SortDirection: nstypes.SortDirection(sortDirection)}, StartSequence: inCursor.StartSequence, DeliveryStatusFilter: req.DeliveryStatusFilter})
+	runWebhookDeliveries, resp, err := h.notificationClient.GetProjectRunWebhookDeliveries(ctx, project.ID, &client.GetProjectRunWebhookDeliveriesOptions{ListOptions: &client.ListOptions{Limit: req.Limit, SortDirection: nstypes.SortDirection(sortDirection)}, StartSequence: inCursor.StartSequence, DeliveryStatusFilter: deliveryStatusFilter})
 	if err != nil {
 		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
 	}
@@ -69,9 +71,11 @@ func (h *ActionHandler) GetProjectRunWebhookDeliveries(ctx context.Context, req 
 	var outCursor string
 	if resp.HasMore && len(runWebhookDeliveries) > 0 {
 		lastRunWebhookDeliverySequence := runWebhookDeliveries[len(runWebhookDeliveries)-1].Sequence
-		outCursor, err = MarshalCursor(&StartSequenceCursor{
+		outCursor, err = MarshalCursor(&DeliveryCursor{
 			StartSequence: lastRunWebhookDeliverySequence,
 			SortDirection: sortDirection,
+
+			DeliveryStatusFilter: deliveryStatusFilter,
 		})
 		if err != nil {
 			return nil, errors.WithStack(err)
