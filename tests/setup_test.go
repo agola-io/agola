@@ -3954,34 +3954,27 @@ func TestGetRemoteSources(t *testing.T) {
 				}
 			}
 
-			var respAllRemoteSources []*gwapitypes.RemoteSourceResponse
+			respAllRemoteSources := []*gwapitypes.RemoteSourceResponse{}
+			sortDirection := tt.sortDirection
+			callsNumber := 0
+			var cursor string
 
-			respRemoteSources, res, err := gwClient.GetRemoteSources(ctx, &gwclient.ListOptions{
-				Limit: tt.limit, SortDirection: tt.sortDirection,
-			})
-			testutil.NilError(t, err)
-
-			respAllRemoteSources = append(respAllRemoteSources, respRemoteSources...)
-			callsNumber := 1
-
-			// fetch next results
 			for {
-				if res.Cursor == "" {
-					break
-				}
-
-				respRemoteSources, res, err = gwClient.GetRemoteSources(ctx, &gwclient.ListOptions{
-					Cursor: res.Cursor, Limit: tt.limit,
-				})
+				respRemoteSources, res, err := gwClient.GetRemoteSources(ctx, &gwclient.ListOptions{Cursor: cursor, Limit: tt.limit, SortDirection: sortDirection})
 				testutil.NilError(t, err)
 
 				callsNumber++
 
 				respAllRemoteSources = append(respAllRemoteSources, respRemoteSources...)
+
+				if res.Cursor == "" {
+					break
+				}
+				cursor = res.Cursor
+				sortDirection = ""
 			}
 
-			assert.Assert(t, cmp.Len(respAllRemoteSources, len(expectedRemoteSources)))
-			assert.DeepEqual(t, respAllRemoteSources, expectedRemoteSources)
+			assert.DeepEqual(t, expectedRemoteSources, respAllRemoteSources)
 			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
 		})
 	}
@@ -4062,27 +4055,13 @@ func TestGetUsers(t *testing.T) {
 				}
 			}
 
-			var respAllUsers []*gwapitypes.UserResponse
+			respAllUsers := []*gwapitypes.UserResponse{}
+			sortDirection := tt.sortDirection
+			callsNumber := 0
+			var cursor string
 
-			respUsers, res, err := gwClient.GetUsers(ctx, &gwclient.ListOptions{
-				Limit: tt.limit, SortDirection: tt.sortDirection,
-			})
-			testutil.NilError(t, err)
-
-			for _, respUser := range respUsers {
-				respAllUsers = append(respAllUsers, &gwapitypes.UserResponse{ID: respUser.ID, UserName: respUser.UserName})
-			}
-			callsNumber := 1
-
-			// fetch next results
 			for {
-				if res.Cursor == "" {
-					break
-				}
-
-				respUsers, res, err = gwClient.GetUsers(ctx, &gwclient.ListOptions{
-					Cursor: res.Cursor, Limit: tt.limit,
-				})
+				respUsers, res, err := gwClient.GetUsers(ctx, &gwclient.ListOptions{Cursor: cursor, Limit: tt.limit, SortDirection: sortDirection})
 				testutil.NilError(t, err)
 
 				callsNumber++
@@ -4090,10 +4069,15 @@ func TestGetUsers(t *testing.T) {
 				for _, respUser := range respUsers {
 					respAllUsers = append(respAllUsers, &gwapitypes.UserResponse{ID: respUser.ID, UserName: respUser.UserName})
 				}
+
+				if res.Cursor == "" {
+					break
+				}
+				cursor = res.Cursor
+				sortDirection = ""
 			}
 
-			assert.Assert(t, cmp.Len(respAllUsers, len(expectedUsers)))
-			assert.DeepEqual(t, respAllUsers, expectedUsers)
+			assert.DeepEqual(t, expectedUsers, respAllUsers)
 			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
 		})
 	}
@@ -4248,34 +4232,27 @@ func TestGetOrgs(t *testing.T) {
 				}
 			}
 
-			var respAllOrgs []*gwapitypes.OrgResponse
+			respAllOrgs := []*gwapitypes.OrgResponse{}
+			sortDirection := tt.sortDirection
+			callsNumber := 0
+			var cursor string
 
-			respOrgs, res, err := client.GetOrgs(ctx, &gwclient.ListOptions{
-				Limit: tt.limit, SortDirection: tt.sortDirection,
-			})
-			testutil.NilError(t, err)
-
-			respAllOrgs = append(respAllOrgs, respOrgs...)
-			callsNumber := 1
-
-			// fetch next results
 			for {
-				if res.Cursor == "" {
-					break
-				}
-
-				respOrgs, res, err = client.GetOrgs(ctx, &gwclient.ListOptions{
-					Cursor: res.Cursor, Limit: tt.limit,
-				})
+				respOrgs, res, err := client.GetOrgs(ctx, &gwclient.ListOptions{Cursor: cursor, Limit: tt.limit, SortDirection: sortDirection})
 				testutil.NilError(t, err)
 
 				callsNumber++
 
 				respAllOrgs = append(respAllOrgs, respOrgs...)
+
+				if res.Cursor == "" {
+					break
+				}
+				cursor = res.Cursor
+				sortDirection = ""
 			}
 
-			assert.Assert(t, cmp.Len(respAllOrgs, len(expectedOrgs)))
-			assert.DeepEqual(t, respAllOrgs, expectedOrgs)
+			assert.DeepEqual(t, expectedOrgs, respAllOrgs)
 			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
 		})
 	}
@@ -4303,7 +4280,7 @@ func TestGetOrgMembers(t *testing.T) {
 	org, _, err := gwClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg01, Visibility: gwapitypes.VisibilityPublic})
 	testutil.NilError(t, err)
 
-	var allOrgMembers []*gwapitypes.OrgMemberResponse
+	allOrgMembers := []*gwapitypes.OrgMemberResponse{}
 	for i := 1; i < 10; i++ {
 		orgMember, _, err := gwClient.AddOrgMember(ctx, agolaOrg01, fmt.Sprintf("orguser%d", i), gwapitypes.MemberRoleMember)
 		testutil.NilError(t, err)
@@ -4365,35 +4342,28 @@ func TestGetOrgMembers(t *testing.T) {
 				}
 			}
 
-			var respAllOrgMembers []*gwapitypes.OrgMemberResponse
+			respAllOrgMembers := []*gwapitypes.OrgMemberResponse{}
+			sortDirection := tt.sortDirection
+			callsNumber := 0
+			var cursor string
 
-			respOrgMembers, res, err := gwClient.GetOrgMembers(ctx, org.ID, &gwclient.ListOptions{
-				Limit: tt.limit, SortDirection: tt.sortDirection,
-			})
-			testutil.NilError(t, err)
-
-			respAllOrgMembers = append(respAllOrgMembers, respOrgMembers.Members...)
-			callsNumber := 1
-
-			// fetch next results
 			for {
-				if res.Cursor == "" {
-					break
-				}
-
-				respOrgMembers, res, err = gwClient.GetOrgMembers(ctx, org.ID, &gwclient.ListOptions{
-					Cursor: res.Cursor, Limit: tt.limit,
-				})
+				respOrgMembers, res, err := gwClient.GetOrgMembers(ctx, org.ID, &gwclient.ListOptions{Cursor: cursor, Limit: tt.limit, SortDirection: sortDirection})
 				testutil.NilError(t, err)
 
 				callsNumber++
 
 				respAllOrgMembers = append(respAllOrgMembers, respOrgMembers.Members...)
+
+				if res.Cursor == "" {
+					break
+				}
+				cursor = res.Cursor
+				sortDirection = ""
 			}
 
-			assert.Assert(t, cmp.Len(respAllOrgMembers, len(expectedOrgMembers)))
-			assert.DeepEqual(t, respAllOrgMembers, expectedOrgMembers)
-			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
+			assert.DeepEqual(t, expectedOrgMembers, respAllOrgMembers)
+			assert.Assert(t, cmp.Equal(tt.expectedCallsNumber, callsNumber))
 		})
 	}
 }
@@ -4487,27 +4457,13 @@ func TestGetUserOrgs(t *testing.T) {
 				}
 			}
 
-			var respAllUserOrgs []*gwapitypes.OrgResponse
+			respAllUserOrgs := []*gwapitypes.OrgResponse{}
+			sortDirection := tt.sortDirection
+			callsNumber := 0
+			var cursor string
 
-			respUserOrgs, res, err := gwClient.GetUserOrgs(ctx, &gwclient.ListOptions{
-				Limit: tt.limit, SortDirection: tt.sortDirection,
-			})
-			testutil.NilError(t, err)
-
-			for _, userOrg := range respUserOrgs {
-				respAllUserOrgs = append(respAllUserOrgs, userOrg.Organization)
-			}
-			callsNumber := 1
-
-			// fetch next results
 			for {
-				if res.Cursor == "" {
-					break
-				}
-
-				respUserOrgs, res, err = gwClient.GetUserOrgs(ctx, &gwclient.ListOptions{
-					Cursor: res.Cursor, Limit: tt.limit,
-				})
+				respUserOrgs, res, err := gwClient.GetUserOrgs(ctx, &gwclient.ListOptions{Cursor: cursor, Limit: tt.limit, SortDirection: sortDirection})
 				testutil.NilError(t, err)
 
 				callsNumber++
@@ -4515,10 +4471,15 @@ func TestGetUserOrgs(t *testing.T) {
 				for _, userOrg := range respUserOrgs {
 					respAllUserOrgs = append(respAllUserOrgs, userOrg.Organization)
 				}
+
+				if res.Cursor == "" {
+					break
+				}
+				cursor = res.Cursor
+				sortDirection = ""
 			}
 
-			assert.Assert(t, cmp.Len(respAllUserOrgs, len(expectedUserOrgs)))
-			assert.DeepEqual(t, respAllUserOrgs, expectedUserOrgs)
+			assert.DeepEqual(t, expectedUserOrgs, respAllUserOrgs)
 			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
 		})
 	}
@@ -5870,39 +5831,32 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 				}
 			}
 
-			var respAllRunWebhookDeliveries []*gwapitypes.RunWebhookDeliveryResponse
+			respAllRunWebhookDeliveries := []*gwapitypes.RunWebhookDeliveryResponse{}
+			sortDirection := tt.sortDirection
+			callsNumber := 0
+			var cursor string
 
-			respRunWebhookDeliveries, res, err := tt.client.GetProjectRunWebhookDeliveries(ctx, tt.projectRef, tt.deliveryStatusFilter, &gwclient.ListOptions{
-				Limit: tt.limit, SortDirection: tt.sortDirection,
-			})
-			if tt.expectedErr == "" {
-				testutil.NilError(t, err)
-			} else {
-				assert.Error(t, err, tt.expectedErr)
-				return
-			}
-
-			respAllRunWebhookDeliveries = append(respAllRunWebhookDeliveries, respRunWebhookDeliveries...)
-			callsNumber := 1
-
-			// fetch next results
 			for {
-				if res.Cursor == "" {
-					break
+				respRunWebhookDeliveries, res, err := tt.client.GetProjectRunWebhookDeliveries(ctx, tt.projectRef, tt.deliveryStatusFilter, &gwclient.ListOptions{Cursor: cursor, Limit: tt.limit, SortDirection: sortDirection})
+				if tt.expectedErr == "" {
+					testutil.NilError(t, err)
+				} else {
+					assert.Error(t, err, tt.expectedErr)
+					return
 				}
-
-				respRunWebhookDeliveries, res, err = tt.client.GetProjectRunWebhookDeliveries(ctx, tt.projectRef, tt.deliveryStatusFilter, &gwclient.ListOptions{
-					Cursor: res.Cursor, Limit: tt.limit,
-				})
-				testutil.NilError(t, err)
 
 				callsNumber++
 
 				respAllRunWebhookDeliveries = append(respAllRunWebhookDeliveries, respRunWebhookDeliveries...)
+
+				if res.Cursor == "" {
+					break
+				}
+				cursor = res.Cursor
+				sortDirection = ""
 			}
 
-			assert.Assert(t, cmp.Len(respAllRunWebhookDeliveries, len(expectedProject01RunWebhookDeliveries)))
-			assert.DeepEqual(t, respAllRunWebhookDeliveries, expectedProject01RunWebhookDeliveries)
+			assert.DeepEqual(t, expectedProject01RunWebhookDeliveries, respAllRunWebhookDeliveries)
 			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
 		})
 	}
@@ -6489,39 +6443,32 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 				}
 			}
 
-			var respAllCommitStatusDeliveries []*gwapitypes.CommitStatusDeliveryResponse
+			respAllCommitStatusDeliveries := []*gwapitypes.CommitStatusDeliveryResponse{}
+			sortDirection := tt.sortDirection
+			callsNumber := 0
+			var cursor string
 
-			respCommitStatusDeliveries, res, err := tt.client.GetProjectCommitStatusDeliveries(ctx, tt.projectRef, tt.deliveryStatusFilter, &gwclient.ListOptions{
-				Limit: tt.limit, SortDirection: tt.sortDirection,
-			})
-			if tt.expectedErr == "" {
-				testutil.NilError(t, err)
-			} else {
-				assert.Error(t, err, tt.expectedErr)
-				return
-			}
-
-			respAllCommitStatusDeliveries = append(respAllCommitStatusDeliveries, respCommitStatusDeliveries...)
-			callsNumber := 1
-
-			// fetch next results
 			for {
-				if res.Cursor == "" {
-					break
+				respCommitStatusDeliveries, res, err := tt.client.GetProjectCommitStatusDeliveries(ctx, tt.projectRef, tt.deliveryStatusFilter, &gwclient.ListOptions{Cursor: cursor, Limit: tt.limit, SortDirection: sortDirection})
+				if tt.expectedErr == "" {
+					testutil.NilError(t, err)
+				} else {
+					assert.Error(t, err, tt.expectedErr)
+					return
 				}
-
-				respCommitStatusDeliveries, res, err = tt.client.GetProjectCommitStatusDeliveries(ctx, tt.projectRef, tt.deliveryStatusFilter, &gwclient.ListOptions{
-					Cursor: res.Cursor, Limit: tt.limit,
-				})
-				testutil.NilError(t, err)
 
 				callsNumber++
 
 				respAllCommitStatusDeliveries = append(respAllCommitStatusDeliveries, respCommitStatusDeliveries...)
+
+				if res.Cursor == "" {
+					break
+				}
+				cursor = res.Cursor
+				sortDirection = ""
 			}
 
-			assert.Assert(t, cmp.Len(respAllCommitStatusDeliveries, len(expectedProject01CommitStatusDeliveries)))
-			assert.DeepEqual(t, respAllCommitStatusDeliveries, expectedProject01CommitStatusDeliveries)
+			assert.DeepEqual(t, expectedProject01CommitStatusDeliveries, respAllCommitStatusDeliveries)
 			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
 		})
 	}
