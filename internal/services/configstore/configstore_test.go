@@ -898,59 +898,84 @@ func TestGetRemoteSources(t *testing.T) {
 		remoteSources = append(remoteSources, remoteSource)
 	}
 
-	t.Run("test get all remote sources", func(t *testing.T) {
-		res, err := cs.ah.GetRemoteSources(ctx, &action.GetRemoteSourcesRequest{SortDirection: types.SortDirectionAsc})
-		testutil.NilError(t, err)
+	tests := []struct {
+		name                string
+		limit               int
+		sortDirection       types.SortDirection
+		expectedCallsNumber int
+	}{
+		{
+			name:                "test get remote sources with limit = 0",
+			sortDirection:       types.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get remote sources with limit less than remote sources",
+			limit:               2,
+			sortDirection:       types.SortDirectionAsc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get remote sources with limit greater than remote sources",
+			limit:               10,
+			sortDirection:       types.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get remote sources with limit = 0 and sortDirection desc",
+			sortDirection:       types.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get remote sources with limit less than remote sources and sortDirection desc",
+			limit:               2,
+			sortDirection:       types.SortDirectionDesc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get remote sources with limit greater than remote sources and sortDirection desc",
+			limit:               10,
+			sortDirection:       types.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+	}
 
-		expectedRemoteSources := 9
-		assert.Assert(t, cmp.Len(res.RemoteSources, expectedRemoteSources))
-		assert.Assert(t, !res.HasMore)
-	})
-
-	t.Run("test get remote sources with limit less than remote sources", func(t *testing.T) {
-		res, err := cs.ah.GetRemoteSources(ctx, &action.GetRemoteSourcesRequest{Limit: 5, SortDirection: types.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedRemoteSources := 5
-		assert.Assert(t, cmp.Len(res.RemoteSources, expectedRemoteSources))
-		assert.Assert(t, res.HasMore)
-	})
-
-	t.Run("test get remote sources with limit less than remote sources continuation", func(t *testing.T) {
-		respAllRemoteSources := []*types.RemoteSource{}
-
-		res, err := cs.ah.GetRemoteSources(ctx, &action.GetRemoteSourcesRequest{Limit: 5, SortDirection: types.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedRemoteSources := 5
-		assert.Assert(t, cmp.Len(res.RemoteSources, expectedRemoteSources))
-		assert.Assert(t, res.HasMore)
-
-		respAllRemoteSources = append(respAllRemoteSources, res.RemoteSources...)
-		lastRemoteSource := res.RemoteSources[len(res.RemoteSources)-1]
-
-		// fetch next results
-		for {
-			res, err = cs.ah.GetRemoteSources(ctx, &action.GetRemoteSourcesRequest{StartRemoteSourceName: lastRemoteSource.Name, Limit: 5, SortDirection: types.SortDirectionAsc})
-			testutil.NilError(t, err)
-
-			expectedRemoteSources := 5
-			assert.Assert(t, !res.HasMore || (len(res.RemoteSources) == expectedRemoteSources))
-
-			respAllRemoteSources = append(respAllRemoteSources, res.RemoteSources...)
-
-			if !res.HasMore {
-				break
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			expectedRemoteSources := append([]*types.RemoteSource{}, remoteSources...)
+			// reverse if sortDirection is desc
+			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
+			if tt.sortDirection == types.SortDirectionDesc {
+				for i, j := 0, len(expectedRemoteSources)-1; i < j; i, j = i+1, j-1 {
+					expectedRemoteSources[i], expectedRemoteSources[j] = expectedRemoteSources[j], expectedRemoteSources[i]
+				}
 			}
 
-			lastRemoteSource = res.RemoteSources[len(res.RemoteSources)-1]
-		}
+			callsNumber := 0
+			var respAllRemoteSources []*types.RemoteSource
+			var startRemoteSourceName string
 
-		expectedRemoteSources = 9
-		assert.Assert(t, cmp.Len(respAllRemoteSources, expectedRemoteSources))
+			for {
+				res, err := cs.ah.GetRemoteSources(ctx, &action.GetRemoteSourcesRequest{StartRemoteSourceName: startRemoteSourceName, Limit: tt.limit, SortDirection: tt.sortDirection})
+				testutil.NilError(t, err)
 
-		assert.Assert(t, cmpDiffObject(remoteSources, respAllRemoteSources))
-	})
+				callsNumber++
+
+				respAllRemoteSources = append(respAllRemoteSources, res.RemoteSources...)
+
+				if !res.HasMore {
+					break
+				}
+
+				lastRemoteSource := res.RemoteSources[len(res.RemoteSources)-1]
+				startRemoteSourceName = lastRemoteSource.Name
+			}
+
+			assert.Assert(t, cmpDiffObject(expectedRemoteSources, respAllRemoteSources))
+			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
+		})
+	}
 }
 
 func TestGetUsers(t *testing.T) {
@@ -973,59 +998,84 @@ func TestGetUsers(t *testing.T) {
 		users = append(users, user)
 	}
 
-	t.Run("test get all users", func(t *testing.T) {
-		res, err := cs.ah.GetUsers(ctx, &action.GetUsersRequest{SortDirection: types.SortDirectionAsc})
-		testutil.NilError(t, err)
+	tests := []struct {
+		name                string
+		limit               int
+		sortDirection       types.SortDirection
+		expectedCallsNumber int
+	}{
+		{
+			name:                "test get users with limit = 0",
+			sortDirection:       types.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get users with limit less than users",
+			limit:               2,
+			sortDirection:       types.SortDirectionAsc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get users with limit greater than users",
+			limit:               10,
+			sortDirection:       types.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get users with limit = 0 and sortDirection desc",
+			sortDirection:       types.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get users with limit less than users and sortDirection desc",
+			limit:               2,
+			sortDirection:       types.SortDirectionDesc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get users with limit greater than users and sortDirection desc",
+			limit:               10,
+			sortDirection:       types.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+	}
 
-		expectedUsers := 9
-		assert.Assert(t, cmp.Len(res.Users, expectedUsers))
-		assert.Assert(t, !res.HasMore)
-	})
-
-	t.Run("test get users with limit less than users", func(t *testing.T) {
-		res, err := cs.ah.GetUsers(ctx, &action.GetUsersRequest{Limit: 5, SortDirection: types.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedUsers := 5
-		assert.Assert(t, cmp.Len(res.Users, expectedUsers))
-		assert.Assert(t, res.HasMore)
-	})
-
-	t.Run("test get users with limit less than users continuation", func(t *testing.T) {
-		respAllUsers := []*types.User{}
-
-		res, err := cs.ah.GetUsers(ctx, &action.GetUsersRequest{Limit: 5, SortDirection: types.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedUsers := 5
-		assert.Assert(t, cmp.Len(res.Users, expectedUsers))
-		assert.Assert(t, res.HasMore)
-
-		respAllUsers = append(respAllUsers, res.Users...)
-		lastUser := res.Users[len(res.Users)-1]
-
-		// fetch next results
-		for {
-			res, err = cs.ah.GetUsers(ctx, &action.GetUsersRequest{StartUserName: lastUser.Name, Limit: 5, SortDirection: types.SortDirectionAsc})
-			testutil.NilError(t, err)
-
-			expectedUsers := 5
-			assert.Assert(t, !res.HasMore || (len(res.Users) == expectedUsers))
-
-			respAllUsers = append(respAllUsers, res.Users...)
-
-			if !res.HasMore {
-				break
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			expectedUsers := append([]*types.User{}, users...)
+			// reverse if sortDirection is desc
+			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
+			if tt.sortDirection == types.SortDirectionDesc {
+				for i, j := 0, len(expectedUsers)-1; i < j; i, j = i+1, j-1 {
+					expectedUsers[i], expectedUsers[j] = expectedUsers[j], expectedUsers[i]
+				}
 			}
 
-			lastUser = res.Users[len(res.Users)-1]
-		}
+			callsNumber := 0
+			var respAllUsers []*types.User
+			var startUserName string
 
-		expectedUsers = 9
-		assert.Assert(t, cmp.Len(respAllUsers, expectedUsers))
+			for {
+				res, err := cs.ah.GetUsers(ctx, &action.GetUsersRequest{StartUserName: startUserName, Limit: tt.limit, SortDirection: tt.sortDirection})
+				testutil.NilError(t, err)
 
-		assert.Assert(t, cmpDiffObject(users, respAllUsers))
-	})
+				callsNumber++
+
+				respAllUsers = append(respAllUsers, res.Users...)
+
+				if !res.HasMore {
+					break
+				}
+
+				lastUser := res.Users[len(res.Users)-1]
+				startUserName = lastUser.Name
+			}
+
+			assert.Assert(t, cmpDiffObject(expectedUsers, respAllUsers))
+			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
+		})
+	}
 }
 
 func TestGetOrgs(t *testing.T) {
@@ -1057,121 +1107,140 @@ func TestGetOrgs(t *testing.T) {
 		}
 	}
 
-	t.Run("test get all public orgs", func(t *testing.T) {
-		res, err := cs.ah.GetOrgs(ctx, &action.GetOrgsRequest{SortDirection: types.SortDirectionAsc})
-		testutil.NilError(t, err)
+	tests := []struct {
+		name                string
+		getPublicOrgsOnly   bool
+		limit               int
+		sortDirection       types.SortDirection
+		expectedCallsNumber int
+	}{
+		{
+			name:                "test get public orgs with limit = 0",
+			getPublicOrgsOnly:   true,
+			sortDirection:       types.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get public/private orgs with limit = 0",
+			getPublicOrgsOnly:   false,
+			sortDirection:       types.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get public orgs with limit less than orgs",
+			getPublicOrgsOnly:   true,
+			limit:               2,
+			sortDirection:       types.SortDirectionAsc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get public orgs with limit greater than orgs",
+			getPublicOrgsOnly:   true,
+			limit:               10,
+			sortDirection:       types.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get public/private orgs with limit less than orgs",
+			getPublicOrgsOnly:   false,
+			limit:               3,
+			sortDirection:       types.SortDirectionAsc,
+			expectedCallsNumber: 6,
+		},
+		{
+			name:                "test get public/private orgs with limit greater than orgs",
+			getPublicOrgsOnly:   false,
+			limit:               20,
+			sortDirection:       types.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get public orgs with limit = 0 and sortDirection desc",
+			getPublicOrgsOnly:   true,
+			sortDirection:       types.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get public/private orgs with limit = 0 and sortDirection desc",
+			getPublicOrgsOnly:   false,
+			sortDirection:       types.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get public orgs with limit less than orgs and sortDirection desc",
+			getPublicOrgsOnly:   true,
+			limit:               2,
+			sortDirection:       types.SortDirectionDesc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get public orgs with limit greater than orgs and sortDirection desc",
+			getPublicOrgsOnly:   true,
+			limit:               10,
+			sortDirection:       types.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get public orgs with limit less than orgs and sortDirection desc",
+			getPublicOrgsOnly:   true,
+			limit:               3,
+			sortDirection:       types.SortDirectionDesc,
+			expectedCallsNumber: 3,
+		},
+		{
+			name:                "test get public/private orgs with limit less than orgs and sortDirection desc",
+			getPublicOrgsOnly:   false,
+			limit:               3,
+			sortDirection:       types.SortDirectionDesc,
+			expectedCallsNumber: 6,
+		},
+	}
 
-		expectedOrgs := 9
-		assert.Assert(t, cmp.Len(res.Orgs, expectedOrgs))
-		assert.Assert(t, !res.HasMore)
-
-		assert.Assert(t, cmpDiffObject(publicOrgs[:expectedOrgs], res.Orgs))
-	})
-
-	t.Run("test get all public/private orgs", func(t *testing.T) {
-		res, err := cs.ah.GetOrgs(ctx, &action.GetOrgsRequest{Visibilities: []types.Visibility{types.VisibilityPublic, types.VisibilityPrivate}, SortDirection: types.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedOrgs := 18
-		assert.Assert(t, cmp.Len(res.Orgs, expectedOrgs))
-		assert.Assert(t, !res.HasMore)
-
-		assert.Assert(t, cmpDiffObject(allOrgs[:expectedOrgs], res.Orgs))
-	})
-
-	t.Run("test get public orgs with limit less than orgs", func(t *testing.T) {
-		res, err := cs.ah.GetOrgs(ctx, &action.GetOrgsRequest{Limit: 5, SortDirection: types.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedOrgs := 5
-		assert.Assert(t, cmp.Len(res.Orgs, expectedOrgs))
-		assert.Assert(t, res.HasMore)
-
-		assert.Assert(t, cmpDiffObject(publicOrgs[:expectedOrgs], res.Orgs))
-	})
-
-	t.Run("test get public/private orgs with limit less than orgs", func(t *testing.T) {
-		res, err := cs.ah.GetOrgs(ctx, &action.GetOrgsRequest{Limit: 5, Visibilities: []types.Visibility{types.VisibilityPublic, types.VisibilityPrivate}, SortDirection: types.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedOrgs := 5
-		assert.Assert(t, cmp.Len(res.Orgs, expectedOrgs))
-		assert.Assert(t, res.HasMore)
-
-		assert.Assert(t, cmpDiffObject(allOrgs[:expectedOrgs], res.Orgs))
-	})
-
-	t.Run("test get public orgs with limit less than orgs continuation", func(t *testing.T) {
-		respAllOrgs := []*types.Organization{}
-
-		res, err := cs.ah.GetOrgs(ctx, &action.GetOrgsRequest{Limit: 5, SortDirection: types.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedOrgs := 5
-		assert.Assert(t, cmp.Len(res.Orgs, expectedOrgs))
-		assert.Assert(t, res.HasMore)
-
-		respAllOrgs = append(respAllOrgs, res.Orgs...)
-		lastOrg := res.Orgs[len(res.Orgs)-1]
-
-		// fetch next results
-		for {
-			res, err = cs.ah.GetOrgs(ctx, &action.GetOrgsRequest{StartOrgName: lastOrg.Name, Limit: 5, SortDirection: types.SortDirectionAsc})
-			testutil.NilError(t, err)
-
-			expectedOrgs := 5
-			assert.Assert(t, !res.HasMore || (len(res.Orgs) == expectedOrgs))
-
-			respAllOrgs = append(respAllOrgs, res.Orgs...)
-
-			if !res.HasMore {
-				break
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			visibilities := []types.Visibility{types.VisibilityPublic}
+			// populate the expected orgs and client
+			expectedOrgs := []*types.Organization{}
+			if tt.getPublicOrgsOnly {
+				expectedOrgs = append(expectedOrgs, publicOrgs...)
+			} else {
+				expectedOrgs = append(expectedOrgs, allOrgs...)
+				visibilities = append(visibilities, types.VisibilityPrivate)
 			}
 
-			lastOrg = res.Orgs[len(res.Orgs)-1]
-		}
-
-		expectedOrgs = 9
-		assert.Assert(t, cmp.Len(respAllOrgs, expectedOrgs))
-
-		assert.Assert(t, cmpDiffObject(publicOrgs, respAllOrgs))
-	})
-
-	t.Run("test get public/private orgs with limit less than orgs continuation", func(t *testing.T) {
-		respAllOrgs := []*types.Organization{}
-
-		res, err := cs.ah.GetOrgs(ctx, &action.GetOrgsRequest{Limit: 5, Visibilities: []types.Visibility{types.VisibilityPublic, types.VisibilityPrivate}, SortDirection: types.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedOrgs := 5
-		assert.Assert(t, cmp.Len(res.Orgs, expectedOrgs))
-		assert.Assert(t, res.HasMore)
-
-		respAllOrgs = append(respAllOrgs, res.Orgs...)
-		lastOrg := res.Orgs[len(res.Orgs)-1]
-
-		// fetch next results
-		for {
-			res, err = cs.ah.GetOrgs(ctx, &action.GetOrgsRequest{StartOrgName: lastOrg.Name, Visibilities: []types.Visibility{types.VisibilityPublic, types.VisibilityPrivate}, Limit: 5, SortDirection: types.SortDirectionAsc})
-			testutil.NilError(t, err)
-
-			expectedOrgs := 5
-			assert.Assert(t, !res.HasMore || (len(res.Orgs) == expectedOrgs))
-
-			respAllOrgs = append(respAllOrgs, res.Orgs...)
-
-			if !res.HasMore {
-				break
+			// reverse if sortDirection is desc
+			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
+			if tt.sortDirection == types.SortDirectionDesc {
+				for i, j := 0, len(expectedOrgs)-1; i < j; i, j = i+1, j-1 {
+					expectedOrgs[i], expectedOrgs[j] = expectedOrgs[j], expectedOrgs[i]
+				}
 			}
 
-			lastOrg = res.Orgs[len(res.Orgs)-1]
-		}
+			callsNumber := 0
+			var startOrgName string
+			var respAllOrgs []*types.Organization
 
-		expectedOrgs = 18
-		assert.Assert(t, cmp.Len(respAllOrgs, expectedOrgs))
+			for {
+				res, err := cs.ah.GetOrgs(ctx, &action.GetOrgsRequest{StartOrgName: startOrgName, Visibilities: visibilities, Limit: tt.limit, SortDirection: tt.sortDirection})
+				testutil.NilError(t, err)
 
-		assert.Assert(t, cmpDiffObject(allOrgs, respAllOrgs))
-	})
+				callsNumber++
+
+				respAllOrgs = append(respAllOrgs, res.Orgs...)
+
+				if !res.HasMore {
+					break
+				}
+
+				lastOrg := res.Orgs[len(res.Orgs)-1]
+				startOrgName = lastOrg.Name
+			}
+
+			assert.Assert(t, cmpDiffObject(expectedOrgs, respAllOrgs))
+			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
+		})
+	}
 }
 
 func TestGetOrgMembers(t *testing.T) {
@@ -1202,64 +1271,89 @@ func TestGetOrgMembers(t *testing.T) {
 		testutil.NilError(t, err)
 	}
 
-	t.Run("test get all org members", func(t *testing.T) {
-		res, err := cs.ah.GetOrgMembers(ctx, &action.GetOrgMembersRequest{OrgRef: org.ID, SortDirection: types.SortDirectionAsc})
-		testutil.NilError(t, err)
+	tests := []struct {
+		name                string
+		limit               int
+		sortDirection       types.SortDirection
+		expectedCallsNumber int
+	}{
+		{
+			name:                "test get org members with limit = 0",
+			sortDirection:       types.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get org members with limit less than org members",
+			limit:               2,
+			sortDirection:       types.SortDirectionAsc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get org members with limit greater than org members",
+			limit:               10,
+			sortDirection:       types.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get org members with limit = 0 and sortDirection desc",
+			sortDirection:       types.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get org members with limit less than org members and sortDirection desc",
+			limit:               2,
+			sortDirection:       types.SortDirectionDesc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get org members with limit greater than org members and sortDirection desc",
+			limit:               10,
+			sortDirection:       types.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+	}
 
-		expectedOrgMembers := 9
-		assert.Assert(t, cmp.Len(res.OrgMembers, expectedOrgMembers))
-		assert.Assert(t, !res.HasMore)
-	})
-
-	t.Run("test get org members with limit less than org members", func(t *testing.T) {
-		res, err := cs.ah.GetOrgMembers(ctx, &action.GetOrgMembersRequest{OrgRef: org.ID, Limit: 5, SortDirection: types.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedOrgMembers := 5
-		assert.Assert(t, cmp.Len(res.OrgMembers, expectedOrgMembers))
-		assert.Assert(t, res.HasMore)
-	})
-
-	t.Run("test get org members with limit less than org members continuation", func(t *testing.T) {
-		orgMembers := []*action.OrgMember{}
-
-		res, err := cs.ah.GetOrgMembers(ctx, &action.GetOrgMembersRequest{OrgRef: org.ID, Limit: 5, SortDirection: types.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedOrgMembers := 5
-		assert.Assert(t, cmp.Len(res.OrgMembers, expectedOrgMembers))
-		assert.Assert(t, res.HasMore)
-
-		orgMembers = append(orgMembers, res.OrgMembers...)
-		lastUser := res.OrgMembers[len(res.OrgMembers)-1]
-
-		// fetch next results
-		for {
-			res, err = cs.ah.GetOrgMembers(ctx, &action.GetOrgMembersRequest{OrgRef: org.ID, StartUserName: lastUser.User.Name, Limit: 5, SortDirection: types.SortDirectionAsc})
-			testutil.NilError(t, err)
-
-			expectedOrgMembers := 5
-			assert.Assert(t, !res.HasMore || (len(res.OrgMembers) == expectedOrgMembers))
-
-			orgMembers = append(orgMembers, res.OrgMembers...)
-
-			if !res.HasMore {
-				break
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			expectedUsers := append([]*types.User{}, users...)
+			// reverse if sortDirection is desc
+			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
+			if tt.sortDirection == types.SortDirectionDesc {
+				for i, j := 0, len(expectedUsers)-1; i < j; i, j = i+1, j-1 {
+					expectedUsers[i], expectedUsers[j] = expectedUsers[j], expectedUsers[i]
+				}
 			}
 
-			lastUser = res.OrgMembers[len(res.OrgMembers)-1]
-		}
+			callsNumber := 0
+			var startUserName string
+			var respAllOrgMembers []*action.OrgMember
 
-		expectedOrgMembers = 9
-		assert.Assert(t, cmp.Len(orgMembers, expectedOrgMembers))
+			for {
+				res, err := cs.ah.GetOrgMembers(ctx, &action.GetOrgMembersRequest{OrgRef: org.ID, StartUserName: startUserName, Limit: tt.limit, SortDirection: tt.sortDirection})
+				testutil.NilError(t, err)
 
-		orgMemberUsers := []*types.User{}
-		for _, orgMember := range orgMembers {
-			orgMemberUsers = append(orgMemberUsers, orgMember.User)
+				callsNumber++
 
-		}
-		assert.Assert(t, cmpDiffObject(users, orgMemberUsers))
-	})
+				respAllOrgMembers = append(respAllOrgMembers, res.OrgMembers...)
+
+				if !res.HasMore {
+					break
+				}
+
+				lastOrgMember := res.OrgMembers[len(res.OrgMembers)-1]
+				startUserName = lastOrgMember.User.Name
+			}
+
+			orgMemberUsers := []*types.User{}
+			for _, orgMember := range respAllOrgMembers {
+				orgMemberUsers = append(orgMemberUsers, orgMember.User)
+			}
+
+			assert.Assert(t, cmpDiffObject(expectedUsers, orgMemberUsers))
+			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
+		})
+	}
 }
 
 func TestGetUserOrgs(t *testing.T) {
@@ -1290,64 +1384,89 @@ func TestGetUserOrgs(t *testing.T) {
 		testutil.NilError(t, err)
 	}
 
-	t.Run("test get all user orgs", func(t *testing.T) {
-		res, err := cs.ah.GetUserOrgs(ctx, &action.GetUserOrgsRequest{UserRef: user.ID, SortDirection: types.SortDirectionAsc})
-		testutil.NilError(t, err)
+	tests := []struct {
+		name                string
+		limit               int
+		sortDirection       types.SortDirection
+		expectedCallsNumber int
+	}{
+		{
+			name:                "test get user orgs with limit = 0",
+			sortDirection:       types.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get user orgs with limit less than user orgs",
+			limit:               2,
+			sortDirection:       types.SortDirectionAsc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get user orgs with limit greater than user orgs",
+			limit:               10,
+			sortDirection:       types.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get user orgs with limit = 0 and sortDirection desc",
+			sortDirection:       types.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "test get user orgs with limit less than user orgs and sortDirection desc",
+			limit:               2,
+			sortDirection:       types.SortDirectionDesc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "test get user orgs with limit greater than user orgs and sortDirection desc",
+			limit:               10,
+			sortDirection:       types.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+	}
 
-		expectedUserOrgs := 9
-		assert.Assert(t, cmp.Len(res.UserOrgs, expectedUserOrgs))
-		assert.Assert(t, !res.HasMore)
-	})
-
-	t.Run("test get user orgs with limit less than user orgs", func(t *testing.T) {
-		res, err := cs.ah.GetUserOrgs(ctx, &action.GetUserOrgsRequest{UserRef: user.ID, Limit: 5, SortDirection: types.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedUserOrgs := 5
-		assert.Assert(t, cmp.Len(res.UserOrgs, expectedUserOrgs))
-		assert.Assert(t, res.HasMore)
-	})
-
-	t.Run("test get user orgs with limit less than user orgs continuation", func(t *testing.T) {
-		respAllUserOrgs := []*action.UserOrg{}
-
-		respUserOrgs, err := cs.ah.GetUserOrgs(ctx, &action.GetUserOrgsRequest{UserRef: user.ID, Limit: 5, SortDirection: types.SortDirectionAsc})
-		testutil.NilError(t, err)
-
-		expectedUserOrgs := 5
-		assert.Assert(t, cmp.Len(respUserOrgs.UserOrgs, expectedUserOrgs))
-		assert.Assert(t, respUserOrgs.HasMore)
-
-		respAllUserOrgs = append(respAllUserOrgs, respUserOrgs.UserOrgs...)
-		lastUserOrg := respUserOrgs.UserOrgs[len(respUserOrgs.UserOrgs)-1]
-
-		// fetch next results
-		for {
-			respUserOrgs, err = cs.ah.GetUserOrgs(ctx, &action.GetUserOrgsRequest{UserRef: user.ID, StartOrgName: lastUserOrg.Organization.Name, Limit: 5, SortDirection: types.SortDirectionAsc})
-			testutil.NilError(t, err)
-
-			expectedUserOrgs := 5
-			assert.Assert(t, !respUserOrgs.HasMore || (len(respUserOrgs.UserOrgs) == expectedUserOrgs))
-
-			respAllUserOrgs = append(respAllUserOrgs, respUserOrgs.UserOrgs...)
-
-			if !respUserOrgs.HasMore {
-				break
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			expectedOrgs := append([]*types.Organization{}, orgs...)
+			// reverse if sortDirection is desc
+			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
+			if tt.sortDirection == types.SortDirectionDesc {
+				for i, j := 0, len(expectedOrgs)-1; i < j; i, j = i+1, j-1 {
+					expectedOrgs[i], expectedOrgs[j] = expectedOrgs[j], expectedOrgs[i]
+				}
 			}
 
-			lastUserOrg = respUserOrgs.UserOrgs[len(respUserOrgs.UserOrgs)-1]
-		}
+			callsNumber := 0
+			var startOrgName string
+			var respAllUserOrgs []*action.UserOrg
 
-		expectedUserOrgs = 9
-		assert.Assert(t, cmp.Len(respAllUserOrgs, expectedUserOrgs))
+			for {
+				res, err := cs.ah.GetUserOrgs(ctx, &action.GetUserOrgsRequest{UserRef: user.ID, StartOrgName: startOrgName, Limit: tt.limit, SortDirection: tt.sortDirection})
+				testutil.NilError(t, err)
 
-		userOrgs := []*types.Organization{}
-		for _, userOrg := range respAllUserOrgs {
-			userOrgs = append(userOrgs, userOrg.Organization)
+				callsNumber++
 
-		}
-		assert.Assert(t, cmpDiffObject(orgs, userOrgs))
-	})
+				respAllUserOrgs = append(respAllUserOrgs, res.UserOrgs...)
+
+				if !res.HasMore {
+					break
+				}
+
+				lastUserOrg := res.UserOrgs[len(res.UserOrgs)-1]
+				startOrgName = lastUserOrg.Organization.Name
+			}
+
+			userOrgOrganizations := []*types.Organization{}
+			for _, userOrg := range respAllUserOrgs {
+				userOrgOrganizations = append(userOrgOrganizations, userOrg.Organization)
+			}
+
+			assert.Assert(t, cmpDiffObject(expectedOrgs, userOrgOrganizations))
+			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
+		})
+	}
 }
 
 func TestRemoteSource(t *testing.T) {
