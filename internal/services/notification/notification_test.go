@@ -562,7 +562,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 			expectedCallsNumber:                5,
 		},
 		{
-			name:                               "test get run webhook deliveries with limit less than run webhook deliveries continuation",
+			name:                               "test get run webhook deliveries with limit less than run webhook deliveries",
 			sortDirection:                      types.SortDirectionAsc,
 			limit:                              5,
 			expectedRunWebhookDeliveriesNumber: 20,
@@ -590,7 +590,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 			expectedCallsNumber:                5,
 		},
 		{
-			name:                               "test get run webhook deliveries with limit less than run webhook deliveries continuation and sortDirection desc",
+			name:                               "test get run webhook deliveries with limit less than run webhook deliveries and sortDirection desc",
 			sortDirection:                      types.SortDirectionDesc,
 			limit:                              5,
 			expectedRunWebhookDeliveriesNumber: 20,
@@ -615,9 +615,17 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 				expectedProject01RunWebhookDeliveries = append(expectedProject01RunWebhookDeliveries, c)
 			}
 
-			var respAllProjectRunWebhookDeliveries []*types.RunWebhookDelivery
+			// reverse if sortDirection is desc
+			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
+			if tt.sortDirection == types.SortDirectionDesc {
+				for i, j := 0, len(expectedProject01RunWebhookDeliveries)-1; i < j; i, j = i+1, j-1 {
+					expectedProject01RunWebhookDeliveries[i], expectedProject01RunWebhookDeliveries[j] = expectedProject01RunWebhookDeliveries[j], expectedProject01RunWebhookDeliveries[i]
+				}
+			}
+
+			callsNumber := 0
 			var lastProjectRunWebhookDelivery uint64
-			var callsNumber int
+			var respAllProjectRunWebhookDeliveries []*types.RunWebhookDelivery
 
 			// fetch next results
 			for {
@@ -633,6 +641,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 				callsNumber++
 
 				respAllProjectRunWebhookDeliveries = append(respAllProjectRunWebhookDeliveries, res.RunWebhookDeliveries...)
+
 				if res.HasMore == false {
 					break
 				}
@@ -640,16 +649,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 				lastProjectRunWebhookDelivery = respAllProjectRunWebhookDeliveries[len(respAllProjectRunWebhookDeliveries)-1].Sequence
 			}
 
-			// reverse if sortDirection is desc
-			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
-			if tt.sortDirection == types.SortDirectionDesc {
-				for i, j := 0, len(expectedProject01RunWebhookDeliveries)-1; i < j; i, j = i+1, j-1 {
-					expectedProject01RunWebhookDeliveries[i], expectedProject01RunWebhookDeliveries[j] = expectedProject01RunWebhookDeliveries[j], expectedProject01RunWebhookDeliveries[i]
-				}
-			}
-
-			assert.Assert(t, cmp.Len(respAllProjectRunWebhookDeliveries, tt.expectedRunWebhookDeliveriesNumber))
-			assert.Assert(t, cmpDiffObject(respAllProjectRunWebhookDeliveries, expectedProject01RunWebhookDeliveries))
+			assert.Assert(t, cmpDiffObject(expectedProject01RunWebhookDeliveries, respAllProjectRunWebhookDeliveries))
 			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
 		})
 	}
@@ -980,7 +980,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 			expectedCallsNumber:                  5,
 		},
 		{
-			name:                                 "test get commit status deliveries with limit less than commit status deliveries continuation",
+			name:                                 "test get commit status deliveries with limit less than commit status deliveries",
 			sortDirection:                        types.SortDirectionAsc,
 			limit:                                5,
 			expectedCommitStatusDeliveriesNumber: 20,
@@ -1008,7 +1008,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 			expectedCallsNumber:                  5,
 		},
 		{
-			name:                                 "test get commit status deliveries with limit less than commit status deliveries continuation and sortDirection desc",
+			name:                                 "test get commit status deliveries with limit less than commit status deliveries and sortDirection desc",
 			sortDirection:                        types.SortDirectionDesc,
 			limit:                                5,
 			expectedCommitStatusDeliveriesNumber: 20,
@@ -1033,9 +1033,17 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 				expectedProject01CommitStatusDeliveries = append(expectedProject01CommitStatusDeliveries, c)
 			}
 
-			var respAllProjectCommitStatusDeliveries []*types.CommitStatusDelivery
+			// reverse if sortDirection is desc
+			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
+			if tt.sortDirection == types.SortDirectionDesc {
+				for i, j := 0, len(expectedProject01CommitStatusDeliveries)-1; i < j; i, j = i+1, j-1 {
+					expectedProject01CommitStatusDeliveries[i], expectedProject01CommitStatusDeliveries[j] = expectedProject01CommitStatusDeliveries[j], expectedProject01CommitStatusDeliveries[i]
+				}
+			}
+
+			callsNumber := 0
 			var lastProjectCommitStatusDelivery uint64
-			var callsNumber int
+			var respAllProjectCommitStatusDeliveries []*types.CommitStatusDelivery
 
 			// fetch next results
 			for {
@@ -1051,6 +1059,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 				callsNumber++
 
 				respAllProjectCommitStatusDeliveries = append(respAllProjectCommitStatusDeliveries, res.CommitStatusDeliveries...)
+
 				if res.HasMore == false {
 					break
 				}
@@ -1058,16 +1067,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 				lastProjectCommitStatusDelivery = respAllProjectCommitStatusDeliveries[len(respAllProjectCommitStatusDeliveries)-1].Sequence
 			}
 
-			// reverse if sortDirection is desc
-			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
-			if tt.sortDirection == types.SortDirectionDesc {
-				for i, j := 0, len(expectedProject01CommitStatusDeliveries)-1; i < j; i, j = i+1, j-1 {
-					expectedProject01CommitStatusDeliveries[i], expectedProject01CommitStatusDeliveries[j] = expectedProject01CommitStatusDeliveries[j], expectedProject01CommitStatusDeliveries[i]
-				}
-			}
-
-			assert.Assert(t, cmp.Len(respAllProjectCommitStatusDeliveries, tt.expectedCommitStatusDeliveriesNumber))
-			assert.Assert(t, cmpDiffObject(respAllProjectCommitStatusDeliveries, expectedProject01CommitStatusDeliveries))
+			assert.Assert(t, cmpDiffObject(expectedProject01CommitStatusDeliveries, respAllProjectCommitStatusDeliveries))
 			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
 		})
 	}
