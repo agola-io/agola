@@ -65,11 +65,15 @@ func (h *ProjectCommitStatusDeliveries) do(w http.ResponseWriter, r *http.Reques
 	vars := mux.Vars(r)
 	projectRef := vars["projectref"]
 
-	deliveryStatusFilter := query["deliverystatus"]
-
 	ropts, err := parseRequestOptions(r)
 	if err != nil {
 		return nil, errors.WithStack(err)
+	}
+
+	deliveryStatusFilter := query["deliverystatus"]
+
+	if ropts.Cursor != "" && len(deliveryStatusFilter) > 0 {
+		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("only one of cursor or deliverystatus should be provided"))
 	}
 
 	areq := &action.GetProjectCommitStatusDeliveriesRequest{

@@ -5705,7 +5705,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 	assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
 
 	_ = testutil.Wait(30*time.Second, func() (bool, error) {
-		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 		if err != nil {
 			return false, nil
 		}
@@ -5722,7 +5722,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 		return true, nil
 	})
 
-	runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+	runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 	testutil.NilError(t, err)
 
 	tests := []struct {
@@ -5837,7 +5837,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 			var cursor string
 
 			for {
-				respRunWebhookDeliveries, res, err := tt.client.GetProjectRunWebhookDeliveries(ctx, tt.projectRef, tt.deliveryStatusFilter, &gwclient.ListOptions{Cursor: cursor, Limit: tt.limit, SortDirection: sortDirection})
+				respRunWebhookDeliveries, res, err := tt.client.GetProjectRunWebhookDeliveries(ctx, tt.projectRef, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Cursor: cursor, Limit: tt.limit, SortDirection: sortDirection}, DeliveryStatusFilter: tt.deliveryStatusFilter})
 				if tt.expectedErr == "" {
 					testutil.NilError(t, err)
 				} else {
@@ -5946,7 +5946,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
 
 		_ = testutil.Wait(30*time.Second, func() (bool, error) {
-			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 			if err != nil {
 				return false, nil
 			}
@@ -5963,7 +5963,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 			return true, nil
 		})
 
-		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 		testutil.NilError(t, err)
 
 		assert.Assert(t, cmp.Len(runWebhookDeliveries, 4))
@@ -5975,7 +5975,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		testutil.NilError(t, err)
 
 		_ = testutil.Wait(30*time.Second, func() (bool, error) {
-			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 			if err != nil {
 				return false, nil
 			}
@@ -5986,7 +5986,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 
 			return true, nil
 		})
-		runWebhookDeliveries, _, err = gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+		runWebhookDeliveries, _, err = gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 		testutil.NilError(t, err)
 
 		assert.Assert(t, cmp.Len(runWebhookDeliveries, 5))
@@ -6055,7 +6055,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
 
 		_ = testutil.Wait(30*time.Second, func() (bool, error) {
-			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 			if err != nil {
 				return false, nil
 			}
@@ -6072,7 +6072,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 			return true, nil
 		})
 
-		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 		testutil.NilError(t, err)
 
 		assert.Assert(t, cmp.Len(runWebhookDeliveries, 4))
@@ -6083,7 +6083,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		_, err = gwUser01Client.ProjectRunWebhookRedelivery(ctx, project.ID, runWebhookDeliveries[0].ID)
 		testutil.NilError(t, err)
 
-		runWebhookDeliveries, _, err = gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+		runWebhookDeliveries, _, err = gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 		testutil.NilError(t, err)
 
 		assert.Assert(t, cmp.Len(runWebhookDeliveries, 5))
@@ -6190,7 +6190,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
 
 		_ = testutil.Wait(30*time.Second, func() (bool, error) {
-			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project01.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project01.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 			if err != nil {
 				return false, nil
 			}
@@ -6207,7 +6207,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 			return true, nil
 		})
 
-		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project01.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project01.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 		testutil.NilError(t, err)
 
 		assert.Assert(t, cmp.Len(runWebhookDeliveries, 4))
@@ -6311,7 +6311,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 	}
 
 	_ = testutil.Wait(30*time.Second, func() (bool, error) {
-		commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+		commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 		if err != nil {
 			return false, nil
 		}
@@ -6328,7 +6328,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 		return true, nil
 	})
 
-	commitStatusDeliveries, resp, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc})
+	commitStatusDeliveries, resp, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc}})
 	testutil.NilError(t, err)
 
 	assert.Assert(t, cmp.Len(commitStatusDeliveries, 2*runCount))
@@ -6449,13 +6449,15 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 			var cursor string
 
 			for {
-				respCommitStatusDeliveries, res, err := tt.client.GetProjectCommitStatusDeliveries(ctx, tt.projectRef, tt.deliveryStatusFilter, &gwclient.ListOptions{Cursor: cursor, Limit: tt.limit, SortDirection: sortDirection})
+				respCommitStatusDeliveries, res, err := tt.client.GetProjectCommitStatusDeliveries(ctx, tt.projectRef, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Cursor: cursor, Limit: tt.limit, SortDirection: sortDirection}, DeliveryStatusFilter: tt.deliveryStatusFilter})
 				if tt.expectedErr == "" {
 					testutil.NilError(t, err)
 				} else {
 					assert.Error(t, err, tt.expectedErr)
 					return
 				}
+
+				testutil.NilError(t, err)
 
 				callsNumber++
 
@@ -6568,7 +6570,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		}
 
 		_ = testutil.Wait(30*time.Second, func() (bool, error) {
-			commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+			commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 			if err != nil {
 				return false, nil
 			}
@@ -6593,7 +6595,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 			t.Fatalf("unexpected err: %v", err)
 		}
 
-		commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+		commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -6611,7 +6613,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 			t.Fatalf("unexpected err: %v", err)
 		}
 		_ = testutil.Wait(30*time.Second, func() (bool, error) {
-			commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionDesc})
+			commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionDesc}})
 			if err != nil {
 				return false, nil
 			}
@@ -6626,7 +6628,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 			return true, nil
 		})
 
-		commitStatusDeliveries, _, err = gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 1, SortDirection: gwapitypes.SortDirectionDesc})
+		commitStatusDeliveries, _, err = gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 1, SortDirection: gwapitypes.SortDirectionDesc}})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -6642,7 +6644,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 			t.Fatalf("unexpected err: %v", err)
 		}
 		_ = testutil.Wait(30*time.Second, func() (bool, error) {
-			commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+			commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 			if err != nil {
 				return false, nil
 			}
@@ -6654,7 +6656,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 			return true, nil
 		})
 
-		commitStatusDeliveries, _, err = gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+		commitStatusDeliveries, _, err = gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -6742,7 +6744,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		}
 
 		_ = testutil.Wait(30*time.Second, func() (bool, error) {
-			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 			if err != nil {
 				return false, nil
 			}
@@ -6759,7 +6761,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 			return true, nil
 		})
 
-		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -6777,7 +6779,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 			t.Fatalf("unexpected err: %v", err)
 		}
 
-		runWebhookDeliveries, _, err = gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+		runWebhookDeliveries, _, err = gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -6915,7 +6917,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		}
 
 		_ = testutil.Wait(30*time.Second, func() (bool, error) {
-			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project01.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project01.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 			if err != nil {
 				return false, nil
 			}
@@ -6932,7 +6934,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 			return true, nil
 		})
 
-		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project01.ID, nil, &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc})
+		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project01.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
