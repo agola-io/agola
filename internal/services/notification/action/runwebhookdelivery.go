@@ -45,6 +45,9 @@ func (h *ActionHandler) GetProjectRunWebhookDeliveries(ctx context.Context, req 
 	if limit > 0 {
 		limit += 1
 	}
+	if req.SortDirection == "" {
+		req.SortDirection = types.SortDirectionAsc
+	}
 
 	var runWebookDeliveries []*types.RunWebhookDelivery
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {

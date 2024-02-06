@@ -541,6 +541,11 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 		expectedCallsNumber                int
 	}{
 		{
+			name:                               "test get run webhook deliveries with limit = 0 and no sortdirection",
+			expectedRunWebhookDeliveriesNumber: 20,
+			expectedCallsNumber:                1,
+		},
+		{
 			name:                               "test get run webhook deliveries with limit = 0",
 			sortDirection:                      types.SortDirectionAsc,
 			expectedRunWebhookDeliveriesNumber: 20,
@@ -614,6 +619,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 				}
 				expectedProject01RunWebhookDeliveries = append(expectedProject01RunWebhookDeliveries, c)
 			}
+			// default sortdirection is asc
 
 			// reverse if sortDirection is desc
 			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
@@ -959,6 +965,11 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 		expectedCallsNumber                  int
 	}{
 		{
+			name:                                 "test get commit status deliveries with limit = 0 and no sortdirection",
+			expectedCommitStatusDeliveriesNumber: 20,
+			expectedCallsNumber:                  1,
+		},
+		{
 			name:                                 "test get commit status deliveries with limit = 0",
 			sortDirection:                        types.SortDirectionAsc,
 			expectedCommitStatusDeliveriesNumber: 20,
@@ -1032,6 +1043,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 				}
 				expectedProject01CommitStatusDeliveries = append(expectedProject01CommitStatusDeliveries, c)
 			}
+			// default sortdirection is asc
 
 			// reverse if sortDirection is desc
 			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21

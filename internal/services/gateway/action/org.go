@@ -71,6 +71,9 @@ func (h *ActionHandler) GetOrgs(ctx context.Context, req *GetOrgsRequest) (*GetO
 		}
 		sortDirection = inCursor.SortDirection
 	}
+	if sortDirection == "" {
+		sortDirection = SortDirectionAsc
+	}
 
 	isAdmin := common.IsUserAdmin(ctx)
 
@@ -134,6 +137,9 @@ func (h *ActionHandler) GetOrgMembers(ctx context.Context, req *GetOrgMembersReq
 			return nil, errors.WithStack(err)
 		}
 		sortDirection = inCursor.SortDirection
+	}
+	if sortDirection == "" {
+		sortDirection = SortDirectionAsc
 	}
 
 	org, _, err := h.configstoreClient.GetOrg(ctx, req.OrgRef)

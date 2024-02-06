@@ -62,6 +62,9 @@ func (h *ActionHandler) GetProjectRunWebhookDeliveries(ctx context.Context, req 
 		sortDirection = inCursor.SortDirection
 		deliveryStatusFilter = inCursor.DeliveryStatusFilter
 	}
+	if sortDirection == "" {
+		sortDirection = SortDirectionAsc
+	}
 
 	runWebhookDeliveries, resp, err := h.notificationClient.GetProjectRunWebhookDeliveries(ctx, project.ID, &client.GetProjectRunWebhookDeliveriesOptions{ListOptions: &client.ListOptions{Limit: req.Limit, SortDirection: nstypes.SortDirection(sortDirection)}, StartSequence: inCursor.StartSequence, DeliveryStatusFilter: deliveryStatusFilter})
 	if err != nil {

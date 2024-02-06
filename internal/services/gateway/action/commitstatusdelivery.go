@@ -62,6 +62,9 @@ func (h *ActionHandler) GetProjectCommitStatusDeliveries(ctx context.Context, re
 		sortDirection = inCursor.SortDirection
 		deliveryStatusFilter = inCursor.DeliveryStatusFilter
 	}
+	if sortDirection == "" {
+		sortDirection = SortDirectionAsc
+	}
 
 	commitStatusDeliveries, resp, err := h.notificationClient.GetProjectCommitStatusDeliveries(ctx, project.ID, &client.GetProjectCommitStatusDeliveriesOptions{ListOptions: &client.ListOptions{Limit: req.Limit, SortDirection: nstypes.SortDirection(sortDirection)}, StartSequence: inCursor.StartSequence, DeliveryStatusFilter: deliveryStatusFilter})
 	if err != nil {

@@ -45,6 +45,9 @@ func (h *ActionHandler) GetProjectCommitStatusDeliveries(ctx context.Context, re
 	if limit > 0 {
 		limit += 1
 	}
+	if req.SortDirection == "" {
+		req.SortDirection = types.SortDirectionAsc
+	}
 
 	var commitStatusDeliveries []*types.CommitStatusDelivery
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {

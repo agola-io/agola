@@ -45,6 +45,9 @@ func (h *ActionHandler) GetUsers(ctx context.Context, req *GetUsersRequest) (*Ge
 	if limit > 0 {
 		limit += 1
 	}
+	if req.SortDirection == "" {
+		req.SortDirection = types.SortDirectionAsc
+	}
 
 	var users []*types.User
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
@@ -640,6 +643,9 @@ func (h *ActionHandler) GetUserOrgs(ctx context.Context, req *GetUserOrgsRequest
 	limit := req.Limit
 	if limit > 0 {
 		limit += 1
+	}
+	if req.SortDirection == "" {
+		req.SortDirection = types.SortDirectionAsc
 	}
 
 	var dbUserOrgs []*db.UserOrg
