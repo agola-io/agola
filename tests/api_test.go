@@ -1377,31 +1377,8 @@ func TestCommitStatusDelivery(t *testing.T) {
 		expectedGiteaContext     string
 	}{
 		{
-			name: "test run result success",
-			config: `
-			{
-			  runs: [
-			    {
-			      name: 'run01',
-			      tasks: [
-			        {
-			          name: 'task01',
-			          runtime: {
-			            containers: [
-			              {
-			                image: 'alpine/git',
-			              },
-			            ],
-			          },
-			          steps: [
-			            { type: 'run', command: 'env' },
-			          ],
-			        },
-			      ],
-			    },
-			  ],
-			}
-			`,
+			name:                     "test run result success",
+			config:                   EnvRunConfig,
 			expectedRunResult:        rstypes.RunResultSuccess,
 			expectedRunPhase:         rstypes.RunPhaseFinished,
 			expectedGiteaStatusState: gitea.StatusSuccess,
@@ -1409,34 +1386,8 @@ func TestCommitStatusDelivery(t *testing.T) {
 			expectedGiteaContext:     "agola/project01/run01",
 		},
 		{
-			name: "test run result failed",
-			config: `
-			{
-			  runs: [
-			    {
-			      name: 'run01',
-			      tasks: [
-			        {
-			          name: 'task01',
-			          runtime: {
-			            containers: [
-			              {
-			                image: 'alpine/git',
-			              },
-			            ],
-			          },
-			          steps: [
-			            { type: 'run', command: 'false' },
-			          ],
-			        },
-			      ],
-			      when: {
-			        branch: 'master',
-			      },
-			    },
-			  ],
-			}
-			`,
+			name:                     "test run result failed",
+			config:                   FailingRunConfig,
 			expectedRunResult:        rstypes.RunResultFailed,
 			expectedRunPhase:         rstypes.RunPhaseFinished,
 			expectedGiteaStatusState: gitea.StatusFailure,
@@ -1551,30 +1502,7 @@ func TestCommitStatusDelivery(t *testing.T) {
 func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 	t.Parallel()
 
-	config := `
-		{
-			runs: [
-			{
-				name: 'run01',
-				tasks: [
-				{
-					name: 'task01',
-					runtime: {
-					containers: [
-						{
-						image: 'alpine/git',
-						},
-					],
-					},
-					steps: [
-					{ type: 'run', command: 'env' },
-					],
-				},
-				],
-			},
-			],
-		}
-	`
+	config := EnvRunConfig
 
 	dir := t.TempDir()
 	wrDir := t.TempDir()
@@ -1801,30 +1729,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 func TestProjectRunWebhookRedelivery(t *testing.T) {
 	t.Parallel()
 
-	config := `
-		{
-			runs: [
-			{
-				name: 'run01',
-				tasks: [
-				{
-					name: 'task01',
-					runtime: {
-					containers: [
-						{
-						image: 'alpine/git',
-						},
-					],
-					},
-					steps: [
-					{ type: 'run', command: 'env' },
-					],
-				},
-				],
-			},
-			],
-		}
-	`
+	config := EnvRunConfig
 
 	t.Run("test redelivery project run webhook delivery with deliverystatus = deliveryError", func(t *testing.T) {
 		dir := t.TempDir()
@@ -2422,30 +2327,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 func TestProjectCommitStatusRedelivery(t *testing.T) {
 	t.Parallel()
 
-	config := `
-		{
-			runs: [
-			{
-				name: 'run01',
-				tasks: [
-				{
-					name: 'task01',
-					runtime: {
-					containers: [
-						{
-						image: 'alpine/git',
-						},
-					],
-					},
-					steps: [
-					{ type: 'run', command: 'env' },
-					],
-				},
-				],
-			},
-			],
-		}
-	`
+	config := EnvRunConfig
 
 	t.Run("test redelivery project commit status delivery with deliverystatus = deliveryError", func(t *testing.T) {
 		dir := t.TempDir()
@@ -3111,29 +2993,7 @@ func TestExportImport(t *testing.T) {
 
 	giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)
 
-	config := `
-				{
-					runs: [
-					  {
-						name: 'run01',
-						tasks: [
-							{
-							name: 'task01',
-							runtime: {
-								containers: [{
-									image: 'alpine/git',
-								},
-							  ],
-							},
-							steps: [
-								{ type: 'clone' },
-								{ type: 'run', command: 'env' },
-						      ],
-							},
-						],
-					  },
-					],
-				}`
+	config := EnvRunConfig
 
 	push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
 

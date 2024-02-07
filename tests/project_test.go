@@ -658,31 +658,7 @@ func TestRefreshRemoteRepositoryInfo(t *testing.T) {
 func TestGetProjectRuns(t *testing.T) {
 	t.Parallel()
 
-	config := `
-    {
-		runs: [
-		  {
-			name: 'run01',
-			tasks: [
-			  {
-				name: 'task01',
-				runtime: {
-				  containers: [
-					{
-					  image: 'alpine/git',
-					},
-				  ],
-				},
-				steps: [
-				  { type: 'clone' },
-				  { type: 'run', command: 'env' },
-				],
-			  },
-			],
-		  },
-		],
-	}
-	`
+	config := EnvRunConfig
 
 	tests := []struct {
 		name         string
@@ -806,30 +782,8 @@ func TestGetProjectRuns(t *testing.T) {
 func TestProjectRunActions(t *testing.T) {
 	t.Parallel()
 
-	config := `
-		{
-			runs: [
-			{
-				name: 'run01',
-				tasks: [
-				{
-					name: 'task01',
-					runtime: {
-					containers: [
-						{
-						image: 'alpine/git',
-						},
-					],
-					},
-					steps: [
-					{ type: 'run', command: 'env' },
-					],
-				},
-				],
-			},
-			],
-		}
-	`
+	config := EnvRunConfig
+
 	expectedErr := remoteErrorForbidden
 
 	t.Run("test run actions on org's project", func(t *testing.T) {

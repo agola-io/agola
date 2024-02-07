@@ -1597,65 +1597,16 @@ func TestRunEventsNotification(t *testing.T) {
 		expectedRunTaskStatus  []rstypes.RunTaskStatus
 	}{
 		{
-			name: "test run result success",
-			config: `
-			{
-			  runs: [
-			    {
-			      name: 'run01',
-			      tasks: [
-			        {
-			          name: 'task01',
-			          runtime: {
-			            containers: [
-			              {
-			                image: 'alpine/git',
-			              },
-			            ],
-			          },
-			          steps: [
-			            { type: 'run', command: 'env' },
-			          ],
-			        },
-			      ],
-			    },
-			  ],
-			}
-			`,
+			name:                   "test run result success",
+			config:                 EnvRunConfig,
 			expectedRunResult:      rstypes.RunResultSuccess,
 			expectedRunPhase:       rstypes.RunPhaseFinished,
 			expectedRunPhaseEvents: []rstypes.RunPhase{rstypes.RunPhaseQueued, rstypes.RunPhaseRunning, rstypes.RunPhaseRunning, rstypes.RunPhaseFinished},
 			expectedRunTaskStatus:  []rstypes.RunTaskStatus{rstypes.RunTaskStatusNotStarted, rstypes.RunTaskStatusNotStarted, rstypes.RunTaskStatusSuccess, rstypes.RunTaskStatusSuccess},
 		},
 		{
-			name: "test run result failed",
-			config: `
-			{
-			  runs: [
-			    {
-			      name: 'run01',
-			      tasks: [
-			        {
-			          name: 'task01',
-			          runtime: {
-			            containers: [
-			              {
-			                image: 'alpine/git',
-			              },
-			            ],
-			          },
-			          steps: [
-			            { type: 'run', command: 'false' },
-			          ],
-			        },
-			      ],
-			      when: {
-			        branch: 'master',
-			      },
-			    },
-			  ],
-			}
-			`,
+			name:                   "test run result failed",
+			config:                 FailingRunConfig,
 			expectedRunResult:      rstypes.RunResultFailed,
 			expectedRunPhase:       rstypes.RunPhaseFinished,
 			expectedRunPhaseEvents: []rstypes.RunPhase{rstypes.RunPhaseQueued, rstypes.RunPhaseRunning, rstypes.RunPhaseRunning, rstypes.RunPhaseFinished},
