@@ -48,27 +48,27 @@ func TestPush(t *testing.T) {
 			name: "test push",
 			config: `
 			{
-			  runs: [
-			    {
-			      name: 'run01',
-			      tasks: [
-			        {
-			          name: 'task01',
-			          runtime: {
-			            containers: [
-			              {
-			                image: 'alpine/git',
-			              },
-			            ],
-			          },
-			          steps: [
-			            { type: 'clone' },
-			            { type: 'run', command: 'env' },
-			          ],
-			        },
-			      ],
-			    },
-			  ],
+				runs: [
+					{
+						name: 'run01',
+						tasks: [
+							{
+								name: 'task01',
+								runtime: {
+									containers: [
+										{
+											image: 'alpine/git',
+										},
+									],
+								},
+								steps: [
+									{ type: 'clone' },
+									{ type: 'run', command: 'env' },
+								],
+							},
+						],
+					},
+				],
 			}
 			`,
 			num: 1,
@@ -83,30 +83,30 @@ func TestPush(t *testing.T) {
 			name: "test push with unmatched branch",
 			config: `
 			{
-			  runs: [
-			    {
-			      name: 'run01',
-			      tasks: [
-			        {
-			          name: 'task01',
-			          runtime: {
-			            containers: [
-			              {
-			                image: 'alpine/git',
-			              },
-			            ],
-			          },
-			          steps: [
-			            { type: 'clone' },
-			            { type: 'run', command: 'env' },
-			          ],
-			        },
-			      ],
-			      when: {
-			        branch: 'notmaster',
-			      },
-			    },
-			  ],
+				runs: [
+					{
+						name: 'run01',
+						tasks: [
+							{
+								name: 'task01',
+								runtime: {
+									containers: [
+										{
+											image: 'alpine/git',
+										},
+									],
+								},
+								steps: [
+									{ type: 'clone' },
+									{ type: 'run', command: 'env' },
+								],
+							},
+						],
+						when: {
+							branch: 'notmaster',
+						},
+					},
+				],
 			}
 			`,
 			num:     0,
@@ -115,60 +115,60 @@ func TestPush(t *testing.T) {
 		{
 			name: "test push with [ci skip] in subject",
 			config: `
-                        {
-                          runs: [
-                            {
-                              name: 'run01',
-                              tasks: [
-                                {
-                                  name: 'task01',
-                                  runtime: {
-                                    containers: [
-                                      {
-                                        image: 'alpine/git',
-                                      },
-                                    ],
-                                  },
-                                  steps: [
-                                    { type: 'clone' },
-                                    { type: 'run', command: 'env' },
-                                  ],
-                                },
-                              ],
-                            },
-                          ],
-                        }
-                        `,
+			{
+				runs: [
+					{
+						name: 'run01',
+						tasks: [
+							{
+								name: 'task01',
+								runtime: {
+									containers: [
+										{
+											image: 'alpine/git',
+										},
+									],
+								},
+								steps: [
+									{ type: 'clone' },
+									{ type: 'run', command: 'env' },
+								],
+							},
+						],
+					},
+				],
+			}
+			`,
 			num:     0,
 			message: "[ci skip] commit",
 		},
 		{
 			name: "test push with [ci skip] in body",
 			config: `
-                        {
-                          runs: [
-                            {
-                              name: 'run01',
-                              tasks: [
-                                {
-                                  name: 'task01',
-                                  runtime: {
-                                    containers: [
-                                      {
-                                        image: 'alpine/git',
-                                      },
-                                    ],
-                                  },
-                                  steps: [
-                                    { type: 'clone' },
-                                    { type: 'run', command: 'env' },
-                                  ],
-                                },
-                              ],
-                            },
-                          ],
-                        }
-                        `,
+			{
+				runs: [
+					{
+						name: 'run01',
+						tasks: [
+							{
+								name: 'task01',
+								runtime: {
+									containers: [
+										{
+											image: 'alpine/git',
+										},
+									],
+								},
+								steps: [
+									{ type: 'clone' },
+									{ type: 'run', command: 'env' },
+								],
+							},
+						],
+					},
+				],
+			}
+			`,
 			num:     0,
 			message: "commit\n\n[ci skip] body",
 		},
@@ -220,8 +220,6 @@ func TestPush(t *testing.T) {
 			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 			testutil.NilError(t, err)
 
-			t.Logf("runs: %s", util.Dump(runs))
-
 			assert.Assert(t, cmp.Len(runs, tt.num))
 
 			if len(runs) > 0 {
@@ -248,30 +246,30 @@ func testDirectRun(t *testing.T, internalServicesAuth bool) {
 	t.Parallel()
 
 	config := `
-      {
-        runs: [
-          {
-            name: 'run01',
-            tasks: [
-              {
-                name: 'task01',
-                runtime: {
-                  containers: [
-                    {
-                      image: 'alpine/git',
-                    },
-                  ],
-                },
-                steps: [
-                  { type: 'clone' },
-                  { type: 'run', command: 'env' },
-                ],
-              },
-            ],
-          },
-        ],
-      }
-    `
+	{
+		runs: [
+			{
+				name: 'run01',
+				tasks: [
+					{
+						name: 'task01',
+						runtime: {
+							containers: [
+								{
+									image: 'alpine/git',
+								},
+							],
+						},
+						steps: [
+							{ type: 'clone' },
+							{ type: 'run', command: 'env' },
+						],
+					},
+				],
+			},
+		],
+	}
+	`
 
 	tests := []struct {
 		name        string
@@ -362,8 +360,6 @@ func testDirectRun(t *testing.T, internalServicesAuth bool) {
 			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
 			testutil.NilError(t, err)
 
-			t.Logf("runs: %s", util.Dump(runs))
-
 			assert.Assert(t, cmp.Len(runs, 1))
 
 			run := runs[0]
@@ -381,38 +377,38 @@ func TestDirectRunVariables(t *testing.T) {
 	t.Parallel()
 
 	config := `
-      {
-        runs: [
-          {
-            name: 'run01',
-            tasks: [
-              {
-                name: 'task01',
-                runtime: {
-                  containers: [
-                    {
-                      image: 'alpine/git',
-                    },
-                  ],
-                },
-                environment: {
-                  ENV01: { from_variable: 'variable01' },
-                  ENV02: { from_variable: 'variable02' },
-                },
-                steps: [
-                  { type: 'clone' },
-                  { type: 'run', command: 'env' },
-                ],
-              },
-            ],
-          },
-        ],
-      }
+	{
+		runs: [
+			{
+				name: 'run01',
+				tasks: [
+					{
+						name: 'task01',
+						runtime: {
+							containers: [
+								{
+									image: 'alpine/git',
+								},
+							],
+						},
+						environment: {
+							ENV01: { from_variable: 'variable01' },
+							ENV02: { from_variable: 'variable02' },
+						},
+						steps: [
+							{ type: 'clone' },
+							{ type: 'run', command: 'env' },
+						],
+					},
+				],
+			},
+		],
+	}
 	`
 
 	varfile01 := `
-      variable01: "variable value 01"
-      variable02: variable value 02
+variable01: "variable value 01"
+variable02: variable value 02
 `
 
 	tests := []struct {
@@ -504,8 +500,6 @@ func TestDirectRunVariables(t *testing.T) {
 			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
 			testutil.NilError(t, err)
 
-			t.Logf("runs: %s", util.Dump(runs))
-
 			assert.Assert(t, cmp.Len(runs, 1))
 
 			run, _, err := gwClient.GetUserRun(ctx, user.ID, runs[0].Number)
@@ -546,30 +540,30 @@ func TestDirectRunLogs(t *testing.T) {
 	t.Parallel()
 
 	config := `
-      {
-        runs: [
-          {
-            name: 'run01',
-            tasks: [
-              {
-                name: 'task01',
-                runtime: {
-                  containers: [
-                    {
-                      image: 'alpine/git',
-                    },
-                  ],
-                },
-                steps: [
-                  { type: 'clone' },
-                  { type: 'run', command: 'echo STEPLOG' },
-                ],
-              },
-            ],
-          },
-        ],
-      }
-    `
+	{
+		runs: [
+			{
+				name: 'run01',
+				tasks: [
+					{
+						name: 'task01',
+						runtime: {
+							containers: [
+								{
+									image: 'alpine/git',
+								},
+							],
+						},
+						steps: [
+							{ type: 'clone' },
+							{ type: 'run', command: 'echo STEPLOG' },
+						],
+					},
+				],
+			},
+		],
+	}
+	`
 
 	tests := []struct {
 		name   string
@@ -656,8 +650,6 @@ func TestDirectRunLogs(t *testing.T) {
 			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
 			testutil.NilError(t, err)
 
-			t.Logf("runs: %s", util.Dump(runs))
-
 			assert.Assert(t, cmp.Len(runs, 1))
 
 			run, _, err := gwClient.GetUserRun(ctx, user.ID, runs[0].Number)
@@ -707,36 +699,36 @@ func TestPullRequest(t *testing.T) {
 	t.Parallel()
 
 	config := `
-       {
-         runs: [
-           {
-             name: 'run01',
-             tasks: [
-               {
-                 name: 'task01',
-                 runtime: {
-                   containers: [
-                     {
-                       image: 'alpine/git',
-                     },
-                   ],
-                 },
-                 environment: {
-                   MYPASSWORD: { from_variable: 'mypassword' },
-                 },
-                 steps: [
-                   { type: 'clone' },
-                   { type: 'run', command: 'echo -n $MYPASSWORD' },
-                 ],
-               },
-             ],
-             when: {
-               ref: '#refs/pull/\\d+/head#',
-             },
-           },
-         ],
-       }
-    `
+	{
+		runs: [
+			{
+				name: 'run01',
+				tasks: [
+					{
+						name: 'task01',
+						runtime: {
+							containers: [
+								{
+									image: 'alpine/git',
+								},
+							],
+						},
+						environment: {
+							MYPASSWORD: { from_variable: 'mypassword' },
+						},
+						steps: [
+							{ type: 'clone' },
+							{ type: 'run', command: 'echo -n $MYPASSWORD' },
+						],
+					},
+				],
+				when: {
+					ref: '#refs/pull/\\d+/head#',
+				},
+			},
+		],
+	}
+	`
 
 	tests := []struct {
 		name               string
@@ -942,8 +934,6 @@ func TestPullRequest(t *testing.T) {
 			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 			testutil.NilError(t, err)
 
-			t.Logf("runs: %s", util.Dump(runs))
-
 			run, _, err := gwClient.GetProjectRun(ctx, project.ID, runs[0].Number)
 			testutil.NilError(t, err)
 
@@ -987,29 +977,29 @@ func TestTaskTimeout(t *testing.T) {
 			taskTimedoutExpected: map[string]bool{"task01": true},
 			config: `
 			{
-			  runs: [
-				{
-				  name: 'run01',
-				  tasks: [
+				runs: [
 					{
-					  name: 'task01',
-					  runtime: {
-						containers: [
-						  {
-							image: 'alpine/git',
-						  },
+						name: 'run01',
+						tasks: [
+							{
+								name: 'task01',
+								runtime: {
+									containers: [
+										{
+											image: 'alpine/git',
+										},
+									],
+								},
+								task_timeout_interval: "15s",
+								steps: [
+									{ type: 'run', command: 'sleep 30' },
+								],
+							},
 						],
-					  },
-					  task_timeout_interval: "15s",
-					  steps: [
-						  { type: 'run', command: 'sleep 30' },
-					  ],
 					},
-				  ],
-				},
-			  ],
+				],
 			}
-		  `,
+		`,
 		},
 		{
 			name:                 "test timeout int value",
@@ -1017,29 +1007,29 @@ func TestTaskTimeout(t *testing.T) {
 			taskTimedoutExpected: map[string]bool{"task01": true},
 			config: `
 			{
-			  runs: [
-				{
-				  name: 'run01',
-				  tasks: [
+				runs: [
 					{
-					  name: 'task01',
-					  runtime: {
-						containers: [
-						  {
-							image: 'alpine/git',
-						  },
+						name: 'run01',
+						tasks: [
+							{
+								name: 'task01',
+								runtime: {
+									containers: [
+										{
+											image: 'alpine/git',
+										},
+									],
+								},
+								task_timeout_interval: 15000000000,
+								steps: [
+									{ type: 'run', command: 'sleep 30' },
+								],
+							},
 						],
-					  },
-					  task_timeout_interval: 15000000000,
-					  steps: [
-						  { type: 'run', command: 'sleep 30' },
-					  ],
 					},
-				  ],
-				},
-			  ],
+				],
 			}
-		  `,
+		`,
 		},
 		{
 			name:                 "test timeout child timeout",
@@ -1047,43 +1037,43 @@ func TestTaskTimeout(t *testing.T) {
 			taskTimedoutExpected: map[string]bool{"task01": false, "task02": true},
 			config: `
 			{
-			  runs: [
-				{
-				  name: 'run01',
-				  tasks: [
+				runs: [
 					{
-					  name: 'task01',
-					  runtime: {
-						containers: [
-						  {
-							image: 'alpine/git',
-						  },
-						],
-					  },
-					  steps: [
-						  { type: 'run', command: 'sleep 30' },
-					  ],
-					},
-					{
-						name: 'task02',
-						depends: ['task01'],
-						runtime: {
-						  containers: [
+						name: 'run01',
+						tasks: [
 							{
-							  image: 'alpine/git',
+								name: 'task01',
+								runtime: {
+									containers: [
+										{
+											image: 'alpine/git',
+										},
+									],
+								},
+								steps: [
+									{ type: 'run', command: 'sleep 30' },
+								],
 							},
-						  ],
-						},
-						task_timeout_interval: "15s",
-						steps: [
-							{ type: 'run', command: 'sleep 30' },
+							{
+								name: 'task02',
+								depends: ['task01'],
+								runtime: {
+									containers: [
+										{
+											image: 'alpine/git',
+										},
+									],
+								},
+								task_timeout_interval: "15s",
+								steps: [
+									{ type: 'run', command: 'sleep 30' },
+								],
+							},
 						],
-					  },
-				  ],
-				},
-			  ],
+					},
+				],
 			}
-		  `,
+		`,
 		},
 		{
 			name:                 "test timeout parent timeout",
@@ -1091,43 +1081,43 @@ func TestTaskTimeout(t *testing.T) {
 			taskTimedoutExpected: map[string]bool{"task01": true, "task02": false},
 			config: `
 			{
-			  runs: [
-				{
-				  name: 'run01',
-				  tasks: [
+				runs: [
 					{
-					  name: 'task01',
-					  runtime: {
-						containers: [
-						  {
-							image: 'alpine/git',
-						  },
-						],
-					  },
-					  task_timeout_interval: "15s",
-					  steps: [
-						  { type: 'run', command: 'sleep 30' },
-					  ],
-					},
-					{
-						name: 'task02',
-						depends: ['task01'],
-						runtime: {
-						  containers: [
+						name: 'run01',
+						tasks: [
 							{
-							  image: 'alpine/git',
+								name: 'task01',
+								runtime: {
+									containers: [
+										{
+											image: 'alpine/git',
+										},
+									],
+								},
+								task_timeout_interval: "15s",
+								steps: [
+									{ type: 'run', command: 'sleep 30' },
+								],
 							},
-						  ],
-						},
-						steps: [
-							{ type: 'run', command: 'sleep 30' },
+							{
+								name: 'task02',
+								depends: ['task01'],
+								runtime: {
+									containers: [
+										{
+											image: 'alpine/git',
+										},
+									],
+								},
+								steps: [
+									{ type: 'run', command: 'sleep 30' },
+								],
+							},
 						],
-					  },
-				  ],
-				},
-			  ],
+					},
+				],
 			}
-		  `,
+		`,
 		},
 		{
 			name:                 "test timeout parent and child timeout",
@@ -1135,44 +1125,44 @@ func TestTaskTimeout(t *testing.T) {
 			taskTimedoutExpected: map[string]bool{"task01": true, "task02": false},
 			config: `
 			{
-			  runs: [
-				{
-				  name: 'run01',
-				  tasks: [
+				runs: [
 					{
-					  name: 'task01',
-					  runtime: {
-						containers: [
-						  {
-							image: 'alpine/git',
-						  },
-						],
-					  },
-					  task_timeout_interval: "15s",
-					  steps: [
-						  { type: 'run', command: 'sleep 30' },
-					  ],
-					},
-					{
-						name: 'task02',
-						depends: ['task01'],
-						runtime: {
-						  containers: [
+						name: 'run01',
+						tasks: [
 							{
-							  image: 'alpine/git',
+								name: 'task01',
+								runtime: {
+									containers: [
+										{
+											image: 'alpine/git',
+										},
+									],
+								},
+								task_timeout_interval: "15s",
+								steps: [
+									{ type: 'run', command: 'sleep 30' },
+								],
 							},
-						  ],
-						},
-						task_timeout_interval: "15s",
-						steps: [
-							{ type: 'run', command: 'sleep 30' },
+							{
+								name: 'task02',
+								depends: ['task01'],
+								runtime: {
+									containers: [
+										{
+											image: 'alpine/git',
+										},
+									],
+								},
+								task_timeout_interval: "15s",
+								steps: [
+									{ type: 'run', command: 'sleep 30' },
+								],
+							},
 						],
-					  },
-				  ],
-				},
-			  ],
+					},
+				],
 			}
-		  `,
+		`,
 		},
 	}
 
@@ -1224,8 +1214,6 @@ func TestTaskTimeout(t *testing.T) {
 			run, _, err := gwClient.GetUserRun(ctx, user.ID, 1)
 			testutil.NilError(t, err)
 
-			t.Logf("runs: %s", util.Dump(run))
-
 			assert.Assert(t, run != nil)
 			assert.Equal(t, run.Phase, rstypes.RunPhaseFinished)
 			assert.Equal(t, run.Result, rstypes.RunResultFailed)
@@ -1242,28 +1230,28 @@ func TestRunRequiredEnvVariables(t *testing.T) {
 	t.Parallel()
 
 	config := `
-		{
-			runs: [
+	{
+		runs: [
 			{
 				name: 'run01',
 				tasks: [
-				{
-					name: 'task01',
-					runtime: {
-					containers: [
-						{
-						image: 'alpine/git',
+					{
+						name: 'task01',
+						runtime: {
+							containers: [
+								{
+									image: 'alpine/git',
+								},
+							],
 						},
-					],
+						steps: [
+							{ type: 'run', command: 'env -u AGOLA_SSHPRIVKEY' },
+						],
 					},
-					steps: [
-					  { type: 'run', command: 'env -u AGOLA_SSHPRIVKEY' },
-					],
-				},
 				],
 			},
-			],
-		}
+		],
+	}
 	`
 
 	tests := []struct {
@@ -1328,8 +1316,6 @@ func TestRunRequiredEnvVariables(t *testing.T) {
 			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 			testutil.NilError(t, err)
 
-			t.Logf("runs: %s", util.Dump(runs))
-
 			assert.Assert(t, cmp.Len(runs, 1))
 
 			run, _, err := gwClient.GetProjectRun(ctx, project.ID, runs[0].Number)
@@ -1376,70 +1362,70 @@ func TestConfigContext(t *testing.T) {
 
 	jsonnetConfig := `
 function(ctx) {
-  runs: [
-    {
-      name: 'run01',
-      tasks: [
-        {
-          name: 'task01',
-          runtime: {
-            containers: [
-              {
-                image: 'alpine/git',
-              },
-            ],
-          },
-          environment: {
-            REF_TYPE: ctx.ref_type,
-            REF: ctx.ref,
-            BRANCH: ctx.branch,
-            TAG: ctx.tag,
-            PULL_REQUEST_ID: ctx.pull_request_id,
-            COMMIT_SHA: ctx.commit_sha,
-          },
-          steps: [
-            { type: 'clone' },
-            { type: 'run', command: 'env' },
-          ],
-        },
-      ],
-    },
-  ],
+	runs: [
+		{
+			name: 'run01',
+			tasks: [
+				{
+					name: 'task01',
+					runtime: {
+						containers: [
+							{
+								image: 'alpine/git',
+							},
+						],
+					},
+					environment: {
+						REF_TYPE: ctx.ref_type,
+						REF: ctx.ref,
+						BRANCH: ctx.branch,
+						TAG: ctx.tag,
+						PULL_REQUEST_ID: ctx.pull_request_id,
+						COMMIT_SHA: ctx.commit_sha,
+					},
+					steps: [
+						{ type: 'clone' },
+						{ type: 'run', command: 'env' },
+					],
+				},
+			],
+		},
+	],
 }
 `
 
 	starlarkConfig := `
 def main(ctx):
-  return {
-    "runs": [
-    {
-      "name": 'run01',
-      "tasks": [
-        {
-          "name": 'task01',
-          "runtime": {
-            "containers": [
-              {
-                "image": 'alpine/git',
-              }
-            ]
-          },
-          "environment": {
-            "REF_TYPE": ctx["ref_type"],
-            "REF": ctx["ref"],
-            "BRANCH": ctx["branch"],
-            "TAG": ctx["tag"],
-            "PULL_REQUEST_ID": ctx["pull_request_id"],
-            "COMMIT_SHA": ctx["commit_sha"]
-          },
-          "steps": [
-            { "type": 'clone' },
-            { "type": 'run', "command": 'env' }
-          ],
-        },
-      ],
-    },
-  ]
+	return {
+		"runs": [
+			{
+			"name": 'run01',
+			"tasks": [
+				{
+					"name": 'task01',
+					"runtime": {
+						"containers": [
+							{
+								"image": 'alpine/git',
+							}
+						]
+					},
+					"environment": {
+						"REF_TYPE": ctx["ref_type"],
+						"REF": ctx["ref"],
+						"BRANCH": ctx["branch"],
+						"TAG": ctx["tag"],
+						"PULL_REQUEST_ID": ctx["pull_request_id"],
+						"COMMIT_SHA": ctx["commit_sha"]
+					},
+					"steps": [
+						{ "type": 'clone' },
+						{ "type": 'run', "command": 'env' }
+					],
+				},
+			],
+		},
+	]
 }
 `
 
@@ -1543,8 +1529,6 @@ def main(ctx):
 				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
 				testutil.NilError(t, err)
 
-				t.Logf("runs: %s", util.Dump(runs))
-
 				assert.Assert(t, cmp.Len(runs, 1))
 
 				run, _, err := gwClient.GetUserRun(ctx, user.ID, runs[0].Number)
@@ -1615,10 +1599,10 @@ func TestRunEventsNotification(t *testing.T) {
 		{
 			name: "test run setup config error",
 			config: `
-				{
-				  runserror:
-				}
-				`,
+			{
+				runserror:
+			}
+			`,
 			expectedRunResult:      rstypes.RunResultUnknown,
 			expectedRunPhase:       rstypes.RunPhaseSetupError,
 			expectedRunPhaseEvents: []rstypes.RunPhase{rstypes.RunPhaseSetupError},

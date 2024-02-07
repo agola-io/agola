@@ -2068,25 +2068,25 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 	config := `
 		{
 			runs: [
-			{
-				name: 'run01',
-				tasks: [
 				{
-					name: 'task01',
-					runtime: {
-					containers: [
+					name: 'run01',
+					tasks: [
 						{
-						image: 'alpine/git',
+							name: 'task01',
+							runtime: {
+								containers: [
+									{
+											image: 'alpine/git',
+									},
+								],
+							},
+							steps: [
+								{ type: 'run', command: 'env' },
+								{ type: 'run', command: 'echo %d' },
+							],
 						},
 					],
-					},
-					steps: [
-					{ type: 'run', command: 'env' },
-					{ type: 'run', command: 'echo %d' },
-					],
 				},
-				],
-			},
 			],
 		}
 	`

@@ -740,8 +740,6 @@ func TestGetProjectRuns(t *testing.T) {
 			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, tt.phaseFilter, tt.resultFilter, 0, 0, false)
 			testutil.NilError(t, err)
 
-			t.Logf("runs: %s", util.Dump(runs))
-
 			assert.Assert(t, cmp.Len(runs, tt.num))
 
 			if len(runs) > 0 {
