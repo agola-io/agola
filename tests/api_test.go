@@ -61,7 +61,7 @@ func TestGetRemoteSources(t *testing.T) {
 		expectedCallsNumber int
 	}{
 		{
-			name:                "get remote sources with limit = 0 and no sortdirection",
+			name:                "get remote sources with limit = 0, no sortdirection",
 			expectedCallsNumber: 1,
 		},
 		{
@@ -82,18 +82,18 @@ func TestGetRemoteSources(t *testing.T) {
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "get remote sources with limit = 0 and sortDirection desc",
+			name:                "get remote sources with limit = 0, sortDirection desc",
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "get remote sources with limit less than remote sources and sortDirection desc",
+			name:                "get remote sources with limit less than remote sources, sortDirection desc",
 			limit:               2,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 5,
 		},
 		{
-			name:                "get remote sources with limit greater than remote sources and sortDirection desc",
+			name:                "get remote sources with limit greater than remote sources, sortDirection desc",
 			limit:               10,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
@@ -702,7 +702,7 @@ func TestGetOrgs(t *testing.T) {
 		expectedCallsNumber int
 	}{
 		{
-			name:                "get public orgs with limit = 0 and no sortdirection",
+			name:                "get public orgs with limit = 0, no sortdirection",
 			getPublicOrgsOnly:   true,
 			expectedCallsNumber: 1,
 		},
@@ -747,40 +747,40 @@ func TestGetOrgs(t *testing.T) {
 			expectedCallsNumber: 6,
 		},
 		{
-			name:                "get public orgs with limit = 0 and sortDirection desc",
+			name:                "get public orgs with limit = 0, sortDirection desc",
 			getPublicOrgsOnly:   true,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "get public/private orgs with limit = 0 and sortDirection desc",
+			name:                "get public/private orgs with limit = 0, sortDirection desc",
 			getPublicOrgsOnly:   false,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "get public orgs with limit less than orgs and sortDirection desc",
+			name:                "get public orgs with limit less than orgs, sortDirection desc",
 			getPublicOrgsOnly:   true,
 			limit:               2,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 5,
 		},
 		{
-			name:                "get public orgs with limit greater than orgs and sortDirection desc",
+			name:                "get public orgs with limit greater than orgs, sortDirection desc",
 			getPublicOrgsOnly:   true,
 			limit:               10,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "get public orgs with limit less than orgs and sortDirection desc",
+			name:                "get public orgs with limit less than orgs, sortDirection desc",
 			getPublicOrgsOnly:   true,
 			limit:               3,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 3,
 		},
 		{
-			name:                "get public/private orgs with limit less than orgs and sortDirection desc",
+			name:                "get public/private orgs with limit less than orgs, sortDirection desc",
 			getPublicOrgsOnly:   false,
 			limit:               3,
 			sortDirection:       gwapitypes.SortDirectionDesc,
@@ -874,7 +874,7 @@ func TestGetOrgMembers(t *testing.T) {
 		expectedCallsNumber int
 	}{
 		{
-			name:                "get org members with limit = 0 and no sortdirection",
+			name:                "get org members with limit = 0, no sortdirection",
 			expectedCallsNumber: 1,
 		},
 		{
@@ -895,18 +895,18 @@ func TestGetOrgMembers(t *testing.T) {
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "get org members with limit = 0 and sortDirection desc",
+			name:                "get org members with limit = 0, sortDirection desc",
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "get org members with limit less than org members and sortDirection desc",
+			name:                "get org members with limit less than org members, sortDirection desc",
 			limit:               2,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 5,
 		},
 		{
-			name:                "get org members with limit greater than org members and sortDirection desc",
+			name:                "get org members with limit greater than org members, sortDirection desc",
 			limit:               10,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
@@ -995,7 +995,7 @@ func TestGetUserOrgs(t *testing.T) {
 		expectedCallsNumber int
 	}{
 		{
-			name:                "get user orgs with limit = 0 and no sortdirection",
+			name:                "get user orgs with limit = 0, no sortdirection",
 			expectedCallsNumber: 1,
 		},
 		{
@@ -1016,18 +1016,18 @@ func TestGetUserOrgs(t *testing.T) {
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "get user orgs with limit = 0 and sortDirection desc",
+			name:                "get user orgs with limit = 0, sortDirection desc",
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "get user orgs with limit less than user orgs and sortDirection desc",
+			name:                "get user orgs with limit less than user orgs, sortDirection desc",
 			limit:               2,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 5,
 		},
 		{
-			name:                "get user orgs with limit greater than user orgs and sortDirection desc",
+			name:                "get user orgs with limit greater than user orgs, sortDirection desc",
 			limit:               10,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
@@ -1285,7 +1285,7 @@ func TestGetUsers(t *testing.T) {
 		expectedCallsNumber int
 	}{
 		{
-			name:                "get users with limit = 0 and no sortdirection",
+			name:                "get users with limit = 0, no sortdirection",
 			expectedCallsNumber: 1,
 		},
 		{
@@ -1306,18 +1306,18 @@ func TestGetUsers(t *testing.T) {
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "get users with limit = 0 and sortDirection desc",
+			name:                "get users with limit = 0, sortDirection desc",
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "get users with limit less than users and sortDirection desc",
+			name:                "get users with limit less than users, sortDirection desc",
 			limit:               2,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 5,
 		},
 		{
-			name:                "get users with limit greater than users and sortDirection desc",
+			name:                "get users with limit greater than users, sortDirection desc",
 			limit:               10,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
@@ -1593,7 +1593,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 		expectedErr          string
 	}{
 		{
-			name:                "get project run webhook deliveries with limit = 0 and no sortdirection",
+			name:                "get project run webhook deliveries with limit = 0, no sortdirection",
 			client:              gwUser01Client,
 			projectRef:          project.ID,
 			expectedCallsNumber: 1,
@@ -1622,14 +1622,14 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "get project run webhook deliveries with limit = 0 and sortDirection desc",
+			name:                "get project run webhook deliveries with limit = 0, sortDirection desc",
 			client:              gwUser01Client,
 			projectRef:          project.ID,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "get project run webhook deliveries with limit less than project run webhook deliveries and sortDirection desc",
+			name:                "get project run webhook deliveries with limit less than project run webhook deliveries, sortDirection desc",
 			client:              gwUser01Client,
 			projectRef:          project.ID,
 			limit:               2,
@@ -1637,7 +1637,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 			expectedCallsNumber: 2,
 		},
 		{
-			name:                "get project run webhook deliveries with limit greater than project run webhook deliveries and sortDirection desc",
+			name:                "get project run webhook deliveries with limit greater than project run webhook deliveries, sortDirection desc",
 			client:              gwUser01Client,
 			projectRef:          project.ID,
 			limit:               5,
@@ -2189,7 +2189,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 		expectedErr          string
 	}{
 		{
-			name:                "get project commit status deliveries with limit = 0 and no sortdirection",
+			name:                "get project commit status deliveries with limit = 0, no sortdirection",
 			client:              gwUser01Client,
 			projectRef:          project.ID,
 			expectedCallsNumber: 1,
@@ -2218,14 +2218,14 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "get project commit status deliveries with limit = 0 and sortDirection desc",
+			name:                "get project commit status deliveries with limit = 0, sortDirection desc",
 			client:              gwUser01Client,
 			projectRef:          project.ID,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "get project commit status deliveries with limit less than project commit status deliveries and sortDirection desc",
+			name:                "get project commit status deliveries with limit less than project commit status deliveries, sortDirection desc",
 			client:              gwUser01Client,
 			projectRef:          project.ID,
 			limit:               2,
@@ -2233,7 +2233,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 			expectedCallsNumber: runCount,
 		},
 		{
-			name:                "get project commit status deliveries with limit greater than project commit status deliveries and sortDirection desc",
+			name:                "get project commit status deliveries with limit greater than project commit status deliveries, sortDirection desc",
 			client:              gwUser01Client,
 			projectRef:          project.ID,
 			limit:               10,
