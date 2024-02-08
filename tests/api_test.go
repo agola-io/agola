@@ -1502,7 +1502,31 @@ func TestCommitStatusDelivery(t *testing.T) {
 func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 	t.Parallel()
 
-	config := EnvRunConfig
+	config := `
+		{
+			runs: [
+				{
+					name: 'run01',
+					tasks: [
+						{
+							name: 'task01',
+							runtime: {
+								containers: [
+									{
+											image: 'alpine/git',
+									},
+								],
+							},
+							steps: [
+								{ type: 'run', command: 'env' },
+								{ type: 'run', command: 'echo %d' },
+							],
+						},
+					],
+				},
+			],
+		}
+	`
 
 	dir := t.TempDir()
 	wrDir := t.TempDir()
@@ -1535,19 +1559,25 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 
 	giteaRepo, project := createProject(ctx, t, giteaClient, gwUser01Client, withVisibility(gwapitypes.VisibilityPrivate))
 
-	push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
+	runCount := 5
 
-	_ = testutil.Wait(30*time.Second, func() (bool, error) {
+	for i := 0; i < runCount; i++ {
+		push(t, fmt.Sprintf(config, i), giteaRepo.CloneURL, giteaToken, "commit", false)
+	}
+
+	_ = testutil.Wait(60*time.Second, func() (bool, error) {
 		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 		if err != nil {
 			return false, nil
 		}
 
-		if len(runs) == 0 {
+		if len(runs) != runCount {
 			return false, nil
 		}
-		if runs[0].Phase != rstypes.RunPhaseFinished {
-			return false, nil
+		for i := 0; i < runCount; i++ {
+			if runs[i].Phase != rstypes.RunPhaseFinished {
+				return false, nil
+			}
 		}
 
 		return true, nil
@@ -1556,10 +1586,11 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 	runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 	testutil.NilError(t, err)
 
-	assert.Assert(t, len(runs) != 0)
-
-	assert.Equal(t, runs[0].Phase, rstypes.RunPhaseFinished)
-	assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
+	assert.Assert(t, cmp.Len(runs, runCount))
+	for i := 0; i < runCount; i++ {
+		assert.Equal(t, runs[i].Phase, rstypes.RunPhaseFinished)
+		assert.Equal(t, runs[i].Result, rstypes.RunResultSuccess)
+	}
 
 	_ = testutil.Wait(30*time.Second, func() (bool, error) {
 		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
@@ -1567,7 +1598,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 			return false, nil
 		}
 
-		if len(runWebhookDeliveries) != 4 {
+		if len(runWebhookDeliveries) != 4*runCount {
 			return false, nil
 		}
 		for _, r := range runWebhookDeliveries {
@@ -1579,8 +1610,24 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 		return true, nil
 	})
 
-	runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
+	runWebhookDeliveries, resp, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 	testutil.NilError(t, err)
+
+	assert.Assert(t, cmp.Len(runWebhookDeliveries, 4*runCount))
+	assert.Assert(t, resp.Cursor == "")
+	for _, r := range runWebhookDeliveries {
+		assert.Assert(t, cmp.Equal(r.DeliveryStatus, gwapitypes.DeliveryStatusDelivered))
+	}
+
+	t.Run("request with cursor and deliveryStatusFilter", func(t *testing.T) {
+		deliveryStatusFilter := []string{"delivered"}
+
+		_, res, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 2, SortDirection: gwapitypes.SortDirectionAsc}, DeliveryStatusFilter: deliveryStatusFilter})
+		testutil.NilError(t, err)
+
+		_, _, err = gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Cursor: res.Cursor, Limit: 2, SortDirection: gwapitypes.SortDirectionAsc}, DeliveryStatusFilter: deliveryStatusFilter})
+		assert.Error(t, err, remoteErrorBadRequest)
+	})
 
 	tests := []struct {
 		name                 string
@@ -1611,7 +1658,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 			projectRef:          project.ID,
 			limit:               2,
 			sortDirection:       gwapitypes.SortDirectionAsc,
-			expectedCallsNumber: 2,
+			expectedCallsNumber: 10,
 		},
 		{
 			name:                "get project run webhook deliveries with limit greater than results length",
@@ -1634,7 +1681,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 			projectRef:          project.ID,
 			limit:               2,
 			sortDirection:       gwapitypes.SortDirectionDesc,
-			expectedCallsNumber: 2,
+			expectedCallsNumber: 10,
 		},
 		{
 			name:                "get project run webhook deliveries with limit greater than results length, sortDirection desc",
@@ -1643,6 +1690,24 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 			limit:               MaxLimit,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
+		},
+		{
+			name:                 "get project run webhook deliveries with limit less than results length, deliveryStatusFilter = delivered",
+			client:               gwUser01Client,
+			projectRef:           project.ID,
+			limit:                2,
+			sortDirection:        gwapitypes.SortDirectionAsc,
+			deliveryStatusFilter: []string{"delivered"},
+			expectedCallsNumber:  10,
+		},
+		{
+			name:                 "get project run webhook deliveries with limit less than results length, deliveryStatusFilter = deliveryError",
+			client:               gwUser01Client,
+			projectRef:           project.ID,
+			limit:                2,
+			sortDirection:        gwapitypes.SortDirectionAsc,
+			deliveryStatusFilter: []string{"deliveryError"},
+			expectedCallsNumber:  1,
 		},
 		{
 			name:          "get project run webhook deliveries with user unauthorized",
@@ -1657,20 +1722,6 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 			projectRef:    "project02",
 			sortDirection: gwapitypes.SortDirectionAsc,
 			expectedErr:   remoteErrorNotExist,
-		},
-		{
-			name:                "get project run webhook deliveries with deliverystatus = delivered",
-			client:              gwUser01Client,
-			projectRef:          project.ID,
-			sortDirection:       gwapitypes.SortDirectionAsc,
-			expectedCallsNumber: 1,
-		},
-		{
-			name:                "get project run webhook deliveries with deliverystatus = deliveryError",
-			client:              gwUser01Client,
-			projectRef:          project.ID,
-			sortDirection:       gwapitypes.SortDirectionAsc,
-			expectedCallsNumber: 1,
 		},
 	}
 
@@ -1697,11 +1748,12 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 
 			respAllRunWebhookDeliveries := []*gwapitypes.RunWebhookDeliveryResponse{}
 			sortDirection := tt.sortDirection
+			deliveryStatusFilter := tt.deliveryStatusFilter
 			callsNumber := 0
 			var cursor string
 
 			for {
-				respRunWebhookDeliveries, res, err := tt.client.GetProjectRunWebhookDeliveries(ctx, tt.projectRef, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Cursor: cursor, Limit: tt.limit, SortDirection: sortDirection}, DeliveryStatusFilter: tt.deliveryStatusFilter})
+				respRunWebhookDeliveries, res, err := tt.client.GetProjectRunWebhookDeliveries(ctx, tt.projectRef, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Cursor: cursor, Limit: tt.limit, SortDirection: sortDirection}, DeliveryStatusFilter: deliveryStatusFilter})
 				if tt.expectedErr == "" {
 					testutil.NilError(t, err)
 				} else {
@@ -1718,6 +1770,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 				}
 				cursor = res.Cursor
 				sortDirection = ""
+				deliveryStatusFilter = nil
 			}
 
 			assert.DeepEqual(t, expectedProject01RunWebhookDeliveries, respAllRunWebhookDeliveries)
@@ -2178,6 +2231,16 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 		assert.Assert(t, cmp.Equal(r.DeliveryStatus, gwapitypes.DeliveryStatusDelivered))
 	}
 
+	t.Run("request with cursor and deliveryStatusFilter", func(t *testing.T) {
+		deliveryStatusFilter := []string{"delivered"}
+
+		_, res, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 2, SortDirection: gwapitypes.SortDirectionAsc}, DeliveryStatusFilter: deliveryStatusFilter})
+		testutil.NilError(t, err)
+
+		_, _, err = gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Cursor: res.Cursor, Limit: 2, SortDirection: gwapitypes.SortDirectionAsc}, DeliveryStatusFilter: deliveryStatusFilter})
+		assert.Error(t, err, remoteErrorBadRequest)
+	})
+
 	tests := []struct {
 		name                 string
 		client               *gwclient.Client
@@ -2207,7 +2270,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 			projectRef:          project.ID,
 			limit:               2,
 			sortDirection:       gwapitypes.SortDirectionAsc,
-			expectedCallsNumber: runCount,
+			expectedCallsNumber: 5,
 		},
 		{
 			name:                "get project commit status deliveries with limit greater than results length",
@@ -2230,7 +2293,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 			projectRef:          project.ID,
 			limit:               2,
 			sortDirection:       gwapitypes.SortDirectionDesc,
-			expectedCallsNumber: runCount,
+			expectedCallsNumber: 5,
 		},
 		{
 			name:                "get project commit status deliveries with limit greater than results length, sortDirection desc",
@@ -2239,6 +2302,24 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 			limit:               MaxLimit,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
+		},
+		{
+			name:                 "get project commit status deliveries with limit less than results length, deliveryStatusFilter = delivered",
+			client:               gwUser01Client,
+			projectRef:           project.ID,
+			limit:                2,
+			sortDirection:        gwapitypes.SortDirectionAsc,
+			deliveryStatusFilter: []string{"delivered"},
+			expectedCallsNumber:  5,
+		},
+		{
+			name:                 "get project commit status deliveries with limit less than results length, deliveryStatusFilter = deliveryError",
+			client:               gwUser01Client,
+			projectRef:           project.ID,
+			limit:                2,
+			sortDirection:        gwapitypes.SortDirectionAsc,
+			deliveryStatusFilter: []string{"deliveryError"},
+			expectedCallsNumber:  1,
 		},
 		{
 			name:          "get project commit status deliveries with user unauthorized",
@@ -2253,20 +2334,6 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 			projectRef:    "project02",
 			sortDirection: gwapitypes.SortDirectionAsc,
 			expectedErr:   remoteErrorNotExist,
-		},
-		{
-			name:                "get project commit status deliveries with deliverystatus = delivered",
-			client:              gwUser01Client,
-			projectRef:          project.ID,
-			sortDirection:       gwapitypes.SortDirectionAsc,
-			expectedCallsNumber: 1,
-		},
-		{
-			name:                "get project commit status deliveries with deliverystatus = deliveryError",
-			client:              gwUser01Client,
-			projectRef:          project.ID,
-			sortDirection:       gwapitypes.SortDirectionAsc,
-			expectedCallsNumber: 1,
 		},
 	}
 
@@ -2293,11 +2360,12 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 
 			respAllCommitStatusDeliveries := []*gwapitypes.CommitStatusDeliveryResponse{}
 			sortDirection := tt.sortDirection
+			deliveryStatusFilter := tt.deliveryStatusFilter
 			callsNumber := 0
 			var cursor string
 
 			for {
-				respCommitStatusDeliveries, res, err := tt.client.GetProjectCommitStatusDeliveries(ctx, tt.projectRef, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Cursor: cursor, Limit: tt.limit, SortDirection: sortDirection}, DeliveryStatusFilter: tt.deliveryStatusFilter})
+				respCommitStatusDeliveries, res, err := tt.client.GetProjectCommitStatusDeliveries(ctx, tt.projectRef, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Cursor: cursor, Limit: tt.limit, SortDirection: sortDirection}, DeliveryStatusFilter: deliveryStatusFilter})
 				if tt.expectedErr == "" {
 					testutil.NilError(t, err)
 				} else {
@@ -2316,6 +2384,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 				}
 				cursor = res.Cursor
 				sortDirection = ""
+				deliveryStatusFilter = nil
 			}
 
 			assert.DeepEqual(t, expectedProject01CommitStatusDeliveries, respAllCommitStatusDeliveries)
