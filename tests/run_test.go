@@ -1192,8 +1192,6 @@ func TestTaskTimeout(t *testing.T) {
 
 			directRun(t, dir, tt.config, ConfigFormatJsonnet, sc.config.Gateway.APIExposedURL, token)
 
-			time.Sleep(30 * time.Second)
-
 			_ = testutil.Wait(120*time.Second, func() (bool, error) {
 				run, _, err := gwClient.GetUserRun(ctx, user.ID, 1)
 				if err != nil {
