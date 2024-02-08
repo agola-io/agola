@@ -92,6 +92,8 @@ const (
 	remoteErrorForbidden    = "remote error forbidden"
 )
 
+const MaxLimit = 30
+
 const EnvRunConfig = `
 {
 	runs: [
