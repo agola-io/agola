@@ -45,7 +45,7 @@ func TestPush(t *testing.T) {
 		message     string
 	}{
 		{
-			name: "test push",
+			name: "push",
 			config: `
 			{
 				runs: [
@@ -80,7 +80,7 @@ func TestPush(t *testing.T) {
 			message: "commit",
 		},
 		{
-			name: "test push with unmatched branch",
+			name: "push with unmatched branch",
 			config: `
 			{
 				runs: [
@@ -113,7 +113,7 @@ func TestPush(t *testing.T) {
 			message: "commit",
 		},
 		{
-			name: "test push with [ci skip] in subject",
+			name: "push with [ci skip] in subject",
 			config: `
 			{
 				runs: [
@@ -143,7 +143,7 @@ func TestPush(t *testing.T) {
 			message: "[ci skip] commit",
 		},
 		{
-			name: "test push with [ci skip] in body",
+			name: "push with [ci skip] in body",
 			config: `
 			{
 				runs: [
@@ -277,7 +277,7 @@ func testDirectRun(t *testing.T, internalServicesAuth bool) {
 		annotations map[string]string
 	}{
 		{
-			name: "test direct run",
+			name: "direct run",
 			annotations: map[string]string{
 				"branch":   "master",
 				"ref":      "refs/heads/master",
@@ -285,7 +285,7 @@ func testDirectRun(t *testing.T, internalServicesAuth bool) {
 			},
 		},
 		{
-			name: "test direct run with destination branch",
+			name: "direct run with destination branch",
 			args: []string{"--branch", "develop"},
 			annotations: map[string]string{
 				"branch":   "develop",
@@ -294,7 +294,7 @@ func testDirectRun(t *testing.T, internalServicesAuth bool) {
 			},
 		},
 		{
-			name: "test direct run with destination tag",
+			name: "direct run with destination tag",
 			args: []string{"--tag", "v0.1.0"},
 			annotations: map[string]string{
 				"tag":      "v0.1.0",
@@ -303,7 +303,7 @@ func testDirectRun(t *testing.T, internalServicesAuth bool) {
 			},
 		},
 		{
-			name: "test direct run with destination ref as a pr",
+			name: "direct run with destination ref as a pr",
 			args: []string{"--ref", "refs/pull/1/head"},
 			annotations: map[string]string{
 				"pull_request_id": "1",
@@ -417,7 +417,7 @@ variable02: variable value 02
 		env  map[string]string
 	}{
 		{
-			name: "test direct run without variables",
+			name: "direct run without variables",
 			args: []string{},
 			env: map[string]string{
 				"ENV01": "",
@@ -425,7 +425,7 @@ variable02: variable value 02
 			},
 		},
 		{
-			name: "test direct run with two variables",
+			name: "direct run with two variables",
 			args: []string{"--var", "variable01=VARIABLEVALUE01", "--var", "variable02=VARIABLEVALUE02"},
 			env: map[string]string{
 				"ENV01": "VARIABLEVALUE01",
@@ -433,7 +433,7 @@ variable02: variable value 02
 			},
 		},
 		{
-			name: "test direct run with a var file",
+			name: "direct run with a var file",
 			args: []string{"--var-file", "../varfile01.yml"},
 			env: map[string]string{
 				"ENV01": "variable value 01",
@@ -441,7 +441,7 @@ variable02: variable value 02
 			},
 		},
 		{
-			name: "test direct run with a var file and a var that overrides",
+			name: "direct run with a var file and a var that overrides",
 			args: []string{"--var-file", "../varfile01.yml", "--var", "variable02=VARIABLEVALUE02"},
 			env: map[string]string{
 				"ENV01": "variable value 01",
@@ -573,30 +573,30 @@ func TestDirectRunLogs(t *testing.T) {
 		err    string
 	}{
 		{
-			name: "test get log step 1",
+			name: "get log step 1",
 			step: 1,
 		},
 		{
-			name:  "test get log setup",
+			name:  "get log setup",
 			setup: true,
 		},
 		{
-			name: "test get log with unexisting step",
+			name: "get log with unexisting step",
 			step: 99,
 			err:  "remote error notexist",
 		},
 		{
-			name:   "test delete log step 1",
+			name:   "delete log step 1",
 			step:   1,
 			delete: true,
 		},
 		{
-			name:   "test delete log setup",
+			name:   "delete log setup",
 			setup:  true,
 			delete: true,
 		},
 		{
-			name:   "test delete log with unexisting step",
+			name:   "delete log with unexisting step",
 			step:   99,
 			delete: true,
 			err:    "remote error notexist",
@@ -737,25 +737,25 @@ func TestPullRequest(t *testing.T) {
 		expected           string
 	}{
 		{
-			name:               "test PR from same repo with PassVarsToForkedPR set to false",
+			name:               "PR from same repo with PassVarsToForkedPR set to false",
 			passVarsToForkedPR: false,
 			prFromSameRepo:     true,
 			expected:           "mysupersecretpassword",
 		},
 		{
-			name:               "test PR from same repo with PassVarsToForkedPR set to true",
+			name:               "PR from same repo with PassVarsToForkedPR set to true",
 			passVarsToForkedPR: true,
 			prFromSameRepo:     true,
 			expected:           "mysupersecretpassword",
 		},
 		{
-			name:               "test PR from forked repo with PassVarsToForkedPR set to false",
+			name:               "PR from forked repo with PassVarsToForkedPR set to false",
 			passVarsToForkedPR: false,
 			prFromSameRepo:     false,
 			expected:           "",
 		},
 		{
-			name:               "test PR from forked repo with PassVarsToForkedPR set to true",
+			name:               "PR from forked repo with PassVarsToForkedPR set to true",
 			passVarsToForkedPR: true,
 			prFromSameRepo:     false,
 			expected:           "mysupersecretpassword",
@@ -972,7 +972,7 @@ func TestTaskTimeout(t *testing.T) {
 		taskTimedoutExpected map[string]bool
 	}{
 		{
-			name:                 "test timeout string value",
+			name:                 "timeout string value",
 			tasksResultExpected:  map[string]rstypes.RunTaskStatus{"task01": rstypes.RunTaskStatusFailed},
 			taskTimedoutExpected: map[string]bool{"task01": true},
 			config: `
@@ -1002,7 +1002,7 @@ func TestTaskTimeout(t *testing.T) {
 		`,
 		},
 		{
-			name:                 "test timeout int value",
+			name:                 "timeout int value",
 			tasksResultExpected:  map[string]rstypes.RunTaskStatus{"task01": rstypes.RunTaskStatusFailed},
 			taskTimedoutExpected: map[string]bool{"task01": true},
 			config: `
@@ -1032,7 +1032,7 @@ func TestTaskTimeout(t *testing.T) {
 		`,
 		},
 		{
-			name:                 "test timeout child timeout",
+			name:                 "timeout child timeout",
 			tasksResultExpected:  map[string]rstypes.RunTaskStatus{"task01": rstypes.RunTaskStatusSuccess, "task02": rstypes.RunTaskStatusFailed},
 			taskTimedoutExpected: map[string]bool{"task01": false, "task02": true},
 			config: `
@@ -1076,7 +1076,7 @@ func TestTaskTimeout(t *testing.T) {
 		`,
 		},
 		{
-			name:                 "test timeout parent timeout",
+			name:                 "timeout parent timeout",
 			tasksResultExpected:  map[string]rstypes.RunTaskStatus{"task01": rstypes.RunTaskStatusFailed, "task02": rstypes.RunTaskStatusSkipped},
 			taskTimedoutExpected: map[string]bool{"task01": true, "task02": false},
 			config: `
@@ -1120,7 +1120,7 @@ func TestTaskTimeout(t *testing.T) {
 		`,
 		},
 		{
-			name:                 "test timeout parent and child timeout",
+			name:                 "timeout parent and child timeout",
 			tasksResultExpected:  map[string]rstypes.RunTaskStatus{"task01": rstypes.RunTaskStatusFailed, "task02": rstypes.RunTaskStatusSkipped},
 			taskTimedoutExpected: map[string]bool{"task01": true, "task02": false},
 			config: `
@@ -1259,7 +1259,7 @@ func TestRunRequiredEnvVariables(t *testing.T) {
 		env  map[string]string
 	}{
 		{
-			name: "test push with run count 1",
+			name: "push with run count 1",
 			env: map[string]string{
 				"AGOLA_GIT_REF_TYPE": "branch",
 				"AGOLA_GIT_REF":      "refs/heads/master",
@@ -1435,7 +1435,7 @@ def main(ctx):
 		env  map[string]string
 	}{
 		{
-			name: "test direct run branch",
+			name: "direct run branch",
 			env: map[string]string{
 				"REF_TYPE":        "branch",
 				"REF":             "refs/heads/master",
@@ -1446,7 +1446,7 @@ def main(ctx):
 			},
 		},
 		{
-			name: "test direct run tag",
+			name: "direct run tag",
 			args: []string{"--tag", "v0.1.0"},
 			env: map[string]string{
 				"REF_TYPE":        "tag",
@@ -1458,7 +1458,7 @@ def main(ctx):
 			},
 		},
 		{
-			name: "test direct run with pr",
+			name: "direct run with pr",
 			args: []string{"--ref", "refs/pull/1/head"},
 			env: map[string]string{
 				"REF_TYPE":        "pull_request",
@@ -1581,7 +1581,7 @@ func TestRunEventsNotification(t *testing.T) {
 		expectedRunTaskStatus  []rstypes.RunTaskStatus
 	}{
 		{
-			name:                   "test run result success",
+			name:                   "run result success",
 			config:                 EnvRunConfig,
 			expectedRunResult:      rstypes.RunResultSuccess,
 			expectedRunPhase:       rstypes.RunPhaseFinished,
@@ -1589,7 +1589,7 @@ func TestRunEventsNotification(t *testing.T) {
 			expectedRunTaskStatus:  []rstypes.RunTaskStatus{rstypes.RunTaskStatusNotStarted, rstypes.RunTaskStatusNotStarted, rstypes.RunTaskStatusSuccess, rstypes.RunTaskStatusSuccess},
 		},
 		{
-			name:                   "test run result failed",
+			name:                   "run result failed",
 			config:                 FailingRunConfig,
 			expectedRunResult:      rstypes.RunResultFailed,
 			expectedRunPhase:       rstypes.RunPhaseFinished,
@@ -1597,7 +1597,7 @@ func TestRunEventsNotification(t *testing.T) {
 			expectedRunTaskStatus:  []rstypes.RunTaskStatus{rstypes.RunTaskStatusNotStarted, rstypes.RunTaskStatusNotStarted, rstypes.RunTaskStatusFailed, rstypes.RunTaskStatusFailed},
 		},
 		{
-			name: "test run setup config error",
+			name: "run setup config error",
 			config: `
 			{
 				runserror:
