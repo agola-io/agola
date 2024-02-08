@@ -61,40 +61,40 @@ func TestGetRemoteSources(t *testing.T) {
 		expectedCallsNumber int
 	}{
 		{
-			name:                "test get remote sources with limit = 0 and no sortdirection",
+			name:                "get remote sources with limit = 0, no sortdirection",
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get remote sources with limit = 0",
+			name:                "get remote sources with limit = 0",
 			sortDirection:       gwapitypes.SortDirectionAsc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get remote sources with limit less than remote sources",
+			name:                "get remote sources with limit less than results length",
 			limit:               2,
 			sortDirection:       gwapitypes.SortDirectionAsc,
 			expectedCallsNumber: 5,
 		},
 		{
-			name:                "test get remote sources with limit greater than remote sources",
-			limit:               10,
+			name:                "get remote sources with limit greater than results length",
+			limit:               MaxLimit,
 			sortDirection:       gwapitypes.SortDirectionAsc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get remote sources with limit = 0 and sortDirection desc",
+			name:                "get remote sources with limit = 0, sortDirection desc",
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get remote sources with limit less than remote sources and sortDirection desc",
+			name:                "get remote sources with limit less than results length, sortDirection desc",
 			limit:               2,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 5,
 		},
 		{
-			name:                "test get remote sources with limit greater than remote sources and sortDirection desc",
-			limit:               10,
+			name:                "get remote sources with limit greater than results length, sortDirection desc",
+			limit:               MaxLimit,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
 		},
@@ -197,32 +197,32 @@ func TestGetOrg(t *testing.T) {
 		err    string
 	}{
 		{
-			name:   "test user owner get pub org",
+			name:   "user owner get pub org",
 			client: gwClientUser01,
 			org:    pubOrg,
 		},
 		{
-			name:   "test user member get pub org",
+			name:   "user member get pub org",
 			client: gwClientUser02,
 			org:    pubOrg,
 		},
 		{
-			name:   "test user not member get pub org",
+			name:   "user not member get pub org",
 			client: gwClientUser03,
 			org:    pubOrg,
 		},
 		{
-			name:   "test user owner get priv org",
+			name:   "user owner get priv org",
 			client: gwClientUser01,
 			org:    privOrg,
 		},
 		{
-			name:   "test user member get priv org",
+			name:   "user member get priv org",
 			client: gwClientUser02,
 			org:    privOrg,
 		},
 		{
-			name:   "test user not member get priv org",
+			name:   "user not member get priv org",
 			client: gwClientUser03,
 			org:    privOrg,
 			err:    remoteErrorNotExist,
@@ -323,7 +323,7 @@ func TestOrgInvitation(t *testing.T) {
 		f                    func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig)
 	}{
 		{
-			name:                 "test create org invitation",
+			name:                 "create org invitation",
 			orgInvitationEnabled: true,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				invitation, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser02, Role: cstypes.MemberRoleMember})
@@ -336,7 +336,7 @@ func TestOrgInvitation(t *testing.T) {
 			},
 		},
 		{
-			name:                 "test user org invitation creation with already existing invitation",
+			name:                 "user org invitation creation with already existing invitation",
 			orgInvitationEnabled: true,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser02, Role: cstypes.MemberRoleMember})
@@ -348,7 +348,7 @@ func TestOrgInvitation(t *testing.T) {
 			},
 		},
 		{
-			name:                 "test get user invitations",
+			name:                 "get user invitations",
 			orgInvitationEnabled: true,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				invitation, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser02, Role: cstypes.MemberRoleMember})
@@ -369,7 +369,7 @@ func TestOrgInvitation(t *testing.T) {
 			},
 		},
 		{
-			name:                 "test user not owner create invitation",
+			name:                 "user not owner create invitation",
 			orgInvitationEnabled: true,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser02.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser01, Role: cstypes.MemberRoleMember})
@@ -378,7 +378,7 @@ func TestOrgInvitation(t *testing.T) {
 			},
 		},
 		{
-			name:                 "test user reject invitation",
+			name:                 "user reject invitation",
 			orgInvitationEnabled: true,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser02, Role: cstypes.MemberRoleMember})
@@ -393,7 +393,7 @@ func TestOrgInvitation(t *testing.T) {
 			},
 		},
 		{
-			name:                 "test user owner delete invitation",
+			name:                 "user owner delete invitation",
 			orgInvitationEnabled: true,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser02, Role: cstypes.MemberRoleMember})
@@ -408,7 +408,7 @@ func TestOrgInvitation(t *testing.T) {
 			},
 		},
 		{
-			name:                 "test user accept invitation",
+			name:                 "user accept invitation",
 			orgInvitationEnabled: true,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser02, Role: cstypes.MemberRoleMember})
@@ -428,7 +428,7 @@ func TestOrgInvitation(t *testing.T) {
 			},
 		},
 		{
-			name:                 "test create invitation org not exists",
+			name:                 "create invitation org not exists",
 			orgInvitationEnabled: true,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg02, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser02, Role: cstypes.MemberRoleMember})
@@ -437,7 +437,7 @@ func TestOrgInvitation(t *testing.T) {
 			},
 		},
 		{
-			name:                 "test create invitation user already org member",
+			name:                 "create invitation user already org member",
 			orgInvitationEnabled: true,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser02, Role: cstypes.MemberRoleMember})
@@ -452,7 +452,7 @@ func TestOrgInvitation(t *testing.T) {
 			},
 		},
 		{
-			name:                 "test create invitation user doesn't exist",
+			name:                 "create invitation user doesn't exist",
 			orgInvitationEnabled: true,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser03, Role: cstypes.MemberRoleMember})
@@ -461,7 +461,7 @@ func TestOrgInvitation(t *testing.T) {
 			},
 		},
 		{
-			name:                 "test user deletion with existing org invitations",
+			name:                 "user deletion with existing org invitations",
 			orgInvitationEnabled: true,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser02, Role: cstypes.MemberRoleMember})
@@ -477,7 +477,7 @@ func TestOrgInvitation(t *testing.T) {
 			},
 		},
 		{
-			name:                 "test org deletion with existing org invitations",
+			name:                 "org deletion with existing org invitations",
 			orgInvitationEnabled: true,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser02, Role: cstypes.MemberRoleMember})
@@ -493,7 +493,7 @@ func TestOrgInvitation(t *testing.T) {
 			},
 		},
 		{
-			name:                 "test create org invitation and accept after invitations disabled",
+			name:                 "create org invitation and accept after invitations disabled",
 			orgInvitationEnabled: true,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser02, Role: cstypes.MemberRoleMember})
@@ -521,7 +521,7 @@ func TestOrgInvitation(t *testing.T) {
 			},
 		},
 		{
-			name:                 "test user owner create org invitation with invitations disabled",
+			name:                 "user owner create org invitation with invitations disabled",
 			orgInvitationEnabled: false,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser02, Role: cstypes.MemberRoleMember})
@@ -530,7 +530,7 @@ func TestOrgInvitation(t *testing.T) {
 			},
 		},
 		{
-			name:                 "test user owner add org member directly with invitations enabled",
+			name:                 "user owner add org member directly with invitations enabled",
 			orgInvitationEnabled: true,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser01.AddOrgMember(ctx, agolaOrg01, agolaUser02, gwapitypes.MemberRoleMember)
@@ -539,7 +539,7 @@ func TestOrgInvitation(t *testing.T) {
 			},
 		},
 		{
-			name:                 "test user owner add org member with existing org invitation",
+			name:                 "user owner add org member with existing org invitation",
 			orgInvitationEnabled: true,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser02, Role: cstypes.MemberRoleMember})
@@ -562,7 +562,7 @@ func TestOrgInvitation(t *testing.T) {
 			},
 		},
 		{
-			name:                 "test user admin add org member directly with existing org invitation",
+			name:                 "user admin add org member directly with existing org invitation",
 			orgInvitationEnabled: true,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser02, Role: cstypes.MemberRoleMember})
@@ -578,7 +578,7 @@ func TestOrgInvitation(t *testing.T) {
 			},
 		},
 		{
-			name:                 "test user owner get org invitations",
+			name:                 "user owner get org invitations",
 			orgInvitationEnabled: true,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser03})
@@ -702,85 +702,85 @@ func TestGetOrgs(t *testing.T) {
 		expectedCallsNumber int
 	}{
 		{
-			name:                "test get public orgs with limit = 0 and no sortdirection",
+			name:                "get public orgs with limit = 0, no sortdirection",
 			getPublicOrgsOnly:   true,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get public orgs with limit = 0",
+			name:                "get public orgs with limit = 0",
 			getPublicOrgsOnly:   true,
 			sortDirection:       gwapitypes.SortDirectionAsc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get public/private orgs with limit = 0",
+			name:                "get public/private orgs with limit = 0",
 			getPublicOrgsOnly:   false,
 			sortDirection:       gwapitypes.SortDirectionAsc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get public orgs with limit less than orgs",
+			name:                "get public orgs with limit less than results length",
 			getPublicOrgsOnly:   true,
 			limit:               2,
 			sortDirection:       gwapitypes.SortDirectionAsc,
 			expectedCallsNumber: 5,
 		},
 		{
-			name:                "test get public orgs with limit greater than orgs",
+			name:                "get public orgs with limit greater than results length",
 			getPublicOrgsOnly:   true,
-			limit:               10,
+			limit:               MaxLimit,
 			sortDirection:       gwapitypes.SortDirectionAsc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get public orgs with limit less than orgs",
+			name:                "get public orgs with limit less than results length",
 			getPublicOrgsOnly:   true,
 			limit:               3,
 			sortDirection:       gwapitypes.SortDirectionAsc,
 			expectedCallsNumber: 3,
 		},
 		{
-			name:                "test get public/private orgs with limit less than orgs",
+			name:                "get public/private orgs with limit less than results length",
 			getPublicOrgsOnly:   false,
 			limit:               3,
 			sortDirection:       gwapitypes.SortDirectionAsc,
 			expectedCallsNumber: 6,
 		},
 		{
-			name:                "test get public orgs with limit = 0 and sortDirection desc",
+			name:                "get public orgs with limit = 0, sortDirection desc",
 			getPublicOrgsOnly:   true,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get public/private orgs with limit = 0 and sortDirection desc",
+			name:                "get public/private orgs with limit = 0, sortDirection desc",
 			getPublicOrgsOnly:   false,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get public orgs with limit less than orgs and sortDirection desc",
+			name:                "get public orgs with limit less than results length, sortDirection desc",
 			getPublicOrgsOnly:   true,
 			limit:               2,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 5,
 		},
 		{
-			name:                "test get public orgs with limit greater than orgs and sortDirection desc",
+			name:                "get public orgs with limit greater than results length, sortDirection desc",
 			getPublicOrgsOnly:   true,
-			limit:               10,
+			limit:               MaxLimit,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get public orgs with limit less than orgs and sortDirection desc",
+			name:                "get public orgs with limit less than results length, sortDirection desc",
 			getPublicOrgsOnly:   true,
 			limit:               3,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 3,
 		},
 		{
-			name:                "test get public/private orgs with limit less than orgs and sortDirection desc",
+			name:                "get public/private orgs with limit less than results length, sortDirection desc",
 			getPublicOrgsOnly:   false,
 			limit:               3,
 			sortDirection:       gwapitypes.SortDirectionDesc,
@@ -874,40 +874,40 @@ func TestGetOrgMembers(t *testing.T) {
 		expectedCallsNumber int
 	}{
 		{
-			name:                "test get org members with limit = 0 and no sortdirection",
+			name:                "get org members with limit = 0, no sortdirection",
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get org members with limit = 0",
+			name:                "get org members with limit = 0",
 			sortDirection:       gwapitypes.SortDirectionAsc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get org members with limit less than org members",
+			name:                "get org members with limit less than results length",
 			limit:               2,
 			sortDirection:       gwapitypes.SortDirectionAsc,
 			expectedCallsNumber: 5,
 		},
 		{
-			name:                "test get org members with limit greater than org members",
-			limit:               10,
+			name:                "get org members with limit greater than results length",
+			limit:               MaxLimit,
 			sortDirection:       gwapitypes.SortDirectionAsc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get org members with limit = 0 and sortDirection desc",
+			name:                "get org members with limit = 0, sortDirection desc",
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get org members with limit less than org members and sortDirection desc",
+			name:                "get org members with limit less than results length, sortDirection desc",
 			limit:               2,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 5,
 		},
 		{
-			name:                "test get org members with limit greater than org members and sortDirection desc",
-			limit:               10,
+			name:                "get org members with limit greater than results length, sortDirection desc",
+			limit:               MaxLimit,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
 		},
@@ -995,40 +995,40 @@ func TestGetUserOrgs(t *testing.T) {
 		expectedCallsNumber int
 	}{
 		{
-			name:                "test get user orgs with limit = 0 and no sortdirection",
+			name:                "get user orgs with limit = 0, no sortdirection",
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get user orgs with limit = 0",
+			name:                "get user orgs with limit = 0",
 			sortDirection:       gwapitypes.SortDirectionAsc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get user orgs with limit less than user orgs",
+			name:                "get user orgs with limit less than results length",
 			limit:               2,
 			sortDirection:       gwapitypes.SortDirectionAsc,
 			expectedCallsNumber: 5,
 		},
 		{
-			name:                "test get user orgs with limit greater than user orgs",
-			limit:               10,
+			name:                "get user orgs with limit greater than results length",
+			limit:               MaxLimit,
 			sortDirection:       gwapitypes.SortDirectionAsc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get user orgs with limit = 0 and sortDirection desc",
+			name:                "get user orgs with limit = 0, sortDirection desc",
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get user orgs with limit less than user orgs and sortDirection desc",
+			name:                "get user orgs with limit less than results length, sortDirection desc",
 			limit:               2,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 5,
 		},
 		{
-			name:                "test get user orgs with limit greater than user orgs and sortDirection desc",
-			limit:               10,
+			name:                "get user orgs with limit greater than results length, sortDirection desc",
+			limit:               MaxLimit,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
 		},
@@ -1181,7 +1181,7 @@ func TestGetUsersPermissions(t *testing.T) {
 		f    func(ctx context.Context, t *testing.T, sc *setupContext)
 	}{
 		{
-			name: "test admin get user by remoteuserid and remotesourceref",
+			name: "admin get user by remoteuserid and remotesourceref",
 			f: func(ctx context.Context, t *testing.T, sc *setupContext) {
 				createLinkedAccount(ctx, t, sc.gitea, sc.config)
 
@@ -1194,7 +1194,7 @@ func TestGetUsersPermissions(t *testing.T) {
 			},
 		},
 		{
-			name: "test user get user by remoteuserid and remotesourceref",
+			name: "user get user by remoteuserid and remotesourceref",
 			f: func(ctx context.Context, t *testing.T, sc *setupContext) {
 				_, user01Token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
 
@@ -1206,7 +1206,7 @@ func TestGetUsersPermissions(t *testing.T) {
 			},
 		},
 		{
-			name: "test admin get users",
+			name: "admin get users",
 			f: func(ctx context.Context, t *testing.T, sc *setupContext) {
 				gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
 
@@ -1227,7 +1227,7 @@ func TestGetUsersPermissions(t *testing.T) {
 			},
 		},
 		{
-			name: "test user get users",
+			name: "user get users",
 			f: func(ctx context.Context, t *testing.T, sc *setupContext) {
 				_, user01Token := createLinkedAccount(ctx, t, sc.gitea, sc.config)
 
@@ -1285,40 +1285,40 @@ func TestGetUsers(t *testing.T) {
 		expectedCallsNumber int
 	}{
 		{
-			name:                "test get users with limit = 0 and no sortdirection",
+			name:                "get users with limit = 0, no sortdirection",
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get users with limit = 0",
+			name:                "get users with limit = 0",
 			sortDirection:       gwapitypes.SortDirectionAsc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get users with limit less than users",
+			name:                "get users with limit less than results length",
 			limit:               2,
 			sortDirection:       gwapitypes.SortDirectionAsc,
 			expectedCallsNumber: 5,
 		},
 		{
-			name:                "test get users with limit greater than users",
-			limit:               10,
+			name:                "get users with limit greater than results length",
+			limit:               MaxLimit,
 			sortDirection:       gwapitypes.SortDirectionAsc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get users with limit = 0 and sortDirection desc",
+			name:                "get users with limit = 0, sortDirection desc",
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get users with limit less than users and sortDirection desc",
+			name:                "get users with limit less than results length, sortDirection desc",
 			limit:               2,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 5,
 		},
 		{
-			name:                "test get users with limit greater than users and sortDirection desc",
-			limit:               10,
+			name:                "get users with limit greater than results length, sortDirection desc",
+			limit:               MaxLimit,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
 		},
@@ -1377,31 +1377,8 @@ func TestCommitStatusDelivery(t *testing.T) {
 		expectedGiteaContext     string
 	}{
 		{
-			name: "test run result success",
-			config: `
-			{
-			  runs: [
-			    {
-			      name: 'run01',
-			      tasks: [
-			        {
-			          name: 'task01',
-			          runtime: {
-			            containers: [
-			              {
-			                image: 'alpine/git',
-			              },
-			            ],
-			          },
-			          steps: [
-			            { type: 'run', command: 'env' },
-			          ],
-			        },
-			      ],
-			    },
-			  ],
-			}
-			`,
+			name:                     "run result success",
+			config:                   EnvRunConfig,
 			expectedRunResult:        rstypes.RunResultSuccess,
 			expectedRunPhase:         rstypes.RunPhaseFinished,
 			expectedGiteaStatusState: gitea.StatusSuccess,
@@ -1409,34 +1386,8 @@ func TestCommitStatusDelivery(t *testing.T) {
 			expectedGiteaContext:     "agola/project01/run01",
 		},
 		{
-			name: "test run result failed",
-			config: `
-			{
-			  runs: [
-			    {
-			      name: 'run01',
-			      tasks: [
-			        {
-			          name: 'task01',
-			          runtime: {
-			            containers: [
-			              {
-			                image: 'alpine/git',
-			              },
-			            ],
-			          },
-			          steps: [
-			            { type: 'run', command: 'false' },
-			          ],
-			        },
-			      ],
-			      when: {
-			        branch: 'master',
-			      },
-			    },
-			  ],
-			}
-			`,
+			name:                     "run result failed",
+			config:                   FailingRunConfig,
 			expectedRunResult:        rstypes.RunResultFailed,
 			expectedRunPhase:         rstypes.RunPhaseFinished,
 			expectedGiteaStatusState: gitea.StatusFailure,
@@ -1444,7 +1395,7 @@ func TestCommitStatusDelivery(t *testing.T) {
 			expectedGiteaContext:     "agola/project01/run01",
 		},
 		{
-			name: "test run setup config error",
+			name: "run setup config error",
 			config: `
 				{
 				  runserror:
@@ -1554,24 +1505,25 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 	config := `
 		{
 			runs: [
-			{
-				name: 'run01',
-				tasks: [
 				{
-					name: 'task01',
-					runtime: {
-					containers: [
+					name: 'run01',
+					tasks: [
 						{
-						image: 'alpine/git',
+							name: 'task01',
+							runtime: {
+								containers: [
+									{
+											image: 'alpine/git',
+									},
+								],
+							},
+							steps: [
+								{ type: 'run', command: 'env' },
+								{ type: 'run', command: 'echo %d' },
+							],
 						},
 					],
-					},
-					steps: [
-					{ type: 'run', command: 'env' },
-					],
 				},
-				],
-			},
 			],
 		}
 	`
@@ -1607,19 +1559,25 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 
 	giteaRepo, project := createProject(ctx, t, giteaClient, gwUser01Client, withVisibility(gwapitypes.VisibilityPrivate))
 
-	push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
+	runCount := 5
 
-	_ = testutil.Wait(30*time.Second, func() (bool, error) {
+	for i := 0; i < runCount; i++ {
+		push(t, fmt.Sprintf(config, i), giteaRepo.CloneURL, giteaToken, "commit", false)
+	}
+
+	_ = testutil.Wait(60*time.Second, func() (bool, error) {
 		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 		if err != nil {
 			return false, nil
 		}
 
-		if len(runs) == 0 {
+		if len(runs) != runCount {
 			return false, nil
 		}
-		if runs[0].Phase != rstypes.RunPhaseFinished {
-			return false, nil
+		for i := 0; i < runCount; i++ {
+			if runs[i].Phase != rstypes.RunPhaseFinished {
+				return false, nil
+			}
 		}
 
 		return true, nil
@@ -1628,10 +1586,11 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 	runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 	testutil.NilError(t, err)
 
-	assert.Assert(t, len(runs) != 0)
-
-	assert.Equal(t, runs[0].Phase, rstypes.RunPhaseFinished)
-	assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
+	assert.Assert(t, cmp.Len(runs, runCount))
+	for i := 0; i < runCount; i++ {
+		assert.Equal(t, runs[i].Phase, rstypes.RunPhaseFinished)
+		assert.Equal(t, runs[i].Result, rstypes.RunResultSuccess)
+	}
 
 	_ = testutil.Wait(30*time.Second, func() (bool, error) {
 		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
@@ -1639,7 +1598,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 			return false, nil
 		}
 
-		if len(runWebhookDeliveries) != 4 {
+		if len(runWebhookDeliveries) != 4*runCount {
 			return false, nil
 		}
 		for _, r := range runWebhookDeliveries {
@@ -1651,8 +1610,24 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 		return true, nil
 	})
 
-	runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
+	runWebhookDeliveries, resp, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 	testutil.NilError(t, err)
+
+	assert.Assert(t, cmp.Len(runWebhookDeliveries, 4*runCount))
+	assert.Assert(t, resp.Cursor == "")
+	for _, r := range runWebhookDeliveries {
+		assert.Assert(t, cmp.Equal(r.DeliveryStatus, gwapitypes.DeliveryStatusDelivered))
+	}
+
+	t.Run("request with cursor and deliveryStatusFilter", func(t *testing.T) {
+		deliveryStatusFilter := []string{"delivered"}
+
+		_, res, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 2, SortDirection: gwapitypes.SortDirectionAsc}, DeliveryStatusFilter: deliveryStatusFilter})
+		testutil.NilError(t, err)
+
+		_, _, err = gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Cursor: res.Cursor, Limit: 2, SortDirection: gwapitypes.SortDirectionAsc}, DeliveryStatusFilter: deliveryStatusFilter})
+		assert.Error(t, err, remoteErrorBadRequest)
+	})
 
 	tests := []struct {
 		name                 string
@@ -1665,84 +1640,88 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 		expectedErr          string
 	}{
 		{
-			name:                "test get project run webhook deliveries with limit = 0 and no sortdirection",
+			name:                "get project run webhook deliveries with limit = 0, no sortdirection",
 			client:              gwUser01Client,
 			projectRef:          project.ID,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get project run webhook deliveries with limit = 0",
+			name:                "get project run webhook deliveries with limit = 0",
 			client:              gwUser01Client,
 			projectRef:          project.ID,
 			sortDirection:       gwapitypes.SortDirectionAsc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get project run webhook deliveries with limit less than project run webhook deliveries",
+			name:                "get project run webhook deliveries with limit less than results length",
 			client:              gwUser01Client,
 			projectRef:          project.ID,
 			limit:               2,
 			sortDirection:       gwapitypes.SortDirectionAsc,
-			expectedCallsNumber: 2,
+			expectedCallsNumber: 10,
 		},
 		{
-			name:                "test get project run webhook deliveries with limit greater than project run webhook deliveries",
+			name:                "get project run webhook deliveries with limit greater than results length",
 			client:              gwUser01Client,
 			projectRef:          project.ID,
-			limit:               5,
+			limit:               MaxLimit,
 			sortDirection:       gwapitypes.SortDirectionAsc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get project run webhook deliveries with limit = 0 and sortDirection desc",
+			name:                "get project run webhook deliveries with limit = 0, sortDirection desc",
 			client:              gwUser01Client,
 			projectRef:          project.ID,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get project run webhook deliveries with limit less than project run webhook deliveries and sortDirection desc",
+			name:                "get project run webhook deliveries with limit less than results length, sortDirection desc",
 			client:              gwUser01Client,
 			projectRef:          project.ID,
 			limit:               2,
 			sortDirection:       gwapitypes.SortDirectionDesc,
-			expectedCallsNumber: 2,
+			expectedCallsNumber: 10,
 		},
 		{
-			name:                "test get project run webhook deliveries with limit greater than project run webhook deliveries and sortDirection desc",
+			name:                "get project run webhook deliveries with limit greater than results length, sortDirection desc",
 			client:              gwUser01Client,
 			projectRef:          project.ID,
-			limit:               5,
+			limit:               MaxLimit,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:          "test get project run webhook deliveries with user unauthorized",
+			name:                 "get project run webhook deliveries with limit less than results length, deliveryStatusFilter = delivered",
+			client:               gwUser01Client,
+			projectRef:           project.ID,
+			limit:                2,
+			sortDirection:        gwapitypes.SortDirectionAsc,
+			deliveryStatusFilter: []string{"delivered"},
+			expectedCallsNumber:  10,
+		},
+		{
+			name:                 "get project run webhook deliveries with limit less than results length, deliveryStatusFilter = deliveryError",
+			client:               gwUser01Client,
+			projectRef:           project.ID,
+			limit:                2,
+			sortDirection:        gwapitypes.SortDirectionAsc,
+			deliveryStatusFilter: []string{"deliveryError"},
+			expectedCallsNumber:  1,
+		},
+		{
+			name:          "get project run webhook deliveries with user unauthorized",
 			client:        gwUser02Client,
 			projectRef:    project.ID,
 			sortDirection: gwapitypes.SortDirectionAsc,
 			expectedErr:   remoteErrorForbidden,
 		},
 		{
-			name:          "test get project run webhook deliveries with not existing project",
+			name:          "get project run webhook deliveries with not existing project",
 			client:        gwUser01Client,
 			projectRef:    "project02",
 			sortDirection: gwapitypes.SortDirectionAsc,
 			expectedErr:   remoteErrorNotExist,
-		},
-		{
-			name:                "test get project run webhook deliveries with deliverystatus = delivered",
-			client:              gwUser01Client,
-			projectRef:          project.ID,
-			sortDirection:       gwapitypes.SortDirectionAsc,
-			expectedCallsNumber: 1,
-		},
-		{
-			name:                "test get project run webhook deliveries with deliverystatus = deliveryError",
-			client:              gwUser01Client,
-			projectRef:          project.ID,
-			sortDirection:       gwapitypes.SortDirectionAsc,
-			expectedCallsNumber: 1,
 		},
 	}
 
@@ -1769,11 +1748,12 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 
 			respAllRunWebhookDeliveries := []*gwapitypes.RunWebhookDeliveryResponse{}
 			sortDirection := tt.sortDirection
+			deliveryStatusFilter := tt.deliveryStatusFilter
 			callsNumber := 0
 			var cursor string
 
 			for {
-				respRunWebhookDeliveries, res, err := tt.client.GetProjectRunWebhookDeliveries(ctx, tt.projectRef, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Cursor: cursor, Limit: tt.limit, SortDirection: sortDirection}, DeliveryStatusFilter: tt.deliveryStatusFilter})
+				respRunWebhookDeliveries, res, err := tt.client.GetProjectRunWebhookDeliveries(ctx, tt.projectRef, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Cursor: cursor, Limit: tt.limit, SortDirection: sortDirection}, DeliveryStatusFilter: deliveryStatusFilter})
 				if tt.expectedErr == "" {
 					testutil.NilError(t, err)
 				} else {
@@ -1790,6 +1770,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 				}
 				cursor = res.Cursor
 				sortDirection = ""
+				deliveryStatusFilter = nil
 			}
 
 			assert.DeepEqual(t, expectedProject01RunWebhookDeliveries, respAllRunWebhookDeliveries)
@@ -1801,32 +1782,9 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 func TestProjectRunWebhookRedelivery(t *testing.T) {
 	t.Parallel()
 
-	config := `
-		{
-			runs: [
-			{
-				name: 'run01',
-				tasks: [
-				{
-					name: 'task01',
-					runtime: {
-					containers: [
-						{
-						image: 'alpine/git',
-						},
-					],
-					},
-					steps: [
-					{ type: 'run', command: 'env' },
-					],
-				},
-				],
-			},
-			],
-		}
-	`
+	config := EnvRunConfig
 
-	t.Run("test redelivery project run webhook delivery with deliverystatus = deliveryError", func(t *testing.T) {
+	t.Run("redelivery project run webhook delivery with deliverystatus = deliveryError", func(t *testing.T) {
 		dir := t.TempDir()
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -1932,7 +1890,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		assert.Error(t, err, expectedErr)
 	})
 
-	t.Run("test redelivery project run webhook delivery with deliverystatus = delivered", func(t *testing.T) {
+	t.Run("redelivery project run webhook delivery with deliverystatus = delivered", func(t *testing.T) {
 		dir := t.TempDir()
 		wrDir := t.TempDir()
 
@@ -2029,7 +1987,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		assert.Error(t, err, expectedErr)
 	})
 
-	t.Run("test redelivery project run webhook delivery with not existing project", func(t *testing.T) {
+	t.Run("redelivery project run webhook delivery with not existing project", func(t *testing.T) {
 		dir := t.TempDir()
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -2046,7 +2004,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		assert.Error(t, err, expectedErr)
 	})
 
-	t.Run("test redelivery project run webhook delivery with not existing run webhook delivery", func(t *testing.T) {
+	t.Run("redelivery project run webhook delivery with not existing run webhook delivery", func(t *testing.T) {
 		dir := t.TempDir()
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -2070,7 +2028,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		assert.Error(t, err, expectedErr)
 	})
 
-	t.Run("test redelivery project run webhook delivery with projectRef that belong to another project", func(t *testing.T) {
+	t.Run("redelivery project run webhook delivery with projectRef that belong to another project", func(t *testing.T) {
 		dir := t.TempDir()
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -2163,25 +2121,25 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 	config := `
 		{
 			runs: [
-			{
-				name: 'run01',
-				tasks: [
 				{
-					name: 'task01',
-					runtime: {
-					containers: [
+					name: 'run01',
+					tasks: [
 						{
-						image: 'alpine/git',
+							name: 'task01',
+							runtime: {
+								containers: [
+									{
+											image: 'alpine/git',
+									},
+								],
+							},
+							steps: [
+								{ type: 'run', command: 'env' },
+								{ type: 'run', command: 'echo %d' },
+							],
 						},
 					],
-					},
-					steps: [
-					{ type: 'run', command: 'env' },
-					{ type: 'run', command: 'echo %d' },
-					],
 				},
-				],
-			},
 			],
 		}
 	`
@@ -2273,6 +2231,16 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 		assert.Assert(t, cmp.Equal(r.DeliveryStatus, gwapitypes.DeliveryStatusDelivered))
 	}
 
+	t.Run("request with cursor and deliveryStatusFilter", func(t *testing.T) {
+		deliveryStatusFilter := []string{"delivered"}
+
+		_, res, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 2, SortDirection: gwapitypes.SortDirectionAsc}, DeliveryStatusFilter: deliveryStatusFilter})
+		testutil.NilError(t, err)
+
+		_, _, err = gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Cursor: res.Cursor, Limit: 2, SortDirection: gwapitypes.SortDirectionAsc}, DeliveryStatusFilter: deliveryStatusFilter})
+		assert.Error(t, err, remoteErrorBadRequest)
+	})
+
 	tests := []struct {
 		name                 string
 		client               *gwclient.Client
@@ -2284,84 +2252,88 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 		expectedErr          string
 	}{
 		{
-			name:                "test get project commit status deliveries with limit = 0 and no sortdirection",
+			name:                "get project commit status deliveries with limit = 0, no sortdirection",
 			client:              gwUser01Client,
 			projectRef:          project.ID,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get project commit status deliveries with limit = 0",
+			name:                "get project commit status deliveries with limit = 0",
 			client:              gwUser01Client,
 			projectRef:          project.ID,
 			sortDirection:       gwapitypes.SortDirectionAsc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get project commit status deliveries with limit less than project commit status deliveries",
+			name:                "get project commit status deliveries with limit less than results length",
 			client:              gwUser01Client,
 			projectRef:          project.ID,
 			limit:               2,
 			sortDirection:       gwapitypes.SortDirectionAsc,
-			expectedCallsNumber: runCount,
+			expectedCallsNumber: 5,
 		},
 		{
-			name:                "test get project commit status deliveries with limit greater than project commit status deliveries",
+			name:                "get project commit status deliveries with limit greater than results length",
 			client:              gwUser01Client,
 			projectRef:          project.ID,
-			limit:               10,
+			limit:               MaxLimit,
 			sortDirection:       gwapitypes.SortDirectionAsc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get project commit status deliveries with limit = 0 and sortDirection desc",
+			name:                "get project commit status deliveries with limit = 0, sortDirection desc",
 			client:              gwUser01Client,
 			projectRef:          project.ID,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:                "test get project commit status deliveries with limit less than project commit status deliveries and sortDirection desc",
+			name:                "get project commit status deliveries with limit less than results length, sortDirection desc",
 			client:              gwUser01Client,
 			projectRef:          project.ID,
 			limit:               2,
 			sortDirection:       gwapitypes.SortDirectionDesc,
-			expectedCallsNumber: runCount,
+			expectedCallsNumber: 5,
 		},
 		{
-			name:                "test get project commit status deliveries with limit greater than project commit status deliveries and sortDirection desc",
+			name:                "get project commit status deliveries with limit greater than results length, sortDirection desc",
 			client:              gwUser01Client,
 			projectRef:          project.ID,
-			limit:               10,
+			limit:               MaxLimit,
 			sortDirection:       gwapitypes.SortDirectionDesc,
 			expectedCallsNumber: 1,
 		},
 		{
-			name:          "test get project commit status deliveries with user unauthorized",
+			name:                 "get project commit status deliveries with limit less than results length, deliveryStatusFilter = delivered",
+			client:               gwUser01Client,
+			projectRef:           project.ID,
+			limit:                2,
+			sortDirection:        gwapitypes.SortDirectionAsc,
+			deliveryStatusFilter: []string{"delivered"},
+			expectedCallsNumber:  5,
+		},
+		{
+			name:                 "get project commit status deliveries with limit less than results length, deliveryStatusFilter = deliveryError",
+			client:               gwUser01Client,
+			projectRef:           project.ID,
+			limit:                2,
+			sortDirection:        gwapitypes.SortDirectionAsc,
+			deliveryStatusFilter: []string{"deliveryError"},
+			expectedCallsNumber:  1,
+		},
+		{
+			name:          "get project commit status deliveries with user unauthorized",
 			client:        gwUser02Client,
 			projectRef:    project.ID,
 			sortDirection: gwapitypes.SortDirectionAsc,
 			expectedErr:   remoteErrorForbidden,
 		},
 		{
-			name:          "test get project commit status deliveries with not existing project",
+			name:          "get project commit status deliveries with not existing project",
 			client:        gwUser01Client,
 			projectRef:    "project02",
 			sortDirection: gwapitypes.SortDirectionAsc,
 			expectedErr:   remoteErrorNotExist,
-		},
-		{
-			name:                "test get project commit status deliveries with deliverystatus = delivered",
-			client:              gwUser01Client,
-			projectRef:          project.ID,
-			sortDirection:       gwapitypes.SortDirectionAsc,
-			expectedCallsNumber: 1,
-		},
-		{
-			name:                "test get project commit status deliveries with deliverystatus = deliveryError",
-			client:              gwUser01Client,
-			projectRef:          project.ID,
-			sortDirection:       gwapitypes.SortDirectionAsc,
-			expectedCallsNumber: 1,
 		},
 	}
 
@@ -2388,11 +2360,12 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 
 			respAllCommitStatusDeliveries := []*gwapitypes.CommitStatusDeliveryResponse{}
 			sortDirection := tt.sortDirection
+			deliveryStatusFilter := tt.deliveryStatusFilter
 			callsNumber := 0
 			var cursor string
 
 			for {
-				respCommitStatusDeliveries, res, err := tt.client.GetProjectCommitStatusDeliveries(ctx, tt.projectRef, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Cursor: cursor, Limit: tt.limit, SortDirection: sortDirection}, DeliveryStatusFilter: tt.deliveryStatusFilter})
+				respCommitStatusDeliveries, res, err := tt.client.GetProjectCommitStatusDeliveries(ctx, tt.projectRef, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Cursor: cursor, Limit: tt.limit, SortDirection: sortDirection}, DeliveryStatusFilter: deliveryStatusFilter})
 				if tt.expectedErr == "" {
 					testutil.NilError(t, err)
 				} else {
@@ -2411,6 +2384,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 				}
 				cursor = res.Cursor
 				sortDirection = ""
+				deliveryStatusFilter = nil
 			}
 
 			assert.DeepEqual(t, expectedProject01CommitStatusDeliveries, respAllCommitStatusDeliveries)
@@ -2422,32 +2396,9 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 func TestProjectCommitStatusRedelivery(t *testing.T) {
 	t.Parallel()
 
-	config := `
-		{
-			runs: [
-			{
-				name: 'run01',
-				tasks: [
-				{
-					name: 'task01',
-					runtime: {
-					containers: [
-						{
-						image: 'alpine/git',
-						},
-					],
-					},
-					steps: [
-					{ type: 'run', command: 'env' },
-					],
-				},
-				],
-			},
-			],
-		}
-	`
+	config := EnvRunConfig
 
-	t.Run("test redelivery project commit status delivery with deliverystatus = deliveryError", func(t *testing.T) {
+	t.Run("redelivery project commit status delivery with deliverystatus = deliveryError", func(t *testing.T) {
 		dir := t.TempDir()
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -2461,21 +2412,17 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		gwUserAdminClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
 
 		_, _, err := gwUserAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser02})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		user02Token, _, err := gwUserAdminClient.CreateUserToken(ctx, agolaUser02, &gwapitypes.CreateUserTokenRequest{TokenName: "token01"})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		gwUser02Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, user02Token.Token)
 
 		giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
 
 		giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 
 		giteaRepo, project := createProject(ctx, t, giteaClient, gwUser01Client, withVisibility(gwapitypes.VisibilityPrivate))
 
@@ -2498,19 +2445,12 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		})
 
 		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
-		if len(runs) == 0 {
-			t.Fatalf("expected %d run got: %d", 1, len(runs))
-		}
+		testutil.NilError(t, err)
 
-		if runs[0].Phase != rstypes.RunPhaseFinished {
-			t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, runs[0].Phase)
-		}
-		if runs[0].Result != rstypes.RunResultSuccess {
-			t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, runs[0].Result)
-		}
+		assert.Assert(t, cmp.Len(runs, 1))
+
+		assert.Equal(t, runs[0].Phase, rstypes.RunPhaseFinished)
+		assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
 
 		_ = testutil.Wait(30*time.Second, func() (bool, error) {
 			commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
@@ -2531,30 +2471,20 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		})
 
 		// set a fake APIURL to make the delivery fail
-		_, _, err = gwUserAdminClient.UpdateRemoteSource(ctx, "gitea", &gwapitypes.UpdateRemoteSourceRequest{
-			APIURL: util.StringP("fakeGiteaAPIURL"),
-		})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		_, _, err = gwUserAdminClient.UpdateRemoteSource(ctx, "gitea", &gwapitypes.UpdateRemoteSourceRequest{APIURL: util.StringP("fakeGiteaAPIURL")})
+		testutil.NilError(t, err)
 
 		commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
-		if len(commitStatusDeliveries) != 2 {
-			t.Fatalf("expected 2 commitStatusDeliveries got: %d", len(commitStatusDeliveries))
-		}
+		testutil.NilError(t, err)
+
+		assert.Assert(t, cmp.Len(commitStatusDeliveries, 2))
 		for _, r := range commitStatusDeliveries {
-			if r.DeliveryStatus != gwapitypes.DeliveryStatusDelivered {
-				t.Fatalf("expected DeliveryStatus deliveryError, got %s", r.DeliveryStatus)
-			}
+			assert.Assert(t, cmp.Equal(r.DeliveryStatus, gwapitypes.DeliveryStatusDelivered))
 		}
 
 		_, err = gwUser01Client.ProjectCommitStatusRedelivery(ctx, project.ID, commitStatusDeliveries[0].ID)
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		_ = testutil.Wait(30*time.Second, func() (bool, error) {
 			commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionDesc}})
 			if err != nil {
@@ -2572,20 +2502,14 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		})
 
 		commitStatusDeliveries, _, err = gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 1, SortDirection: gwapitypes.SortDirectionDesc}})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
-		if len(commitStatusDeliveries) != 1 {
-			t.Fatalf("expected 1 commitStatusDeliveries got: %d", len(commitStatusDeliveries))
-		}
-		if commitStatusDeliveries[0].DeliveryStatus != gwapitypes.DeliveryStatusDeliveryError {
-			t.Fatalf("expected DeliveryStatus deliveryError, got %s", commitStatusDeliveries[0].DeliveryStatus)
-		}
+		testutil.NilError(t, err)
+
+		assert.Assert(t, cmp.Len(commitStatusDeliveries, 1))
+		assert.Assert(t, cmp.Equal(commitStatusDeliveries[0].DeliveryStatus, gwapitypes.DeliveryStatusDeliveryError))
 
 		_, err = gwUser01Client.ProjectCommitStatusRedelivery(ctx, project.ID, commitStatusDeliveries[0].ID)
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		_ = testutil.Wait(30*time.Second, func() (bool, error) {
 			commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 			if err != nil {
@@ -2600,24 +2524,16 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		})
 
 		commitStatusDeliveries, _, err = gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
-		if len(commitStatusDeliveries) != 4 {
-			t.Fatalf("expected 4 commitStatusDeliveries got: %d", len(commitStatusDeliveries))
-		}
+		testutil.NilError(t, err)
+
+		assert.Assert(t, cmp.Len(commitStatusDeliveries, 4))
 
 		_, err = gwUser02Client.ProjectCommitStatusRedelivery(ctx, project.ID, commitStatusDeliveries[0].ID)
 		expectedErr := remoteErrorForbidden
-		if err == nil {
-			t.Fatalf("expected error %v, got nil err", expectedErr)
-		}
-		if err.Error() != expectedErr {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr)
 	})
 
-	t.Run("test redelivery project run webhook delivery with deliverystatus = delivered", func(t *testing.T) {
+	t.Run("redelivery project run webhook delivery with deliverystatus = delivered", func(t *testing.T) {
 		dir := t.TempDir()
 		wrDir := t.TempDir()
 
@@ -2635,21 +2551,17 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		gwUserAdminClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
 
 		_, _, err := gwUserAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser02})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		user02Token, _, err := gwUserAdminClient.CreateUserToken(ctx, agolaUser02, &gwapitypes.CreateUserTokenRequest{TokenName: "token01"})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
+
 		gwUser02Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, user02Token.Token)
 
 		giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
 
 		giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 
 		giteaRepo, project := createProject(ctx, t, giteaClient, gwUser01Client, withVisibility(gwapitypes.VisibilityPrivate))
 
@@ -2672,19 +2584,12 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		})
 
 		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
-		if len(runs) == 0 {
-			t.Fatalf("expected %d run got: %d", 1, len(runs))
-		}
+		testutil.NilError(t, err)
 
-		if runs[0].Phase != rstypes.RunPhaseFinished {
-			t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, runs[0].Phase)
-		}
-		if runs[0].Result != rstypes.RunResultSuccess {
-			t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, runs[0].Result)
-		}
+		assert.Assert(t, cmp.Len(runs, 1))
+
+		assert.Equal(t, runs[0].Phase, rstypes.RunPhaseFinished)
+		assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
 
 		_ = testutil.Wait(30*time.Second, func() (bool, error) {
 			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
@@ -2705,42 +2610,27 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		})
 
 		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
-		if len(runWebhookDeliveries) != 4 {
-			t.Fatalf("expected 4 runWebhookDeliveries got: %d", len(runWebhookDeliveries))
-		}
+		testutil.NilError(t, err)
+
+		assert.Assert(t, cmp.Len(runWebhookDeliveries, 4))
 		for _, r := range runWebhookDeliveries {
-			if r.DeliveryStatus != gwapitypes.DeliveryStatusDelivered {
-				t.Fatalf("expected DeliveryStatus delivered, got %s", r.DeliveryStatus)
-			}
+			assert.Assert(t, cmp.Equal(r.DeliveryStatus, gwapitypes.DeliveryStatusDelivered))
 		}
 
 		_, err = gwUser01Client.ProjectRunWebhookRedelivery(ctx, project.ID, runWebhookDeliveries[0].ID)
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 
 		runWebhookDeliveries, _, err = gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
-		if len(runWebhookDeliveries) != 5 {
-			t.Fatalf("expected 5 runWebhookDeliveries got: %d", len(runWebhookDeliveries))
-		}
+		testutil.NilError(t, err)
+
+		assert.Assert(t, cmp.Len(runWebhookDeliveries, 5))
 
 		_, err = gwUser02Client.ProjectRunWebhookRedelivery(ctx, project.ID, runWebhookDeliveries[0].ID)
 		expectedErr := remoteErrorForbidden
-		if err == nil {
-			t.Fatalf("expected error %v, got nil err", expectedErr)
-		}
-		if err.Error() != expectedErr {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr)
 	})
 
-	t.Run("test redelivery project run webhook delivery with not existing project", func(t *testing.T) {
+	t.Run("redelivery project run webhook delivery with not existing project", func(t *testing.T) {
 		dir := t.TempDir()
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -2754,15 +2644,10 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 
 		_, err := gwUser01Client.ProjectRunWebhookRedelivery(ctx, "projecttestid", "runwebhookdeliverytestid")
 		expectedErr := remoteErrorNotExist
-		if err == nil {
-			t.Fatalf("expected error %v, got nil err", expectedErr)
-		}
-		if err.Error() != expectedErr {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr)
 	})
 
-	t.Run("test redelivery project run webhook delivery with not existing run webhook delivery", func(t *testing.T) {
+	t.Run("redelivery project run webhook delivery with not existing run webhook delivery", func(t *testing.T) {
 		dir := t.TempDir()
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -2777,23 +2662,16 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
 
 		giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 
 		_, project := createProject(ctx, t, giteaClient, gwUser01Client, withVisibility(gwapitypes.VisibilityPrivate))
 
 		_, err = gwUser01Client.ProjectRunWebhookRedelivery(ctx, project.ID, "runwebhookdeliverytestid")
 		expectedErr := remoteErrorNotExist
-		if err == nil {
-			t.Fatalf("expected error %v, got nil err", expectedErr)
-		}
-		if err.Error() != expectedErr {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr)
 	})
 
-	t.Run("test redelivery project run webhook delivery with projectRef that belong to another project", func(t *testing.T) {
+	t.Run("redelivery project run webhook delivery with projectRef that belong to another project", func(t *testing.T) {
 		dir := t.TempDir()
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -2809,9 +2687,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
 
 		giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 
 		giteaRepo, project01 := createProject(ctx, t, giteaClient, gwUser01Client, withVisibility(gwapitypes.VisibilityPrivate))
 
@@ -2822,9 +2698,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 			RepoPath:         path.Join(giteaUser01, "repo01"),
 			Visibility:       gwapitypes.VisibilityPublic,
 		})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
+		testutil.NilError(t, err)
 
 		push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
@@ -2845,19 +2719,12 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		})
 
 		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project01.ID, nil, nil, 0, 0, false)
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
-		if len(runs) == 0 {
-			t.Fatalf("expected %d run got: %d", 1, len(runs))
-		}
+		testutil.NilError(t, err)
 
-		if runs[0].Phase != rstypes.RunPhaseFinished {
-			t.Fatalf("expected run phase %q, got %q", rstypes.RunPhaseFinished, runs[0].Phase)
-		}
-		if runs[0].Result != rstypes.RunResultSuccess {
-			t.Fatalf("expected run result %q, got %q", rstypes.RunResultSuccess, runs[0].Result)
-		}
+		assert.Assert(t, cmp.Len(runs, 1))
+
+		assert.Equal(t, runs[0].Phase, rstypes.RunPhaseFinished)
+		assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
 
 		_ = testutil.Wait(30*time.Second, func() (bool, error) {
 			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project01.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
@@ -2878,26 +2745,16 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		})
 
 		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project01.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
-		if len(runWebhookDeliveries) != 4 {
-			t.Fatalf("expected 4 runWebhookDeliveries got: %d", len(runWebhookDeliveries))
-		}
+		testutil.NilError(t, err)
+
+		assert.Assert(t, cmp.Len(runWebhookDeliveries, 4))
 		for _, r := range runWebhookDeliveries {
-			if r.DeliveryStatus != gwapitypes.DeliveryStatusDeliveryError {
-				t.Fatalf("expected DeliveryStatus deliveryError, got %s", r.DeliveryStatus)
-			}
+			assert.Equal(t, r.DeliveryStatus, gwapitypes.DeliveryStatusDeliveryError)
 		}
 
 		_, err = gwUser01Client.ProjectRunWebhookRedelivery(ctx, project02.ID, runWebhookDeliveries[0].ID)
 		expectedErr := remoteErrorNotExist
-		if err == nil {
-			t.Fatalf("expected error %v, got nil err", expectedErr)
-		}
-		if err.Error() != expectedErr {
-			t.Fatalf("expected err %v, got err: %v", expectedErr, err)
-		}
+		assert.Error(t, err, expectedErr)
 	})
 }
 
@@ -2909,7 +2766,7 @@ func TestMaintenance(t *testing.T) {
 		f    func(ctx context.Context, t *testing.T, sc *setupContext)
 	}{
 		{
-			name: "test admin user enable maintenance",
+			name: "admin user enable maintenance",
 			f: func(ctx context.Context, t *testing.T, sc *setupContext) {
 				gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
 
@@ -2923,7 +2780,7 @@ func TestMaintenance(t *testing.T) {
 			},
 		},
 		{
-			name: "test user enable maintenance",
+			name: "user enable maintenance",
 			f: func(ctx context.Context, t *testing.T, sc *setupContext) {
 				gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
 
@@ -2944,7 +2801,7 @@ func TestMaintenance(t *testing.T) {
 			},
 		},
 		{
-			name: "test user disable maintenance",
+			name: "user disable maintenance",
 			f: func(ctx context.Context, t *testing.T, sc *setupContext) {
 				gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
 
@@ -2965,7 +2822,7 @@ func TestMaintenance(t *testing.T) {
 			},
 		},
 		{
-			name: "test admin user enable maintenance already enabled",
+			name: "admin user enable maintenance already enabled",
 			f: func(ctx context.Context, t *testing.T, sc *setupContext) {
 				gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
 
@@ -3004,7 +2861,7 @@ func TestMaintenance(t *testing.T) {
 			},
 		},
 		{
-			name: "test admin user disable maintenance",
+			name: "admin user disable maintenance",
 			f: func(ctx context.Context, t *testing.T, sc *setupContext) {
 				gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
 
@@ -3046,7 +2903,7 @@ func TestMaintenance(t *testing.T) {
 			},
 		},
 		{
-			name: "test admin user disable maintenance already disabled",
+			name: "admin user disable maintenance already disabled",
 			f: func(ctx context.Context, t *testing.T, sc *setupContext) {
 				gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
 
@@ -3059,7 +2916,7 @@ func TestMaintenance(t *testing.T) {
 			},
 		},
 		{
-			name: "test wrong provided servicename",
+			name: "wrong provided servicename",
 			f: func(ctx context.Context, t *testing.T, sc *setupContext) {
 				gwClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
 
@@ -3111,29 +2968,7 @@ func TestExportImport(t *testing.T) {
 
 	giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)
 
-	config := `
-				{
-					runs: [
-					  {
-						name: 'run01',
-						tasks: [
-							{
-							name: 'task01',
-							runtime: {
-								containers: [{
-									image: 'alpine/git',
-								},
-							  ],
-							},
-							steps: [
-								{ type: 'clone' },
-								{ type: 'run', command: 'env' },
-						      ],
-							},
-						],
-					  },
-					],
-				}`
+	config := EnvRunConfig
 
 	push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
 

@@ -95,64 +95,64 @@ func TestGetProjectGroup(t *testing.T) {
 		err    string
 	}{
 		{
-			name:   "test user owner get pub org pub pg",
+			name:   "user owner get pub org pub pg",
 			client: gwClientUser01,
 			pg:     pubOrgPubPG,
 		},
 		{
-			name:   "test user member get pub org pub pg",
+			name:   "user member get pub org pub pg",
 			client: gwClientUser02,
 			pg:     pubOrgPubPG,
 		},
 		{
-			name:   "test user not member get pub org pub pg",
+			name:   "user not member get pub org pub pg",
 			client: gwClientUser03,
 			pg:     pubOrgPubPG,
 		},
 		{
-			name:   "test user owner get pub org priv pg",
+			name:   "user owner get pub org priv pg",
 			client: gwClientUser01,
 			pg:     pubOrgPrivPG,
 		},
 		{
-			name:   "test user member get pub org priv pg",
+			name:   "user member get pub org priv pg",
 			client: gwClientUser02,
 			pg:     pubOrgPrivPG,
 		},
 		{
-			name:   "test user not member get pub org priv pg",
+			name:   "user not member get pub org priv pg",
 			client: gwClientUser03,
 			pg:     pubOrgPrivPG,
 			err:    remoteErrorNotExist,
 		},
 		{
-			name:   "test user owner get priv org pub pg",
+			name:   "user owner get priv org pub pg",
 			client: gwClientUser01,
 			pg:     privOrgPubPG,
 		},
 		{
-			name:   "test user member get priv org pub pg",
+			name:   "user member get priv org pub pg",
 			client: gwClientUser02,
 			pg:     privOrgPubPG,
 		},
 		{
-			name:   "test user not member get priv org pub pg",
+			name:   "user not member get priv org pub pg",
 			client: gwClientUser03,
 			pg:     privOrgPubPG,
 			err:    remoteErrorNotExist,
 		},
 		{
-			name:   "test user owner get priv org priv pg",
+			name:   "user owner get priv org priv pg",
 			client: gwClientUser01,
 			pg:     privOrgPrivPG,
 		},
 		{
-			name:   "test user member get priv org priv pg",
+			name:   "user member get priv org priv pg",
 			client: gwClientUser02,
 			pg:     privOrgPrivPG,
 		},
 		{
-			name:   "test user not member get priv org priv pg",
+			name:   "user not member get priv org priv pg",
 			client: gwClientUser03,
 			pg:     privOrgPrivPG,
 			err:    remoteErrorNotExist,
@@ -287,128 +287,128 @@ func TestGetProject(t *testing.T) {
 		err    string
 	}{
 		{
-			name:   "test user owner get pub org pub pg pub proj",
+			name:   "user owner get pub org pub pg pub proj",
 			client: gwClientUser01,
 			proj:   pubOrgPubPGPubProj,
 		},
 		{
-			name:   "test user member get pub org pub pg pub proj",
+			name:   "user member get pub org pub pg pub proj",
 			client: gwClientUser02,
 			proj:   pubOrgPubPGPubProj,
 		},
 		{
-			name:   "test user not member get pub org pub pg pub proj",
+			name:   "user not member get pub org pub pg pub proj",
 			client: gwClientUser03,
 			proj:   pubOrgPubPGPubProj,
 		},
 		{
-			name:   "test user owner get pub org pub pg priv proj",
+			name:   "user owner get pub org pub pg priv proj",
 			client: gwClientUser01,
 			proj:   pubOrgPubPGPrivProj,
 		},
 		{
-			name:   "test user member get pub org pub pg priv proj",
+			name:   "user member get pub org pub pg priv proj",
 			client: gwClientUser02,
 			proj:   pubOrgPubPGPrivProj,
 		},
 		{
-			name:   "test user not member get pub org pub pg priv proj",
+			name:   "user not member get pub org pub pg priv proj",
 			client: gwClientUser03,
 			proj:   pubOrgPubPGPrivProj,
 			err:    remoteErrorNotExist,
 		},
 		{
-			name:   "test user owner get pub org priv pg pub proj",
+			name:   "user owner get pub org priv pg pub proj",
 			client: gwClientUser01,
 			proj:   pubOrgPrivPGPubProj,
 		},
 		{
-			name:   "test user member get pub org priv pg pub proj",
+			name:   "user member get pub org priv pg pub proj",
 			client: gwClientUser02,
 			proj:   pubOrgPrivPGPubProj,
 		},
 		{
-			name:   "test user not member get pub org priv pg pub proj",
+			name:   "user not member get pub org priv pg pub proj",
 			client: gwClientUser03,
 			proj:   pubOrgPrivPGPubProj,
 			err:    remoteErrorNotExist,
 		},
 		{
-			name:   "test user owner get pub org priv pg priv proj",
+			name:   "user owner get pub org priv pg priv proj",
 			client: gwClientUser01,
 			proj:   pubOrgPrivPGPrivProj,
 		},
 		{
-			name:   "test user member get pub org priv pg priv proj",
+			name:   "user member get pub org priv pg priv proj",
 			client: gwClientUser02,
 			proj:   pubOrgPrivPGPrivProj,
 		},
 		{
-			name:   "test user not member get pub org priv pg priv proj",
+			name:   "user not member get pub org priv pg priv proj",
 			client: gwClientUser03,
 			proj:   pubOrgPrivPGPrivProj,
 			err:    remoteErrorNotExist,
 		},
 		{
-			name:   "test user owner get priv org pub pg pub proj",
+			name:   "user owner get priv org pub pg pub proj",
 			client: gwClientUser01,
 			proj:   privOrgPubPGPubProj,
 		},
 		{
-			name:   "test user member get priv org pub pg pub proj",
+			name:   "user member get priv org pub pg pub proj",
 			client: gwClientUser02,
 			proj:   privOrgPubPGPubProj,
 		},
 		{
-			name:   "test user not member get priv org pub pg pub proj",
+			name:   "user not member get priv org pub pg pub proj",
 			client: gwClientUser03,
 			proj:   privOrgPubPGPubProj,
 			err:    remoteErrorNotExist,
 		},
 		{
-			name:   "test user owner get priv org pub pg priv proj",
+			name:   "user owner get priv org pub pg priv proj",
 			client: gwClientUser01,
 			proj:   privOrgPubPGPrivProj,
 		},
 		{
-			name:   "test user member get priv org pub pg priv proj",
+			name:   "user member get priv org pub pg priv proj",
 			client: gwClientUser02,
 			proj:   privOrgPubPGPrivProj,
 		},
 		{
-			name:   "test user not member get priv org pub pg priv proj",
+			name:   "user not member get priv org pub pg priv proj",
 			client: gwClientUser03,
 			proj:   privOrgPubPGPrivProj,
 			err:    remoteErrorNotExist,
 		},
 		{
-			name:   "test user owner get priv org priv pg pub proj",
+			name:   "user owner get priv org priv pg pub proj",
 			client: gwClientUser01,
 			proj:   privOrgPrivPGPubProj,
 		},
 		{
-			name:   "test user member get priv org priv pg pub proj",
+			name:   "user member get priv org priv pg pub proj",
 			client: gwClientUser02,
 			proj:   privOrgPrivPGPubProj,
 		},
 		{
-			name:   "test user not member get priv org priv pg pub proj",
+			name:   "user not member get priv org priv pg pub proj",
 			client: gwClientUser03,
 			proj:   privOrgPrivPGPubProj,
 			err:    remoteErrorNotExist,
 		},
 		{
-			name:   "test user owner get priv org priv pg priv proj",
+			name:   "user owner get priv org priv pg priv proj",
 			client: gwClientUser01,
 			proj:   privOrgPrivPGPrivProj,
 		},
 		{
-			name:   "test user member get priv org priv pg priv proj",
+			name:   "user member get priv org priv pg priv proj",
 			client: gwClientUser02,
 			proj:   privOrgPrivPGPrivProj,
 		},
 		{
-			name:   "test user not member get priv org priv pg priv proj",
+			name:   "user not member get priv org priv pg priv proj",
 			client: gwClientUser03,
 			proj:   privOrgPrivPGPrivProj,
 			err:    remoteErrorNotExist,
@@ -457,7 +457,7 @@ func TestCreateProject(t *testing.T) {
 func TestUpdateProject(t *testing.T) {
 	t.Parallel()
 
-	t.Run("test update PassVarsToForkedPR in users's project", func(t *testing.T) {
+	t.Run("update PassVarsToForkedPR in users's project", func(t *testing.T) {
 		dir := t.TempDir()
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -493,7 +493,7 @@ func TestUpdateProject(t *testing.T) {
 		assert.Assert(t, project.PassVarsToForkedPR)
 	})
 
-	t.Run("test create users's project with MembersCanPerformRunActions true", func(t *testing.T) {
+	t.Run("create users's project with MembersCanPerformRunActions true", func(t *testing.T) {
 		dir := t.TempDir()
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -531,7 +531,7 @@ func TestUpdateProject(t *testing.T) {
 		assert.Error(t, err, remoteErrorBadRequest)
 	})
 
-	t.Run("test update users's project with MembersCanPerformRunActions true", func(t *testing.T) {
+	t.Run("update users's project with MembersCanPerformRunActions true", func(t *testing.T) {
 		dir := t.TempDir()
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -559,7 +559,7 @@ func TestUpdateProject(t *testing.T) {
 		assert.Error(t, err, remoteErrorBadRequest)
 	})
 
-	t.Run("test create/update orgs's project", func(t *testing.T) {
+	t.Run("create/update orgs's project", func(t *testing.T) {
 		dir := t.TempDir()
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -658,31 +658,7 @@ func TestRefreshRemoteRepositoryInfo(t *testing.T) {
 func TestGetProjectRuns(t *testing.T) {
 	t.Parallel()
 
-	config := `
-    {
-		runs: [
-		  {
-			name: 'run01',
-			tasks: [
-			  {
-				name: 'task01',
-				runtime: {
-				  containers: [
-					{
-					  image: 'alpine/git',
-					},
-				  ],
-				},
-				steps: [
-				  { type: 'clone' },
-				  { type: 'run', command: 'env' },
-				],
-			  },
-			],
-		  },
-		],
-	}
-	`
+	config := EnvRunConfig
 
 	tests := []struct {
 		name         string
@@ -691,27 +667,27 @@ func TestGetProjectRuns(t *testing.T) {
 		num          int
 	}{
 		{
-			name: "test get all runs",
+			name: "get all runs",
 			num:  1,
 		},
 		{
-			name:         "test get runs phase finished and result success",
+			name:         "get runs phase finished and result success",
 			phaseFilter:  []string{"finished"},
 			resultFilter: []string{"success"},
 			num:          1,
 		},
 		{
-			name:        "test get runs phase running",
+			name:        "get runs phase running",
 			phaseFilter: []string{"running"},
 			num:         0,
 		},
 		{
-			name:         "test get runs result failed",
+			name:         "get runs result failed",
 			resultFilter: []string{"failed"},
 			num:          0,
 		},
 		{
-			name:         "test get runs with all filters",
+			name:         "get runs with all filters",
 			phaseFilter:  []string{"setuperror", "queued", "cancelled", "running", "finished"},
 			resultFilter: []string{"unknown", "stopped", "success", "failed"},
 			num:          1,
@@ -764,8 +740,6 @@ func TestGetProjectRuns(t *testing.T) {
 			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, tt.phaseFilter, tt.resultFilter, 0, 0, false)
 			testutil.NilError(t, err)
 
-			t.Logf("runs: %s", util.Dump(runs))
-
 			assert.Assert(t, cmp.Len(runs, tt.num))
 
 			if len(runs) > 0 {
@@ -776,7 +750,7 @@ func TestGetProjectRuns(t *testing.T) {
 		})
 	}
 
-	t.Run("test get not existing run", func(t *testing.T) {
+	t.Run("get not existing run", func(t *testing.T) {
 		t.Parallel()
 
 		dir := t.TempDir()
@@ -806,33 +780,11 @@ func TestGetProjectRuns(t *testing.T) {
 func TestProjectRunActions(t *testing.T) {
 	t.Parallel()
 
-	config := `
-		{
-			runs: [
-			{
-				name: 'run01',
-				tasks: [
-				{
-					name: 'task01',
-					runtime: {
-					containers: [
-						{
-						image: 'alpine/git',
-						},
-					],
-					},
-					steps: [
-					{ type: 'run', command: 'env' },
-					],
-				},
-				],
-			},
-			],
-		}
-	`
+	config := EnvRunConfig
+
 	expectedErr := remoteErrorForbidden
 
-	t.Run("test run actions on org's project", func(t *testing.T) {
+	t.Run("run actions on org's project", func(t *testing.T) {
 		dir := t.TempDir()
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -939,7 +891,7 @@ func TestProjectRunActions(t *testing.T) {
 		assert.Error(t, err, expectedErr)
 	})
 
-	t.Run("test run actions on user's project", func(t *testing.T) {
+	t.Run("run actions on user's project", func(t *testing.T) {
 		dir := t.TempDir()
 
 		// for user project MembersCanPerformRunActions will be ignored

@@ -92,6 +92,58 @@ const (
 	remoteErrorForbidden    = "remote error forbidden"
 )
 
+const MaxLimit = 30
+
+const EnvRunConfig = `
+{
+	runs: [
+		{
+			name: 'run01',
+			tasks: [
+				{
+					name: 'task01',
+					runtime: {
+						containers: [
+							{
+								image: 'alpine/git',
+							},
+						],
+					},
+					steps: [
+						{ type: 'run', command: 'env' },
+					],
+				},
+			],
+		},
+	],
+}
+`
+
+const FailingRunConfig = `
+{
+	runs: [
+		{
+			name: 'run01',
+			tasks: [
+				{
+					name: 'task01',
+					runtime: {
+						containers: [
+							{
+								image: 'alpine/git',
+							},
+						],
+					},
+					steps: [
+						{ type: 'run', command: 'false' },
+					],
+				},
+			],
+		},
+	],
+}
+`
+
 func setupGitea(t *testing.T, dir, dockerBridgeAddress string) *testutil.TestGitea {
 	tgitea, err := testutil.NewTestGitea(t, dir, dockerBridgeAddress)
 	testutil.NilError(t, err)
