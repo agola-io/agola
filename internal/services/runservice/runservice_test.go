@@ -129,26 +129,29 @@ func TestExportImport(t *testing.T) {
 	err = rs.ah.SetMaintenanceEnabled(ctx, true)
 	testutil.NilError(t, err)
 
-	_ = testutil.Wait(30*time.Second, func() (bool, error) {
+	err = testutil.Wait(30*time.Second, func() (bool, error) {
 		if !rs.ah.IsMaintenanceMode() {
 			return false, nil
 		}
 
 		return true, nil
 	})
+	testutil.NilError(t, err)
+
 	err = rs.ah.Import(ctx, &export)
 	testutil.NilError(t, err)
 
 	err = rs.ah.SetMaintenanceEnabled(ctx, false)
 	testutil.NilError(t, err)
 
-	_ = testutil.Wait(30*time.Second, func() (bool, error) {
+	err = testutil.Wait(30*time.Second, func() (bool, error) {
 		if rs.ah.IsMaintenanceMode() {
 			return false, nil
 		}
 
 		return true, nil
 	})
+	testutil.NilError(t, err)
 
 	newRuns, err := getRuns(ctx, rs)
 	testutil.NilError(t, err)

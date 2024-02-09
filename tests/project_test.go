@@ -720,7 +720,7 @@ func TestGetProjectRuns(t *testing.T) {
 
 			push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
-			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+			err = testutil.Wait(60*time.Second, func() (bool, error) {
 				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 				if err != nil {
 					return false, nil
@@ -736,6 +736,7 @@ func TestGetProjectRuns(t *testing.T) {
 
 				return true, nil
 			})
+			testutil.NilError(t, err)
 
 			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, tt.phaseFilter, tt.resultFilter, 0, 0, false)
 			testutil.NilError(t, err)
@@ -831,7 +832,7 @@ func TestProjectRunActions(t *testing.T) {
 
 		// test org run actions executed by an user that's organization owner
 
-		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		err = testutil.Wait(60*time.Second, func() (bool, error) {
 			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 			if err != nil {
 				return false, nil
@@ -846,6 +847,7 @@ func TestProjectRunActions(t *testing.T) {
 
 			return true, nil
 		})
+		testutil.NilError(t, err)
 
 		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 		testutil.NilError(t, err)
@@ -924,7 +926,7 @@ func TestProjectRunActions(t *testing.T) {
 
 		push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
-		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		err = testutil.Wait(60*time.Second, func() (bool, error) {
 			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 			if err != nil {
 				return false, nil
@@ -939,6 +941,7 @@ func TestProjectRunActions(t *testing.T) {
 
 			return true, nil
 		})
+		testutil.NilError(t, err)
 
 		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 		testutil.NilError(t, err)

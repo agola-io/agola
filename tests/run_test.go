@@ -200,22 +200,24 @@ func TestPush(t *testing.T) {
 
 			push(t, tt.config, giteaRepo.CloneURL, giteaToken, tt.message, false)
 
-			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+			err = testutil.Wait(60*time.Second, func() (bool, error) {
 				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 				if err != nil {
 					return false, nil
 				}
 
-				if len(runs) == 0 {
+				if len(runs) != tt.num {
 					return false, nil
 				}
-				run := runs[0]
-				if run.Phase != rstypes.RunPhaseFinished {
-					return false, nil
+				for _, run := range runs {
+					if run.Phase != rstypes.RunPhaseFinished {
+						return false, nil
+					}
 				}
 
 				return true, nil
 			})
+			testutil.NilError(t, err)
 
 			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 			testutil.NilError(t, err)
@@ -339,7 +341,7 @@ func testDirectRun(t *testing.T, internalServicesAuth bool) {
 
 			directRun(t, dir, config, ConfigFormatJsonnet, sc.config.Gateway.APIExposedURL, token, tt.args...)
 
-			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+			err = testutil.Wait(60*time.Second, func() (bool, error) {
 				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
 				if err != nil {
 					return false, nil
@@ -349,13 +351,13 @@ func testDirectRun(t *testing.T, internalServicesAuth bool) {
 					return false, nil
 				}
 
-				run := runs[0]
-				if run.Phase != rstypes.RunPhaseFinished {
+				if runs[0].Phase != rstypes.RunPhaseFinished {
 					return false, nil
 				}
 
 				return true, nil
 			})
+			testutil.NilError(t, err)
 
 			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
 			testutil.NilError(t, err)
@@ -479,7 +481,7 @@ variable02: variable value 02
 			directRun(t, dir, config, ConfigFormatJsonnet, sc.config.Gateway.APIExposedURL, token, tt.args...)
 
 			// TODO(sgotti) add an util to wait for a run phase
-			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+			err = testutil.Wait(60*time.Second, func() (bool, error) {
 				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
 				if err != nil {
 					return false, nil
@@ -489,13 +491,13 @@ variable02: variable value 02
 					return false, nil
 				}
 
-				run := runs[0]
-				if run.Phase != rstypes.RunPhaseFinished {
+				if runs[0].Phase != rstypes.RunPhaseFinished {
 					return false, nil
 				}
 
 				return true, nil
 			})
+			testutil.NilError(t, err)
 
 			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
 			testutil.NilError(t, err)
@@ -629,7 +631,7 @@ func TestDirectRunLogs(t *testing.T) {
 
 			directRun(t, dir, config, ConfigFormatJsonnet, sc.config.Gateway.APIExposedURL, token)
 
-			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+			err = testutil.Wait(60*time.Second, func() (bool, error) {
 				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
 				if err != nil {
 					return false, nil
@@ -639,13 +641,13 @@ func TestDirectRunLogs(t *testing.T) {
 					return false, nil
 				}
 
-				run := runs[0]
-				if run.Phase != rstypes.RunPhaseFinished {
+				if runs[0].Phase != rstypes.RunPhaseFinished {
 					return false, nil
 				}
 
 				return true, nil
 			})
+			testutil.NilError(t, err)
 
 			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
 			testutil.NilError(t, err)
@@ -666,7 +668,7 @@ func TestDirectRunLogs(t *testing.T) {
 				}
 			}
 
-			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+			err = testutil.Wait(30*time.Second, func() (bool, error) {
 				t, _, err := gwClient.GetUserRunTask(ctx, user.ID, runs[0].Number, task.ID)
 				if err != nil {
 					return false, nil
@@ -679,6 +681,7 @@ func TestDirectRunLogs(t *testing.T) {
 				}
 				return true, nil
 			})
+			testutil.NilError(t, err)
 
 			if tt.delete {
 				_, err = gwClient.DeleteUserLogs(ctx, user.ID, run.Number, task.ID, tt.setup, tt.step)
@@ -914,7 +917,7 @@ func TestPullRequest(t *testing.T) {
 				_, _, err = giteaUser02Client.CreatePullRequest(giteaUser01, "repo01", prOpts)
 				testutil.NilError(t, err, "failed to create pull request")
 			}
-			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+			err = testutil.Wait(60*time.Second, func() (bool, error) {
 				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 				if err != nil {
 					return false, nil
@@ -923,13 +926,13 @@ func TestPullRequest(t *testing.T) {
 				if len(runs) == 0 {
 					return false, nil
 				}
-				run := runs[0]
-				if run.Phase != rstypes.RunPhaseFinished {
+				if runs[0].Phase != rstypes.RunPhaseFinished {
 					return false, nil
 				}
 
 				return true, nil
 			})
+			testutil.NilError(t, err)
 
 			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 			testutil.NilError(t, err)
@@ -1192,7 +1195,7 @@ func TestTaskTimeout(t *testing.T) {
 
 			directRun(t, dir, tt.config, ConfigFormatJsonnet, sc.config.Gateway.APIExposedURL, token)
 
-			_ = testutil.Wait(120*time.Second, func() (bool, error) {
+			err = testutil.Wait(120*time.Second, func() (bool, error) {
 				run, _, err := gwClient.GetUserRun(ctx, user.ID, 1)
 				if err != nil {
 					return false, nil
@@ -1208,6 +1211,7 @@ func TestTaskTimeout(t *testing.T) {
 
 				return true, nil
 			})
+			testutil.NilError(t, err)
 
 			run, _, err := gwClient.GetUserRun(ctx, user.ID, 1)
 			testutil.NilError(t, err)
@@ -1293,7 +1297,7 @@ func TestRunRequiredEnvVariables(t *testing.T) {
 			push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
 			// TODO(sgotti) add an util to wait for a run phase
-			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+			err = testutil.Wait(60*time.Second, func() (bool, error) {
 				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 				if err != nil {
 					return false, nil
@@ -1303,13 +1307,13 @@ func TestRunRequiredEnvVariables(t *testing.T) {
 					return false, nil
 				}
 
-				run := runs[0]
-				if run.Phase != rstypes.RunPhaseFinished {
+				if runs[0].Phase != rstypes.RunPhaseFinished {
 					return false, nil
 				}
 
 				return true, nil
 			})
+			testutil.NilError(t, err)
 
 			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 			testutil.NilError(t, err)
@@ -1506,7 +1510,7 @@ def main(ctx):
 				directRun(t, dir, config, configFormat, sc.config.Gateway.APIExposedURL, token, tt.args...)
 
 				// TODO(sgotti) add an util to wait for a run phase
-				_ = testutil.Wait(30*time.Second, func() (bool, error) {
+				err = testutil.Wait(60*time.Second, func() (bool, error) {
 					runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
 					if err != nil {
 						return false, nil
@@ -1516,13 +1520,13 @@ def main(ctx):
 						return false, nil
 					}
 
-					run := runs[0]
-					if run.Phase != rstypes.RunPhaseFinished {
+					if runs[0].Phase != rstypes.RunPhaseFinished {
 						return false, nil
 					}
 
 					return true, nil
 				})
+				testutil.NilError(t, err)
 
 				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
 				testutil.NilError(t, err)
@@ -1636,7 +1640,7 @@ func TestRunEventsNotification(t *testing.T) {
 
 			push(t, tt.config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
-			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+			err = testutil.Wait(60*time.Second, func() (bool, error) {
 				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 				if err != nil {
 					return false, nil
@@ -1651,6 +1655,7 @@ func TestRunEventsNotification(t *testing.T) {
 
 				return true, nil
 			})
+			testutil.NilError(t, err)
 
 			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 			testutil.NilError(t, err)
@@ -1663,7 +1668,7 @@ func TestRunEventsNotification(t *testing.T) {
 			run, _, err := gwClient.GetProjectRun(ctx, project.ID, runs[0].Number)
 			testutil.NilError(t, err)
 
-			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+			err = testutil.Wait(30*time.Second, func() (bool, error) {
 				webhooks, err := wr.webhooks.getWebhooks()
 				testutil.NilError(t, err)
 
@@ -1673,6 +1678,7 @@ func TestRunEventsNotification(t *testing.T) {
 
 				return true, nil
 			})
+			testutil.NilError(t, err)
 
 			webhooks, err := wr.webhooks.getWebhooks()
 			testutil.NilError(t, err)

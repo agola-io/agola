@@ -266,13 +266,14 @@ func TestExportImport(t *testing.T) {
 	err = cs.ah.SetMaintenanceEnabled(ctx, true)
 	testutil.NilError(t, err)
 
-	_ = testutil.Wait(30*time.Second, func() (bool, error) {
+	err = testutil.Wait(30*time.Second, func() (bool, error) {
 		if !cs.ah.IsMaintenanceMode() {
 			return false, nil
 		}
 
 		return true, nil
 	})
+	testutil.NilError(t, err)
 
 	err = cs.ah.Import(ctx, &export)
 	testutil.NilError(t, err)
@@ -280,13 +281,14 @@ func TestExportImport(t *testing.T) {
 	err = cs.ah.SetMaintenanceEnabled(ctx, false)
 	testutil.NilError(t, err)
 
-	_ = testutil.Wait(30*time.Second, func() (bool, error) {
+	err = testutil.Wait(30*time.Second, func() (bool, error) {
 		if cs.ah.IsMaintenanceMode() {
 			return false, nil
 		}
 
 		return true, nil
 	})
+	testutil.NilError(t, err)
 
 	newRemoteSources, err := getRemoteSources(ctx, cs)
 	testutil.NilError(t, err)
