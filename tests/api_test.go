@@ -1448,7 +1448,7 @@ func TestCommitStatusDelivery(t *testing.T) {
 
 			push(t, tt.config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
-			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+			err = testutil.Wait(60*time.Second, func() (bool, error) {
 				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 				if err != nil {
 					return false, nil
@@ -1463,6 +1463,7 @@ func TestCommitStatusDelivery(t *testing.T) {
 
 				return true, nil
 			})
+			testutil.NilError(t, err)
 
 			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 			testutil.NilError(t, err)
@@ -1472,7 +1473,7 @@ func TestCommitStatusDelivery(t *testing.T) {
 			assert.Equal(t, runs[0].Phase, tt.expectedRunPhase)
 			assert.Equal(t, runs[0].Result, tt.expectedRunResult)
 
-			_ = testutil.Wait(30*time.Second, func() (bool, error) {
+			err = testutil.Wait(30*time.Second, func() (bool, error) {
 				combinedStatus, _, err := giteaClient.GetCombinedStatus(agolaUser01, giteaRepo.Name, "master")
 				if err != nil {
 					return false, nil
@@ -1484,6 +1485,7 @@ func TestCommitStatusDelivery(t *testing.T) {
 
 				return true, nil
 			})
+			testutil.NilError(t, err)
 
 			targetURL, err := webRunURL(sc.config.Notification.WebExposedURL, project.ID, runs[0].Number)
 			testutil.NilError(t, err)
@@ -1565,7 +1567,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 		push(t, fmt.Sprintf(config, i), giteaRepo.CloneURL, giteaToken, "commit", false)
 	}
 
-	_ = testutil.Wait(60*time.Second, func() (bool, error) {
+	err = testutil.Wait(60*time.Second, func() (bool, error) {
 		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 		if err != nil {
 			return false, nil
@@ -1582,6 +1584,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 
 		return true, nil
 	})
+	testutil.NilError(t, err)
 
 	runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 	testutil.NilError(t, err)
@@ -1592,7 +1595,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 		assert.Equal(t, runs[i].Result, rstypes.RunResultSuccess)
 	}
 
-	_ = testutil.Wait(30*time.Second, func() (bool, error) {
+	err = testutil.Wait(60*time.Second, func() (bool, error) {
 		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 		if err != nil {
 			return false, nil
@@ -1609,6 +1612,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 
 		return true, nil
 	})
+	testutil.NilError(t, err)
 
 	runWebhookDeliveries, resp, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 	testutil.NilError(t, err)
@@ -1815,7 +1819,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 
 		push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
-		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		err = testutil.Wait(60*time.Second, func() (bool, error) {
 			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 			if err != nil {
 				return false, nil
@@ -1830,6 +1834,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 
 			return true, nil
 		})
+		testutil.NilError(t, err)
 
 		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 		testutil.NilError(t, err)
@@ -1839,7 +1844,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		assert.Equal(t, runs[0].Phase, rstypes.RunPhaseFinished)
 		assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
 
-		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		err = testutil.Wait(60*time.Second, func() (bool, error) {
 			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 			if err != nil {
 				return false, nil
@@ -1856,6 +1861,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 
 			return true, nil
 		})
+		testutil.NilError(t, err)
 
 		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 		testutil.NilError(t, err)
@@ -1868,7 +1874,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		_, err = gwUser01Client.ProjectRunWebhookRedelivery(ctx, project.ID, runWebhookDeliveries[0].ID)
 		testutil.NilError(t, err)
 
-		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		err = testutil.Wait(60*time.Second, func() (bool, error) {
 			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 			if err != nil {
 				return false, nil
@@ -1880,6 +1886,8 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 
 			return true, nil
 		})
+		testutil.NilError(t, err)
+
 		runWebhookDeliveries, _, err = gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 		testutil.NilError(t, err)
 
@@ -1924,7 +1932,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 
 		push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
-		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		err = testutil.Wait(60*time.Second, func() (bool, error) {
 			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 			if err != nil {
 				return false, nil
@@ -1939,6 +1947,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 
 			return true, nil
 		})
+		testutil.NilError(t, err)
 
 		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 		testutil.NilError(t, err)
@@ -1948,7 +1957,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		assert.Equal(t, runs[0].Phase, rstypes.RunPhaseFinished)
 		assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
 
-		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		err = testutil.Wait(60*time.Second, func() (bool, error) {
 			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 			if err != nil {
 				return false, nil
@@ -1965,6 +1974,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 
 			return true, nil
 		})
+		testutil.NilError(t, err)
 
 		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 		testutil.NilError(t, err)
@@ -2059,7 +2069,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 
 		push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
-		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		err = testutil.Wait(60*time.Second, func() (bool, error) {
 			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project01.ID, nil, nil, 0, 0, false)
 			if err != nil {
 				return false, nil
@@ -2074,6 +2084,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 
 			return true, nil
 		})
+		testutil.NilError(t, err)
 
 		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project01.ID, nil, nil, 0, 0, false)
 		testutil.NilError(t, err)
@@ -2083,7 +2094,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		assert.Equal(t, runs[0].Phase, rstypes.RunPhaseFinished)
 		assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
 
-		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		err = testutil.Wait(60*time.Second, func() (bool, error) {
 			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project01.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 			if err != nil {
 				return false, nil
@@ -2100,6 +2111,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 
 			return true, nil
 		})
+		testutil.NilError(t, err)
 
 		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project01.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 		testutil.NilError(t, err)
@@ -2177,7 +2189,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 		push(t, fmt.Sprintf(config, i), giteaRepo.CloneURL, giteaToken, "commit", false)
 	}
 
-	_ = testutil.Wait(60*time.Second, func() (bool, error) {
+	err = testutil.Wait(60*time.Second, func() (bool, error) {
 		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, true)
 		if err != nil {
 			return false, nil
@@ -2194,6 +2206,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 
 		return true, nil
 	})
+	testutil.NilError(t, err)
 
 	runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, true)
 	testutil.NilError(t, err)
@@ -2204,7 +2217,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 		assert.Equal(t, runs[i].Result, rstypes.RunResultSuccess)
 	}
 
-	_ = testutil.Wait(30*time.Second, func() (bool, error) {
+	err = testutil.Wait(60*time.Second, func() (bool, error) {
 		commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 		if err != nil {
 			return false, nil
@@ -2221,6 +2234,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 
 		return true, nil
 	})
+	testutil.NilError(t, err)
 
 	commitStatusDeliveries, resp, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc}})
 	testutil.NilError(t, err)
@@ -2428,7 +2442,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 
 		push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
-		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		err = testutil.Wait(60*time.Second, func() (bool, error) {
 			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 			if err != nil {
 				return false, nil
@@ -2443,6 +2457,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 
 			return true, nil
 		})
+		testutil.NilError(t, err)
 
 		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 		testutil.NilError(t, err)
@@ -2452,7 +2467,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		assert.Equal(t, runs[0].Phase, rstypes.RunPhaseFinished)
 		assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
 
-		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		err = testutil.Wait(60*time.Second, func() (bool, error) {
 			commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 			if err != nil {
 				return false, nil
@@ -2462,13 +2477,14 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 				return false, nil
 			}
 			for _, r := range commitStatusDeliveries {
-				if r.DeliveryStatus != gwapitypes.DeliveryStatusDeliveryError {
+				if r.DeliveryStatus != gwapitypes.DeliveryStatusDelivered {
 					return false, nil
 				}
 			}
 
 			return true, nil
 		})
+		testutil.NilError(t, err)
 
 		// set a fake APIURL to make the delivery fail
 		_, _, err = gwUserAdminClient.UpdateRemoteSource(ctx, "gitea", &gwapitypes.UpdateRemoteSourceRequest{APIURL: util.StringP("fakeGiteaAPIURL")})
@@ -2485,7 +2501,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		_, err = gwUser01Client.ProjectCommitStatusRedelivery(ctx, project.ID, commitStatusDeliveries[0].ID)
 		testutil.NilError(t, err)
 
-		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		err = testutil.Wait(60*time.Second, func() (bool, error) {
 			commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionDesc}})
 			if err != nil {
 				return false, nil
@@ -2500,6 +2516,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 
 			return true, nil
 		})
+		testutil.NilError(t, err)
 
 		commitStatusDeliveries, _, err = gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 1, SortDirection: gwapitypes.SortDirectionDesc}})
 		testutil.NilError(t, err)
@@ -2510,18 +2527,19 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		_, err = gwUser01Client.ProjectCommitStatusRedelivery(ctx, project.ID, commitStatusDeliveries[0].ID)
 		testutil.NilError(t, err)
 
-		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		err = testutil.Wait(60*time.Second, func() (bool, error) {
 			commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 			if err != nil {
 				return false, nil
 			}
 
-			if len(commitStatusDeliveries) != 3 {
+			if len(commitStatusDeliveries) != 4 {
 				return false, nil
 			}
 
 			return true, nil
 		})
+		testutil.NilError(t, err)
 
 		commitStatusDeliveries, _, err = gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 		testutil.NilError(t, err)
@@ -2567,7 +2585,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 
 		push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
-		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		err = testutil.Wait(60*time.Second, func() (bool, error) {
 			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 			if err != nil {
 				return false, nil
@@ -2582,6 +2600,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 
 			return true, nil
 		})
+		testutil.NilError(t, err)
 
 		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 		testutil.NilError(t, err)
@@ -2591,7 +2610,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		assert.Equal(t, runs[0].Phase, rstypes.RunPhaseFinished)
 		assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
 
-		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		err = testutil.Wait(60*time.Second, func() (bool, error) {
 			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 			if err != nil {
 				return false, nil
@@ -2608,6 +2627,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 
 			return true, nil
 		})
+		testutil.NilError(t, err)
 
 		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 		testutil.NilError(t, err)
@@ -2702,7 +2722,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 
 		push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
-		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		err = testutil.Wait(60*time.Second, func() (bool, error) {
 			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project01.ID, nil, nil, 0, 0, false)
 			if err != nil {
 				return false, nil
@@ -2717,6 +2737,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 
 			return true, nil
 		})
+		testutil.NilError(t, err)
 
 		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project01.ID, nil, nil, 0, 0, false)
 		testutil.NilError(t, err)
@@ -2726,7 +2747,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		assert.Equal(t, runs[0].Phase, rstypes.RunPhaseFinished)
 		assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
 
-		_ = testutil.Wait(30*time.Second, func() (bool, error) {
+		err = testutil.Wait(60*time.Second, func() (bool, error) {
 			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project01.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 			if err != nil {
 				return false, nil
@@ -2743,6 +2764,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 
 			return true, nil
 		})
+		testutil.NilError(t, err)
 
 		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project01.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 		testutil.NilError(t, err)
@@ -2832,7 +2854,7 @@ func TestMaintenance(t *testing.T) {
 				_, err = gwClient.EnableMaintenance(ctx, runserviceService)
 				testutil.NilError(t, err)
 
-				_ = testutil.Wait(30*time.Second, func() (bool, error) {
+				err = testutil.Wait(30*time.Second, func() (bool, error) {
 					maintenanceStatus, _, err := gwClient.GetMaintenanceStatus(ctx, configstoreService)
 					if err != nil {
 						return false, nil
@@ -2851,6 +2873,7 @@ func TestMaintenance(t *testing.T) {
 
 					return true, nil
 				})
+				testutil.NilError(t, err)
 
 				expectedErr := remoteErrorBadRequest
 				_, err = gwClient.EnableMaintenance(ctx, configstoreService)
@@ -2868,7 +2891,7 @@ func TestMaintenance(t *testing.T) {
 				_, err := gwClient.EnableMaintenance(ctx, configstoreService)
 				testutil.NilError(t, err)
 
-				_ = testutil.Wait(30*time.Second, func() (bool, error) {
+				err = testutil.Wait(30*time.Second, func() (bool, error) {
 					maintenanceStatus, _, err := gwClient.GetMaintenanceStatus(ctx, configstoreService)
 					if err != nil {
 						return false, nil
@@ -2879,6 +2902,7 @@ func TestMaintenance(t *testing.T) {
 
 					return true, nil
 				})
+				testutil.NilError(t, err)
 
 				_, err = gwClient.DisableMaintenance(ctx, configstoreService)
 				testutil.NilError(t, err)
@@ -2886,7 +2910,7 @@ func TestMaintenance(t *testing.T) {
 				_, err = gwClient.EnableMaintenance(ctx, runserviceService)
 				testutil.NilError(t, err)
 
-				_ = testutil.Wait(30*time.Second, func() (bool, error) {
+				err = testutil.Wait(30*time.Second, func() (bool, error) {
 					maintenanceStatus, _, err := gwClient.GetMaintenanceStatus(ctx, runserviceService)
 					if err != nil {
 						return false, nil
@@ -2897,6 +2921,7 @@ func TestMaintenance(t *testing.T) {
 
 					return true, nil
 				})
+				testutil.NilError(t, err)
 
 				_, err = gwClient.DisableMaintenance(ctx, runserviceService)
 				testutil.NilError(t, err)
@@ -2972,7 +2997,7 @@ func TestExportImport(t *testing.T) {
 
 	push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
-	_ = testutil.Wait(30*time.Second, func() (bool, error) {
+	err = testutil.Wait(60*time.Second, func() (bool, error) {
 		runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 		if err != nil {
 			return false, nil
@@ -2988,6 +3013,7 @@ func TestExportImport(t *testing.T) {
 
 		return true, nil
 	})
+	testutil.NilError(t, err)
 
 	runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
 	testutil.NilError(t, err)
@@ -3052,7 +3078,7 @@ func TestExportImport(t *testing.T) {
 	_, err = gwClient.EnableMaintenance(ctx, runserviceService)
 	testutil.NilError(t, err)
 
-	_ = testutil.Wait(30*time.Second, func() (bool, error) {
+	err = testutil.Wait(30*time.Second, func() (bool, error) {
 		maintenanceStatus, _, err := gwClient.GetMaintenanceStatus(ctx, configstoreService)
 		if err != nil {
 			return false, nil
@@ -3071,6 +3097,7 @@ func TestExportImport(t *testing.T) {
 
 		return true, nil
 	})
+	testutil.NilError(t, err)
 
 	r, err := os.Open(filepath.Join(dir, "export-configstore"))
 	testutil.NilError(t, err)
@@ -3084,7 +3111,7 @@ func TestExportImport(t *testing.T) {
 	_, err = gwClient.DisableMaintenance(ctx, runserviceService)
 	testutil.NilError(t, err)
 
-	_ = testutil.Wait(30*time.Second, func() (bool, error) {
+	err = testutil.Wait(30*time.Second, func() (bool, error) {
 		maintenanceStatus, _, err := gwClient.GetMaintenanceStatus(ctx, configstoreService)
 		if err != nil {
 			return false, nil
@@ -3103,6 +3130,7 @@ func TestExportImport(t *testing.T) {
 
 		return true, nil
 	})
+	testutil.NilError(t, err)
 
 	impUsers, _, err := gwClient.GetUsers(ctx, nil)
 	testutil.NilError(t, err)
