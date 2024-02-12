@@ -41,7 +41,7 @@ type runListOptions struct {
 	projectRef  string
 	username    string
 	phaseFilter []string
-	limit       int
+	limit       uint
 	start       uint64
 }
 
@@ -65,7 +65,7 @@ func init() {
 	flags.StringVar(&runListOpts.projectRef, "project", "", "project id or full path")
 	flags.StringVar(&runListOpts.username, "username", "", "User name for user direct runs")
 	flags.StringSliceVarP(&runListOpts.phaseFilter, "phase", "s", nil, "filter runs matching the provided phase. This option can be repeated multiple times")
-	flags.IntVar(&runListOpts.limit, "limit", 10, "max number of runs to show")
+	flags.UintVar(&runListOpts.limit, "limit", 10, "max number of runs to show")
 	flags.Uint64Var(&runListOpts.start, "start", 0, "starting run number (excluded) to fetch")
 
 	cmdRun.AddCommand(cmdRunList)
@@ -105,61 +105,86 @@ func runList(cmd *cobra.Command, args []string) error {
 
 	isProject := !flags.Changed("username")
 
-	var runsResp []*gwapitypes.RunsResponse
-	var err error
-	if isProject {
-		runsResp, _, err = gwClient.GetProjectRuns(context.TODO(), runListOpts.projectRef, runListOpts.phaseFilter, nil, runListOpts.start, runListOpts.limit, false)
-	} else {
-		runsResp, _, err = gwClient.GetUserRuns(context.TODO(), runListOpts.username, runListOpts.phaseFilter, nil, runListOpts.start, runListOpts.limit, false)
-	}
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	runs := make([]*runDetails, len(runsResp))
-	for i, runResponse := range runsResp {
+	limit := int(runListOpts.limit)
+	runCount := 0
+	var cursor string
+	for {
+		var runsResp []*gwapitypes.RunsResponse
 		var err error
-		var run *gwapitypes.RunResponse
-		if isProject {
-			run, _, err = gwClient.GetProjectRun(context.TODO(), runListOpts.projectRef, runResponse.Number)
+
+		var getRunsOptions *gwclient.GetRunsOptions
+		if cursor == "" {
+			getRunsOptions = &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc}, PhaseFilter: runListOpts.phaseFilter, StartRunCounter: runListOpts.start}
 		} else {
-			run, _, err = gwClient.GetUserRun(context.TODO(), runListOpts.username, runResponse.Number)
+			getRunsOptions = &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{Cursor: cursor}}
+		}
+		getRunsOptions.ListOptions.Limit = limit - runCount
+
+		var resp *gwclient.Response
+		if isProject {
+			runsResp, resp, err = gwClient.GetProjectRuns(context.TODO(), runListOpts.projectRef, getRunsOptions)
+		} else {
+			runsResp, resp, err = gwClient.GetUserRuns(context.TODO(), runListOpts.username, getRunsOptions)
 		}
 		if err != nil {
 			return errors.WithStack(err)
 		}
+		cursor = resp.Cursor
 
-		tasks := []*taskDetails{}
-		for _, task := range run.Tasks {
-			var runTaskResponse *gwapitypes.RunTaskResponse
-			if isProject {
-				runTaskResponse, _, err = gwClient.GetProjectRunTask(context.TODO(), runListOpts.projectRef, run.Number, task.ID)
-			} else {
-				runTaskResponse, _, err = gwClient.GetUserRunTask(context.TODO(), runListOpts.username, run.Number, task.ID)
-			}
-			t := &taskDetails{
-				name:            task.Name,
-				level:           task.Level,
-				runTaskResponse: runTaskResponse,
-				retrieveError:   err,
-			}
-			tasks = append(tasks, t)
+		runCount += len(runsResp)
+		if runCount >= limit {
+			cursor = ""
 		}
 
-		sort.Slice(tasks, func(i, j int) bool {
-			if tasks[i].level != tasks[j].level {
-				return tasks[i].level < tasks[j].level
+		runs := make([]*runDetails, len(runsResp))
+		for i, runResponse := range runsResp {
+			var err error
+			var run *gwapitypes.RunResponse
+			if isProject {
+				run, _, err = gwClient.GetProjectRun(context.TODO(), runListOpts.projectRef, runResponse.Number)
+			} else {
+				run, _, err = gwClient.GetUserRun(context.TODO(), runListOpts.username, runResponse.Number)
 			}
-			return tasks[i].name < tasks[j].name
-		})
+			if err != nil {
+				return errors.WithStack(err)
+			}
 
-		runs[i] = &runDetails{
-			runResponse: run,
-			tasks:       tasks,
+			tasks := []*taskDetails{}
+			for _, task := range run.Tasks {
+				var runTaskResponse *gwapitypes.RunTaskResponse
+				if isProject {
+					runTaskResponse, _, err = gwClient.GetProjectRunTask(context.TODO(), runListOpts.projectRef, run.Number, task.ID)
+				} else {
+					runTaskResponse, _, err = gwClient.GetUserRunTask(context.TODO(), runListOpts.username, run.Number, task.ID)
+				}
+				t := &taskDetails{
+					name:            task.Name,
+					level:           task.Level,
+					runTaskResponse: runTaskResponse,
+					retrieveError:   err,
+				}
+				tasks = append(tasks, t)
+			}
+
+			sort.Slice(tasks, func(i, j int) bool {
+				if tasks[i].level != tasks[j].level {
+					return tasks[i].level < tasks[j].level
+				}
+				return tasks[i].name < tasks[j].name
+			})
+
+			runs[i] = &runDetails{
+				runResponse: run,
+				tasks:       tasks,
+			}
+		}
+
+		printRuns(runs)
+
+		if cursor == "" {
+			break
 		}
 	}
-
-	printRuns(runs)
 
 	return nil
 }

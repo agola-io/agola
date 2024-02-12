@@ -107,6 +107,68 @@ func parseRequestOptions(r *http.Request) (*requestOptions, error) {
 	}, nil
 }
 
+type groupRunsRequestOptions struct {
+	*requestOptions
+
+	StartRunCounter uint64
+
+	SubGroup     string
+	PhaseFilter  []string
+	ResultFilter []string
+}
+
+func parseGroupRunsRequestOptions(r *http.Request) (*groupRunsRequestOptions, error) {
+	ropts, err := parseRequestOptions(r)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	query := r.URL.Query()
+
+	startRunCounterStr := query.Get("start")
+
+	var startRunCounter uint64
+	hasStartRunCounter := false
+	if startRunCounterStr != "" {
+		hasStartRunCounter = true
+
+		var err error
+		startRunCounter, err = strconv.ParseUint(startRunCounterStr, 10, 64)
+		if err != nil {
+			return nil, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse run counter"))
+		}
+	}
+
+	subGroup := query.Get("subgroup")
+	phaseFilter := query["phase"]
+	resultFilter := query["result"]
+
+	if ropts.Cursor != "" {
+		if hasStartRunCounter {
+			return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("only one of cursor or start should be provided"))
+		}
+		if subGroup != "" {
+			return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("only one of cursor or subgroup should be provided"))
+		}
+		if len(phaseFilter) > 0 {
+			return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("only one of cursor or phaseFilter should be provided"))
+		}
+		if len(resultFilter) > 0 {
+			return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("only one of cursor or resultFilter should be provided"))
+		}
+	}
+
+	return &groupRunsRequestOptions{
+		requestOptions: ropts,
+
+		StartRunCounter: startRunCounter,
+
+		SubGroup:     subGroup,
+		PhaseFilter:  phaseFilter,
+		ResultFilter: resultFilter,
+	}, nil
+}
+
 func addCursorHeader(w http.ResponseWriter, cursor string) {
 	w.Header().Add(agolaCursorHeader, cursor)
 }

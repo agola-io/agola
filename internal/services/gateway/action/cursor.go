@@ -44,3 +44,13 @@ type DeliveryCursor struct {
 
 	DeliveryStatusFilter []string
 }
+
+type GroupRunsCursor struct {
+	StartRunCounter uint64
+
+	SortDirection SortDirection
+
+	SubGroup     string
+	PhaseFilter  []string
+	ResultFilter []string
+}

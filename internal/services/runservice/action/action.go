@@ -54,6 +54,72 @@ func NewActionHandler(log zerolog.Logger, d *db.DB, ost *objectstorage.ObjStorag
 	}
 }
 
+type GetGroupRunsRequest struct {
+	Group string
+
+	Limit         int
+	SortDirection types.SortDirection
+
+	ChangeGroups    []string
+	StartRunCounter uint64
+	PhaseFilter     []types.RunPhase
+	ResultFilter    []types.RunResult
+}
+
+type GetGroupRunsResponse struct {
+	Runs                    []*types.Run
+	ChangeGroupsUpdateToken string
+
+	HasMore bool
+}
+
+func (h *ActionHandler) GetGroupRuns(ctx context.Context, req *GetGroupRunsRequest) (*GetGroupRunsResponse, error) {
+	limit := req.Limit
+	if limit > 0 {
+		limit += 1
+	}
+	if req.SortDirection == "" {
+		req.SortDirection = types.SortDirectionDesc
+	}
+
+	var runs []*types.Run
+	var cgt *types.ChangeGroupsUpdateToken
+
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		runs, err = h.d.GetGroupRuns(tx, req.Group, req.PhaseFilter, req.ResultFilter, req.StartRunCounter, limit, req.SortDirection)
+		if err != nil {
+			h.log.Err(err).Send()
+			return errors.WithStack(err)
+		}
+
+		cgt, err = h.GetChangeGroupsUpdateTokens(tx, req.ChangeGroups)
+		return errors.WithStack(err)
+	})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	cgts, err := types.MarshalChangeGroupsUpdateToken(cgt)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	var hasMore bool
+	if req.Limit > 0 {
+		hasMore = len(runs) > req.Limit
+		if hasMore {
+			runs = runs[0:req.Limit]
+		}
+	}
+
+	return &GetGroupRunsResponse{
+		Runs:                    runs,
+		ChangeGroupsUpdateToken: cgts,
+		HasMore:                 hasMore,
+	}, nil
+}
+
 type RunChangePhaseRequest struct {
 	RunID                   string
 	Phase                   types.RunPhase

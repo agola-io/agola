@@ -201,7 +201,7 @@ func TestPush(t *testing.T) {
 			push(t, tt.config, giteaRepo.CloneURL, giteaToken, tt.message, false)
 
 			err = testutil.Wait(60*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc}})
 				if err != nil {
 					return false, nil
 				}
@@ -219,7 +219,7 @@ func TestPush(t *testing.T) {
 			})
 			testutil.NilError(t, err)
 
-			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc}})
 			testutil.NilError(t, err)
 
 			assert.Assert(t, cmp.Len(runs, tt.num))
@@ -342,7 +342,7 @@ func testDirectRun(t *testing.T, internalServicesAuth bool) {
 			directRun(t, dir, config, ConfigFormatJsonnet, sc.config.Gateway.APIExposedURL, token, tt.args...)
 
 			err = testutil.Wait(60*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
+				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc}})
 				if err != nil {
 					return false, nil
 				}
@@ -359,7 +359,7 @@ func testDirectRun(t *testing.T, internalServicesAuth bool) {
 			})
 			testutil.NilError(t, err)
 
-			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc}})
 			testutil.NilError(t, err)
 
 			assert.Assert(t, cmp.Len(runs, 1))
@@ -482,7 +482,7 @@ variable02: variable value 02
 
 			// TODO(sgotti) add an util to wait for a run phase
 			err = testutil.Wait(60*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
+				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc}})
 				if err != nil {
 					return false, nil
 				}
@@ -499,7 +499,7 @@ variable02: variable value 02
 			})
 			testutil.NilError(t, err)
 
-			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc}})
 			testutil.NilError(t, err)
 
 			assert.Assert(t, cmp.Len(runs, 1))
@@ -632,7 +632,7 @@ func TestDirectRunLogs(t *testing.T) {
 			directRun(t, dir, config, ConfigFormatJsonnet, sc.config.Gateway.APIExposedURL, token)
 
 			err = testutil.Wait(60*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
+				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc}})
 				if err != nil {
 					return false, nil
 				}
@@ -649,7 +649,7 @@ func TestDirectRunLogs(t *testing.T) {
 			})
 			testutil.NilError(t, err)
 
-			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwClient.GetUserRuns(ctx, user.ID, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc}})
 			testutil.NilError(t, err)
 
 			assert.Assert(t, cmp.Len(runs, 1))
@@ -918,7 +918,7 @@ func TestPullRequest(t *testing.T) {
 				testutil.NilError(t, err, "failed to create pull request")
 			}
 			err = testutil.Wait(60*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc}})
 				if err != nil {
 					return false, nil
 				}
@@ -934,7 +934,7 @@ func TestPullRequest(t *testing.T) {
 			})
 			testutil.NilError(t, err)
 
-			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc}})
 			testutil.NilError(t, err)
 
 			run, _, err := gwClient.GetProjectRun(ctx, project.ID, runs[0].Number)
@@ -1298,7 +1298,7 @@ func TestRunRequiredEnvVariables(t *testing.T) {
 
 			// TODO(sgotti) add an util to wait for a run phase
 			err = testutil.Wait(60*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc}})
 				if err != nil {
 					return false, nil
 				}
@@ -1315,7 +1315,7 @@ func TestRunRequiredEnvVariables(t *testing.T) {
 			})
 			testutil.NilError(t, err)
 
-			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc}})
 			testutil.NilError(t, err)
 
 			assert.Assert(t, cmp.Len(runs, 1))
@@ -1511,7 +1511,7 @@ def main(ctx):
 
 				// TODO(sgotti) add an util to wait for a run phase
 				err = testutil.Wait(60*time.Second, func() (bool, error) {
-					runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
+					runs, _, err := gwClient.GetUserRuns(ctx, user.ID, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc}})
 					if err != nil {
 						return false, nil
 					}
@@ -1528,7 +1528,7 @@ def main(ctx):
 				})
 				testutil.NilError(t, err)
 
-				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, nil, nil, 0, 0, false)
+				runs, _, err := gwClient.GetUserRuns(ctx, user.ID, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc}})
 				testutil.NilError(t, err)
 
 				assert.Assert(t, cmp.Len(runs, 1))
@@ -1641,7 +1641,7 @@ func TestRunEventsNotification(t *testing.T) {
 			push(t, tt.config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
 			err = testutil.Wait(60*time.Second, func() (bool, error) {
-				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+				runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc}})
 				if err != nil {
 					return false, nil
 				}
@@ -1657,7 +1657,7 @@ func TestRunEventsNotification(t *testing.T) {
 			})
 			testutil.NilError(t, err)
 
-			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, nil, nil, 0, 0, false)
+			runs, _, err := gwClient.GetProjectRuns(ctx, project.ID, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionDesc}})
 			testutil.NilError(t, err)
 
 			assert.Assert(t, cmp.Len(runs, 1))
