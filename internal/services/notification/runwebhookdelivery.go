@@ -32,7 +32,7 @@ import (
 )
 
 const (
-	MaxRunWebhookDeliveriesQueryLimit = 40
+	maxRunWebhookDeliveriesQueryLimit = 40
 	RunWebhookDeliveriesLockKey       = "runwebhookdeliveryevents"
 
 	// runWebhookDeliveriesInterval is the time to wait between every runWebhookDeliveriesHandler call.
@@ -71,7 +71,7 @@ func (n *NotificationService) runWebhookDeliveriesHandler(ctx context.Context) e
 
 		err := n.d.Do(ctx, func(tx *sql.Tx) error {
 			var err error
-			runWebhookDeliveries, err = n.d.GetProjectRunWebhookDeliveriesAfterSequenceByProjectID(tx, curRunWebhookDeliverySequence, "", []types.DeliveryStatus{types.DeliveryStatusNotDelivered}, MaxRunWebhookDeliveriesQueryLimit, types.SortDirectionAsc)
+			runWebhookDeliveries, err = n.d.GetProjectRunWebhookDeliveriesAfterSequenceByProjectID(tx, curRunWebhookDeliverySequence, "", []types.DeliveryStatus{types.DeliveryStatusNotDelivered}, maxRunWebhookDeliveriesQueryLimit, types.SortDirectionAsc)
 			if err != nil {
 				return errors.WithStack(err)
 			}
@@ -90,7 +90,7 @@ func (n *NotificationService) runWebhookDeliveriesHandler(ctx context.Context) e
 			curRunWebhookDeliverySequence = r.Sequence
 		}
 
-		if len(runWebhookDeliveries) < MaxRunWebhookDeliveriesQueryLimit {
+		if len(runWebhookDeliveries) < maxRunWebhookDeliveriesQueryLimit {
 			return nil
 		}
 	}

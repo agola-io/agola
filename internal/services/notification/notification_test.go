@@ -92,7 +92,7 @@ func TestRunWebhookDelivery(t *testing.T) {
 		ns.c.WebhookURL = fmt.Sprintf("%s/%s", wr.exposedURL, "webhooks")
 		ns.c.WebhookSecret = webhookSecret
 
-		runWebhooks := make([]*types.RunWebhook, MaxRunWebhookDeliveriesQueryLimit+10)
+		runWebhooks := make([]*types.RunWebhook, maxRunWebhookDeliveriesQueryLimit+10)
 		for i := 0; i < len(runWebhooks); i++ {
 			runWebhooks[i] = createRunWebhook(t, ctx, ns, project01)
 			createRunWebhookDelivery(t, ctx, ns, runWebhooks[i].ID, types.DeliveryStatusNotDelivered)
@@ -351,7 +351,7 @@ func TestCommitStatusDelivery(t *testing.T) {
 		cs := setupStubCommitStatusUpdater()
 		ns.u = cs
 
-		commitStatuses := make([]*types.CommitStatus, MaxCommitStatusDeliveriesQueryLimit+10)
+		commitStatuses := make([]*types.CommitStatus, maxCommitStatusDeliveriesQueryLimit+10)
 		for i := 0; i < len(commitStatuses); i++ {
 			commitStatuses[i] = createCommitStatus(t, ctx, ns, i, fmt.Sprintf("projectID-%d", i))
 			createCommitStatusDelivery(t, ctx, ns, commitStatuses[i].ID, types.DeliveryStatusNotDelivered)
@@ -698,7 +698,7 @@ func TestRunWebhooksCleaner(t *testing.T) {
 	expectedRunWebhooks := make([]*types.RunWebhook, 0)
 	expectedRunWebhookDeliveries := make([]*types.RunWebhookDelivery, 0)
 
-	for i := 0; i < 5; i++ {
+	for i := 0; i < maxRunWebhooksQueryLimit+10; i++ {
 		runWebhook := createRunWebhook(t, ctx, ns, project01)
 		expectedRunWebhooks = append(expectedRunWebhooks, runWebhook)
 
@@ -706,7 +706,7 @@ func TestRunWebhooksCleaner(t *testing.T) {
 		expectedRunWebhookDeliveries = append(expectedRunWebhookDeliveries, createRunWebhookDelivery(t, ctx, ns, runWebhook.ID, types.DeliveryStatusNotDelivered))
 	}
 
-	for i := 0; i < 5; i++ {
+	for i := 0; i < maxRunWebhooksQueryLimit+10; i++ {
 		runWebhook := createRunWebhook(t, ctx, ns, project02)
 		expectedRunWebhooks = append(expectedRunWebhooks, runWebhook)
 
@@ -715,7 +715,7 @@ func TestRunWebhooksCleaner(t *testing.T) {
 	}
 
 	runWebhookCreationTime := time.Now().Add(-1 * time.Hour)
-	for i := 0; i < 50; i++ {
+	for i := 0; i < maxRunWebhooksQueryLimit+10; i++ {
 		runWebhook := createRunWebhook(t, ctx, ns, project01)
 		createRunWebhookDelivery(t, ctx, ns, runWebhook.ID, types.DeliveryStatusDelivered)
 		createRunWebhookDelivery(t, ctx, ns, runWebhook.ID, types.DeliveryStatusNotDelivered)
@@ -900,7 +900,7 @@ func TestCommitStatusesCleaner(t *testing.T) {
 	expectedCommitStatuses := make([]*types.CommitStatus, 0)
 	expectedCommitStatusDeliveries := make([]*types.CommitStatusDelivery, 0)
 
-	for i := 0; i < 5; i++ {
+	for i := 0; i < maxCommitStatusesQueryLimit+10; i++ {
 		commitStatus := createCommitStatus(t, ctx, ns, 1, fmt.Sprintf("projectID-%d", i))
 		expectedCommitStatuses = append(expectedCommitStatuses, commitStatus)
 
@@ -909,7 +909,7 @@ func TestCommitStatusesCleaner(t *testing.T) {
 	}
 
 	commitStatusCreationTime := time.Now().Add(-1 * time.Hour)
-	for i := 0; i < 50; i++ {
+	for i := 0; i < maxCommitStatusesQueryLimit+10; i++ {
 		commitStatus := createCommitStatus(t, ctx, ns, i, fmt.Sprintf("projectID-%d", i))
 		createCommitStatusDelivery(t, ctx, ns, commitStatus.ID, types.DeliveryStatusDelivered)
 		createCommitStatusDelivery(t, ctx, ns, commitStatus.ID, types.DeliveryStatusNotDelivered)

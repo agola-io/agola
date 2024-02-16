@@ -155,9 +155,10 @@ func (n *NotificationService) runWebhooksCleaner(ctx context.Context, runWebhook
 	}
 	defer func() { _ = l.Unlock() }()
 
+	var afterRunWebhookID string
+
 	for {
 		var runWebhooks []*nstypes.RunWebhook
-		var afterRunWebhookID string
 
 		err := n.d.Do(ctx, func(tx *sql.Tx) error {
 			var err error

@@ -161,9 +161,10 @@ func (n *NotificationService) commitStatusesCleaner(ctx context.Context, commitS
 	}
 	defer func() { _ = l.Unlock() }()
 
+	var afterCommitStatusID string
+
 	for {
 		var commitStatuses []*types.CommitStatus
-		var afterCommitStatusID string
 
 		err := n.d.Do(ctx, func(tx *sql.Tx) error {
 			var err error
