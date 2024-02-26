@@ -16,6 +16,7 @@ var DDLPostgres = []string{
 	"create table if not exists secret (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamptz NOT NULL, update_time timestamptz NOT NULL, name varchar NOT NULL, parent_kind varchar NOT NULL, parent_id varchar NOT NULL, type varchar NOT NULL, data jsonb NOT NULL, secret_provider_id varchar NOT NULL, path varchar NOT NULL, PRIMARY KEY (id))",
 	"create table if not exists variable (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamptz NOT NULL, update_time timestamptz NOT NULL, name varchar NOT NULL, parent_kind varchar NOT NULL, parent_id varchar NOT NULL, variable_values jsonb NOT NULL, PRIMARY KEY (id))",
 	"create table if not exists orginvitation (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamptz NOT NULL, update_time timestamptz NOT NULL, user_id varchar NOT NULL, organization_id varchar NOT NULL, role varchar NOT NULL, PRIMARY KEY (id), foreign key (user_id) references user_t(id), foreign key (organization_id) references organization(id))",
+	"create table if not exists userprojectfavorite (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamptz NOT NULL, update_time timestamptz NOT NULL, user_id varchar NOT NULL, project_id varchar NOT NULL, PRIMARY KEY (id), foreign key (user_id) references user_t(id), foreign key (project_id) references project(id))",
 
 	// indexes
 }
@@ -31,6 +32,7 @@ var DDLSqlite3 = []string{
 	"create table if not exists secret (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamp NOT NULL, update_time timestamp NOT NULL, name varchar NOT NULL, parent_kind varchar NOT NULL, parent_id varchar NOT NULL, type varchar NOT NULL, data text NOT NULL, secret_provider_id varchar NOT NULL, path varchar NOT NULL, PRIMARY KEY (id))",
 	"create table if not exists variable (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamp NOT NULL, update_time timestamp NOT NULL, name varchar NOT NULL, parent_kind varchar NOT NULL, parent_id varchar NOT NULL, variable_values text NOT NULL, PRIMARY KEY (id))",
 	"create table if not exists orginvitation (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamp NOT NULL, update_time timestamp NOT NULL, user_id varchar NOT NULL, organization_id varchar NOT NULL, role varchar NOT NULL, PRIMARY KEY (id), foreign key (user_id) references user_t(id), foreign key (organization_id) references organization(id))",
+	"create table if not exists userprojectfavorite (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamp NOT NULL, update_time timestamp NOT NULL, user_id varchar NOT NULL, project_id varchar NOT NULL, PRIMARY KEY (id), foreign key (user_id) references user_t(id), foreign key (project_id) references project(id))",
 
 	// indexes
 }
