@@ -34,7 +34,7 @@ RUN make WEBBUNDLE=1 WEBDISTPATH=/agola-web/dist
 #######
 ####### Build the final image
 #######
-FROM debian:buster AS agola
+FROM debian:bookworm AS agola
 
 WORKDIR /
 
