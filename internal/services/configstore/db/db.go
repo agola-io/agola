@@ -1261,3 +1261,72 @@ func (d *DB) DeleteOrgInvitationsByUserID(tx *sql.Tx, userID string) error {
 
 	return nil
 }
+
+func (d *DB) GetUserProjectFavorites(tx *sql.Tx) ([]*types.UserProjectFavorite, error) {
+	q := userProjectFavoriteSelect()
+	userProjectFavorites, _, err := d.fetchUserProjectFavorites(tx, q)
+	return userProjectFavorites, errors.WithStack(err)
+}
+
+func (d *DB) GetUserProjectFavorite(tx *sql.Tx, userID string, projectID string) (*types.UserProjectFavorite, error) {
+	q := userProjectFavoriteSelect()
+	q.Where(q.E("user_id", userID))
+	q.Where(q.E("project_id", projectID))
+
+	userProjectFavorites, _, err := d.fetchUserProjectFavorites(tx, q)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	out, err := mustSingleRow(userProjectFavorites)
+	return out, errors.WithStack(err)
+}
+
+func (d *DB) GetUserProjectFavoritesByUserID(tx *sql.Tx, userID string, startUserProjectFavoriteID string, limit int, sortDirection types.SortDirection) ([]*types.UserProjectFavorite, error) {
+	q := userProjectFavoriteSelect()
+	q.Where(q.E("user_id", userID))
+
+	q.OrderBy("id")
+	switch sortDirection {
+	case types.SortDirectionAsc:
+		q = q.Asc()
+	case types.SortDirectionDesc:
+		q = q.Desc()
+	}
+	if startUserProjectFavoriteID != "" {
+		switch sortDirection {
+		case types.SortDirectionAsc:
+			q = q.Where(q.G("id", startUserProjectFavoriteID))
+		case types.SortDirectionDesc:
+			q = q.Where(q.L("id", startUserProjectFavoriteID))
+		}
+	}
+
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
+
+	userProjectFavorites, _, err := d.fetchUserProjectFavorites(tx, q)
+
+	return userProjectFavorites, errors.WithStack(err)
+}
+
+func (d *DB) DeleteUserProjectFavoritesByProjectID(tx *sql.Tx, projectID string) error {
+	q := sq.NewDeleteBuilder()
+	q.DeleteFrom("userprojectfavorite").Where(q.E("project_id", projectID))
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to delete userprojectfavorite")
+	}
+
+	return nil
+}
+
+func (d *DB) DeleteUserProjectFavoritesByUserID(tx *sql.Tx, userID string) error {
+	q := sq.NewDeleteBuilder()
+	q.DeleteFrom("userprojectfavorite").Where(q.E("user_id", userID))
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to delete userprojectfavorite")
+	}
+
+	return nil
+}
