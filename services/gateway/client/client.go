@@ -871,3 +871,27 @@ func (c *Client) GetProjectCommitStatusDeliveries(ctx context.Context, projectRe
 func (c *Client) ProjectCommitStatusRedelivery(ctx context.Context, projectRef string, commitStatusDeliveryID string) (*Response, error) {
 	return c.getResponse(ctx, "PUT", fmt.Sprintf("/projects/%s/commitstatusdeliveries/%s/redelivery", projectRef, commitStatusDeliveryID), nil, jsonContent, nil)
 }
+
+func (c *Client) GetUserProjectFavorites(ctx context.Context, opts *ListOptions) ([]*gwapitypes.UserProjectFavoriteResponse, *Response, error) {
+	q := url.Values{}
+	opts.Add(q)
+
+	projectFavorites := []*gwapitypes.UserProjectFavoriteResponse{}
+	resp, err := c.getParsedResponse(ctx, "GET", "/user/projectfavorites", q, jsonContent, nil, &projectFavorites)
+	return projectFavorites, resp, errors.WithStack(err)
+}
+
+func (c *Client) CreateUserProjectFavorite(ctx context.Context, req *gwapitypes.CreateUserProjectFavoriteRequest) (*gwapitypes.UserProjectFavoriteResponse, *Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+
+	projectFavorite := new(gwapitypes.UserProjectFavoriteResponse)
+	resp, err := c.getParsedResponse(ctx, "POST", fmt.Sprintf("/user/projects/%s/projectfavorites", req.ProjectRef), nil, jsonContent, bytes.NewReader(reqj), projectFavorite)
+	return projectFavorite, resp, errors.WithStack(err)
+}
+
+func (c *Client) DeleteUserProjectFavorite(ctx context.Context, projectRef string) (*Response, error) {
+	return c.getResponse(ctx, "DELETE", fmt.Sprintf("/user/projects/%s/projectfavorites", projectRef), nil, jsonContent, nil)
+}
