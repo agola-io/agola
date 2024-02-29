@@ -60,7 +60,4 @@ SHELL ["/bin/bash", "-c"]
 
 RUN mkdir -p /data/agola/{configstore,runservice,executor,notification,gitserver}
 
-# copy the example config
-COPY examples/agolademo/config.yml .
-
 ENTRYPOINT ["/bin/agola"]

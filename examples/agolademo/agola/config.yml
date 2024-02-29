@@ -1,6 +1,6 @@
 gateway:
-  apiExposedURL: "http://172.17.0.1:8000"
-  webExposedURL: "http://172.17.0.1:8000"
+  apiExposedURL: "http://172.30.0.2:8000"
+  webExposedURL: "http://172.30.0.2:8000"
   runserviceURL: "http://localhost:4000"
   configstoreURL: "http://localhost:4002"
   gitserverURL: "http://localhost:4003"
@@ -26,7 +26,7 @@ scheduler:
   runserviceURL: "http://localhost:4000"
 
 notification:
-  webExposedURL: "http://172.17.0.1:8000"
+  webExposedURL: "http://172.30.0.2:8000"
   runserviceURL: "http://localhost:4000"
   configstoreURL: "http://localhost:4002"
   db:
@@ -66,6 +66,8 @@ executor:
   activeTasksLimit: 2
   driver:
     type: docker
+  docker:
+    network: agolademo_net1
 
 gitserver:
   dataDir: /data/agola/gitserver
