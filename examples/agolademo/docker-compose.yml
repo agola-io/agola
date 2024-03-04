@@ -1,0 +1,56 @@
+name:
+  agolademo
+
+services:
+  agola:
+    image: "agolademo"
+    command: serve --components all-base,executor
+    configs:
+      - source: agola
+        target: /config.yml
+    networks:
+      net1:
+        ipv4_address: 172.30.0.2
+    # ports:
+    #   - "8000:8000"
+    volumes:
+      - agola-data:/data/agola
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  gitea:
+    image: gitea/gitea:1.21.6
+    restart: always
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+    configs:
+      - source: gitea
+        target: /data/gitea/conf/app.ini
+    networks:
+      net1:
+        ipv4_address: 172.30.0.3
+    volumes:
+      - gitea-data:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    # ports:
+    #   - "3000:3000"
+    #   - "2222:22"
+
+networks:
+  net1:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.30.0.0/16
+          gateway: 172.30.0.1
+
+volumes:
+  agola-data:
+  gitea-data:
+
+configs:
+  agola:
+    file: ./agola/config.yml
+  gitea:
+    file: ./gitea/app.ini
