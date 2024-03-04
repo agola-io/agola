@@ -1496,12 +1496,12 @@ func NewExecutor(ctx context.Context, log zerolog.Logger, c *config.Executor) (*
 	var d driver.Driver
 	switch c.Driver.Type {
 	case config.DriverTypeDocker:
-		d, err = driver.NewDockerDriver(log, e.id, e.c.ToolboxPath, e.c.InitImage.Image, initDockerConfig)
+		d, err = driver.NewDockerDriver(log, e.id, e.c.ToolboxPath, e.c.InitImage.Image, driver.WithDockerDriverNetwork(e.c.Docker.Network), driver.WithDockerDriverInitDockerConfig(initDockerConfig))
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create docker driver")
 		}
 	case config.DriverTypeK8s:
-		d, err = driver.NewK8sDriver(log, e.id, c.ToolboxPath, e.c.InitImage.Image, initDockerConfig)
+		d, err = driver.NewK8sDriver(log, e.id, c.ToolboxPath, e.c.InitImage.Image, driver.WithK8sDriverInitDockerConfig(initDockerConfig))
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create kubernetes driver")
 		}

@@ -50,23 +50,43 @@ type DockerDriver struct {
 	initDockerConfig *registry.DockerConfig
 	executorID       string
 	arch             types.Arch
+	network          string
 }
 
-func NewDockerDriver(log zerolog.Logger, executorID, toolboxPath, initImage string, initDockerConfig *registry.DockerConfig) (*DockerDriver, error) {
+type DockerDriverCreateOption func(*DockerDriver)
+
+func WithDockerDriverNetwork(network string) func(*DockerDriver) {
+	return func(d *DockerDriver) {
+		d.network = network
+	}
+}
+
+func WithDockerDriverInitDockerConfig(initDockerConfig *registry.DockerConfig) func(*DockerDriver) {
+	return func(d *DockerDriver) {
+		d.initDockerConfig = initDockerConfig
+	}
+}
+
+func NewDockerDriver(log zerolog.Logger, executorID, toolboxPath, initImage string, opts ...DockerDriverCreateOption) (*DockerDriver, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.26"))
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	return &DockerDriver{
-		log:              log,
-		client:           cli,
-		toolboxPath:      toolboxPath,
-		initImage:        initImage,
-		initDockerConfig: initDockerConfig,
-		executorID:       executorID,
-		arch:             types.ArchFromString(runtime.GOARCH),
-	}, nil
+	d := &DockerDriver{
+		log:         log,
+		client:      cli,
+		toolboxPath: toolboxPath,
+		initImage:   initImage,
+		executorID:  executorID,
+		arch:        types.ArchFromString(runtime.GOARCH),
+	}
+
+	for _, o := range opts {
+		o(d)
+	}
+
+	return d, nil
 }
 
 func (d *DockerDriver) Setup(ctx context.Context) error {
@@ -314,6 +334,7 @@ func (d *DockerDriver) createContainer(ctx context.Context, index int, podConfig
 		// TODO(sgotti) migrate this to cliHostConfig.Mounts
 		cliHostConfig.Binds = []string{fmt.Sprintf("%s:%s", toolboxVol.Name, podConfig.InitVolumeDir)}
 		cliHostConfig.ReadonlyPaths = []string{fmt.Sprintf("%s:%s", toolboxVol.Name, podConfig.InitVolumeDir)}
+		cliHostConfig.NetworkMode = container.NetworkMode(d.network)
 	} else {
 		// attach other containers to maincontainer network
 		cliHostConfig.NetworkMode = container.NetworkMode(fmt.Sprintf("container:%s", maincontainerID))

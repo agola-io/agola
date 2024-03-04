@@ -41,7 +41,7 @@ func TestDockerPod(t *testing.T) {
 
 	initImage := "busybox:stable"
 
-	d, err := NewDockerDriver(log, "executorid01", toolboxPath, initImage, nil)
+	d, err := NewDockerDriver(log, "executorid01", toolboxPath, initImage)
 	testutil.NilError(t, err)
 
 	ctx := context.Background()

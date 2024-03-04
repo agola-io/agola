@@ -182,6 +182,14 @@ type Executor struct {
 	ActiveTasksLimit int `yaml:"activeTasksLimit"`
 
 	AllowPrivilegedContainers bool `yaml:"allowPrivilegedContainers"`
+
+	// docker specific configuration
+	Docker DockerExecutor `yaml:"docker"`
+}
+
+type DockerExecutor struct {
+	// docker network to use when creating containers
+	Network string `yaml:"network"`
 }
 
 type InitImage struct {
