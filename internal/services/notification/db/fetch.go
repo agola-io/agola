@@ -45,7 +45,7 @@ func (d *DB) scanRunWebhook(rows *stdsql.Rows, skipFieldsCount uint) (*types.Run
 		x.Init()
 	}
 
-	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Payload, &v.ProjectID})
+	fields := []any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Payload, &v.ProjectID}
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))
@@ -149,7 +149,7 @@ func (d *DB) scanRunWebhookDelivery(rows *stdsql.Rows, skipFieldsCount uint) (*t
 		x.Init()
 	}
 
-	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Sequence, &v.RunWebhookID, &v.DeliveryStatus, &v.DeliveredAt, &v.StatusCode})
+	fields := []any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Sequence, &v.RunWebhookID, &v.DeliveryStatus, &v.DeliveredAt, &v.StatusCode}
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))
@@ -259,7 +259,7 @@ func (d *DB) scanLastRunEventSequence(rows *stdsql.Rows, skipFieldsCount uint) (
 		x.Init()
 	}
 
-	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Value})
+	fields := []any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Value}
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))
@@ -361,7 +361,7 @@ func (d *DB) scanCommitStatus(rows *stdsql.Rows, skipFieldsCount uint) (*types.C
 		x.Init()
 	}
 
-	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.ProjectID, &v.State, &v.CommitSHA, &v.RunCounter, &v.Description, &v.Context})
+	fields := []any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.ProjectID, &v.State, &v.CommitSHA, &v.RunCounter, &v.Description, &v.Context}
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))
@@ -473,7 +473,7 @@ func (d *DB) scanCommitStatusDelivery(rows *stdsql.Rows, skipFieldsCount uint) (
 		x.Init()
 	}
 
-	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Sequence, &v.CommitStatusID, &v.DeliveryStatus, &v.DeliveredAt})
+	fields := []any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Sequence, &v.CommitStatusID, &v.DeliveryStatus, &v.DeliveredAt}
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))
