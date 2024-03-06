@@ -3,7 +3,7 @@ name:
 
 services:
   agola:
-    image: "agolademo"
+    image: "sorintlab/agolademo"
     command: serve --components all-base,executor
     configs:
       - source: agola
