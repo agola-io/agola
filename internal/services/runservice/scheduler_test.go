@@ -15,7 +15,7 @@
 package runservice
 
 import (
-	"sort"
+	"slices"
 	"testing"
 	"time"
 
@@ -575,8 +575,8 @@ func TestGetTasksToRun(t *testing.T) {
 			for _, t := range tasks {
 				outTasks = append(outTasks, t.ID)
 			}
-			sort.Strings(tt.out)
-			sort.Strings(outTasks)
+			slices.Sort(tt.out)
+			slices.Sort(outTasks)
 
 			assert.DeepEqual(t, tt.out, outTasks)
 		})

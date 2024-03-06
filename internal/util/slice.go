@@ -14,33 +14,17 @@
 
 package util
 
-import "sort"
+import (
+	"slices"
+)
 
-func StringInSlice(s []string, e string) bool {
-	for _, v := range s {
-		if v == e {
-			return true
-		}
-	}
-	return false
+// EqualStringSlice compares two slices of strings, a nil slice is considered an empty one
+func EqualStringSlice(a []string, b []string) bool {
+	return slices.Equal(a, b)
 }
 
-// CompareStringSlice compares two slices of strings, a nil slice is considered an empty one
-func CompareStringSlice(a []string, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-
-	for i, v := range a {
-		if v != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
-// CompareStringSliceNoOrder compares two slices of strings regardless of their order, a nil slice is considered an empty one
-func CompareStringSliceNoOrder(a []string, b []string) bool {
+// EqualStringSliceNoOrder compares two slices of strings regardless of their order, a nil slice is considered an empty one
+func EqualStringSliceNoOrder(a []string, b []string) bool {
 	if len(a) != len(b) {
 		return false
 	}
@@ -51,22 +35,17 @@ func CompareStringSliceNoOrder(a []string, b []string) bool {
 	a = append([]string(nil), a...)
 	b = append([]string(nil), b...)
 
-	sort.Strings(a)
-	sort.Strings(b)
+	slices.Sort(a)
+	slices.Sort(b)
 
-	for i, v := range a {
-		if v != b[i] {
-			return false
-		}
-	}
-	return true
+	return slices.Equal(a, b)
 }
 
 // CommonElements return the common elements in two slices of strings
 func CommonElements(a []string, b []string) []string {
 	common := []string{}
 	for _, v := range a {
-		if StringInSlice(b, v) {
+		if slices.Contains(b, v) {
 			common = append(common, v)
 		}
 	}
@@ -77,7 +56,7 @@ func CommonElements(a []string, b []string) []string {
 func Difference(a []string, b []string) []string {
 	diff := []string{}
 	for _, v := range a {
-		if !StringInSlice(b, v) {
+		if !slices.Contains(b, v) {
 			diff = append(diff, v)
 		}
 	}

@@ -21,6 +21,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -953,11 +954,8 @@ func TestGetRemoteSources(t *testing.T) {
 			// default sortdirection is asc
 
 			// reverse if sortDirection is desc
-			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
 			if tt.sortDirection == types.SortDirectionDesc {
-				for i, j := 0, len(expectedRemoteSources)-1; i < j; i, j = i+1, j-1 {
-					expectedRemoteSources[i], expectedRemoteSources[j] = expectedRemoteSources[j], expectedRemoteSources[i]
-				}
+				slices.Reverse(expectedRemoteSources)
 			}
 
 			callsNumber := 0
@@ -1059,11 +1057,8 @@ func TestGetUsers(t *testing.T) {
 			// default sortdirection is asc
 
 			// reverse if sortDirection is desc
-			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
 			if tt.sortDirection == types.SortDirectionDesc {
-				for i, j := 0, len(expectedUsers)-1; i < j; i, j = i+1, j-1 {
-					expectedUsers[i], expectedUsers[j] = expectedUsers[j], expectedUsers[i]
-				}
+				slices.Reverse(expectedUsers)
 			}
 
 			callsNumber := 0
@@ -1230,11 +1225,8 @@ func TestGetOrgs(t *testing.T) {
 			// default sortdirection is asc
 
 			// reverse if sortDirection is desc
-			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
 			if tt.sortDirection == types.SortDirectionDesc {
-				for i, j := 0, len(expectedOrgs)-1; i < j; i, j = i+1, j-1 {
-					expectedOrgs[i], expectedOrgs[j] = expectedOrgs[j], expectedOrgs[i]
-				}
+				slices.Reverse(expectedOrgs)
 			}
 
 			callsNumber := 0
@@ -1344,11 +1336,8 @@ func TestGetOrgMembers(t *testing.T) {
 			// default sortdirection is asc
 
 			// reverse if sortDirection is desc
-			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
 			if tt.sortDirection == types.SortDirectionDesc {
-				for i, j := 0, len(expectedUsers)-1; i < j; i, j = i+1, j-1 {
-					expectedUsers[i], expectedUsers[j] = expectedUsers[j], expectedUsers[i]
-				}
+				slices.Reverse(expectedUsers)
 			}
 
 			callsNumber := 0
@@ -1463,11 +1452,8 @@ func TestGetUserOrgs(t *testing.T) {
 			// default sortdirection is asc
 
 			// reverse if sortDirection is desc
-			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
 			if tt.sortDirection == types.SortDirectionDesc {
-				for i, j := 0, len(expectedOrgs)-1; i < j; i, j = i+1, j-1 {
-					expectedOrgs[i], expectedOrgs[j] = expectedOrgs[j], expectedOrgs[i]
-				}
+				slices.Reverse(expectedOrgs)
 			}
 
 			callsNumber := 0

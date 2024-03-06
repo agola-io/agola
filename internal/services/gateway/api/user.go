@@ -18,7 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"sort"
+	"slices"
 	"strconv"
 
 	"github.com/gorilla/mux"
@@ -159,7 +159,7 @@ func createPrivateUserResponse(u *cstypes.User, tokens []*cstypes.UserToken, lin
 	for _, token := range tokens {
 		user.Tokens = append(user.Tokens, token.Name)
 	}
-	sort.Strings(user.Tokens)
+	slices.Sort(user.Tokens)
 
 	for _, la := range linkedAccounts {
 		user.LinkedAccounts = append(user.LinkedAccounts, &gwapitypes.LinkedAccountResponse{

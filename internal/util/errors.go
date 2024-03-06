@@ -57,7 +57,7 @@ func (e *Errors) Equal(e2 error) bool {
 		errs2 = append(errs2, e2.Error())
 	}
 
-	return CompareStringSliceNoOrder(errs1, errs2)
+	return EqualStringSliceNoOrder(errs1, errs2)
 }
 
 // Wrapper error is an helper error type that (optionally) wrap an error and add stack information starting at the frame where the error has been created

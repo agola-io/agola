@@ -15,12 +15,13 @@
 package notification
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
-	"sort"
+	"slices"
 	"strconv"
 	"sync"
 	"testing"
@@ -171,8 +172,8 @@ func (h *runEventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.runEvents.mu.Lock()
 	defer h.runEvents.mu.Unlock()
 
-	sort.Slice(h.runEvents.runEvents, func(i, j int) bool {
-		return h.runEvents.runEvents[i].Sequence < h.runEvents.runEvents[j].Sequence
+	slices.SortFunc(h.runEvents.runEvents, func(a, b *types.RunEvent) int {
+		return cmp.Compare(a.Sequence, b.Sequence)
 	})
 
 	for _, runEvent := range h.runEvents.runEvents {

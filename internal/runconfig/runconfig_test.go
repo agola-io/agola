@@ -441,7 +441,7 @@ func TestGetAllParents(t *testing.T) {
 				for _, p := range allParents {
 					allParentsList = append(allParentsList, p.ID)
 				}
-				assert.Assert(t, util.CompareStringSliceNoOrder(tt.out[task.ID], allParentsList), "task: %s, want: %s, got: %s", task.ID, util.Dump(tt.out[task.ID]), util.Dump(allParentsList))
+				assert.Assert(t, util.EqualStringSliceNoOrder(tt.out[task.ID], allParentsList), "task: %s, want: %s, got: %s", task.ID, util.Dump(tt.out[task.ID]), util.Dump(allParentsList))
 			}
 		})
 	}
