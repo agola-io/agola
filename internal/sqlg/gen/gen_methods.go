@@ -8,7 +8,6 @@ import (
 
 	"agola.io/agola/internal/sqlg"
 	"github.com/Masterminds/sprig/v3"
-	"github.com/iancoleman/strcase"
 )
 
 type MethodsData struct {
@@ -33,8 +32,8 @@ func genMethodsData(gd *genData) MethodsData {
 	for _, oi := range objectsInfo {
 		tableDef := DMLGenericDataTable{Table: oi.Table, ObjectName: oi.Name}
 		tableDef.LowerObjectName = strings.ToLower(oi.Name)
-		tableDef.LowerCamelObjectName = strcase.ToLowerCamel(oi.Name)
-		tableDef.FuncPrefix = strcase.ToLowerCamel(oi.Name)
+		tableDef.LowerCamelObjectName = ToLowerCamel(oi.Name)
+		tableDef.FuncPrefix = ToLowerCamel(oi.Name)
 
 		for _, of := range oi.Fields {
 			colName := of.ColName

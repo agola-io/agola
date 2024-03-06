@@ -13,18 +13,18 @@ import (
 	types "agola.io/agola/services/notification/types"
 )
 var (
-	runWebhookInsertSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inPayload []byte, inProjectId string) *sq.InsertBuilder {
+	runWebhookInsertSqlite3 = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inPayload []byte, inProjectID string) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("runwebhook").Cols("id", "revision", "creation_time", "update_time", "payload", "project_id").Values(inId, inRevision, inCreationTime, inUpdateTime, inPayload, inProjectId)
+		return ib.InsertInto("runwebhook").Cols("id", "revision", "creation_time", "update_time", "payload", "project_id").Values(inID, inRevision, inCreationTime, inUpdateTime, inPayload, inProjectID)
 	}
-	runWebhookUpdateSqlite3 = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inPayload []byte, inProjectId string) *sq.UpdateBuilder {
+	runWebhookUpdateSqlite3 = func(curRevision uint64, inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inPayload []byte, inProjectID string) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("runwebhook").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("payload", inPayload), ub.Assign("project_id", inProjectId)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("runwebhook").Set(ub.Assign("id", inID), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("payload", inPayload), ub.Assign("project_id", inProjectID)).Where(ub.E("id", inID), ub.E("revision", curRevision))
 	}
 
-	runWebhookInsertRawSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inPayload []byte, inProjectId string) *sq.InsertBuilder {
+	runWebhookInsertRawSqlite3 = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inPayload []byte, inProjectID string) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("runwebhook").Cols("id", "revision", "creation_time", "update_time", "payload", "project_id").SQL("").Values(inId, inRevision, inCreationTime, inUpdateTime, inPayload, inProjectId)
+		return ib.InsertInto("runwebhook").Cols("id", "revision", "creation_time", "update_time", "payload", "project_id").SQL("").Values(inID, inRevision, inCreationTime, inUpdateTime, inPayload, inProjectID)
 	}
 )
 
@@ -59,18 +59,18 @@ func (d *DB) insertRawRunWebhookSqlite3(tx *sql.Tx, runwebhook *types.RunWebhook
 	return nil
 }
 var (
-	runWebhookDeliveryInsertSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inRunWebhookId string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time, inStatusCode int) *sq.InsertBuilder {
+	runWebhookDeliveryInsertSqlite3 = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inRunWebhookID string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time, inStatusCode int) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("runwebhookdelivery").Cols("id", "revision", "creation_time", "update_time", "sequence", "run_webhook_id", "delivery_status", "delivered_at", "status_code").Values(inId, inRevision, inCreationTime, inUpdateTime, inSequence, inRunWebhookId, inDeliveryStatus, inDeliveredAt, inStatusCode)
+		return ib.InsertInto("runwebhookdelivery").Cols("id", "revision", "creation_time", "update_time", "sequence", "run_webhook_id", "delivery_status", "delivered_at", "status_code").Values(inID, inRevision, inCreationTime, inUpdateTime, inSequence, inRunWebhookID, inDeliveryStatus, inDeliveredAt, inStatusCode)
 	}
-	runWebhookDeliveryUpdateSqlite3 = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inRunWebhookId string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time, inStatusCode int) *sq.UpdateBuilder {
+	runWebhookDeliveryUpdateSqlite3 = func(curRevision uint64, inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inRunWebhookID string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time, inStatusCode int) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("runwebhookdelivery").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("run_webhook_id", inRunWebhookId), ub.Assign("delivery_status", inDeliveryStatus), ub.Assign("delivered_at", inDeliveredAt), ub.Assign("status_code", inStatusCode)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("runwebhookdelivery").Set(ub.Assign("id", inID), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("run_webhook_id", inRunWebhookID), ub.Assign("delivery_status", inDeliveryStatus), ub.Assign("delivered_at", inDeliveredAt), ub.Assign("status_code", inStatusCode)).Where(ub.E("id", inID), ub.E("revision", curRevision))
 	}
 
-	runWebhookDeliveryInsertRawSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inRunWebhookId string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time, inStatusCode int) *sq.InsertBuilder {
+	runWebhookDeliveryInsertRawSqlite3 = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inRunWebhookID string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time, inStatusCode int) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("runwebhookdelivery").Cols("id", "revision", "creation_time", "update_time", "sequence", "run_webhook_id", "delivery_status", "delivered_at", "status_code").SQL("").Values(inId, inRevision, inCreationTime, inUpdateTime, inSequence, inRunWebhookId, inDeliveryStatus, inDeliveredAt, inStatusCode)
+		return ib.InsertInto("runwebhookdelivery").Cols("id", "revision", "creation_time", "update_time", "sequence", "run_webhook_id", "delivery_status", "delivered_at", "status_code").SQL("").Values(inID, inRevision, inCreationTime, inUpdateTime, inSequence, inRunWebhookID, inDeliveryStatus, inDeliveredAt, inStatusCode)
 	}
 )
 
@@ -105,18 +105,18 @@ func (d *DB) insertRawRunWebhookDeliverySqlite3(tx *sql.Tx, runwebhookdelivery *
 	return nil
 }
 var (
-	lastRunEventSequenceInsertSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inValue uint64) *sq.InsertBuilder {
+	lastRunEventSequenceInsertSqlite3 = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inValue uint64) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("lastruneventsequence").Cols("id", "revision", "creation_time", "update_time", "value").Values(inId, inRevision, inCreationTime, inUpdateTime, inValue)
+		return ib.InsertInto("lastruneventsequence").Cols("id", "revision", "creation_time", "update_time", "value").Values(inID, inRevision, inCreationTime, inUpdateTime, inValue)
 	}
-	lastRunEventSequenceUpdateSqlite3 = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inValue uint64) *sq.UpdateBuilder {
+	lastRunEventSequenceUpdateSqlite3 = func(curRevision uint64, inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inValue uint64) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("lastruneventsequence").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("value", inValue)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("lastruneventsequence").Set(ub.Assign("id", inID), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("value", inValue)).Where(ub.E("id", inID), ub.E("revision", curRevision))
 	}
 
-	lastRunEventSequenceInsertRawSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inValue uint64) *sq.InsertBuilder {
+	lastRunEventSequenceInsertRawSqlite3 = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inValue uint64) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("lastruneventsequence").Cols("id", "revision", "creation_time", "update_time", "value").SQL("").Values(inId, inRevision, inCreationTime, inUpdateTime, inValue)
+		return ib.InsertInto("lastruneventsequence").Cols("id", "revision", "creation_time", "update_time", "value").SQL("").Values(inID, inRevision, inCreationTime, inUpdateTime, inValue)
 	}
 )
 
@@ -151,18 +151,18 @@ func (d *DB) insertRawLastRunEventSequenceSqlite3(tx *sql.Tx, lastruneventsequen
 	return nil
 }
 var (
-	commitStatusInsertSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inProjectId string, inState types.CommitState, inCommitSha string, inRunCounter uint64, inDescription string, inContext string) *sq.InsertBuilder {
+	commitStatusInsertSqlite3 = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inProjectID string, inState types.CommitState, inCommitSHA string, inRunCounter uint64, inDescription string, inContext string) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("commitstatus").Cols("id", "revision", "creation_time", "update_time", "project_id", "state", "commit_sha", "run_counter", "description", "context").Values(inId, inRevision, inCreationTime, inUpdateTime, inProjectId, inState, inCommitSha, inRunCounter, inDescription, inContext)
+		return ib.InsertInto("commitstatus").Cols("id", "revision", "creation_time", "update_time", "project_id", "state", "commit_sha", "run_counter", "description", "context").Values(inID, inRevision, inCreationTime, inUpdateTime, inProjectID, inState, inCommitSHA, inRunCounter, inDescription, inContext)
 	}
-	commitStatusUpdateSqlite3 = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inProjectId string, inState types.CommitState, inCommitSha string, inRunCounter uint64, inDescription string, inContext string) *sq.UpdateBuilder {
+	commitStatusUpdateSqlite3 = func(curRevision uint64, inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inProjectID string, inState types.CommitState, inCommitSHA string, inRunCounter uint64, inDescription string, inContext string) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("commitstatus").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("project_id", inProjectId), ub.Assign("state", inState), ub.Assign("commit_sha", inCommitSha), ub.Assign("run_counter", inRunCounter), ub.Assign("description", inDescription), ub.Assign("context", inContext)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("commitstatus").Set(ub.Assign("id", inID), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("project_id", inProjectID), ub.Assign("state", inState), ub.Assign("commit_sha", inCommitSHA), ub.Assign("run_counter", inRunCounter), ub.Assign("description", inDescription), ub.Assign("context", inContext)).Where(ub.E("id", inID), ub.E("revision", curRevision))
 	}
 
-	commitStatusInsertRawSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inProjectId string, inState types.CommitState, inCommitSha string, inRunCounter uint64, inDescription string, inContext string) *sq.InsertBuilder {
+	commitStatusInsertRawSqlite3 = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inProjectID string, inState types.CommitState, inCommitSHA string, inRunCounter uint64, inDescription string, inContext string) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("commitstatus").Cols("id", "revision", "creation_time", "update_time", "project_id", "state", "commit_sha", "run_counter", "description", "context").SQL("").Values(inId, inRevision, inCreationTime, inUpdateTime, inProjectId, inState, inCommitSha, inRunCounter, inDescription, inContext)
+		return ib.InsertInto("commitstatus").Cols("id", "revision", "creation_time", "update_time", "project_id", "state", "commit_sha", "run_counter", "description", "context").SQL("").Values(inID, inRevision, inCreationTime, inUpdateTime, inProjectID, inState, inCommitSHA, inRunCounter, inDescription, inContext)
 	}
 )
 
@@ -197,18 +197,18 @@ func (d *DB) insertRawCommitStatusSqlite3(tx *sql.Tx, commitstatus *types.Commit
 	return nil
 }
 var (
-	commitStatusDeliveryInsertSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inCommitStatusId string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time) *sq.InsertBuilder {
+	commitStatusDeliveryInsertSqlite3 = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inCommitStatusID string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("commitstatusdelivery").Cols("id", "revision", "creation_time", "update_time", "sequence", "commit_status_id", "delivery_status", "delivered_at").Values(inId, inRevision, inCreationTime, inUpdateTime, inSequence, inCommitStatusId, inDeliveryStatus, inDeliveredAt)
+		return ib.InsertInto("commitstatusdelivery").Cols("id", "revision", "creation_time", "update_time", "sequence", "commit_status_id", "delivery_status", "delivered_at").Values(inID, inRevision, inCreationTime, inUpdateTime, inSequence, inCommitStatusID, inDeliveryStatus, inDeliveredAt)
 	}
-	commitStatusDeliveryUpdateSqlite3 = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inCommitStatusId string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time) *sq.UpdateBuilder {
+	commitStatusDeliveryUpdateSqlite3 = func(curRevision uint64, inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inCommitStatusID string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("commitstatusdelivery").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("commit_status_id", inCommitStatusId), ub.Assign("delivery_status", inDeliveryStatus), ub.Assign("delivered_at", inDeliveredAt)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("commitstatusdelivery").Set(ub.Assign("id", inID), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("commit_status_id", inCommitStatusID), ub.Assign("delivery_status", inDeliveryStatus), ub.Assign("delivered_at", inDeliveredAt)).Where(ub.E("id", inID), ub.E("revision", curRevision))
 	}
 
-	commitStatusDeliveryInsertRawSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inCommitStatusId string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time) *sq.InsertBuilder {
+	commitStatusDeliveryInsertRawSqlite3 = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inCommitStatusID string, inDeliveryStatus types.DeliveryStatus, inDeliveredAt *time.Time) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("commitstatusdelivery").Cols("id", "revision", "creation_time", "update_time", "sequence", "commit_status_id", "delivery_status", "delivered_at").SQL("").Values(inId, inRevision, inCreationTime, inUpdateTime, inSequence, inCommitStatusId, inDeliveryStatus, inDeliveredAt)
+		return ib.InsertInto("commitstatusdelivery").Cols("id", "revision", "creation_time", "update_time", "sequence", "commit_status_id", "delivery_status", "delivered_at").SQL("").Values(inID, inRevision, inCreationTime, inUpdateTime, inSequence, inCommitStatusID, inDeliveryStatus, inDeliveredAt)
 	}
 )
 

@@ -11,7 +11,6 @@ import (
 
 	"github.com/Masterminds/sprig/v3"
 	"github.com/huandu/xstrings"
-	"github.com/iancoleman/strcase"
 )
 
 type DMLGenericData struct {
@@ -99,8 +98,8 @@ func genDMLGenericData(gd *genData) DMLGenericData {
 	for _, oi := range objectsInfo {
 		tableDef := DMLGenericDataTable{Table: oi.Table, ObjectName: oi.Name}
 		tableDef.LowerObjectName = strings.ToLower(oi.Name)
-		tableDef.LowerCamelObjectName = strcase.ToLowerCamel(oi.Name)
-		tableDef.FuncPrefix = strcase.ToLowerCamel(oi.Name)
+		tableDef.LowerCamelObjectName = ToLowerCamel(oi.Name)
+		tableDef.FuncPrefix = ToLowerCamel(oi.Name)
 
 		for _, of := range oi.Fields {
 			colName := of.ColName
@@ -112,7 +111,7 @@ func genDMLGenericData(gd *genData) DMLGenericData {
 				fieldType = "*" + fieldType
 			}
 
-			paramName := "in" + strcase.ToCamel(of.Name)
+			paramName := "in" + ToCamel(of.Name)
 
 			var scanField string
 			if of.JSON {
@@ -178,8 +177,8 @@ func genDMLData(gd *genData, dbType sql.Type) DMLData {
 		tableDef := DMLDataTable{Table: oi.Table, ObjectName: oi.Name}
 		tableDef.LowerTable = strings.ToLower(oi.Table)
 		tableDef.LowerObjectName = strings.ToLower(oi.Name)
-		tableDef.LowerCamelObjectName = strcase.ToLowerCamel(oi.Name)
-		tableDef.FuncPrefix = strcase.ToLowerCamel(oi.Name)
+		tableDef.LowerCamelObjectName = ToLowerCamel(oi.Name)
+		tableDef.FuncPrefix = ToLowerCamel(oi.Name)
 
 		for _, of := range oi.Fields {
 			colName := of.ColName
@@ -191,7 +190,7 @@ func genDMLData(gd *genData, dbType sql.Type) DMLData {
 				fieldType = "*" + fieldType
 			}
 
-			paramName := "in" + strcase.ToCamel(of.Name)
+			paramName := "in" + ToCamel(of.Name)
 
 			var funcParam string
 			if of.JSON {
@@ -690,7 +689,7 @@ var (
 	}
 	{{ $tableDef.FuncPrefix }}Update{{ $dbType }} = func(curRevision uint64, {{ $tableDef.UpdateFuncParams | join ", "}}) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("{{ $tableDef.Table }}").Set({{ $tableDef.UpdateSets | join ", "}}).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("{{ $tableDef.Table }}").Set({{ $tableDef.UpdateSets | join ", "}}).Where(ub.E("id", inID), ub.E("revision", curRevision))
 	}
 
 	{{ $tableDef.FuncPrefix }}InsertRaw{{ $dbType }} = func({{ $tableDef.RawFuncParams | join ", "}}) *sq.InsertBuilder {

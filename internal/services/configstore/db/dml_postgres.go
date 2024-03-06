@@ -14,18 +14,18 @@ import (
 	types "agola.io/agola/services/configstore/types"
 )
 var (
-	remoteSourceInsertPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inAPIURL string, inSkipVerify bool, inType types.RemoteSourceType, inAuthType types.RemoteSourceAuthType, inOauth2ClientID string, inOauth2ClientSecret string, inSSHHostKey string, inSkipSSHHostKeyCheck bool, inRegistrationEnabled bool, inLoginEnabled bool) *sq.InsertBuilder {
+	remoteSourceInsertPostgres = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inAPIURL string, inSkipVerify bool, inType types.RemoteSourceType, inAuthType types.RemoteSourceAuthType, inOauth2ClientID string, inOauth2ClientSecret string, inSSHHostKey string, inSkipSSHHostKeyCheck bool, inRegistrationEnabled bool, inLoginEnabled bool) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("remotesource").Cols("id", "revision", "creation_time", "update_time", "name", "apiurl", "skip_verify", "type", "auth_type", "oauth2_client_id", "oauth2_client_secret", "ssh_host_key", "skip_ssh_host_key_check", "registration_enabled", "login_enabled").Values(inId, inRevision, inCreationTime, inUpdateTime, inName, inAPIURL, inSkipVerify, inType, inAuthType, inOauth2ClientID, inOauth2ClientSecret, inSSHHostKey, inSkipSSHHostKeyCheck, inRegistrationEnabled, inLoginEnabled)
+		return ib.InsertInto("remotesource").Cols("id", "revision", "creation_time", "update_time", "name", "apiurl", "skip_verify", "type", "auth_type", "oauth2_client_id", "oauth2_client_secret", "ssh_host_key", "skip_ssh_host_key_check", "registration_enabled", "login_enabled").Values(inID, inRevision, inCreationTime, inUpdateTime, inName, inAPIURL, inSkipVerify, inType, inAuthType, inOauth2ClientID, inOauth2ClientSecret, inSSHHostKey, inSkipSSHHostKeyCheck, inRegistrationEnabled, inLoginEnabled)
 	}
-	remoteSourceUpdatePostgres = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inAPIURL string, inSkipVerify bool, inType types.RemoteSourceType, inAuthType types.RemoteSourceAuthType, inOauth2ClientID string, inOauth2ClientSecret string, inSSHHostKey string, inSkipSSHHostKeyCheck bool, inRegistrationEnabled bool, inLoginEnabled bool) *sq.UpdateBuilder {
+	remoteSourceUpdatePostgres = func(curRevision uint64, inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inAPIURL string, inSkipVerify bool, inType types.RemoteSourceType, inAuthType types.RemoteSourceAuthType, inOauth2ClientID string, inOauth2ClientSecret string, inSSHHostKey string, inSkipSSHHostKeyCheck bool, inRegistrationEnabled bool, inLoginEnabled bool) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("remotesource").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("name", inName), ub.Assign("apiurl", inAPIURL), ub.Assign("skip_verify", inSkipVerify), ub.Assign("type", inType), ub.Assign("auth_type", inAuthType), ub.Assign("oauth2_client_id", inOauth2ClientID), ub.Assign("oauth2_client_secret", inOauth2ClientSecret), ub.Assign("ssh_host_key", inSSHHostKey), ub.Assign("skip_ssh_host_key_check", inSkipSSHHostKeyCheck), ub.Assign("registration_enabled", inRegistrationEnabled), ub.Assign("login_enabled", inLoginEnabled)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("remotesource").Set(ub.Assign("id", inID), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("name", inName), ub.Assign("apiurl", inAPIURL), ub.Assign("skip_verify", inSkipVerify), ub.Assign("type", inType), ub.Assign("auth_type", inAuthType), ub.Assign("oauth2_client_id", inOauth2ClientID), ub.Assign("oauth2_client_secret", inOauth2ClientSecret), ub.Assign("ssh_host_key", inSSHHostKey), ub.Assign("skip_ssh_host_key_check", inSkipSSHHostKeyCheck), ub.Assign("registration_enabled", inRegistrationEnabled), ub.Assign("login_enabled", inLoginEnabled)).Where(ub.E("id", inID), ub.E("revision", curRevision))
 	}
 
-	remoteSourceInsertRawPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inAPIURL string, inSkipVerify bool, inType types.RemoteSourceType, inAuthType types.RemoteSourceAuthType, inOauth2ClientID string, inOauth2ClientSecret string, inSSHHostKey string, inSkipSSHHostKeyCheck bool, inRegistrationEnabled bool, inLoginEnabled bool) *sq.InsertBuilder {
+	remoteSourceInsertRawPostgres = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inAPIURL string, inSkipVerify bool, inType types.RemoteSourceType, inAuthType types.RemoteSourceAuthType, inOauth2ClientID string, inOauth2ClientSecret string, inSSHHostKey string, inSkipSSHHostKeyCheck bool, inRegistrationEnabled bool, inLoginEnabled bool) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("remotesource").Cols("id", "revision", "creation_time", "update_time", "name", "apiurl", "skip_verify", "type", "auth_type", "oauth2_client_id", "oauth2_client_secret", "ssh_host_key", "skip_ssh_host_key_check", "registration_enabled", "login_enabled").SQL("OVERRIDING SYSTEM VALUE").Values(inId, inRevision, inCreationTime, inUpdateTime, inName, inAPIURL, inSkipVerify, inType, inAuthType, inOauth2ClientID, inOauth2ClientSecret, inSSHHostKey, inSkipSSHHostKeyCheck, inRegistrationEnabled, inLoginEnabled)
+		return ib.InsertInto("remotesource").Cols("id", "revision", "creation_time", "update_time", "name", "apiurl", "skip_verify", "type", "auth_type", "oauth2_client_id", "oauth2_client_secret", "ssh_host_key", "skip_ssh_host_key_check", "registration_enabled", "login_enabled").SQL("OVERRIDING SYSTEM VALUE").Values(inID, inRevision, inCreationTime, inUpdateTime, inName, inAPIURL, inSkipVerify, inType, inAuthType, inOauth2ClientID, inOauth2ClientSecret, inSSHHostKey, inSkipSSHHostKeyCheck, inRegistrationEnabled, inLoginEnabled)
 	}
 )
 
@@ -60,18 +60,18 @@ func (d *DB) insertRawRemoteSourcePostgres(tx *sql.Tx, remotesource *types.Remot
 	return nil
 }
 var (
-	userInsertPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inSecret string, inAdmin bool) *sq.InsertBuilder {
+	userInsertPostgres = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inSecret string, inAdmin bool) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("user_t").Cols("id", "revision", "creation_time", "update_time", "name", "secret", "admin").Values(inId, inRevision, inCreationTime, inUpdateTime, inName, inSecret, inAdmin)
+		return ib.InsertInto("user_t").Cols("id", "revision", "creation_time", "update_time", "name", "secret", "admin").Values(inID, inRevision, inCreationTime, inUpdateTime, inName, inSecret, inAdmin)
 	}
-	userUpdatePostgres = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inSecret string, inAdmin bool) *sq.UpdateBuilder {
+	userUpdatePostgres = func(curRevision uint64, inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inSecret string, inAdmin bool) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("user_t").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("name", inName), ub.Assign("secret", inSecret), ub.Assign("admin", inAdmin)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("user_t").Set(ub.Assign("id", inID), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("name", inName), ub.Assign("secret", inSecret), ub.Assign("admin", inAdmin)).Where(ub.E("id", inID), ub.E("revision", curRevision))
 	}
 
-	userInsertRawPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inSecret string, inAdmin bool) *sq.InsertBuilder {
+	userInsertRawPostgres = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inSecret string, inAdmin bool) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("user_t").Cols("id", "revision", "creation_time", "update_time", "name", "secret", "admin").SQL("OVERRIDING SYSTEM VALUE").Values(inId, inRevision, inCreationTime, inUpdateTime, inName, inSecret, inAdmin)
+		return ib.InsertInto("user_t").Cols("id", "revision", "creation_time", "update_time", "name", "secret", "admin").SQL("OVERRIDING SYSTEM VALUE").Values(inID, inRevision, inCreationTime, inUpdateTime, inName, inSecret, inAdmin)
 	}
 )
 
@@ -106,18 +106,18 @@ func (d *DB) insertRawUserPostgres(tx *sql.Tx, user *types.User) error {
 	return nil
 }
 var (
-	userTokenInsertPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inUserID string, inName string, inValue string) *sq.InsertBuilder {
+	userTokenInsertPostgres = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inUserID string, inName string, inValue string) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("usertoken").Cols("id", "revision", "creation_time", "update_time", "user_id", "name", "value").Values(inId, inRevision, inCreationTime, inUpdateTime, inUserID, inName, inValue)
+		return ib.InsertInto("usertoken").Cols("id", "revision", "creation_time", "update_time", "user_id", "name", "value").Values(inID, inRevision, inCreationTime, inUpdateTime, inUserID, inName, inValue)
 	}
-	userTokenUpdatePostgres = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inUserID string, inName string, inValue string) *sq.UpdateBuilder {
+	userTokenUpdatePostgres = func(curRevision uint64, inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inUserID string, inName string, inValue string) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("usertoken").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("user_id", inUserID), ub.Assign("name", inName), ub.Assign("value", inValue)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("usertoken").Set(ub.Assign("id", inID), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("user_id", inUserID), ub.Assign("name", inName), ub.Assign("value", inValue)).Where(ub.E("id", inID), ub.E("revision", curRevision))
 	}
 
-	userTokenInsertRawPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inUserID string, inName string, inValue string) *sq.InsertBuilder {
+	userTokenInsertRawPostgres = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inUserID string, inName string, inValue string) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("usertoken").Cols("id", "revision", "creation_time", "update_time", "user_id", "name", "value").SQL("OVERRIDING SYSTEM VALUE").Values(inId, inRevision, inCreationTime, inUpdateTime, inUserID, inName, inValue)
+		return ib.InsertInto("usertoken").Cols("id", "revision", "creation_time", "update_time", "user_id", "name", "value").SQL("OVERRIDING SYSTEM VALUE").Values(inID, inRevision, inCreationTime, inUpdateTime, inUserID, inName, inValue)
 	}
 )
 
@@ -152,18 +152,18 @@ func (d *DB) insertRawUserTokenPostgres(tx *sql.Tx, usertoken *types.UserToken) 
 	return nil
 }
 var (
-	linkedAccountInsertPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inUserID string, inRemoteUserID string, inRemoteUserName string, inRemoteUserAvatarURL string, inRemoteSourceID string, inUserAccessToken string, inOauth2AccessToken string, inOauth2RefreshToken string, inOauth2AccessTokenExpiresAt time.Time) *sq.InsertBuilder {
+	linkedAccountInsertPostgres = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inUserID string, inRemoteUserID string, inRemoteUserName string, inRemoteUserAvatarURL string, inRemoteSourceID string, inUserAccessToken string, inOauth2AccessToken string, inOauth2RefreshToken string, inOauth2AccessTokenExpiresAt time.Time) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("linkedaccount").Cols("id", "revision", "creation_time", "update_time", "user_id", "remote_user_id", "remote_user_name", "remote_user_avatar_url", "remote_source_id", "user_access_token", "oauth2_access_token", "oauth2_refresh_token", "oauth2_access_token_expires_at").Values(inId, inRevision, inCreationTime, inUpdateTime, inUserID, inRemoteUserID, inRemoteUserName, inRemoteUserAvatarURL, inRemoteSourceID, inUserAccessToken, inOauth2AccessToken, inOauth2RefreshToken, inOauth2AccessTokenExpiresAt)
+		return ib.InsertInto("linkedaccount").Cols("id", "revision", "creation_time", "update_time", "user_id", "remote_user_id", "remote_user_name", "remote_user_avatar_url", "remote_source_id", "user_access_token", "oauth2_access_token", "oauth2_refresh_token", "oauth2_access_token_expires_at").Values(inID, inRevision, inCreationTime, inUpdateTime, inUserID, inRemoteUserID, inRemoteUserName, inRemoteUserAvatarURL, inRemoteSourceID, inUserAccessToken, inOauth2AccessToken, inOauth2RefreshToken, inOauth2AccessTokenExpiresAt)
 	}
-	linkedAccountUpdatePostgres = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inUserID string, inRemoteUserID string, inRemoteUserName string, inRemoteUserAvatarURL string, inRemoteSourceID string, inUserAccessToken string, inOauth2AccessToken string, inOauth2RefreshToken string, inOauth2AccessTokenExpiresAt time.Time) *sq.UpdateBuilder {
+	linkedAccountUpdatePostgres = func(curRevision uint64, inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inUserID string, inRemoteUserID string, inRemoteUserName string, inRemoteUserAvatarURL string, inRemoteSourceID string, inUserAccessToken string, inOauth2AccessToken string, inOauth2RefreshToken string, inOauth2AccessTokenExpiresAt time.Time) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("linkedaccount").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("user_id", inUserID), ub.Assign("remote_user_id", inRemoteUserID), ub.Assign("remote_user_name", inRemoteUserName), ub.Assign("remote_user_avatar_url", inRemoteUserAvatarURL), ub.Assign("remote_source_id", inRemoteSourceID), ub.Assign("user_access_token", inUserAccessToken), ub.Assign("oauth2_access_token", inOauth2AccessToken), ub.Assign("oauth2_refresh_token", inOauth2RefreshToken), ub.Assign("oauth2_access_token_expires_at", inOauth2AccessTokenExpiresAt)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("linkedaccount").Set(ub.Assign("id", inID), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("user_id", inUserID), ub.Assign("remote_user_id", inRemoteUserID), ub.Assign("remote_user_name", inRemoteUserName), ub.Assign("remote_user_avatar_url", inRemoteUserAvatarURL), ub.Assign("remote_source_id", inRemoteSourceID), ub.Assign("user_access_token", inUserAccessToken), ub.Assign("oauth2_access_token", inOauth2AccessToken), ub.Assign("oauth2_refresh_token", inOauth2RefreshToken), ub.Assign("oauth2_access_token_expires_at", inOauth2AccessTokenExpiresAt)).Where(ub.E("id", inID), ub.E("revision", curRevision))
 	}
 
-	linkedAccountInsertRawPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inUserID string, inRemoteUserID string, inRemoteUserName string, inRemoteUserAvatarURL string, inRemoteSourceID string, inUserAccessToken string, inOauth2AccessToken string, inOauth2RefreshToken string, inOauth2AccessTokenExpiresAt time.Time) *sq.InsertBuilder {
+	linkedAccountInsertRawPostgres = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inUserID string, inRemoteUserID string, inRemoteUserName string, inRemoteUserAvatarURL string, inRemoteSourceID string, inUserAccessToken string, inOauth2AccessToken string, inOauth2RefreshToken string, inOauth2AccessTokenExpiresAt time.Time) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("linkedaccount").Cols("id", "revision", "creation_time", "update_time", "user_id", "remote_user_id", "remote_user_name", "remote_user_avatar_url", "remote_source_id", "user_access_token", "oauth2_access_token", "oauth2_refresh_token", "oauth2_access_token_expires_at").SQL("OVERRIDING SYSTEM VALUE").Values(inId, inRevision, inCreationTime, inUpdateTime, inUserID, inRemoteUserID, inRemoteUserName, inRemoteUserAvatarURL, inRemoteSourceID, inUserAccessToken, inOauth2AccessToken, inOauth2RefreshToken, inOauth2AccessTokenExpiresAt)
+		return ib.InsertInto("linkedaccount").Cols("id", "revision", "creation_time", "update_time", "user_id", "remote_user_id", "remote_user_name", "remote_user_avatar_url", "remote_source_id", "user_access_token", "oauth2_access_token", "oauth2_refresh_token", "oauth2_access_token_expires_at").SQL("OVERRIDING SYSTEM VALUE").Values(inID, inRevision, inCreationTime, inUpdateTime, inUserID, inRemoteUserID, inRemoteUserName, inRemoteUserAvatarURL, inRemoteSourceID, inUserAccessToken, inOauth2AccessToken, inOauth2RefreshToken, inOauth2AccessTokenExpiresAt)
 	}
 )
 
@@ -198,18 +198,18 @@ func (d *DB) insertRawLinkedAccountPostgres(tx *sql.Tx, linkedaccount *types.Lin
 	return nil
 }
 var (
-	organizationInsertPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inVisibility types.Visibility, inCreatorUserID string) *sq.InsertBuilder {
+	organizationInsertPostgres = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inVisibility types.Visibility, inCreatorUserID string) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("organization").Cols("id", "revision", "creation_time", "update_time", "name", "visibility", "creator_user_id").Values(inId, inRevision, inCreationTime, inUpdateTime, inName, inVisibility, inCreatorUserID)
+		return ib.InsertInto("organization").Cols("id", "revision", "creation_time", "update_time", "name", "visibility", "creator_user_id").Values(inID, inRevision, inCreationTime, inUpdateTime, inName, inVisibility, inCreatorUserID)
 	}
-	organizationUpdatePostgres = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inVisibility types.Visibility, inCreatorUserID string) *sq.UpdateBuilder {
+	organizationUpdatePostgres = func(curRevision uint64, inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inVisibility types.Visibility, inCreatorUserID string) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("organization").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("name", inName), ub.Assign("visibility", inVisibility), ub.Assign("creator_user_id", inCreatorUserID)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("organization").Set(ub.Assign("id", inID), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("name", inName), ub.Assign("visibility", inVisibility), ub.Assign("creator_user_id", inCreatorUserID)).Where(ub.E("id", inID), ub.E("revision", curRevision))
 	}
 
-	organizationInsertRawPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inVisibility types.Visibility, inCreatorUserID string) *sq.InsertBuilder {
+	organizationInsertRawPostgres = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inVisibility types.Visibility, inCreatorUserID string) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("organization").Cols("id", "revision", "creation_time", "update_time", "name", "visibility", "creator_user_id").SQL("OVERRIDING SYSTEM VALUE").Values(inId, inRevision, inCreationTime, inUpdateTime, inName, inVisibility, inCreatorUserID)
+		return ib.InsertInto("organization").Cols("id", "revision", "creation_time", "update_time", "name", "visibility", "creator_user_id").SQL("OVERRIDING SYSTEM VALUE").Values(inID, inRevision, inCreationTime, inUpdateTime, inName, inVisibility, inCreatorUserID)
 	}
 )
 
@@ -244,18 +244,18 @@ func (d *DB) insertRawOrganizationPostgres(tx *sql.Tx, organization *types.Organ
 	return nil
 }
 var (
-	organizationMemberInsertPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inOrganizationID string, inUserID string, inMemberRole types.MemberRole) *sq.InsertBuilder {
+	organizationMemberInsertPostgres = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inOrganizationID string, inUserID string, inMemberRole types.MemberRole) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("orgmember").Cols("id", "revision", "creation_time", "update_time", "organization_id", "user_id", "member_role").Values(inId, inRevision, inCreationTime, inUpdateTime, inOrganizationID, inUserID, inMemberRole)
+		return ib.InsertInto("orgmember").Cols("id", "revision", "creation_time", "update_time", "organization_id", "user_id", "member_role").Values(inID, inRevision, inCreationTime, inUpdateTime, inOrganizationID, inUserID, inMemberRole)
 	}
-	organizationMemberUpdatePostgres = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inOrganizationID string, inUserID string, inMemberRole types.MemberRole) *sq.UpdateBuilder {
+	organizationMemberUpdatePostgres = func(curRevision uint64, inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inOrganizationID string, inUserID string, inMemberRole types.MemberRole) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("orgmember").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("organization_id", inOrganizationID), ub.Assign("user_id", inUserID), ub.Assign("member_role", inMemberRole)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("orgmember").Set(ub.Assign("id", inID), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("organization_id", inOrganizationID), ub.Assign("user_id", inUserID), ub.Assign("member_role", inMemberRole)).Where(ub.E("id", inID), ub.E("revision", curRevision))
 	}
 
-	organizationMemberInsertRawPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inOrganizationID string, inUserID string, inMemberRole types.MemberRole) *sq.InsertBuilder {
+	organizationMemberInsertRawPostgres = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inOrganizationID string, inUserID string, inMemberRole types.MemberRole) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("orgmember").Cols("id", "revision", "creation_time", "update_time", "organization_id", "user_id", "member_role").SQL("OVERRIDING SYSTEM VALUE").Values(inId, inRevision, inCreationTime, inUpdateTime, inOrganizationID, inUserID, inMemberRole)
+		return ib.InsertInto("orgmember").Cols("id", "revision", "creation_time", "update_time", "organization_id", "user_id", "member_role").SQL("OVERRIDING SYSTEM VALUE").Values(inID, inRevision, inCreationTime, inUpdateTime, inOrganizationID, inUserID, inMemberRole)
 	}
 )
 
@@ -290,18 +290,18 @@ func (d *DB) insertRawOrganizationMemberPostgres(tx *sql.Tx, organizationmember 
 	return nil
 }
 var (
-	projectGroupInsertPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inParentKind types.ObjectKind, inParentID string, inVisibility types.Visibility) *sq.InsertBuilder {
+	projectGroupInsertPostgres = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inParentKind types.ObjectKind, inParentID string, inVisibility types.Visibility) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("projectgroup").Cols("id", "revision", "creation_time", "update_time", "name", "parent_kind", "parent_id", "visibility").Values(inId, inRevision, inCreationTime, inUpdateTime, inName, inParentKind, inParentID, inVisibility)
+		return ib.InsertInto("projectgroup").Cols("id", "revision", "creation_time", "update_time", "name", "parent_kind", "parent_id", "visibility").Values(inID, inRevision, inCreationTime, inUpdateTime, inName, inParentKind, inParentID, inVisibility)
 	}
-	projectGroupUpdatePostgres = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inParentKind types.ObjectKind, inParentID string, inVisibility types.Visibility) *sq.UpdateBuilder {
+	projectGroupUpdatePostgres = func(curRevision uint64, inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inParentKind types.ObjectKind, inParentID string, inVisibility types.Visibility) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("projectgroup").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("name", inName), ub.Assign("parent_kind", inParentKind), ub.Assign("parent_id", inParentID), ub.Assign("visibility", inVisibility)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("projectgroup").Set(ub.Assign("id", inID), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("name", inName), ub.Assign("parent_kind", inParentKind), ub.Assign("parent_id", inParentID), ub.Assign("visibility", inVisibility)).Where(ub.E("id", inID), ub.E("revision", curRevision))
 	}
 
-	projectGroupInsertRawPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inParentKind types.ObjectKind, inParentID string, inVisibility types.Visibility) *sq.InsertBuilder {
+	projectGroupInsertRawPostgres = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inParentKind types.ObjectKind, inParentID string, inVisibility types.Visibility) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("projectgroup").Cols("id", "revision", "creation_time", "update_time", "name", "parent_kind", "parent_id", "visibility").SQL("OVERRIDING SYSTEM VALUE").Values(inId, inRevision, inCreationTime, inUpdateTime, inName, inParentKind, inParentID, inVisibility)
+		return ib.InsertInto("projectgroup").Cols("id", "revision", "creation_time", "update_time", "name", "parent_kind", "parent_id", "visibility").SQL("OVERRIDING SYSTEM VALUE").Values(inID, inRevision, inCreationTime, inUpdateTime, inName, inParentKind, inParentID, inVisibility)
 	}
 )
 
@@ -336,18 +336,18 @@ func (d *DB) insertRawProjectGroupPostgres(tx *sql.Tx, projectgroup *types.Proje
 	return nil
 }
 var (
-	projectInsertPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inParentKind types.ObjectKind, inParentID string, inSecret string, inVisibility types.Visibility, inRemoteRepositoryConfigType types.RemoteRepositoryConfigType, inRemoteSourceID string, inLinkedAccountID string, inRepositoryID string, inRepositoryPath string, inSSHPrivateKey string, inSkipSSHHostKeyCheck bool, inWebhookSecret string, inPassVarsToForkedPR bool, inDefaultBranch string, inMembersCanPerformRunActions bool) *sq.InsertBuilder {
+	projectInsertPostgres = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inParentKind types.ObjectKind, inParentID string, inSecret string, inVisibility types.Visibility, inRemoteRepositoryConfigType types.RemoteRepositoryConfigType, inRemoteSourceID string, inLinkedAccountID string, inRepositoryID string, inRepositoryPath string, inSSHPrivateKey string, inSkipSSHHostKeyCheck bool, inWebhookSecret string, inPassVarsToForkedPR bool, inDefaultBranch string, inMembersCanPerformRunActions bool) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("project").Cols("id", "revision", "creation_time", "update_time", "name", "parent_kind", "parent_id", "secret", "visibility", "remote_repository_config_type", "remote_source_id", "linked_account_id", "repository_id", "repository_path", "ssh_private_key", "skip_ssh_host_key_check", "webhook_secret", "pass_vars_to_forked_pr", "default_branch", "members_can_perform_run_actions").Values(inId, inRevision, inCreationTime, inUpdateTime, inName, inParentKind, inParentID, inSecret, inVisibility, inRemoteRepositoryConfigType, inRemoteSourceID, inLinkedAccountID, inRepositoryID, inRepositoryPath, inSSHPrivateKey, inSkipSSHHostKeyCheck, inWebhookSecret, inPassVarsToForkedPR, inDefaultBranch, inMembersCanPerformRunActions)
+		return ib.InsertInto("project").Cols("id", "revision", "creation_time", "update_time", "name", "parent_kind", "parent_id", "secret", "visibility", "remote_repository_config_type", "remote_source_id", "linked_account_id", "repository_id", "repository_path", "ssh_private_key", "skip_ssh_host_key_check", "webhook_secret", "pass_vars_to_forked_pr", "default_branch", "members_can_perform_run_actions").Values(inID, inRevision, inCreationTime, inUpdateTime, inName, inParentKind, inParentID, inSecret, inVisibility, inRemoteRepositoryConfigType, inRemoteSourceID, inLinkedAccountID, inRepositoryID, inRepositoryPath, inSSHPrivateKey, inSkipSSHHostKeyCheck, inWebhookSecret, inPassVarsToForkedPR, inDefaultBranch, inMembersCanPerformRunActions)
 	}
-	projectUpdatePostgres = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inParentKind types.ObjectKind, inParentID string, inSecret string, inVisibility types.Visibility, inRemoteRepositoryConfigType types.RemoteRepositoryConfigType, inRemoteSourceID string, inLinkedAccountID string, inRepositoryID string, inRepositoryPath string, inSSHPrivateKey string, inSkipSSHHostKeyCheck bool, inWebhookSecret string, inPassVarsToForkedPR bool, inDefaultBranch string, inMembersCanPerformRunActions bool) *sq.UpdateBuilder {
+	projectUpdatePostgres = func(curRevision uint64, inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inParentKind types.ObjectKind, inParentID string, inSecret string, inVisibility types.Visibility, inRemoteRepositoryConfigType types.RemoteRepositoryConfigType, inRemoteSourceID string, inLinkedAccountID string, inRepositoryID string, inRepositoryPath string, inSSHPrivateKey string, inSkipSSHHostKeyCheck bool, inWebhookSecret string, inPassVarsToForkedPR bool, inDefaultBranch string, inMembersCanPerformRunActions bool) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("project").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("name", inName), ub.Assign("parent_kind", inParentKind), ub.Assign("parent_id", inParentID), ub.Assign("secret", inSecret), ub.Assign("visibility", inVisibility), ub.Assign("remote_repository_config_type", inRemoteRepositoryConfigType), ub.Assign("remote_source_id", inRemoteSourceID), ub.Assign("linked_account_id", inLinkedAccountID), ub.Assign("repository_id", inRepositoryID), ub.Assign("repository_path", inRepositoryPath), ub.Assign("ssh_private_key", inSSHPrivateKey), ub.Assign("skip_ssh_host_key_check", inSkipSSHHostKeyCheck), ub.Assign("webhook_secret", inWebhookSecret), ub.Assign("pass_vars_to_forked_pr", inPassVarsToForkedPR), ub.Assign("default_branch", inDefaultBranch), ub.Assign("members_can_perform_run_actions", inMembersCanPerformRunActions)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("project").Set(ub.Assign("id", inID), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("name", inName), ub.Assign("parent_kind", inParentKind), ub.Assign("parent_id", inParentID), ub.Assign("secret", inSecret), ub.Assign("visibility", inVisibility), ub.Assign("remote_repository_config_type", inRemoteRepositoryConfigType), ub.Assign("remote_source_id", inRemoteSourceID), ub.Assign("linked_account_id", inLinkedAccountID), ub.Assign("repository_id", inRepositoryID), ub.Assign("repository_path", inRepositoryPath), ub.Assign("ssh_private_key", inSSHPrivateKey), ub.Assign("skip_ssh_host_key_check", inSkipSSHHostKeyCheck), ub.Assign("webhook_secret", inWebhookSecret), ub.Assign("pass_vars_to_forked_pr", inPassVarsToForkedPR), ub.Assign("default_branch", inDefaultBranch), ub.Assign("members_can_perform_run_actions", inMembersCanPerformRunActions)).Where(ub.E("id", inID), ub.E("revision", curRevision))
 	}
 
-	projectInsertRawPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inParentKind types.ObjectKind, inParentID string, inSecret string, inVisibility types.Visibility, inRemoteRepositoryConfigType types.RemoteRepositoryConfigType, inRemoteSourceID string, inLinkedAccountID string, inRepositoryID string, inRepositoryPath string, inSSHPrivateKey string, inSkipSSHHostKeyCheck bool, inWebhookSecret string, inPassVarsToForkedPR bool, inDefaultBranch string, inMembersCanPerformRunActions bool) *sq.InsertBuilder {
+	projectInsertRawPostgres = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inParentKind types.ObjectKind, inParentID string, inSecret string, inVisibility types.Visibility, inRemoteRepositoryConfigType types.RemoteRepositoryConfigType, inRemoteSourceID string, inLinkedAccountID string, inRepositoryID string, inRepositoryPath string, inSSHPrivateKey string, inSkipSSHHostKeyCheck bool, inWebhookSecret string, inPassVarsToForkedPR bool, inDefaultBranch string, inMembersCanPerformRunActions bool) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("project").Cols("id", "revision", "creation_time", "update_time", "name", "parent_kind", "parent_id", "secret", "visibility", "remote_repository_config_type", "remote_source_id", "linked_account_id", "repository_id", "repository_path", "ssh_private_key", "skip_ssh_host_key_check", "webhook_secret", "pass_vars_to_forked_pr", "default_branch", "members_can_perform_run_actions").SQL("OVERRIDING SYSTEM VALUE").Values(inId, inRevision, inCreationTime, inUpdateTime, inName, inParentKind, inParentID, inSecret, inVisibility, inRemoteRepositoryConfigType, inRemoteSourceID, inLinkedAccountID, inRepositoryID, inRepositoryPath, inSSHPrivateKey, inSkipSSHHostKeyCheck, inWebhookSecret, inPassVarsToForkedPR, inDefaultBranch, inMembersCanPerformRunActions)
+		return ib.InsertInto("project").Cols("id", "revision", "creation_time", "update_time", "name", "parent_kind", "parent_id", "secret", "visibility", "remote_repository_config_type", "remote_source_id", "linked_account_id", "repository_id", "repository_path", "ssh_private_key", "skip_ssh_host_key_check", "webhook_secret", "pass_vars_to_forked_pr", "default_branch", "members_can_perform_run_actions").SQL("OVERRIDING SYSTEM VALUE").Values(inID, inRevision, inCreationTime, inUpdateTime, inName, inParentKind, inParentID, inSecret, inVisibility, inRemoteRepositoryConfigType, inRemoteSourceID, inLinkedAccountID, inRepositoryID, inRepositoryPath, inSSHPrivateKey, inSkipSSHHostKeyCheck, inWebhookSecret, inPassVarsToForkedPR, inDefaultBranch, inMembersCanPerformRunActions)
 	}
 )
 
@@ -382,18 +382,18 @@ func (d *DB) insertRawProjectPostgres(tx *sql.Tx, project *types.Project) error 
 	return nil
 }
 var (
-	secretInsertPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inParentKind types.ObjectKind, inParentID string, inType types.SecretType, inData []byte, inSecretProviderID string, inPath string) *sq.InsertBuilder {
+	secretInsertPostgres = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inParentKind types.ObjectKind, inParentID string, inType types.SecretType, inData []byte, inSecretProviderID string, inPath string) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("secret").Cols("id", "revision", "creation_time", "update_time", "name", "parent_kind", "parent_id", "type", "data", "secret_provider_id", "path").Values(inId, inRevision, inCreationTime, inUpdateTime, inName, inParentKind, inParentID, inType, inData, inSecretProviderID, inPath)
+		return ib.InsertInto("secret").Cols("id", "revision", "creation_time", "update_time", "name", "parent_kind", "parent_id", "type", "data", "secret_provider_id", "path").Values(inID, inRevision, inCreationTime, inUpdateTime, inName, inParentKind, inParentID, inType, inData, inSecretProviderID, inPath)
 	}
-	secretUpdatePostgres = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inParentKind types.ObjectKind, inParentID string, inType types.SecretType, inData []byte, inSecretProviderID string, inPath string) *sq.UpdateBuilder {
+	secretUpdatePostgres = func(curRevision uint64, inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inParentKind types.ObjectKind, inParentID string, inType types.SecretType, inData []byte, inSecretProviderID string, inPath string) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("secret").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("name", inName), ub.Assign("parent_kind", inParentKind), ub.Assign("parent_id", inParentID), ub.Assign("type", inType), ub.Assign("data", inData), ub.Assign("secret_provider_id", inSecretProviderID), ub.Assign("path", inPath)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("secret").Set(ub.Assign("id", inID), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("name", inName), ub.Assign("parent_kind", inParentKind), ub.Assign("parent_id", inParentID), ub.Assign("type", inType), ub.Assign("data", inData), ub.Assign("secret_provider_id", inSecretProviderID), ub.Assign("path", inPath)).Where(ub.E("id", inID), ub.E("revision", curRevision))
 	}
 
-	secretInsertRawPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inParentKind types.ObjectKind, inParentID string, inType types.SecretType, inData []byte, inSecretProviderID string, inPath string) *sq.InsertBuilder {
+	secretInsertRawPostgres = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inParentKind types.ObjectKind, inParentID string, inType types.SecretType, inData []byte, inSecretProviderID string, inPath string) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("secret").Cols("id", "revision", "creation_time", "update_time", "name", "parent_kind", "parent_id", "type", "data", "secret_provider_id", "path").SQL("OVERRIDING SYSTEM VALUE").Values(inId, inRevision, inCreationTime, inUpdateTime, inName, inParentKind, inParentID, inType, inData, inSecretProviderID, inPath)
+		return ib.InsertInto("secret").Cols("id", "revision", "creation_time", "update_time", "name", "parent_kind", "parent_id", "type", "data", "secret_provider_id", "path").SQL("OVERRIDING SYSTEM VALUE").Values(inID, inRevision, inCreationTime, inUpdateTime, inName, inParentKind, inParentID, inType, inData, inSecretProviderID, inPath)
 	}
 )
 
@@ -440,18 +440,18 @@ func (d *DB) insertRawSecretPostgres(tx *sql.Tx, secret *types.Secret) error {
 	return nil
 }
 var (
-	variableInsertPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inParentKind types.ObjectKind, inParentID string, inValues []byte) *sq.InsertBuilder {
+	variableInsertPostgres = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inParentKind types.ObjectKind, inParentID string, inValues []byte) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("variable").Cols("id", "revision", "creation_time", "update_time", "name", "parent_kind", "parent_id", "variable_values").Values(inId, inRevision, inCreationTime, inUpdateTime, inName, inParentKind, inParentID, inValues)
+		return ib.InsertInto("variable").Cols("id", "revision", "creation_time", "update_time", "name", "parent_kind", "parent_id", "variable_values").Values(inID, inRevision, inCreationTime, inUpdateTime, inName, inParentKind, inParentID, inValues)
 	}
-	variableUpdatePostgres = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inParentKind types.ObjectKind, inParentID string, inValues []byte) *sq.UpdateBuilder {
+	variableUpdatePostgres = func(curRevision uint64, inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inParentKind types.ObjectKind, inParentID string, inValues []byte) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("variable").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("name", inName), ub.Assign("parent_kind", inParentKind), ub.Assign("parent_id", inParentID), ub.Assign("variable_values", inValues)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("variable").Set(ub.Assign("id", inID), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("name", inName), ub.Assign("parent_kind", inParentKind), ub.Assign("parent_id", inParentID), ub.Assign("variable_values", inValues)).Where(ub.E("id", inID), ub.E("revision", curRevision))
 	}
 
-	variableInsertRawPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inParentKind types.ObjectKind, inParentID string, inValues []byte) *sq.InsertBuilder {
+	variableInsertRawPostgres = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inParentKind types.ObjectKind, inParentID string, inValues []byte) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("variable").Cols("id", "revision", "creation_time", "update_time", "name", "parent_kind", "parent_id", "variable_values").SQL("OVERRIDING SYSTEM VALUE").Values(inId, inRevision, inCreationTime, inUpdateTime, inName, inParentKind, inParentID, inValues)
+		return ib.InsertInto("variable").Cols("id", "revision", "creation_time", "update_time", "name", "parent_kind", "parent_id", "variable_values").SQL("OVERRIDING SYSTEM VALUE").Values(inID, inRevision, inCreationTime, inUpdateTime, inName, inParentKind, inParentID, inValues)
 	}
 )
 
@@ -498,18 +498,18 @@ func (d *DB) insertRawVariablePostgres(tx *sql.Tx, variable *types.Variable) err
 	return nil
 }
 var (
-	orgInvitationInsertPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inUserID string, inOrganizationID string, inRole types.MemberRole) *sq.InsertBuilder {
+	orgInvitationInsertPostgres = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inUserID string, inOrganizationID string, inRole types.MemberRole) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("orginvitation").Cols("id", "revision", "creation_time", "update_time", "user_id", "organization_id", "role").Values(inId, inRevision, inCreationTime, inUpdateTime, inUserID, inOrganizationID, inRole)
+		return ib.InsertInto("orginvitation").Cols("id", "revision", "creation_time", "update_time", "user_id", "organization_id", "role").Values(inID, inRevision, inCreationTime, inUpdateTime, inUserID, inOrganizationID, inRole)
 	}
-	orgInvitationUpdatePostgres = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inUserID string, inOrganizationID string, inRole types.MemberRole) *sq.UpdateBuilder {
+	orgInvitationUpdatePostgres = func(curRevision uint64, inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inUserID string, inOrganizationID string, inRole types.MemberRole) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("orginvitation").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("user_id", inUserID), ub.Assign("organization_id", inOrganizationID), ub.Assign("role", inRole)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("orginvitation").Set(ub.Assign("id", inID), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("user_id", inUserID), ub.Assign("organization_id", inOrganizationID), ub.Assign("role", inRole)).Where(ub.E("id", inID), ub.E("revision", curRevision))
 	}
 
-	orgInvitationInsertRawPostgres = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inUserID string, inOrganizationID string, inRole types.MemberRole) *sq.InsertBuilder {
+	orgInvitationInsertRawPostgres = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inUserID string, inOrganizationID string, inRole types.MemberRole) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("orginvitation").Cols("id", "revision", "creation_time", "update_time", "user_id", "organization_id", "role").SQL("OVERRIDING SYSTEM VALUE").Values(inId, inRevision, inCreationTime, inUpdateTime, inUserID, inOrganizationID, inRole)
+		return ib.InsertInto("orginvitation").Cols("id", "revision", "creation_time", "update_time", "user_id", "organization_id", "role").SQL("OVERRIDING SYSTEM VALUE").Values(inID, inRevision, inCreationTime, inUpdateTime, inUserID, inOrganizationID, inRole)
 	}
 )
 

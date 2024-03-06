@@ -14,18 +14,18 @@ import (
 	types "agola.io/agola/services/runservice/types"
 )
 var (
-	changeGroupInsertSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inValue string) *sq.InsertBuilder {
+	changeGroupInsertSqlite3 = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inValue string) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("changegroup").Cols("id", "revision", "creation_time", "update_time", "name", "value").Values(inId, inRevision, inCreationTime, inUpdateTime, inName, inValue)
+		return ib.InsertInto("changegroup").Cols("id", "revision", "creation_time", "update_time", "name", "value").Values(inID, inRevision, inCreationTime, inUpdateTime, inName, inValue)
 	}
-	changeGroupUpdateSqlite3 = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inValue string) *sq.UpdateBuilder {
+	changeGroupUpdateSqlite3 = func(curRevision uint64, inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inValue string) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("changegroup").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("name", inName), ub.Assign("value", inValue)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("changegroup").Set(ub.Assign("id", inID), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("name", inName), ub.Assign("value", inValue)).Where(ub.E("id", inID), ub.E("revision", curRevision))
 	}
 
-	changeGroupInsertRawSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inValue string) *sq.InsertBuilder {
+	changeGroupInsertRawSqlite3 = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inValue string) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("changegroup").Cols("id", "revision", "creation_time", "update_time", "name", "value").SQL("").Values(inId, inRevision, inCreationTime, inUpdateTime, inName, inValue)
+		return ib.InsertInto("changegroup").Cols("id", "revision", "creation_time", "update_time", "name", "value").SQL("").Values(inID, inRevision, inCreationTime, inUpdateTime, inName, inValue)
 	}
 )
 
@@ -60,18 +60,18 @@ func (d *DB) insertRawChangeGroupSqlite3(tx *sql.Tx, changegroup *types.ChangeGr
 	return nil
 }
 var (
-	runConfigInsertSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inGroup string, inSetupErrors []byte, inAnnotations []byte, inStaticEnvironment []byte, inEnvironment []byte, inTasks []byte, inCacheGroup string) *sq.InsertBuilder {
+	runConfigInsertSqlite3 = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inGroup string, inSetupErrors []byte, inAnnotations []byte, inStaticEnvironment []byte, inEnvironment []byte, inTasks []byte, inCacheGroup string) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("runconfig").Cols("id", "revision", "creation_time", "update_time", "name", "run_group", "setup_errors", "annotations", "static_environment", "environment", "tasks", "cache_group").Values(inId, inRevision, inCreationTime, inUpdateTime, inName, inGroup, inSetupErrors, inAnnotations, inStaticEnvironment, inEnvironment, inTasks, inCacheGroup)
+		return ib.InsertInto("runconfig").Cols("id", "revision", "creation_time", "update_time", "name", "run_group", "setup_errors", "annotations", "static_environment", "environment", "tasks", "cache_group").Values(inID, inRevision, inCreationTime, inUpdateTime, inName, inGroup, inSetupErrors, inAnnotations, inStaticEnvironment, inEnvironment, inTasks, inCacheGroup)
 	}
-	runConfigUpdateSqlite3 = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inGroup string, inSetupErrors []byte, inAnnotations []byte, inStaticEnvironment []byte, inEnvironment []byte, inTasks []byte, inCacheGroup string) *sq.UpdateBuilder {
+	runConfigUpdateSqlite3 = func(curRevision uint64, inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inGroup string, inSetupErrors []byte, inAnnotations []byte, inStaticEnvironment []byte, inEnvironment []byte, inTasks []byte, inCacheGroup string) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("runconfig").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("name", inName), ub.Assign("run_group", inGroup), ub.Assign("setup_errors", inSetupErrors), ub.Assign("annotations", inAnnotations), ub.Assign("static_environment", inStaticEnvironment), ub.Assign("environment", inEnvironment), ub.Assign("tasks", inTasks), ub.Assign("cache_group", inCacheGroup)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("runconfig").Set(ub.Assign("id", inID), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("name", inName), ub.Assign("run_group", inGroup), ub.Assign("setup_errors", inSetupErrors), ub.Assign("annotations", inAnnotations), ub.Assign("static_environment", inStaticEnvironment), ub.Assign("environment", inEnvironment), ub.Assign("tasks", inTasks), ub.Assign("cache_group", inCacheGroup)).Where(ub.E("id", inID), ub.E("revision", curRevision))
 	}
 
-	runConfigInsertRawSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inGroup string, inSetupErrors []byte, inAnnotations []byte, inStaticEnvironment []byte, inEnvironment []byte, inTasks []byte, inCacheGroup string) *sq.InsertBuilder {
+	runConfigInsertRawSqlite3 = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inGroup string, inSetupErrors []byte, inAnnotations []byte, inStaticEnvironment []byte, inEnvironment []byte, inTasks []byte, inCacheGroup string) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("runconfig").Cols("id", "revision", "creation_time", "update_time", "name", "run_group", "setup_errors", "annotations", "static_environment", "environment", "tasks", "cache_group").SQL("").Values(inId, inRevision, inCreationTime, inUpdateTime, inName, inGroup, inSetupErrors, inAnnotations, inStaticEnvironment, inEnvironment, inTasks, inCacheGroup)
+		return ib.InsertInto("runconfig").Cols("id", "revision", "creation_time", "update_time", "name", "run_group", "setup_errors", "annotations", "static_environment", "environment", "tasks", "cache_group").SQL("").Values(inID, inRevision, inCreationTime, inUpdateTime, inName, inGroup, inSetupErrors, inAnnotations, inStaticEnvironment, inEnvironment, inTasks, inCacheGroup)
 	}
 )
 
@@ -166,18 +166,18 @@ func (d *DB) insertRawRunConfigSqlite3(tx *sql.Tx, runconfig *types.RunConfig) e
 	return nil
 }
 var (
-	runInsertSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inName string, inRunConfigID string, inCounter uint64, inGroup string, inAnnotations []byte, inPhase types.RunPhase, inResult types.RunResult, inStop bool, inTasks []byte, inEnqueueTime *time.Time, inStartTime *time.Time, inEndTime *time.Time, inArchived bool) *sq.InsertBuilder {
+	runInsertSqlite3 = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inName string, inRunConfigID string, inCounter uint64, inGroup string, inAnnotations []byte, inPhase types.RunPhase, inResult types.RunResult, inStop bool, inTasks []byte, inEnqueueTime *time.Time, inStartTime *time.Time, inEndTime *time.Time, inArchived bool) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("run").Cols("id", "revision", "creation_time", "update_time", "sequence", "name", "run_config_id", "counter", "run_group", "annotations", "phase", "result", "stop", "tasks", "enqueue_time", "start_time", "end_time", "archived").Values(inId, inRevision, inCreationTime, inUpdateTime, inSequence, inName, inRunConfigID, inCounter, inGroup, inAnnotations, inPhase, inResult, inStop, inTasks, inEnqueueTime, inStartTime, inEndTime, inArchived)
+		return ib.InsertInto("run").Cols("id", "revision", "creation_time", "update_time", "sequence", "name", "run_config_id", "counter", "run_group", "annotations", "phase", "result", "stop", "tasks", "enqueue_time", "start_time", "end_time", "archived").Values(inID, inRevision, inCreationTime, inUpdateTime, inSequence, inName, inRunConfigID, inCounter, inGroup, inAnnotations, inPhase, inResult, inStop, inTasks, inEnqueueTime, inStartTime, inEndTime, inArchived)
 	}
-	runUpdateSqlite3 = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inRunConfigID string, inCounter uint64, inGroup string, inAnnotations []byte, inPhase types.RunPhase, inResult types.RunResult, inStop bool, inTasks []byte, inEnqueueTime *time.Time, inStartTime *time.Time, inEndTime *time.Time, inArchived bool) *sq.UpdateBuilder {
+	runUpdateSqlite3 = func(curRevision uint64, inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inName string, inRunConfigID string, inCounter uint64, inGroup string, inAnnotations []byte, inPhase types.RunPhase, inResult types.RunResult, inStop bool, inTasks []byte, inEnqueueTime *time.Time, inStartTime *time.Time, inEndTime *time.Time, inArchived bool) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("run").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("name", inName), ub.Assign("run_config_id", inRunConfigID), ub.Assign("counter", inCounter), ub.Assign("run_group", inGroup), ub.Assign("annotations", inAnnotations), ub.Assign("phase", inPhase), ub.Assign("result", inResult), ub.Assign("stop", inStop), ub.Assign("tasks", inTasks), ub.Assign("enqueue_time", inEnqueueTime), ub.Assign("start_time", inStartTime), ub.Assign("end_time", inEndTime), ub.Assign("archived", inArchived)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("run").Set(ub.Assign("id", inID), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("name", inName), ub.Assign("run_config_id", inRunConfigID), ub.Assign("counter", inCounter), ub.Assign("run_group", inGroup), ub.Assign("annotations", inAnnotations), ub.Assign("phase", inPhase), ub.Assign("result", inResult), ub.Assign("stop", inStop), ub.Assign("tasks", inTasks), ub.Assign("enqueue_time", inEnqueueTime), ub.Assign("start_time", inStartTime), ub.Assign("end_time", inEndTime), ub.Assign("archived", inArchived)).Where(ub.E("id", inID), ub.E("revision", curRevision))
 	}
 
-	runInsertRawSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inName string, inRunConfigID string, inCounter uint64, inGroup string, inAnnotations []byte, inPhase types.RunPhase, inResult types.RunResult, inStop bool, inTasks []byte, inEnqueueTime *time.Time, inStartTime *time.Time, inEndTime *time.Time, inArchived bool) *sq.InsertBuilder {
+	runInsertRawSqlite3 = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inName string, inRunConfigID string, inCounter uint64, inGroup string, inAnnotations []byte, inPhase types.RunPhase, inResult types.RunResult, inStop bool, inTasks []byte, inEnqueueTime *time.Time, inStartTime *time.Time, inEndTime *time.Time, inArchived bool) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("run").Cols("id", "revision", "creation_time", "update_time", "sequence", "name", "run_config_id", "counter", "run_group", "annotations", "phase", "result", "stop", "tasks", "enqueue_time", "start_time", "end_time", "archived").SQL("").Values(inId, inRevision, inCreationTime, inUpdateTime, inSequence, inName, inRunConfigID, inCounter, inGroup, inAnnotations, inPhase, inResult, inStop, inTasks, inEnqueueTime, inStartTime, inEndTime, inArchived)
+		return ib.InsertInto("run").Cols("id", "revision", "creation_time", "update_time", "sequence", "name", "run_config_id", "counter", "run_group", "annotations", "phase", "result", "stop", "tasks", "enqueue_time", "start_time", "end_time", "archived").SQL("").Values(inID, inRevision, inCreationTime, inUpdateTime, inSequence, inName, inRunConfigID, inCounter, inGroup, inAnnotations, inPhase, inResult, inStop, inTasks, inEnqueueTime, inStartTime, inEndTime, inArchived)
 	}
 )
 
@@ -236,18 +236,18 @@ func (d *DB) insertRawRunSqlite3(tx *sql.Tx, run *types.Run) error {
 	return nil
 }
 var (
-	runCounterInsertSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inGroupID string, inValue uint64) *sq.InsertBuilder {
+	runCounterInsertSqlite3 = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inGroupID string, inValue uint64) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("runcounter").Cols("id", "revision", "creation_time", "update_time", "group_id", "value").Values(inId, inRevision, inCreationTime, inUpdateTime, inGroupID, inValue)
+		return ib.InsertInto("runcounter").Cols("id", "revision", "creation_time", "update_time", "group_id", "value").Values(inID, inRevision, inCreationTime, inUpdateTime, inGroupID, inValue)
 	}
-	runCounterUpdateSqlite3 = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inGroupID string, inValue uint64) *sq.UpdateBuilder {
+	runCounterUpdateSqlite3 = func(curRevision uint64, inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inGroupID string, inValue uint64) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("runcounter").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("group_id", inGroupID), ub.Assign("value", inValue)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("runcounter").Set(ub.Assign("id", inID), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("group_id", inGroupID), ub.Assign("value", inValue)).Where(ub.E("id", inID), ub.E("revision", curRevision))
 	}
 
-	runCounterInsertRawSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inGroupID string, inValue uint64) *sq.InsertBuilder {
+	runCounterInsertRawSqlite3 = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inGroupID string, inValue uint64) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("runcounter").Cols("id", "revision", "creation_time", "update_time", "group_id", "value").SQL("").Values(inId, inRevision, inCreationTime, inUpdateTime, inGroupID, inValue)
+		return ib.InsertInto("runcounter").Cols("id", "revision", "creation_time", "update_time", "group_id", "value").SQL("").Values(inID, inRevision, inCreationTime, inUpdateTime, inGroupID, inValue)
 	}
 )
 
@@ -282,18 +282,18 @@ func (d *DB) insertRawRunCounterSqlite3(tx *sql.Tx, runcounter *types.RunCounter
 	return nil
 }
 var (
-	runEventInsertSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inRunEventType types.RunEventType, inRunID string, inPhase types.RunPhase, inResult types.RunResult, inData []byte, inDataVersion uint64) *sq.InsertBuilder {
+	runEventInsertSqlite3 = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inRunEventType types.RunEventType, inRunID string, inPhase types.RunPhase, inResult types.RunResult, inData []byte, inDataVersion uint64) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("runevent").Cols("id", "revision", "creation_time", "update_time", "sequence", "run_event_type", "run_id", "phase", "result", "data", "data_version").Values(inId, inRevision, inCreationTime, inUpdateTime, inSequence, inRunEventType, inRunID, inPhase, inResult, inData, inDataVersion)
+		return ib.InsertInto("runevent").Cols("id", "revision", "creation_time", "update_time", "sequence", "run_event_type", "run_id", "phase", "result", "data", "data_version").Values(inID, inRevision, inCreationTime, inUpdateTime, inSequence, inRunEventType, inRunID, inPhase, inResult, inData, inDataVersion)
 	}
-	runEventUpdateSqlite3 = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inRunEventType types.RunEventType, inRunID string, inPhase types.RunPhase, inResult types.RunResult, inData []byte, inDataVersion uint64) *sq.UpdateBuilder {
+	runEventUpdateSqlite3 = func(curRevision uint64, inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inRunEventType types.RunEventType, inRunID string, inPhase types.RunPhase, inResult types.RunResult, inData []byte, inDataVersion uint64) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("runevent").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("run_event_type", inRunEventType), ub.Assign("run_id", inRunID), ub.Assign("phase", inPhase), ub.Assign("result", inResult), ub.Assign("data", inData), ub.Assign("data_version", inDataVersion)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("runevent").Set(ub.Assign("id", inID), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("run_event_type", inRunEventType), ub.Assign("run_id", inRunID), ub.Assign("phase", inPhase), ub.Assign("result", inResult), ub.Assign("data", inData), ub.Assign("data_version", inDataVersion)).Where(ub.E("id", inID), ub.E("revision", curRevision))
 	}
 
-	runEventInsertRawSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inRunEventType types.RunEventType, inRunID string, inPhase types.RunPhase, inResult types.RunResult, inData []byte, inDataVersion uint64) *sq.InsertBuilder {
+	runEventInsertRawSqlite3 = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inSequence uint64, inRunEventType types.RunEventType, inRunID string, inPhase types.RunPhase, inResult types.RunResult, inData []byte, inDataVersion uint64) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("runevent").Cols("id", "revision", "creation_time", "update_time", "sequence", "run_event_type", "run_id", "phase", "result", "data", "data_version").SQL("").Values(inId, inRevision, inCreationTime, inUpdateTime, inSequence, inRunEventType, inRunID, inPhase, inResult, inData, inDataVersion)
+		return ib.InsertInto("runevent").Cols("id", "revision", "creation_time", "update_time", "sequence", "run_event_type", "run_id", "phase", "result", "data", "data_version").SQL("").Values(inID, inRevision, inCreationTime, inUpdateTime, inSequence, inRunEventType, inRunID, inPhase, inResult, inData, inDataVersion)
 	}
 )
 
@@ -340,18 +340,18 @@ func (d *DB) insertRawRunEventSqlite3(tx *sql.Tx, runevent *types.RunEvent) erro
 	return nil
 }
 var (
-	executorInsertSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inExecutorID string, inListenURL string, inArchs []byte, inLabels []byte, inAllowPrivilegedContainers bool, inActiveTasksLimit int, inActiveTasks int, inDynamic bool, inExecutorGroup string, inSiblingsExecutors []byte) *sq.InsertBuilder {
+	executorInsertSqlite3 = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inExecutorID string, inListenURL string, inArchs []byte, inLabels []byte, inAllowPrivilegedContainers bool, inActiveTasksLimit int, inActiveTasks int, inDynamic bool, inExecutorGroup string, inSiblingsExecutors []byte) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("executor").Cols("id", "revision", "creation_time", "update_time", "executor_id", "listen_url", "archs", "labels", "allow_privileged_containers", "active_tasks_limit", "active_tasks", "dynamic", "executor_group", "siblings_executors").Values(inId, inRevision, inCreationTime, inUpdateTime, inExecutorID, inListenURL, inArchs, inLabels, inAllowPrivilegedContainers, inActiveTasksLimit, inActiveTasks, inDynamic, inExecutorGroup, inSiblingsExecutors)
+		return ib.InsertInto("executor").Cols("id", "revision", "creation_time", "update_time", "executor_id", "listen_url", "archs", "labels", "allow_privileged_containers", "active_tasks_limit", "active_tasks", "dynamic", "executor_group", "siblings_executors").Values(inID, inRevision, inCreationTime, inUpdateTime, inExecutorID, inListenURL, inArchs, inLabels, inAllowPrivilegedContainers, inActiveTasksLimit, inActiveTasks, inDynamic, inExecutorGroup, inSiblingsExecutors)
 	}
-	executorUpdateSqlite3 = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inExecutorID string, inListenURL string, inArchs []byte, inLabels []byte, inAllowPrivilegedContainers bool, inActiveTasksLimit int, inActiveTasks int, inDynamic bool, inExecutorGroup string, inSiblingsExecutors []byte) *sq.UpdateBuilder {
+	executorUpdateSqlite3 = func(curRevision uint64, inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inExecutorID string, inListenURL string, inArchs []byte, inLabels []byte, inAllowPrivilegedContainers bool, inActiveTasksLimit int, inActiveTasks int, inDynamic bool, inExecutorGroup string, inSiblingsExecutors []byte) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("executor").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("executor_id", inExecutorID), ub.Assign("listen_url", inListenURL), ub.Assign("archs", inArchs), ub.Assign("labels", inLabels), ub.Assign("allow_privileged_containers", inAllowPrivilegedContainers), ub.Assign("active_tasks_limit", inActiveTasksLimit), ub.Assign("active_tasks", inActiveTasks), ub.Assign("dynamic", inDynamic), ub.Assign("executor_group", inExecutorGroup), ub.Assign("siblings_executors", inSiblingsExecutors)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("executor").Set(ub.Assign("id", inID), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("executor_id", inExecutorID), ub.Assign("listen_url", inListenURL), ub.Assign("archs", inArchs), ub.Assign("labels", inLabels), ub.Assign("allow_privileged_containers", inAllowPrivilegedContainers), ub.Assign("active_tasks_limit", inActiveTasksLimit), ub.Assign("active_tasks", inActiveTasks), ub.Assign("dynamic", inDynamic), ub.Assign("executor_group", inExecutorGroup), ub.Assign("siblings_executors", inSiblingsExecutors)).Where(ub.E("id", inID), ub.E("revision", curRevision))
 	}
 
-	executorInsertRawSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inExecutorID string, inListenURL string, inArchs []byte, inLabels []byte, inAllowPrivilegedContainers bool, inActiveTasksLimit int, inActiveTasks int, inDynamic bool, inExecutorGroup string, inSiblingsExecutors []byte) *sq.InsertBuilder {
+	executorInsertRawSqlite3 = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inExecutorID string, inListenURL string, inArchs []byte, inLabels []byte, inAllowPrivilegedContainers bool, inActiveTasksLimit int, inActiveTasks int, inDynamic bool, inExecutorGroup string, inSiblingsExecutors []byte) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("executor").Cols("id", "revision", "creation_time", "update_time", "executor_id", "listen_url", "archs", "labels", "allow_privileged_containers", "active_tasks_limit", "active_tasks", "dynamic", "executor_group", "siblings_executors").SQL("").Values(inId, inRevision, inCreationTime, inUpdateTime, inExecutorID, inListenURL, inArchs, inLabels, inAllowPrivilegedContainers, inActiveTasksLimit, inActiveTasks, inDynamic, inExecutorGroup, inSiblingsExecutors)
+		return ib.InsertInto("executor").Cols("id", "revision", "creation_time", "update_time", "executor_id", "listen_url", "archs", "labels", "allow_privileged_containers", "active_tasks_limit", "active_tasks", "dynamic", "executor_group", "siblings_executors").SQL("").Values(inID, inRevision, inCreationTime, inUpdateTime, inExecutorID, inListenURL, inArchs, inLabels, inAllowPrivilegedContainers, inActiveTasksLimit, inActiveTasks, inDynamic, inExecutorGroup, inSiblingsExecutors)
 	}
 )
 
@@ -422,18 +422,18 @@ func (d *DB) insertRawExecutorSqlite3(tx *sql.Tx, executor *types.Executor) erro
 	return nil
 }
 var (
-	executorTaskInsertSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inExecutorID string, inRunID string, inRunTaskID string, inStop bool, inPhase types.ExecutorTaskPhase, inTimedout bool, inFailError string, inStartTime *time.Time, inEndTime *time.Time, inSetupStep []byte, inSteps []byte) *sq.InsertBuilder {
+	executorTaskInsertSqlite3 = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inExecutorID string, inRunID string, inRunTaskID string, inStop bool, inPhase types.ExecutorTaskPhase, inTimedout bool, inFailError string, inStartTime *time.Time, inEndTime *time.Time, inSetupStep []byte, inSteps []byte) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("executortask").Cols("id", "revision", "creation_time", "update_time", "executor_id", "run_id", "run_task_id", "stop", "phase", "timedout", "fail_error", "start_time", "end_time", "setup_step", "steps").Values(inId, inRevision, inCreationTime, inUpdateTime, inExecutorID, inRunID, inRunTaskID, inStop, inPhase, inTimedout, inFailError, inStartTime, inEndTime, inSetupStep, inSteps)
+		return ib.InsertInto("executortask").Cols("id", "revision", "creation_time", "update_time", "executor_id", "run_id", "run_task_id", "stop", "phase", "timedout", "fail_error", "start_time", "end_time", "setup_step", "steps").Values(inID, inRevision, inCreationTime, inUpdateTime, inExecutorID, inRunID, inRunTaskID, inStop, inPhase, inTimedout, inFailError, inStartTime, inEndTime, inSetupStep, inSteps)
 	}
-	executorTaskUpdateSqlite3 = func(curRevision uint64, inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inExecutorID string, inRunID string, inRunTaskID string, inStop bool, inPhase types.ExecutorTaskPhase, inTimedout bool, inFailError string, inStartTime *time.Time, inEndTime *time.Time, inSetupStep []byte, inSteps []byte) *sq.UpdateBuilder {
+	executorTaskUpdateSqlite3 = func(curRevision uint64, inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inExecutorID string, inRunID string, inRunTaskID string, inStop bool, inPhase types.ExecutorTaskPhase, inTimedout bool, inFailError string, inStartTime *time.Time, inEndTime *time.Time, inSetupStep []byte, inSteps []byte) *sq.UpdateBuilder {
 		ub:= sq.NewUpdateBuilder()
-		return ub.Update("executortask").Set(ub.Assign("id", inId), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("executor_id", inExecutorID), ub.Assign("run_id", inRunID), ub.Assign("run_task_id", inRunTaskID), ub.Assign("stop", inStop), ub.Assign("phase", inPhase), ub.Assign("timedout", inTimedout), ub.Assign("fail_error", inFailError), ub.Assign("start_time", inStartTime), ub.Assign("end_time", inEndTime), ub.Assign("setup_step", inSetupStep), ub.Assign("steps", inSteps)).Where(ub.E("id", inId), ub.E("revision", curRevision))
+		return ub.Update("executortask").Set(ub.Assign("id", inID), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("executor_id", inExecutorID), ub.Assign("run_id", inRunID), ub.Assign("run_task_id", inRunTaskID), ub.Assign("stop", inStop), ub.Assign("phase", inPhase), ub.Assign("timedout", inTimedout), ub.Assign("fail_error", inFailError), ub.Assign("start_time", inStartTime), ub.Assign("end_time", inEndTime), ub.Assign("setup_step", inSetupStep), ub.Assign("steps", inSteps)).Where(ub.E("id", inID), ub.E("revision", curRevision))
 	}
 
-	executorTaskInsertRawSqlite3 = func(inId string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inExecutorID string, inRunID string, inRunTaskID string, inStop bool, inPhase types.ExecutorTaskPhase, inTimedout bool, inFailError string, inStartTime *time.Time, inEndTime *time.Time, inSetupStep []byte, inSteps []byte) *sq.InsertBuilder {
+	executorTaskInsertRawSqlite3 = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inExecutorID string, inRunID string, inRunTaskID string, inStop bool, inPhase types.ExecutorTaskPhase, inTimedout bool, inFailError string, inStartTime *time.Time, inEndTime *time.Time, inSetupStep []byte, inSteps []byte) *sq.InsertBuilder {
 		ib:= sq.NewInsertBuilder()
-		return ib.InsertInto("executortask").Cols("id", "revision", "creation_time", "update_time", "executor_id", "run_id", "run_task_id", "stop", "phase", "timedout", "fail_error", "start_time", "end_time", "setup_step", "steps").SQL("").Values(inId, inRevision, inCreationTime, inUpdateTime, inExecutorID, inRunID, inRunTaskID, inStop, inPhase, inTimedout, inFailError, inStartTime, inEndTime, inSetupStep, inSteps)
+		return ib.InsertInto("executortask").Cols("id", "revision", "creation_time", "update_time", "executor_id", "run_id", "run_task_id", "stop", "phase", "timedout", "fail_error", "start_time", "end_time", "setup_step", "steps").SQL("").Values(inID, inRevision, inCreationTime, inUpdateTime, inExecutorID, inRunID, inRunTaskID, inStop, inPhase, inTimedout, inFailError, inStartTime, inEndTime, inSetupStep, inSteps)
 	}
 )
 
