@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"testing"
 	"time"
@@ -107,11 +108,8 @@ func TestGetRemoteSources(t *testing.T) {
 			// default sortdirection is asc
 
 			// reverse if sortDirection is desc
-			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
 			if tt.sortDirection == gwapitypes.SortDirectionDesc {
-				for i, j := 0, len(expectedRemoteSources)-1; i < j; i, j = i+1, j-1 {
-					expectedRemoteSources[i], expectedRemoteSources[j] = expectedRemoteSources[j], expectedRemoteSources[i]
-				}
+				slices.Reverse(expectedRemoteSources)
 			}
 
 			respAllRemoteSources := []*gwapitypes.RemoteSourceResponse{}
@@ -804,11 +802,8 @@ func TestGetOrgs(t *testing.T) {
 			// default sortdirection is asc
 
 			// reverse if sortDirection is desc
-			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
 			if tt.sortDirection == gwapitypes.SortDirectionDesc {
-				for i, j := 0, len(expectedOrgs)-1; i < j; i, j = i+1, j-1 {
-					expectedOrgs[i], expectedOrgs[j] = expectedOrgs[j], expectedOrgs[i]
-				}
+				slices.Reverse(expectedOrgs)
 			}
 
 			respAllOrgs := []*gwapitypes.OrgResponse{}
@@ -920,11 +915,8 @@ func TestGetOrgMembers(t *testing.T) {
 			// default sortdirection is asc
 
 			// reverse if sortDirection is desc
-			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
 			if tt.sortDirection == gwapitypes.SortDirectionDesc {
-				for i, j := 0, len(expectedOrgMembers)-1; i < j; i, j = i+1, j-1 {
-					expectedOrgMembers[i], expectedOrgMembers[j] = expectedOrgMembers[j], expectedOrgMembers[i]
-				}
+				slices.Reverse(expectedOrgMembers)
 			}
 
 			respAllOrgMembers := []*gwapitypes.OrgMemberResponse{}
@@ -1041,11 +1033,8 @@ func TestGetUserOrgs(t *testing.T) {
 			// default sortdirection is asc
 
 			// reverse if sortDirection is desc
-			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
 			if tt.sortDirection == gwapitypes.SortDirectionDesc {
-				for i, j := 0, len(expectedUserOrgs)-1; i < j; i, j = i+1, j-1 {
-					expectedUserOrgs[i], expectedUserOrgs[j] = expectedUserOrgs[j], expectedUserOrgs[i]
-				}
+				slices.Reverse(expectedUserOrgs)
 			}
 
 			respAllUserOrgs := []*gwapitypes.OrgResponse{}
@@ -1331,11 +1320,8 @@ func TestGetUsers(t *testing.T) {
 			// default sortdirection is asc
 
 			// reverse if sortDirection is desc
-			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
 			if tt.sortDirection == gwapitypes.SortDirectionDesc {
-				for i, j := 0, len(expectedUsers)-1; i < j; i, j = i+1, j-1 {
-					expectedUsers[i], expectedUsers[j] = expectedUsers[j], expectedUsers[i]
-				}
+				slices.Reverse(expectedUsers)
 			}
 
 			respAllUsers := []*gwapitypes.UserResponse{}
@@ -1735,7 +1721,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 			// populate the expected commit status deliveries
 			expectedProject01RunWebhookDeliveries := []*gwapitypes.RunWebhookDeliveryResponse{}
 			for _, r := range runWebhookDeliveries {
-				if len(tt.deliveryStatusFilter) > 0 && !util.StringInSlice(tt.deliveryStatusFilter, string(r.DeliveryStatus)) {
+				if len(tt.deliveryStatusFilter) > 0 && !slices.Contains(tt.deliveryStatusFilter, string(r.DeliveryStatus)) {
 					continue
 				}
 				expectedProject01RunWebhookDeliveries = append(expectedProject01RunWebhookDeliveries, r)
@@ -1743,11 +1729,8 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 			// default sortdirection is asc
 
 			// reverse if sortDirection is desc
-			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
 			if tt.sortDirection == gwapitypes.SortDirectionDesc {
-				for i, j := 0, len(expectedProject01RunWebhookDeliveries)-1; i < j; i, j = i+1, j-1 {
-					expectedProject01RunWebhookDeliveries[i], expectedProject01RunWebhookDeliveries[j] = expectedProject01RunWebhookDeliveries[j], expectedProject01RunWebhookDeliveries[i]
-				}
+				slices.Reverse(expectedProject01RunWebhookDeliveries)
 			}
 
 			respAllRunWebhookDeliveries := []*gwapitypes.RunWebhookDeliveryResponse{}
@@ -2357,7 +2340,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 			// populate the expected commit status deliveries
 			expectedProject01CommitStatusDeliveries := []*gwapitypes.CommitStatusDeliveryResponse{}
 			for _, c := range commitStatusDeliveries {
-				if len(tt.deliveryStatusFilter) > 0 && !util.StringInSlice(tt.deliveryStatusFilter, string(c.DeliveryStatus)) {
+				if len(tt.deliveryStatusFilter) > 0 && !slices.Contains(tt.deliveryStatusFilter, string(c.DeliveryStatus)) {
 					continue
 				}
 				expectedProject01CommitStatusDeliveries = append(expectedProject01CommitStatusDeliveries, c)
@@ -2365,11 +2348,8 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 			// default sortdirection is asc
 
 			// reverse if sortDirection is desc
-			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
 			if tt.sortDirection == gwapitypes.SortDirectionDesc {
-				for i, j := 0, len(expectedProject01CommitStatusDeliveries)-1; i < j; i, j = i+1, j-1 {
-					expectedProject01CommitStatusDeliveries[i], expectedProject01CommitStatusDeliveries[j] = expectedProject01CommitStatusDeliveries[j], expectedProject01CommitStatusDeliveries[i]
-				}
+				slices.Reverse(expectedProject01CommitStatusDeliveries)
 			}
 
 			respAllCommitStatusDeliveries := []*gwapitypes.CommitStatusDeliveryResponse{}
@@ -3501,10 +3481,10 @@ func testGetGroupRuns(t *testing.T, userRun bool) {
 					continue
 				}
 
-				if len(tt.phaseFilter) > 0 && !util.StringInSlice(tt.phaseFilter, string(run.Phase)) {
+				if len(tt.phaseFilter) > 0 && !slices.Contains(tt.phaseFilter, string(run.Phase)) {
 					continue
 				}
-				if len(tt.resultFilter) > 0 && !util.StringInSlice(tt.resultFilter, string(run.Result)) {
+				if len(tt.resultFilter) > 0 && !slices.Contains(tt.resultFilter, string(run.Result)) {
 					continue
 				}
 
@@ -3512,11 +3492,8 @@ func testGetGroupRuns(t *testing.T, userRun bool) {
 			}
 
 			// reverse if sortDirection is desc
-			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
 			if tt.sortDirection == gwapitypes.SortDirectionDesc || tt.sortDirection == "" {
-				for i, j := 0, len(expectedRuns)-1; i < j; i, j = i+1, j-1 {
-					expectedRuns[i], expectedRuns[j] = expectedRuns[j], expectedRuns[i]
-				}
+				slices.Reverse(expectedRuns)
 			}
 
 			respAllRuns := []*gwapitypes.RunsResponse{}

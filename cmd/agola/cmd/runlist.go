@@ -15,9 +15,10 @@
 package cmd
 
 import (
+	"cmp"
 	"context"
 	"fmt"
-	"sort"
+	"slices"
 
 	"github.com/rs/zerolog/log"
 	"github.com/sorintlab/errors"
@@ -166,11 +167,11 @@ func runList(cmd *cobra.Command, args []string) error {
 				tasks = append(tasks, t)
 			}
 
-			sort.Slice(tasks, func(i, j int) bool {
-				if tasks[i].level != tasks[j].level {
-					return tasks[i].level < tasks[j].level
+			slices.SortFunc(tasks, func(a, b *taskDetails) int {
+				if n := cmp.Compare(a.level, b.level); n != 0 {
+					return n
 				}
-				return tasks[i].name < tasks[j].name
+				return cmp.Compare(a.name, b.name)
 			})
 
 			runs[i] = &runDetails{

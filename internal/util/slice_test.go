@@ -20,7 +20,7 @@ import (
 	"gotest.tools/assert"
 )
 
-func TestCompareStringSlice(t *testing.T) {
+func TestEqualStringSlice(t *testing.T) {
 	tests := []struct {
 		a  []string
 		b  []string
@@ -39,12 +39,12 @@ func TestCompareStringSlice(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		ok := CompareStringSlice(tt.a, tt.b)
+		ok := EqualStringSlice(tt.a, tt.b)
 		assert.Equal(t, ok, tt.ok, "%d: got %t but wanted: %t a: %v, b: %v", i, ok, tt.ok, tt.a, tt.b)
 	}
 }
 
-func TestCompareStringSliceNoOrder(t *testing.T) {
+func TestEqualStringSliceNoOrder(t *testing.T) {
 	tests := []struct {
 		a  []string
 		b  []string
@@ -63,7 +63,7 @@ func TestCompareStringSliceNoOrder(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		ok := CompareStringSliceNoOrder(tt.a, tt.b)
+		ok := EqualStringSliceNoOrder(tt.a, tt.b)
 		assert.Equal(t, ok, tt.ok, "%d: got %t but wanted: %t a: %v, b: %v", i, ok, tt.ok, tt.a, tt.b)
 	}
 }
@@ -92,6 +92,6 @@ func TestDifference(t *testing.T) {
 
 	for i, tt := range tests {
 		r := Difference(tt.a, tt.b)
-		assert.Assert(t, CompareStringSliceNoOrder(r, tt.r), "%d: got %v but wanted: %v a: %v, b: %v", i, r, tt.r, tt.a, tt.b)
+		assert.Assert(t, EqualStringSliceNoOrder(r, tt.r), "%d: got %v but wanted: %v a: %v, b: %v", i, r, tt.r, tt.a, tt.b)
 	}
 }

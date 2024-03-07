@@ -3,6 +3,7 @@ package testutil
 import (
 	"bufio"
 	"bytes"
+	stdcmp "cmp"
 	"context"
 	stdsql "database/sql"
 	"encoding/json"
@@ -11,7 +12,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strconv"
 	"testing"
 	"time"
@@ -702,7 +703,7 @@ func TestMigrate(t *testing.T, lastVersion uint, dataFixtures DataFixtures, setu
 						tableNames = append(tableNames, table.Name)
 					}
 
-					sort.Strings(tableNames)
+					slices.Sort(tableNames)
 
 					return tableNames
 				}
@@ -743,10 +744,10 @@ func decodeExport(t *testing.T, d manager.DB, export []byte) []any {
 	}
 
 	// sort objects by id
-	sort.Slice(objs, func(i, j int) bool {
-		o1 := objs[i].(sqlg.Object)
-		o2 := objs[j].(sqlg.Object)
-		return o1.GetID() < o2.GetID()
+	slices.SortFunc(objs, func(a, b any) int {
+		ao := a.(sqlg.Object)
+		bo := b.(sqlg.Object)
+		return stdcmp.Compare(ao.GetID(), bo.GetID())
 	})
 
 	return objs

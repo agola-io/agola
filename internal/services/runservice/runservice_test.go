@@ -21,6 +21,7 @@ import (
 	"net"
 	"os"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -603,21 +604,18 @@ func TestGetGroupRuns(t *testing.T) {
 					continue
 				}
 
-				if len(tt.phaseFilter) > 0 && !phaseInSlice(tt.phaseFilter, run.Phase) {
+				if len(tt.phaseFilter) > 0 && !slices.Contains(tt.phaseFilter, run.Phase) {
 					continue
 				}
-				if len(tt.resultFilter) > 0 && !resultInSlice(tt.resultFilter, run.Result) {
+				if len(tt.resultFilter) > 0 && !slices.Contains(tt.resultFilter, run.Result) {
 					continue
 				}
 				expectedRuns = append(expectedRuns, run)
 			}
 
 			// reverse if sortDirection is desc
-			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
 			if tt.sortDirection == types.SortDirectionDesc || tt.sortDirection == "" {
-				for i, j := 0, len(expectedRuns)-1; i < j; i, j = i+1, j-1 {
-					expectedRuns[i], expectedRuns[j] = expectedRuns[j], expectedRuns[i]
-				}
+				slices.Reverse(expectedRuns)
 			}
 
 			callsNumber := 0
@@ -645,24 +643,4 @@ func TestGetGroupRuns(t *testing.T) {
 			assert.Equal(t, callsNumber, tt.expectedCallsNumber)
 		})
 	}
-}
-
-// TODO(sgotti) use go 1.21 generics slices.Contains when removing support for go < 1.21
-func phaseInSlice(phases []types.RunPhase, phase types.RunPhase) bool {
-	for _, s := range phases {
-		if phase == s {
-			return true
-		}
-	}
-	return false
-}
-
-// TODO(sgotti) use go 1.21 generics slices.Contains when removing support for go < 1.21
-func resultInSlice(results []types.RunResult, result types.RunResult) bool {
-	for _, s := range results {
-		if result == s {
-			return true
-		}
-	}
-	return false
 }

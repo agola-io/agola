@@ -17,6 +17,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/rs/zerolog/log"
 	"github.com/sorintlab/errors"
@@ -31,7 +32,6 @@ import (
 	"agola.io/agola/internal/services/notification"
 	"agola.io/agola/internal/services/runservice"
 	"agola.io/agola/internal/services/scheduler"
-	"agola.io/agola/internal/util"
 )
 
 var (
@@ -82,10 +82,10 @@ func init() {
 }
 
 func isComponentEnabled(name string) bool {
-	if util.StringInSlice(serveOpts.components, "all-base") && name != "executor" {
+	if slices.Contains(serveOpts.components, "all-base") && name != "executor" {
 		return true
 	}
-	return util.StringInSlice(serveOpts.components, name)
+	return slices.Contains(serveOpts.components, name)
 }
 
 func serve(cmd *cobra.Command, args []string) error {
@@ -95,7 +95,7 @@ func serve(cmd *cobra.Command, args []string) error {
 		return errors.Errorf("no enabled components")
 	}
 	for _, ec := range serveOpts.components {
-		if !util.StringInSlice(componentsNames, ec) {
+		if !slices.Contains(componentsNames, ec) {
 			return errors.Errorf("unknown component name %q", ec)
 		}
 	}

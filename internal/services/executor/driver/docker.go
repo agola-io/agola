@@ -15,6 +15,7 @@
 package driver
 
 import (
+	"cmp"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -22,7 +23,7 @@ import (
 	"io"
 	"path/filepath"
 	"runtime"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -247,7 +248,7 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 		return nil, errors.Errorf("expected %d containers but got %d", len(containers), count)
 	}
 	// put the containers in the right order based on their container index
-	sort.Sort(ContainerSlice(pod.containers))
+	slices.SortFunc(pod.containers, ContainersByIndexSortFunc)
 
 	return pod, nil
 }
@@ -481,7 +482,8 @@ func (d *DockerDriver) GetPods(ctx context.Context, all bool) ([]Pod, error) {
 	pods := make([]Pod, 0, len(podsMap))
 	for _, pod := range podsMap {
 		// put the containers in the right order based on their container index
-		sort.Sort(ContainerSlice(pod.containers))
+		slices.SortFunc(pod.containers, ContainersByIndexSortFunc)
+
 		pods = append(pods, pod)
 	}
 	return pods, nil
@@ -503,11 +505,9 @@ type DockerContainer struct {
 	dockertypes.Container
 }
 
-type ContainerSlice []*DockerContainer
-
-func (p ContainerSlice) Len() int           { return len(p) }
-func (p ContainerSlice) Less(i, j int) bool { return p[i].Index < p[j].Index }
-func (p ContainerSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+func ContainersByIndexSortFunc(a, b *DockerContainer) int {
+	return cmp.Compare(a.Index, b.Index)
+}
 
 func (dp *DockerPod) ID() string {
 	return dp.id

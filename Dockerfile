@@ -7,7 +7,7 @@ FROM $AGOLAWEB_IMAGE as agola-web
 #######
 
 # base build image
-FROM golang:1.21-bookworm AS build_base
+FROM golang:1.22-bookworm AS build_base
 
 WORKDIR /agola
 

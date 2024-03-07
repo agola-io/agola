@@ -22,6 +22,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -614,7 +615,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 			// populate the expected run webhook deliveries
 			expectedProject01RunWebhookDeliveries := []*types.RunWebhookDelivery{}
 			for _, c := range project01RunWebhookDeliveries {
-				if len(tt.deliveryStatusFilter) > 0 && !deliveryStatusInSlice(tt.deliveryStatusFilter, c.DeliveryStatus) {
+				if len(tt.deliveryStatusFilter) > 0 && !slices.Contains(tt.deliveryStatusFilter, c.DeliveryStatus) {
 					continue
 				}
 				expectedProject01RunWebhookDeliveries = append(expectedProject01RunWebhookDeliveries, c)
@@ -622,11 +623,8 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 			// default sortdirection is asc
 
 			// reverse if sortDirection is desc
-			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
 			if tt.sortDirection == types.SortDirectionDesc {
-				for i, j := 0, len(expectedProject01RunWebhookDeliveries)-1; i < j; i, j = i+1, j-1 {
-					expectedProject01RunWebhookDeliveries[i], expectedProject01RunWebhookDeliveries[j] = expectedProject01RunWebhookDeliveries[j], expectedProject01RunWebhookDeliveries[i]
-				}
+				slices.Reverse(expectedProject01RunWebhookDeliveries)
 			}
 
 			callsNumber := 0
@@ -1038,7 +1036,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 			// populate the expected commit status deliveries
 			expectedProject01CommitStatusDeliveries := []*types.CommitStatusDelivery{}
 			for _, c := range project01CommitStatusDeliveries {
-				if len(tt.deliveryStatusFilter) > 0 && !deliveryStatusInSlice(tt.deliveryStatusFilter, c.DeliveryStatus) {
+				if len(tt.deliveryStatusFilter) > 0 && !slices.Contains(tt.deliveryStatusFilter, c.DeliveryStatus) {
 					continue
 				}
 				expectedProject01CommitStatusDeliveries = append(expectedProject01CommitStatusDeliveries, c)
@@ -1046,11 +1044,8 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 			// default sortdirection is asc
 
 			// reverse if sortDirection is desc
-			// TODO(sgotti) use go 1.21 generics slices.Reverse when removing support for go < 1.21
 			if tt.sortDirection == types.SortDirectionDesc {
-				for i, j := 0, len(expectedProject01CommitStatusDeliveries)-1; i < j; i, j = i+1, j-1 {
-					expectedProject01CommitStatusDeliveries[i], expectedProject01CommitStatusDeliveries[j] = expectedProject01CommitStatusDeliveries[j], expectedProject01CommitStatusDeliveries[i]
-				}
+				slices.Reverse(expectedProject01CommitStatusDeliveries)
 			}
 
 			callsNumber := 0
@@ -1083,16 +1078,6 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
 		})
 	}
-}
-
-// TODO(sgotti) use go 1.21 generics slices.Contains when removing support for go < 1.21
-func deliveryStatusInSlice(deliveryStatuses []types.DeliveryStatus, deliveryStatus types.DeliveryStatus) bool {
-	for _, s := range deliveryStatuses {
-		if deliveryStatus == s {
-			return true
-		}
-	}
-	return false
 }
 
 func TestProjectCommitStatusRedelivery(t *testing.T) {

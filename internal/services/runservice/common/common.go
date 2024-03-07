@@ -15,8 +15,9 @@
 package common
 
 import (
+	"cmp"
 	"path"
-	"sort"
+	"slices"
 	"strconv"
 
 	"github.com/sorintlab/errors"
@@ -100,16 +101,13 @@ func OSTSubGroupTypes(group string) []string {
 	return sg
 }
 
-type parentsByLevelName []*types.RunConfigTask
-
-func (p parentsByLevelName) Len() int { return len(p) }
-func (p parentsByLevelName) Less(i, j int) bool {
-	if p[i].Level != p[j].Level {
-		return p[i].Level < p[j].Level
+func parentsByLevelNameSortFunc(a, b *types.RunConfigTask) int {
+	if n := cmp.Compare(a.Level, b.Level); n != 0 {
+		return n
 	}
-	return p[i].Name < p[j].Name
+
+	return cmp.Compare(a.Name, b.Name)
 }
-func (p parentsByLevelName) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
 
 func mergeEnv(dest, src map[string]string) {
 	for k, v := range src {
@@ -160,7 +158,7 @@ func GenExecutorTaskSpecData(r *types.Run, rt *types.RunTask, rc *types.RunConfi
 	rctAllParents := runconfig.GetAllParents(rc.Tasks, rct)
 
 	// sort parents by level and name just for reproducibility
-	sort.Sort(parentsByLevelName(rctAllParents))
+	slices.SortFunc(rctAllParents, parentsByLevelNameSortFunc)
 
 	for _, rctParent := range rctAllParents {
 		for _, archiveStep := range r.Tasks[rctParent.ID].WorkspaceArchives {

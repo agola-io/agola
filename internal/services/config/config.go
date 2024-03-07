@@ -16,6 +16,7 @@ package config
 
 import (
 	"os"
+	"slices"
 	"time"
 
 	"github.com/sorintlab/errors"
@@ -658,8 +659,8 @@ func Validate(c *Config, componentsNames []string) error {
 }
 
 func isComponentEnabled(componentsNames []string, name string) bool {
-	if util.StringInSlice(componentsNames, "all-base") && name != "executor" {
+	if slices.Contains(componentsNames, "all-base") && name != "executor" {
 		return true
 	}
-	return util.StringInSlice(componentsNames, name)
+	return slices.Contains(componentsNames, name)
 }
