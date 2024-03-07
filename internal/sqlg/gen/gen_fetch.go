@@ -80,7 +80,7 @@ func (d *DB) scan{{ $tableDef.ObjectName }}(rows *stdsql.Rows, skipFieldsCount u
 		x.Init()
 	}
 
-	fields := append([]any{ {{- $tableDef.ScanFields | join ", " -}} })
+	fields := []any{ {{- $tableDef.ScanFields | join ", " -}} }
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))

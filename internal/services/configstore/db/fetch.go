@@ -46,7 +46,7 @@ func (d *DB) scanRemoteSource(rows *stdsql.Rows, skipFieldsCount uint) (*types.R
 		x.Init()
 	}
 
-	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Name, &v.APIURL, &v.SkipVerify, &v.Type, &v.AuthType, &v.Oauth2ClientID, &v.Oauth2ClientSecret, &v.SSHHostKey, &v.SkipSSHHostKeyCheck, &v.RegistrationEnabled, &v.LoginEnabled})
+	fields := []any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Name, &v.APIURL, &v.SkipVerify, &v.Type, &v.AuthType, &v.Oauth2ClientID, &v.Oauth2ClientSecret, &v.SSHHostKey, &v.SkipSSHHostKeyCheck, &v.RegistrationEnabled, &v.LoginEnabled}
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))
@@ -168,7 +168,7 @@ func (d *DB) scanUser(rows *stdsql.Rows, skipFieldsCount uint) (*types.User, str
 		x.Init()
 	}
 
-	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Name, &v.Secret, &v.Admin})
+	fields := []any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Name, &v.Secret, &v.Admin}
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))
@@ -274,7 +274,7 @@ func (d *DB) scanUserToken(rows *stdsql.Rows, skipFieldsCount uint) (*types.User
 		x.Init()
 	}
 
-	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.UserID, &v.Name, &v.Value})
+	fields := []any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.UserID, &v.Name, &v.Value}
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))
@@ -380,7 +380,7 @@ func (d *DB) scanLinkedAccount(rows *stdsql.Rows, skipFieldsCount uint) (*types.
 		x.Init()
 	}
 
-	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.UserID, &v.RemoteUserID, &v.RemoteUserName, &v.RemoteUserAvatarURL, &v.RemoteSourceID, &v.UserAccessToken, &v.Oauth2AccessToken, &v.Oauth2RefreshToken, &v.Oauth2AccessTokenExpiresAt})
+	fields := []any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.UserID, &v.RemoteUserID, &v.RemoteUserName, &v.RemoteUserAvatarURL, &v.RemoteSourceID, &v.UserAccessToken, &v.Oauth2AccessToken, &v.Oauth2RefreshToken, &v.Oauth2AccessTokenExpiresAt}
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))
@@ -498,7 +498,7 @@ func (d *DB) scanOrganization(rows *stdsql.Rows, skipFieldsCount uint) (*types.O
 		x.Init()
 	}
 
-	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Name, &v.Visibility, &v.CreatorUserID})
+	fields := []any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Name, &v.Visibility, &v.CreatorUserID}
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))
@@ -604,7 +604,7 @@ func (d *DB) scanOrganizationMember(rows *stdsql.Rows, skipFieldsCount uint) (*t
 		x.Init()
 	}
 
-	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.OrganizationID, &v.UserID, &v.MemberRole})
+	fields := []any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.OrganizationID, &v.UserID, &v.MemberRole}
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))
@@ -710,7 +710,7 @@ func (d *DB) scanProjectGroup(rows *stdsql.Rows, skipFieldsCount uint) (*types.P
 		x.Init()
 	}
 
-	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Name, &v.Parent.Kind, &v.Parent.ID, &v.Visibility})
+	fields := []any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Name, &v.Parent.Kind, &v.Parent.ID, &v.Visibility}
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))
@@ -818,7 +818,7 @@ func (d *DB) scanProject(rows *stdsql.Rows, skipFieldsCount uint) (*types.Projec
 		x.Init()
 	}
 
-	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Name, &v.Parent.Kind, &v.Parent.ID, &v.Secret, &v.Visibility, &v.RemoteRepositoryConfigType, &v.RemoteSourceID, &v.LinkedAccountID, &v.RepositoryID, &v.RepositoryPath, &v.SSHPrivateKey, &v.SkipSSHHostKeyCheck, &v.WebhookSecret, &v.PassVarsToForkedPR, &v.DefaultBranch, &v.MembersCanPerformRunActions})
+	fields := []any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Name, &v.Parent.Kind, &v.Parent.ID, &v.Secret, &v.Visibility, &v.RemoteRepositoryConfigType, &v.RemoteSourceID, &v.LinkedAccountID, &v.RepositoryID, &v.RepositoryPath, &v.SSHPrivateKey, &v.SkipSSHHostKeyCheck, &v.WebhookSecret, &v.PassVarsToForkedPR, &v.DefaultBranch, &v.MembersCanPerformRunActions}
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))
@@ -951,7 +951,7 @@ func (d *DB) scanSecret(rows *stdsql.Rows, skipFieldsCount uint) (*types.Secret,
 		x.Init()
 	}
 
-	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Name, &v.Parent.Kind, &v.Parent.ID, &v.Type, &inDataJSON, &v.SecretProviderID, &v.Path})
+	fields := []any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Name, &v.Parent.Kind, &v.Parent.ID, &v.Type, &inDataJSON, &v.SecretProviderID, &v.Path}
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))
@@ -1071,7 +1071,7 @@ func (d *DB) scanVariable(rows *stdsql.Rows, skipFieldsCount uint) (*types.Varia
 		x.Init()
 	}
 
-	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Name, &v.Parent.Kind, &v.Parent.ID, &inValuesJSON})
+	fields := []any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Name, &v.Parent.Kind, &v.Parent.ID, &inValuesJSON}
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))
@@ -1184,7 +1184,7 @@ func (d *DB) scanOrgInvitation(rows *stdsql.Rows, skipFieldsCount uint) (*types.
 		x.Init()
 	}
 
-	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.UserID, &v.OrganizationID, &v.Role})
+	fields := []any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.UserID, &v.OrganizationID, &v.Role}
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))

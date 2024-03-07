@@ -46,7 +46,7 @@ func (d *DB) scanChangeGroup(rows *stdsql.Rows, skipFieldsCount uint) (*types.Ch
 		x.Init()
 	}
 
-	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Name, &v.Value})
+	fields := []any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Name, &v.Value}
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))
@@ -155,7 +155,7 @@ func (d *DB) scanRunConfig(rows *stdsql.Rows, skipFieldsCount uint) (*types.RunC
 		x.Init()
 	}
 
-	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Name, &v.Group, &inSetupErrorsJSON, &inAnnotationsJSON, &inStaticEnvironmentJSON, &inEnvironmentJSON, &inTasksJSON, &v.CacheGroup})
+	fields := []any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Name, &v.Group, &inSetupErrorsJSON, &inAnnotationsJSON, &inStaticEnvironmentJSON, &inEnvironmentJSON, &inTasksJSON, &v.CacheGroup}
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))
@@ -298,7 +298,7 @@ func (d *DB) scanRun(rows *stdsql.Rows, skipFieldsCount uint) (*types.Run, strin
 		x.Init()
 	}
 
-	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Sequence, &v.Name, &v.RunConfigID, &v.Counter, &v.Group, &inAnnotationsJSON, &v.Phase, &v.Result, &v.Stop, &inTasksJSON, &v.EnqueueTime, &v.StartTime, &v.EndTime, &v.Archived})
+	fields := []any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Sequence, &v.Name, &v.RunConfigID, &v.Counter, &v.Group, &inAnnotationsJSON, &v.Phase, &v.Result, &v.Stop, &inTasksJSON, &v.EnqueueTime, &v.StartTime, &v.EndTime, &v.Archived}
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))
@@ -436,7 +436,7 @@ func (d *DB) scanRunCounter(rows *stdsql.Rows, skipFieldsCount uint) (*types.Run
 		x.Init()
 	}
 
-	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.GroupID, &v.Value})
+	fields := []any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.GroupID, &v.Value}
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))
@@ -541,7 +541,7 @@ func (d *DB) scanRunEvent(rows *stdsql.Rows, skipFieldsCount uint) (*types.RunEv
 		x.Init()
 	}
 
-	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Sequence, &v.RunEventType, &v.RunID, &v.Phase, &v.Result, &inDataJSON, &v.DataVersion})
+	fields := []any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.Sequence, &v.RunEventType, &v.RunID, &v.Phase, &v.Result, &inDataJSON, &v.DataVersion}
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))
@@ -663,7 +663,7 @@ func (d *DB) scanExecutor(rows *stdsql.Rows, skipFieldsCount uint) (*types.Execu
 		x.Init()
 	}
 
-	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.ExecutorID, &v.ListenURL, &inArchsJSON, &inLabelsJSON, &v.AllowPrivilegedContainers, &v.ActiveTasksLimit, &v.ActiveTasks, &v.Dynamic, &v.ExecutorGroup, &inSiblingsExecutorsJSON})
+	fields := []any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.ExecutorID, &v.ListenURL, &inArchsJSON, &inLabelsJSON, &v.AllowPrivilegedContainers, &v.ActiveTasksLimit, &v.ActiveTasks, &v.Dynamic, &v.ExecutorGroup, &inSiblingsExecutorsJSON}
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))
@@ -800,7 +800,7 @@ func (d *DB) scanExecutorTask(rows *stdsql.Rows, skipFieldsCount uint) (*types.E
 		x.Init()
 	}
 
-	fields := append([]any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.ExecutorID, &v.RunID, &v.RunTaskID, &v.Stop, &v.Phase, &v.Timedout, &v.FailError, &v.StartTime, &v.EndTime, &inSetupStepJSON, &inStepsJSON})
+	fields := []any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.ExecutorID, &v.RunID, &v.RunTaskID, &v.Stop, &v.Phase, &v.Timedout, &v.FailError, &v.StartTime, &v.EndTime, &inSetupStepJSON, &inStepsJSON}
 
 	for i := uint(0); i < skipFieldsCount; i++ {
 		fields = append(fields, new(any))

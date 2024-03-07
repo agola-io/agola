@@ -26,7 +26,6 @@ require (
 	github.com/hashicorp/go-sockaddr v1.0.5
 	github.com/huandu/go-sqlbuilder v1.22.0
 	github.com/huandu/xstrings v1.4.0
-	github.com/iancoleman/strcase v0.3.0
 	github.com/lib/pq v1.10.9
 	github.com/mattn/go-sqlite3 v1.14.17
 	github.com/minio/minio-go/v6 v6.0.57
