@@ -20,7 +20,7 @@ See [the agolademo example](https://agola.io/tryit)
 ## Features
 
 * Easy to install and manage.
-* Scalable and High Available: go from a single instance (single process) deployment to a distributed deployment.
+* Scalable and Highly Available: go from a single instance (single process) deployment to a distributed deployment.
 * Deploy anywhere: Kubernetes, IaaS, bare metal and execute the "tasks" anywhere (currently containers executors like docker or orchestrators and Kubernetes, but easily extensible to future technologies or VMs instead of containers).
 * Support any language, deployment system etc... (just use the right image)
 * Integrate with multiple git providers at the same time: you could add repos from github, gitlab, gitea (and more to come) inside the same agola installation.
