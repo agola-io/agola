@@ -16,11 +16,18 @@ package util
 
 import (
 	"regexp"
+	"unicode/utf8"
 
 	"github.com/gofrs/uuid"
 	"github.com/sorintlab/errors"
 )
 
+const (
+	minNameCharacters = 1
+	maxNameCharacters = 40
+)
+
+var singleCharNameRegexp = regexp.MustCompile(`^[a-zA-Z0-9]$`)
 var nameRegexp = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9]*([-]?[a-zA-Z0-9]+)+$`)
 
 var (
@@ -33,5 +40,15 @@ func ValidateName(s string) bool {
 	if _, err := uuid.FromString(s); err == nil {
 		return false
 	}
+
+	c := utf8.RuneCountInString(s)
+	if c < minNameCharacters || c > maxNameCharacters {
+		return false
+	}
+
+	if c == 1 {
+		return singleCharNameRegexp.MatchString(s)
+	}
+
 	return nameRegexp.MatchString(s)
 }
