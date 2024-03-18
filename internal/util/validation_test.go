@@ -22,6 +22,9 @@ import (
 
 var (
 	goodNames = []string{
+		"0",
+		"a",
+		"Z",
 		"bar",
 		"foo-bar",
 		"foo-bar-baz",
@@ -36,6 +39,9 @@ var (
 	}
 	badNames = []string{
 		"",
+		"-",
+		"È",
+		"Èà",
 		"foo bar",
 		" foo bar",
 		"foo bar ",
@@ -48,10 +54,11 @@ var (
 		"foo_bar",
 		"foo#bar",
 		"1foobar",
-		"cba7b810-9dad-11d1-80b4-00c04fd430c8",
-		"{cba7b810-9dad-11d1-80b4-00c04fd430c8}",
-		"urn:uuid:cba7b810-9dad-11d1-80b4-00c04fd430c8",
-		"cba7b8109dad11d180b400c04fd430c8",
+		"cba7b810-9dad-11d1-80b4-00c04fd430c8",   // uuid
+		"{cba7b810-9dad-11d1-80b4-00c04fd430c8}", // uuid
+		"urn:uuid:cba7b810-9dad-11d1-80b4-00c04fd430c8", // uuid
+		"cba7b8109dad11d180b400c04fd430c8",              // uuid
+		"abcdefghijklmnopqrstuvwxyz0123456789abcde",     // 41 ascii chars length
 	}
 )
 
