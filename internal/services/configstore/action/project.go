@@ -318,6 +318,10 @@ func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) er
 			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project %q doesn't exist", projectRef))
 		}
 
+		if err := h.d.DeleteUserProjectFavoritesByProjectID(tx, project.ID); err != nil {
+			return util.NewAPIError(util.KindFromRemoteError(err), err)
+		}
+
 		// TODO(sgotti) implement childs garbage collection
 		if err := h.d.DeleteProject(tx, project.ID); err != nil {
 			return errors.WithStack(err)

@@ -265,6 +265,10 @@ func (g *Gateway) Run(ctx context.Context) error {
 	userRunLogsHandler := api.NewLogsHandler(g.log, g.ah, scommon.GroupTypeUser)
 	userRunLogsDeleteHandler := api.NewLogsDeleteHandler(g.log, g.ah, scommon.GroupTypeUser)
 
+	createUserProjectFavoriteHandler := api.NewCreateUserProjectFavoriteHandler(g.log, g.ah)
+	deleteUserProjectFavoriteHandler := api.NewDeleteUserProjectFavoriteHandler(g.log, g.ah)
+	userProjectFavoritesHandler := api.NewUserProjectFavoritesHandler(g.log, g.ah)
+
 	userRemoteReposHandler := api.NewUserRemoteReposHandler(g.log, g.ah, g.configstoreClient)
 
 	badgeHandler := api.NewBadgeHandler(g.log, g.ah)
@@ -354,6 +358,9 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/user/orgs", authForcedHandler(userOrgsHandler)).Methods("GET")
 	apirouter.Handle("/user/org_invitations", authForcedHandler(userOrgInvitationsHandler)).Methods("GET")
 	apirouter.Handle("/user/org_invitations/{orgref}/actions", authForcedHandler(userOrgInvitationActionHandler)).Methods("PUT")
+	apirouter.Handle("/user/projects/{projectref}/projectfavorites", authForcedHandler(createUserProjectFavoriteHandler)).Methods("POST")
+	apirouter.Handle("/user/projects/{projectref}/projectfavorites", authForcedHandler(deleteUserProjectFavoriteHandler)).Methods("DELETE")
+	apirouter.Handle("/user/projectfavorites", authForcedHandler(userProjectFavoritesHandler)).Methods("GET")
 
 	apirouter.Handle("/users/{userref}/runs", authForcedHandler(userRunsHandler)).Methods("GET")
 	apirouter.Handle("/users/{userref}/runs/{runnumber}", authOptionalHandler(userRunHandler)).Methods("GET")

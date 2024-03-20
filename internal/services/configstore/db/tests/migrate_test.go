@@ -36,6 +36,7 @@ var importFixtures = testutil.DataFixtures{
 	1: "dbv1.jsonc",
 	2: "dbv2.jsonc",
 	3: "dbv3.jsonc",
+	4: "dbv4.jsonc",
 }
 
 func TestCreate(t *testing.T) {

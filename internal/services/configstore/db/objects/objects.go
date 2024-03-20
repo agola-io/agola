@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	Version = uint(3)
+	Version = uint(4)
 )
 
 const TypesImport = "agola.io/agola/services/configstore/types"
@@ -136,6 +136,16 @@ var ObjectsInfo = []sqlg.ObjectInfo{
 		Constraints: []string{
 			"foreign key (user_id) references user_t(id)",
 			"foreign key (organization_id) references organization(id)",
+		},
+	},
+	{Name: "UserProjectFavorite", Table: "userprojectfavorite",
+		Fields: []sqlg.ObjectField{
+			{Name: "UserID", Type: "string"},
+			{Name: "ProjectID", Type: "string"},
+		},
+		Constraints: []string{
+			"foreign key (user_id) references user_t(id)",
+			"foreign key (project_id) references project(id)",
 		},
 	},
 }
