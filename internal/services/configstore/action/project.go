@@ -21,6 +21,7 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/sorintlab/errors"
 
+	serrors "agola.io/agola/internal/services/errors"
 	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
@@ -66,10 +67,10 @@ func (h *ActionHandler) projectDynamicData(tx *sql.Tx, project *types.Project) (
 
 func (h *ActionHandler) ValidateProjectReq(ctx context.Context, req *CreateUpdateProjectRequest) error {
 	if req.Name == "" {
-		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project name required"))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project name required"), serrors.InvalidProjectName())
 	}
 	if !util.ValidateName(req.Name) {
-		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid project name %q", req.Name))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid project name %q", req.Name), serrors.InvalidProjectName())
 	}
 	if req.Parent.ID == "" {
 		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project parent id required"))
@@ -117,7 +118,7 @@ func (h *ActionHandler) GetProject(ctx context.Context, projectRef string) (*Get
 		}
 
 		if project == nil {
-			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("project %q doesn't exist", projectRef))
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("project %q doesn't exist", projectRef), serrors.ProjectDoesNotExist())
 		}
 
 		projectDynamicData, err = h.projectDynamicData(tx, project)
@@ -165,7 +166,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateUpdateProj
 			return errors.WithStack(err)
 		}
 		if group == nil {
-			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project group with id %q doesn't exist", req.Parent.ID))
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("parent project group with id %q doesn't exist", req.Parent.ID), serrors.ParentProjectGroupDoesNotExist())
 		}
 		req.Parent.ID = group.ID
 
@@ -174,7 +175,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateUpdateProj
 			return errors.WithStack(err)
 		}
 		if ownerType == types.ObjectKindUser && req.MembersCanPerformRunActions {
-			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("cannot set MembersCanPerformRunActions on an user project."))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("cannot set MembersCanPerformRunActions on an user project."), serrors.CannotSetMembersCanPerformRunActionsOnUserProject())
 		}
 
 		groupPath, err := h.d.GetProjectGroupPath(tx, group)
@@ -189,7 +190,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateUpdateProj
 			return errors.WithStack(err)
 		}
 		if p != nil {
-			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project with name %q, path %q already exists", p.Name, pp))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project with name %q, path %q already exists", p.Name, pp), serrors.ProjectAlreadyExists())
 		}
 
 		if req.RemoteRepositoryConfigType == types.RemoteRepositoryConfigTypeRemoteSource {
@@ -268,7 +269,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, curProjectRef string,
 			return errors.WithStack(err)
 		}
 		if project == nil {
-			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project with ref %q doesn't exist", curProjectRef))
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("project with ref %q doesn't exist", curProjectRef), serrors.ProjectDoesNotExist())
 		}
 
 		// check parent project group exists
@@ -277,7 +278,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, curProjectRef string,
 			return errors.WithStack(err)
 		}
 		if group == nil {
-			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project group with id %q doesn't exist", req.Parent.ID))
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("parent project group with id %q doesn't exist", req.Parent.ID), serrors.ParentProjectGroupDoesNotExist())
 		}
 		req.Parent.ID = group.ID
 
@@ -286,7 +287,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, curProjectRef string,
 			return errors.WithStack(err)
 		}
 		if ownerType == types.ObjectKindUser && req.MembersCanPerformRunActions {
-			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("cannot set MembersCanPerformRunActions on an user project."))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("cannot set MembersCanPerformRunActions on an user project."), serrors.CannotSetMembersCanPerformRunActionsOnUserProject())
 		}
 
 		groupPath, err := h.d.GetProjectGroupPath(tx, group)
@@ -302,7 +303,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, curProjectRef string,
 				return errors.WithStack(err)
 			}
 			if ap != nil {
-				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project with name %q, path %q already exists", req.Name, pp))
+				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project with name %q, path %q already exists", req.Name, pp), serrors.ProjectAlreadyExists())
 			}
 		}
 
@@ -313,7 +314,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, curProjectRef string,
 				return errors.WithStack(err)
 			}
 			if curGroup == nil {
-				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project group with id %q doesn't exist", project.Parent.ID))
+				return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("parent project group with id %q doesn't exist", project.Parent.ID), serrors.ParentProjectGroupDoesNotExist())
 			}
 		}
 
@@ -381,7 +382,7 @@ func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) er
 			return errors.WithStack(err)
 		}
 		if project == nil {
-			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project %q doesn't exist", projectRef))
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("project %q doesn't exist", projectRef), serrors.ProjectDoesNotExist())
 		}
 
 		// TODO(sgotti) implement childs garbage collection

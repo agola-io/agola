@@ -23,6 +23,7 @@ import (
 	"github.com/sorintlab/errors"
 
 	gitsource "agola.io/agola/internal/gitsources"
+	serrors "agola.io/agola/internal/services/errors"
 	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
@@ -67,8 +68,9 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 
 	user, _, err := h.configstoreClient.GetUser(ctx, curUserID)
 	if err != nil {
-		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get user %q", curUserID))
+		return nil, util.NewAPIErrorWrap(util.ErrInternal, err, util.WithAPIErrorMsg("failed to get user %q", curUserID))
 	}
+
 	parentRef := req.ParentRef
 	if parentRef == "" {
 		// create project in current user namespace
@@ -77,7 +79,10 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 
 	pg, _, err := h.configstoreClient.GetProjectGroup(ctx, parentRef)
 	if err != nil {
-		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get project group %q", parentRef))
+		if util.RemoteErrorIs(err, util.ErrNotExist) {
+			return nil, util.NewAPIError(util.ErrNotExist, serrors.ParentProjectGroupDoesNotExist())
+		}
+		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get parent project group %q", req.ParentRef))
 	}
 
 	isProjectOwner, err := h.IsAuthUserProjectOwner(ctx, pg.OwnerType, pg.OwnerID)
@@ -89,13 +94,13 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 	}
 
 	if !util.ValidateName(req.Name) {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid project name %q", req.Name))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid project name %q", req.Name), serrors.InvalidProjectName())
 	}
 	if req.RemoteSourceName == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("empty remote source name"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("empty remote source name"), serrors.InvalidRemoteSourceName())
 	}
 	if req.RepoPath == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("empty remote repo path"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("empty remote repo path"), serrors.InvalidRepoPath())
 	}
 
 	projectPath := path.Join(pg.Path, req.Name)
@@ -104,7 +109,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 			return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get project %q", req.Name))
 		}
 	} else {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project %q already exists", projectPath))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project %q already exists", projectPath), serrors.ProjectAlreadyExists())
 	}
 
 	gitSource, rs, la, err := h.GetUserGitSource(ctx, req.RemoteSourceName, curUserID)

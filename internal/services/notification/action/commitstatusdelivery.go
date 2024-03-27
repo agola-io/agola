@@ -19,6 +19,7 @@ import (
 
 	"github.com/sorintlab/errors"
 
+	serrors "agola.io/agola/internal/services/errors"
 	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/notification/types"
@@ -85,7 +86,7 @@ func (h *ActionHandler) CommitStatusRedelivery(ctx context.Context, projectID st
 			return errors.WithStack(err)
 		}
 		if commitStatusDelivery == nil {
-			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("commitStatusDelivery %q doesn't exist", commitStatusDeliveryID))
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("commitStatusDelivery %q doesn't exist", commitStatusDeliveryID), serrors.CommitStatusDeliveryDoesNotExist())
 		}
 
 		commitStatus, err := h.d.GetCommitStatusByID(tx, commitStatusDelivery.CommitStatusID)
@@ -93,10 +94,10 @@ func (h *ActionHandler) CommitStatusRedelivery(ctx context.Context, projectID st
 			return errors.WithStack(err)
 		}
 		if commitStatus == nil {
-			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("commitStatus %q doesn't exist", commitStatusDelivery.CommitStatusID))
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("commitStatus %q doesn't exist", commitStatusDelivery.CommitStatusID), serrors.CommitStatusDoesNotExist())
 		}
 		if commitStatus.ProjectID != projectID {
-			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("commitStatusDelivery %q doesn't belong to project %q", commitStatusDeliveryID, projectID))
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("commitStatusDelivery %q doesn't belong to project %q", commitStatusDeliveryID, projectID), serrors.CommitStatusDeliveryDoesNotExist())
 		}
 
 		commitStatusDeliveries, err := h.d.GetCommitStatusDeliveriesByCommitStatusID(tx, commitStatusDelivery.CommitStatusID, []types.DeliveryStatus{types.DeliveryStatusNotDelivered}, 1, types.SortDirectionDesc)
@@ -105,7 +106,7 @@ func (h *ActionHandler) CommitStatusRedelivery(ctx context.Context, projectID st
 		}
 		// check if commitStatus has delivery not delivered
 		if len(commitStatusDeliveries) != 0 {
-			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("the previous delivery of commit status %q hasn't already been delivered", commitStatusDelivery.CommitStatusID))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("the previous delivery of commit status %q hasn't already been delivered", commitStatusDelivery.CommitStatusID), serrors.CommitStatusDeliveryAlreadyInProgress())
 		}
 
 		newCommitStatusDelivery := types.NewCommitStatusDelivery(tx)

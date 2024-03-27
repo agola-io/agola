@@ -7,10 +7,13 @@ import (
 	"testing"
 
 	"code.gitea.io/sdk/gitea"
+	"github.com/pkg/errors"
 	"gotest.tools/assert"
 
 	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/testutil"
+	"agola.io/agola/internal/util"
+	gwapierrors "agola.io/agola/services/gateway/api/errors"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 )
@@ -89,8 +92,8 @@ func TestPasswordRegisterUser(t *testing.T) {
 			RemoteSourceLoginPassword: giteaUser01Password,
 		},
 	})
-	expectedErr := remoteErrorBadRequest
-	assert.Error(t, err, expectedErr)
+	expectedErr := util.NewRemoteError(util.ErrBadRequest, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeLinkedAccountAlreadyExists}))
+	assert.Error(t, err, expectedErr.Error())
 
 	// Remove user
 	_, err = adminGWClient.DeleteUser(ctx, loginUserResponse.User.ID)
@@ -186,7 +189,7 @@ func TestPasswordLogin(t *testing.T) {
 	// should fails since the registered token has been removed
 	_, _, err = tokenGWClient.GetUserRemoteRepos(ctx, rs.ID)
 	expectedErr := remoteErrorBadRequest
-	assert.Error(t, err, expectedErr)
+	assert.Error(t, err, expectedErr.Error())
 
 	// redo login. Should create a new gitea user access token
 	_, _, err = loginGWClient.Login(ctx, &gwapitypes.LoginUserRequest{
@@ -242,7 +245,7 @@ func TestCookieAuth(t *testing.T) {
 
 	_, _, err = gwCookieClient.GetCurrentUser(ctx, cookies)
 	expectedErr := remoteErrorUnauthorized
-	assert.Error(t, err, expectedErr)
+	assert.Error(t, err, expectedErr.Error())
 
 	// Don't send secondary authcookie
 	cookies = []*http.Cookie{}
@@ -255,7 +258,7 @@ func TestCookieAuth(t *testing.T) {
 
 	_, _, err = gwCookieClient.GetCurrentUser(ctx, cookies)
 	expectedErr = remoteErrorUnauthorized
-	assert.Error(t, err, expectedErr)
+	assert.Error(t, err, expectedErr.Error())
 }
 
 func TestCSRF(t *testing.T) {
@@ -298,8 +301,8 @@ func TestCSRF(t *testing.T) {
 
 	// Don't send csrf token in request headers. Should return 403 (forbidden)
 	_, _, err = gwCookieClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg02, Visibility: gwapitypes.VisibilityPublic}, http.Header{}, cookies)
-	expectedErr := "unknown api error (status: 403)"
-	assert.Error(t, err, expectedErr)
+	expectedErr := errors.Errorf("unknown api error (status: 403)")
+	assert.Error(t, err, expectedErr.Error())
 
 	csrfCookieName := common.CSRFCookieName(false)
 	noCSRFCookies := []*http.Cookie{}
@@ -312,8 +315,8 @@ func TestCSRF(t *testing.T) {
 
 	// Don't send csrf cookie. Should return 403 (forbidden)
 	_, _, err = gwCookieClient.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg02, Visibility: gwapitypes.VisibilityPublic}, header, noCSRFCookies)
-	expectedErr = "unknown api error (status: 403)"
-	assert.Error(t, err, expectedErr)
+	expectedErr = errors.Errorf("unknown api error (status: 403)")
+	assert.Error(t, err, expectedErr.Error())
 
 	// Send also an Authorization token that won't match to check that csrf check is done
 	header.Set("Authorization", "Token unexistenttoken")
@@ -324,5 +327,5 @@ func TestCSRF(t *testing.T) {
 	// continue other auth checkers. The error should then be the commented one.
 	// expectedErr = "unknown api error (status: 403)"
 	expectedErr = remoteErrorUnauthorized
-	assert.Error(t, err, expectedErr)
+	assert.Error(t, err, expectedErr.Error())
 }

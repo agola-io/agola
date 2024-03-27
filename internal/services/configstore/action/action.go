@@ -21,6 +21,7 @@ import (
 	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/configstore/db"
+	serrors "agola.io/agola/internal/services/errors"
 	"agola.io/agola/internal/sqlg/lock"
 	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/internal/util"
@@ -52,7 +53,7 @@ func (h *ActionHandler) ResolveObjectID(tx *sql.Tx, objectKind types.ObjectKind,
 			return "", errors.WithStack(err)
 		}
 		if group == nil {
-			return "", util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("group with ref %q doesn't exists", ref))
+			return "", util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("project group with ref %q doesn't exists", ref), serrors.ProjectGroupDoesNotExist())
 		}
 		return group.ID, nil
 
@@ -62,7 +63,7 @@ func (h *ActionHandler) ResolveObjectID(tx *sql.Tx, objectKind types.ObjectKind,
 			return "", errors.WithStack(err)
 		}
 		if project == nil {
-			return "", util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project with ref %q doesn't exists", ref))
+			return "", util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("project with ref %q doesn't exists", ref), serrors.ProjectDoesNotExist())
 		}
 		return project.ID, nil
 

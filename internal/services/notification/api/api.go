@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"strconv"
 
+	serrors "agola.io/agola/internal/services/errors"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/notification/types"
 )
@@ -40,11 +41,11 @@ func parseRequestOptions(r *http.Request) (*requestOptions, error) {
 		var err error
 		limit, err = strconv.Atoi(limitS)
 		if err != nil {
-			return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse limit"))
+			return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse limit"), serrors.InvalidLimit())
 		}
 	}
 	if limit < 0 {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("limit must be greater or equal than 0"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("limit must be greater or equal than 0"), serrors.InvalidLimit())
 	}
 
 	sortDirection := types.SortDirection(query.Get("sortdirection"))
@@ -53,7 +54,7 @@ func parseRequestOptions(r *http.Request) (*requestOptions, error) {
 		case types.SortDirectionAsc:
 		case types.SortDirectionDesc:
 		default:
-			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("wrong sort direction %q", sortDirection))
+			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("wrong sort direction %q", sortDirection), serrors.InvalidSortDirection())
 		}
 	}
 

@@ -29,6 +29,7 @@ import (
 	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/objectstorage"
+	serrors "agola.io/agola/internal/services/errors"
 	"agola.io/agola/internal/services/runservice/action"
 	"agola.io/agola/internal/services/runservice/db"
 	"agola.io/agola/internal/services/runservice/store"
@@ -56,11 +57,11 @@ func parseRequestOptions(r *http.Request) (*requestOptions, error) {
 		var err error
 		limit, err = strconv.Atoi(limitS)
 		if err != nil {
-			return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse limit"))
+			return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse limit"), serrors.InvalidLimit())
 		}
 	}
 	if limit < 0 {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("limit must be greater or equal than 0"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("limit must be greater or equal than 0"), serrors.InvalidLimit())
 	}
 
 	sortDirection := types.SortDirection(query.Get("sortdirection"))
@@ -69,7 +70,7 @@ func parseRequestOptions(r *http.Request) (*requestOptions, error) {
 		case types.SortDirectionAsc:
 		case types.SortDirectionDesc:
 		default:
-			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("wrong sort direction %q", sortDirection))
+			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("wrong sort direction %q", sortDirection), serrors.InvalidSortDirection())
 		}
 	}
 
@@ -172,15 +173,15 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 	}
 
 	if r == nil {
-		return true, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("no such run with id: %s", runID))
+		return true, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("no such run with id: %s", runID), serrors.RunDoesNotExist())
 	}
 
 	task, ok := r.Tasks[taskID]
 	if !ok {
-		return true, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("no such task with ID %s in run %s", taskID, runID))
+		return true, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("no such task with ID %s in run %s", taskID, runID), serrors.RunTaskDoesNotExist())
 	}
 	if len(task.Steps) <= step {
-		return true, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("no such step for task %s in run %s", taskID, runID))
+		return true, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("no such step for task %s in run %s", taskID, runID), serrors.RunTaskStepDoesNotExist())
 	}
 
 	// if the log has been already fetched use it, otherwise fetch it from the executor
@@ -526,11 +527,11 @@ func (h *RunHandler) do(r *http.Request) (*rsapitypes.RunResponse, error) {
 	}
 
 	if run == nil {
-		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("run with id %q doesn't exist", runRef))
+		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("run with id %q doesn't exist", runRef), serrors.RunDoesNotExist())
 	}
 
 	if rc == nil {
-		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("run config for run with id %q doesn't exist", runRef))
+		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("run config for run with id %q doesn't exist", runRef), serrors.RunDoesNotExist())
 	}
 
 	cgts, err := types.MarshalChangeGroupsUpdateToken(cgt)
@@ -582,20 +583,20 @@ func (h *RunByGroupHandler) do(r *http.Request) (*rsapitypes.RunResponse, error)
 
 	group, err := url.PathUnescape(vars["group"])
 	if err != nil {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("group is empty"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("group is empty"), serrors.InvalidRunGroup())
 	}
 
 	runCounterStr := vars["runcounter"]
 
 	var runCounter uint64
 	if runCounterStr == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("runcounter is empty"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("runcounter is empty"), serrors.InvalidRunNumber())
 	}
 	if runCounterStr != "" {
 		var err error
 		runCounter, err = strconv.ParseUint(runCounterStr, 10, 64)
 		if err != nil {
-			return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse runcounter"))
+			return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse runcounter"), serrors.InvalidRunNumber())
 		}
 	}
 
@@ -626,11 +627,11 @@ func (h *RunByGroupHandler) do(r *http.Request) (*rsapitypes.RunResponse, error)
 		return nil, errors.WithStack(err)
 	}
 	if run == nil {
-		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("run for group %q with counter %d doesn't exist", group, runCounter))
+		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("run for group %q with counter %d doesn't exist", group, runCounter), serrors.RunDoesNotExist())
 	}
 
 	if rc == nil {
-		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("run config for run with id %q doesn't exist", run.ID))
+		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("run config for run with id %q doesn't exist", run.ID), serrors.RunDoesNotExist())
 	}
 
 	cgts, err := types.MarshalChangeGroupsUpdateToken(cgt)
@@ -716,7 +717,7 @@ func (h *RunsHandler) do(r *http.Request) (*rsapitypes.GetRunsResponse, error) {
 		var err error
 		startRunSequence, err = strconv.ParseUint(startRunSequenceStr, 10, 64)
 		if err != nil {
-			return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run sequence"))
+			return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run sequence"), serrors.InvalidStartSequence())
 		}
 	}
 
@@ -793,7 +794,7 @@ func (h *GroupRunsHandler) do(w http.ResponseWriter, r *http.Request) (*rsapityp
 
 	group, err := url.PathUnescape(vars["group"])
 	if err != nil {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("group is empty"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("group is empty"), serrors.InvalidRunGroup())
 	}
 
 	var startRunCounter uint64
@@ -802,7 +803,7 @@ func (h *GroupRunsHandler) do(w http.ResponseWriter, r *http.Request) (*rsapityp
 		var err error
 		startRunCounter, err = strconv.ParseUint(startRunCounterStr, 10, 64)
 		if err != nil {
-			return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse runcounter"))
+			return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse runcounter"), serrors.InvalidRunNumber())
 		}
 	}
 
@@ -1034,7 +1035,7 @@ func (h *RunEventsHandler) do(w http.ResponseWriter, r *http.Request) error {
 		var err error
 		afterRunEventSequence, err = strconv.ParseUint(afterRunEventSequenceStr, 10, 64)
 		if err != nil {
-			return util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse afterSequence"))
+			return util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse afterSequence"), serrors.InvalidStartSequence())
 		}
 	}
 

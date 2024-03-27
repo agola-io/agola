@@ -19,6 +19,7 @@ import (
 
 	"github.com/sorintlab/errors"
 
+	serrors "agola.io/agola/internal/services/errors"
 	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/configstore/types"
@@ -36,7 +37,7 @@ func (h *ActionHandler) GetSecret(ctx context.Context, secretID string) (*types.
 	}
 
 	if secret == nil {
-		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("secret %q doesn't exist", secretID))
+		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("secret %q doesn't exist", secretID), serrors.SecretDoesNotExist())
 	}
 
 	return secret, nil
@@ -88,18 +89,18 @@ func (h *ActionHandler) GetSecrets(ctx context.Context, parentKind types.ObjectK
 
 func (h *ActionHandler) ValidateSecretReq(ctx context.Context, req *CreateUpdateSecretRequest) error {
 	if req.Name == "" {
-		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("secret name required"))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("secret name required"), serrors.InvalidSecretName())
 	}
 	if !util.ValidateName(req.Name) {
-		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid secret name %q", req.Name))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid secret name %q", req.Name), serrors.InvalidSecretName())
 	}
 	if req.Type != types.SecretTypeInternal {
-		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid secret type %q", req.Type))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid secret type %q", req.Type), serrors.InvalidSecretType())
 	}
 	switch req.Type {
 	case types.SecretTypeInternal:
 		if len(req.Data) == 0 {
-			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("empty secret data"))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("empty secret data"), serrors.InvalidSecretData())
 		}
 	}
 	if req.Parent.Kind == "" {
@@ -144,7 +145,7 @@ func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateUpdateSecre
 			return errors.WithStack(err)
 		}
 		if s != nil {
-			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("secret with name %q for %s with id %q already exists", req.Name, req.Parent.Kind, req.Parent.ID))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("secret with name %q for %s with id %q already exists", req.Name, req.Parent.Kind, req.Parent.ID), serrors.SecretAlreadyExists())
 		}
 
 		secret = types.NewSecret(tx)
@@ -188,7 +189,7 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, curSecretName string, 
 			return errors.WithStack(err)
 		}
 		if secret == nil {
-			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("secret with name %q for %s with id %q doesn't exists", curSecretName, req.Parent.Kind, req.Parent.ID))
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("secret with name %q for %s with id %q doesn't exists", curSecretName, req.Parent.Kind, req.Parent.ID), serrors.SecretDoesNotExist())
 		}
 
 		if secret.Name != req.Name {
@@ -198,7 +199,7 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, curSecretName string, 
 				return errors.WithStack(err)
 			}
 			if s != nil {
-				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("secret with name %q for %s with id %q already exists", req.Name, req.Parent.Kind, req.Parent.ID))
+				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("secret with name %q for %s with id %q already exists", req.Name, req.Parent.Kind, req.Parent.ID), serrors.SecretAlreadyExists())
 			}
 		}
 
@@ -236,7 +237,7 @@ func (h *ActionHandler) DeleteSecret(ctx context.Context, parentKind types.Objec
 			return errors.WithStack(err)
 		}
 		if secret == nil {
-			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("secret with name %q doesn't exist", secretName))
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("secret with name %q doesn't exist", secretName), serrors.SecretDoesNotExist())
 		}
 
 		if err := h.d.DeleteSecret(tx, secret.ID); err != nil {

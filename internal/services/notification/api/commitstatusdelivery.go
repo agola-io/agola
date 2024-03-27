@@ -22,6 +22,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	serrors "agola.io/agola/internal/services/errors"
 	"agola.io/agola/internal/services/notification/action"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/notification/types"
@@ -62,7 +63,7 @@ func (h *CommitStatusDeliveriesHandler) do(w http.ResponseWriter, r *http.Reques
 
 	deliveryStatusFilter, err := types.DeliveryStatusFromStringSlice(query["deliverystatus"])
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("wrong deliverystatus"))
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("wrong deliverystatus"), serrors.InvalidDeliveryStatus())
 	}
 
 	startSequenceStr := query.Get("startsequence")
@@ -71,7 +72,7 @@ func (h *CommitStatusDeliveriesHandler) do(w http.ResponseWriter, r *http.Reques
 		var err error
 		startSequence, err = strconv.ParseUint(startSequenceStr, 10, 64)
 		if err != nil {
-			return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse startsequence"))
+			return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse startsequence"), serrors.InvalidStartSequence())
 		}
 	}
 

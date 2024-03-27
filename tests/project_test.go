@@ -13,6 +13,7 @@ import (
 
 	"agola.io/agola/internal/testutil"
 	"agola.io/agola/internal/util"
+	gwapierrors "agola.io/agola/services/gateway/api/errors"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 	rstypes "agola.io/agola/services/runservice/types"
@@ -92,7 +93,7 @@ func TestGetProjectGroup(t *testing.T) {
 		name   string
 		client *gwclient.Client
 		pg     *gwapitypes.ProjectGroupResponse
-		err    string
+		err    error
 	}{
 		{
 			name:   "user owner get pub org pub pg",
@@ -123,7 +124,7 @@ func TestGetProjectGroup(t *testing.T) {
 			name:   "user not member get pub org priv pg",
 			client: gwClientUser03,
 			pg:     pubOrgPrivPG,
-			err:    remoteErrorNotExist,
+			err:    util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeOrganizationDoesNotExist})),
 		},
 		{
 			name:   "user owner get priv org pub pg",
@@ -139,7 +140,7 @@ func TestGetProjectGroup(t *testing.T) {
 			name:   "user not member get priv org pub pg",
 			client: gwClientUser03,
 			pg:     privOrgPubPG,
-			err:    remoteErrorNotExist,
+			err:    util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeOrganizationDoesNotExist})),
 		},
 		{
 			name:   "user owner get priv org priv pg",
@@ -155,7 +156,7 @@ func TestGetProjectGroup(t *testing.T) {
 			name:   "user not member get priv org priv pg",
 			client: gwClientUser03,
 			pg:     privOrgPrivPG,
-			err:    remoteErrorNotExist,
+			err:    util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeOrganizationDoesNotExist})),
 		},
 	}
 
@@ -164,8 +165,8 @@ func TestGetProjectGroup(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			pg, _, err := tt.client.GetProjectGroup(ctx, tt.pg.ID)
 
-			if tt.err != "" {
-				assert.Error(t, err, tt.err)
+			if tt.err != nil {
+				assert.Error(t, err, tt.err.Error())
 			} else {
 				testutil.NilError(t, err)
 
@@ -284,7 +285,7 @@ func TestGetProject(t *testing.T) {
 		name   string
 		client *gwclient.Client
 		proj   *gwapitypes.ProjectResponse
-		err    string
+		err    error
 	}{
 		{
 			name:   "user owner get pub org pub pg pub proj",
@@ -315,7 +316,7 @@ func TestGetProject(t *testing.T) {
 			name:   "user not member get pub org pub pg priv proj",
 			client: gwClientUser03,
 			proj:   pubOrgPubPGPrivProj,
-			err:    remoteErrorNotExist,
+			err:    util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeOrganizationDoesNotExist})),
 		},
 		{
 			name:   "user owner get pub org priv pg pub proj",
@@ -331,7 +332,7 @@ func TestGetProject(t *testing.T) {
 			name:   "user not member get pub org priv pg pub proj",
 			client: gwClientUser03,
 			proj:   pubOrgPrivPGPubProj,
-			err:    remoteErrorNotExist,
+			err:    util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeOrganizationDoesNotExist})),
 		},
 		{
 			name:   "user owner get pub org priv pg priv proj",
@@ -347,7 +348,7 @@ func TestGetProject(t *testing.T) {
 			name:   "user not member get pub org priv pg priv proj",
 			client: gwClientUser03,
 			proj:   pubOrgPrivPGPrivProj,
-			err:    remoteErrorNotExist,
+			err:    util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeOrganizationDoesNotExist})),
 		},
 		{
 			name:   "user owner get priv org pub pg pub proj",
@@ -363,7 +364,7 @@ func TestGetProject(t *testing.T) {
 			name:   "user not member get priv org pub pg pub proj",
 			client: gwClientUser03,
 			proj:   privOrgPubPGPubProj,
-			err:    remoteErrorNotExist,
+			err:    util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeOrganizationDoesNotExist})),
 		},
 		{
 			name:   "user owner get priv org pub pg priv proj",
@@ -379,7 +380,7 @@ func TestGetProject(t *testing.T) {
 			name:   "user not member get priv org pub pg priv proj",
 			client: gwClientUser03,
 			proj:   privOrgPubPGPrivProj,
-			err:    remoteErrorNotExist,
+			err:    util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeOrganizationDoesNotExist})),
 		},
 		{
 			name:   "user owner get priv org priv pg pub proj",
@@ -395,7 +396,7 @@ func TestGetProject(t *testing.T) {
 			name:   "user not member get priv org priv pg pub proj",
 			client: gwClientUser03,
 			proj:   privOrgPrivPGPubProj,
-			err:    remoteErrorNotExist,
+			err:    util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeOrganizationDoesNotExist})),
 		},
 		{
 			name:   "user owner get priv org priv pg priv proj",
@@ -411,7 +412,7 @@ func TestGetProject(t *testing.T) {
 			name:   "user not member get priv org priv pg priv proj",
 			client: gwClientUser03,
 			proj:   privOrgPrivPGPrivProj,
-			err:    remoteErrorNotExist,
+			err:    util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeOrganizationDoesNotExist})),
 		},
 	}
 
@@ -420,8 +421,8 @@ func TestGetProject(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			pg, _, err := tt.client.GetProject(ctx, tt.proj.ID)
 
-			if tt.err != "" {
-				assert.Error(t, err, tt.err)
+			if tt.err != nil {
+				assert.Error(t, err, tt.err.Error())
 			} else {
 				testutil.NilError(t, err)
 
@@ -528,7 +529,8 @@ func TestUpdateProject(t *testing.T) {
 		}
 
 		_, _, err = gwClient.CreateProject(ctx, req)
-		assert.Error(t, err, remoteErrorBadRequest)
+		expectedErr := util.NewRemoteError(util.ErrBadRequest, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeCannotSetMembersCanPerformRunActionsOnUserProject}))
+		assert.Error(t, err, expectedErr.Error())
 	})
 
 	t.Run("update users's project with MembersCanPerformRunActions true", func(t *testing.T) {
@@ -556,7 +558,8 @@ func TestUpdateProject(t *testing.T) {
 			Name:                        &project.Name,
 			MembersCanPerformRunActions: util.BoolP(true),
 		})
-		assert.Error(t, err, remoteErrorBadRequest)
+		expectedErr := util.NewRemoteError(util.ErrBadRequest, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeCannotSetMembersCanPerformRunActionsOnUserProject}))
+		assert.Error(t, err, expectedErr.Error())
 	})
 
 	t.Run("create/update orgs's project", func(t *testing.T) {
@@ -679,7 +682,8 @@ func TestGetProjectRun(t *testing.T) {
 		_, project := createProject(ctx, t, giteaClient, gwClient)
 
 		_, _, err = gwClient.GetProjectRun(ctx, project.ID, 1)
-		assert.Error(t, err, remoteErrorNotExist)
+		expectedErr := util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeRunDoesNotExist}))
+		assert.Error(t, err, expectedErr.Error())
 	})
 }
 
@@ -782,7 +786,7 @@ func TestProjectRunActions(t *testing.T) {
 			ActionType: gwapitypes.RunActionTypeRestart,
 			FromStart:  true,
 		})
-		assert.Error(t, err, expectedErr)
+		assert.Error(t, err, expectedErr.Error())
 
 		// test org run actions executed by an organization member type with MembersCanPerformRunActions false
 
@@ -795,7 +799,7 @@ func TestProjectRunActions(t *testing.T) {
 			ActionType: gwapitypes.RunActionTypeRestart,
 			FromStart:  true,
 		})
-		assert.Error(t, err, expectedErr)
+		assert.Error(t, err, expectedErr.Error())
 	})
 
 	t.Run("run actions on user's project", func(t *testing.T) {
@@ -868,6 +872,6 @@ func TestProjectRunActions(t *testing.T) {
 			ActionType: gwapitypes.RunActionTypeRestart,
 			FromStart:  true,
 		})
-		assert.Error(t, err, expectedErr)
+		assert.Error(t, err, expectedErr.Error())
 	})
 }

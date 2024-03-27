@@ -30,6 +30,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/sorintlab/errors"
 
+	serrors "agola.io/agola/internal/services/errors"
 	"agola.io/agola/internal/testutil"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/runservice/types"
@@ -172,7 +173,7 @@ func (h *runEventsHandler) do(w http.ResponseWriter, r *http.Request) error {
 		var err error
 		afterRunEventSequence, err = strconv.ParseUint(afterRunEventSequenceStr, 10, 64)
 		if err != nil {
-			return util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse afterSequence"))
+			return util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse afterSequence"), serrors.InvalidStartSequence())
 		}
 	}
 

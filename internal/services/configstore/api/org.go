@@ -23,6 +23,7 @@ import (
 	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/configstore/action"
+	serrors "agola.io/agola/internal/services/errors"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	"agola.io/agola/services/configstore/types"
@@ -221,7 +222,7 @@ func (h *OrgsHandler) do(w http.ResponseWriter, r *http.Request) ([]*types.Organ
 	if ok {
 		for _, vs := range visibilitiesStr {
 			if !types.IsValidVisibility(types.Visibility(vs)) {
-				return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid visibility"))
+				return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid visibility"), serrors.InvalidVisibility())
 			}
 			visibilities = append(visibilities, types.Visibility(vs))
 		}
