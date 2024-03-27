@@ -179,29 +179,30 @@ type APIError struct {
 	Code    ErrorCode
 	Message string
 
-	msg string
+	msg   string
+	depth int
 }
 
 func NewAPIErrorWrap(kind ErrorKind, err error, options ...APIErrorOption) error {
-	aerr := &APIError{Kind: kind}
+	aerr := &APIError{Kind: kind, depth: 1}
 
 	for _, opt := range options {
 		opt(aerr)
 	}
 
-	aerr.WrapperError = NewWrapperError(err, WithWrapperErrorMsg(aerr.message()))
+	aerr.WrapperError = NewWrapperError(err, WithWrapperErrorMsg(aerr.message()), WithWrapperErrorCallerDepth(aerr.depth))
 
 	return aerr
 }
 
 func NewAPIError(kind ErrorKind, options ...APIErrorOption) error {
-	aerr := &APIError{Kind: kind}
+	aerr := &APIError{Kind: kind, depth: 1}
 
 	for _, opt := range options {
 		opt(aerr)
 	}
 
-	aerr.WrapperError = NewWrapperError(nil, WithWrapperErrorMsg(aerr.message()))
+	aerr.WrapperError = NewWrapperError(nil, WithWrapperErrorMsg(aerr.message()), WithWrapperErrorCallerDepth(aerr.depth))
 
 	return aerr
 }
@@ -231,6 +232,12 @@ type APIErrorOption func(e *APIError)
 func WithAPIErrorMsg(format string, args ...interface{}) APIErrorOption {
 	return func(e *APIError) {
 		e.msg = fmt.Sprintf(format, args...)
+	}
+}
+
+func WithAPIErrorCallerDepth(depth int) APIErrorOption {
+	return func(e *APIError) {
+		e.depth = depth
 	}
 }
 

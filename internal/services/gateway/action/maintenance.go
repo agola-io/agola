@@ -46,14 +46,14 @@ func (h *ActionHandler) IsMaintenanceEnabled(ctx context.Context, serviceName st
 	case ConfigstoreService:
 		csresp, _, err := h.configstoreClient.GetMaintenanceStatus(ctx)
 		if err != nil {
-			return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+			return nil, APIErrorFromRemoteError(err)
 		}
 
 		return &MaintenanceStatusResponse{RequestedStatus: csresp.RequestedStatus, CurrentStatus: csresp.CurrentStatus}, nil
 	case RunserviceService:
 		rsresp, _, err := h.runserviceClient.GetMaintenanceStatus(ctx)
 		if err != nil {
-			return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+			return nil, APIErrorFromRemoteError(err)
 		}
 
 		return &MaintenanceStatusResponse{RequestedStatus: rsresp.RequestedStatus, CurrentStatus: rsresp.CurrentStatus}, nil
@@ -86,7 +86,7 @@ func (h *ActionHandler) MaintenanceMode(ctx context.Context, serviceName string,
 	}
 
 	if err != nil {
-		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return APIErrorFromRemoteError(err)
 	}
 	return nil
 }

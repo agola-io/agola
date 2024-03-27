@@ -43,7 +43,7 @@ func (h *ActionHandler) GetSecrets(ctx context.Context, req *GetSecretsRequest) 
 		cssecrets, _, err = h.configstoreClient.GetProjectSecrets(ctx, req.ParentRef, req.Tree)
 	}
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return nil, APIErrorFromRemoteError(err)
 	}
 
 	if req.RemoveOverridden {
@@ -99,7 +99,7 @@ func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretReque
 		rs, _, err = h.configstoreClient.CreateProjectSecret(ctx, req.ParentRef, creq)
 	}
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to create secret"))
+		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to create secret"))
 	}
 	h.log.Info().Msgf("secret %s created, ID: %s", rs.Name, rs.ID)
 
@@ -153,7 +153,7 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretReque
 		rs, _, err = h.configstoreClient.UpdateProjectSecret(ctx, req.ParentRef, req.SecretName, creq)
 	}
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to update secret"))
+		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to update secret"))
 	}
 	h.log.Info().Msgf("secret %s updated, ID: %s", rs.Name, rs.ID)
 
@@ -178,7 +178,7 @@ func (h *ActionHandler) DeleteSecret(ctx context.Context, parentType cstypes.Obj
 		_, err = h.configstoreClient.DeleteProjectSecret(ctx, parentRef, name)
 	}
 	if err != nil {
-		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to delete secret"))
+		return APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to delete secret"))
 	}
 	return nil
 }

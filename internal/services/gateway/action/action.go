@@ -18,10 +18,25 @@ import (
 	"github.com/rs/zerolog"
 
 	scommon "agola.io/agola/internal/services/common"
+	"agola.io/agola/internal/util"
 	csclient "agola.io/agola/services/configstore/client"
 	nsclient "agola.io/agola/services/notification/client"
 	rsclient "agola.io/agola/services/runservice/client"
 )
+
+func APIErrorFromRemoteError(err error, options ...util.APIErrorOption) error {
+	opts := []util.APIErrorOption{util.WithAPIErrorCallerDepth(2)}
+	opts = append(opts, options...)
+
+	rerr, ok := util.AsRemoteError(err)
+	if !ok {
+		return util.NewAPIErrorWrap(util.ErrInternal, err, opts...)
+	}
+
+	// assume remote error from internal services can be propagated from the gateway
+	opts = append(opts, util.WithAPIErrorUserCode(util.ErrorCode(rerr.Code)), util.WithAPIErrorUserMessage(rerr.Message))
+	return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, opts...)
+}
 
 type SortDirection string
 
