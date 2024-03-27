@@ -62,7 +62,7 @@ func (h *RunWebhookDeliveriesHandler) do(w http.ResponseWriter, r *http.Request)
 
 	deliveryStatusFilter, err := types.DeliveryStatusFromStringSlice(query["deliverystatus"])
 	if err != nil {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "wrong deliverystatus"))
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("wrong deliverystatus"))
 	}
 
 	startSequenceStr := query.Get("startsequence")
@@ -71,7 +71,7 @@ func (h *RunWebhookDeliveriesHandler) do(w http.ResponseWriter, r *http.Request)
 		var err error
 		startSequence, err = strconv.ParseUint(startSequenceStr, 10, 64)
 		if err != nil {
-			return nil, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse startsequence"))
+			return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse startsequence"))
 		}
 	}
 

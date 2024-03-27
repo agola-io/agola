@@ -48,7 +48,7 @@ func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var req gwapitypes.CreateUserRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 
@@ -107,7 +107,7 @@ func (h *CurrentUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	userID := common.CurrentUserID(ctx)
 	if userID == "" {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user not authenticated")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user not authenticated")))
 		return
 	}
 
@@ -235,7 +235,7 @@ func (h *UsersHandler) do(w http.ResponseWriter, r *http.Request) ([]*gwapitypes
 		ausers = ares.Users
 		addCursorHeader(w, ares.Cursor)
 	default:
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("unknown query_type: %q", queryType))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("unknown query_type: %q", queryType))
 	}
 
 	users := make([]*gwapitypes.PrivateUserResponse, len(ausers))
@@ -263,7 +263,7 @@ func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	var req *gwapitypes.CreateUserLARequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 
@@ -352,7 +352,7 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	var req gwapitypes.CreateUserTokenRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 
@@ -418,7 +418,7 @@ func (h *RegisterUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	var req *gwapitypes.RegisterUserRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 
@@ -471,7 +471,7 @@ func (h *AuthorizeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var req *gwapitypes.LoginUserRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 
@@ -528,7 +528,7 @@ func (h *LoginUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var req *gwapitypes.LoginUserRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 
@@ -585,7 +585,7 @@ func (h *UserCreateRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	var req gwapitypes.UserCreateRunRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 
@@ -637,7 +637,7 @@ func (h *UserOrgsHandler) do(w http.ResponseWriter, r *http.Request) ([]*gwapity
 
 	userID := common.CurrentUserID(ctx)
 	if userID == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user not authenticated"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user not authenticated"))
 	}
 
 	ropts, err := parseRequestOptions(r)
@@ -683,7 +683,7 @@ func (h *UserOrgInvitationsHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 
 	userID := common.CurrentUserID(ctx)
 	if userID == "" {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user not authenticated")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user not authenticated")))
 		return
 	}
 
@@ -701,12 +701,12 @@ func (h *UserOrgInvitationsHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		var err error
 		limit, err = strconv.Atoi(limitS)
 		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit")))
+			util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse limit")))
 			return
 		}
 	}
 	if limit < 0 {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("limit must be greater or equal than 0")))
 		return
 	}
 	if limit > MaxOrgInvitationsLimit {

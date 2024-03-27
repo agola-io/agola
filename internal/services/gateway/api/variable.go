@@ -116,7 +116,7 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	var req gwapitypes.CreateVariableRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 	areq := &action.CreateVariableRequest{
@@ -160,7 +160,7 @@ func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	var req gwapitypes.UpdateVariableRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 

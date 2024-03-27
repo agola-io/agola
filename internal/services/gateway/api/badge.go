@@ -41,7 +41,7 @@ func (h *BadgeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	projectRef, err := url.PathUnescape(vars["projectref"])
 	if err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 	branch := query.Get("branch")

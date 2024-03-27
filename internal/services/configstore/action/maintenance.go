@@ -109,10 +109,10 @@ func (h *ActionHandler) SetMaintenanceEnabled(ctx context.Context, enable bool) 
 		}
 
 		if enable && enabled {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("maintenance mode already enabled"))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("maintenance mode already enabled"))
 		}
 		if !enable && !enabled {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("maintenance mode already disabled"))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("maintenance mode already disabled"))
 		}
 
 		db := sq.DeleteFrom(maintenanceTableName)
@@ -142,7 +142,7 @@ func (h *ActionHandler) Export(ctx context.Context, w io.Writer) error {
 
 func (h *ActionHandler) Import(ctx context.Context, r io.Reader) error {
 	if !h.maintenanceMode {
-		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("not in maintenance mode"))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("not in maintenance mode"))
 	}
 
 	dbm := manager.NewDBManager(h.log, h.d, h.lf)

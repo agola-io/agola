@@ -62,7 +62,7 @@ func (h *CommitStatusDeliveriesHandler) do(w http.ResponseWriter, r *http.Reques
 
 	deliveryStatusFilter, err := types.DeliveryStatusFromStringSlice(query["deliverystatus"])
 	if err != nil {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "wrong deliverystatus"))
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("wrong deliverystatus"))
 	}
 
 	startSequenceStr := query.Get("startsequence")
@@ -71,7 +71,7 @@ func (h *CommitStatusDeliveriesHandler) do(w http.ResponseWriter, r *http.Reques
 		var err error
 		startSequence, err = strconv.ParseUint(startSequenceStr, 10, 64)
 		if err != nil {
-			return nil, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse startsequence"))
+			return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse startsequence"))
 		}
 	}
 

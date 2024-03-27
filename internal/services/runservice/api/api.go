@@ -56,11 +56,11 @@ func parseRequestOptions(r *http.Request) (*requestOptions, error) {
 		var err error
 		limit, err = strconv.Atoi(limitS)
 		if err != nil {
-			return nil, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit"))
+			return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse limit"))
 		}
 	}
 	if limit < 0 {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("limit must be greater or equal than 0"))
 	}
 
 	sortDirection := types.SortDirection(query.Get("sortdirection"))
@@ -69,7 +69,7 @@ func parseRequestOptions(r *http.Request) (*requestOptions, error) {
 		case types.SortDirectionAsc:
 		case types.SortDirectionDesc:
 		default:
-			return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("wrong sort direction %q", sortDirection))
+			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("wrong sort direction %q", sortDirection))
 		}
 	}
 
@@ -144,7 +144,7 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if sendError {
 			switch {
 			case util.APIErrorIs(err, util.ErrNotExist):
-				util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Wrapf(err, "log doesn't exist")))
+				util.HTTPError(w, util.NewAPIErrorWrap(util.ErrNotExist, err, util.WithAPIErrorMsg("log doesn't exist")))
 			default:
 				util.HTTPError(w, err)
 			}
@@ -167,15 +167,15 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 	}
 
 	if r == nil {
-		return true, util.NewAPIError(util.ErrNotExist, errors.Errorf("no such run with id: %s", runID))
+		return true, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("no such run with id: %s", runID))
 	}
 
 	task, ok := r.Tasks[taskID]
 	if !ok {
-		return true, util.NewAPIError(util.ErrNotExist, errors.Errorf("no such task with ID %s in run %s", taskID, runID))
+		return true, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("no such task with ID %s in run %s", taskID, runID))
 	}
 	if len(task.Steps) <= step {
-		return true, util.NewAPIError(util.ErrNotExist, errors.Errorf("no such step for task %s in run %s", taskID, runID))
+		return true, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("no such step for task %s in run %s", taskID, runID))
 	}
 
 	// if the log has been already fetched use it, otherwise fetch it from the executor
@@ -189,7 +189,7 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 		f, err := h.ost.ReadObject(logPath)
 		if err != nil {
 			if objectstorage.IsNotExist(err) {
-				return true, util.NewAPIError(util.ErrNotExist, err)
+				return true, util.NewAPIErrorWrap(util.ErrNotExist, err)
 			}
 			return true, errors.WithStack(err)
 		}
@@ -207,7 +207,7 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 			return errors.WithStack(err)
 		}
 		if et == nil {
-			return util.NewAPIError(util.ErrNotExist, errors.Errorf("executor task for run task with id %q doesn't exist", task.ID))
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("executor task for run task with id %q doesn't exist", task.ID))
 		}
 
 		executor, err = h.d.GetExecutorByExecutorID(tx, et.ExecutorID)
@@ -215,7 +215,7 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 			return errors.WithStack(err)
 		}
 		if executor == nil {
-			return util.NewAPIError(util.ErrNotExist, errors.Errorf("executor with id %q doesn't exist", et.ExecutorID))
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("executor with id %q doesn't exist", et.ExecutorID))
 		}
 
 		return nil
@@ -240,7 +240,7 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 	defer req.Body.Close()
 	if req.StatusCode != http.StatusOK {
 		if req.StatusCode == http.StatusNotFound {
-			return true, util.NewAPIError(util.ErrNotExist, errors.New("no log on executor"))
+			return true, util.NewAPIErrorWrap(util.ErrNotExist, errors.New("no log on executor"))
 		}
 		return true, errors.Errorf("received http status: %d", req.StatusCode)
 	}
@@ -314,23 +314,23 @@ func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	runID := q.Get("runid")
 	if runID == "" {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("runid is empty")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("runid is empty")))
 		return
 	}
 	taskID := q.Get("taskid")
 	if taskID == "" {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("taskid is empty")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("taskid is empty")))
 		return
 	}
 
 	_, setup := q["setup"]
 	stepStr := q.Get("step")
 	if !setup && stepStr == "" {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("setup is false and step is empty")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("setup is false and step is empty")))
 		return
 	}
 	if setup && stepStr != "" {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("setup is true and step is %s", stepStr)))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("setup is true and step is %s", stepStr)))
 		return
 	}
 
@@ -339,7 +339,7 @@ func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		step, err = strconv.Atoi(stepStr)
 		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("step %s is not a valid number", stepStr)))
+			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("step %s is not a valid number", stepStr)))
 			return
 		}
 	}
@@ -348,7 +348,7 @@ func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.log.Err(err).Send()
 		switch {
 		case util.APIErrorIs(err, util.ErrNotExist):
-			util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Wrapf(err, "log doesn't exist")))
+			util.HTTPError(w, util.NewAPIErrorWrap(util.ErrNotExist, err, util.WithAPIErrorMsg("log doesn't exist")))
 		default:
 			util.HTTPError(w, err)
 		}
@@ -370,15 +370,15 @@ func (h *LogsDeleteHandler) deleteTaskLogs(ctx context.Context, runID, taskID st
 	}
 
 	if r == nil {
-		return util.NewAPIError(util.ErrNotExist, errors.Errorf("no such run with id: %s", runID))
+		return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("no such run with id: %s", runID))
 	}
 
 	task, ok := r.Tasks[taskID]
 	if !ok {
-		return util.NewAPIError(util.ErrNotExist, errors.Errorf("no such task with ID %s in run %s", taskID, runID))
+		return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("no such task with ID %s in run %s", taskID, runID))
 	}
 	if len(task.Steps) <= step {
-		return util.NewAPIError(util.ErrNotExist, errors.Errorf("no such step for task %s in run %s", taskID, runID))
+		return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("no such step for task %s in run %s", taskID, runID))
 	}
 
 	if task.Steps[step].LogPhase == types.RunTaskFetchPhaseFinished {
@@ -391,13 +391,13 @@ func (h *LogsDeleteHandler) deleteTaskLogs(ctx context.Context, runID, taskID st
 		err := h.ost.DeleteObject(logPath)
 		if err != nil {
 			if objectstorage.IsNotExist(err) {
-				return util.NewAPIError(util.ErrNotExist, err)
+				return util.NewAPIErrorWrap(util.ErrNotExist, err)
 			}
 			return errors.WithStack(err)
 		}
 		return nil
 	}
-	return util.NewAPIError(util.ErrBadRequest, errors.Errorf("Log for task %s in run %s is not yet archived", taskID, runID))
+	return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("Log for task %s in run %s is not yet archived", taskID, runID))
 }
 
 type ChangeGroupsUpdateTokensHandler struct {
@@ -492,12 +492,12 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if run == nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("run with id %q doesn't exist", runRef)))
+		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("run with id %q doesn't exist", runRef)))
 		return
 	}
 
 	if rc == nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("run config for run with id %q doesn't exist", runRef)))
+		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("run config for run with id %q doesn't exist", runRef)))
 		return
 	}
 
@@ -553,20 +553,20 @@ func (h *RunByGroupHandler) do(w http.ResponseWriter, r *http.Request) (*rsapity
 
 	group, err := url.PathUnescape(vars["group"])
 	if err != nil {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("group is empty"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("group is empty"))
 	}
 
 	runCounterStr := vars["runcounter"]
 
 	var runCounter uint64
 	if runCounterStr == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("runcounter is empty"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("runcounter is empty"))
 	}
 	if runCounterStr != "" {
 		var err error
 		runCounter, err = strconv.ParseUint(runCounterStr, 10, 64)
 		if err != nil {
-			return nil, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse runcounter"))
+			return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse runcounter"))
 		}
 	}
 
@@ -597,11 +597,11 @@ func (h *RunByGroupHandler) do(w http.ResponseWriter, r *http.Request) (*rsapity
 		return nil, errors.WithStack(err)
 	}
 	if run == nil {
-		return nil, util.NewAPIError(util.ErrNotExist, errors.Errorf("run for group %q with counter %d doesn't exist", group, runCounter))
+		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("run for group %q with counter %d doesn't exist", group, runCounter))
 	}
 
 	if rc == nil {
-		return nil, util.NewAPIError(util.ErrNotExist, errors.Errorf("run config for run with id %q doesn't exist", run.ID))
+		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("run config for run with id %q doesn't exist", run.ID))
 	}
 
 	cgts, err := types.MarshalChangeGroupsUpdateToken(cgt)
@@ -677,7 +677,7 @@ func (h *RunsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		startRunSequence, err = strconv.ParseUint(startRunSequenceStr, 10, 64)
 		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse run sequence")))
+			util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run sequence")))
 			return
 		}
 	}
@@ -760,7 +760,7 @@ func (h *GroupRunsHandler) do(w http.ResponseWriter, r *http.Request) (*rsapityp
 
 	group, err := url.PathUnescape(vars["group"])
 	if err != nil {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("group is empty"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("group is empty"))
 	}
 
 	var startRunCounter uint64
@@ -769,7 +769,7 @@ func (h *GroupRunsHandler) do(w http.ResponseWriter, r *http.Request) (*rsapityp
 		var err error
 		startRunCounter, err = strconv.ParseUint(startRunCounterStr, 10, 64)
 		if err != nil {
-			return nil, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse runcounter"))
+			return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse runcounter"))
 		}
 	}
 
@@ -978,7 +978,7 @@ func (h *RunEventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		afterRunEventSequence, err = strconv.ParseUint(afterRunEventSequenceStr, 10, 64)
 		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse afterSequence")))
+			util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse afterSequence")))
 			return
 		}
 	}

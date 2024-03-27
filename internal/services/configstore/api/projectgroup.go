@@ -71,7 +71,7 @@ func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 
@@ -107,7 +107,7 @@ func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 
@@ -142,7 +142,7 @@ func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.
 	vars := mux.Vars(r)
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 
@@ -178,7 +178,7 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	var req *csapitypes.CreateUpdateProjectGroupRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 
@@ -220,14 +220,14 @@ func (h *UpdateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	vars := mux.Vars(r)
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 
 	var req *csapitypes.CreateUpdateProjectGroupRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 
@@ -269,7 +269,7 @@ func (h *DeleteProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	vars := mux.Vars(r)
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 

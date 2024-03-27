@@ -178,38 +178,69 @@ type APIError struct {
 	Kind    ErrorKind
 	Code    ErrorCode
 	Message string
+
+	msg string
 }
 
-func NewAPIError(kind ErrorKind, err error, options ...APIErrorOption) error {
+func NewAPIErrorWrap(kind ErrorKind, err error, options ...APIErrorOption) error {
 	aerr := &APIError{Kind: kind}
 
 	for _, opt := range options {
 		opt(aerr)
 	}
 
-	msg := fmt.Sprintf("apiError (kind: %s", kind)
-	if aerr.Code != "" {
-		msg += fmt.Sprintf(", code: %s", aerr.Code)
-	}
-	if aerr.Message != "" {
-		msg += fmt.Sprintf(", message: %s", aerr.Message)
-	}
-	msg += ")"
-
-	aerr.WrapperError = NewWrapperError(err, WithWrapperErrorMsg(msg))
+	aerr.WrapperError = NewWrapperError(err, WithWrapperErrorMsg(aerr.message()))
 
 	return aerr
 }
 
+func NewAPIError(kind ErrorKind, options ...APIErrorOption) error {
+	aerr := &APIError{Kind: kind}
+
+	for _, opt := range options {
+		opt(aerr)
+	}
+
+	aerr.WrapperError = NewWrapperError(nil, WithWrapperErrorMsg(aerr.message()))
+
+	return aerr
+}
+
+func (e *APIError) message() string {
+	msg := e.msg
+	if msg != "" {
+		msg += ", "
+	}
+	msg += fmt.Sprintf("apiError (kind: %s", e.Kind)
+	if e.Code != "" {
+		msg += fmt.Sprintf(", code: %s", e.Code)
+	}
+	if e.Message != "" {
+		msg += fmt.Sprintf(", message: %s", e.Message)
+	}
+	msg += ")"
+
+	return msg
+}
+
 type APIErrorOption func(e *APIError)
 
-func WithCode(code ErrorCode) APIErrorOption {
+// WithAPIErrorMsg adds an internal message to the error. This message could
+// contain sensitive data so it's just for internal logging and will not be sent
+// to the api caller.
+func WithAPIErrorMsg(format string, args ...interface{}) APIErrorOption {
+	return func(e *APIError) {
+		e.msg = fmt.Sprintf(format, args...)
+	}
+}
+
+func WithAPIErrorUserCode(code ErrorCode) APIErrorOption {
 	return func(e *APIError) {
 		e.Code = code
 	}
 }
 
-func WithMessage(message string) APIErrorOption {
+func WithAPIErrorUserMessage(message string) APIErrorOption {
 	return func(e *APIError) {
 		e.Message = message
 	}

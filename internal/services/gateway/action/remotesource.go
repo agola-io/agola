@@ -104,33 +104,33 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemot
 	}
 
 	if !util.ValidateName(req.Name) {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid remotesource name %q", req.Name))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid remotesource name %q", req.Name))
 	}
 
 	if req.Name == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource name required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource name required"))
 	}
 	if req.APIURL == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource api url required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource api url required"))
 	}
 	if req.Type == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource type required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource type required"))
 	}
 	if req.AuthType == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource auth type required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource auth type required"))
 	}
 
 	// validate if the remote source type supports the required auth type
 	if !cstypes.SourceSupportsAuthType(cstypes.RemoteSourceType(req.Type), cstypes.RemoteSourceAuthType(req.AuthType)) {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource type %q doesn't support auth type %q", req.Type, req.AuthType))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource type %q doesn't support auth type %q", req.Type, req.AuthType))
 	}
 
 	if req.AuthType == string(cstypes.RemoteSourceAuthTypeOauth2) {
 		if req.Oauth2ClientID == "" {
-			return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource oauth2 clientid required"))
+			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource oauth2 clientid required"))
 		}
 		if req.Oauth2ClientSecret == "" {
-			return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource oauth2 client secret required"))
+			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource oauth2 client secret required"))
 		}
 	}
 

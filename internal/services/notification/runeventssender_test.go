@@ -164,7 +164,7 @@ func (h *runEventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		afterRunEventSequence, err = strconv.ParseUint(afterRunEventSequenceStr, 10, 64)
 		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse afterSequence")))
+			util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse afterSequence")))
 			return
 		}
 	}

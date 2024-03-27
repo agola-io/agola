@@ -68,7 +68,7 @@ func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	var req *csapitypes.CreateUpdateRemoteSourceRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 
@@ -115,7 +115,7 @@ func (h *UpdateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	var req *csapitypes.CreateUpdateRemoteSourceRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 
