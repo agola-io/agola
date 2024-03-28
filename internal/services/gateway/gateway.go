@@ -355,6 +355,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/user/org_invitations", authForcedHandler(userOrgInvitationsHandler)).Methods("GET")
 	apirouter.Handle("/user/org_invitations/{orgref}/actions", authForcedHandler(userOrgInvitationActionHandler)).Methods("PUT")
 
+	apirouter.Handle("/users/{userref}/runs/{yyy}", authOptionalHandler(userRunHandler)).Methods("GET")
 	apirouter.Handle("/users/{userref}/runs", authForcedHandler(userRunsHandler)).Methods("GET")
 	apirouter.Handle("/users/{userref}/runs/{runnumber}", authOptionalHandler(userRunHandler)).Methods("GET")
 	apirouter.Handle("/users/{userref}/runs/{xxx}", authOptionalHandler(userRunHandler)).Methods("GET")
