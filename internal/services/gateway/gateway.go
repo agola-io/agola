@@ -357,6 +357,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	apirouter.Handle("/users/{userref}/runs", authForcedHandler(userRunsHandler)).Methods("GET")
 	apirouter.Handle("/users/{userref}/runs/{runnumber}", authOptionalHandler(userRunHandler)).Methods("GET")
+	apirouter.Handle("/users/{userref}/runs/{xxx}", authOptionalHandler(userRunHandler)).Methods("GET")
 	apirouter.Handle("/users/{userref}/runs/{runnumber}/actions", authForcedHandler(userRunActionsHandler)).Methods("PUT")
 	apirouter.Handle("/users/{userref}/runs/{runnumber}/tasks/{taskid}", authOptionalHandler(userRuntaskHandler)).Methods("GET")
 	apirouter.Handle("/users/{userref}/runs/{runnumber}/tasks/{taskid}/actions", authForcedHandler(userRunTaskActionsHandler)).Methods("PUT")
