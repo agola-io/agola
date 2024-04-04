@@ -178,19 +178,19 @@ func (h *ActionHandler) DeleteUser(ctx context.Context, userRef string) error {
 		}
 
 		if err := h.d.DeleteOrgMembersByUserID(tx, user.ID); err != nil {
-			return util.NewAPIError(util.KindFromRemoteError(err), err)
+			return errors.WithStack(err)
 		}
 
 		if err := h.d.DeleteOrgInvitationsByUserID(tx, user.ID); err != nil {
-			return util.NewAPIError(util.KindFromRemoteError(err), err)
+			return errors.WithStack(err)
 		}
 
 		if err := h.d.DeleteLinkedAccountsByUserID(tx, user.ID); err != nil {
-			return util.NewAPIError(util.KindFromRemoteError(err), err)
+			return errors.WithStack(err)
 		}
 
 		if err := h.d.DeleteUserTokensByUserID(tx, user.ID); err != nil {
-			return util.NewAPIError(util.KindFromRemoteError(err), err)
+			return errors.WithStack(err)
 		}
 
 		if err := h.d.DeleteUser(tx, user.ID); err != nil {

@@ -284,11 +284,11 @@ func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 		}
 
 		if err := h.d.DeleteOrgMembersByOrgID(tx, org.ID); err != nil {
-			return util.NewAPIError(util.KindFromRemoteError(err), err)
+			return errors.WithStack(err)
 		}
 
 		if err := h.d.DeleteOrgInvitationsByOrgID(tx, org.ID); err != nil {
-			return util.NewAPIError(util.KindFromRemoteError(err), err)
+			return errors.WithStack(err)
 		}
 
 		// delete all projects and groups
