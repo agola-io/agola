@@ -15,79 +15,54 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
-	"path"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
 	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/configstore/action"
-	"agola.io/agola/internal/services/configstore/db"
-	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	"agola.io/agola/services/configstore/types"
 )
 
-func projectGroupResponse(ctx context.Context, d *db.DB, projectGroup *types.ProjectGroup) (*csapitypes.ProjectGroup, error) {
-	r, err := projectGroupsResponse(ctx, d, []*types.ProjectGroup{projectGroup})
+func projectGroupResponse(projectGroup *types.ProjectGroup, projectGroupDynamicData *action.ProjectGroupDynamicData) (*csapitypes.ProjectGroup, error) {
+	r, err := projectGroupsResponse([]*types.ProjectGroup{projectGroup}, map[string]*action.ProjectGroupDynamicData{projectGroup.ID: projectGroupDynamicData})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 	return r[0], nil
 }
 
-func projectGroupsResponse(ctx context.Context, d *db.DB, projectGroups []*types.ProjectGroup) ([]*csapitypes.ProjectGroup, error) {
+func projectGroupsResponse(projectGroups []*types.ProjectGroup, projectGroupsDynamicData map[string]*action.ProjectGroupDynamicData) ([]*csapitypes.ProjectGroup, error) {
 	resProjectGroups := make([]*csapitypes.ProjectGroup, len(projectGroups))
 
-	err := d.Do(ctx, func(tx *sql.Tx) error {
-		for i, projectGroup := range projectGroups {
-			pp, err := d.GetPath(tx, projectGroup.Parent.Kind, projectGroup.Parent.ID)
-			if err != nil {
-				return errors.WithStack(err)
-			}
+	for i, projectGroup := range projectGroups {
+		projectGroupDynamicData := projectGroupsDynamicData[projectGroup.ID]
 
-			ownerType, ownerID, err := d.GetProjectGroupOwnerID(tx, projectGroup)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-
-			// calculate global visibility
-			visibility, err := getGlobalVisibility(d, tx, projectGroup.Visibility, &projectGroup.Parent)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-
-			// we calculate the path here from parent path since the db could not yet be
-			// updated on create
-			resProjectGroups[i] = &csapitypes.ProjectGroup{
-				ProjectGroup:     projectGroup,
-				OwnerType:        ownerType,
-				OwnerID:          ownerID,
-				Path:             path.Join(pp, projectGroup.Name),
-				ParentPath:       pp,
-				GlobalVisibility: visibility,
-			}
-
+		resProjectGroups[i] = &csapitypes.ProjectGroup{
+			ProjectGroup:     projectGroup,
+			OwnerType:        projectGroupDynamicData.OwnerType,
+			OwnerID:          projectGroupDynamicData.OwnerID,
+			Path:             projectGroupDynamicData.Path,
+			ParentPath:       projectGroupDynamicData.ParentPath,
+			GlobalVisibility: projectGroupDynamicData.GlobalVisibility,
 		}
-		return nil
-	})
+	}
 
-	return resProjectGroups, errors.WithStack(err)
+	return resProjectGroups, nil
 }
 
 type ProjectGroupHandler struct {
-	log    zerolog.Logger
-	ah     *action.ActionHandler
-	readDB *db.DB
+	log zerolog.Logger
+	ah  *action.ActionHandler
 }
 
-func NewProjectGroupHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *db.DB) *ProjectGroupHandler {
-	return &ProjectGroupHandler{log: log, ah: ah, readDB: readDB}
+func NewProjectGroupHandler(log zerolog.Logger, ah *action.ActionHandler) *ProjectGroupHandler {
+	return &ProjectGroupHandler{log: log, ah: ah}
 }
 
 func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -100,13 +75,13 @@ func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	projectGroup, err := h.ah.GetProjectGroup(ctx, projectGroupRef)
+	res, err := h.ah.GetProjectGroup(ctx, projectGroupRef)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	resProjectGroup, err := projectGroupResponse(ctx, h.readDB, projectGroup)
+	resProjectGroup, err := projectGroupResponse(res.ProjectGroup, res.ProjectGroupDynamicData)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
@@ -118,13 +93,12 @@ func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 }
 
 type ProjectGroupProjectsHandler struct {
-	log    zerolog.Logger
-	ah     *action.ActionHandler
-	readDB *db.DB
+	log zerolog.Logger
+	ah  *action.ActionHandler
 }
 
-func NewProjectGroupProjectsHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *db.DB) *ProjectGroupProjectsHandler {
-	return &ProjectGroupProjectsHandler{log: log, ah: ah, readDB: readDB}
+func NewProjectGroupProjectsHandler(log zerolog.Logger, ah *action.ActionHandler) *ProjectGroupProjectsHandler {
+	return &ProjectGroupProjectsHandler{log: log, ah: ah}
 }
 
 func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -137,13 +111,13 @@ func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	projects, err := h.ah.GetProjectGroupProjects(ctx, projectGroupRef)
+	res, err := h.ah.GetProjectGroupProjects(ctx, projectGroupRef)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	resProjects, err := projectsResponse(ctx, h.readDB, projects)
+	resProjects, err := projectsResponse(res.Projects, res.ProjectsDynamicData)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
@@ -155,13 +129,12 @@ func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 }
 
 type ProjectGroupSubgroupsHandler struct {
-	log    zerolog.Logger
-	ah     *action.ActionHandler
-	readDB *db.DB
+	log zerolog.Logger
+	ah  *action.ActionHandler
 }
 
-func NewProjectGroupSubgroupsHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *db.DB) *ProjectGroupSubgroupsHandler {
-	return &ProjectGroupSubgroupsHandler{log: log, ah: ah, readDB: readDB}
+func NewProjectGroupSubgroupsHandler(log zerolog.Logger, ah *action.ActionHandler) *ProjectGroupSubgroupsHandler {
+	return &ProjectGroupSubgroupsHandler{log: log, ah: ah}
 }
 
 func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -173,13 +146,13 @@ func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.
 		return
 	}
 
-	projectGroups, err := h.ah.GetProjectGroupSubgroups(ctx, projectGroupRef)
+	res, err := h.ah.GetProjectGroupSubgroups(ctx, projectGroupRef)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	resProjectGroups, err := projectGroupsResponse(ctx, h.readDB, projectGroups)
+	resProjectGroups, err := projectGroupsResponse(res.ProjectGroups, res.ProjectGroupsDynamicData)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
@@ -191,13 +164,12 @@ func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.
 }
 
 type CreateProjectGroupHandler struct {
-	log    zerolog.Logger
-	ah     *action.ActionHandler
-	readDB *db.DB
+	log zerolog.Logger
+	ah  *action.ActionHandler
 }
 
-func NewCreateProjectGroupHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *db.DB) *CreateProjectGroupHandler {
-	return &CreateProjectGroupHandler{log: log, ah: ah, readDB: readDB}
+func NewCreateProjectGroupHandler(log zerolog.Logger, ah *action.ActionHandler) *CreateProjectGroupHandler {
+	return &CreateProjectGroupHandler{log: log, ah: ah}
 }
 
 func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -216,13 +188,13 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		Visibility: req.Visibility,
 	}
 
-	projectGroup, err := h.ah.CreateProjectGroup(ctx, areq)
+	res, err := h.ah.CreateProjectGroup(ctx, areq)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	resProjectGroup, err := projectGroupResponse(ctx, h.readDB, projectGroup)
+	resProjectGroup, err := projectGroupResponse(res.ProjectGroup, res.ProjectGroupDynamicData)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
@@ -234,13 +206,12 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 }
 
 type UpdateProjectGroupHandler struct {
-	log    zerolog.Logger
-	ah     *action.ActionHandler
-	readDB *db.DB
+	log zerolog.Logger
+	ah  *action.ActionHandler
 }
 
-func NewUpdateProjectGroupHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *db.DB) *UpdateProjectGroupHandler {
-	return &UpdateProjectGroupHandler{log: log, ah: ah, readDB: readDB}
+func NewUpdateProjectGroupHandler(log zerolog.Logger, ah *action.ActionHandler) *UpdateProjectGroupHandler {
+	return &UpdateProjectGroupHandler{log: log, ah: ah}
 }
 
 func (h *UpdateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -266,13 +237,13 @@ func (h *UpdateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		Visibility: req.Visibility,
 	}
 
-	projectGroup, err := h.ah.UpdateProjectGroup(ctx, projectGroupRef, areq)
+	res, err := h.ah.UpdateProjectGroup(ctx, projectGroupRef, areq)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	resProjectGroup, err := projectGroupResponse(ctx, h.readDB, projectGroup)
+	resProjectGroup, err := projectGroupResponse(res.ProjectGroup, res.ProjectGroupDynamicData)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return

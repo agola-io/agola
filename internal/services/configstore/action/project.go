@@ -26,6 +26,44 @@ import (
 	"agola.io/agola/services/configstore/types"
 )
 
+type ProjectDynamicData struct {
+	OwnerType        types.ObjectKind
+	OwnerID          string
+	Path             string
+	ParentPath       string
+	GlobalVisibility types.Visibility
+}
+
+func (h *ActionHandler) projectDynamicData(tx *sql.Tx, project *types.Project) (*ProjectDynamicData, error) {
+	var projectDynamicData *ProjectDynamicData
+
+	pp, err := h.d.GetPath(tx, project.Parent.Kind, project.Parent.ID)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	ownerType, ownerID, err := h.d.GetProjectOwnerID(tx, project)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	// calculate global visibility
+	visibility, err := h.getGlobalVisibility(tx, project.Visibility, &project.Parent)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	projectDynamicData = &ProjectDynamicData{
+		OwnerType:        ownerType,
+		OwnerID:          ownerID,
+		Path:             path.Join(pp, project.Name),
+		ParentPath:       pp,
+		GlobalVisibility: visibility,
+	}
+
+	return projectDynamicData, nil
+}
+
 func (h *ActionHandler) ValidateProjectReq(ctx context.Context, req *CreateUpdateProjectRequest) error {
 	if req.Name == "" {
 		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("project name required"))
@@ -62,22 +100,38 @@ func (h *ActionHandler) ValidateProjectReq(ctx context.Context, req *CreateUpdat
 	return nil
 }
 
-func (h *ActionHandler) GetProject(ctx context.Context, projectRef string) (*types.Project, error) {
+type GetProjectResponse struct {
+	Project            *types.Project
+	ProjectDynamicData *ProjectDynamicData
+}
+
+func (h *ActionHandler) GetProject(ctx context.Context, projectRef string) (*GetProjectResponse, error) {
 	var project *types.Project
+	var projectDynamicData *ProjectDynamicData
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
 		project, err = h.d.GetProject(tx, projectRef)
+
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		if project == nil {
+			return util.NewAPIError(util.ErrNotExist, errors.Errorf("project %q doesn't exist", projectRef))
+		}
+
+		projectDynamicData, err = h.projectDynamicData(tx, project)
+
 		return errors.WithStack(err)
 	})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	if project == nil {
-		return nil, util.NewAPIError(util.ErrNotExist, errors.Errorf("project %q doesn't exist", projectRef))
-	}
-
-	return project, nil
+	return &GetProjectResponse{
+		Project:            project,
+		ProjectDynamicData: projectDynamicData,
+	}, nil
 }
 
 type CreateUpdateProjectRequest struct {
@@ -97,12 +151,13 @@ type CreateUpdateProjectRequest struct {
 	MembersCanPerformRunActions bool
 }
 
-func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateUpdateProjectRequest) (*types.Project, error) {
+func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateUpdateProjectRequest) (*GetProjectResponse, error) {
 	if err := h.ValidateProjectReq(ctx, req); err != nil {
 		return nil, errors.WithStack(err)
 	}
 
 	var project *types.Project
+	var projectDynamicData *ProjectDynamicData
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
 		group, err := h.d.GetProjectGroup(tx, req.Parent.ID)
@@ -184,21 +239,27 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateUpdateProj
 			return errors.WithStack(err)
 		}
 
-		return nil
+		projectDynamicData, err = h.projectDynamicData(tx, project)
+
+		return errors.WithStack(err)
 	})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	return project, errors.WithStack(err)
+	return &GetProjectResponse{
+		Project:            project,
+		ProjectDynamicData: projectDynamicData,
+	}, nil
 }
 
-func (h *ActionHandler) UpdateProject(ctx context.Context, curProjectRef string, req *CreateUpdateProjectRequest) (*types.Project, error) {
+func (h *ActionHandler) UpdateProject(ctx context.Context, curProjectRef string, req *CreateUpdateProjectRequest) (*GetProjectResponse, error) {
 	if err := h.ValidateProjectReq(ctx, req); err != nil {
 		return nil, errors.WithStack(err)
 	}
 
 	var project *types.Project
+	var projectDynamicData *ProjectDynamicData
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
 		// check project exists
@@ -298,13 +359,18 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, curProjectRef string,
 			return errors.WithStack(err)
 		}
 
-		return nil
+		projectDynamicData, err = h.projectDynamicData(tx, project)
+
+		return errors.WithStack(err)
 	})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	return project, errors.WithStack(err)
+	return &GetProjectResponse{
+		Project:            project,
+		ProjectDynamicData: projectDynamicData,
+	}, nil
 }
 
 func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) error {

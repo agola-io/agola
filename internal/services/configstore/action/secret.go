@@ -42,25 +42,48 @@ func (h *ActionHandler) GetSecret(ctx context.Context, secretID string) (*types.
 	return secret, nil
 }
 
-func (h *ActionHandler) GetSecrets(ctx context.Context, parentKind types.ObjectKind, parentRef string, tree bool) ([]*types.Secret, error) {
+type GetSecretsResponse struct {
+	Secrets     []*types.Secret
+	ParentPaths map[string]string
+}
+
+func (h *ActionHandler) GetSecrets(ctx context.Context, parentKind types.ObjectKind, parentRef string, tree bool) (*GetSecretsResponse, error) {
 	var secrets []*types.Secret
+	parentPaths := map[string]string{}
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		parentID, err := h.ResolveObjectID(tx, parentKind, parentRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
+
 		if tree {
 			secrets, err = h.d.GetSecretsTree(tx, parentKind, parentID)
 		} else {
 			secrets, err = h.d.GetSecrets(tx, parentID)
 		}
-		return errors.WithStack(err)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		// populate secrets parent paths
+		for _, s := range secrets {
+			pp, err := h.d.GetPath(tx, s.Parent.Kind, s.Parent.ID)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			parentPaths[s.ID] = pp
+		}
+
+		return nil
 	})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	return secrets, nil
+	return &GetSecretsResponse{
+		Secrets:     secrets,
+		ParentPaths: parentPaths,
+	}, nil
 }
 
 func (h *ActionHandler) ValidateSecretReq(ctx context.Context, req *CreateUpdateSecretRequest) error {

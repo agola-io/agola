@@ -98,6 +98,24 @@ func (h *ActionHandler) GetOrgMembers(ctx context.Context, req *GetOrgMembersReq
 	}, nil
 }
 
+func (h *ActionHandler) GetOrg(ctx context.Context, orgRef string) (*types.Organization, error) {
+	var org *types.Organization
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		org, err = h.d.GetOrg(tx, orgRef)
+		return errors.WithStack(err)
+	})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	if org == nil {
+		return nil, util.NewAPIError(util.ErrNotExist, errors.Errorf("org %q doesn't exist", orgRef))
+	}
+
+	return org, nil
+}
+
 type GetOrgsRequest struct {
 	StartOrgName string
 	Visibilities []types.Visibility
@@ -494,6 +512,10 @@ func (h *ActionHandler) GetOrgInvitationByUserRef(ctx context.Context, orgRef, u
 	})
 	if err != nil {
 		return nil, errors.WithStack(err)
+	}
+
+	if orgInvitation == nil {
+		return nil, util.NewAPIError(util.ErrNotExist, errors.Errorf("invitation for org %q user %q doesn't exist", orgRef, userRef))
 	}
 
 	return orgInvitation, nil

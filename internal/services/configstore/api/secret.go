@@ -20,11 +20,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
-	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/configstore/action"
-	"agola.io/agola/internal/services/configstore/db"
-	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	"agola.io/agola/services/configstore/types"
@@ -33,11 +30,10 @@ import (
 type SecretHandler struct {
 	log zerolog.Logger
 	ah  *action.ActionHandler
-	d   *db.DB
 }
 
-func NewSecretHandler(log zerolog.Logger, ah *action.ActionHandler, d *db.DB) *SecretHandler {
-	return &SecretHandler{log: log, ah: ah, d: d}
+func NewSecretHandler(log zerolog.Logger, ah *action.ActionHandler) *SecretHandler {
+	return &SecretHandler{log: log, ah: ah}
 }
 
 func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -59,11 +55,10 @@ func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 type SecretsHandler struct {
 	log zerolog.Logger
 	ah  *action.ActionHandler
-	d   *db.DB
 }
 
-func NewSecretsHandler(log zerolog.Logger, ah *action.ActionHandler, d *db.DB) *SecretsHandler {
-	return &SecretsHandler{log: log, ah: ah, d: d}
+func NewSecretsHandler(log zerolog.Logger, ah *action.ActionHandler) *SecretsHandler {
+	return &SecretsHandler{log: log, ah: ah}
 }
 
 func (h *SecretsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -77,32 +72,15 @@ func (h *SecretsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	secrets, err := h.ah.GetSecrets(ctx, parentKind, parentRef, tree)
+	res, err := h.ah.GetSecrets(ctx, parentKind, parentRef, tree)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	resSecrets := make([]*csapitypes.Secret, len(secrets))
-	for i, s := range secrets {
-		resSecrets[i] = &csapitypes.Secret{Secret: s}
-	}
-
-	err = h.d.Do(ctx, func(tx *sql.Tx) error {
-		// populate parent path
-		for _, s := range resSecrets {
-			pp, err := h.d.GetPath(tx, s.Parent.Kind, s.Parent.ID)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-			s.ParentPath = pp
-		}
-		return errors.WithStack(err)
-	})
-	if err != nil {
-		h.log.Err(err).Send()
-		util.HTTPError(w, err)
-		return
+	resSecrets := make([]*csapitypes.Secret, len(res.Secrets))
+	for i, s := range res.Secrets {
+		resSecrets[i] = &csapitypes.Secret{Secret: s, ParentPath: res.ParentPaths[s.ID]}
 	}
 
 	if err := util.HTTPResponse(w, http.StatusOK, resSecrets); err != nil {

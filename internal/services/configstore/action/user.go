@@ -27,6 +27,101 @@ import (
 	"agola.io/agola/services/configstore/types"
 )
 
+type UserQueryRequest struct {
+	QueryType string
+
+	Token string
+
+	LinkedAccountID string
+
+	RemoteUserID   string
+	RemoteSourceID string
+}
+
+func (h *ActionHandler) UserQuery(ctx context.Context, req *UserQueryRequest) (*types.User, error) {
+	var user *types.User
+
+	switch req.QueryType {
+	case "bytoken":
+		err := h.d.Do(ctx, func(tx *sql.Tx) error {
+			var err error
+			user, err = h.d.GetUserByTokenValue(tx, req.Token)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			if user == nil {
+				return util.NewAPIError(util.ErrNotExist, errors.Errorf("user with required token doesn't exist"))
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+	case "bylinkedaccount":
+		err := h.d.Do(ctx, func(tx *sql.Tx) error {
+			var err error
+			user, err = h.d.GetUserByLinkedAccount(tx, req.LinkedAccountID)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			if user == nil {
+				return util.NewAPIError(util.ErrNotExist, errors.Errorf("user with linked account %q doesn't exist", req.LinkedAccountID))
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+	case "byremoteuser":
+		err := h.d.Do(ctx, func(tx *sql.Tx) error {
+			la, err := h.d.GetLinkedAccountByRemoteUserIDandSource(tx, req.RemoteUserID, req.RemoteSourceID)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			if la == nil {
+				return util.NewAPIError(util.ErrNotExist, errors.Errorf("linked account with remote user %q for remote source %q doesn't exist", req.RemoteUserID, req.RemoteSourceID))
+			}
+
+			user, err = h.d.GetUser(tx, la.UserID)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			if user == nil {
+				return util.NewAPIError(util.ErrNotExist, errors.Errorf("user with remote user %q for remote source %q doesn't exist", req.RemoteUserID, req.RemoteSourceID))
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+	default:
+		return nil, errors.Errorf("unknown query_type: %q", req.QueryType)
+	}
+
+	return user, nil
+}
+
+func (h *ActionHandler) GetUser(ctx context.Context, userRef string) (*types.User, error) {
+	var user *types.User
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		user, err = h.d.GetUser(tx, userRef)
+		return errors.WithStack(err)
+	})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	if user == nil {
+		return nil, util.NewAPIError(util.ErrNotExist, errors.Errorf("user %q doesn't exist", userRef))
+	}
+
+	return user, nil
+}
+
 type GetUsersRequest struct {
 	StartUserName string
 

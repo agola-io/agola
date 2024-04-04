@@ -15,26 +15,22 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
-	"path"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
 	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/configstore/action"
-	"agola.io/agola/internal/services/configstore/db"
-	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	"agola.io/agola/services/configstore/types"
 )
 
-func projectResponse(ctx context.Context, d *db.DB, project *types.Project) (*csapitypes.Project, error) {
-	r, err := projectsResponse(ctx, d, []*types.Project{project})
+func projectResponse(project *types.Project, projectDynamicData *action.ProjectDynamicData) (*csapitypes.Project, error) {
+	r, err := projectsResponse([]*types.Project{project}, map[string]*action.ProjectDynamicData{project.ID: projectDynamicData})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -42,86 +38,32 @@ func projectResponse(ctx context.Context, d *db.DB, project *types.Project) (*cs
 }
 
 // TODO(sgotti) do these queries inside the action handler?
-func projectsResponse(ctx context.Context, d *db.DB, projects []*types.Project) ([]*csapitypes.Project, error) {
+func projectsResponse(projects []*types.Project, projectsDynamicData map[string]*action.ProjectDynamicData) ([]*csapitypes.Project, error) {
 	resProjects := make([]*csapitypes.Project, len(projects))
 
-	// TODO(sgotti) use a single query to get all the paths
-	err := d.Do(ctx, func(tx *sql.Tx) error {
-		for i, project := range projects {
-			pp, err := d.GetPath(tx, project.Parent.Kind, project.Parent.ID)
-			if err != nil {
-				return errors.WithStack(err)
-			}
+	for i, project := range projects {
+		projectDynamicData := projectsDynamicData[project.ID]
 
-			ownerType, ownerID, err := d.GetProjectOwnerID(tx, project)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-
-			// calculate global visibility
-			visibility, err := getGlobalVisibility(d, tx, project.Visibility, &project.Parent)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-
-			// we calculate the path here from parent path since the db could not yet be
-			// updated on create
-			resProjects[i] = &csapitypes.Project{
-				Project:          project,
-				OwnerType:        ownerType,
-				OwnerID:          ownerID,
-				Path:             path.Join(pp, project.Name),
-				ParentPath:       pp,
-				GlobalVisibility: visibility,
-			}
-		}
-
-		return nil
-	})
-
-	return resProjects, errors.WithStack(err)
-}
-
-func getGlobalVisibility(readDB *db.DB, tx *sql.Tx, curVisibility types.Visibility, parent *types.Parent) (types.Visibility, error) {
-	curParent := parent
-	if curVisibility == types.VisibilityPrivate {
-		return curVisibility, nil
-	}
-
-	for curParent.Kind == types.ObjectKindProjectGroup {
-		projectGroup, err := readDB.GetProjectGroupByID(tx, curParent.ID)
-		if err != nil {
-			return "", errors.WithStack(err)
-		}
-		if projectGroup.Visibility == types.VisibilityPrivate {
-			return types.VisibilityPrivate, nil
-		}
-
-		curParent = &projectGroup.Parent
-	}
-
-	// check parent visibility
-	if curParent.Kind == types.ObjectKindOrg {
-		org, err := readDB.GetOrg(tx, curParent.ID)
-		if err != nil {
-			return "", errors.WithStack(err)
-		}
-		if org.Visibility == types.VisibilityPrivate {
-			return types.VisibilityPrivate, nil
+		resProjects[i] = &csapitypes.Project{
+			Project:          project,
+			OwnerType:        projectDynamicData.OwnerType,
+			OwnerID:          projectDynamicData.OwnerID,
+			Path:             projectDynamicData.Path,
+			ParentPath:       projectDynamicData.ParentPath,
+			GlobalVisibility: projectDynamicData.GlobalVisibility,
 		}
 	}
 
-	return curVisibility, nil
+	return resProjects, nil
 }
 
 type ProjectHandler struct {
-	log    zerolog.Logger
-	ah     *action.ActionHandler
-	readDB *db.DB
+	log zerolog.Logger
+	ah  *action.ActionHandler
 }
 
-func NewProjectHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *db.DB) *ProjectHandler {
-	return &ProjectHandler{log: log, ah: ah, readDB: readDB}
+func NewProjectHandler(log zerolog.Logger, ah *action.ActionHandler) *ProjectHandler {
+	return &ProjectHandler{log: log, ah: ah}
 }
 
 func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -133,13 +75,13 @@ func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	project, err := h.ah.GetProject(ctx, projectRef)
+	res, err := h.ah.GetProject(ctx, projectRef)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	resProject, err := projectResponse(ctx, h.readDB, project)
+	resProject, err := projectResponse(res.Project, res.ProjectDynamicData)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
@@ -151,13 +93,12 @@ func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type CreateProjectHandler struct {
-	log    zerolog.Logger
-	ah     *action.ActionHandler
-	readDB *db.DB
+	log zerolog.Logger
+	ah  *action.ActionHandler
 }
 
-func NewCreateProjectHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *db.DB) *CreateProjectHandler {
-	return &CreateProjectHandler{log: log, ah: ah, readDB: readDB}
+func NewCreateProjectHandler(log zerolog.Logger, ah *action.ActionHandler) *CreateProjectHandler {
+	return &CreateProjectHandler{log: log, ah: ah}
 }
 
 func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -186,13 +127,13 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		MembersCanPerformRunActions: req.MembersCanPerformRunActions,
 	}
 
-	project, err := h.ah.CreateProject(ctx, areq)
+	res, err := h.ah.CreateProject(ctx, areq)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	resProject, err := projectResponse(ctx, h.readDB, project)
+	resProject, err := projectResponse(res.Project, res.ProjectDynamicData)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
@@ -204,13 +145,12 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 }
 
 type UpdateProjectHandler struct {
-	log    zerolog.Logger
-	ah     *action.ActionHandler
-	readDB *db.DB
+	log zerolog.Logger
+	ah  *action.ActionHandler
 }
 
-func NewUpdateProjectHandler(log zerolog.Logger, ah *action.ActionHandler, readDB *db.DB) *UpdateProjectHandler {
-	return &UpdateProjectHandler{log: log, ah: ah, readDB: readDB}
+func NewUpdateProjectHandler(log zerolog.Logger, ah *action.ActionHandler) *UpdateProjectHandler {
+	return &UpdateProjectHandler{log: log, ah: ah}
 }
 
 func (h *UpdateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -246,13 +186,13 @@ func (h *UpdateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		MembersCanPerformRunActions: req.MembersCanPerformRunActions,
 	}
 
-	project, err := h.ah.UpdateProject(ctx, projectRef, areq)
+	res, err := h.ah.UpdateProject(ctx, projectRef, areq)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	resProject, err := projectResponse(ctx, h.readDB, project)
+	resProject, err := projectResponse(res.Project, res.ProjectDynamicData)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
