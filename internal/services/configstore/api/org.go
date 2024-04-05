@@ -23,8 +23,6 @@ import (
 	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/configstore/action"
-	"agola.io/agola/internal/services/configstore/db"
-	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	"agola.io/agola/services/configstore/types"
@@ -32,11 +30,11 @@ import (
 
 type OrgHandler struct {
 	log zerolog.Logger
-	d   *db.DB
+	ah  *action.ActionHandler
 }
 
-func NewOrgHandler(log zerolog.Logger, d *db.DB) *OrgHandler {
-	return &OrgHandler{log: log, d: d}
+func NewOrgHandler(log zerolog.Logger, ah *action.ActionHandler) *OrgHandler {
+	return &OrgHandler{log: log, ah: ah}
 }
 
 func (h *OrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -44,20 +42,9 @@ func (h *OrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	orgRef := vars["orgref"]
 
-	var org *types.Organization
-	err := h.d.Do(ctx, func(tx *sql.Tx) error {
-		var err error
-		org, err = h.d.GetOrg(tx, orgRef)
-		return errors.WithStack(err)
-	})
-	if err != nil {
+	org, err := h.ah.GetOrg(ctx, orgRef)
+	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
-		util.HTTPError(w, err)
-		return
-	}
-
-	if org == nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("org %q doesn't exist", orgRef)))
 		return
 	}
 
@@ -447,10 +434,6 @@ func (h *OrgInvitationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	orgInvitation, err := h.ah.GetOrgInvitationByUserRef(ctx, orgRef, userRef)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
-		return
-	}
-	if orgInvitation == nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("invitation for org %q user %q doesn't exist", orgRef, userRef)))
 		return
 	}
 

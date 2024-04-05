@@ -24,6 +24,24 @@ import (
 	"agola.io/agola/services/configstore/types"
 )
 
+func (h *ActionHandler) GetRemoteSource(ctx context.Context, remoteSourceRef string) (*types.RemoteSource, error) {
+	var remoteSource *types.RemoteSource
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		remoteSource, err = h.d.GetRemoteSource(tx, remoteSourceRef)
+		return errors.WithStack(err)
+	})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	if remoteSource == nil {
+		return nil, util.NewAPIError(util.ErrNotExist, errors.Errorf("remotesource %q doesn't exist", remoteSourceRef))
+	}
+
+	return remoteSource, nil
+}
+
 type GetRemoteSourcesRequest struct {
 	StartRemoteSourceName string
 
@@ -239,4 +257,41 @@ func (h *ActionHandler) DeleteRemoteSource(ctx context.Context, remoteSourceName
 	}
 
 	return errors.WithStack(err)
+}
+
+type GetLinkedAccountsRequest struct {
+	QueryType string
+
+	RemoteUserID   string
+	RemoteSourceID string
+}
+
+func (h *ActionHandler) GetLinkedAccounts(ctx context.Context, req *GetLinkedAccountsRequest) ([]*types.LinkedAccount, error) {
+	var linkedAccounts []*types.LinkedAccount
+	err := h.d.Do(ctx, func(tx *sql.Tx) error {
+		switch req.QueryType {
+		case "byremoteuser":
+			remoteUserID := req.RemoteUserID
+			remoteSourceID := req.RemoteSourceID
+			la, err := h.d.GetLinkedAccountByRemoteUserIDandSource(tx, remoteUserID, remoteSourceID)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			if la == nil {
+				return util.NewAPIError(util.ErrNotExist, errors.Errorf("linked account with remote user %q for remote source %q token doesn't exist", remoteUserID, remoteSourceID))
+			}
+
+			linkedAccounts = []*types.LinkedAccount{la}
+
+		default:
+			return errors.Errorf("unknown query_type: %q", req.QueryType)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return linkedAccounts, nil
 }

@@ -20,11 +20,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
-	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/configstore/action"
-	"agola.io/agola/internal/services/configstore/db"
-	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	"agola.io/agola/services/configstore/types"
@@ -33,11 +30,10 @@ import (
 type VariablesHandler struct {
 	log zerolog.Logger
 	ah  *action.ActionHandler
-	d   *db.DB
 }
 
-func NewVariablesHandler(log zerolog.Logger, ah *action.ActionHandler, d *db.DB) *VariablesHandler {
-	return &VariablesHandler{log: log, ah: ah, d: d}
+func NewVariablesHandler(log zerolog.Logger, ah *action.ActionHandler) *VariablesHandler {
+	return &VariablesHandler{log: log, ah: ah}
 }
 
 func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -51,31 +47,15 @@ func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	variables, err := h.ah.GetVariables(ctx, parentKind, parentRef, tree)
+	res, err := h.ah.GetVariables(ctx, parentKind, parentRef, tree)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	resVariables := make([]*csapitypes.Variable, len(variables))
-	for i, v := range variables {
-		resVariables[i] = &csapitypes.Variable{Variable: v}
-	}
-	err = h.d.Do(ctx, func(tx *sql.Tx) error {
-		// populate parent path
-		for _, v := range resVariables {
-			pp, err := h.d.GetPath(tx, v.Parent.Kind, v.Parent.ID)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-			v.ParentPath = pp
-		}
-		return errors.WithStack(err)
-	})
-	if err != nil {
-		h.log.Err(err).Send()
-		util.HTTPError(w, err)
-		return
+	resVariables := make([]*csapitypes.Variable, len(res.Variables))
+	for i, v := range res.Variables {
+		resVariables[i] = &csapitypes.Variable{Variable: v, ParentPath: res.ParentPaths[v.ID]}
 	}
 
 	if err := util.HTTPResponse(w, http.StatusOK, resVariables); err != nil {

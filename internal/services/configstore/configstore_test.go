@@ -507,36 +507,36 @@ func TestProjectUpdate(t *testing.T) {
 	_, err = cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic})
 	testutil.NilError(t, err)
 
-	p01 := &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}
-	_, err = cs.ah.CreateProject(ctx, p01)
+	p01req := &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}
+	_, err = cs.ah.CreateProject(ctx, p01req)
 	testutil.NilError(t, err)
 
-	p02 := &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}
-	_, err = cs.ah.CreateProject(ctx, p02)
+	p02req := &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}
+	_, err = cs.ah.CreateProject(ctx, p02req)
 	testutil.NilError(t, err)
 
-	p03 := &action.CreateUpdateProjectRequest{Name: "project02", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}
-	_, err = cs.ah.CreateProject(ctx, p03)
+	p03req := &action.CreateUpdateProjectRequest{Name: "project02", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual}
+	_, err = cs.ah.CreateProject(ctx, p03req)
 	testutil.NilError(t, err)
 
 	t.Run("rename project keeping same parent", func(t *testing.T) {
 		projectName := "project02"
-		p03.Name = "newproject02"
-		_, err := cs.ah.UpdateProject(ctx, path.Join("user", user.Name, "projectgroup01", projectName), p03)
+		p03req.Name = "newproject02"
+		_, err := cs.ah.UpdateProject(ctx, path.Join("user", user.Name, "projectgroup01", projectName), p03req)
 		testutil.NilError(t, err)
 	})
 	t.Run("move project to project group having project with same name", func(t *testing.T) {
 		projectName := "project01"
 		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("project with name %q, path %q already exists", projectName, path.Join("user", user.Name, projectName)))
-		p02.Parent.ID = path.Join("user", user.Name)
-		_, err := cs.ah.UpdateProject(ctx, path.Join("user", user.Name, "projectgroup01", projectName), p02)
+		p02req.Parent.ID = path.Join("user", user.Name)
+		_, err := cs.ah.UpdateProject(ctx, path.Join("user", user.Name, "projectgroup01", projectName), p02req)
 		assert.Error(t, err, expectedErr.Error())
 	})
 	t.Run("move project to project group changing name", func(t *testing.T) {
 		projectName := "project01"
-		p02.Name = "newproject01"
-		p02.Parent.ID = path.Join("user", user.Name)
-		_, err := cs.ah.UpdateProject(ctx, path.Join("user", user.Name, "projectgroup01", projectName), p02)
+		p02req.Name = "newproject01"
+		p02req.Parent.ID = path.Join("user", user.Name)
+		_, err := cs.ah.UpdateProject(ctx, path.Join("user", user.Name, "projectgroup01", projectName), p02req)
 		testutil.NilError(t, err)
 	})
 	t.Run("test user project MembersCanPerformRunActions parameter", func(t *testing.T) {
@@ -552,8 +552,8 @@ func TestProjectUpdate(t *testing.T) {
 
 		// test update user project
 
-		p01.MembersCanPerformRunActions = true
-		_, err = cs.ah.UpdateProject(ctx, path.Join("user", user.Name, "project01"), p01)
+		p01req.MembersCanPerformRunActions = true
+		_, err = cs.ah.UpdateProject(ctx, path.Join("user", user.Name, "project01"), p01req)
 		assert.Error(t, err, expectedErr.Error())
 	})
 }
@@ -575,7 +575,7 @@ func TestProjectGroupUpdate(t *testing.T) {
 	user, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"})
 	testutil.NilError(t, err)
 
-	rootPG, err := cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
+	rootPGres, err := cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
 	testutil.NilError(t, err)
 
 	pg01req := &action.CreateUpdateProjectGroupRequest{Name: "pg01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic}
@@ -615,10 +615,10 @@ func TestProjectGroupUpdate(t *testing.T) {
 		projectGroupName := "pg01"
 		pg05req.Name = "newpg01"
 		pg05req.Parent.ID = path.Join("user", user.Name)
-		pg05, err := cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name, "pg02", projectGroupName), pg05req)
+		pg05res, err := cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name, "pg02", projectGroupName), pg05req)
 		testutil.NilError(t, err)
 
-		assert.Equal(t, pg05.Parent.ID, rootPG.ID)
+		assert.Equal(t, pg05res.ProjectGroup.Parent.ID, rootPGres.ProjectGroup.ID)
 	})
 	t.Run("move project group inside itself", func(t *testing.T) {
 		projectGroupName := "pg02"
@@ -635,53 +635,49 @@ func TestProjectGroupUpdate(t *testing.T) {
 		assert.Error(t, err, expectedErr.Error())
 	})
 	t.Run("change root project group parent kind", func(t *testing.T) {
-		var rootPG *types.ProjectGroup
-		rootPG, err := cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
+		rootPGres, err := cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
 		testutil.NilError(t, err)
 
-		rootPG.Parent.Kind = types.ObjectKindProjectGroup
-		rootPG.Name = "rootpg"
+		rootPGres.ProjectGroup.Parent.Kind = types.ObjectKindProjectGroup
+		rootPGres.ProjectGroup.Name = "rootpg"
 
 		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("changing project group parent kind isn't supported"))
-		_, err = cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name), &action.CreateUpdateProjectGroupRequest{Name: rootPG.Name, Parent: rootPG.Parent, Visibility: rootPG.Visibility})
+		_, err = cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name), &action.CreateUpdateProjectGroupRequest{Name: rootPGres.ProjectGroup.Name, Parent: rootPGres.ProjectGroup.Parent, Visibility: rootPGres.ProjectGroup.Visibility})
 		assert.Error(t, err, expectedErr.Error())
 	})
 	t.Run("change root project group parent id", func(t *testing.T) {
-		var rootPG *types.ProjectGroup
-		rootPG, err := cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
+		rootPGres, err := cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
 		testutil.NilError(t, err)
 
-		rootPG.Parent.ID = path.Join("user", user.Name, "pg01")
+		rootPGres.ProjectGroup.Parent.ID = path.Join("user", user.Name, "pg01")
 
 		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("cannot change root project group parent kind or id"))
-		_, err = cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name), &action.CreateUpdateProjectGroupRequest{Name: rootPG.Name, Parent: rootPG.Parent, Visibility: rootPG.Visibility})
+		_, err = cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name), &action.CreateUpdateProjectGroupRequest{Name: rootPGres.ProjectGroup.Name, Parent: rootPGres.ProjectGroup.Parent, Visibility: rootPGres.ProjectGroup.Visibility})
 		assert.Error(t, err, expectedErr.Error())
 	})
 	t.Run("change root project group name", func(t *testing.T) {
-		var rootPG *types.ProjectGroup
-		rootPG, err := cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
+		rootPGres, err := cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
 		testutil.NilError(t, err)
 
-		rootPG.Name = "rootpgnewname"
+		rootPGres.ProjectGroup.Name = "rootpgnewname"
 
 		expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("project group name for root project group must be empty"))
-		_, err = cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name), &action.CreateUpdateProjectGroupRequest{Name: rootPG.Name, Parent: rootPG.Parent, Visibility: rootPG.Visibility})
+		_, err = cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name), &action.CreateUpdateProjectGroupRequest{Name: rootPGres.ProjectGroup.Name, Parent: rootPGres.ProjectGroup.Parent, Visibility: rootPGres.ProjectGroup.Visibility})
 		assert.Error(t, err, expectedErr.Error())
 	})
 	t.Run("change root project group visibility", func(t *testing.T) {
-		var rootPG *types.ProjectGroup
-		rootPG, err := cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
+		rootPGres, err := cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
 		testutil.NilError(t, err)
 
-		rootPG.Visibility = types.VisibilityPrivate
+		rootPGres.ProjectGroup.Visibility = types.VisibilityPrivate
 
-		_, err = cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name), &action.CreateUpdateProjectGroupRequest{Name: rootPG.Name, Parent: rootPG.Parent, Visibility: rootPG.Visibility})
+		_, err = cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name), &action.CreateUpdateProjectGroupRequest{Name: rootPGres.ProjectGroup.Name, Parent: rootPGres.ProjectGroup.Parent, Visibility: rootPGres.ProjectGroup.Visibility})
 		testutil.NilError(t, err)
 
-		rootPG, err = cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
+		rootPGres, err = cs.ah.GetProjectGroup(ctx, path.Join("user", user.Name))
 		testutil.NilError(t, err)
 
-		assert.Equal(t, rootPG.Visibility, types.VisibilityPrivate)
+		assert.Equal(t, rootPGres.ProjectGroup.Visibility, types.VisibilityPrivate)
 	})
 }
 
@@ -703,11 +699,11 @@ func TestProjectGroupDelete(t *testing.T) {
 	testutil.NilError(t, err)
 
 	// create a projectgroup in org root project group
-	pg01, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
+	pg01res, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
 	testutil.NilError(t, err)
 
 	// create a child projectgroup in org root project group
-	_, err = cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "subprojectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: pg01.ID}, Visibility: types.VisibilityPublic})
+	_, err = cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "subprojectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: pg01res.ProjectGroup.ID}, Visibility: types.VisibilityPublic})
 	testutil.NilError(t, err)
 
 	t.Run("delete root project group", func(t *testing.T) {
@@ -717,7 +713,7 @@ func TestProjectGroupDelete(t *testing.T) {
 	})
 
 	t.Run("delete project group", func(t *testing.T) {
-		err := cs.ah.DeleteProjectGroup(ctx, pg01.ID)
+		err := cs.ah.DeleteProjectGroup(ctx, pg01res.ProjectGroup.ID)
 		testutil.NilError(t, err)
 	})
 }
@@ -740,76 +736,76 @@ func TestProjectGroupDeleteDontSeeOldChildObjects(t *testing.T) {
 	testutil.NilError(t, err)
 
 	// create a projectgroup in org root project group
-	pg01, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
+	pg01res, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
 	testutil.NilError(t, err)
 
 	// create a child projectgroup in org root project group
-	spg01, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "subprojectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: pg01.ID}, Visibility: types.VisibilityPublic})
+	spg01res, err := cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "subprojectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: pg01res.ProjectGroup.ID}, Visibility: types.VisibilityPublic})
 	testutil.NilError(t, err)
 
 	// create a project inside child projectgroup
-	project, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: spg01.ID}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+	projectRes, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: spg01res.ProjectGroup.ID}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 	testutil.NilError(t, err)
 
 	// create project secret
-	_, err = cs.ah.CreateSecret(ctx, &action.CreateUpdateSecretRequest{Name: "secret01", Parent: types.Parent{Kind: types.ObjectKindProject, ID: project.ID}, Type: types.SecretTypeInternal, Data: map[string]string{"secret01": "secretvar01"}})
+	_, err = cs.ah.CreateSecret(ctx, &action.CreateUpdateSecretRequest{Name: "secret01", Parent: types.Parent{Kind: types.ObjectKindProject, ID: projectRes.Project.ID}, Type: types.SecretTypeInternal, Data: map[string]string{"secret01": "secretvar01"}})
 	testutil.NilError(t, err)
 
 	// create project variable
-	_, err = cs.ah.CreateVariable(ctx, &action.CreateUpdateVariableRequest{Name: "variable01", Parent: types.Parent{Kind: types.ObjectKindProject, ID: project.ID}, Values: []types.VariableValue{{SecretName: "secret01", SecretVar: "secretvar01"}}})
+	_, err = cs.ah.CreateVariable(ctx, &action.CreateUpdateVariableRequest{Name: "variable01", Parent: types.Parent{Kind: types.ObjectKindProject, ID: projectRes.Project.ID}, Values: []types.VariableValue{{SecretName: "secret01", SecretVar: "secretvar01"}}})
 	testutil.NilError(t, err)
 
 	// delete projectgroup
-	err = cs.ah.DeleteProjectGroup(ctx, pg01.ID)
+	err = cs.ah.DeleteProjectGroup(ctx, pg01res.ProjectGroup.ID)
 	testutil.NilError(t, err)
 
 	// recreate the same hierarchj using the paths
-	pg01, err = cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
+	pg01res, err = cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "projectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic})
 	testutil.NilError(t, err)
 
-	spg01, err = cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "subprojectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name, pg01.Name)}, Visibility: types.VisibilityPublic})
+	spg01res, err = cs.ah.CreateProjectGroup(ctx, &action.CreateUpdateProjectGroupRequest{Name: "subprojectgroup01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name, pg01res.ProjectGroup.Name)}, Visibility: types.VisibilityPublic})
 	testutil.NilError(t, err)
 
-	project, err = cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name, pg01.Name, spg01.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+	projectRes, err = cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: "project01", Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name, pg01res.ProjectGroup.Name, spg01res.ProjectGroup.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 	testutil.NilError(t, err)
 
-	secret, err := cs.ah.CreateSecret(ctx, &action.CreateUpdateSecretRequest{Name: "secret01", Parent: types.Parent{Kind: types.ObjectKindProject, ID: path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name)}, Type: types.SecretTypeInternal, Data: map[string]string{"secret01": "secretvar01"}})
+	secret, err := cs.ah.CreateSecret(ctx, &action.CreateUpdateSecretRequest{Name: "secret01", Parent: types.Parent{Kind: types.ObjectKindProject, ID: path.Join("org", org.Name, pg01res.ProjectGroup.Name, spg01res.ProjectGroup.Name, projectRes.Project.Name)}, Type: types.SecretTypeInternal, Data: map[string]string{"secret01": "secretvar01"}})
 	testutil.NilError(t, err)
 
-	variable, err := cs.ah.CreateVariable(ctx, &action.CreateUpdateVariableRequest{Name: "variable01", Parent: types.Parent{Kind: types.ObjectKindProject, ID: path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name)}, Values: []types.VariableValue{{SecretName: "secret01", SecretVar: "secretvar01"}}})
+	variable, err := cs.ah.CreateVariable(ctx, &action.CreateUpdateVariableRequest{Name: "variable01", Parent: types.Parent{Kind: types.ObjectKindProject, ID: path.Join("org", org.Name, pg01res.ProjectGroup.Name, spg01res.ProjectGroup.Name, projectRes.Project.Name)}, Values: []types.VariableValue{{SecretName: "secret01", SecretVar: "secretvar01"}}})
 	testutil.NilError(t, err)
 
 	// Get by projectgroup id
-	projects, err := cs.ah.GetProjectGroupProjects(ctx, spg01.ID)
+	projectsRes, err := cs.ah.GetProjectGroupProjects(ctx, spg01res.ProjectGroup.ID)
 	testutil.NilError(t, err)
 
-	assert.Assert(t, cmpDiffObject(projects, []*types.Project{project}))
+	assert.Assert(t, cmpDiffObject(projectsRes.Projects, []*types.Project{projectRes.Project}))
 
 	// Get by projectgroup path
-	projects, err = cs.ah.GetProjectGroupProjects(ctx, path.Join("org", org.Name, pg01.Name, spg01.Name))
+	projectsRes, err = cs.ah.GetProjectGroupProjects(ctx, path.Join("org", org.Name, pg01res.ProjectGroup.Name, spg01res.ProjectGroup.Name))
 	testutil.NilError(t, err)
 
-	assert.Assert(t, cmpDiffObject(projects, []*types.Project{project}))
+	assert.Assert(t, cmpDiffObject(projectsRes.Projects, []*types.Project{projectRes.Project}))
 
-	secrets, err := cs.ah.GetSecrets(ctx, types.ObjectKindProject, project.ID, false)
+	secretsRes, err := cs.ah.GetSecrets(ctx, types.ObjectKindProject, projectRes.Project.ID, false)
 	testutil.NilError(t, err)
 
-	assert.Assert(t, cmpDiffObject(secrets, []*types.Secret{secret}))
+	assert.Assert(t, cmpDiffObject(secretsRes.Secrets, []*types.Secret{secret}))
 
-	secrets, err = cs.ah.GetSecrets(ctx, types.ObjectKindProject, path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name), false)
+	secretsRes, err = cs.ah.GetSecrets(ctx, types.ObjectKindProject, path.Join("org", org.Name, pg01res.ProjectGroup.Name, spg01res.ProjectGroup.Name, projectRes.Project.Name), false)
 	testutil.NilError(t, err)
 
-	assert.Assert(t, cmpDiffObject(secrets, []*types.Secret{secret}))
+	assert.Assert(t, cmpDiffObject(secretsRes.Secrets, []*types.Secret{secret}))
 
-	variables, err := cs.ah.GetVariables(ctx, types.ObjectKindProject, project.ID, false)
+	variablesRes, err := cs.ah.GetVariables(ctx, types.ObjectKindProject, projectRes.Project.ID, false)
 	testutil.NilError(t, err)
 
-	assert.Assert(t, cmpDiffObject(variables, []*types.Variable{variable}))
+	assert.Assert(t, cmpDiffObject(variablesRes.Variables, []*types.Variable{variable}))
 
-	variables, err = cs.ah.GetVariables(ctx, types.ObjectKindProject, path.Join("org", org.Name, pg01.Name, spg01.Name, project.Name), false)
+	variablesRes, err = cs.ah.GetVariables(ctx, types.ObjectKindProject, path.Join("org", org.Name, pg01res.ProjectGroup.Name, spg01res.ProjectGroup.Name, projectRes.Project.Name), false)
 	testutil.NilError(t, err)
 
-	assert.Assert(t, cmpDiffObject(variables, []*types.Variable{variable}))
+	assert.Assert(t, cmpDiffObject(variablesRes.Variables, []*types.Variable{variable}))
 }
 
 func TestOrgMembers(t *testing.T) {

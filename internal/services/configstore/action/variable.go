@@ -24,8 +24,14 @@ import (
 	"agola.io/agola/services/configstore/types"
 )
 
-func (h *ActionHandler) GetVariables(ctx context.Context, parentKind types.ObjectKind, parentRef string, tree bool) ([]*types.Variable, error) {
+type GetVariablesResponse struct {
+	Variables   []*types.Variable
+	ParentPaths map[string]string
+}
+
+func (h *ActionHandler) GetVariables(ctx context.Context, parentKind types.ObjectKind, parentRef string, tree bool) (*GetVariablesResponse, error) {
 	var variables []*types.Variable
+	parentPaths := map[string]string{}
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		parentID, err := h.ResolveObjectID(tx, parentKind, parentRef)
 		if err != nil {
@@ -36,13 +42,30 @@ func (h *ActionHandler) GetVariables(ctx context.Context, parentKind types.Objec
 		} else {
 			variables, err = h.d.GetVariables(tx, parentID)
 		}
-		return errors.WithStack(err)
+
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		// populate variables parent paths
+		for _, s := range variables {
+			pp, err := h.d.GetPath(tx, s.Parent.Kind, s.Parent.ID)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			parentPaths[s.ID] = pp
+		}
+
+		return nil
 	})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	return variables, nil
+	return &GetVariablesResponse{
+		Variables:   variables,
+		ParentPaths: parentPaths,
+	}, nil
 }
 
 func (h *ActionHandler) ValidateVariableReq(ctx context.Context, req *CreateUpdateVariableRequest) error {

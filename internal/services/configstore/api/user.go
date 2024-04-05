@@ -23,8 +23,6 @@ import (
 	"github.com/sorintlab/errors"
 
 	action "agola.io/agola/internal/services/configstore/action"
-	"agola.io/agola/internal/services/configstore/db"
-	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	"agola.io/agola/services/configstore/types"
@@ -32,11 +30,11 @@ import (
 
 type UserHandler struct {
 	log zerolog.Logger
-	d   *db.DB
+	ah  *action.ActionHandler
 }
 
-func NewUserHandler(log zerolog.Logger, d *db.DB) *UserHandler {
-	return &UserHandler{log: log, d: d}
+func NewUserHandler(log zerolog.Logger, ah *action.ActionHandler) *UserHandler {
+	return &UserHandler{log: log, ah: ah}
 }
 
 func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -44,20 +42,9 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userRef := vars["userref"]
 
-	var user *types.User
-	err := h.d.Do(ctx, func(tx *sql.Tx) error {
-		var err error
-		user, err = h.d.GetUser(tx, userRef)
-		return errors.WithStack(err)
-	})
-	if err != nil {
+	user, err := h.ah.GetUser(ctx, userRef)
+	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
-		util.HTTPError(w, err)
-		return
-	}
-
-	if user == nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("user %q doesn't exist", userRef)))
 		return
 	}
 
@@ -175,12 +162,11 @@ func (h *DeleteUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 type UsersHandler struct {
 	log zerolog.Logger
-	d   *db.DB
 	ah  *action.ActionHandler
 }
 
-func NewUsersHandler(log zerolog.Logger, d *db.DB, ah *action.ActionHandler) *UsersHandler {
-	return &UsersHandler{log: log, d: d, ah: ah}
+func NewUsersHandler(log zerolog.Logger, ah *action.ActionHandler) *UsersHandler {
+	return &UsersHandler{log: log, ah: ah}
 }
 
 func (h *UsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -209,81 +195,35 @@ func (h *UsersHandler) do(w http.ResponseWriter, r *http.Request) ([]*types.User
 	// handle special queries, like get user by token
 	queryType := query.Get("query_type")
 
-	var users []*types.User
-	switch queryType {
-	case "bytoken":
-		err = h.d.Do(ctx, func(tx *sql.Tx) error {
-			token := query.Get("token")
-			user, err := h.d.GetUserByTokenValue(tx, token)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-			if user == nil {
-				return util.NewAPIError(util.ErrNotExist, errors.Errorf("user with required token doesn't exist"))
-			}
-			users = []*types.User{user}
-			return nil
-		})
+	if queryType != "" {
+		req := &action.UserQueryRequest{
+			QueryType: queryType,
+
+			Token: query.Get("token"),
+
+			LinkedAccountID: query.Get("linkedaccountid"),
+
+			RemoteUserID:   query.Get("remoteuserid"),
+			RemoteSourceID: query.Get("remotesourceid"),
+		}
+
+		user, err := h.ah.UserQuery(ctx, req)
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
 
-	case "bylinkedaccount":
-		err = h.d.Do(ctx, func(tx *sql.Tx) error {
-			linkedAccountID := query.Get("linkedaccountid")
-			user, err := h.d.GetUserByLinkedAccount(tx, linkedAccountID)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-			if user == nil {
-				return util.NewAPIError(util.ErrNotExist, errors.Errorf("user with linked account %q token doesn't exist", linkedAccountID))
-			}
-			users = []*types.User{user}
-			return nil
-		})
-		if err != nil {
-			return nil, errors.WithStack(err)
-		}
-
-	case "byremoteuser":
-		err = h.d.Do(ctx, func(tx *sql.Tx) error {
-			remoteUserID := query.Get("remoteuserid")
-			remoteSourceID := query.Get("remotesourceid")
-			la, err := h.d.GetLinkedAccountByRemoteUserIDandSource(tx, remoteUserID, remoteSourceID)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-			if la == nil {
-				return util.NewAPIError(util.ErrNotExist, errors.Errorf("linked account with remote user %q for remote source %q token doesn't exist", remoteUserID, remoteSourceID))
-			}
-
-			user, err := h.d.GetUser(tx, la.UserID)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-			if user == nil {
-				return util.NewAPIError(util.ErrNotExist, errors.Errorf("user with remote user %q for remote source %q token doesn't exist", remoteUserID, remoteSourceID))
-			}
-			users = []*types.User{user}
-			return nil
-		})
-		if err != nil {
-			return nil, errors.WithStack(err)
-		}
-
-	default:
-		// default query
-		var err error
-
-		ares, err := h.ah.GetUsers(ctx, &action.GetUsersRequest{StartUserName: startUserName, Limit: ropts.Limit, SortDirection: ropts.SortDirection})
-		if err != nil {
-			return nil, errors.WithStack(err)
-		}
-
-		users = ares.Users
-
-		addHasMoreHeader(w, ares.HasMore)
+		return []*types.User{user}, nil
 	}
+
+	// default query
+	ares, err := h.ah.GetUsers(ctx, &action.GetUsersRequest{StartUserName: startUserName, Limit: ropts.Limit, SortDirection: ropts.SortDirection})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	users := ares.Users
+
+	addHasMoreHeader(w, ares.HasMore)
 
 	return users, nil
 }

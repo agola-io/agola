@@ -23,8 +23,6 @@ import (
 	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/configstore/action"
-	"agola.io/agola/internal/services/configstore/db"
-	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	"agola.io/agola/services/configstore/types"
@@ -32,11 +30,11 @@ import (
 
 type RemoteSourceHandler struct {
 	log zerolog.Logger
-	d   *db.DB
+	ah  *action.ActionHandler
 }
 
-func NewRemoteSourceHandler(log zerolog.Logger, d *db.DB) *RemoteSourceHandler {
-	return &RemoteSourceHandler{log: log, d: d}
+func NewRemoteSourceHandler(log zerolog.Logger, ah *action.ActionHandler) *RemoteSourceHandler {
+	return &RemoteSourceHandler{log: log, ah: ah}
 }
 
 func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -44,20 +42,9 @@ func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	vars := mux.Vars(r)
 	rsRef := vars["remotesourceref"]
 
-	var remoteSource *types.RemoteSource
-	err := h.d.Do(ctx, func(tx *sql.Tx) error {
-		var err error
-		remoteSource, err = h.d.GetRemoteSource(tx, rsRef)
-		return errors.WithStack(err)
-	})
-	if err != nil {
+	remoteSource, err := h.ah.GetRemoteSource(ctx, rsRef)
+	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
-		util.HTTPError(w, err)
-		return
-	}
-
-	if remoteSource == nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, errors.Errorf("remote source %q doesn't exist", rsRef)))
 		return
 	}
 
@@ -175,7 +162,9 @@ func (h *DeleteRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	err := h.ah.DeleteRemoteSource(ctx, rsRef)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
+		return
 	}
+
 	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
 		h.log.Err(err).Send()
 	}
@@ -225,11 +214,11 @@ func (h *RemoteSourcesHandler) do(w http.ResponseWriter, r *http.Request) ([]*ty
 
 type LinkedAccountsHandler struct {
 	log zerolog.Logger
-	d   *db.DB
+	ah  *action.ActionHandler
 }
 
-func NewLinkedAccountsHandler(log zerolog.Logger, d *db.DB) *LinkedAccountsHandler {
-	return &LinkedAccountsHandler{log: log, d: d}
+func NewLinkedAccountsHandler(log zerolog.Logger, ah *action.ActionHandler) *LinkedAccountsHandler {
+	return &LinkedAccountsHandler{log: log, ah: ah}
 }
 
 func (h *LinkedAccountsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -238,30 +227,12 @@ func (h *LinkedAccountsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 	queryType := query.Get("query_type")
 
-	var linkedAccounts []*types.LinkedAccount
-	err := h.d.Do(ctx, func(tx *sql.Tx) error {
-		switch queryType {
-		case "byremoteuser":
-			remoteUserID := query.Get("remoteuserid")
-			remoteSourceID := query.Get("remotesourceid")
-			la, err := h.d.GetLinkedAccountByRemoteUserIDandSource(tx, remoteUserID, remoteSourceID)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-			if la == nil {
-				return util.NewAPIError(util.ErrNotExist, errors.Errorf("linked account with remote user %q for remote source %q token doesn't exist", remoteUserID, remoteSourceID))
-			}
+	remoteUserID := query.Get("remoteuserid")
+	remoteSourceID := query.Get("remotesourceid")
 
-			linkedAccounts = []*types.LinkedAccount{la}
-		default:
-			return errors.Errorf("unknown query_type: %q", queryType)
-		}
-
-		return nil
-	})
-	if err != nil {
+	linkedAccounts, err := h.ah.GetLinkedAccounts(ctx, &action.GetLinkedAccountsRequest{QueryType: queryType, RemoteUserID: remoteUserID, RemoteSourceID: remoteSourceID})
+	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
-		util.HTTPError(w, err)
 		return
 	}
 
