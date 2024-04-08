@@ -15,6 +15,7 @@
 package util
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -144,6 +145,29 @@ func (w *WrapperError) StackTrace() errors.StackTrace {
 	return w.stack.StackTrace()
 }
 
+type APIDetailedError struct {
+	Code    ErrorCode
+	Details any
+}
+
+func NewAPIDetailedError(code ErrorCode, options ...APIDetailedErrorOption) *APIDetailedError {
+	aerr := &APIDetailedError{Code: code}
+
+	for _, opt := range options {
+		opt(aerr)
+	}
+
+	return aerr
+}
+
+type APIDetailedErrorOption func(e *APIDetailedError)
+
+func WithAPIDetailedErrorDetails(details any) APIDetailedErrorOption {
+	return func(e *APIDetailedError) {
+		e.Details = details
+	}
+}
+
 type ErrorKind int
 type ErrorCode string
 
@@ -175,9 +199,8 @@ func (k ErrorKind) String() string {
 type APIError struct {
 	*WrapperError
 
-	Kind    ErrorKind
-	Code    ErrorCode
-	Message string
+	Kind           ErrorKind
+	DetailedErrors []*APIDetailedError
 
 	msg   string
 	depth int
@@ -213,11 +236,26 @@ func (e *APIError) message() string {
 		msg += ", "
 	}
 	msg += fmt.Sprintf("apiError (kind: %s", e.Kind)
-	if e.Code != "" {
-		msg += fmt.Sprintf(", code: %s", e.Code)
-	}
-	if e.Message != "" {
-		msg += fmt.Sprintf(", message: %s", e.Message)
+	uec := 0
+	for _, detailedError := range e.DetailedErrors {
+		if detailedError == nil {
+			continue
+		}
+		msg += fmt.Sprintf(", error[%d]: (", uec)
+		if detailedError.Code != "" {
+			msg += fmt.Sprintf("code: %s", detailedError.Code)
+		} else {
+			msg += "code: unknown"
+		}
+		if detailedError.Details != nil {
+			if out, err := json.Marshal(detailedError.Details); err != nil {
+				msg += ", details marshal error"
+			} else {
+				msg += fmt.Sprintf(", details: %s", out)
+			}
+		}
+		msg += ")"
+		uec++
 	}
 	msg += ")"
 
@@ -241,15 +279,9 @@ func WithAPIErrorCallerDepth(depth int) APIErrorOption {
 	}
 }
 
-func WithAPIErrorUserCode(code ErrorCode) APIErrorOption {
+func WithAPIErrorDetailedError(ue *APIDetailedError) APIErrorOption {
 	return func(e *APIError) {
-		e.Code = code
-	}
-}
-
-func WithAPIErrorUserMessage(message string) APIErrorOption {
-	return func(e *APIError) {
-		e.Message = message
+		e.DetailedErrors = append(e.DetailedErrors, ue)
 	}
 }
 
@@ -266,31 +298,62 @@ func APIErrorIs(err error, kind ErrorKind) bool {
 	return false
 }
 
+type RemoteDetailedError struct {
+	Code    ErrorCode
+	Details any
+}
+
 // RemoteError is an error received from a remote call. It's similar to
 // APIError but with another type so it can be distinguished and won't be
 // propagated to the api response.
 type RemoteError struct {
-	Kind    ErrorKind
-	Code    string
-	Message string
+	Kind           ErrorKind
+	DetailedErrors []*RemoteDetailedError
 }
 
-func NewRemoteError(kind ErrorKind, code string, message string) error {
-	return &RemoteError{Kind: kind, Code: code, Message: message}
+func NewRemoteError(kind ErrorKind, options ...RemoteErrorOption) error {
+	aerr := &RemoteError{Kind: kind}
+
+	for _, opt := range options {
+		opt(aerr)
+	}
+
+	return aerr
+}
+
+type RemoteErrorOption func(e *RemoteError)
+
+func WithRemoteErrorDetailedError(ue *RemoteDetailedError) RemoteErrorOption {
+	return func(e *RemoteError) {
+		e.DetailedErrors = append(e.DetailedErrors, ue)
+	}
 }
 
 func (e *RemoteError) Error() string {
-	code := e.Code
-	message := e.Message
-	errStr := fmt.Sprintf("remote error %s", e.Kind)
-	if code != "" {
-		errStr += fmt.Sprintf(" (code: %s)", code)
-	}
-	if message != "" {
-		errStr += fmt.Sprintf(" (message: %s)", message)
+	msg := fmt.Sprintf("remote error %s", e.Kind)
+	uec := 0
+	for _, detailedError := range e.DetailedErrors {
+		if detailedError == nil {
+			continue
+		}
+		msg += fmt.Sprintf(", error[%d]: (", uec)
+		if detailedError.Code != "" {
+			msg += fmt.Sprintf("code: %s", detailedError.Code)
+		} else {
+			msg += "code: unknown"
+		}
+		if detailedError.Details != nil {
+			if out, err := json.Marshal(detailedError.Details); err != nil {
+				msg += ", details marshal error"
+			} else {
+				msg += fmt.Sprintf(", details: %s", out)
+			}
+		}
+		msg += ")"
+		uec++
 	}
 
-	return errStr
+	return msg
 }
 
 func AsRemoteError(err error) (*RemoteError, bool) {
