@@ -71,7 +71,7 @@ func (e *Errors) Equal(e2 error) bool {
 //
 //	func NewCustomError(err error) error {
 //		return &CustomError{
-//			util.NewWrapperError(err, "connection error"),
+//			util.NewWrapperError(err, util.WithWrapperErrorMsg("connection error")),
 //		}
 //	}
 //
@@ -98,12 +98,32 @@ type WrapperError struct {
 	stack *errors.Stack
 }
 
-func NewWrapperError(err error, format string, args ...interface{}) *WrapperError {
-	return &WrapperError{
-		err: err,
-		msg: fmt.Sprintf(format, args...),
+func NewWrapperError(err error, options ...WrapperErrorOption) *WrapperError {
+	werr := &WrapperError{err: err}
+
+	for _, opt := range options {
+		opt(werr)
+	}
+
+	if werr.stack == nil {
 		// skip one frame by default if the error is used as in the example
-		stack: errors.Callers(1),
+		werr.stack = errors.Callers(1)
+	}
+
+	return werr
+}
+
+type WrapperErrorOption func(e *WrapperError)
+
+func WithWrapperErrorMsg(format string, args ...interface{}) WrapperErrorOption {
+	return func(e *WrapperError) {
+		e.msg = fmt.Sprintf(format, args...)
+	}
+}
+
+func WithWrapperErrorCallerDepth(depth int) WrapperErrorOption {
+	return func(e *WrapperError) {
+		e.stack = errors.Callers(depth + 1)
 	}
 }
 
@@ -176,7 +196,7 @@ func NewAPIError(kind ErrorKind, err error, options ...APIErrorOption) error {
 	}
 	msg += ")"
 
-	aerr.WrapperError = NewWrapperError(err, msg)
+	aerr.WrapperError = NewWrapperError(err, WithWrapperErrorMsg(msg))
 
 	return aerr
 }
