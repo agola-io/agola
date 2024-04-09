@@ -42,7 +42,7 @@ type ErrNotExist struct {
 
 func NewErrNotExist(err error, format string, args ...interface{}) error {
 	return &ErrNotExist{
-		util.NewWrapperError(err, format, args...),
+		util.NewWrapperError(err, util.WithWrapperErrorMsg(format, args...)),
 	}
 }
 

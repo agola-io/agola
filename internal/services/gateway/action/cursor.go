@@ -21,11 +21,11 @@ func MarshalCursor(c any) (string, error) {
 func UnmarshalCursor(cs string, c any) error {
 	cj, err := base64.StdEncoding.DecodeString(cs)
 	if err != nil {
-		return util.NewAPIError(util.ErrBadRequest, err)
+		return util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	if err := json.Unmarshal(cj, c); err != nil {
-		return util.NewAPIError(util.ErrBadRequest, err)
+		return util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	return nil

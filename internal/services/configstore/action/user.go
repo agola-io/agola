@@ -50,7 +50,7 @@ func (h *ActionHandler) UserQuery(ctx context.Context, req *UserQueryRequest) (*
 				return errors.WithStack(err)
 			}
 			if user == nil {
-				return util.NewAPIError(util.ErrNotExist, errors.Errorf("user with required token doesn't exist"))
+				return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("user with required token doesn't exist"))
 			}
 			return nil
 		})
@@ -66,7 +66,7 @@ func (h *ActionHandler) UserQuery(ctx context.Context, req *UserQueryRequest) (*
 				return errors.WithStack(err)
 			}
 			if user == nil {
-				return util.NewAPIError(util.ErrNotExist, errors.Errorf("user with linked account %q doesn't exist", req.LinkedAccountID))
+				return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("user with linked account %q doesn't exist", req.LinkedAccountID))
 			}
 			return nil
 		})
@@ -81,7 +81,7 @@ func (h *ActionHandler) UserQuery(ctx context.Context, req *UserQueryRequest) (*
 				return errors.WithStack(err)
 			}
 			if la == nil {
-				return util.NewAPIError(util.ErrNotExist, errors.Errorf("linked account with remote user %q for remote source %q doesn't exist", req.RemoteUserID, req.RemoteSourceID))
+				return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("linked account with remote user %q for remote source %q doesn't exist", req.RemoteUserID, req.RemoteSourceID))
 			}
 
 			user, err = h.d.GetUser(tx, la.UserID)
@@ -89,7 +89,7 @@ func (h *ActionHandler) UserQuery(ctx context.Context, req *UserQueryRequest) (*
 				return errors.WithStack(err)
 			}
 			if user == nil {
-				return util.NewAPIError(util.ErrNotExist, errors.Errorf("user with remote user %q for remote source %q doesn't exist", req.RemoteUserID, req.RemoteSourceID))
+				return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("user with remote user %q for remote source %q doesn't exist", req.RemoteUserID, req.RemoteSourceID))
 			}
 			return nil
 		})
@@ -116,7 +116,7 @@ func (h *ActionHandler) GetUser(ctx context.Context, userRef string) (*types.Use
 	}
 
 	if user == nil {
-		return nil, util.NewAPIError(util.ErrNotExist, errors.Errorf("user %q doesn't exist", userRef))
+		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("user %q doesn't exist", userRef))
 	}
 
 	return user, nil
@@ -176,10 +176,10 @@ type CreateUserRequest struct {
 
 func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) (*types.User, error) {
 	if req.UserName == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user name required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user name required"))
 	}
 	if !util.ValidateName(req.UserName) {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid user name %q", req.UserName))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid user name %q", req.UserName))
 	}
 
 	var user *types.User
@@ -192,7 +192,7 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 			return errors.WithStack(err)
 		}
 		if u != nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user with name %q already exists", u.Name))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user with name %q already exists", u.Name))
 		}
 
 		var rs *types.RemoteSource
@@ -202,14 +202,14 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 				return errors.WithStack(err)
 			}
 			if rs == nil {
-				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remote source %q doesn't exist", req.CreateUserLARequest.RemoteSourceName))
+				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remote source %q doesn't exist", req.CreateUserLARequest.RemoteSourceName))
 			}
 			la, err := h.d.GetLinkedAccountByRemoteUserIDandSource(tx, req.CreateUserLARequest.RemoteUserID, rs.ID)
 			if err != nil {
 				return errors.Wrapf(err, "failed to get linked account for remote user id %q and remote source %q", req.CreateUserLARequest.RemoteUserID, rs.ID)
 			}
 			if la != nil {
-				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("linked account for remote user id %q for remote source %q already exists", req.CreateUserLARequest.RemoteUserID, req.CreateUserLARequest.RemoteSourceName))
+				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("linked account for remote user id %q for remote source %q already exists", req.CreateUserLARequest.RemoteUserID, req.CreateUserLARequest.RemoteSourceName))
 			}
 		}
 
@@ -269,7 +269,7 @@ func (h *ActionHandler) DeleteUser(ctx context.Context, userRef string) error {
 			return errors.WithStack(err)
 		}
 		if user == nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", userRef))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user %q doesn't exist", userRef))
 		}
 
 		if err := h.d.DeleteOrgMembersByUserID(tx, user.ID); err != nil {
@@ -318,7 +318,7 @@ func (h *ActionHandler) UpdateUser(ctx context.Context, req *UpdateUserRequest) 
 			return errors.WithStack(err)
 		}
 		if user == nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", req.UserRef))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user %q doesn't exist", req.UserRef))
 		}
 
 		if req.UserName != "" {
@@ -328,7 +328,7 @@ func (h *ActionHandler) UpdateUser(ctx context.Context, req *UpdateUserRequest) 
 				return errors.WithStack(err)
 			}
 			if u != nil {
-				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user with name %q already exists", u.Name))
+				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user with name %q already exists", u.Name))
 			}
 
 			user.Name = req.UserName
@@ -349,7 +349,7 @@ func (h *ActionHandler) UpdateUser(ctx context.Context, req *UpdateUserRequest) 
 
 func (h *ActionHandler) GetUserLinkedAccounts(ctx context.Context, userRef string) ([]*types.LinkedAccount, error) {
 	if userRef == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user ref required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user ref required"))
 	}
 
 	var linkedAccounts []*types.LinkedAccount
@@ -359,7 +359,7 @@ func (h *ActionHandler) GetUserLinkedAccounts(ctx context.Context, userRef strin
 			return errors.WithStack(err)
 		}
 		if user == nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", userRef))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user %q doesn't exist", userRef))
 		}
 
 		linkedAccounts, err = h.d.GetUserLinkedAccounts(tx, user.ID)
@@ -390,10 +390,10 @@ type CreateUserLARequest struct {
 
 func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLARequest) (*types.LinkedAccount, error) {
 	if req.UserRef == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user ref required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user ref required"))
 	}
 	if req.RemoteSourceName == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("remote source name required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remote source name required"))
 	}
 
 	var la *types.LinkedAccount
@@ -403,7 +403,7 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 			return errors.WithStack(err)
 		}
 		if user == nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", req.UserRef))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user %q doesn't exist", req.UserRef))
 		}
 
 		rs, err := h.d.GetRemoteSourceByName(tx, req.RemoteSourceName)
@@ -411,7 +411,7 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 			return errors.WithStack(err)
 		}
 		if rs == nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remote source %q doesn't exist", req.RemoteSourceName))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remote source %q doesn't exist", req.RemoteSourceName))
 		}
 
 		la, err = h.d.GetLinkedAccountByRemoteUserIDandSource(tx, req.RemoteUserID, rs.ID)
@@ -419,7 +419,7 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 			return errors.Wrapf(err, "failed to get linked account for remote user id %q and remote source %q", req.RemoteUserID, rs.ID)
 		}
 		if la != nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("linked account for remote user id %q for remote source %q already exists", req.RemoteUserID, req.RemoteSourceName))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("linked account for remote user id %q for remote source %q already exists", req.RemoteUserID, req.RemoteSourceName))
 		}
 
 		la = types.NewLinkedAccount(tx)
@@ -447,10 +447,10 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 
 func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) error {
 	if userRef == "" {
-		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user ref  required"))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user ref  required"))
 	}
 	if laID == "" {
-		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user linked account id required"))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user linked account id required"))
 	}
 
 	var user *types.User
@@ -462,7 +462,7 @@ func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) 
 			return errors.WithStack(err)
 		}
 		if user == nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", userRef))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user %q doesn't exist", userRef))
 		}
 
 		la, err := h.d.GetLinkedAccount(tx, laID)
@@ -470,12 +470,12 @@ func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) 
 			return errors.WithStack(err)
 		}
 		if la == nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("linked account id %q for user %q doesn't exist", laID, userRef))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("linked account id %q for user %q doesn't exist", laID, userRef))
 		}
 
 		// check that the linked account belongs to the right user
 		if user.ID != la.UserID {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("linked account id %q for user %q doesn't exist", laID, userRef))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("linked account id %q for user %q doesn't exist", laID, userRef))
 		}
 
 		if err := h.d.DeleteLinkedAccount(tx, la.ID); err != nil {
@@ -505,7 +505,7 @@ type UpdateUserLARequest struct {
 
 func (h *ActionHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLARequest) (*types.LinkedAccount, error) {
 	if req.UserRef == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user ref required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user ref required"))
 	}
 
 	var la *types.LinkedAccount
@@ -515,7 +515,7 @@ func (h *ActionHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLAReque
 			return errors.WithStack(err)
 		}
 		if user == nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", req.UserRef))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user %q doesn't exist", req.UserRef))
 		}
 
 		la, err = h.d.GetLinkedAccount(tx, req.LinkedAccountID)
@@ -523,12 +523,12 @@ func (h *ActionHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLAReque
 			return errors.WithStack(err)
 		}
 		if la == nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("linked account id %q for user %q doesn't exist", req.LinkedAccountID, req.UserRef))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("linked account id %q for user %q doesn't exist", req.LinkedAccountID, req.UserRef))
 		}
 
 		// check that the linked account belongs to the right user
 		if user.ID != la.UserID {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("linked account id %q for user %q doesn't exist", req.LinkedAccountID, req.UserRef))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("linked account id %q for user %q doesn't exist", req.LinkedAccountID, req.UserRef))
 		}
 
 		rs, err := h.d.GetRemoteSource(tx, la.RemoteSourceID)
@@ -536,7 +536,7 @@ func (h *ActionHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLAReque
 			return errors.WithStack(err)
 		}
 		if rs == nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remote source with id %q doesn't exist", la.RemoteSourceID))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remote source with id %q doesn't exist", la.RemoteSourceID))
 		}
 
 		la.RemoteUserID = req.RemoteUserID
@@ -561,7 +561,7 @@ func (h *ActionHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLAReque
 
 func (h *ActionHandler) GetUserTokens(ctx context.Context, userRef string) ([]*types.UserToken, error) {
 	if userRef == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user ref required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user ref required"))
 	}
 
 	var tokens []*types.UserToken
@@ -571,7 +571,7 @@ func (h *ActionHandler) GetUserTokens(ctx context.Context, userRef string) ([]*t
 			return errors.WithStack(err)
 		}
 		if user == nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", userRef))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user %q doesn't exist", userRef))
 		}
 
 		tokens, err = h.d.GetUserTokens(tx, user.ID)
@@ -590,10 +590,10 @@ func (h *ActionHandler) GetUserTokens(ctx context.Context, userRef string) ([]*t
 
 func (h *ActionHandler) CreateUserToken(ctx context.Context, userRef, tokenName string) (*types.UserToken, error) {
 	if userRef == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user ref required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user ref required"))
 	}
 	if tokenName == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("token name required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("token name required"))
 	}
 
 	var token *types.UserToken
@@ -603,7 +603,7 @@ func (h *ActionHandler) CreateUserToken(ctx context.Context, userRef, tokenName 
 			return errors.WithStack(err)
 		}
 		if user == nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", userRef))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user %q doesn't exist", userRef))
 		}
 
 		userToken, err := h.d.GetUserToken(tx, user.ID, tokenName)
@@ -612,7 +612,7 @@ func (h *ActionHandler) CreateUserToken(ctx context.Context, userRef, tokenName 
 		}
 
 		if userToken != nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("token %q for user %q already exists", tokenName, userRef))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("token %q for user %q already exists", tokenName, userRef))
 		}
 
 		token = types.NewUserToken(tx)
@@ -635,10 +635,10 @@ func (h *ActionHandler) CreateUserToken(ctx context.Context, userRef, tokenName 
 
 func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName string) error {
 	if userRef == "" {
-		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user ref required"))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user ref required"))
 	}
 	if tokenName == "" {
-		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("token name required"))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("token name required"))
 	}
 
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
@@ -647,7 +647,7 @@ func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName 
 			return errors.WithStack(err)
 		}
 		if user == nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", userRef))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user %q doesn't exist", userRef))
 		}
 
 		userToken, err := h.d.GetUserToken(tx, user.ID, tokenName)
@@ -656,7 +656,7 @@ func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName 
 		}
 
 		if userToken == nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("token %q for user %q doesn't exist", tokenName, userRef))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("token %q for user %q doesn't exist", tokenName, userRef))
 		}
 
 		if err := h.d.DeleteUserToken(tx, userToken.ID); err != nil {
@@ -694,14 +694,14 @@ func (h *ActionHandler) GetUserOrg(ctx context.Context, userRef, orgRef string) 
 			return errors.WithStack(err)
 		}
 		if user == nil {
-			return util.NewAPIError(util.ErrNotExist, errors.Errorf("user %q doesn't exist", userRef))
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("user %q doesn't exist", userRef))
 		}
 		org, err := h.d.GetOrg(tx, orgRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
 		if org == nil {
-			return util.NewAPIError(util.ErrNotExist, errors.Errorf("org %q doesn't exist", orgRef))
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("org %q doesn't exist", orgRef))
 		}
 
 		dbUserOrg, err = h.d.GetUserOrg(tx, user.ID, org.ID)
@@ -712,7 +712,7 @@ func (h *ActionHandler) GetUserOrg(ctx context.Context, userRef, orgRef string) 
 	}
 
 	if dbUserOrg == nil {
-		return nil, util.NewAPIError(util.ErrNotExist, errors.Errorf("user %q is not member of org %q", userRef, orgRef))
+		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("user %q is not member of org %q", userRef, orgRef))
 	}
 
 	userOrg := userOrgResponse(dbUserOrg)
@@ -751,7 +751,7 @@ func (h *ActionHandler) GetUserOrgs(ctx context.Context, req *GetUserOrgsRequest
 			return errors.WithStack(err)
 		}
 		if user == nil {
-			return util.NewAPIError(util.ErrNotExist, errors.Errorf("user %q doesn't exist", req.UserRef))
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("user %q doesn't exist", req.UserRef))
 		}
 
 		dbUserOrgs, err = h.d.GetUserOrgs(tx, user.ID, req.StartOrgName, limit, req.SortDirection)
@@ -788,7 +788,7 @@ func (h *ActionHandler) GetUserOrgInvitations(ctx context.Context, userRef strin
 			return errors.WithStack(err)
 		}
 		if user == nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("user %q doesn't exist", userRef))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user %q doesn't exist", userRef))
 		}
 
 		orgInvitations, err = h.d.GetOrgInvitationByUserID(tx, user.ID)

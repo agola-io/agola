@@ -42,14 +42,14 @@ type GetProjectRunWebhookDeliveriesResponse struct {
 func (h *ActionHandler) GetProjectRunWebhookDeliveries(ctx context.Context, req *GetProjectRunWebhookDeliveriesRequest) (*GetProjectRunWebhookDeliveriesResponse, error) {
 	project, _, err := h.configstoreClient.GetProject(ctx, req.ProjectRef)
 	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
+		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
 	}
 	isUserOwner, err := h.IsAuthUserProjectOwner(ctx, project.OwnerType, project.OwnerID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to determine permissions")
 	}
 	if !isUserOwner {
-		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
+		return nil, util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authorized"))
 	}
 
 	inCursor := &DeliveryCursor{}
@@ -68,7 +68,7 @@ func (h *ActionHandler) GetProjectRunWebhookDeliveries(ctx context.Context, req 
 
 	runWebhookDeliveries, resp, err := h.notificationClient.GetProjectRunWebhookDeliveries(ctx, project.ID, &client.GetProjectRunWebhookDeliveriesOptions{ListOptions: &client.ListOptions{Limit: req.Limit, SortDirection: nstypes.SortDirection(sortDirection)}, StartSequence: inCursor.StartSequence, DeliveryStatusFilter: deliveryStatusFilter})
 	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
+		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
 	}
 
 	var outCursor string
@@ -101,19 +101,19 @@ type ProjectRunWebhookRedeliveryRequest struct {
 func (h *ActionHandler) ProjectRunWebhookRedelivery(ctx context.Context, req *ProjectRunWebhookRedeliveryRequest) error {
 	project, _, err := h.configstoreClient.GetProject(ctx, req.ProjectRef)
 	if err != nil {
-		return util.NewAPIError(util.KindFromRemoteError(err), err)
+		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
 	}
 	isUserOwner, err := h.IsAuthUserProjectOwner(ctx, project.OwnerType, project.OwnerID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to determine permissions")
 	}
 	if !isUserOwner {
-		return util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
+		return util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authorized"))
 	}
 
 	_, err = h.notificationClient.RunWebhookRedelivery(ctx, project.ID, req.RunWebhookDeliveryID)
 	if err != nil {
-		return util.NewAPIError(util.KindFromRemoteError(err), err)
+		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
 	}
 
 	return nil

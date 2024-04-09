@@ -74,7 +74,7 @@ func (h *ProjectRunWebhookDeliveries) do(w http.ResponseWriter, r *http.Request)
 	deliveryStatusFilter := query["deliverystatus"]
 
 	if ropts.Cursor != "" && len(deliveryStatusFilter) > 0 {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("only one of cursor or deliverystatus should be provided"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("only one of cursor or deliverystatus should be provided"))
 	}
 
 	areq := &action.GetProjectRunWebhookDeliveriesRequest{

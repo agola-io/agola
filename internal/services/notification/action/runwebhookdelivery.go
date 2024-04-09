@@ -85,7 +85,7 @@ func (h *ActionHandler) RunWebhookRedelivery(ctx context.Context, projectID stri
 			return errors.WithStack(err)
 		}
 		if runWebhookDelivery == nil {
-			return util.NewAPIError(util.ErrNotExist, errors.Errorf("runWebhookDelivery %q doesn't exist", runWebhookDeliveryID))
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("runWebhookDelivery %q doesn't exist", runWebhookDeliveryID))
 		}
 
 		runWebhook, err := h.d.GetRunWebhookByID(tx, runWebhookDelivery.RunWebhookID)
@@ -93,10 +93,10 @@ func (h *ActionHandler) RunWebhookRedelivery(ctx context.Context, projectID stri
 			return errors.WithStack(err)
 		}
 		if runWebhook == nil {
-			return util.NewAPIError(util.ErrNotExist, errors.Errorf("runWebhook %q doesn't exist", runWebhookDelivery.RunWebhookID))
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("runWebhook %q doesn't exist", runWebhookDelivery.RunWebhookID))
 		}
 		if runWebhook.ProjectID != projectID {
-			return util.NewAPIError(util.ErrNotExist, errors.Errorf("runWebhookDelivery %q doesn't belong to project %q", runWebhookDeliveryID, projectID))
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("runWebhookDelivery %q doesn't belong to project %q", runWebhookDeliveryID, projectID))
 		}
 
 		runWebhookDeliveries, err := h.d.GetRunWebhookDeliveriesByRunWebhookID(tx, runWebhookDelivery.RunWebhookID, []types.DeliveryStatus{types.DeliveryStatusNotDelivered}, 1, types.SortDirectionDesc)
@@ -105,7 +105,7 @@ func (h *ActionHandler) RunWebhookRedelivery(ctx context.Context, projectID stri
 		}
 		// check if runWebhook has delivery not delivered
 		if len(runWebhookDeliveries) != 0 {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("the previous delivery of run webhook %q hasn't already been delivered", runWebhookDelivery.RunWebhookID))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("the previous delivery of run webhook %q hasn't already been delivered", runWebhookDelivery.RunWebhookID))
 		}
 
 		newRunWebhookDelivery := types.NewRunWebhookDelivery(tx)

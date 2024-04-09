@@ -39,32 +39,32 @@ type MaintenanceStatusResponse struct {
 
 func (h *ActionHandler) IsMaintenanceEnabled(ctx context.Context, serviceName string) (*MaintenanceStatusResponse, error) {
 	if !common.IsUserAdmin(ctx) {
-		return nil, util.NewAPIError(util.ErrUnauthorized, errors.Errorf("user not admin"))
+		return nil, util.NewAPIError(util.ErrUnauthorized, util.WithAPIErrorMsg("user not admin"))
 	}
 
 	switch serviceName {
 	case ConfigstoreService:
 		csresp, _, err := h.configstoreClient.GetMaintenanceStatus(ctx)
 		if err != nil {
-			return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
+			return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
 		}
 
 		return &MaintenanceStatusResponse{RequestedStatus: csresp.RequestedStatus, CurrentStatus: csresp.CurrentStatus}, nil
 	case RunserviceService:
 		rsresp, _, err := h.runserviceClient.GetMaintenanceStatus(ctx)
 		if err != nil {
-			return nil, util.NewAPIError(util.KindFromRemoteError(err), err)
+			return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
 		}
 
 		return &MaintenanceStatusResponse{RequestedStatus: rsresp.RequestedStatus, CurrentStatus: rsresp.CurrentStatus}, nil
 	default:
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid service name %q", serviceName))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid service name %q", serviceName))
 	}
 }
 
 func (h *ActionHandler) MaintenanceMode(ctx context.Context, serviceName string, enable bool) error {
 	if !common.IsUserAdmin(ctx) {
-		return util.NewAPIError(util.ErrUnauthorized, errors.Errorf("user not admin"))
+		return util.NewAPIError(util.ErrUnauthorized, util.WithAPIErrorMsg("user not admin"))
 	}
 
 	var err error
@@ -82,18 +82,18 @@ func (h *ActionHandler) MaintenanceMode(ctx context.Context, serviceName string,
 			_, err = h.runserviceClient.DisableMaintenance(ctx)
 		}
 	default:
-		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid service name %q", serviceName))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid service name %q", serviceName))
 	}
 
 	if err != nil {
-		return util.NewAPIError(util.KindFromRemoteError(err), err)
+		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
 	}
 	return nil
 }
 
 func (h *ActionHandler) Export(ctx context.Context, serviceName string) (*http.Response, error) {
 	if !common.IsUserAdmin(ctx) {
-		return nil, util.NewAPIError(util.ErrUnauthorized, errors.Errorf("user not admin"))
+		return nil, util.NewAPIError(util.ErrUnauthorized, util.WithAPIErrorMsg("user not admin"))
 	}
 
 	var err error
@@ -108,7 +108,7 @@ func (h *ActionHandler) Export(ctx context.Context, serviceName string) (*http.R
 		resp, err = h.runserviceClient.Export(ctx)
 		res = resp.Response
 	default:
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid service name %q", serviceName))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid service name %q", serviceName))
 	}
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -119,7 +119,7 @@ func (h *ActionHandler) Export(ctx context.Context, serviceName string) (*http.R
 
 func (h *ActionHandler) Import(ctx context.Context, r io.Reader, serviceName string) error {
 	if !common.IsUserAdmin(ctx) {
-		return util.NewAPIError(util.ErrUnauthorized, errors.Errorf("user not admin"))
+		return util.NewAPIError(util.ErrUnauthorized, util.WithAPIErrorMsg("user not admin"))
 	}
 
 	var err error
@@ -129,7 +129,7 @@ func (h *ActionHandler) Import(ctx context.Context, r io.Reader, serviceName str
 	case RunserviceService:
 		_, err = h.runserviceClient.Import(ctx, r)
 	default:
-		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid service name %q", serviceName))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid service name %q", serviceName))
 	}
 	if err != nil {
 		return errors.WithStack(err)

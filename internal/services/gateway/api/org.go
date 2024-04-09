@@ -47,7 +47,7 @@ func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var req gwapitypes.CreateOrgRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 
@@ -86,7 +86,7 @@ func (h *UpdateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var req gwapitypes.UpdateOrgRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 
@@ -300,7 +300,7 @@ func (h *AddOrgMemberHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	var req gwapitypes.AddOrgMemberRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 
@@ -360,7 +360,7 @@ func (h *CreateOrgInvitationHandler) ServeHTTP(w http.ResponseWriter, r *http.Re
 	var req gwapitypes.CreateOrgInvitationRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 
@@ -404,12 +404,12 @@ func (h *OrgInvitationsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		var err error
 		limit, err = strconv.Atoi(limitS)
 		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "cannot parse limit")))
+			util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse limit")))
 			return
 		}
 	}
 	if limit < 0 {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("limit must be greater or equal than 0")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("limit must be greater or equal than 0")))
 		return
 	}
 	if limit > MaxOrgInvitationsLimit {
@@ -471,7 +471,7 @@ func (h *UserOrgInvitationActionHandler) ServeHTTP(w http.ResponseWriter, r *htt
 	var req gwapitypes.OrgInvitationActionRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 

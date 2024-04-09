@@ -45,7 +45,7 @@ func (h *ActionHandler) GetProject(ctx context.Context, projectRef string) (*csa
 		return nil, errors.Wrapf(err, "failed to determine ownership")
 	}
 	if !isMember {
-		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
+		return nil, util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authorized"))
 	}
 
 	return project, nil
@@ -67,7 +67,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 
 	user, _, err := h.configstoreClient.GetUser(ctx, curUserID)
 	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q", curUserID))
+		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get user %q", curUserID))
 	}
 	parentRef := req.ParentRef
 	if parentRef == "" {
@@ -77,7 +77,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 
 	pg, _, err := h.configstoreClient.GetProjectGroup(ctx, parentRef)
 	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get project group %q", parentRef))
+		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get project group %q", parentRef))
 	}
 
 	isProjectOwner, err := h.IsAuthUserProjectOwner(ctx, pg.OwnerType, pg.OwnerID)
@@ -85,26 +85,26 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 		return nil, errors.Wrapf(err, "failed to determine ownership")
 	}
 	if !isProjectOwner {
-		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
+		return nil, util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authorized"))
 	}
 
 	if !util.ValidateName(req.Name) {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid project name %q", req.Name))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid project name %q", req.Name))
 	}
 	if req.RemoteSourceName == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("empty remote source name"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("empty remote source name"))
 	}
 	if req.RepoPath == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("empty remote repo path"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("empty remote repo path"))
 	}
 
 	projectPath := path.Join(pg.Path, req.Name)
 	if _, _, err = h.configstoreClient.GetProject(ctx, projectPath); err != nil {
 		if !util.RemoteErrorIs(err, util.ErrNotExist) {
-			return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get project %q", req.Name))
+			return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get project %q", req.Name))
 		}
 	} else {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("project %q already exists", projectPath))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project %q already exists", projectPath))
 	}
 
 	gitSource, rs, la, err := h.GetUserGitSource(ctx, req.RemoteSourceName, curUserID)
@@ -145,7 +145,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 	h.log.Info().Msgf("creating project")
 	rp, _, err := h.configstoreClient.CreateProject(ctx, creq)
 	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to create project"))
+		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to create project"))
 	}
 	h.log.Info().Msgf("project %s created, ID: %s", rp.Name, rp.ID)
 
@@ -180,7 +180,7 @@ type UpdateProjectRequest struct {
 func (h *ActionHandler) UpdateProject(ctx context.Context, projectRef string, req *UpdateProjectRequest) (*csapitypes.Project, error) {
 	p, _, err := h.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get project %q", projectRef))
+		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get project %q", projectRef))
 	}
 
 	isProjectOwner, err := h.IsAuthUserProjectOwner(ctx, p.OwnerType, p.OwnerID)
@@ -188,7 +188,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, projectRef string, re
 		return nil, errors.Wrapf(err, "failed to determine ownership")
 	}
 	if !isProjectOwner {
-		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
+		return nil, util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authorized"))
 	}
 
 	if req.Name != nil {
@@ -226,7 +226,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, projectRef string, re
 	h.log.Info().Msgf("updating project")
 	rp, _, err := h.configstoreClient.UpdateProject(ctx, p.ID, creq)
 	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to update project"))
+		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to update project"))
 	}
 	h.log.Info().Msgf("project %s updated, ID: %s", p.Name, p.ID)
 
@@ -238,7 +238,7 @@ func (h *ActionHandler) ProjectUpdateRepoLinkedAccount(ctx context.Context, proj
 
 	p, _, err := h.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get project %q", projectRef))
+		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get project %q", projectRef))
 	}
 
 	isProjectOwner, err := h.IsAuthUserProjectOwner(ctx, p.OwnerType, p.OwnerID)
@@ -246,7 +246,7 @@ func (h *ActionHandler) ProjectUpdateRepoLinkedAccount(ctx context.Context, proj
 		return nil, errors.Wrapf(err, "failed to determine ownership")
 	}
 	if !isProjectOwner {
-		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
+		return nil, util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authorized"))
 	}
 
 	gitsource, _, la, err := h.GetUserGitSource(ctx, p.RemoteSourceID, curUserID)
@@ -280,7 +280,7 @@ func (h *ActionHandler) ProjectUpdateRepoLinkedAccount(ctx context.Context, proj
 	h.log.Info().Msgf("updating project")
 	rp, _, err := h.configstoreClient.UpdateProject(ctx, p.ID, creq)
 	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to update project"))
+		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to update project"))
 	}
 	h.log.Info().Msgf("project %s updated, ID: %s", p.Name, p.ID)
 
@@ -367,7 +367,7 @@ func (h *ActionHandler) genWebhookURL(project *csapitypes.Project) (string, erro
 func (h *ActionHandler) ReconfigProject(ctx context.Context, projectRef string) error {
 	p, _, err := h.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
-		return util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get project %q", projectRef))
+		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get project %q", projectRef))
 	}
 
 	isProjectOwner, err := h.IsAuthUserProjectOwner(ctx, p.OwnerType, p.OwnerID)
@@ -375,7 +375,7 @@ func (h *ActionHandler) ReconfigProject(ctx context.Context, projectRef string) 
 		return errors.Wrapf(err, "failed to determine ownership")
 	}
 	if !isProjectOwner {
-		return util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
+		return util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authorized"))
 	}
 
 	user, rs, la, err := h.getRemoteRepoAccessData(ctx, p.LinkedAccountID)
@@ -391,7 +391,7 @@ func (h *ActionHandler) ReconfigProject(ctx context.Context, projectRef string) 
 func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) error {
 	p, _, err := h.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
-		return util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get project %q", projectRef))
+		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get project %q", projectRef))
 	}
 
 	isProjectOwner, err := h.IsAuthUserProjectOwner(ctx, p.OwnerType, p.OwnerID)
@@ -399,7 +399,7 @@ func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) er
 		return errors.Wrapf(err, "failed to determine ownership")
 	}
 	if !isProjectOwner {
-		return util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
+		return util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authorized"))
 	}
 
 	// get data needed for repo cleanup
@@ -413,7 +413,7 @@ func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) er
 
 	h.log.Info().Msgf("deleting project with ID: %q", p.ID)
 	if _, err = h.configstoreClient.DeleteProject(ctx, projectRef); err != nil {
-		return util.NewAPIError(util.KindFromRemoteError(err), err)
+		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
 	}
 
 	// try to cleanup gitsource configs
@@ -433,7 +433,7 @@ func (h *ActionHandler) ProjectCreateRun(ctx context.Context, projectRef, branch
 
 	p, _, err := h.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
-		return util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get project %q", projectRef))
+		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get project %q", projectRef))
 	}
 
 	isProjectOwner, err := h.IsAuthUserProjectOwner(ctx, p.OwnerType, p.OwnerID)
@@ -441,7 +441,7 @@ func (h *ActionHandler) ProjectCreateRun(ctx context.Context, projectRef, branch
 		return errors.Wrapf(err, "failed to determine ownership")
 	}
 	if !isProjectOwner {
-		return util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
+		return util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authorized"))
 	}
 
 	gitSource, rs, _, err := h.GetUserGitSource(ctx, p.RemoteSourceID, curUserID)
@@ -466,10 +466,10 @@ func (h *ActionHandler) ProjectCreateRun(ctx context.Context, projectRef, branch
 		set++
 	}
 	if set == 0 {
-		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("one of branch, tag or ref is required"))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("one of branch, tag or ref is required"))
 	}
 	if set > 1 {
-		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("only one of branch, tag or ref can be provided"))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("only one of branch, tag or ref can be provided"))
 	}
 
 	var refType types.RunRefType
@@ -488,7 +488,7 @@ func (h *ActionHandler) ProjectCreateRun(ctx context.Context, projectRef, branch
 
 	gitRefType, name, err := gitSource.RefType(refName)
 	if err != nil {
-		return util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "failed to get refType for ref %q", refName))
+		return util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("failed to get refType for ref %q", refName))
 	}
 	ref, err := gitSource.GetRef(p.RepositoryPath, refName)
 	if err != nil {
@@ -569,12 +569,12 @@ func (h *ActionHandler) ProjectCreateRun(ctx context.Context, projectRef, branch
 func (h *ActionHandler) getRemoteRepoAccessData(ctx context.Context, linkedAccountID string) (*cstypes.User, *cstypes.RemoteSource, *cstypes.LinkedAccount, error) {
 	user, _, err := h.configstoreClient.GetUserByLinkedAccount(ctx, linkedAccountID)
 	if err != nil {
-		return nil, nil, nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user with linked account id %q", linkedAccountID))
+		return nil, nil, nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get user with linked account id %q", linkedAccountID))
 	}
 
 	linkedAccounts, _, err := h.configstoreClient.GetUserLinkedAccounts(ctx, user.ID)
 	if err != nil {
-		return nil, nil, nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get user %q linked accounts", user.ID))
+		return nil, nil, nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get user %q linked accounts", user.ID))
 	}
 
 	var la *cstypes.LinkedAccount
@@ -591,7 +591,7 @@ func (h *ActionHandler) getRemoteRepoAccessData(ctx context.Context, linkedAccou
 
 	rs, _, err := h.configstoreClient.GetRemoteSource(ctx, la.RemoteSourceID)
 	if err != nil {
-		return nil, nil, nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get remote source %q", la.RemoteSourceID))
+		return nil, nil, nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get remote source %q", la.RemoteSourceID))
 	}
 
 	return user, rs, la, nil
@@ -600,7 +600,7 @@ func (h *ActionHandler) getRemoteRepoAccessData(ctx context.Context, linkedAccou
 func (h *ActionHandler) RefreshRemoteRepositoryInfo(ctx context.Context, projectRef string) (*csapitypes.Project, error) {
 	p, err := h.GetProject(ctx, projectRef)
 	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get project %q", projectRef))
+		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get project %q", projectRef))
 	}
 
 	isProjectOwner, err := h.IsAuthUserProjectOwner(ctx, p.OwnerType, p.OwnerID)
@@ -608,12 +608,12 @@ func (h *ActionHandler) RefreshRemoteRepositoryInfo(ctx context.Context, project
 		return nil, errors.Wrapf(err, "failed to determine ownership")
 	}
 	if !isProjectOwner {
-		return nil, util.NewAPIError(util.ErrForbidden, errors.Errorf("user not authorized"))
+		return nil, util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authorized"))
 	}
 
 	gitSource, _, _, err := h.GetUserGitSource(ctx, p.RemoteSourceID, common.CurrentUserID(ctx))
 	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to get remote source %q", p.RemoteSourceID))
+		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get remote source %q", p.RemoteSourceID))
 	}
 
 	repoInfo, err := gitSource.GetRepoInfo(p.RepositoryPath)
@@ -639,7 +639,7 @@ func (h *ActionHandler) RefreshRemoteRepositoryInfo(ctx context.Context, project
 	h.log.Info().Msgf("updating project")
 	rp, _, err := h.configstoreClient.UpdateProject(ctx, p.ID, creq)
 	if err != nil {
-		return nil, util.NewAPIError(util.KindFromRemoteError(err), errors.Wrapf(err, "failed to update project"))
+		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to update project"))
 	}
 	h.log.Info().Msgf("project %s updated, ID: %s", p.Name, p.ID)
 

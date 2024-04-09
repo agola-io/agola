@@ -68,7 +68,7 @@ func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var req *csapitypes.CreateOrgRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 
@@ -106,7 +106,7 @@ func (h *UpdateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var req *csapitypes.UpdateOrgRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 
@@ -187,7 +187,7 @@ func (h *OrgsHandler) do(w http.ResponseWriter, r *http.Request) ([]*types.Organ
 	if ok {
 		for _, vs := range visibilitiesStr {
 			if !types.IsValidVisibility(types.Visibility(vs)) {
-				return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid visibility"))
+				return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid visibility"))
 			}
 			visibilities = append(visibilities, types.Visibility(vs))
 		}
@@ -222,7 +222,7 @@ func (h *AddOrgMemberHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	var req *csapitypes.AddOrgMemberRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 

@@ -42,7 +42,7 @@ func (h *OAuth2CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	cresp, err := h.ah.HandleOauth2Callback(ctx, code, state)
 	if err != nil {
 		h.log.Err(err).Send()
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 

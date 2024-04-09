@@ -188,7 +188,7 @@ func (h *ActionHandler) UpdateChangeGroups(tx *sql.Tx, cgt *types.ChangeGroupsUp
 
 	curCgt := h.genChangeGroupsUpdateTokens(curChangeGroups)
 	if !reflect.DeepEqual(cgt, curCgt) {
-		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("concurrent update"))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("concurrent update"))
 	}
 
 	for _, curChangeGroup := range curChangeGroups {
@@ -350,13 +350,13 @@ func (h *ActionHandler) newRun(ctx context.Context, req *RunCreateRequest) (*typ
 	setupErrors := req.SetupErrors
 
 	if req.Group == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("run group is empty"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("run group is empty"))
 	}
 	if !path.IsAbs(req.Group) {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("run group %q must be an absolute path", req.Group))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("run group %q must be an absolute path", req.Group))
 	}
 	if req.RunConfigTasks == nil && len(setupErrors) == 0 {
-		return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("empty run config tasks and setup errors"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("empty run config tasks and setup errors"))
 	}
 
 	if err := runconfig.CheckRunConfigTasks(rcts); err != nil {
@@ -405,7 +405,7 @@ func (h *ActionHandler) recreateRun(ctx context.Context, req *RunCreateRequest) 
 			return errors.WithStack(err)
 		}
 		if run == nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("run %q doesn't exist", req.RunID))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("run %q doesn't exist", req.RunID))
 		}
 
 		rc, err = h.d.GetRunConfig(tx, run.RunConfigID)
@@ -413,7 +413,7 @@ func (h *ActionHandler) recreateRun(ctx context.Context, req *RunCreateRequest) 
 			return errors.WithStack(err)
 		}
 		if rc == nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("runconfig %q doesn't exist", run.RunConfigID))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("runconfig %q doesn't exist", run.RunConfigID))
 		}
 
 		return nil
@@ -427,11 +427,11 @@ func (h *ActionHandler) recreateRun(ctx context.Context, req *RunCreateRequest) 
 
 	if req.FromStart {
 		if canRestart, reason := run.CanRestartFromScratch(); !canRestart {
-			return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("run cannot be restarted: %s", reason))
+			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("run cannot be restarted: %s", reason))
 		}
 	} else {
 		if canRestart, reason := run.CanRestartFromFailedTasks(); !canRestart {
-			return nil, util.NewAPIError(util.ErrBadRequest, errors.Errorf("run cannot be restarted: %s", reason))
+			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("run cannot be restarted: %s", reason))
 		}
 	}
 
@@ -708,7 +708,7 @@ func (h *ActionHandler) RunTaskSetAnnotations(ctx context.Context, req *RunTaskS
 
 		task, ok := r.Tasks[req.TaskID]
 		if !ok {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("run %q doesn't have task %q", r.ID, req.TaskID))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("run %q doesn't have task %q", r.ID, req.TaskID))
 		}
 
 		task.Annotations = req.Annotations
@@ -754,15 +754,15 @@ func (h *ActionHandler) ApproveRunTask(ctx context.Context, req *RunTaskApproveR
 
 		task, ok := r.Tasks[req.TaskID]
 		if !ok {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("run %q doesn't have task %q", r.ID, req.TaskID))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("run %q doesn't have task %q", r.ID, req.TaskID))
 		}
 
 		if !task.WaitingApproval {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("run %q, task %q is not in waiting approval state", r.ID, req.TaskID))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("run %q, task %q is not in waiting approval state", r.ID, req.TaskID))
 		}
 
 		if task.Approved {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("run %q, task %q is already approved", r.ID, req.TaskID))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("run %q, task %q is already approved", r.ID, req.TaskID))
 		}
 
 		task.WaitingApproval = false
@@ -806,7 +806,7 @@ func (h *ActionHandler) GetExecutorTask(ctx context.Context, etID string) (*GetE
 			return errors.WithStack(err)
 		}
 		if et == nil {
-			return util.NewAPIError(util.ErrNotExist, errors.Errorf("executor task %q not found", etID))
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("executor task %q not found", etID))
 		}
 
 		r, err := h.d.GetRun(tx, et.RunID)
@@ -822,7 +822,7 @@ func (h *ActionHandler) GetExecutorTask(ctx context.Context, etID string) (*GetE
 			return errors.Wrapf(err, "cannot get run config %q", r.ID)
 		}
 		if rc == nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("runconfig %q doesn't exist", r.RunConfigID))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("runconfig %q doesn't exist", r.RunConfigID))
 		}
 
 		rt, ok := r.Tasks[et.RunTaskID]
@@ -866,7 +866,7 @@ func (h *ActionHandler) GetExecutorTasks(ctx context.Context, executorID string)
 				return errors.Wrapf(err, "cannot get run config %q", r.ID)
 			}
 			if rc == nil {
-				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("runconfig %q doesn't exist", r.RunConfigID))
+				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("runconfig %q doesn't exist", r.RunConfigID))
 			}
 
 			rt, ok := r.Tasks[et.RunTaskID]

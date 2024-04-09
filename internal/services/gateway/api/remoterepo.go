@@ -19,7 +19,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
-	"github.com/sorintlab/errors"
 
 	gitsource "agola.io/agola/internal/gitsources"
 	"agola.io/agola/internal/services/gateway/action"
@@ -55,7 +54,7 @@ func (h *UserRemoteReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 
 	userID := common.CurrentUserID(ctx)
 	if userID == "" {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("user not authenticated")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user not authenticated")))
 		return
 	}
 
@@ -68,7 +67,7 @@ func (h *UserRemoteReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 
 	remoteRepos, err := gitsource.ListUserRepos()
 	if err != nil {
-		err := util.NewAPIError(util.ErrBadRequest, errors.Wrapf(err, "failed to get user repositories from git source"))
+		err := util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("failed to get user repositories from git source"))
 		util.HTTPError(w, err)
 		h.log.Err(err).Send()
 		return

@@ -36,7 +36,7 @@ func (h *ActionHandler) GetRemoteSource(ctx context.Context, remoteSourceRef str
 	}
 
 	if remoteSource == nil {
-		return nil, util.NewAPIError(util.ErrNotExist, errors.Errorf("remotesource %q doesn't exist", remoteSourceRef))
+		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("remotesource %q doesn't exist", remoteSourceRef))
 	}
 
 	return remoteSource, nil
@@ -90,35 +90,35 @@ func (h *ActionHandler) GetRemoteSources(ctx context.Context, req *GetRemoteSour
 
 func (h *ActionHandler) ValidateRemoteSourceReq(ctx context.Context, req *CreateUpdateRemoteSourceRequest) error {
 	if req.Name == "" {
-		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource name required"))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource name required"))
 	}
 	if !util.ValidateName(req.Name) {
-		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("invalid remotesource name %q", req.Name))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid remotesource name %q", req.Name))
 	}
 
 	if req.Name == "" {
-		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource name required"))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource name required"))
 	}
 	if req.APIURL == "" {
-		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource api url required"))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource api url required"))
 	}
 	if req.Type == "" {
-		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource type required"))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource type required"))
 	}
 	if req.AuthType == "" {
-		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource auth type required"))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource auth type required"))
 	}
 
 	// validate if the remotesource type supports the required auth type
 	if !types.SourceSupportsAuthType(types.RemoteSourceType(req.Type), types.RemoteSourceAuthType(req.AuthType)) {
-		return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource type %q doesn't support auth type %q", req.Type, req.AuthType))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource type %q doesn't support auth type %q", req.Type, req.AuthType))
 	}
 	if req.AuthType == types.RemoteSourceAuthTypeOauth2 {
 		if req.Oauth2ClientID == "" {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource oauth2clientid required for auth type %q", types.RemoteSourceAuthTypeOauth2))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource oauth2clientid required for auth type %q", types.RemoteSourceAuthTypeOauth2))
 		}
 		if req.Oauth2ClientSecret == "" {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource oauth2clientsecret required for auth type %q", types.RemoteSourceAuthTypeOauth2))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource oauth2clientsecret required for auth type %q", types.RemoteSourceAuthTypeOauth2))
 		}
 	}
 
@@ -152,7 +152,7 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateUpdat
 			return errors.WithStack(err)
 		}
 		if curRemoteSource != nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource %q already exists", req.Name))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource %q already exists", req.Name))
 		}
 
 		remoteSource = types.NewRemoteSource(tx)
@@ -196,7 +196,7 @@ func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, remoteSourceRef 
 			return errors.WithStack(err)
 		}
 		if remoteSource == nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource with ref %q doesn't exist", remoteSourceRef))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource with ref %q doesn't exist", remoteSourceRef))
 		}
 
 		if remoteSource.Name != req.Name {
@@ -206,7 +206,7 @@ func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, remoteSourceRef 
 				return errors.WithStack(err)
 			}
 			if u != nil {
-				return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource %q already exists", u.Name))
+				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource %q already exists", u.Name))
 			}
 		}
 
@@ -243,7 +243,7 @@ func (h *ActionHandler) DeleteRemoteSource(ctx context.Context, remoteSourceName
 			return errors.WithStack(err)
 		}
 		if remoteSource == nil {
-			return util.NewAPIError(util.ErrBadRequest, errors.Errorf("remotesource %q doesn't exist", remoteSourceName))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource %q doesn't exist", remoteSourceName))
 		}
 
 		if err := h.d.DeleteRemoteSource(tx, remoteSource.ID); err != nil {
@@ -278,7 +278,7 @@ func (h *ActionHandler) GetLinkedAccounts(ctx context.Context, req *GetLinkedAcc
 				return errors.WithStack(err)
 			}
 			if la == nil {
-				return util.NewAPIError(util.ErrNotExist, errors.Errorf("linked account with remote user %q for remote source %q token doesn't exist", remoteUserID, remoteSourceID))
+				return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("linked account with remote user %q for remote source %q token doesn't exist", remoteUserID, remoteSourceID))
 			}
 
 			linkedAccounts = []*types.LinkedAccount{la}

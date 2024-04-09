@@ -17,7 +17,6 @@ import (
 	"net/http"
 
 	"github.com/rs/zerolog"
-	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
@@ -53,11 +52,11 @@ func (h *InternalAuthChecker) do(w http.ResponseWriter, r *http.Request) error {
 		tokenString := common.ExtractToken(r.Header, "Authorization", "Token")
 
 		if tokenString == "" {
-			return util.NewAPIError(util.ErrUnauthorized, errors.Errorf("no api token provided"))
+			return util.NewAPIError(util.ErrUnauthorized, util.WithAPIErrorMsg("no api token provided"))
 		}
 
 		if tokenString != h.apiToken {
-			return util.NewAPIError(util.ErrUnauthorized, errors.Errorf("wrong api token"))
+			return util.NewAPIError(util.ErrUnauthorized, util.WithAPIErrorMsg("wrong api token"))
 		}
 	}
 

@@ -275,7 +275,7 @@ func (h *ExecutorTaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	// TODO(sgotti) Check authorized call from executors
 	etID := vars["taskid"]
 	if etID == "" {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, errors.Errorf("taskid is empty")))
+		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("taskid is empty")))
 		return
 	}
 
@@ -380,7 +380,7 @@ func (h *ArchivesHandler) readArchive(rtID string, step int, w io.Writer) error 
 	f, err := h.ost.ReadObject(archivePath)
 	if err != nil {
 		if objectstorage.IsNotExist(err) {
-			return util.NewAPIError(util.ErrNotExist, err)
+			return util.NewAPIErrorWrap(util.ErrNotExist, err)
 		}
 		return errors.WithStack(err)
 	}
@@ -489,7 +489,7 @@ func (h *CacheHandler) readCache(key string, w io.Writer) error {
 	f, err := h.ost.ReadObject(cachePath)
 	if err != nil {
 		if objectstorage.IsNotExist(err) {
-			return util.NewAPIError(util.ErrNotExist, err)
+			return util.NewAPIErrorWrap(util.ErrNotExist, err)
 		}
 		return errors.WithStack(err)
 	}
@@ -586,7 +586,7 @@ func (h *ExecutorDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 			return errors.WithStack(err)
 		}
 		if executor == nil {
-			return util.NewAPIError(util.ErrNotExist, errors.Errorf("executor with executor id %s doesn't exist", executorID))
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("executor with executor id %s doesn't exist", executorID))
 		}
 
 		if err := h.d.DeleteExecutor(tx, executor.ID); err != nil {

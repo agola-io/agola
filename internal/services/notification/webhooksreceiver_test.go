@@ -182,7 +182,7 @@ func newHandleWebhookHandler(log zerolog.Logger, webhooks *webhooks) *handleWebh
 func (h *handleWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, err))
+		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
 		return
 	}
 

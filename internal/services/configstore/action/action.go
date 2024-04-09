@@ -52,7 +52,7 @@ func (h *ActionHandler) ResolveObjectID(tx *sql.Tx, objectKind types.ObjectKind,
 			return "", errors.WithStack(err)
 		}
 		if group == nil {
-			return "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("group with ref %q doesn't exists", ref))
+			return "", util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("group with ref %q doesn't exists", ref))
 		}
 		return group.ID, nil
 
@@ -62,11 +62,11 @@ func (h *ActionHandler) ResolveObjectID(tx *sql.Tx, objectKind types.ObjectKind,
 			return "", errors.WithStack(err)
 		}
 		if project == nil {
-			return "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("project with ref %q doesn't exists", ref))
+			return "", util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project with ref %q doesn't exists", ref))
 		}
 		return project.ID, nil
 
 	default:
-		return "", util.NewAPIError(util.ErrBadRequest, errors.Errorf("unknown object kind %q", objectKind))
+		return "", util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("unknown object kind %q", objectKind))
 	}
 }

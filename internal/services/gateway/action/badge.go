@@ -29,14 +29,14 @@ import (
 func (h *ActionHandler) GetBadge(ctx context.Context, projectRef, branch string) (string, error) {
 	project, _, err := h.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
-		return "", util.NewAPIError(util.KindFromRemoteError(err), err)
+		return "", util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
 	}
 
 	// if branch is empty we get the latest run for every branch.
 	group := path.Join("/", string(common.GroupTypeProject), project.ID, string(common.GroupTypeBranch), url.PathEscape(branch))
 	runResp, _, err := h.runserviceClient.GetGroupLastRun(ctx, group, nil)
 	if err != nil {
-		return "", util.NewAPIError(util.KindFromRemoteError(err), err)
+		return "", util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
 	}
 	if len(runResp.Runs) == 0 {
 		return badgeUnknown, nil
