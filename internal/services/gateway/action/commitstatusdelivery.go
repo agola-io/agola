@@ -42,7 +42,7 @@ type GetProjectCommitStatusDeliveriesResponse struct {
 func (h *ActionHandler) GetProjectCommitStatusDeliveries(ctx context.Context, req *GetProjectCommitStatusDeliveriesRequest) (*GetProjectCommitStatusDeliveriesResponse, error) {
 	project, _, err := h.configstoreClient.GetProject(ctx, req.ProjectRef)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return nil, APIErrorFromRemoteError(err)
 	}
 	isUserOwner, err := h.IsAuthUserProjectOwner(ctx, project.OwnerType, project.OwnerID)
 	if err != nil {
@@ -68,7 +68,7 @@ func (h *ActionHandler) GetProjectCommitStatusDeliveries(ctx context.Context, re
 
 	commitStatusDeliveries, resp, err := h.notificationClient.GetProjectCommitStatusDeliveries(ctx, project.ID, &client.GetProjectCommitStatusDeliveriesOptions{ListOptions: &client.ListOptions{Limit: req.Limit, SortDirection: nstypes.SortDirection(sortDirection)}, StartSequence: inCursor.StartSequence, DeliveryStatusFilter: deliveryStatusFilter})
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return nil, APIErrorFromRemoteError(err)
 	}
 
 	var outCursor string
@@ -101,7 +101,7 @@ type ProjectCommitStatusRedeliveryRequest struct {
 func (h *ActionHandler) ProjectCommitStatusRedelivery(ctx context.Context, req *ProjectCommitStatusRedeliveryRequest) error {
 	project, _, err := h.configstoreClient.GetProject(ctx, req.ProjectRef)
 	if err != nil {
-		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return APIErrorFromRemoteError(err)
 	}
 	isUserOwner, err := h.IsAuthUserProjectOwner(ctx, project.OwnerType, project.OwnerID)
 	if err != nil {
@@ -113,7 +113,7 @@ func (h *ActionHandler) ProjectCommitStatusRedelivery(ctx context.Context, req *
 
 	_, err = h.notificationClient.CommitStatusRedelivery(ctx, project.ID, req.CommitStatusDeliveryID)
 	if err != nil {
-		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return APIErrorFromRemoteError(err)
 	}
 
 	return nil

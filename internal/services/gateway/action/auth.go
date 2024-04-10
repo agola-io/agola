@@ -42,7 +42,7 @@ func (h *ActionHandler) IsAuthUserOrgOwner(ctx context.Context, orgID string) (b
 		if util.RemoteErrorIs(err, util.ErrNotExist) {
 			return false, nil
 		}
-		return false, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get user org"))
+		return false, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get user org"))
 	}
 
 	if userOrg.Role == cstypes.MemberRoleOwner {
@@ -75,7 +75,7 @@ func (h *ActionHandler) IsAuthUserProjectOwner(ctx context.Context, ownerType cs
 			if util.RemoteErrorIs(err, util.ErrNotExist) {
 				return false, nil
 			}
-			return false, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get user org"))
+			return false, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get user org"))
 		}
 
 		if userOrg.Role == cstypes.MemberRoleOwner {
@@ -106,7 +106,7 @@ func (h *ActionHandler) IsAuthUserMember(ctx context.Context, ownerType cstypes.
 	if ownerType == cstypes.ObjectKindOrg {
 		userOrg, _, err := h.configstoreClient.GetUserOrg(ctx, userID, ownerID)
 		if err != nil {
-			return false, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get user orgs"))
+			return false, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get user orgs"))
 		}
 
 		if userOrg == nil {
@@ -126,14 +126,14 @@ func (h *ActionHandler) IsAuthUserVariableOwner(ctx context.Context, parentType 
 	case cstypes.ObjectKindProjectGroup:
 		pg, _, err := h.configstoreClient.GetProjectGroup(ctx, parentRef)
 		if err != nil {
-			return false, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get project group %q", parentRef))
+			return false, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get project group %q", parentRef))
 		}
 		ownerType = pg.OwnerType
 		ownerID = pg.OwnerID
 	case cstypes.ObjectKindProject:
 		p, _, err := h.configstoreClient.GetProject(ctx, parentRef)
 		if err != nil {
-			return false, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get project  %q", parentRef))
+			return false, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get project  %q", parentRef))
 		}
 		ownerType = p.OwnerType
 		ownerID = p.OwnerID
@@ -151,7 +151,7 @@ func (h *ActionHandler) CanAuthUserGetRun(ctx context.Context, groupType scommon
 	case scommon.GroupTypeProject:
 		p, _, err := h.configstoreClient.GetProject(ctx, ref)
 		if err != nil {
-			return false, "", util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+			return false, "", APIErrorFromRemoteError(err)
 		}
 		refID = p.ID
 		ownerID = p.OwnerID
@@ -160,7 +160,7 @@ func (h *ActionHandler) CanAuthUserGetRun(ctx context.Context, groupType scommon
 	case scommon.GroupTypeUser:
 		u, _, err := h.configstoreClient.GetUser(ctx, ref)
 		if err != nil {
-			return false, "", util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+			return false, "", APIErrorFromRemoteError(err)
 		}
 
 		// user direct runs
@@ -201,7 +201,7 @@ func (h *ActionHandler) CanAuthUserDoRunActions(ctx context.Context, groupType s
 		var err error
 		p, _, err = h.configstoreClient.GetProject(ctx, ref)
 		if err != nil {
-			return false, "", util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+			return false, "", APIErrorFromRemoteError(err)
 		}
 		refID = p.ID
 		ownerType = p.OwnerType
@@ -209,7 +209,7 @@ func (h *ActionHandler) CanAuthUserDoRunActions(ctx context.Context, groupType s
 	case scommon.GroupTypeUser:
 		u, _, err := h.configstoreClient.GetUser(ctx, ref)
 		if err != nil {
-			return false, "", util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+			return false, "", APIErrorFromRemoteError(err)
 		}
 
 		// user direct runs

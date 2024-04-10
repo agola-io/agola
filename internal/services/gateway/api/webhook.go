@@ -70,17 +70,17 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) error {
 
 	csProject, _, err := h.configstoreClient.GetProject(ctx, projectID)
 	if err != nil {
-		return util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("failed to get project %s", projectID))
+		return action.APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get project %s", projectID))
 	}
 	project := csProject.Project
 
 	user, _, err := h.configstoreClient.GetUserByLinkedAccount(ctx, project.LinkedAccountID)
 	if err != nil {
-		return util.NewAPIErrorWrap(util.ErrInternal, err, util.WithAPIErrorMsg("failed to get user by linked account %q", project.LinkedAccountID))
+		return action.APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get user by linked account %q", project.LinkedAccountID))
 	}
 	linkedAccounts, _, err := h.configstoreClient.GetUserLinkedAccounts(ctx, user.ID)
 	if err != nil {
-		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get user %q linked accounts", user.ID))
+		return action.APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get user %q linked accounts", user.ID))
 	}
 
 	var la *cstypes.LinkedAccount
@@ -97,7 +97,7 @@ func (h *webhooksHandler) handleWebhook(r *http.Request) error {
 
 	rs, _, err := h.configstoreClient.GetRemoteSource(ctx, la.RemoteSourceID)
 	if err != nil {
-		return util.NewAPIErrorWrap(util.ErrInternal, err, util.WithAPIErrorMsg("failed to get remote source %q", la.RemoteSourceID))
+		return action.APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get remote source %q", la.RemoteSourceID))
 	}
 
 	gitSource, err := h.ah.GetGitSource(ctx, rs, user.Name, la)

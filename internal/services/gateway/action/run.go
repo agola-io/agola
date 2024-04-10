@@ -87,7 +87,7 @@ func (h *ActionHandler) GetRun(ctx context.Context, groupType scommon.GroupType,
 
 	runResp, _, err := h.runserviceClient.GetRunByGroup(ctx, group, runNumber, nil)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return nil, APIErrorFromRemoteError(err)
 	}
 
 	return runResp, nil
@@ -149,7 +149,7 @@ func (h *ActionHandler) GetGroupRuns(ctx context.Context, req *GetGroupRunsReque
 
 	runsResp, resp, err := h.runserviceClient.GetGroupRuns(ctx, group, &client.GetGroupRunsOptions{ListOptions: &client.ListOptions{Limit: req.Limit, SortDirection: rstypes.SortDirection(sortDirection)}, StartRunCounter: startRunCounter, PhaseFilter: phaseFilter, ResultFilter: resultFilter})
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return nil, APIErrorFromRemoteError(err)
 	}
 
 	var outCursor string
@@ -198,12 +198,12 @@ func (h *ActionHandler) GetLogs(ctx context.Context, req *GetLogsRequest) (*http
 
 	runResp, _, err := h.runserviceClient.GetRunByGroup(ctx, group, req.RunNumber, nil)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return nil, APIErrorFromRemoteError(err)
 	}
 
 	resp, err := h.runserviceClient.GetLogs(ctx, runResp.Run.ID, req.TaskID, req.Setup, req.Step, req.Follow)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return nil, APIErrorFromRemoteError(err)
 	}
 
 	return resp.Response, nil
@@ -231,11 +231,11 @@ func (h *ActionHandler) DeleteLogs(ctx context.Context, req *DeleteLogsRequest) 
 
 	runResp, _, err := h.runserviceClient.GetRunByGroup(ctx, group, req.RunNumber, nil)
 	if err != nil {
-		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return APIErrorFromRemoteError(err)
 	}
 
 	if _, err = h.runserviceClient.DeleteLogs(ctx, runResp.Run.ID, req.TaskID, req.Setup, req.Step); err != nil {
-		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return APIErrorFromRemoteError(err)
 	}
 
 	return nil
@@ -272,7 +272,7 @@ func (h *ActionHandler) RunAction(ctx context.Context, req *RunActionsRequest) (
 
 	runResp, _, err := h.runserviceClient.GetRunByGroup(ctx, group, req.RunNumber, nil)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return nil, APIErrorFromRemoteError(err)
 	}
 	runID := runResp.Run.ID
 
@@ -285,7 +285,7 @@ func (h *ActionHandler) RunAction(ctx context.Context, req *RunActionsRequest) (
 
 		runResp, _, err = h.runserviceClient.CreateRun(ctx, rsreq)
 		if err != nil {
-			return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+			return nil, APIErrorFromRemoteError(err)
 		}
 
 	case RunActionTypeCancel:
@@ -295,7 +295,7 @@ func (h *ActionHandler) RunAction(ctx context.Context, req *RunActionsRequest) (
 		}
 
 		if _, err = h.runserviceClient.RunActions(ctx, runID, rsreq); err != nil {
-			return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+			return nil, APIErrorFromRemoteError(err)
 		}
 
 	case RunActionTypeStop:
@@ -304,7 +304,7 @@ func (h *ActionHandler) RunAction(ctx context.Context, req *RunActionsRequest) (
 		}
 
 		if _, err = h.runserviceClient.RunActions(ctx, runID, rsreq); err != nil {
-			return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+			return nil, APIErrorFromRemoteError(err)
 		}
 
 	default:
@@ -342,7 +342,7 @@ func (h *ActionHandler) RunTaskAction(ctx context.Context, req *RunTaskActionsRe
 
 	runResp, _, err := h.runserviceClient.GetRunByGroup(ctx, group, req.RunNumber, nil)
 	if err != nil {
-		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return APIErrorFromRemoteError(err)
 	}
 
 	runID := runResp.Run.ID
@@ -392,7 +392,7 @@ func (h *ActionHandler) RunTaskAction(ctx context.Context, req *RunTaskActionsRe
 		}
 
 		if _, err := h.runserviceClient.RunTaskActions(ctx, runID, req.TaskID, rsreq); err != nil {
-			return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+			return APIErrorFromRemoteError(err)
 		}
 
 	default:
@@ -606,7 +606,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 
 		if _, _, err := h.runserviceClient.CreateRun(ctx, createRunReq); err != nil {
 			h.log.Err(err).Msgf("failed to create run")
-			return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+			return APIErrorFromRemoteError(err)
 		}
 		return nil
 	}
@@ -636,7 +636,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 
 		if _, _, err := h.runserviceClient.CreateRun(ctx, createRunReq); err != nil {
 			h.log.Err(err).Msgf("failed to create run")
-			return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+			return APIErrorFromRemoteError(err)
 		}
 	}
 

@@ -42,7 +42,7 @@ type GetProjectRunWebhookDeliveriesResponse struct {
 func (h *ActionHandler) GetProjectRunWebhookDeliveries(ctx context.Context, req *GetProjectRunWebhookDeliveriesRequest) (*GetProjectRunWebhookDeliveriesResponse, error) {
 	project, _, err := h.configstoreClient.GetProject(ctx, req.ProjectRef)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return nil, APIErrorFromRemoteError(err)
 	}
 	isUserOwner, err := h.IsAuthUserProjectOwner(ctx, project.OwnerType, project.OwnerID)
 	if err != nil {
@@ -68,7 +68,7 @@ func (h *ActionHandler) GetProjectRunWebhookDeliveries(ctx context.Context, req 
 
 	runWebhookDeliveries, resp, err := h.notificationClient.GetProjectRunWebhookDeliveries(ctx, project.ID, &client.GetProjectRunWebhookDeliveriesOptions{ListOptions: &client.ListOptions{Limit: req.Limit, SortDirection: nstypes.SortDirection(sortDirection)}, StartSequence: inCursor.StartSequence, DeliveryStatusFilter: deliveryStatusFilter})
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return nil, APIErrorFromRemoteError(err)
 	}
 
 	var outCursor string
@@ -101,7 +101,7 @@ type ProjectRunWebhookRedeliveryRequest struct {
 func (h *ActionHandler) ProjectRunWebhookRedelivery(ctx context.Context, req *ProjectRunWebhookRedeliveryRequest) error {
 	project, _, err := h.configstoreClient.GetProject(ctx, req.ProjectRef)
 	if err != nil {
-		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return APIErrorFromRemoteError(err)
 	}
 	isUserOwner, err := h.IsAuthUserProjectOwner(ctx, project.OwnerType, project.OwnerID)
 	if err != nil {
@@ -113,7 +113,7 @@ func (h *ActionHandler) ProjectRunWebhookRedelivery(ctx context.Context, req *Pr
 
 	_, err = h.notificationClient.RunWebhookRedelivery(ctx, project.ID, req.RunWebhookDeliveryID)
 	if err != nil {
-		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return APIErrorFromRemoteError(err)
 	}
 
 	return nil

@@ -28,7 +28,7 @@ import (
 func (h *ActionHandler) GetProjectGroup(ctx context.Context, projectGroupRef string) (*csapitypes.ProjectGroup, error) {
 	projectGroup, _, err := h.configstoreClient.GetProjectGroup(ctx, projectGroupRef)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return nil, APIErrorFromRemoteError(err)
 	}
 
 	if projectGroup.GlobalVisibility == cstypes.VisibilityPublic {
@@ -49,7 +49,7 @@ func (h *ActionHandler) GetProjectGroup(ctx context.Context, projectGroupRef str
 func (h *ActionHandler) GetProjectGroupSubgroups(ctx context.Context, projectGroupRef string) ([]*csapitypes.ProjectGroup, error) {
 	projectGroups, _, err := h.configstoreClient.GetProjectGroupSubgroups(ctx, projectGroupRef)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return nil, APIErrorFromRemoteError(err)
 	}
 	return projectGroups, nil
 }
@@ -57,7 +57,7 @@ func (h *ActionHandler) GetProjectGroupSubgroups(ctx context.Context, projectGro
 func (h *ActionHandler) GetProjectGroupProjects(ctx context.Context, projectGroupRef string) ([]*csapitypes.Project, error) {
 	projects, _, err := h.configstoreClient.GetProjectGroupProjects(ctx, projectGroupRef)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return nil, APIErrorFromRemoteError(err)
 	}
 	return projects, nil
 }
@@ -76,7 +76,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProje
 
 	pg, _, err := h.configstoreClient.GetProjectGroup(ctx, req.ParentRef)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get project group %q", req.ParentRef))
+		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get project group %q", req.ParentRef))
 	}
 
 	isProjectOwner, err := h.IsAuthUserProjectOwner(ctx, pg.OwnerType, pg.OwnerID)
@@ -89,7 +89,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProje
 
 	user, _, err := h.configstoreClient.GetUser(ctx, req.CurrentUserID)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get user %q", req.CurrentUserID))
+		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get user %q", req.CurrentUserID))
 	}
 
 	parentRef := req.ParentRef
@@ -110,7 +110,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProje
 	h.log.Info().Msgf("creating projectGroup")
 	rp, _, err := h.configstoreClient.CreateProjectGroup(ctx, creq)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to create projectGroup"))
+		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to create project group"))
 	}
 	h.log.Info().Msgf("projectGroup %s created, ID: %s", rp.Name, rp.ID)
 
@@ -127,7 +127,7 @@ type UpdateProjectGroupRequest struct {
 func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, projectGroupRef string, req *UpdateProjectGroupRequest) (*csapitypes.ProjectGroup, error) {
 	pg, _, err := h.configstoreClient.GetProjectGroup(ctx, projectGroupRef)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get project group %q", projectGroupRef))
+		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get project group %q", projectGroupRef))
 	}
 
 	isProjectOwner, err := h.IsAuthUserProjectOwner(ctx, pg.OwnerType, pg.OwnerID)
@@ -157,7 +157,7 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, projectGroupRef 
 	h.log.Info().Msgf("updating project group")
 	rp, _, err := h.configstoreClient.UpdateProjectGroup(ctx, pg.ID, creq)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to update project group"))
+		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to create project group"))
 	}
 	h.log.Info().Msgf("project group %q updated, ID: %s", pg.Name, pg.ID)
 
@@ -167,7 +167,7 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, projectGroupRef 
 func (h *ActionHandler) DeleteProjectGroup(ctx context.Context, projectRef string) error {
 	p, _, err := h.configstoreClient.GetProjectGroup(ctx, projectRef)
 	if err != nil {
-		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get project %q", projectRef))
+		return APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get project %q", projectRef))
 	}
 
 	isProjectOwner, err := h.IsAuthUserProjectOwner(ctx, p.OwnerType, p.OwnerID)
@@ -179,7 +179,7 @@ func (h *ActionHandler) DeleteProjectGroup(ctx context.Context, projectRef strin
 	}
 
 	if _, err = h.configstoreClient.DeleteProjectGroup(ctx, projectRef); err != nil {
-		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return APIErrorFromRemoteError(err)
 	}
 	return nil
 }

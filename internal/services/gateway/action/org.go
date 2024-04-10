@@ -29,7 +29,7 @@ import (
 func (h *ActionHandler) GetOrg(ctx context.Context, orgRef string) (*cstypes.Organization, error) {
 	org, _, err := h.configstoreClient.GetOrg(ctx, orgRef)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return nil, APIErrorFromRemoteError(err)
 	}
 
 	if org.Visibility == cstypes.VisibilityPublic {
@@ -86,7 +86,7 @@ func (h *ActionHandler) GetOrgs(ctx context.Context, req *GetOrgsRequest) (*GetO
 
 	orgs, resp, err := h.configstoreClient.GetOrgs(ctx, &client.GetOrgsOptions{ListOptions: &client.ListOptions{Limit: req.Limit, SortDirection: cstypes.SortDirection(sortDirection)}, StartOrgName: inCursor.Start, Visibilities: visibilites})
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return nil, APIErrorFromRemoteError(err)
 	}
 
 	var outCursor string
@@ -144,12 +144,12 @@ func (h *ActionHandler) GetOrgMembers(ctx context.Context, req *GetOrgMembersReq
 
 	org, _, err := h.configstoreClient.GetOrg(ctx, req.OrgRef)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return nil, APIErrorFromRemoteError(err)
 	}
 
 	orgMembers, resp, err := h.configstoreClient.GetOrgMembers(ctx, req.OrgRef, &client.GetOrgMembersOptions{ListOptions: &client.ListOptions{Limit: req.Limit, SortDirection: cstypes.SortDirection(sortDirection)}, StartUserName: inCursor.Start})
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return nil, APIErrorFromRemoteError(err)
 	}
 
 	var outCursor string
@@ -210,7 +210,7 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*
 	h.log.Info().Msgf("creating organization")
 	org, _, err := h.configstoreClient.CreateOrg(ctx, creq)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to create organization"))
+		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to create organization"))
 	}
 	h.log.Info().Msgf("organization %s created, ID: %s", org.Name, org.ID)
 
@@ -224,7 +224,7 @@ type UpdateOrgRequest struct {
 func (h *ActionHandler) UpdateOrg(ctx context.Context, orgRef string, req *UpdateOrgRequest) (*cstypes.Organization, error) {
 	org, _, err := h.configstoreClient.GetOrg(ctx, orgRef)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return nil, APIErrorFromRemoteError(err)
 	}
 
 	isOrgOwner, err := h.IsAuthUserOrgOwner(ctx, org.ID)
@@ -246,7 +246,7 @@ func (h *ActionHandler) UpdateOrg(ctx context.Context, orgRef string, req *Updat
 	h.log.Info().Msgf("updating organization")
 	org, _, err = h.configstoreClient.UpdateOrg(ctx, orgRef, creq)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to update organization"))
+		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to update organization"))
 	}
 	h.log.Info().Msgf("organization %s updated, ID: %s", org.Name, org.ID)
 
@@ -256,7 +256,7 @@ func (h *ActionHandler) UpdateOrg(ctx context.Context, orgRef string, req *Updat
 func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 	org, _, err := h.configstoreClient.GetOrg(ctx, orgRef)
 	if err != nil {
-		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return APIErrorFromRemoteError(err)
 	}
 
 	isOrgOwner, err := h.IsAuthUserOrgOwner(ctx, org.ID)
@@ -268,7 +268,7 @@ func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 	}
 
 	if _, err := h.configstoreClient.DeleteOrg(ctx, orgRef); err != nil {
-		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to delete org"))
+		return APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to delete org"))
 	}
 	return nil
 }
@@ -286,11 +286,11 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 
 	org, _, err := h.configstoreClient.GetOrg(ctx, orgRef)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return nil, APIErrorFromRemoteError(err)
 	}
 	user, _, err := h.configstoreClient.GetUser(ctx, userRef)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return nil, APIErrorFromRemoteError(err)
 	}
 
 	isOrgOwner, err := h.IsAuthUserOrgOwner(ctx, org.ID)
@@ -303,7 +303,7 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 
 	orgmember, _, err := h.configstoreClient.AddOrgMember(ctx, orgRef, userRef, role)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to add/update organization member"))
+		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to add/update organization member"))
 	}
 
 	return &AddOrgMemberResponse{
@@ -316,7 +316,7 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 func (h *ActionHandler) RemoveOrgMember(ctx context.Context, orgRef, userRef string) error {
 	org, _, err := h.configstoreClient.GetOrg(ctx, orgRef)
 	if err != nil {
-		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return APIErrorFromRemoteError(err)
 	}
 
 	isOrgOwner, err := h.IsAuthUserOrgOwner(ctx, org.ID)
@@ -328,7 +328,7 @@ func (h *ActionHandler) RemoveOrgMember(ctx context.Context, orgRef, userRef str
 	}
 
 	if _, err = h.configstoreClient.RemoveOrgMember(ctx, orgRef, userRef); err != nil {
-		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to remove organization member"))
+		return APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to remove organization member"))
 	}
 
 	return nil
@@ -346,7 +346,7 @@ func (h *ActionHandler) GetOrgInvitations(ctx context.Context, orgRef string, li
 
 	org, _, err := h.configstoreClient.GetOrg(ctx, orgRef)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get org %s", orgRef))
+		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get org %s", orgRef))
 	}
 
 	isOrgOwner, err := h.IsAuthUserOrgOwner(ctx, org.ID)
@@ -359,7 +359,7 @@ func (h *ActionHandler) GetOrgInvitations(ctx context.Context, orgRef string, li
 
 	orgInvitations, _, err := h.configstoreClient.GetOrgInvitations(ctx, orgRef, limit)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return nil, APIErrorFromRemoteError(err)
 	}
 	return orgInvitations, nil
 }
@@ -391,7 +391,7 @@ func (h *ActionHandler) CreateOrgInvitation(ctx context.Context, req *CreateOrgI
 
 	org, _, err := h.configstoreClient.GetOrg(ctx, req.OrganizationRef)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get org %s", req.OrganizationRef))
+		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get org %s", req.OrganizationRef))
 	}
 
 	isOrgOwner, err := h.IsAuthUserOrgOwner(ctx, org.ID)
@@ -427,7 +427,7 @@ func (h *ActionHandler) CreateOrgInvitation(ctx context.Context, req *CreateOrgI
 	h.log.Info().Msgf("creating org invitation")
 	orgInvitation, _, err := h.configstoreClient.CreateOrgInvitation(ctx, org.ID, creq)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to create org invitation"))
+		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to create org invitation"))
 	}
 	h.log.Info().Msgf("org invitation created, ID: %s", orgInvitation.ID)
 
@@ -454,7 +454,7 @@ func (h *ActionHandler) OrgInvitationAction(ctx context.Context, req *OrgInvitat
 
 	orgInvitation, _, err := h.configstoreClient.GetOrgInvitation(ctx, req.OrgRef, userID)
 	if err != nil {
-		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get org invitation"))
+		return APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get org invitation"))
 	}
 	if orgInvitation == nil {
 		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invitation for org %s user %s not found", req.OrgRef, userID))
@@ -466,7 +466,7 @@ func (h *ActionHandler) OrgInvitationAction(ctx context.Context, req *OrgInvitat
 
 	org, _, err := h.configstoreClient.GetOrg(ctx, req.OrgRef)
 	if err != nil {
-		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get org %s", req.OrgRef))
+		return APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get org %s", req.OrgRef))
 	}
 
 	if org == nil {
@@ -476,7 +476,7 @@ func (h *ActionHandler) OrgInvitationAction(ctx context.Context, req *OrgInvitat
 	creq := &csapitypes.OrgInvitationActionRequest{Action: req.Action}
 	_, err = h.configstoreClient.UserOrgInvitationAction(ctx, userID, req.OrgRef, creq)
 	if err != nil {
-		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return APIErrorFromRemoteError(err)
 	}
 
 	return nil
@@ -490,12 +490,12 @@ func (h *ActionHandler) DeleteOrgInvitation(ctx context.Context, orgRef string, 
 
 	orgInvitation, _, err := h.configstoreClient.GetOrgInvitation(ctx, orgRef, userRef)
 	if err != nil {
-		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return APIErrorFromRemoteError(err)
 	}
 
 	org, _, err := h.configstoreClient.GetOrg(ctx, orgInvitation.OrganizationID)
 	if err != nil {
-		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to get org %s", orgInvitation.OrganizationID))
+		return APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get org %s", orgInvitation.OrganizationID))
 	}
 
 	isOrgOwner, err := h.IsAuthUserOrgOwner(ctx, org.ID)
@@ -508,7 +508,7 @@ func (h *ActionHandler) DeleteOrgInvitation(ctx context.Context, orgRef string, 
 
 	_, err = h.configstoreClient.DeleteOrgInvitation(ctx, orgRef, userRef)
 	if err != nil {
-		return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, util.WithAPIErrorMsg("failed to delete org invitation"))
+		return APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to delete org invitation"))
 	}
 	return nil
 }
@@ -516,12 +516,12 @@ func (h *ActionHandler) DeleteOrgInvitation(ctx context.Context, orgRef string, 
 func (h *ActionHandler) GetOrgInvitation(ctx context.Context, orgRef string, userRef string) (*OrgInvitationResponse, error) {
 	cOrgInvitation, _, err := h.configstoreClient.GetOrgInvitation(ctx, orgRef, userRef)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return nil, APIErrorFromRemoteError(err)
 	}
 
 	org, _, err := h.configstoreClient.GetOrg(ctx, cOrgInvitation.OrganizationID)
 	if err != nil {
-		return nil, util.NewAPIErrorWrap(util.KindFromRemoteError(err), err)
+		return nil, APIErrorFromRemoteError(err)
 	}
 
 	res := OrgInvitationResponse{
