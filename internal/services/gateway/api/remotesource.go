@@ -38,13 +38,24 @@ func NewCreateRemoteSourceHandler(log zerolog.Logger, ah *action.ActionHandler) 
 }
 
 func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *CreateRemoteSourceHandler) do(r *http.Request) (*gwapitypes.RemoteSourceResponse, error) {
 	ctx := r.Context()
 
 	var req gwapitypes.CreateRemoteSourceRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	creq := &action.CreateRemoteSourceRequest{
@@ -61,15 +72,13 @@ func (h *CreateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		LoginEnabled:        req.LoginEnabled,
 	}
 	rs, err := h.ah.CreateRemoteSource(ctx, creq)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	res := createRemoteSourceResponse(rs)
-	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Err(err).Send()
-	}
+
+	return res, nil
 }
 
 type UpdateRemoteSourceHandler struct {
@@ -82,6 +91,18 @@ func NewUpdateRemoteSourceHandler(log zerolog.Logger, ah *action.ActionHandler) 
 }
 
 func (h *UpdateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *UpdateRemoteSourceHandler) do(r *http.Request) (*gwapitypes.RemoteSourceResponse, error) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 	rsRef := vars["remotesourceref"]
@@ -89,8 +110,7 @@ func (h *UpdateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	var req gwapitypes.UpdateRemoteSourceRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	creq := &action.UpdateRemoteSourceRequest{
@@ -107,15 +127,13 @@ func (h *UpdateRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		LoginEnabled:        req.LoginEnabled,
 	}
 	rs, err := h.ah.UpdateRemoteSource(ctx, creq)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	res := createRemoteSourceResponse(rs)
-	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Err(err).Send()
-	}
+
+	return res, nil
 }
 
 func createRemoteSourceResponse(r *cstypes.RemoteSource) *gwapitypes.RemoteSourceResponse {
@@ -139,20 +157,30 @@ func NewRemoteSourceHandler(log zerolog.Logger, ah *action.ActionHandler) *Remot
 }
 
 func (h *RemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	vars := mux.Vars(r)
-	rsRef := vars["remotesourceref"]
-
-	rs, err := h.ah.GetRemoteSource(ctx, rsRef)
+	res, err := h.do(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	res := createRemoteSourceResponse(rs)
 	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
 		h.log.Err(err).Send()
 	}
+}
+
+func (h *RemoteSourceHandler) do(r *http.Request) (*gwapitypes.RemoteSourceResponse, error) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	rsRef := vars["remotesourceref"]
+
+	rs, err := h.ah.GetRemoteSource(ctx, rsRef)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	res := createRemoteSourceResponse(rs)
+
+	return res, nil
 }
 
 type RemoteSourcesHandler struct {
@@ -209,11 +237,7 @@ func NewDeleteRemoteSourceHandler(log zerolog.Logger, ah *action.ActionHandler) 
 }
 
 func (h *DeleteRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	vars := mux.Vars(r)
-	rsRef := vars["remotesourceref"]
-
-	err := h.ah.DeleteRemoteSource(ctx, rsRef)
+	err := h.do(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
@@ -222,4 +246,17 @@ func (h *DeleteRemoteSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
 		h.log.Err(err).Send()
 	}
+}
+
+func (h *DeleteRemoteSourceHandler) do(r *http.Request) error {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	rsRef := vars["remotesourceref"]
+
+	err := h.ah.DeleteRemoteSource(ctx, rsRef)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
 }

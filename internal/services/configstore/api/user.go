@@ -38,19 +38,28 @@ func NewUserHandler(log zerolog.Logger, ah *action.ActionHandler) *UserHandler {
 }
 
 func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	vars := mux.Vars(r)
-	userRef := vars["userref"]
-
-	user, err := h.ah.GetUser(ctx, userRef)
+	res, err := h.do(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, user); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
 		h.log.Err(err).Send()
 	}
+}
+
+func (h *UserHandler) do(r *http.Request) (*types.User, error) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	userRef := vars["userref"]
+
+	user, err := h.ah.GetUser(ctx, userRef)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return user, nil
 }
 
 type CreateUserHandler struct {
@@ -63,13 +72,24 @@ func NewCreateUserHandler(log zerolog.Logger, ah *action.ActionHandler) *CreateU
 }
 
 func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *CreateUserHandler) do(r *http.Request) (*types.User, error) {
 	ctx := r.Context()
 
 	var req *csapitypes.CreateUserRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	creq := &action.CreateUserRequest{
@@ -88,14 +108,11 @@ func (h *CreateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user, err := h.ah.CreateUser(ctx, creq)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
-	if err := util.HTTPResponse(w, http.StatusCreated, user); err != nil {
-		h.log.Err(err).Send()
-	}
+	return user, nil
 }
 
 type UpdateUserHandler struct {
@@ -108,6 +125,18 @@ func NewUpdateUserHandler(log zerolog.Logger, ah *action.ActionHandler) *UpdateU
 }
 
 func (h *UpdateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *UpdateUserHandler) do(r *http.Request) (*types.User, error) {
 	ctx := r.Context()
 
 	vars := mux.Vars(r)
@@ -116,8 +145,7 @@ func (h *UpdateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var req *csapitypes.UpdateUserRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	creq := &action.UpdateUserRequest{
@@ -126,14 +154,11 @@ func (h *UpdateUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user, err := h.ah.UpdateUser(ctx, creq)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
-	if err := util.HTTPResponse(w, http.StatusCreated, user); err != nil {
-		h.log.Err(err).Send()
-	}
+	return user, nil
 }
 
 type DeleteUserHandler struct {
@@ -146,18 +171,28 @@ func NewDeleteUserHandler(log zerolog.Logger, ah *action.ActionHandler) *DeleteU
 }
 
 func (h *DeleteUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *DeleteUserHandler) do(r *http.Request) error {
 	ctx := r.Context()
 
 	vars := mux.Vars(r)
 	userRef := vars["userref"]
 
-	err := h.ah.DeleteUser(ctx, userRef)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
+	if err := h.ah.DeleteUser(ctx, userRef); err != nil {
+		return errors.WithStack(err)
 	}
-	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Err(err).Send()
-	}
+
+	return nil
 }
 
 type UsersHandler struct {
@@ -238,19 +273,28 @@ func NewUserLinkedAccountsHandler(log zerolog.Logger, ah *action.ActionHandler) 
 }
 
 func (h *UserLinkedAccountsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	vars := mux.Vars(r)
-	userRef := vars["userref"]
-
-	linkedAccounts, err := h.ah.GetUserLinkedAccounts(ctx, userRef)
+	res, err := h.do(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	if err := util.HTTPResponse(w, http.StatusCreated, linkedAccounts); err != nil {
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
 		h.log.Err(err).Send()
 	}
+}
+
+func (h *UserLinkedAccountsHandler) do(r *http.Request) ([]*types.LinkedAccount, error) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	userRef := vars["userref"]
+
+	linkedAccounts, err := h.ah.GetUserLinkedAccounts(ctx, userRef)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return linkedAccounts, nil
 }
 
 type CreateUserLAHandler struct {
@@ -263,6 +307,18 @@ func NewCreateUserLAHandler(log zerolog.Logger, ah *action.ActionHandler) *Creat
 }
 
 func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *CreateUserLAHandler) do(r *http.Request) (*types.LinkedAccount, error) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 	userRef := vars["userref"]
@@ -270,8 +326,7 @@ func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	var req csapitypes.CreateUserLARequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	creq := &action.CreateUserLARequest{
@@ -284,15 +339,12 @@ func (h *CreateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		Oauth2RefreshToken:         req.Oauth2RefreshToken,
 		Oauth2AccessTokenExpiresAt: req.Oauth2AccessTokenExpiresAt,
 	}
-	user, err := h.ah.CreateUserLA(ctx, creq)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	linkedAccount, err := h.ah.CreateUserLA(ctx, creq)
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
-	if err := util.HTTPResponse(w, http.StatusCreated, user); err != nil {
-		h.log.Err(err).Send()
-	}
+	return linkedAccount, nil
 }
 
 type DeleteUserLAHandler struct {
@@ -305,18 +357,28 @@ func NewDeleteUserLAHandler(log zerolog.Logger, ah *action.ActionHandler) *Delet
 }
 
 func (h *DeleteUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *DeleteUserLAHandler) do(r *http.Request) error {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 	userRef := vars["userref"]
 	laID := vars["laid"]
 
-	err := h.ah.DeleteUserLA(ctx, userRef, laID)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
+	if err := h.ah.DeleteUserLA(ctx, userRef, laID); err != nil {
+		return errors.WithStack(err)
 	}
-	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Err(err).Send()
-	}
+
+	return nil
 }
 
 type UpdateUserLAHandler struct {
@@ -329,6 +391,18 @@ func NewUpdateUserLAHandler(log zerolog.Logger, ah *action.ActionHandler) *Updat
 }
 
 func (h *UpdateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *UpdateUserLAHandler) do(r *http.Request) (*types.LinkedAccount, error) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 	userRef := vars["userref"]
@@ -337,8 +411,7 @@ func (h *UpdateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	var req csapitypes.UpdateUserLARequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	creq := &action.UpdateUserLARequest{
@@ -351,15 +424,12 @@ func (h *UpdateUserLAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		Oauth2RefreshToken:         req.Oauth2RefreshToken,
 		Oauth2AccessTokenExpiresAt: req.Oauth2AccessTokenExpiresAt,
 	}
-	user, err := h.ah.UpdateUserLA(ctx, creq)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	linkedAccount, err := h.ah.UpdateUserLA(ctx, creq)
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, user); err != nil {
-		h.log.Err(err).Send()
-	}
+	return linkedAccount, nil
 }
 
 type UserTokensHandler struct {
@@ -372,19 +442,28 @@ func NewUserTokensHandler(log zerolog.Logger, ah *action.ActionHandler) *UserTok
 }
 
 func (h *UserTokensHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	vars := mux.Vars(r)
-	userRef := vars["userref"]
-
-	linkedAccounts, err := h.ah.GetUserTokens(ctx, userRef)
+	res, err := h.do(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	if err := util.HTTPResponse(w, http.StatusCreated, linkedAccounts); err != nil {
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
 		h.log.Err(err).Send()
 	}
+}
+
+func (h *UserTokensHandler) do(r *http.Request) ([]*types.UserToken, error) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	userRef := vars["userref"]
+
+	userTokens, err := h.ah.GetUserTokens(ctx, userRef)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return userTokens, nil
 }
 
 type CreateUserTokenHandler struct {
@@ -397,6 +476,18 @@ func NewCreateUserTokenHandler(log zerolog.Logger, ah *action.ActionHandler) *Cr
 }
 
 func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *CreateUserTokenHandler) do(r *http.Request) (*csapitypes.CreateUserTokenResponse, error) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 	userRef := vars["userref"]
@@ -404,23 +495,20 @@ func (h *CreateUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	var req csapitypes.CreateUserTokenRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	token, err := h.ah.CreateUserToken(ctx, userRef, req.TokenName)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
-	resp := &csapitypes.CreateUserTokenResponse{
+	res := &csapitypes.CreateUserTokenResponse{
 		Name:  token.Name,
 		Token: token.Value,
 	}
-	if err := util.HTTPResponse(w, http.StatusCreated, resp); err != nil {
-		h.log.Err(err).Send()
-	}
+
+	return res, nil
 }
 
 type DeleteUserTokenHandler struct {
@@ -433,19 +521,28 @@ func NewDeleteUserTokenHandler(log zerolog.Logger, ah *action.ActionHandler) *De
 }
 
 func (h *DeleteUserTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *DeleteUserTokenHandler) do(r *http.Request) error {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 	userRef := vars["userref"]
 	tokenName := vars["tokenname"]
 
-	err := h.ah.DeleteUserToken(ctx, userRef, tokenName)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err := h.ah.DeleteUserToken(ctx, userRef, tokenName); err != nil {
+		return errors.WithStack(err)
 	}
-	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Err(err).Send()
-	}
+
+	return nil
 }
 
 func userOrgResponse(userOrg *action.UserOrg) *csapitypes.UserOrgResponse {
@@ -465,7 +562,7 @@ func NewUserOrgHandler(log zerolog.Logger, ah *action.ActionHandler) *UserOrgHan
 }
 
 func (h *UserOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	res, err := h.do(w, r)
+	res, err := h.do(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
@@ -476,7 +573,7 @@ func (h *UserOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *UserOrgHandler) do(w http.ResponseWriter, r *http.Request) (*csapitypes.UserOrgResponse, error) {
+func (h *UserOrgHandler) do(r *http.Request) (*csapitypes.UserOrgResponse, error) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 	userRef := vars["userref"]
@@ -556,17 +653,26 @@ func NewUserOrgInvitationsHandler(log zerolog.Logger, ah *action.ActionHandler) 
 }
 
 func (h *UserOrgInvitationsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	vars := mux.Vars(r)
-	userRef := vars["userref"]
-
-	userOrgInvitations, err := h.ah.GetUserOrgInvitations(ctx, userRef)
+	res, err := h.do(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, userOrgInvitations); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
 		h.log.Err(err).Send()
 	}
+}
+
+func (h *UserOrgInvitationsHandler) do(r *http.Request) ([]*types.OrgInvitation, error) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	userRef := vars["userref"]
+
+	userOrgInvitations, err := h.ah.GetUserOrgInvitations(ctx, userRef)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return userOrgInvitations, nil
 }

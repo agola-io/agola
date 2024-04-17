@@ -20,6 +20,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
+	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/configstore/action"
 	"agola.io/agola/internal/util"
@@ -37,20 +38,30 @@ func NewVariablesHandler(log zerolog.Logger, ah *action.ActionHandler) *Variable
 }
 
 func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	query := r.URL.Query()
-	_, tree := query["tree"]
-
-	parentKind, parentRef, err := GetObjectKindRef(r)
+	res, err := h.do(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	res, err := h.ah.GetVariables(ctx, parentKind, parentRef, tree)
-	if util.HTTPError(w, err) {
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
 		h.log.Err(err).Send()
-		return
+	}
+}
+
+func (h *VariablesHandler) do(r *http.Request) ([]*csapitypes.Variable, error) {
+	ctx := r.Context()
+	query := r.URL.Query()
+	_, tree := query["tree"]
+
+	parentKind, parentRef, err := GetObjectKindRef(r)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	res, err := h.ah.GetVariables(ctx, parentKind, parentRef, tree)
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	resVariables := make([]*csapitypes.Variable, len(res.Variables))
@@ -58,9 +69,7 @@ func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		resVariables[i] = &csapitypes.Variable{Variable: v, ParentPath: res.ParentPaths[v.ID]}
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, resVariables); err != nil {
-		h.log.Err(err).Send()
-	}
+	return resVariables, nil
 }
 
 type CreateVariableHandler struct {
@@ -73,18 +82,28 @@ func NewCreateVariableHandler(log zerolog.Logger, ah *action.ActionHandler) *Cre
 }
 
 func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	parentKind, parentRef, err := GetObjectKindRef(r)
+	res, err := h.do(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *CreateVariableHandler) do(r *http.Request) (*types.Variable, error) {
+	ctx := r.Context()
+	parentKind, parentRef, err := GetObjectKindRef(r)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
 	var req *csapitypes.CreateUpdateVariableRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	areq := &action.CreateUpdateVariableRequest{
@@ -97,14 +116,11 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	}
 
 	variable, err := h.ah.CreateVariable(ctx, areq)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
-	if err := util.HTTPResponse(w, http.StatusCreated, variable); err != nil {
-		h.log.Err(err).Send()
-	}
+	return variable, nil
 }
 
 type UpdateVariableHandler struct {
@@ -117,21 +133,31 @@ func NewUpdateVariableHandler(log zerolog.Logger, ah *action.ActionHandler) *Upd
 }
 
 func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	vars := mux.Vars(r)
-	variableName := vars["variablename"]
-
-	parentKind, parentRef, err := GetObjectKindRef(r)
+	res, err := h.do(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *UpdateVariableHandler) do(r *http.Request) (*types.Variable, error) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	variableName := vars["variablename"]
+
+	parentKind, parentRef, err := GetObjectKindRef(r)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
 	var req *csapitypes.CreateUpdateVariableRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	areq := &action.CreateUpdateVariableRequest{
@@ -144,14 +170,11 @@ func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	}
 
 	variable, err := h.ah.UpdateVariable(ctx, variableName, areq)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, variable); err != nil {
-		h.log.Err(err).Send()
-	}
+	return variable, nil
 }
 
 type DeleteVariableHandler struct {
@@ -164,21 +187,31 @@ func NewDeleteVariableHandler(log zerolog.Logger, ah *action.ActionHandler) *Del
 }
 
 func (h *DeleteVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	vars := mux.Vars(r)
-	variableName := vars["variablename"]
-
-	parentKind, parentRef, err := GetObjectKindRef(r)
+	err := h.do(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	err = h.ah.DeleteVariable(ctx, parentKind, parentRef, variableName)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-	}
 	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
 		h.log.Err(err).Send()
 	}
+}
+
+func (h *DeleteVariableHandler) do(r *http.Request) error {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	variableName := vars["variablename"]
+
+	parentKind, parentRef, err := GetObjectKindRef(r)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	err = h.ah.DeleteVariable(ctx, parentKind, parentRef, variableName)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
 }

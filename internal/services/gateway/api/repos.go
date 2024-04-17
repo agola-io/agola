@@ -21,6 +21,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
+	"github.com/sorintlab/errors"
 
 	util "agola.io/agola/internal/util"
 )
@@ -36,15 +37,21 @@ func NewReposHandler(log zerolog.Logger, gitServerURL, gitserverAPIToken string)
 }
 
 func (h *ReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.do(w, r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+}
+
+func (h *ReposHandler) do(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 	path := vars["rest"]
 
 	u, err := url.Parse(h.gitserverURL)
 	if err != nil {
-		h.log.Err(err).Send()
-		util.HTTPError(w, err)
-		return
+		return errors.WithStack(err)
 	}
 	u.Path = path
 	u.RawQuery = r.URL.RawQuery
@@ -53,9 +60,7 @@ func (h *ReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// proxy all the request body to the destination server
 	req, err := http.NewRequestWithContext(ctx, r.Method, u.String(), r.Body)
 	if err != nil {
-		h.log.Err(err).Send()
-		util.HTTPError(w, err)
-		return
+		return errors.WithStack(err)
 	}
 
 	// copy request headers
@@ -72,9 +77,7 @@ func (h *ReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		h.log.Err(err).Send()
-		util.HTTPError(w, err)
-		return
+		return errors.WithStack(err)
 	}
 
 	// copy response headers
@@ -89,8 +92,8 @@ func (h *ReposHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer resp.Body.Close()
 	// copy response body
 	if _, err := io.Copy(w, resp.Body); err != nil {
-		h.log.Err(err).Send()
-		util.HTTPError(w, err)
-		return
+		return errors.WithStack(err)
 	}
+
+	return nil
 }

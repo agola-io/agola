@@ -110,18 +110,14 @@ func NewProjectRunWebhookRedeliveryHandler(log zerolog.Logger, ah *action.Action
 }
 
 func (h *ProjectRunWebhookRedelivery) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	err := h.do(w, r)
+	err := h.do(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
-
-	if err := util.HTTPResponse(w, http.StatusOK, nil); err != nil {
-		h.log.Err(err).Send()
-	}
 }
 
-func (h *ProjectRunWebhookRedelivery) do(w http.ResponseWriter, r *http.Request) error {
+func (h *ProjectRunWebhookRedelivery) do(r *http.Request) error {
 	ctx := r.Context()
 
 	vars := mux.Vars(r)

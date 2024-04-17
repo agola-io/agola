@@ -67,29 +67,36 @@ func NewProjectHandler(log zerolog.Logger, ah *action.ActionHandler) *ProjectHan
 }
 
 func (h *ProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *ProjectHandler) do(r *http.Request) (*csapitypes.Project, error) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 	projectRef, err := url.PathUnescape(vars["projectref"])
 	if err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	res, err := h.ah.GetProject(ctx, projectRef)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	resProject, err := projectResponse(res.Project, res.ProjectDynamicData)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, resProject); err != nil {
-		h.log.Err(err).Send()
-	}
+	return resProject, nil
 }
 
 type CreateProjectHandler struct {
@@ -102,13 +109,24 @@ func NewCreateProjectHandler(log zerolog.Logger, ah *action.ActionHandler) *Crea
 }
 
 func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *CreateProjectHandler) do(r *http.Request) (*csapitypes.Project, error) {
 	ctx := r.Context()
 
 	var req *csapitypes.CreateUpdateProjectRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	areq := &action.CreateUpdateProjectRequest{
@@ -128,20 +146,16 @@ func (h *CreateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	}
 
 	res, err := h.ah.CreateProject(ctx, areq)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	resProject, err := projectResponse(res.Project, res.ProjectDynamicData)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
-	if err := util.HTTPResponse(w, http.StatusCreated, resProject); err != nil {
-		h.log.Err(err).Send()
-	}
+	return resProject, nil
 }
 
 type UpdateProjectHandler struct {
@@ -154,20 +168,30 @@ func NewUpdateProjectHandler(log zerolog.Logger, ah *action.ActionHandler) *Upda
 }
 
 func (h *UpdateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *UpdateProjectHandler) do(r *http.Request) (*csapitypes.Project, error) {
 	ctx := r.Context()
 
 	vars := mux.Vars(r)
 	projectRef, err := url.PathUnescape(vars["projectref"])
 	if err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	var req *csapitypes.CreateUpdateProjectRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	areq := &action.CreateUpdateProjectRequest{
@@ -187,20 +211,16 @@ func (h *UpdateProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	}
 
 	res, err := h.ah.UpdateProject(ctx, projectRef, areq)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	resProject, err := projectResponse(res.Project, res.ProjectDynamicData)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
-	if err := util.HTTPResponse(w, http.StatusCreated, resProject); err != nil {
-		h.log.Err(err).Send()
-	}
+	return resProject, nil
 }
 
 type DeleteProjectHandler struct {
@@ -213,22 +233,32 @@ func NewDeleteProjectHandler(log zerolog.Logger, ah *action.ActionHandler) *Dele
 }
 
 func (h *DeleteProjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *DeleteProjectHandler) do(r *http.Request) error {
 	ctx := r.Context()
 
 	vars := mux.Vars(r)
 	projectRef, err := url.PathUnescape(vars["projectref"])
 	if err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	err = h.ah.DeleteProject(ctx, projectRef)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
+	if err != nil {
+		return errors.WithStack(err)
 	}
-	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Err(err).Send()
-	}
+
+	return nil
 }
 
 const (

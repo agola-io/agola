@@ -147,15 +147,15 @@ func NewAuthChecker(log zerolog.Logger, configstoreClient *csclient.Client, opts
 }
 
 func (h *AuthChecker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	err := h.do(ctx, w, r)
+	err := h.do(w, r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 	}
 }
 
-func (h *AuthChecker) do(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+func (h *AuthChecker) do(w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
+
 	for _, checker := range h.checkers {
 		res, err := checker.DoAuth(ctx, r)
 		if err != nil {
@@ -177,6 +177,7 @@ func (h *AuthChecker) do(ctx context.Context, w http.ResponseWriter, r *http.Req
 			}
 
 			h.doNext(ctx, w, r)
+
 			return nil
 		}
 	}
@@ -186,6 +187,7 @@ func (h *AuthChecker) do(ctx context.Context, w http.ResponseWriter, r *http.Req
 	}
 
 	h.doNext(ctx, w, r)
+
 	return nil
 }
 
