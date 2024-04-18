@@ -100,18 +100,14 @@ func NewCommitStatusRedeliveryHandler(log zerolog.Logger, ah *action.ActionHandl
 }
 
 func (h *CommitStatusRedeliveryHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	err := h.do(w, r)
+	err := h.do(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
-
-	if err := util.HTTPResponse(w, http.StatusOK, nil); err != nil {
-		h.log.Err(err).Send()
-	}
 }
 
-func (h *CommitStatusRedeliveryHandler) do(w http.ResponseWriter, r *http.Request) error {
+func (h *CommitStatusRedeliveryHandler) do(r *http.Request) error {
 	ctx := r.Context()
 
 	vars := mux.Vars(r)

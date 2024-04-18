@@ -18,6 +18,7 @@ import (
 	"net/http"
 
 	"github.com/rs/zerolog"
+	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
@@ -34,6 +35,18 @@ func NewOAuth2CallbackHandler(log zerolog.Logger, ah *action.ActionHandler) *OAu
 }
 
 func (h *OAuth2CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(w, r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *OAuth2CallbackHandler) do(w http.ResponseWriter, r *http.Request) (*gwapitypes.RemoteSourceAuthResult, error) {
 	ctx := r.Context()
 	query := r.URL.Query()
 	code := query.Get("code")
@@ -41,9 +54,7 @@ func (h *OAuth2CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 	cresp, err := h.ah.HandleOauth2Callback(ctx, code, state)
 	if err != nil {
-		h.log.Err(err).Send()
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return nil, errors.WithStack(err)
 	}
 
 	var response interface{}
@@ -85,11 +96,10 @@ func (h *OAuth2CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		response = &gwapitypes.RegisterUserResponse{}
 	}
 
-	res := gwapitypes.RemoteSourceAuthResult{
+	res := &gwapitypes.RemoteSourceAuthResult{
 		RequestType: string(cresp.RequestType),
 		Response:    response,
 	}
-	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
-		h.log.Err(err).Send()
-	}
+
+	return res, nil
 }

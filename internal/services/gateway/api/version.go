@@ -18,9 +18,11 @@ import (
 	"net/http"
 
 	"github.com/rs/zerolog"
+	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/gateway/action"
 	util "agola.io/agola/internal/util"
+	gwapitypes "agola.io/agola/services/gateway/api/types"
 )
 
 type VersionHandler struct {
@@ -33,15 +35,24 @@ func NewVersionHandler(log zerolog.Logger, ah *action.ActionHandler) *VersionHan
 }
 
 func (h *VersionHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	version, err := h.ah.GetVersion(ctx)
+	res, err := h.do(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, version); err != nil {
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
 		h.log.Err(err).Send()
 	}
+}
+
+func (h *VersionHandler) do(r *http.Request) (*gwapitypes.VersionResponse, error) {
+	ctx := r.Context()
+
+	version, err := h.ah.GetVersion(ctx)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return version, nil
 }

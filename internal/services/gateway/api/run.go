@@ -178,6 +178,18 @@ func NewGroupRunHandler(log zerolog.Logger, ah *action.ActionHandler, groupType 
 }
 
 func (h *GroupRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *GroupRunHandler) do(r *http.Request) (*gwapitypes.RunResponse, error) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 
@@ -187,8 +199,7 @@ func (h *GroupRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case common.GroupTypeProject:
 		ref, err = url.PathUnescape(vars["projectref"])
 		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("projectref is empty")))
-			return
+			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("projectref is empty"))
 		}
 	case common.GroupTypeUser:
 		ref = vars["userref"]
@@ -201,21 +212,18 @@ func (h *GroupRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		runNumber, err = strconv.ParseUint(runNumberStr, 10, 64)
 		if err != nil {
-			util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run number")))
-			return
+			return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run number"))
 		}
 	}
 
 	runResp, err := h.ah.GetRun(ctx, h.groupType, ref, runNumber)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	res := createRunResponse(runResp.Run, runResp.RunConfig)
-	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
-		h.log.Err(err).Send()
-	}
+
+	return res, nil
 }
 
 type RuntaskHandler struct {
@@ -229,6 +237,18 @@ func NewRuntaskHandler(log zerolog.Logger, ah *action.ActionHandler, groupType c
 }
 
 func (h *RuntaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *RuntaskHandler) do(r *http.Request) (*gwapitypes.RunTaskResponse, error) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 
@@ -238,8 +258,7 @@ func (h *RuntaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case common.GroupTypeProject:
 		ref, err = url.PathUnescape(vars["projectref"])
 		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("projectref is empty")))
-			return
+			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("projectref is empty"))
 		}
 	case common.GroupTypeUser:
 		ref = vars["userref"]
@@ -252,17 +271,15 @@ func (h *RuntaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		runNumber, err = strconv.ParseUint(runNumberStr, 10, 64)
 		if err != nil {
-			util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run number")))
-			return
+			return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run number"))
 		}
 	}
 
 	taskID := vars["taskid"]
 
 	runResp, err := h.ah.GetRun(ctx, h.groupType, ref, runNumber)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	run := runResp.Run
@@ -270,15 +287,13 @@ func (h *RuntaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	rt, ok := run.Tasks[taskID]
 	if !ok {
-		util.HTTPError(w, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("run %q task %q not found", runNumber, taskID)))
-		return
+		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("run %q task %q not found", runNumber, taskID))
 	}
 	rct := rc.Tasks[rt.ID]
 
 	res := createRunTaskResponse(rt, rct)
-	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
-		h.log.Err(err).Send()
-	}
+
+	return res, nil
 }
 
 func createRunsResponse(r *rstypes.Run) *gwapitypes.RunsResponse {
@@ -382,6 +397,18 @@ func NewRunActionsHandler(log zerolog.Logger, ah *action.ActionHandler, groupTyp
 }
 
 func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *RunActionsHandler) do(r *http.Request) (*gwapitypes.RunResponse, error) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 
@@ -391,8 +418,7 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case common.GroupTypeProject:
 		ref, err = url.PathUnescape(vars["projectref"])
 		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("projectref is empty")))
-			return
+			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("projectref is empty"))
 		}
 	case common.GroupTypeUser:
 		ref = vars["userref"]
@@ -405,16 +431,14 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		runNumber, err = strconv.ParseUint(runNumberStr, 10, 64)
 		if err != nil {
-			util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run number")))
-			return
+			return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run number"))
 		}
 	}
 
 	var req gwapitypes.RunActionsRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	areq := &action.RunActionsRequest{
@@ -426,15 +450,13 @@ func (h *RunActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	runResp, err := h.ah.RunAction(ctx, areq)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	res := createRunResponse(runResp.Run, runResp.RunConfig)
-	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
-		h.log.Err(err).Send()
-	}
+
+	return res, nil
 }
 
 type RunTaskActionsHandler struct {
@@ -448,6 +470,15 @@ func NewRunTaskActionsHandler(log zerolog.Logger, ah *action.ActionHandler, grou
 }
 
 func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+}
+
+func (h *RunTaskActionsHandler) do(r *http.Request) error {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 
@@ -457,8 +488,7 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	case common.GroupTypeProject:
 		ref, err = url.PathUnescape(vars["projectref"])
 		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("projectref is empty")))
-			return
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("projectref is empty"))
 		}
 	case common.GroupTypeUser:
 		ref = vars["userref"]
@@ -471,8 +501,7 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		var err error
 		runNumber, err = strconv.ParseUint(runNumberStr, 10, 64)
 		if err != nil {
-			util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run number")))
-			return
+			return util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run number"))
 		}
 	}
 	taskID := vars["taskid"]
@@ -480,8 +509,7 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	var req gwapitypes.RunTaskActionsRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	areq := &action.RunTaskActionsRequest{
@@ -493,10 +521,11 @@ func (h *RunTaskActionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	}
 
 	err = h.ah.RunTaskAction(ctx, areq)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return errors.WithStack(err)
 	}
+
+	return nil
 }
 
 type LogsHandler struct {
@@ -510,6 +539,14 @@ func NewLogsHandler(log zerolog.Logger, ah *action.ActionHandler, groupType comm
 }
 
 func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.do(w, r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+}
+
+func (h *LogsHandler) do(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 
@@ -521,8 +558,7 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case common.GroupTypeProject:
 		ref, err = url.PathUnescape(vars["projectref"])
 		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("projectref is empty")))
-			return
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("projectref is empty"))
 		}
 	case common.GroupTypeUser:
 		ref = vars["userref"]
@@ -535,8 +571,7 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		runNumber, err = strconv.ParseUint(runNumberStr, 10, 64)
 		if err != nil {
-			util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run number")))
-			return
+			return util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run number"))
 		}
 	}
 
@@ -545,12 +580,10 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, setup := q["setup"]
 	stepStr := q.Get("step")
 	if !setup && stepStr == "" {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("no setup or step number provided")))
-		return
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("no setup or step number provided"))
 	}
 	if setup && stepStr != "" {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("both setup and step number provided")))
-		return
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("both setup and step number provided"))
 	}
 
 	var step int
@@ -558,8 +591,7 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		step, err = strconv.Atoi(stepStr)
 		if err != nil {
-			util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse step number")))
-			return
+			return util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse step number"))
 		}
 	}
 
@@ -579,9 +611,8 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp, err := h.ah.GetLogs(ctx, areq)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return errors.WithStack(err)
 	}
 
 	// write and flush the headers so the client will receive the response
@@ -599,9 +630,10 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	defer resp.Body.Close()
 	if err := sendLogs(w, resp.Body); err != nil {
-		h.log.Err(err).Send()
-		return
+		return errors.WithStack(err)
 	}
+
+	return nil
 }
 
 // sendLogs streams received logs lines and flushes them
@@ -647,6 +679,18 @@ func NewLogsDeleteHandler(log zerolog.Logger, ah *action.ActionHandler, groupTyp
 }
 
 func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *LogsDeleteHandler) do(r *http.Request) error {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 
@@ -658,8 +702,7 @@ func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case common.GroupTypeProject:
 		ref, err = url.PathUnescape(vars["projectref"])
 		if err != nil {
-			util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("projectref is empty")))
-			return
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("projectref is empty"))
 		}
 	case common.GroupTypeUser:
 		ref = vars["userref"]
@@ -672,8 +715,7 @@ func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		runNumber, err = strconv.ParseUint(runNumberStr, 10, 64)
 		if err != nil {
-			util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run number")))
-			return
+			return util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run number"))
 		}
 	}
 
@@ -682,12 +724,10 @@ func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, setup := q["setup"]
 	stepStr := q.Get("step")
 	if !setup && stepStr == "" {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("no setup or step number provided")))
-		return
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("no setup or step number provided"))
 	}
 	if setup && stepStr != "" {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("both setup and step number provided")))
-		return
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("both setup and step number provided"))
 	}
 
 	var step int
@@ -695,8 +735,7 @@ func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		step, err = strconv.Atoi(stepStr)
 		if err != nil {
-			util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse step number")))
-			return
+			return util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse step number"))
 		}
 	}
 
@@ -709,9 +748,9 @@ func (h *LogsDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Step:      step,
 	}
 
-	err = h.ah.DeleteLogs(ctx, areq)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err := h.ah.DeleteLogs(ctx, areq); err != nil {
+		return errors.WithStack(err)
 	}
+
+	return nil
 }

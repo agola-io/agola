@@ -47,18 +47,14 @@ func NewWebhooksHandler(log zerolog.Logger, ah *action.ActionHandler, configstor
 }
 
 func (h *webhooksHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	err := h.handleWebhook(r)
+	err := h.do(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
-
-	if err := util.HTTPResponse(w, http.StatusOK, nil); err != nil {
-		h.log.Err(err).Send()
-	}
 }
 
-func (h *webhooksHandler) handleWebhook(r *http.Request) error {
+func (h *webhooksHandler) do(r *http.Request) error {
 	ctx := r.Context()
 
 	projectID := r.URL.Query().Get("projectid")

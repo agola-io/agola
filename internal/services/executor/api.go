@@ -26,6 +26,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/sorintlab/errors"
 
+	"agola.io/agola/internal/util"
 	rsapitypes "agola.io/agola/services/runservice/api/types"
 )
 
@@ -38,15 +39,23 @@ func NewTaskSubmissionHandler(c chan<- *rsapitypes.ExecutorTask) *taskSubmission
 }
 
 func (h *taskSubmissionHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.do(r)
+	if util.HTTPError(w, err) {
+		return
+	}
+}
+
+func (h *taskSubmissionHandler) do(r *http.Request) error {
 	var et *rsapitypes.ExecutorTask
 	d := json.NewDecoder(r.Body)
 
 	if err := d.Decode(&et); err != nil {
-		http.Error(w, "", http.StatusInternalServerError)
-		return
+		return errors.WithStack(err)
 	}
 
 	h.c <- et
+
+	return nil
 }
 
 type logsHandler struct {
@@ -62,23 +71,28 @@ func NewLogsHandler(log zerolog.Logger, e *Executor) *logsHandler {
 }
 
 func (h *logsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.do(w, r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+}
+
+func (h *logsHandler) do(w http.ResponseWriter, r *http.Request) error {
 	q := r.URL.Query()
 
 	taskID := q.Get("taskid")
 	if taskID == "" {
-		http.Error(w, "", http.StatusBadRequest)
-		return
+		return util.NewAPIError(util.ErrBadRequest)
 	}
 
 	_, setup := q["setup"]
 	stepStr := q.Get("step")
 	if !setup && stepStr == "" {
-		http.Error(w, "", http.StatusBadRequest)
-		return
+		return util.NewAPIError(util.ErrBadRequest)
 	}
 	if setup && stepStr != "" {
-		http.Error(w, "", http.StatusBadRequest)
-		return
+		return util.NewAPIError(util.ErrBadRequest)
 	}
 
 	var step int
@@ -86,8 +100,7 @@ func (h *logsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		step, err = strconv.Atoi(stepStr)
 		if err != nil {
-			http.Error(w, "", http.StatusBadRequest)
-			return
+			return util.NewAPIErrorWrap(util.ErrBadRequest, err)
 		}
 	}
 
@@ -98,8 +111,10 @@ func (h *logsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.readTaskLogs(taskID, setup, step, w, follow); err != nil {
-		h.log.Err(err).Send()
+		return errors.WithStack(err)
 	}
+
+	return nil
 }
 
 func (h *logsHandler) readTaskLogs(taskID string, setup bool, step int, w http.ResponseWriter, follow bool) error {
@@ -200,34 +215,39 @@ func NewArchivesHandler(e *Executor) *archivesHandler {
 }
 
 func (h *archivesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.do(w, r)
+	if util.HTTPError(w, err) {
+		return
+	}
+}
+
+func (h *archivesHandler) do(w http.ResponseWriter, r *http.Request) error {
 	q := r.URL.Query()
 
 	taskID := q.Get("taskid")
 	if taskID == "" {
-		http.Error(w, "", http.StatusBadRequest)
-		return
+		return util.NewAPIError(util.ErrBadRequest)
 	}
 	s := q.Get("step")
 	if s == "" {
-		http.Error(w, "", http.StatusBadRequest)
-		return
+		return util.NewAPIError(util.ErrBadRequest)
 	}
 	step, err := strconv.Atoi(s)
 	if err != nil {
-		http.Error(w, "", http.StatusBadRequest)
-		return
+		return util.NewAPIError(util.ErrBadRequest)
 	}
 
 	w.Header().Set("Cache-Control", "no-cache")
 
 	if err := h.readArchive(taskID, step, w); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			http.Error(w, "", http.StatusNotFound)
+			return util.NewAPIError(util.ErrNotExist)
 		} else {
-			http.Error(w, "", http.StatusInternalServerError)
+			return errors.WithStack(err)
 		}
-		return
 	}
+
+	return nil
 }
 
 func (h *archivesHandler) readArchive(taskID string, step int, w http.ResponseWriter) error {

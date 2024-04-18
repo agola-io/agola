@@ -86,6 +86,14 @@ func NewExecutorStatusHandler(log zerolog.Logger, d *db.DB, ah *action.ActionHan
 }
 
 func (h *ExecutorStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+}
+
+func (h *ExecutorStatusHandler) do(r *http.Request) error {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 	executorID := vars["executorid"]
@@ -96,9 +104,7 @@ func (h *ExecutorStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	defer r.Body.Close()
 
 	if err := d.Decode(&executorStatus); err != nil {
-		h.log.Err(err).Send()
-		http.Error(w, "", http.StatusBadRequest)
-		return
+		return util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	var executor *types.Executor
@@ -131,16 +137,15 @@ func (h *ExecutorStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 		return nil
 	})
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return errors.WithStack(err)
 	}
 
-	err = h.deleteStaleExecutors(ctx, executor)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err = h.deleteStaleExecutors(ctx, executor); err != nil {
+		return errors.WithStack(err)
 	}
+
+	return nil
 }
 
 func (h *ExecutorStatusHandler) deleteStaleExecutors(ctx context.Context, curExecutor *types.Executor) error {
@@ -198,6 +203,14 @@ func NewExecutorTaskStatusHandler(log zerolog.Logger, d *db.DB, c chan<- string)
 }
 
 func (h *ExecutorTaskStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+}
+
+func (h *ExecutorTaskStatusHandler) do(r *http.Request) error {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 	// executorID := vars["executorid"]
@@ -209,8 +222,7 @@ func (h *ExecutorTaskStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	defer r.Body.Close()
 
 	if err := d.Decode(&etStatus); err != nil {
-		http.Error(w, "", http.StatusBadRequest)
-		return
+		return util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
@@ -251,12 +263,13 @@ func (h *ExecutorTaskStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 
 		return nil
 	})
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return errors.WithStack(err)
 	}
 
 	go func() { h.c <- etID }()
+
+	return nil
 }
 
 type ExecutorTaskHandler struct {
@@ -269,27 +282,35 @@ func NewExecutorTaskHandler(log zerolog.Logger, ah *action.ActionHandler) *Execu
 }
 
 func (h *ExecutorTaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *ExecutorTaskHandler) do(r *http.Request) (*rsapitypes.ExecutorTask, error) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 
 	// TODO(sgotti) Check authorized call from executors
 	etID := vars["taskid"]
 	if etID == "" {
-		util.HTTPError(w, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("taskid is empty")))
-		return
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("taskid is empty"))
 	}
 
 	ares, err := h.ah.GetExecutorTask(ctx, etID)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	res := GenExecutorTaskResponse(ares.Et, ares.EtSpecData)
 
-	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
-		h.log.Err(err).Send()
-	}
+	return res, nil
 }
 
 type ExecutorTasksHandler struct {
@@ -302,33 +323,39 @@ func NewExecutorTasksHandler(log zerolog.Logger, ah *action.ActionHandler) *Exec
 }
 
 func (h *ExecutorTasksHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *ExecutorTasksHandler) do(r *http.Request) ([]*rsapitypes.ExecutorTask, error) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 
 	// TODO(sgotti) Check authorized call from executors
 	executorID := vars["executorid"]
 	if executorID == "" {
-		http.Error(w, "", http.StatusBadRequest)
-		return
+		return nil, util.NewAPIError(util.ErrBadRequest)
 	}
 
 	ares, err := h.ah.GetExecutorTasks(ctx, executorID)
 	if err != nil {
-		http.Error(w, "", http.StatusInternalServerError)
-		return
+		return nil, errors.WithStack(err)
 	}
 
 	res := []*rsapitypes.ExecutorTask{}
 
 	for _, ar := range ares {
 		res = append(res, GenExecutorTaskResponse(ar.Et, ar.EtSpecData))
-
 	}
 
-	if err := json.NewEncoder(w).Encode(res); err != nil {
-		http.Error(w, "", http.StatusInternalServerError)
-		return
-	}
+	return res, nil
 }
 
 type ArchivesHandler struct {
@@ -344,22 +371,27 @@ func NewArchivesHandler(log zerolog.Logger, ost *objectstorage.ObjStorage) *Arch
 }
 
 func (h *ArchivesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.do(w, r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+}
+
+func (h *ArchivesHandler) do(w http.ResponseWriter, r *http.Request) error {
 	// TODO(sgotti) Check authorized call from executors
 
 	taskID := r.URL.Query().Get("taskid")
 	if taskID == "" {
-		http.Error(w, "", http.StatusBadRequest)
-		return
+		return util.NewAPIError(util.ErrBadRequest)
 	}
 	s := r.URL.Query().Get("step")
 	if s == "" {
-		http.Error(w, "", http.StatusBadRequest)
-		return
+		return util.NewAPIError(util.ErrBadRequest)
 	}
 	step, err := strconv.Atoi(s)
 	if err != nil {
-		http.Error(w, "", http.StatusBadRequest)
-		return
+		return util.NewAPIError(util.ErrBadRequest)
 	}
 
 	w.Header().Set("Cache-Control", "no-cache")
@@ -367,12 +399,13 @@ func (h *ArchivesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := h.readArchive(taskID, step, w); err != nil {
 		switch {
 		case util.APIErrorIs(err, util.ErrNotExist):
-			http.Error(w, err.Error(), http.StatusNotFound)
+			return util.NewAPIErrorWrap(util.ErrNotExist, err)
 		default:
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return errors.WithStack(err)
 		}
-		return
 	}
+
+	return nil
 }
 
 func (h *ArchivesHandler) readArchive(rtID string, step int, w io.Writer) error {
@@ -405,34 +438,38 @@ func NewCacheHandler(log zerolog.Logger, ost *objectstorage.ObjStorage) *CacheHa
 }
 
 func (h *CacheHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.do(w, r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+}
+
+func (h *CacheHandler) do(w http.ResponseWriter, r *http.Request) error {
 	vars := mux.Vars(r)
 	// TODO(sgotti) Check authorized call from executors
 
 	// keep and use the escaped path
 	key := vars["key"]
 	if key == "" {
-		http.Error(w, "empty cache key", http.StatusBadRequest)
-		return
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("empty cache key"))
 	}
 	if len(key) > common.MaxCacheKeyLength {
-		http.Error(w, "cache key too long", http.StatusBadRequest)
-		return
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("cache key too long"))
 	}
 	query := r.URL.Query()
 	_, prefix := query["prefix"]
 
 	matchedKey, err := matchCache(h.ost, key, prefix)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return errors.WithStack(err)
 	}
 	if matchedKey == "" {
-		http.Error(w, "", http.StatusNotFound)
-		return
+		return util.NewAPIError(util.ErrNotExist)
 	}
 
 	if r.Method == "HEAD" {
-		return
+		return nil
 	}
 
 	w.Header().Set("Cache-Control", "no-cache")
@@ -440,12 +477,13 @@ func (h *CacheHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := h.readCache(matchedKey, w); err != nil {
 		switch {
 		case util.APIErrorIs(err, util.ErrNotExist):
-			http.Error(w, err.Error(), http.StatusNotFound)
+			return util.NewAPIErrorWrap(util.ErrNotExist, err)
 		default:
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return errors.WithStack(err)
 		}
-		return
 	}
+
+	return nil
 }
 
 func matchCache(ost *objectstorage.ObjStorage, key string, prefix bool) (string, error) {
@@ -514,30 +552,35 @@ func NewCacheCreateHandler(log zerolog.Logger, ost *objectstorage.ObjStorage) *C
 }
 
 func (h *CacheCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.do(w, r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+}
+
+func (h *CacheCreateHandler) do(w http.ResponseWriter, r *http.Request) error {
 	vars := mux.Vars(r)
 	// TODO(sgotti) Check authorized call from executors
 
 	// keep and use the escaped path
 	key := vars["key"]
 	if key == "" {
-		http.Error(w, "empty cache key", http.StatusBadRequest)
-		return
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("empty cache key"))
 	}
 	if len(key) > common.MaxCacheKeyLength {
-		http.Error(w, "cache key too long", http.StatusBadRequest)
-		return
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("cache key too long"))
 	}
 
 	w.Header().Set("Cache-Control", "no-cache")
 
 	matchedKey, err := matchCache(h.ost, key, false)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return errors.WithStack(err)
 	}
 	if matchedKey != "" {
 		http.Error(w, "", http.StatusNotModified)
-		return
+		return nil
 	}
 
 	size := int64(-1)
@@ -545,16 +588,16 @@ func (h *CacheCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if sizeStr != "" {
 		size, err = strconv.ParseInt(sizeStr, 10, 64)
 		if err != nil {
-			http.Error(w, "", http.StatusBadRequest)
-			return
+			return util.NewAPIError(util.ErrBadRequest)
 		}
 	}
 
 	cachePath := store.OSTCachePath(key)
 	if err := h.ost.WriteObject(cachePath, r.Body, size, false); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return errors.WithStack(err)
 	}
+
+	return nil
 }
 
 type ExecutorDeleteHandler struct {
@@ -570,14 +613,25 @@ func NewExecutorDeleteHandler(log zerolog.Logger, d *db.DB) *ExecutorDeleteHandl
 }
 
 func (h *ExecutorDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *ExecutorDeleteHandler) do(r *http.Request) error {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 
 	// TODO(sgotti) Check authorized call from executors
 	executorID := vars["executorid"]
 	if executorID == "" {
-		http.Error(w, "", http.StatusBadRequest)
-		return
+		return util.NewAPIError(util.ErrBadRequest)
 	}
 
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
@@ -595,8 +649,9 @@ func (h *ExecutorDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 		return nil
 	})
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return errors.WithStack(err)
 	}
+
+	return nil
 }

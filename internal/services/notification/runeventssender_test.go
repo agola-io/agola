@@ -153,6 +153,14 @@ func newRunEventsHandler(log zerolog.Logger, runEvents *runEvents) *runEventsHan
 }
 
 func (h *runEventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.do(w, r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+}
+
+func (h *runEventsHandler) do(w http.ResponseWriter, r *http.Request) error {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -164,8 +172,7 @@ func (h *runEventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		afterRunEventSequence, err = strconv.ParseUint(afterRunEventSequenceStr, 10, 64)
 		if err != nil {
-			util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse afterSequence")))
-			return
+			return util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse afterSequence"))
 		}
 	}
 
@@ -184,10 +191,14 @@ func (h *runEventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		runEventj, err := json.Marshal(runEvent)
 		if err != nil {
 			h.log.Err(err).Send()
+			continue
 		}
 
 		if _, err := w.Write([]byte(fmt.Sprintf("data: %s\n\n", runEventj))); err != nil {
 			h.log.Err(err).Send()
+			continue
 		}
 	}
+
+	return nil
 }

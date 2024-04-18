@@ -204,12 +204,12 @@ func (g *Gateway) Run(ctx context.Context) error {
 	projectCommitStatusDeliveriesHandler := api.NewProjectCommitStatusDeliveriesHandler(g.log, g.ah)
 	projectCommitStatusRedeliveryHandler := api.NewProjectCommitStatusRedeliveryHandler(g.log, g.ah)
 
-	secretHandler := api.NewSecretHandler(g.log, g.ah)
+	secretsHandler := api.NewSecretsHandler(g.log, g.ah)
 	createSecretHandler := api.NewCreateSecretHandler(g.log, g.ah)
 	updateSecretHandler := api.NewUpdateSecretHandler(g.log, g.ah)
 	deleteSecretHandler := api.NewDeleteSecretHandler(g.log, g.ah)
 
-	variableHandler := api.NewVariableHandler(g.log, g.ah)
+	variablesHandler := api.NewVariablesHandler(g.log, g.ah)
 	createVariableHandler := api.NewCreateVariableHandler(g.log, g.ah)
 	updateVariableHandler := api.NewUpdateVariableHandler(g.log, g.ah)
 	deleteVariableHandler := api.NewDeleteVariableHandler(g.log, g.ah)
@@ -327,8 +327,8 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/projects/{projectref}/commitstatusdeliveries", authForcedHandler(projectCommitStatusDeliveriesHandler)).Methods("GET")
 	apirouter.Handle("/projects/{projectref}/commitstatusdeliveries/{commitstatusdeliveryid}/redelivery", authForcedHandler(projectCommitStatusRedeliveryHandler)).Methods("PUT")
 
-	apirouter.Handle("/projectgroups/{projectgroupref}/secrets", authForcedHandler(secretHandler)).Methods("GET")
-	apirouter.Handle("/projects/{projectref}/secrets", authForcedHandler(secretHandler)).Methods("GET")
+	apirouter.Handle("/projectgroups/{projectgroupref}/secrets", authForcedHandler(secretsHandler)).Methods("GET")
+	apirouter.Handle("/projects/{projectref}/secrets", authForcedHandler(secretsHandler)).Methods("GET")
 	apirouter.Handle("/projectgroups/{projectgroupref}/secrets", authForcedHandler(createSecretHandler)).Methods("POST")
 	apirouter.Handle("/projects/{projectref}/secrets", authForcedHandler(createSecretHandler)).Methods("POST")
 	apirouter.Handle("/projectgroups/{projectgroupref}/secrets/{secretname}", authForcedHandler(updateSecretHandler)).Methods("PUT")
@@ -336,8 +336,8 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/projectgroups/{projectgroupref}/secrets/{secretname}", authForcedHandler(deleteSecretHandler)).Methods("DELETE")
 	apirouter.Handle("/projects/{projectref}/secrets/{secretname}", authForcedHandler(deleteSecretHandler)).Methods("DELETE")
 
-	apirouter.Handle("/projectgroups/{projectgroupref}/variables", authForcedHandler(variableHandler)).Methods("GET")
-	apirouter.Handle("/projects/{projectref}/variables", authForcedHandler(variableHandler)).Methods("GET")
+	apirouter.Handle("/projectgroups/{projectgroupref}/variables", authForcedHandler(variablesHandler)).Methods("GET")
+	apirouter.Handle("/projects/{projectref}/variables", authForcedHandler(variablesHandler)).Methods("GET")
 	apirouter.Handle("/projectgroups/{projectgroupref}/variables", authForcedHandler(createVariableHandler)).Methods("POST")
 	apirouter.Handle("/projects/{projectref}/variables", authForcedHandler(createVariableHandler)).Methods("POST")
 	apirouter.Handle("/projectgroups/{projectgroupref}/variables/{variablename}", authForcedHandler(updateVariableHandler)).Methods("PUT")

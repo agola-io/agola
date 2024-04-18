@@ -20,6 +20,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
+	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/common"
 	"agola.io/agola/internal/services/gateway/action"
@@ -53,25 +54,36 @@ func createVariableResponse(v *csapitypes.Variable, secrets []*csapitypes.Secret
 	return nv
 }
 
-type VariableHandler struct {
+type VariablesHandler struct {
 	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewVariableHandler(log zerolog.Logger, ah *action.ActionHandler) *VariableHandler {
-	return &VariableHandler{log: log, ah: ah}
+func NewVariablesHandler(log zerolog.Logger, ah *action.ActionHandler) *VariablesHandler {
+	return &VariablesHandler{log: log, ah: ah}
 }
 
-func (h *VariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *VariablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *VariablesHandler) do(r *http.Request) ([]*gwapitypes.VariableResponse, error) {
 	ctx := r.Context()
 	query := r.URL.Query()
 	_, tree := query["tree"]
 	_, removeoverridden := query["removeoverridden"]
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	areq := &action.GetVariablesRequest{
@@ -81,9 +93,8 @@ func (h *VariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		RemoveOverridden: removeoverridden,
 	}
 	csvars, cssecrets, err := h.ah.GetVariables(ctx, areq)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	variables := make([]*gwapitypes.VariableResponse, len(csvars))
@@ -91,9 +102,7 @@ func (h *VariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		variables[i] = createVariableResponse(v, cssecrets)
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, variables); err != nil {
-		h.log.Err(err).Send()
-	}
+	return variables, nil
 }
 
 type CreateVariableHandler struct {
@@ -106,18 +115,28 @@ func NewCreateVariableHandler(log zerolog.Logger, ah *action.ActionHandler) *Cre
 }
 
 func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	parentType, parentRef, err := GetConfigTypeRef(r)
+	res, err := h.do(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *CreateVariableHandler) do(r *http.Request) (*gwapitypes.VariableResponse, error) {
+	ctx := r.Context()
+	parentType, parentRef, err := GetConfigTypeRef(r)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
 	var req gwapitypes.CreateVariableRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 	areq := &action.CreateVariableRequest{
 		Name:       req.Name,
@@ -126,15 +145,13 @@ func (h *CreateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		Values:     fromAPIVariableValues(req.Values),
 	}
 	csvar, cssecrets, err := h.ah.CreateVariable(ctx, areq)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	res := createVariableResponse(csvar, cssecrets)
-	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Err(err).Send()
-	}
+
+	return res, nil
 }
 
 type UpdateVariableHandler struct {
@@ -147,21 +164,31 @@ func NewUpdateVariableHandler(log zerolog.Logger, ah *action.ActionHandler) *Upd
 }
 
 func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	vars := mux.Vars(r)
-	variableName := vars["variablename"]
-
-	parentType, parentRef, err := GetConfigTypeRef(r)
+	res, err := h.do(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *UpdateVariableHandler) do(r *http.Request) (*gwapitypes.VariableResponse, error) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	variableName := vars["variablename"]
+
+	parentType, parentRef, err := GetConfigTypeRef(r)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
 	var req gwapitypes.UpdateVariableRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	areq := &action.UpdateVariableRequest{
@@ -173,15 +200,13 @@ func (h *UpdateVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		Values:     fromAPIVariableValues(req.Values),
 	}
 	csvar, cssecrets, err := h.ah.UpdateVariable(ctx, areq)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	res := createVariableResponse(csvar, cssecrets)
-	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
-		h.log.Err(err).Send()
-	}
+
+	return res, nil
 }
 
 type DeleteVariableHandler struct {
@@ -194,17 +219,7 @@ func NewDeleteVariableHandler(log zerolog.Logger, ah *action.ActionHandler) *Del
 }
 
 func (h *DeleteVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	vars := mux.Vars(r)
-	variableName := vars["variablename"]
-
-	parentType, parentRef, err := GetConfigTypeRef(r)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
-	}
-
-	err = h.ah.DeleteVariable(ctx, parentType, parentRef, variableName)
+	err := h.do(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
@@ -213,6 +228,24 @@ func (h *DeleteVariableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
 		h.log.Err(err).Send()
 	}
+}
+
+func (h *DeleteVariableHandler) do(r *http.Request) error {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	variableName := vars["variablename"]
+
+	parentType, parentRef, err := GetConfigTypeRef(r)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	err = h.ah.DeleteVariable(ctx, parentType, parentRef, variableName)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
 }
 
 func fromAPIVariableValues(apivalues []gwapitypes.VariableValueRequest) []cstypes.VariableValue {

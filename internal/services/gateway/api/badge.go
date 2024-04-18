@@ -20,6 +20,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
+	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
@@ -35,21 +36,27 @@ func NewBadgeHandler(log zerolog.Logger, ah *action.ActionHandler) *BadgeHandler
 }
 
 func (h *BadgeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.do(w, r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+}
+
+func (h *BadgeHandler) do(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 	query := r.URL.Query()
 
 	projectRef, err := url.PathUnescape(vars["projectref"])
 	if err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 	branch := query.Get("branch")
 
 	badge, err := h.ah.GetBadge(ctx, projectRef, branch)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return errors.WithStack(err)
 	}
 
 	// TODO(sgotti) return some caching headers
@@ -59,4 +66,6 @@ func (h *BadgeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if _, err := w.Write([]byte(badge)); err != nil {
 		h.log.Err(err).Send()
 	}
+
+	return nil
 }

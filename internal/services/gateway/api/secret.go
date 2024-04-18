@@ -20,6 +20,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
+	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
@@ -36,25 +37,36 @@ func createSecretResponse(s *csapitypes.Secret) *gwapitypes.SecretResponse {
 	}
 }
 
-type SecretHandler struct {
+type SecretsHandler struct {
 	log zerolog.Logger
 	ah  *action.ActionHandler
 }
 
-func NewSecretHandler(log zerolog.Logger, ah *action.ActionHandler) *SecretHandler {
-	return &SecretHandler{log: log, ah: ah}
+func NewSecretsHandler(log zerolog.Logger, ah *action.ActionHandler) *SecretsHandler {
+	return &SecretsHandler{log: log, ah: ah}
 }
 
-func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *SecretsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *SecretsHandler) do(r *http.Request) ([]*gwapitypes.SecretResponse, error) {
 	ctx := r.Context()
 	query := r.URL.Query()
 	_, tree := query["tree"]
 	_, removeoverridden := query["removeoverridden"]
 
 	parentType, parentRef, err := GetConfigTypeRef(r)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	areq := &action.GetSecretsRequest{
@@ -64,9 +76,8 @@ func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		RemoveOverridden: removeoverridden,
 	}
 	cssecrets, err := h.ah.GetSecrets(ctx, areq)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	secrets := make([]*gwapitypes.SecretResponse, len(cssecrets))
@@ -74,9 +85,7 @@ func (h *SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		secrets[i] = createSecretResponse(s)
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, secrets); err != nil {
-		h.log.Err(err).Send()
-	}
+	return secrets, nil
 }
 
 type CreateSecretHandler struct {
@@ -89,17 +98,28 @@ func NewCreateSecretHandler(log zerolog.Logger, ah *action.ActionHandler) *Creat
 }
 
 func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *CreateSecretHandler) do(r *http.Request) (*gwapitypes.SecretResponse, error) {
 	ctx := r.Context()
 	parentType, parentRef, err := GetConfigTypeRef(r)
-	if util.HTTPError(w, err) {
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	var req gwapitypes.CreateSecretRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	areq := &action.CreateSecretRequest{
@@ -112,15 +132,13 @@ func (h *CreateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		Path:             req.Path,
 	}
 	cssecret, err := h.ah.CreateSecret(ctx, areq)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	res := createSecretResponse(cssecret)
-	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
-		h.log.Err(err).Send()
-	}
+
+	return res, nil
 }
 
 type UpdateSecretHandler struct {
@@ -133,21 +151,31 @@ func NewUpdateSecretHandler(log zerolog.Logger, ah *action.ActionHandler) *Updat
 }
 
 func (h *UpdateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	vars := mux.Vars(r)
-	secretName := vars["secretname"]
-
-	parentType, parentRef, err := GetConfigTypeRef(r)
+	res, err := h.do(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
 	}
 
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *UpdateSecretHandler) do(r *http.Request) (*gwapitypes.SecretResponse, error) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	secretName := vars["secretname"]
+
+	parentType, parentRef, err := GetConfigTypeRef(r)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
 	var req gwapitypes.UpdateSecretRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 	areq := &action.UpdateSecretRequest{
 		SecretName: secretName,
@@ -161,15 +189,13 @@ func (h *UpdateSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		Path:             req.Path,
 	}
 	cssecret, err := h.ah.UpdateSecret(ctx, areq)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	res := createSecretResponse(cssecret)
-	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
-		h.log.Err(err).Send()
-	}
+
+	return res, nil
 }
 
 type DeleteSecretHandler struct {
@@ -182,16 +208,7 @@ func NewDeleteSecretHandler(log zerolog.Logger, ah *action.ActionHandler) *Delet
 }
 
 func (h *DeleteSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	vars := mux.Vars(r)
-	secretName := vars["secretname"]
-
-	parentType, parentRef, err := GetConfigTypeRef(r)
-	if util.HTTPError(w, err) {
-		return
-	}
-
-	err = h.ah.DeleteSecret(ctx, parentType, parentRef, secretName)
+	err := h.do(r)
 	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
 		return
@@ -200,4 +217,22 @@ func (h *DeleteSecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
 		h.log.Err(err).Send()
 	}
+}
+
+func (h *DeleteSecretHandler) do(r *http.Request) error {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	secretName := vars["secretname"]
+
+	parentType, parentRef, err := GetConfigTypeRef(r)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	err = h.ah.DeleteSecret(ctx, parentType, parentRef, secretName)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
 }

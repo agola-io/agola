@@ -18,6 +18,7 @@ import (
 	"net/http"
 
 	"github.com/rs/zerolog"
+	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/runservice/action"
 	"agola.io/agola/internal/util"
@@ -35,19 +36,28 @@ func NewMaintenanceStatusHandler(log zerolog.Logger, ah *action.ActionHandler, c
 }
 
 func (h *MaintenanceStatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *MaintenanceStatusHandler) do(r *http.Request) (*rsapitypes.MaintenanceStatusResponse, error) {
 	ctx := r.Context()
 
 	requestedStatus, err := h.ah.IsMaintenanceEnabled(ctx)
 	if err != nil {
-		h.log.Err(err).Send()
-		util.HTTPError(w, err)
-		return
+		return nil, errors.WithStack(err)
 	}
 
-	resp := rsapitypes.MaintenanceStatusResponse{RequestedStatus: requestedStatus, CurrentStatus: h.currentMaintenanceMode}
-	if err := util.HTTPResponse(w, http.StatusOK, resp); err != nil {
-		h.log.Err(err).Send()
-	}
+	res := &rsapitypes.MaintenanceStatusResponse{RequestedStatus: requestedStatus, CurrentStatus: h.currentMaintenanceMode}
+
+	return res, nil
 }
 
 type MaintenanceModeHandler struct {
@@ -60,6 +70,14 @@ func NewMaintenanceModeHandler(log zerolog.Logger, ah *action.ActionHandler) *Ma
 }
 
 func (h *MaintenanceModeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+}
+
+func (h *MaintenanceModeHandler) do(r *http.Request) error {
 	ctx := r.Context()
 
 	enable := false
@@ -70,16 +88,11 @@ func (h *MaintenanceModeHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		enable = false
 	}
 
-	err := h.ah.SetMaintenanceEnabled(ctx, enable)
-	if err != nil {
-		h.log.Err(err).Send()
-		util.HTTPError(w, err)
-		return
+	if err := h.ah.SetMaintenanceEnabled(ctx, enable); err != nil {
+		return errors.WithStack(err)
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, nil); err != nil {
-		h.log.Err(err).Send()
-	}
+	return nil
 }
 
 type ExportHandler struct {
@@ -92,10 +105,17 @@ func NewExportHandler(log zerolog.Logger, ah *action.ActionHandler) *ExportHandl
 }
 
 func (h *ExportHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.do(w, r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+}
+
+func (h *ExportHandler) do(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 
-	err := h.ah.Export(ctx, w)
-	if err != nil {
+	if err := h.ah.Export(ctx, w); err != nil {
 		h.log.Err(err).Send()
 		// since we already answered with a 200 we cannot return another error code
 		// So abort the connection and the client will detect the missing ending chunk
@@ -104,6 +124,8 @@ func (h *ExportHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// this is the way to force close a request without logging the panic
 		panic(http.ErrAbortHandler)
 	}
+
+	return nil
 }
 
 type ImportHandler struct {
@@ -116,17 +138,19 @@ func NewImportHandler(log zerolog.Logger, ah *action.ActionHandler) *ImportHandl
 }
 
 func (h *ImportHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	err := h.ah.Import(ctx, r.Body)
-	if err != nil {
+	err := h.do(r)
+	if util.HTTPError(w, err) {
 		h.log.Err(err).Send()
-		util.HTTPError(w, err)
 		return
 	}
+}
 
-	if err := util.HTTPResponse(w, http.StatusOK, nil); err != nil {
-		h.log.Err(err).Send()
+func (h *ImportHandler) do(r *http.Request) error {
+	ctx := r.Context()
+
+	if err := h.ah.Import(ctx, r.Body); err != nil {
+		return errors.WithStack(err)
 	}
 
+	return nil
 }

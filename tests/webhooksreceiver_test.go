@@ -184,18 +184,27 @@ func newHandleWebhookHandler(log zerolog.Logger, webhooks *webhooks) *handleWebh
 }
 
 func (h *handleWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusCreated, nil); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *handleWebhookHandler) do(r *http.Request) error {
 	var req *types.RunWebhook
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		h.log.Err(err).Send()
-		return
+		return util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	signature := r.Header.Get(signatureSHA256Key)
 
 	h.webhooks.addWebhook(&webhook{webhookData: req, signature: signature})
 
-	if err := util.HTTPResponse(w, http.StatusCreated, nil); err != nil {
-		h.log.Err(err).Send()
-	}
+	return nil
 }

@@ -66,30 +66,37 @@ func NewProjectGroupHandler(log zerolog.Logger, ah *action.ActionHandler) *Proje
 }
 
 func (h *ProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *ProjectGroupHandler) do(r *http.Request) (*csapitypes.ProjectGroup, error) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	res, err := h.ah.GetProjectGroup(ctx, projectGroupRef)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	resProjectGroup, err := projectGroupResponse(res.ProjectGroup, res.ProjectGroupDynamicData)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, resProjectGroup); err != nil {
-		h.log.Err(err).Send()
-	}
+	return resProjectGroup, nil
 }
 
 type ProjectGroupProjectsHandler struct {
@@ -102,30 +109,37 @@ func NewProjectGroupProjectsHandler(log zerolog.Logger, ah *action.ActionHandler
 }
 
 func (h *ProjectGroupProjectsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *ProjectGroupProjectsHandler) do(r *http.Request) ([]*csapitypes.Project, error) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	res, err := h.ah.GetProjectGroupProjects(ctx, projectGroupRef)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	resProjects, err := projectsResponse(res.Projects, res.ProjectsDynamicData)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, resProjects); err != nil {
-		h.log.Err(err).Send()
-	}
+	return resProjects, nil
 }
 
 type ProjectGroupSubgroupsHandler struct {
@@ -138,29 +152,36 @@ func NewProjectGroupSubgroupsHandler(log zerolog.Logger, ah *action.ActionHandle
 }
 
 func (h *ProjectGroupSubgroupsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusOK, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *ProjectGroupSubgroupsHandler) do(r *http.Request) ([]*csapitypes.ProjectGroup, error) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	res, err := h.ah.GetProjectGroupSubgroups(ctx, projectGroupRef)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	resProjectGroups, err := projectGroupsResponse(res.ProjectGroups, res.ProjectGroupsDynamicData)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
-	if err := util.HTTPResponse(w, http.StatusOK, resProjectGroups); err != nil {
-		h.log.Err(err).Send()
-	}
+	return resProjectGroups, nil
 }
 
 type CreateProjectGroupHandler struct {
@@ -173,13 +194,24 @@ func NewCreateProjectGroupHandler(log zerolog.Logger, ah *action.ActionHandler) 
 }
 
 func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *CreateProjectGroupHandler) do(r *http.Request) (*csapitypes.ProjectGroup, error) {
 	ctx := r.Context()
 
 	var req *csapitypes.CreateUpdateProjectGroupRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	areq := &action.CreateUpdateProjectGroupRequest{
@@ -189,20 +221,16 @@ func (h *CreateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	}
 
 	res, err := h.ah.CreateProjectGroup(ctx, areq)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	resProjectGroup, err := projectGroupResponse(res.ProjectGroup, res.ProjectGroupDynamicData)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
-	if err := util.HTTPResponse(w, http.StatusCreated, resProjectGroup); err != nil {
-		h.log.Err(err).Send()
-	}
+	return resProjectGroup, nil
 }
 
 type UpdateProjectGroupHandler struct {
@@ -215,20 +243,30 @@ func NewUpdateProjectGroupHandler(log zerolog.Logger, ah *action.ActionHandler) 
 }
 
 func (h *UpdateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	res, err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusCreated, res); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *UpdateProjectGroupHandler) do(r *http.Request) (*csapitypes.ProjectGroup, error) {
 	ctx := r.Context()
 
 	vars := mux.Vars(r)
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	var req *csapitypes.CreateUpdateProjectGroupRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
 	areq := &action.CreateUpdateProjectGroupRequest{
@@ -238,20 +276,16 @@ func (h *UpdateProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	}
 
 	res, err := h.ah.UpdateProjectGroup(ctx, projectGroupRef, areq)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	resProjectGroup, err := projectGroupResponse(res.ProjectGroup, res.ProjectGroupDynamicData)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
-		return
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
-	if err := util.HTTPResponse(w, http.StatusCreated, resProjectGroup); err != nil {
-		h.log.Err(err).Send()
-	}
+	return resProjectGroup, nil
 }
 
 type DeleteProjectGroupHandler struct {
@@ -264,20 +298,29 @@ func NewDeleteProjectGroupHandler(log zerolog.Logger, ah *action.ActionHandler) 
 }
 
 func (h *DeleteProjectGroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.do(r)
+	if util.HTTPError(w, err) {
+		h.log.Err(err).Send()
+		return
+	}
+
+	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
+		h.log.Err(err).Send()
+	}
+}
+
+func (h *DeleteProjectGroupHandler) do(r *http.Request) error {
 	ctx := r.Context()
 
 	vars := mux.Vars(r)
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
-		util.HTTPError(w, util.NewAPIErrorWrap(util.ErrBadRequest, err))
-		return
+		return util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
-	err = h.ah.DeleteProjectGroup(ctx, projectGroupRef)
-	if util.HTTPError(w, err) {
-		h.log.Err(err).Send()
+	if err = h.ah.DeleteProjectGroup(ctx, projectGroupRef); err != nil {
+		return errors.WithStack(err)
 	}
-	if err := util.HTTPResponse(w, http.StatusNoContent, nil); err != nil {
-		h.log.Err(err).Send()
-	}
+
+	return nil
 }
