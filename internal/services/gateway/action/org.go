@@ -19,6 +19,7 @@ import (
 
 	"github.com/sorintlab/errors"
 
+	serrors "agola.io/agola/internal/services/errors"
 	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
@@ -193,10 +194,13 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*
 	}
 
 	if req.Name == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("organization name required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("organization name required"), serrors.InvalidOrganizationName())
 	}
 	if !util.ValidateName(req.Name) {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid organization name %q", req.Name))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid organization name %q", req.Name), serrors.InvalidOrganizationName())
+	}
+	if !cstypes.IsValidVisibility(req.Visibility) {
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid organization visibility"), serrors.InvalidVisibility())
 	}
 
 	creq := &csapitypes.CreateOrgRequest{
@@ -281,7 +285,7 @@ type AddOrgMemberResponse struct {
 
 func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string, role cstypes.MemberRole) (*AddOrgMemberResponse, error) {
 	if h.organizationMemberAddingMode != OrganizationMemberAddingModeDirect && !common.IsUserAdmin(ctx) {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("cannot directly add user to organization"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("cannot directly add user to organization"), serrors.CannotAddUserToOrganization())
 	}
 
 	org, _, err := h.configstoreClient.GetOrg(ctx, orgRef)
@@ -376,17 +380,17 @@ func (h *ActionHandler) CreateOrgInvitation(ctx context.Context, req *CreateOrgI
 	}
 
 	if h.organizationMemberAddingMode != OrganizationMemberAddingModeInvitation {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user members can not added by invitation"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invitation creation is disabled"), serrors.CannotCreateInvitation())
 	}
 
 	if req.UserRef == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user id required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user ref required"))
 	}
 	if req.OrganizationRef == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("organization id required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("organization ref required"))
 	}
-	if req.Role == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("role is required"))
+	if !cstypes.IsValidMemberRole(req.Role) {
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("role is required"), serrors.InvalidRole())
 	}
 
 	org, _, err := h.configstoreClient.GetOrg(ctx, req.OrganizationRef)
@@ -413,10 +417,10 @@ func (h *ActionHandler) CreateOrgInvitation(ctx context.Context, req *CreateOrgI
 	_, _, err = h.configstoreClient.GetOrgInvitation(ctx, req.OrganizationRef, req.UserRef)
 	if err != nil {
 		if !util.RemoteErrorIs(err, util.ErrNotExist) {
-			return nil, errors.Wrapf(err, "failed to determine if org invitation exists")
+			return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get org invitation"))
 		}
 	} else {
-		return nil, errors.Errorf("invitation already exists")
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invitation already exists"), serrors.InvitationAlreadyExists())
 	}
 
 	creq := &csapitypes.CreateOrgInvitationRequest{
@@ -457,7 +461,7 @@ func (h *ActionHandler) OrgInvitationAction(ctx context.Context, req *OrgInvitat
 		return APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get org invitation"))
 	}
 	if orgInvitation == nil {
-		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invitation for org %s user %s not found", req.OrgRef, userID))
+		return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("invitation for org %s user %s not found", req.OrgRef, userID), serrors.InvitationDoesNotExist())
 	}
 
 	if userID != orgInvitation.UserID {
@@ -470,7 +474,7 @@ func (h *ActionHandler) OrgInvitationAction(ctx context.Context, req *OrgInvitat
 	}
 
 	if org == nil {
-		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("org %s not found", req.OrgRef))
+		return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("org %s doesn't exist", req.OrgRef), serrors.OrganizationDoesNotExist())
 	}
 
 	creq := &csapitypes.OrgInvitationActionRequest{Action: req.Action}

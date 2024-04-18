@@ -20,6 +20,7 @@ import (
 	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/common"
+	serrors "agola.io/agola/internal/services/errors"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"
@@ -87,11 +88,11 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateVariableR
 	}
 
 	if !util.ValidateName(req.Name) {
-		return nil, nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid variable name %q", req.Name))
+		return nil, nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid variable name %q", req.Name), serrors.InvalidVariableName())
 	}
 
 	if len(req.Values) == 0 {
-		return nil, nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("empty variable values"))
+		return nil, nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("empty variable values"), serrors.InvalidVariableValues())
 	}
 
 	creq := &csapitypes.CreateUpdateVariableRequest{
@@ -154,11 +155,11 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableR
 	}
 
 	if !util.ValidateName(req.Name) {
-		return nil, nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid variable name %q", req.Name))
+		return nil, nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid variable name %q", req.Name), serrors.InvalidVariableName())
 	}
 
 	if len(req.Values) == 0 {
-		return nil, nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("empty variable values"))
+		return nil, nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("empty variable values"), serrors.InvalidVariableValues())
 	}
 
 	creq := &csapitypes.CreateUpdateVariableRequest{

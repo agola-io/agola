@@ -34,7 +34,10 @@ func APIErrorFromRemoteError(err error, options ...util.APIErrorOption) error {
 	}
 
 	// assume remote error from internal services can be propagated from the gateway
-	opts = append(opts, util.WithAPIErrorUserCode(util.ErrorCode(rerr.Code)), util.WithAPIErrorUserMessage(rerr.Message))
+	for _, detailedError := range rerr.DetailedErrors {
+		opts = append(opts, util.WithAPIErrorDetailedError(util.NewAPIDetailedError(util.ErrorCode(detailedError.Code), util.WithAPIDetailedErrorDetails(detailedError.Details))))
+	}
+
 	return util.NewAPIErrorWrap(util.KindFromRemoteError(err), err, opts...)
 }
 

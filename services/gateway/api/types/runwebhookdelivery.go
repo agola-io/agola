@@ -24,14 +24,6 @@ const (
 	DeliveryStatusDeliveryError DeliveryStatus = "deliveryError"
 )
 
-func DeliveryStatusFromStringSlice(slice []string) []DeliveryStatus {
-	dss := make([]DeliveryStatus, len(slice))
-	for i, s := range slice {
-		dss[i] = DeliveryStatus(s)
-	}
-	return dss
-}
-
 type RunWebhookDeliveryResponse struct {
 	ID             string         `json:"id"`
 	Sequence       uint64         `json:"sequence"`

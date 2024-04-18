@@ -20,6 +20,7 @@ import (
 	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/common"
+	serrors "agola.io/agola/internal/services/errors"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"
@@ -80,7 +81,7 @@ func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretReque
 	}
 
 	if !util.ValidateName(req.Name) {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid secret name %q", req.Name))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid secret name %q", req.Name), serrors.InvalidSecretName())
 	}
 
 	creq := &csapitypes.CreateUpdateSecretRequest{
@@ -134,7 +135,7 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretReque
 	}
 
 	if !util.ValidateName(req.Name) {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid secret name %q", req.Name))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid secret name %q", req.Name), serrors.InvalidSecretName())
 	}
 
 	creq := &csapitypes.CreateUpdateSecretRequest{

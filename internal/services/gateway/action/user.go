@@ -29,6 +29,7 @@ import (
 	gitsource "agola.io/agola/internal/gitsources"
 	"agola.io/agola/internal/gitsources/agolagit"
 	scommon "agola.io/agola/internal/services/common"
+	serrors "agola.io/agola/internal/services/errors"
 	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/services/types"
 	"agola.io/agola/internal/util"
@@ -225,10 +226,10 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 	}
 
 	if req.UserName == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user name required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user name required"), serrors.InvalidUserName())
 	}
 	if !util.ValidateName(req.UserName) {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid user name %q", req.UserName))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid user name %q", req.UserName), serrors.InvalidUserName())
 	}
 
 	creq := &csapitypes.CreateUserRequest{
@@ -278,7 +279,7 @@ func (h *ActionHandler) CreateUserToken(ctx context.Context, req *CreateUserToke
 		}
 	}
 	if token != nil {
-		return "", util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user %q already have a token with name %q", userRef, req.TokenName))
+		return "", util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user %q already have a token with name %q", userRef, req.TokenName), serrors.UserTokenAlreadyExists())
 	}
 
 	h.log.Info().Msgf("creating user token")
@@ -326,7 +327,7 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 		}
 	}
 	if la != nil {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user %q already have a linked account for remote source %q", userRef, rs.Name))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user %q already have a linked account for remote source %q", userRef, rs.Name), serrors.LinkedAccountAlreadyExists())
 	}
 
 	userSource, err := scommon.GetUserSource(rs, req.RemoteUserName, req.RemotePassword, req.Oauth2AccessToken)
@@ -390,7 +391,7 @@ func (h *ActionHandler) UpdateUserLA(ctx context.Context, userRef string, la *cs
 		}
 	}
 	if !laFound {
-		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user %q doesn't have a linked account with id %q", userRef, la.ID))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user %q doesn't have a linked account with id %q", userRef, la.ID), serrors.LinkedAccountDoesNotExist())
 	}
 
 	creq := &csapitypes.UpdateUserLARequest{
@@ -467,10 +468,10 @@ type RegisterUserRequest struct {
 
 func (h *ActionHandler) RegisterUser(ctx context.Context, req *RegisterUserRequest) (*cstypes.User, error) {
 	if req.UserName == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user name required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user name required"), serrors.InvalidUserName())
 	}
 	if !util.ValidateName(req.UserName) {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid user name %q", req.UserName))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid user name %q", req.UserName), serrors.InvalidUserName())
 	}
 
 	rs, _, err := h.configstoreClient.GetRemoteSource(ctx, req.RemoteSourceName)
@@ -499,7 +500,7 @@ func (h *ActionHandler) RegisterUser(ctx context.Context, req *RegisterUserReque
 			return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get linked account for remote user id %q and remote source %q", remoteUserInfo.ID, rs.ID))
 		}
 	} else {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("linked account for remote user id %q for remote source %q already exists", remoteUserInfo.ID, rs.ID))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("linked account for remote user id %q for remote source %q already exists", remoteUserInfo.ID, rs.ID), serrors.LinkedAccountAlreadyExists())
 	}
 
 	var userAccessToken string
@@ -597,7 +598,7 @@ func (h *ActionHandler) LoginUser(ctx context.Context, req *LoginUserRequest) (*
 		}
 	}
 	if la == nil {
-		return nil, errors.Errorf("linked account for user %q for remote source %q doesn't exist", user.Name, rs.Name)
+		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("linked account for user %q for remote source %q doesn't exist", user.Name, rs.Name), serrors.LinkedAccountDoesNotExist())
 	}
 
 	userAccessToken := la.UserAccessToken
@@ -753,7 +754,7 @@ func (h *ActionHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSource
 			}
 		}
 		if la != nil {
-			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user %q already have a linked account for remote source %q", req.UserRef, rs.Name))
+			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user %q already have a linked account for remote source %q", req.UserRef, rs.Name), serrors.LinkedAccountAlreadyExists())
 		}
 
 	case RemoteSourceRequestTypeLoginUser:

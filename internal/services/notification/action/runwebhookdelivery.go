@@ -19,6 +19,7 @@ import (
 
 	"github.com/sorintlab/errors"
 
+	serrors "agola.io/agola/internal/services/errors"
 	"agola.io/agola/internal/sqlg/sql"
 	"agola.io/agola/internal/util"
 	"agola.io/agola/services/notification/types"
@@ -85,7 +86,7 @@ func (h *ActionHandler) RunWebhookRedelivery(ctx context.Context, projectID stri
 			return errors.WithStack(err)
 		}
 		if runWebhookDelivery == nil {
-			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("runWebhookDelivery %q doesn't exist", runWebhookDeliveryID))
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("runWebhookDelivery %q doesn't exist", runWebhookDeliveryID), serrors.RunWebhookDeliveryDoesNotExist())
 		}
 
 		runWebhook, err := h.d.GetRunWebhookByID(tx, runWebhookDelivery.RunWebhookID)
@@ -93,10 +94,10 @@ func (h *ActionHandler) RunWebhookRedelivery(ctx context.Context, projectID stri
 			return errors.WithStack(err)
 		}
 		if runWebhook == nil {
-			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("runWebhook %q doesn't exist", runWebhookDelivery.RunWebhookID))
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("runWebhook %q doesn't exist", runWebhookDelivery.RunWebhookID), serrors.RunWebhookDoesNotExist())
 		}
 		if runWebhook.ProjectID != projectID {
-			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("runWebhookDelivery %q doesn't belong to project %q", runWebhookDeliveryID, projectID))
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("runWebhookDelivery %q doesn't belong to project %q", runWebhookDeliveryID, projectID), serrors.RunWebhookDeliveryDoesNotExist())
 		}
 
 		runWebhookDeliveries, err := h.d.GetRunWebhookDeliveriesByRunWebhookID(tx, runWebhookDelivery.RunWebhookID, []types.DeliveryStatus{types.DeliveryStatusNotDelivered}, 1, types.SortDirectionDesc)
@@ -105,7 +106,7 @@ func (h *ActionHandler) RunWebhookRedelivery(ctx context.Context, projectID stri
 		}
 		// check if runWebhook has delivery not delivered
 		if len(runWebhookDeliveries) != 0 {
-			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("the previous delivery of run webhook %q hasn't already been delivered", runWebhookDelivery.RunWebhookID))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("the previous delivery of run webhook %q hasn't already been delivered", runWebhookDelivery.RunWebhookID), serrors.RunWebhookDeliveryAlreadyInProgress())
 		}
 
 		newRunWebhookDelivery := types.NewRunWebhookDelivery(tx)

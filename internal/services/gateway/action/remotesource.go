@@ -19,6 +19,7 @@ import (
 
 	"github.com/sorintlab/errors"
 
+	serrors "agola.io/agola/internal/services/errors"
 	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
@@ -104,33 +105,33 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemot
 	}
 
 	if !util.ValidateName(req.Name) {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid remotesource name %q", req.Name))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid remotesource name %q", req.Name), serrors.InvalidRemoteSourceName())
 	}
 
 	if req.Name == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource name required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource name required"), serrors.InvalidRemoteSourceName())
 	}
 	if req.APIURL == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource api url required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource api url required"), serrors.InvalidRemoteSourceAPIURL())
 	}
 	if req.Type == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource type required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource type required"), serrors.InvalidRemoteSourceType())
 	}
 	if req.AuthType == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource auth type required"))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource auth type required"), serrors.InvalidRemoteSourceAuthType())
 	}
 
 	// validate if the remote source type supports the required auth type
 	if !cstypes.SourceSupportsAuthType(cstypes.RemoteSourceType(req.Type), cstypes.RemoteSourceAuthType(req.AuthType)) {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource type %q doesn't support auth type %q", req.Type, req.AuthType))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource type %q doesn't support auth type %q", req.Type, req.AuthType), serrors.InvalidRemoteSourceAuthType())
 	}
 
 	if req.AuthType == string(cstypes.RemoteSourceAuthTypeOauth2) {
 		if req.Oauth2ClientID == "" {
-			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource oauth2 clientid required"))
+			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource oauth2 clientid required"), serrors.InvalidOauth2ClientID())
 		}
 		if req.Oauth2ClientSecret == "" {
-			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource oauth2 client secret required"))
+			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource oauth2 client secret required"), serrors.InvalidOauth2ClientSecret())
 		}
 	}
 
@@ -190,6 +191,28 @@ func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, req *UpdateRemot
 	rs, _, err := h.configstoreClient.GetRemoteSource(ctx, req.RemoteSourceRef)
 	if err != nil {
 		return nil, errors.WithStack(err)
+	}
+
+	if req.Name != nil {
+		if !util.ValidateName(*req.Name) {
+			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid remotesource name %q", *req.Name), serrors.InvalidRemoteSourceName())
+		}
+		if *req.Name == "" {
+			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource name required"), serrors.InvalidRemoteSourceName())
+		}
+	}
+
+	if req.APIURL != nil && *req.APIURL == "" {
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource api url required"), serrors.InvalidRemoteSourceAPIURL())
+	}
+
+	if rs.AuthType == cstypes.RemoteSourceAuthTypeOauth2 {
+		if req.Oauth2ClientID != nil && *req.Oauth2ClientID == "" {
+			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource oauth2 clientid required"), serrors.InvalidOauth2ClientID())
+		}
+		if req.Oauth2ClientSecret != nil && *req.Oauth2ClientSecret == "" {
+			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource oauth2 client secret required"), serrors.InvalidOauth2ClientSecret())
+		}
 	}
 
 	if req.Name != nil {

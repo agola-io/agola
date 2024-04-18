@@ -20,6 +20,7 @@ import (
 
 	"github.com/sorintlab/errors"
 
+	serrors "agola.io/agola/internal/services/errors"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"
@@ -71,12 +72,15 @@ type CreateProjectGroupRequest struct {
 
 func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProjectGroupRequest) (*csapitypes.ProjectGroup, error) {
 	if !util.ValidateName(req.Name) {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid project group name %q", req.Name))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid project group name %q", req.Name), serrors.InvalidProjectName())
 	}
 
 	pg, _, err := h.configstoreClient.GetProjectGroup(ctx, req.ParentRef)
 	if err != nil {
-		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get project group %q", req.ParentRef))
+		if util.RemoteErrorIs(err, util.ErrNotExist) {
+			return nil, util.NewAPIError(util.ErrNotExist, serrors.ParentProjectGroupDoesNotExist())
+		}
+		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get parent project group %q", req.ParentRef))
 	}
 
 	isProjectOwner, err := h.IsAuthUserProjectOwner(ctx, pg.OwnerType, pg.OwnerID)

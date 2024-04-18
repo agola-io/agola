@@ -27,23 +27,30 @@ func HTTPResponse(w http.ResponseWriter, code int, res interface{}) error {
 	return nil
 }
 
-type ErrorResponse struct {
+type errorResponse struct {
 	Code    string `json:"code"`
-	Message string `json:"message"`
+	Details any    `json:"details"`
 }
 
-func ErrorResponseFromError(err error) *ErrorResponse {
+func ErrorResponseFromError(err error) []*errorResponse {
 	if err == nil {
 		return nil
 	}
 
+	res := []*errorResponse{}
+
 	var aerr *APIError
 	if errors.As(err, &aerr) {
-		return &ErrorResponse{Code: string(aerr.Code), Message: aerr.Message}
+		for _, detailedError := range aerr.DetailedErrors {
+			res = append(res, &errorResponse{
+				Code:    string(detailedError.Code),
+				Details: detailedError.Details,
+			})
+		}
 	}
 
-	// on generic error return an error response without any code
-	return &ErrorResponse{}
+	// on generic error return an empty array
+	return res
 }
 
 func HTTPError(w http.ResponseWriter, err error) bool {
@@ -90,7 +97,7 @@ func ErrFromRemote(resp *http.Response) error {
 		return nil
 	}
 
-	response := &ErrorResponse{}
+	errorsRes := []*errorResponse{}
 
 	defer resp.Body.Close()
 
@@ -102,7 +109,7 @@ func ErrFromRemote(resp *http.Response) error {
 	// Re-populate error response body so it can be parsed by the caller if needed
 	resp.Body = io.NopCloser(bytes.NewBuffer(data))
 
-	if err := json.Unmarshal(data, &response); err != nil {
+	if err := json.Unmarshal(data, &errorsRes); err != nil {
 		return errors.Errorf("unknown api error (status: %d)", resp.StatusCode)
 	}
 
@@ -120,5 +127,11 @@ func ErrFromRemote(resp *http.Response) error {
 		kind = ErrInternal
 	}
 
-	return NewRemoteError(kind, response.Code, response.Message)
+	remoteErrorOptions := []RemoteErrorOption{}
+	for _, errorRes := range errorsRes {
+		remoteErrorOptions = append(remoteErrorOptions,
+			WithRemoteErrorDetailedError(&RemoteDetailedError{Code: ErrorCode(errorRes.Code), Details: errorRes.Details}))
+	}
+
+	return NewRemoteError(kind, remoteErrorOptions...)
 }

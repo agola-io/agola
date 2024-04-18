@@ -26,6 +26,7 @@ import (
 	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/common"
+	serrors "agola.io/agola/internal/services/errors"
 	"agola.io/agola/internal/services/gateway/action"
 	"agola.io/agola/internal/util"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
@@ -212,7 +213,7 @@ func (h *GroupRunHandler) do(r *http.Request) (*gwapitypes.RunResponse, error) {
 		var err error
 		runNumber, err = strconv.ParseUint(runNumberStr, 10, 64)
 		if err != nil {
-			return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run number"))
+			return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run number"), serrors.InvalidRunNumber())
 		}
 	}
 
@@ -271,7 +272,7 @@ func (h *RuntaskHandler) do(r *http.Request) (*gwapitypes.RunTaskResponse, error
 		var err error
 		runNumber, err = strconv.ParseUint(runNumberStr, 10, 64)
 		if err != nil {
-			return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run number"))
+			return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run number"), serrors.InvalidRunNumber())
 		}
 	}
 
@@ -431,7 +432,7 @@ func (h *RunActionsHandler) do(r *http.Request) (*gwapitypes.RunResponse, error)
 		var err error
 		runNumber, err = strconv.ParseUint(runNumberStr, 10, 64)
 		if err != nil {
-			return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run number"))
+			return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run number"), serrors.InvalidRunNumber())
 		}
 	}
 
@@ -501,7 +502,7 @@ func (h *RunTaskActionsHandler) do(r *http.Request) error {
 		var err error
 		runNumber, err = strconv.ParseUint(runNumberStr, 10, 64)
 		if err != nil {
-			return util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run number"))
+			return util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run number"), serrors.InvalidRunNumber())
 		}
 	}
 	taskID := vars["taskid"]
@@ -571,7 +572,7 @@ func (h *LogsHandler) do(w http.ResponseWriter, r *http.Request) error {
 		var err error
 		runNumber, err = strconv.ParseUint(runNumberStr, 10, 64)
 		if err != nil {
-			return util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run number"))
+			return util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run number"), serrors.InvalidRunNumber())
 		}
 	}
 
@@ -591,7 +592,7 @@ func (h *LogsHandler) do(w http.ResponseWriter, r *http.Request) error {
 		var err error
 		step, err = strconv.Atoi(stepStr)
 		if err != nil {
-			return util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse step number"))
+			return util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse step number"), serrors.InvalidRunTaskStepNumber())
 		}
 	}
 
@@ -715,7 +716,7 @@ func (h *LogsDeleteHandler) do(r *http.Request) error {
 		var err error
 		runNumber, err = strconv.ParseUint(runNumberStr, 10, 64)
 		if err != nil {
-			return util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run number"))
+			return util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse run number"), serrors.InvalidRunNumber())
 		}
 	}
 
@@ -735,7 +736,7 @@ func (h *LogsDeleteHandler) do(r *http.Request) error {
 		var err error
 		step, err = strconv.Atoi(stepStr)
 		if err != nil {
-			return util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse step number"))
+			return util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("cannot parse step number"), serrors.InvalidRunTaskStepNumber())
 		}
 	}
 

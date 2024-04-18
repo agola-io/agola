@@ -23,6 +23,7 @@ import (
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"
+	gwapierrors "agola.io/agola/services/gateway/api/errors"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
 	rstypes "agola.io/agola/services/runservice/types"
@@ -192,7 +193,7 @@ func TestGetOrg(t *testing.T) {
 		name   string
 		client *gwclient.Client
 		org    *gwapitypes.OrgResponse
-		err    string
+		err    error
 	}{
 		{
 			name:   "user owner get pub org",
@@ -223,7 +224,7 @@ func TestGetOrg(t *testing.T) {
 			name:   "user not member get priv org",
 			client: gwClientUser03,
 			org:    privOrg,
-			err:    remoteErrorNotExist,
+			err:    util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeOrganizationDoesNotExist})),
 		},
 	}
 
@@ -232,8 +233,8 @@ func TestGetOrg(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			org, _, err := tt.client.GetOrg(ctx, tt.org.ID)
 
-			if tt.err != "" {
-				assert.Error(t, err, tt.err)
+			if tt.err != nil {
+				assert.Error(t, err, tt.err.Error())
 			} else {
 				testutil.NilError(t, err)
 
@@ -295,7 +296,7 @@ func TestUpdateOrganization(t *testing.T) {
 	visibility = gwapitypes.VisibilityPrivate
 	_, _, err = gwClientUser02.UpdateOrg(ctx, agolaOrg01, &gwapitypes.UpdateOrgRequest{Visibility: &visibility})
 	expectedErr := remoteErrorForbidden
-	assert.Error(t, err, expectedErr)
+	assert.Error(t, err, expectedErr.Error())
 
 	org, _, err = gwClientUser01.GetOrg(ctx, agolaOrg01)
 	testutil.NilError(t, err)
@@ -341,8 +342,8 @@ func TestOrgInvitation(t *testing.T) {
 				testutil.NilError(t, err)
 
 				_, _, err = tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser02, Role: cstypes.MemberRoleMember})
-				expectedErr := remoteErrorInternal
-				assert.Error(t, err, expectedErr)
+				expectedErr := util.NewRemoteError(util.ErrBadRequest, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeInvitationAlreadyExists}))
+				assert.Error(t, err, expectedErr.Error())
 			},
 		},
 		{
@@ -372,7 +373,7 @@ func TestOrgInvitation(t *testing.T) {
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser02.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser01, Role: cstypes.MemberRoleMember})
 				expectedErr := remoteErrorForbidden
-				assert.Error(t, err, expectedErr)
+				assert.Error(t, err, expectedErr.Error())
 			},
 		},
 		{
@@ -386,8 +387,8 @@ func TestOrgInvitation(t *testing.T) {
 				testutil.NilError(t, err)
 
 				_, _, err = tc.gwClientUser02.GetOrgInvitation(ctx, agolaOrg01, agolaUser02)
-				expectedErr := remoteErrorNotExist
-				assert.Error(t, err, expectedErr)
+				expectedErr := util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeInvitationDoesNotExist}))
+				assert.Error(t, err, expectedErr.Error())
 			},
 		},
 		{
@@ -401,8 +402,8 @@ func TestOrgInvitation(t *testing.T) {
 				testutil.NilError(t, err)
 
 				_, _, err = tc.gwClientUser01.GetOrgInvitation(ctx, agolaOrg01, agolaUser02)
-				expectedErr := remoteErrorNotExist
-				assert.Error(t, err, expectedErr)
+				expectedErr := util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeInvitationDoesNotExist}))
+				assert.Error(t, err, expectedErr.Error())
 			},
 		},
 		{
@@ -416,8 +417,8 @@ func TestOrgInvitation(t *testing.T) {
 				testutil.NilError(t, err)
 
 				_, _, err = tc.gwClientUser02.GetOrgInvitation(ctx, agolaOrg01, agolaUser02)
-				expectedErr := remoteErrorNotExist
-				assert.Error(t, err, expectedErr)
+				expectedErr := util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeInvitationDoesNotExist}))
+				assert.Error(t, err, expectedErr.Error())
 
 				org01Members, _, err := tc.gwClientUser01.GetOrgMembers(ctx, agolaOrg01, nil)
 				testutil.NilError(t, err)
@@ -430,8 +431,8 @@ func TestOrgInvitation(t *testing.T) {
 			orgInvitationEnabled: true,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg02, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser02, Role: cstypes.MemberRoleMember})
-				expectedErr := remoteErrorNotExist
-				assert.Error(t, err, expectedErr)
+				expectedErr := util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeOrganizationDoesNotExist}))
+				assert.Error(t, err, expectedErr.Error())
 			},
 		},
 		{
@@ -446,7 +447,7 @@ func TestOrgInvitation(t *testing.T) {
 
 				_, _, err = tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser02, Role: cstypes.MemberRoleMember})
 				expectedErr := remoteErrorInternal
-				assert.Error(t, err, expectedErr)
+				assert.Error(t, err, expectedErr.Error())
 			},
 		},
 		{
@@ -454,8 +455,8 @@ func TestOrgInvitation(t *testing.T) {
 			orgInvitationEnabled: true,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser03, Role: cstypes.MemberRoleMember})
-				expectedErr := remoteErrorNotExist
-				assert.Error(t, err, expectedErr)
+				expectedErr := util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeUserDoesNotExist}))
+				assert.Error(t, err, expectedErr.Error())
 			},
 		},
 		{
@@ -485,8 +486,8 @@ func TestOrgInvitation(t *testing.T) {
 				testutil.NilError(t, err)
 
 				orgInvitations, _, err := tc.gwClientUser01.GetOrgInvitations(ctx, agolaOrg01)
-				expectedErr := remoteErrorNotExist
-				assert.Error(t, err, expectedErr)
+				expectedErr := util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeOrganizationDoesNotExist}))
+				assert.Error(t, err, expectedErr.Error())
 				assert.Assert(t, cmp.Len(orgInvitations, 0))
 			},
 		},
@@ -509,8 +510,8 @@ func TestOrgInvitation(t *testing.T) {
 				testutil.NilError(t, err)
 
 				_, _, err = gwClientUser01.GetOrgInvitation(ctx, agolaOrg01, agolaUser02)
-				expectedErr := remoteErrorNotExist
-				assert.Error(t, err, expectedErr)
+				expectedErr := util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeInvitationDoesNotExist}))
+				assert.Error(t, err, expectedErr.Error())
 
 				orgMembers, _, err := gwClientUser01.GetOrgMembers(ctx, agolaOrg01, nil)
 				testutil.NilError(t, err)
@@ -523,8 +524,8 @@ func TestOrgInvitation(t *testing.T) {
 			orgInvitationEnabled: false,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser01.CreateOrgInvitation(ctx, agolaOrg01, &gwapitypes.CreateOrgInvitationRequest{UserRef: agolaUser02, Role: cstypes.MemberRoleMember})
-				expectedErr := remoteErrorBadRequest
-				assert.Error(t, err, expectedErr)
+				expectedErr := util.NewRemoteError(util.ErrBadRequest, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeCannotCreateInvitation}))
+				assert.Error(t, err, expectedErr.Error())
 			},
 		},
 		{
@@ -532,8 +533,8 @@ func TestOrgInvitation(t *testing.T) {
 			orgInvitationEnabled: true,
 			f: func(ctx context.Context, t *testing.T, tc *testOrgInvitationConfig) {
 				_, _, err := tc.gwClientUser01.AddOrgMember(ctx, agolaOrg01, agolaUser02, gwapitypes.MemberRoleMember)
-				expectedErr := remoteErrorBadRequest
-				assert.Error(t, err, expectedErr)
+				expectedErr := util.NewRemoteError(util.ErrBadRequest, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeCannotAddUserToOrganization}))
+				assert.Error(t, err, expectedErr.Error())
 			},
 		},
 		{
@@ -595,7 +596,7 @@ func TestOrgInvitation(t *testing.T) {
 
 				_, _, err = tc.gwClientUser02.GetOrgInvitations(ctx, agolaOrg01)
 				expectedErr := remoteErrorForbidden
-				assert.Error(t, err, expectedErr)
+				assert.Error(t, err, expectedErr.Error())
 			},
 		},
 	}
@@ -1191,7 +1192,7 @@ func TestGetUsersPermissions(t *testing.T) {
 
 				_, _, err := gwClient.GetUserByLinkedAccountRemoteUserAndSource(ctx, "1", "gitea")
 				expectedErr := remoteErrorUnauthorized
-				assert.Error(t, err, expectedErr)
+				assert.Error(t, err, expectedErr.Error())
 			},
 		},
 		{
@@ -1224,7 +1225,7 @@ func TestGetUsersPermissions(t *testing.T) {
 
 				_, _, err := gwClient.GetUsers(ctx, nil)
 				expectedErr := remoteErrorUnauthorized
-				assert.Error(t, err, expectedErr)
+				assert.Error(t, err, expectedErr.Error())
 			},
 		},
 	}
@@ -1616,7 +1617,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 		testutil.NilError(t, err)
 
 		_, _, err = gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Cursor: res.Cursor, Limit: 2, SortDirection: gwapitypes.SortDirectionAsc}, DeliveryStatusFilter: deliveryStatusFilter})
-		assert.Error(t, err, remoteErrorBadRequest)
+		assert.Error(t, err, remoteErrorBadRequest.Error())
 	})
 
 	tests := []struct {
@@ -1627,7 +1628,7 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 		sortDirection        gwapitypes.SortDirection
 		deliveryStatusFilter []string
 		expectedCallsNumber  int
-		expectedErr          string
+		expectedErr          error
 	}{
 		{
 			name:                "get project run webhook deliveries with limit = 0, no sortdirection",
@@ -1704,14 +1705,14 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 			client:        gwUser02Client,
 			projectRef:    project.ID,
 			sortDirection: gwapitypes.SortDirectionAsc,
-			expectedErr:   remoteErrorForbidden,
+			expectedErr:   util.NewRemoteError(util.ErrForbidden),
 		},
 		{
 			name:          "get project run webhook deliveries with not existing project",
 			client:        gwUser01Client,
 			projectRef:    "project02",
 			sortDirection: gwapitypes.SortDirectionAsc,
-			expectedErr:   remoteErrorNotExist,
+			expectedErr:   util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeProjectDoesNotExist})),
 		},
 	}
 
@@ -1741,10 +1742,10 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 
 			for {
 				respRunWebhookDeliveries, res, err := tt.client.GetProjectRunWebhookDeliveries(ctx, tt.projectRef, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Cursor: cursor, Limit: tt.limit, SortDirection: sortDirection}, DeliveryStatusFilter: deliveryStatusFilter})
-				if tt.expectedErr == "" {
+				if tt.expectedErr == nil {
 					testutil.NilError(t, err)
 				} else {
-					assert.Error(t, err, tt.expectedErr)
+					assert.Error(t, err, tt.expectedErr.Error())
 					return
 				}
 
@@ -1878,7 +1879,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 
 		_, err = gwUser02Client.ProjectRunWebhookRedelivery(ctx, project.ID, runWebhookDeliveries[0].ID)
 		expectedErr := remoteErrorForbidden
-		assert.Error(t, err, expectedErr)
+		assert.Error(t, err, expectedErr.Error())
 	})
 
 	t.Run("redelivery project run webhook delivery with deliverystatus = delivered", func(t *testing.T) {
@@ -1977,7 +1978,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 
 		_, err = gwUser02Client.ProjectRunWebhookRedelivery(ctx, project.ID, runWebhookDeliveries[0].ID)
 		expectedErr := remoteErrorForbidden
-		assert.Error(t, err, expectedErr)
+		assert.Error(t, err, expectedErr.Error())
 	})
 
 	t.Run("redelivery project run webhook delivery with not existing project", func(t *testing.T) {
@@ -1993,8 +1994,8 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		gwUser01Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01)
 
 		_, err := gwUser01Client.ProjectRunWebhookRedelivery(ctx, "projecttestid", "runwebhookdeliverytestid")
-		expectedErr := remoteErrorNotExist
-		assert.Error(t, err, expectedErr)
+		expectedErr := util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeProjectDoesNotExist}))
+		assert.Error(t, err, expectedErr.Error())
 	})
 
 	t.Run("redelivery project run webhook delivery with not existing run webhook delivery", func(t *testing.T) {
@@ -2017,8 +2018,8 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		_, project := createProject(ctx, t, giteaClient, gwUser01Client, withVisibility(gwapitypes.VisibilityPrivate))
 
 		_, err = gwUser01Client.ProjectRunWebhookRedelivery(ctx, project.ID, "runwebhookdeliverytestid")
-		expectedErr := remoteErrorNotExist
-		assert.Error(t, err, expectedErr)
+		expectedErr := util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeRunWebhookDeliveryDoesNotExist}))
+		assert.Error(t, err, expectedErr.Error())
 	})
 
 	t.Run("redelivery project run webhook delivery with projectRef that belong to another project", func(t *testing.T) {
@@ -2105,8 +2106,8 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		}
 
 		_, err = gwUser01Client.ProjectRunWebhookRedelivery(ctx, project02.ID, runWebhookDeliveries[0].ID)
-		expectedErr := remoteErrorNotExist
-		assert.Error(t, err, expectedErr)
+		expectedErr := util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeRunWebhookDeliveryDoesNotExist}))
+		assert.Error(t, err, expectedErr.Error())
 	})
 }
 
@@ -2235,7 +2236,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 		testutil.NilError(t, err)
 
 		_, _, err = gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Cursor: res.Cursor, Limit: 2, SortDirection: gwapitypes.SortDirectionAsc}, DeliveryStatusFilter: deliveryStatusFilter})
-		assert.Error(t, err, remoteErrorBadRequest)
+		assert.Error(t, err, remoteErrorBadRequest.Error())
 	})
 
 	tests := []struct {
@@ -2246,7 +2247,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 		sortDirection        gwapitypes.SortDirection
 		deliveryStatusFilter []string
 		expectedCallsNumber  int
-		expectedErr          string
+		expectedErr          error
 	}{
 		{
 			name:                "get project commit status deliveries with limit = 0, no sortdirection",
@@ -2330,7 +2331,7 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 			client:        gwUser01Client,
 			projectRef:    "project02",
 			sortDirection: gwapitypes.SortDirectionAsc,
-			expectedErr:   remoteErrorNotExist,
+			expectedErr:   util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeProjectDoesNotExist})),
 		},
 	}
 
@@ -2360,10 +2361,10 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 
 			for {
 				respCommitStatusDeliveries, res, err := tt.client.GetProjectCommitStatusDeliveries(ctx, tt.projectRef, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Cursor: cursor, Limit: tt.limit, SortDirection: sortDirection}, DeliveryStatusFilter: deliveryStatusFilter})
-				if tt.expectedErr == "" {
+				if tt.expectedErr == nil {
 					testutil.NilError(t, err)
 				} else {
-					assert.Error(t, err, tt.expectedErr)
+					assert.Error(t, err, tt.expectedErr.Error())
 					return
 				}
 
@@ -2528,7 +2529,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 
 		_, err = gwUser02Client.ProjectCommitStatusRedelivery(ctx, project.ID, commitStatusDeliveries[0].ID)
 		expectedErr := remoteErrorForbidden
-		assert.Error(t, err, expectedErr)
+		assert.Error(t, err, expectedErr.Error())
 	})
 
 	t.Run("redelivery project run webhook delivery with deliverystatus = delivered", func(t *testing.T) {
@@ -2627,7 +2628,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 
 		_, err = gwUser02Client.ProjectRunWebhookRedelivery(ctx, project.ID, runWebhookDeliveries[0].ID)
 		expectedErr := remoteErrorForbidden
-		assert.Error(t, err, expectedErr)
+		assert.Error(t, err, expectedErr.Error())
 	})
 
 	t.Run("redelivery project run webhook delivery with not existing project", func(t *testing.T) {
@@ -2643,8 +2644,8 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		gwUser01Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01)
 
 		_, err := gwUser01Client.ProjectRunWebhookRedelivery(ctx, "projecttestid", "runwebhookdeliverytestid")
-		expectedErr := remoteErrorNotExist
-		assert.Error(t, err, expectedErr)
+		expectedErr := util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeProjectDoesNotExist}))
+		assert.Error(t, err, expectedErr.Error())
 	})
 
 	t.Run("redelivery project run webhook delivery with not existing run webhook delivery", func(t *testing.T) {
@@ -2667,8 +2668,8 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		_, project := createProject(ctx, t, giteaClient, gwUser01Client, withVisibility(gwapitypes.VisibilityPrivate))
 
 		_, err = gwUser01Client.ProjectRunWebhookRedelivery(ctx, project.ID, "runwebhookdeliverytestid")
-		expectedErr := remoteErrorNotExist
-		assert.Error(t, err, expectedErr)
+		expectedErr := util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeRunWebhookDeliveryDoesNotExist}))
+		assert.Error(t, err, expectedErr.Error())
 	})
 
 	t.Run("redelivery project run webhook delivery with projectRef that belong to another project", func(t *testing.T) {
@@ -2755,8 +2756,8 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		}
 
 		_, err = gwUser01Client.ProjectRunWebhookRedelivery(ctx, project02.ID, runWebhookDeliveries[0].ID)
-		expectedErr := remoteErrorNotExist
-		assert.Error(t, err, expectedErr)
+		expectedErr := util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeRunWebhookDeliveryDoesNotExist}))
+		assert.Error(t, err, expectedErr.Error())
 	})
 }
 
@@ -2796,10 +2797,10 @@ func TestMaintenance(t *testing.T) {
 
 				expectedErr := remoteErrorUnauthorized
 				_, err = gwClient.EnableMaintenance(ctx, configstoreService)
-				assert.Error(t, err, expectedErr)
+				assert.Error(t, err, expectedErr.Error())
 
 				_, err = gwClient.EnableMaintenance(ctx, runserviceService)
-				assert.Error(t, err, expectedErr)
+				assert.Error(t, err, expectedErr.Error())
 			},
 		},
 		{
@@ -2817,10 +2818,10 @@ func TestMaintenance(t *testing.T) {
 
 				expectedErr := remoteErrorUnauthorized
 				_, err = gwClient.DisableMaintenance(ctx, configstoreService)
-				assert.Error(t, err, expectedErr)
+				assert.Error(t, err, expectedErr.Error())
 
 				_, err = gwClient.DisableMaintenance(ctx, runserviceService)
-				assert.Error(t, err, expectedErr)
+				assert.Error(t, err, expectedErr.Error())
 			},
 		},
 		{
@@ -2857,10 +2858,10 @@ func TestMaintenance(t *testing.T) {
 
 				expectedErr := remoteErrorBadRequest
 				_, err = gwClient.EnableMaintenance(ctx, configstoreService)
-				assert.Error(t, err, expectedErr)
+				assert.Error(t, err, expectedErr.Error())
 
 				_, err = gwClient.EnableMaintenance(ctx, runserviceService)
-				assert.Error(t, err, expectedErr)
+				assert.Error(t, err, expectedErr.Error())
 			},
 		},
 		{
@@ -2914,10 +2915,10 @@ func TestMaintenance(t *testing.T) {
 
 				expectedErr := remoteErrorBadRequest
 				_, err := gwClient.DisableMaintenance(ctx, configstoreService)
-				assert.Error(t, err, expectedErr)
+				assert.Error(t, err, expectedErr.Error())
 
 				_, err = gwClient.DisableMaintenance(ctx, runserviceService)
-				assert.Error(t, err, expectedErr)
+				assert.Error(t, err, expectedErr.Error())
 			},
 		},
 		{
@@ -2927,10 +2928,10 @@ func TestMaintenance(t *testing.T) {
 
 				expectedErr := remoteErrorBadRequest
 				_, err := gwClient.EnableMaintenance(ctx, "test")
-				assert.Error(t, err, expectedErr)
+				assert.Error(t, err, expectedErr.Error())
 
 				_, err = gwClient.DisableMaintenance(ctx, "test")
-				assert.Error(t, err, expectedErr)
+				assert.Error(t, err, expectedErr.Error())
 			},
 		},
 	}
@@ -3227,7 +3228,7 @@ func testGetGroupRuns(t *testing.T, userRun bool) {
 		testutil.NilError(t, err)
 
 		_, _, err = getFn(ctx, ref, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{Cursor: res.Cursor, Limit: 2, SortDirection: gwapitypes.SortDirectionAsc}, StartRunCounter: startRunCounter})
-		assert.Error(t, err, remoteErrorBadRequest)
+		assert.Error(t, err, remoteErrorBadRequest.Error())
 	})
 
 	t.Run("request with cursor and phaseFilter", func(t *testing.T) {
@@ -3237,7 +3238,7 @@ func testGetGroupRuns(t *testing.T, userRun bool) {
 		testutil.NilError(t, err)
 
 		_, _, err = getFn(ctx, ref, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{Cursor: res.Cursor, Limit: 2, SortDirection: gwapitypes.SortDirectionAsc}, PhaseFilter: phaseFilter})
-		assert.Error(t, err, remoteErrorBadRequest)
+		assert.Error(t, err, remoteErrorBadRequest.Error())
 	})
 
 	t.Run("request with cursor and resultFilter", func(t *testing.T) {
@@ -3247,7 +3248,7 @@ func testGetGroupRuns(t *testing.T, userRun bool) {
 		testutil.NilError(t, err)
 
 		_, _, err = getFn(ctx, ref, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{Cursor: res.Cursor, Limit: 2, SortDirection: gwapitypes.SortDirectionAsc}, ResultFilter: resultFilter})
-		assert.Error(t, err, remoteErrorBadRequest)
+		assert.Error(t, err, remoteErrorBadRequest.Error())
 	})
 
 	tests := []struct {
