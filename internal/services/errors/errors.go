@@ -29,6 +29,14 @@ func InvalidRole() util.APIErrorOption {
 	return detailedErrorOption(apierrors.ErrorCodeInvalidRole)
 }
 
+func InvalidPath() util.APIErrorOption {
+	return detailedErrorOption(apierrors.ErrorCodeInvalidPath)
+}
+
+func InvalidRef() util.APIErrorOption {
+	return detailedErrorOption(apierrors.ErrorCodeInvalidRef)
+}
+
 func UserDoesNotExist() util.APIErrorOption {
 	return detailedErrorOption(apierrors.ErrorCodeUserDoesNotExist)
 }
