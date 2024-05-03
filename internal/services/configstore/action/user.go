@@ -85,7 +85,7 @@ func (h *ActionHandler) UserQuery(ctx context.Context, req *UserQueryRequest) (*
 				return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("linked account with remote user %q for remote source %q doesn't exist", req.RemoteUserID, req.RemoteSourceID), serrors.LinkedAccountDoesNotExist())
 			}
 
-			user, err = h.d.GetUser(tx, la.UserID)
+			user, err = h.GetUserByRef(tx, la.UserID)
 			if err != nil {
 				return errors.WithStack(err)
 			}
@@ -109,7 +109,7 @@ func (h *ActionHandler) GetUser(ctx context.Context, userRef string) (*types.Use
 	var user *types.User
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		user, err = h.d.GetUser(tx, userRef)
+		user, err = h.GetUserByRef(tx, userRef)
 		return errors.WithStack(err)
 	})
 	if err != nil {
@@ -265,7 +265,7 @@ func (h *ActionHandler) DeleteUser(ctx context.Context, userRef string) error {
 		var err error
 
 		// check user existance
-		user, err := h.d.GetUser(tx, userRef)
+		user, err := h.GetUserByRef(tx, userRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -314,7 +314,7 @@ func (h *ActionHandler) UpdateUser(ctx context.Context, req *UpdateUserRequest) 
 
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		user, err = h.d.GetUser(tx, req.UserRef)
+		user, err = h.GetUserByRef(tx, req.UserRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -355,7 +355,7 @@ func (h *ActionHandler) GetUserLinkedAccounts(ctx context.Context, userRef strin
 
 	var linkedAccounts []*types.LinkedAccount
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
-		user, err := h.d.GetUser(tx, userRef)
+		user, err := h.GetUserByRef(tx, userRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -399,7 +399,7 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 
 	var la *types.LinkedAccount
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
-		user, err := h.d.GetUser(tx, req.UserRef)
+		user, err := h.GetUserByRef(tx, req.UserRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -458,7 +458,7 @@ func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) 
 
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		user, err = h.d.GetUser(tx, userRef)
+		user, err = h.GetUserByRef(tx, userRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -511,7 +511,7 @@ func (h *ActionHandler) UpdateUserLA(ctx context.Context, req *UpdateUserLAReque
 
 	var la *types.LinkedAccount
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
-		user, err := h.d.GetUser(tx, req.UserRef)
+		user, err := h.GetUserByRef(tx, req.UserRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -567,7 +567,7 @@ func (h *ActionHandler) GetUserTokens(ctx context.Context, userRef string) ([]*t
 
 	var tokens []*types.UserToken
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
-		user, err := h.d.GetUser(tx, userRef)
+		user, err := h.GetUserByRef(tx, userRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -599,7 +599,7 @@ func (h *ActionHandler) CreateUserToken(ctx context.Context, userRef, tokenName 
 
 	var token *types.UserToken
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
-		user, err := h.d.GetUser(tx, userRef)
+		user, err := h.GetUserByRef(tx, userRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -643,7 +643,7 @@ func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName 
 	}
 
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
-		user, err := h.d.GetUser(tx, userRef)
+		user, err := h.GetUserByRef(tx, userRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -690,14 +690,14 @@ func (h *ActionHandler) GetUserOrg(ctx context.Context, userRef, orgRef string) 
 
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		user, err := h.d.GetUser(tx, userRef)
+		user, err := h.GetUserByRef(tx, userRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
 		if user == nil {
 			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("user %q doesn't exist", userRef), serrors.UserDoesNotExist())
 		}
-		org, err := h.d.GetOrg(tx, orgRef)
+		org, err := h.GetOrgByRef(tx, orgRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -747,7 +747,7 @@ func (h *ActionHandler) GetUserOrgs(ctx context.Context, req *GetUserOrgsRequest
 	var dbUserOrgs []*db.UserOrg
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		user, err := h.d.GetUser(tx, req.UserRef)
+		user, err := h.GetUserByRef(tx, req.UserRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -784,7 +784,7 @@ func (h *ActionHandler) GetUserOrgs(ctx context.Context, req *GetUserOrgsRequest
 func (h *ActionHandler) GetUserOrgInvitations(ctx context.Context, userRef string) ([]*types.OrgInvitation, error) {
 	var orgInvitations []*types.OrgInvitation
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
-		user, err := h.d.GetUser(tx, userRef)
+		user, err := h.GetUserByRef(tx, userRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}

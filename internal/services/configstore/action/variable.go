@@ -25,6 +25,43 @@ import (
 	"agola.io/agola/services/configstore/types"
 )
 
+func (h *ActionHandler) GetVariablesTree(tx *sql.Tx, parentKind types.ObjectKind, parentID string) ([]*types.Variable, error) {
+	allVariables := []*types.Variable{}
+
+	for parentKind == types.ObjectKindProjectGroup || parentKind == types.ObjectKindProject {
+		vars, err := h.d.GetVariables(tx, parentID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get variables for %s %q", parentKind, parentID)
+		}
+		allVariables = append(allVariables, vars...)
+
+		switch parentKind {
+		case types.ObjectKindProjectGroup:
+			projectGroup, err := h.GetProjectGroupByRef(tx, parentID)
+			if err != nil {
+				return nil, errors.WithStack(err)
+			}
+			if projectGroup == nil {
+				return nil, errors.Errorf("projectgroup with id %q doesn't exist", parentID)
+			}
+			parentKind = projectGroup.Parent.Kind
+			parentID = projectGroup.Parent.ID
+		case types.ObjectKindProject:
+			project, err := h.GetProjectByRef(tx, parentID)
+			if err != nil {
+				return nil, errors.WithStack(err)
+			}
+			if project == nil {
+				return nil, errors.Errorf("project with id %q doesn't exist", parentID)
+			}
+			parentKind = project.Parent.Kind
+			parentID = project.Parent.ID
+		}
+	}
+
+	return allVariables, nil
+}
+
 type GetVariablesResponse struct {
 	Variables   []*types.Variable
 	ParentPaths map[string]string
@@ -39,7 +76,7 @@ func (h *ActionHandler) GetVariables(ctx context.Context, parentKind types.Objec
 			return errors.WithStack(err)
 		}
 		if tree {
-			variables, err = h.d.GetVariablesTree(tx, parentKind, parentID)
+			variables, err = h.GetVariablesTree(tx, parentKind, parentID)
 		} else {
 			variables, err = h.d.GetVariables(tx, parentID)
 		}
@@ -50,7 +87,7 @@ func (h *ActionHandler) GetVariables(ctx context.Context, parentKind types.Objec
 
 		// populate variables parent paths
 		for _, s := range variables {
-			pp, err := h.d.GetPath(tx, s.Parent.Kind, s.Parent.ID)
+			pp, err := h.GetPath(tx, s.Parent.Kind, s.Parent.ID)
 			if err != nil {
 				return errors.WithStack(err)
 			}

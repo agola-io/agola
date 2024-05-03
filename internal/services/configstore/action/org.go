@@ -65,7 +65,7 @@ func (h *ActionHandler) GetOrgMembers(ctx context.Context, req *GetOrgMembersReq
 	var dbOrgMembers []*db.OrgUser
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		org, err := h.d.GetOrg(tx, req.OrgRef)
+		org, err := h.GetOrgByRef(tx, req.OrgRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -103,7 +103,7 @@ func (h *ActionHandler) GetOrg(ctx context.Context, orgRef string) (*types.Organ
 	var org *types.Organization
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		org, err = h.d.GetOrg(tx, orgRef)
+		org, err = h.GetOrgByRef(tx, orgRef)
 		return errors.WithStack(err)
 	})
 	if err != nil {
@@ -200,7 +200,7 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*
 		}
 
 		if req.CreatorUserID != "" {
-			user, err := h.d.GetUser(tx, req.CreatorUserID)
+			user, err := h.GetUserByRef(tx, req.CreatorUserID)
 			if err != nil {
 				return errors.WithStack(err)
 			}
@@ -265,7 +265,7 @@ func (h *ActionHandler) UpdateOrg(ctx context.Context, orgRef string, req *Updat
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
 		// check org existance
-		org, err = h.d.GetOrg(tx, orgRef)
+		org, err = h.GetOrgByRef(tx, orgRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -294,7 +294,7 @@ func (h *ActionHandler) DeleteOrg(ctx context.Context, orgRef string) error {
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
 		// check org existance
-		org, err = h.d.GetOrg(tx, orgRef)
+		org, err = h.GetOrgByRef(tx, orgRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -357,7 +357,7 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 	var orgmember *types.OrganizationMember
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		// check existing org
-		org, err := h.d.GetOrg(tx, orgRef)
+		org, err := h.GetOrgByRef(tx, orgRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -365,7 +365,7 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("org %q doesn't exists", orgRef), serrors.OrganizationDoesNotExist())
 		}
 		// check existing user
-		user, err := h.d.GetUser(tx, userRef)
+		user, err := h.GetUserByRef(tx, userRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -421,7 +421,7 @@ func (h *ActionHandler) AddOrgMember(ctx context.Context, orgRef, userRef string
 func (h *ActionHandler) RemoveOrgMember(ctx context.Context, orgRef, userRef string) error {
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		// check existing org
-		org, err := h.d.GetOrg(tx, orgRef)
+		org, err := h.GetOrgByRef(tx, orgRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -429,7 +429,7 @@ func (h *ActionHandler) RemoveOrgMember(ctx context.Context, orgRef, userRef str
 			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("org %q doesn't exists", orgRef), serrors.OrganizationDoesNotExist())
 		}
 		// check existing user
-		user, err := h.d.GetUser(tx, userRef)
+		user, err := h.GetUserByRef(tx, userRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -462,7 +462,7 @@ func (h *ActionHandler) RemoveOrgMember(ctx context.Context, orgRef, userRef str
 func (h *ActionHandler) GetOrgInvitations(ctx context.Context, orgRef string) ([]*types.OrgInvitation, error) {
 	var orgInvitations []*types.OrgInvitation
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
-		org, err := h.d.GetOrg(tx, orgRef)
+		org, err := h.GetOrgByRef(tx, orgRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -488,7 +488,7 @@ func (h *ActionHandler) GetOrgInvitationByUserRef(ctx context.Context, orgRef, u
 	var orgInvitation *types.OrgInvitation
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		// check existing org
-		org, err := h.d.GetOrg(tx, orgRef)
+		org, err := h.GetOrgByRef(tx, orgRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -496,7 +496,7 @@ func (h *ActionHandler) GetOrgInvitationByUserRef(ctx context.Context, orgRef, u
 			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("organization %q doesn't exist", orgRef), serrors.OrganizationDoesNotExist())
 		}
 		// check existing user
-		user, err := h.d.GetUser(tx, userRef)
+		user, err := h.GetUserByRef(tx, userRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -543,7 +543,7 @@ func (h *ActionHandler) CreateOrgInvitation(ctx context.Context, req *CreateOrgI
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
 
-		org, err := h.d.GetOrg(tx, req.OrganizationRef)
+		org, err := h.GetOrgByRef(tx, req.OrganizationRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -551,7 +551,7 @@ func (h *ActionHandler) CreateOrgInvitation(ctx context.Context, req *CreateOrgI
 			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("organization %q doesn't exist", req.OrganizationRef), serrors.OrganizationDoesNotExist())
 		}
 
-		user, err := h.d.GetUser(tx, req.UserRef)
+		user, err := h.GetUserByRef(tx, req.UserRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -588,7 +588,7 @@ func (h *ActionHandler) CreateOrgInvitation(ctx context.Context, req *CreateOrgI
 
 func (h *ActionHandler) DeleteOrgInvitation(ctx context.Context, orgRef string, userRef string) error {
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
-		org, err := h.d.GetOrg(tx, orgRef)
+		org, err := h.GetOrgByRef(tx, orgRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -596,7 +596,7 @@ func (h *ActionHandler) DeleteOrgInvitation(ctx context.Context, orgRef string, 
 			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("org %q doesn't exists", orgRef), serrors.OrganizationDoesNotExist())
 		}
 		// check existing user
-		user, err := h.d.GetUser(tx, userRef)
+		user, err := h.GetUserByRef(tx, userRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -638,7 +638,7 @@ func (h *ActionHandler) OrgInvitationAction(ctx context.Context, req *OrgInvitat
 	}
 
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
-		org, err := h.d.GetOrg(tx, req.OrgRef)
+		org, err := h.GetOrgByRef(tx, req.OrgRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -646,7 +646,7 @@ func (h *ActionHandler) OrgInvitationAction(ctx context.Context, req *OrgInvitat
 			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("org %q doesn't exists", req.OrgRef), serrors.OrganizationDoesNotExist())
 		}
 		// check existing user
-		user, err := h.d.GetUser(tx, req.UserRef)
+		user, err := h.GetUserByRef(tx, req.UserRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}

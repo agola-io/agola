@@ -376,7 +376,7 @@ func TestUser(t *testing.T) {
 		var user *types.User
 		err = cs.d.Do(ctx, func(tx *sql.Tx) error {
 			var err error
-			user, err = cs.d.GetUser(tx, "user03")
+			user, err = cs.ah.GetUserByRef(tx, "user03")
 			return errors.WithStack(err)
 		})
 		testutil.NilError(t, err)

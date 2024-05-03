@@ -15,11 +15,14 @@
 package action
 
 import (
+	"path"
+	"strings"
 	"sync"
 
 	"github.com/rs/zerolog"
 	"github.com/sorintlab/errors"
 
+	"agola.io/agola/internal/services/configstore/common"
 	"agola.io/agola/internal/services/configstore/db"
 	serrors "agola.io/agola/internal/services/errors"
 	"agola.io/agola/internal/sqlg/lock"
@@ -45,10 +48,309 @@ func NewActionHandler(log zerolog.Logger, d *db.DB, lf lock.LockFactory) *Action
 	}
 }
 
+func (h *ActionHandler) GetProjectGroupByPath(tx *sql.Tx, projectGroupPath string) (*types.ProjectGroup, error) {
+	parts := strings.Split(projectGroupPath, "/")
+	if len(parts) < 2 {
+		return nil, errors.Errorf("wrong project group path: %q", projectGroupPath)
+	}
+	var parentID string
+	switch parts[0] {
+	case "org":
+		org, err := h.d.GetOrgByName(tx, parts[1])
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get org %q", parts[1])
+		}
+		if org == nil {
+			return nil, errors.Errorf("cannot find org with name %q", parts[1])
+		}
+		parentID = org.ID
+	case "user":
+		user, err := h.d.GetUserByName(tx, parts[1])
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get user %q", parts[1])
+		}
+		if user == nil {
+			return nil, errors.Errorf("cannot find user with name %q", parts[1])
+		}
+		parentID = user.ID
+	default:
+		return nil, errors.Errorf("wrong project group path: %q", projectGroupPath)
+	}
+
+	var projectGroup *types.ProjectGroup
+	// add root project group (empty name)
+	for _, projectGroupName := range append([]string{""}, parts[2:]...) {
+		var err error
+		projectGroup, err = h.d.GetProjectGroupByName(tx, parentID, projectGroupName)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get project group %q", projectGroupName)
+		}
+		if projectGroup == nil {
+			return nil, nil
+		}
+		parentID = projectGroup.ID
+	}
+
+	return projectGroup, nil
+}
+
+func (h *ActionHandler) GetProjectByPath(tx *sql.Tx, projectPath string) (*types.Project, error) {
+	if len(strings.Split(projectPath, "/")) < 3 {
+		return nil, errors.Errorf("wrong project path: %q", projectPath)
+	}
+
+	projectGroupPath := path.Dir(projectPath)
+	projectName := path.Base(projectPath)
+	projectGroup, err := h.GetProjectGroupByPath(tx, projectGroupPath)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get project group %q", projectGroupPath)
+	}
+	if projectGroup == nil {
+		return nil, nil
+	}
+
+	project, err := h.d.GetProjectByName(tx, projectGroup.ID, projectName)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get project group %q", projectName)
+	}
+
+	return project, nil
+}
+
+func (h *ActionHandler) GetProjectGroupPath(tx *sql.Tx, group *types.ProjectGroup) (string, error) {
+	var p string
+
+	groups, err := h.GetProjectGroupHierarchy(tx, group)
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	rootGroupType := groups[0].ParentKind
+	rootGroupID := groups[0].ParentID
+	switch rootGroupType {
+	case types.ObjectKindOrg:
+		fallthrough
+	case types.ObjectKindUser:
+		var err error
+		p, err = h.GetPath(tx, rootGroupType, rootGroupID)
+		if err != nil {
+			return "", errors.WithStack(err)
+		}
+	default:
+		return "", errors.Errorf("invalid root group type %q", rootGroupType)
+	}
+
+	for _, group := range groups {
+		p = path.Join(p, group.Name)
+	}
+
+	return p, nil
+}
+
+func (h *ActionHandler) GetProjectPath(tx *sql.Tx, project *types.Project) (string, error) {
+	pgroup, err := h.GetProjectGroupByRef(tx, project.Parent.ID)
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+	if pgroup == nil {
+		return "", errors.Errorf("parent group %q for project %q doesn't exist", project.Parent.ID, project.ID)
+	}
+	p, err := h.GetProjectGroupPath(tx, pgroup)
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	p = path.Join(p, project.Name)
+
+	return p, nil
+}
+
+func (h *ActionHandler) GetProjectGroupByRef(tx *sql.Tx, projectGroupRef string) (*types.ProjectGroup, error) {
+	groupRef, err := common.ParsePathRef(projectGroupRef)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	var group *types.ProjectGroup
+	switch groupRef {
+	case common.RefTypeID:
+		group, err = h.d.GetProjectGroupByID(tx, projectGroupRef)
+	case common.RefTypePath:
+		group, err = h.GetProjectGroupByPath(tx, projectGroupRef)
+	}
+	return group, errors.WithStack(err)
+}
+
+func (h *ActionHandler) GetProjectByRef(tx *sql.Tx, projectRef string) (*types.Project, error) {
+	projectRefType, err := common.ParsePathRef(projectRef)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	var project *types.Project
+	switch projectRefType {
+	case common.RefTypeID:
+		project, err = h.d.GetProjectByID(tx, projectRef)
+	case common.RefTypePath:
+		project, err = h.GetProjectByPath(tx, projectRef)
+	}
+	return project, errors.WithStack(err)
+}
+
+func (h *ActionHandler) GetOrgByRef(tx *sql.Tx, orgRef string) (*types.Organization, error) {
+	refType, err := common.ParseNameRef(orgRef)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	var org *types.Organization
+	switch refType {
+	case common.RefTypeID:
+		org, err = h.d.GetOrgByID(tx, orgRef)
+	case common.RefTypeName:
+		org, err = h.d.GetOrgByName(tx, orgRef)
+	}
+	return org, errors.WithStack(err)
+}
+
+func (h *ActionHandler) GetUserByRef(tx *sql.Tx, userRef string) (*types.User, error) {
+	refType, err := common.ParseNameRef(userRef)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	var user *types.User
+	switch refType {
+	case common.RefTypeID:
+		user, err = h.d.GetUserByID(tx, userRef)
+	case common.RefTypeName:
+		user, err = h.d.GetUserByName(tx, userRef)
+	}
+	return user, errors.WithStack(err)
+}
+
+func (h *ActionHandler) GetPath(tx *sql.Tx, objectKind types.ObjectKind, id string) (string, error) {
+	var p string
+	switch objectKind {
+	case types.ObjectKindProjectGroup:
+		projectGroup, err := h.GetProjectGroupByRef(tx, id)
+		if err != nil {
+			return "", errors.WithStack(err)
+		}
+		if projectGroup == nil {
+			return "", errors.Errorf("projectgroup with id %q doesn't exist", id)
+		}
+		p, err = h.GetProjectGroupPath(tx, projectGroup)
+		if err != nil {
+			return "", errors.WithStack(err)
+		}
+	case types.ObjectKindProject:
+		project, err := h.GetProjectByRef(tx, id)
+		if err != nil {
+			return "", errors.WithStack(err)
+		}
+		if project == nil {
+			return "", errors.Errorf("project with id %q doesn't exist", id)
+		}
+		p, err = h.GetProjectPath(tx, project)
+		if err != nil {
+			return "", errors.WithStack(err)
+		}
+	case types.ObjectKindOrg:
+		org, err := h.GetOrgByRef(tx, id)
+		if err != nil {
+			return "", errors.Wrapf(err, "failed to get org %q", id)
+		}
+		if org == nil {
+			return "", errors.Errorf("cannot find org with id %q", id)
+		}
+		p = path.Join("org", org.Name)
+	case types.ObjectKindUser:
+		user, err := h.GetUserByRef(tx, id)
+		if err != nil {
+			return "", errors.Wrapf(err, "failed to get user %q", id)
+		}
+		if user == nil {
+			return "", errors.Errorf("cannot find user with id %q", id)
+		}
+		p = path.Join("user", user.Name)
+	default:
+		return "", errors.Errorf("config type %q doesn't provide a path", objectKind)
+	}
+
+	return p, nil
+}
+
+type hierarchyElement struct {
+	ID         string
+	Name       string
+	Kind       types.ObjectKind
+	ParentKind types.ObjectKind
+	ParentID   string
+}
+
+func (h *ActionHandler) GetProjectGroupHierarchy(tx *sql.Tx, projectGroup *types.ProjectGroup) ([]*hierarchyElement, error) {
+	projectGroupID := projectGroup.Parent.ID
+	elements := []*hierarchyElement{
+		{
+			ID:         projectGroup.ID,
+			Name:       projectGroup.Name,
+			Kind:       types.ObjectKindProjectGroup,
+			ParentKind: projectGroup.Parent.Kind,
+			ParentID:   projectGroup.Parent.ID,
+		},
+	}
+
+	for projectGroup.Parent.Kind == types.ObjectKindProjectGroup {
+		var err error
+		projectGroup, err = h.GetProjectGroupByRef(tx, projectGroupID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get project group %q", projectGroupID)
+		}
+		if projectGroup == nil {
+			return nil, errors.Errorf("project group %q doesn't exist", projectGroupID)
+		}
+		elements = append([]*hierarchyElement{
+			{
+				ID:         projectGroup.ID,
+				Name:       projectGroup.Name,
+				Kind:       types.ObjectKindProjectGroup,
+				ParentKind: projectGroup.Parent.Kind,
+				ParentID:   projectGroup.Parent.ID,
+			},
+		}, elements...)
+		projectGroupID = projectGroup.Parent.ID
+	}
+
+	return elements, nil
+}
+
+func (h *ActionHandler) GetProjectGroupOwnerID(tx *sql.Tx, group *types.ProjectGroup) (types.ObjectKind, string, error) {
+	groups, err := h.GetProjectGroupHierarchy(tx, group)
+	if err != nil {
+		return "", "", errors.WithStack(err)
+	}
+
+	rootGroupType := groups[0].ParentKind
+	rootGroupID := groups[0].ParentID
+	return rootGroupType, rootGroupID, nil
+}
+
+func (h *ActionHandler) GetProjectOwnerID(tx *sql.Tx, project *types.Project) (types.ObjectKind, string, error) {
+	pgroup, err := h.GetProjectGroupByRef(tx, project.Parent.ID)
+	if err != nil {
+		return "", "", errors.WithStack(err)
+	}
+	if pgroup == nil {
+		return "", "", errors.Errorf("parent group %q for project %q doesn't exist", project.Parent.ID, project.ID)
+	}
+	return h.GetProjectGroupOwnerID(tx, pgroup)
+}
+
 func (h *ActionHandler) ResolveObjectID(tx *sql.Tx, objectKind types.ObjectKind, ref string) (string, error) {
 	switch objectKind {
 	case types.ObjectKindProjectGroup:
-		group, err := h.d.GetProjectGroup(tx, ref)
+		group, err := h.GetProjectGroupByRef(tx, ref)
 		if err != nil {
 			return "", errors.WithStack(err)
 		}
@@ -58,7 +360,7 @@ func (h *ActionHandler) ResolveObjectID(tx *sql.Tx, objectKind types.ObjectKind,
 		return group.ID, nil
 
 	case types.ObjectKindProject:
-		project, err := h.d.GetProject(tx, ref)
+		project, err := h.GetProjectByRef(tx, ref)
 		if err != nil {
 			return "", errors.WithStack(err)
 		}
@@ -70,4 +372,36 @@ func (h *ActionHandler) ResolveObjectID(tx *sql.Tx, objectKind types.ObjectKind,
 	default:
 		return "", util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("unknown object kind %q", objectKind))
 	}
+}
+
+func (h *ActionHandler) getGlobalVisibility(tx *sql.Tx, curVisibility types.Visibility, parent *types.Parent) (types.Visibility, error) {
+	curParent := parent
+	if curVisibility == types.VisibilityPrivate {
+		return curVisibility, nil
+	}
+
+	for curParent.Kind == types.ObjectKindProjectGroup {
+		projectGroup, err := h.d.GetProjectGroupByID(tx, curParent.ID)
+		if err != nil {
+			return "", errors.WithStack(err)
+		}
+		if projectGroup.Visibility == types.VisibilityPrivate {
+			return types.VisibilityPrivate, nil
+		}
+
+		curParent = &projectGroup.Parent
+	}
+
+	// check parent visibility
+	if curParent.Kind == types.ObjectKindOrg {
+		org, err := h.GetOrgByRef(tx, curParent.ID)
+		if err != nil {
+			return "", errors.WithStack(err)
+		}
+		if org.Visibility == types.VisibilityPrivate {
+			return types.VisibilityPrivate, nil
+		}
+	}
+
+	return curVisibility, nil
 }
