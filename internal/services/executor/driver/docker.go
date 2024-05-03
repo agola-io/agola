@@ -31,6 +31,7 @@ import (
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	dockertypesimage "github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
@@ -121,7 +122,7 @@ func (d *DockerDriver) createToolboxVolume(ctx context.Context, podID string, ou
 
 	containerID := resp.ID
 
-	if err := d.client.ContainerStart(ctx, containerID, dockertypes.ContainerStartOptions{}); err != nil {
+	if err := d.client.ContainerStart(ctx, containerID, container.StartOptions{}); err != nil {
 		return nil, errors.WithStack(err)
 	}
 
@@ -151,7 +152,7 @@ func (d *DockerDriver) createToolboxVolume(ctx context.Context, podID string, ou
 	}
 
 	// ignore remove error
-	_ = d.client.ContainerRemove(ctx, containerID, dockertypes.ContainerRemoveOptions{Force: true})
+	_ = d.client.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: true})
 
 	return &toolboxVol, nil
 }
@@ -184,7 +185,7 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 			mainContainerID = containerID
 		}
 
-		if err := d.client.ContainerStart(ctx, containerID, dockertypes.ContainerStartOptions{}); err != nil {
+		if err := d.client.ContainerStart(ctx, containerID, container.StartOptions{}); err != nil {
 			return nil, errors.WithStack(err)
 		}
 	}
@@ -200,7 +201,7 @@ func (d *DockerDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.
 	}
 
 	containers, err := d.client.ContainerList(ctx,
-		dockertypes.ContainerListOptions{
+		container.ListOptions{
 			Filters: args,
 		})
 	if err != nil {
@@ -277,7 +278,7 @@ func (d *DockerDriver) fetchImage(ctx context.Context, image string, alwaysFetch
 
 	args := filters.NewArgs()
 	args.Add("reference", image)
-	img, err := d.client.ImageList(ctx, dockertypes.ImageListOptions{Filters: args})
+	img, err := d.client.ImageList(ctx, dockertypesimage.ListOptions{Filters: args})
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -285,7 +286,7 @@ func (d *DockerDriver) fetchImage(ctx context.Context, image string, alwaysFetch
 
 	// fetch only if forced, is latest tag or image doesn't exist
 	if alwaysFetch || tag == "latest" || !exists {
-		reader, err := d.client.ImagePull(ctx, image, dockertypes.ImagePullOptions{RegistryAuth: registryAuthEnc})
+		reader, err := d.client.ImagePull(ctx, image, dockertypesimage.PullOptions{RegistryAuth: registryAuthEnc})
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -377,7 +378,7 @@ func (d *DockerDriver) GetPods(ctx context.Context, all bool) ([]Pod, error) {
 	args := filters.NewArgs()
 
 	containers, err := d.client.ContainerList(ctx,
-		dockertypes.ContainerListOptions{
+		container.ListOptions{
 			Filters: args,
 			All:     all,
 		})
@@ -537,8 +538,8 @@ func (dp *DockerPod) Stop(ctx context.Context) error {
 
 func (dp *DockerPod) Remove(ctx context.Context) error {
 	errs := []error{}
-	for _, container := range dp.containers {
-		if err := dp.client.ContainerRemove(ctx, container.ID, dockertypes.ContainerRemoveOptions{Force: true}); err != nil {
+	for _, c := range dp.containers {
+		if err := dp.client.ContainerRemove(ctx, c.ID, container.RemoveOptions{Force: true}); err != nil {
 			errs = append(errs, err)
 		}
 	}
