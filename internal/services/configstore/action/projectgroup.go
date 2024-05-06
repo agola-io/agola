@@ -27,38 +27,6 @@ import (
 	"agola.io/agola/services/configstore/types"
 )
 
-func (h *ActionHandler) getGlobalVisibility(tx *sql.Tx, curVisibility types.Visibility, parent *types.Parent) (types.Visibility, error) {
-	curParent := parent
-	if curVisibility == types.VisibilityPrivate {
-		return curVisibility, nil
-	}
-
-	for curParent.Kind == types.ObjectKindProjectGroup {
-		projectGroup, err := h.d.GetProjectGroupByID(tx, curParent.ID)
-		if err != nil {
-			return "", errors.WithStack(err)
-		}
-		if projectGroup.Visibility == types.VisibilityPrivate {
-			return types.VisibilityPrivate, nil
-		}
-
-		curParent = &projectGroup.Parent
-	}
-
-	// check parent visibility
-	if curParent.Kind == types.ObjectKindOrg {
-		org, err := h.d.GetOrg(tx, curParent.ID)
-		if err != nil {
-			return "", errors.WithStack(err)
-		}
-		if org.Visibility == types.VisibilityPrivate {
-			return types.VisibilityPrivate, nil
-		}
-	}
-
-	return curVisibility, nil
-}
-
 type ProjectGroupDynamicData struct {
 	OwnerType        types.ObjectKind
 	OwnerID          string
@@ -70,12 +38,12 @@ type ProjectGroupDynamicData struct {
 func (h *ActionHandler) projectGroupDynamicData(tx *sql.Tx, projectGroup *types.ProjectGroup) (*ProjectGroupDynamicData, error) {
 	var projectGroupDynamicData *ProjectGroupDynamicData
 
-	pp, err := h.d.GetPath(tx, projectGroup.Parent.Kind, projectGroup.Parent.ID)
+	pp, err := h.GetPath(tx, projectGroup.Parent.Kind, projectGroup.Parent.ID)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	ownerType, ownerID, err := h.d.GetProjectGroupOwnerID(tx, projectGroup)
+	ownerType, ownerID, err := h.GetProjectGroupOwnerID(tx, projectGroup)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -107,7 +75,7 @@ func (h *ActionHandler) GetProjectGroup(ctx context.Context, projectGroupRef str
 	var projectGroupDynamicData *ProjectGroupDynamicData
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		projectGroup, err = h.d.GetProjectGroup(tx, projectGroupRef)
+		projectGroup, err = h.GetProjectGroupByRef(tx, projectGroupRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -140,7 +108,7 @@ func (h *ActionHandler) GetProjectGroupSubgroups(ctx context.Context, projectGro
 	projectGroupsDynamicData := map[string]*ProjectGroupDynamicData{}
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		projectGroup, err := h.d.GetProjectGroup(tx, projectGroupRef)
+		projectGroup, err := h.GetProjectGroupByRef(tx, projectGroupRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -184,7 +152,7 @@ func (h *ActionHandler) GetProjectGroupProjects(ctx context.Context, projectGrou
 	projectsDynamicData := map[string]*ProjectDynamicData{}
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		projectGroup, err := h.d.GetProjectGroup(tx, projectGroupRef)
+		projectGroup, err := h.GetProjectGroupByRef(tx, projectGroupRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -268,7 +236,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateUpdat
 	var projectGroup *types.ProjectGroup
 	var projectGroupDynamicData *ProjectGroupDynamicData
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
-		parentProjectGroup, err := h.d.GetProjectGroup(tx, req.Parent.ID)
+		parentProjectGroup, err := h.GetProjectGroupByRef(tx, req.Parent.ID)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -280,7 +248,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateUpdat
 		// it to an ID here. Change the request format to avoid this.
 		req.Parent.ID = parentProjectGroup.ID
 
-		groupPath, err := h.d.GetProjectGroupPath(tx, parentProjectGroup)
+		groupPath, err := h.GetProjectGroupPath(tx, parentProjectGroup)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -328,7 +296,7 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, curProjectGroupR
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
 		// check project exists
-		projectGroup, err = h.d.GetProjectGroup(tx, curProjectGroupRef)
+		projectGroup, err = h.GetProjectGroupByRef(tx, curProjectGroupRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -353,7 +321,7 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, curProjectGroupR
 
 		case types.ObjectKindProjectGroup:
 			// check parent exists
-			group, err := h.d.GetProjectGroup(tx, req.Parent.ID)
+			group, err := h.GetProjectGroupByRef(tx, req.Parent.ID)
 			if err != nil {
 				return errors.WithStack(err)
 			}
@@ -366,13 +334,13 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, curProjectGroupR
 			req.Parent.ID = group.ID
 		}
 
-		curPGParentPath, err := h.d.GetPath(tx, projectGroup.Parent.Kind, projectGroup.Parent.ID)
+		curPGParentPath, err := h.GetPath(tx, projectGroup.Parent.Kind, projectGroup.Parent.ID)
 		if err != nil {
 			return errors.WithStack(err)
 		}
 		curPGP := path.Join(curPGParentPath, projectGroup.Name)
 
-		pgParentPath, err := h.d.GetPath(tx, req.Parent.Kind, req.Parent.ID)
+		pgParentPath, err := h.GetPath(tx, req.Parent.Kind, req.Parent.ID)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -419,7 +387,7 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, curProjectGroupR
 func (h *ActionHandler) DeleteProjectGroup(ctx context.Context, projectGroupRef string) error {
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		// check project group existance
-		projectGroup, err := h.d.GetProjectGroup(tx, projectGroupRef)
+		projectGroup, err := h.GetProjectGroupByRef(tx, projectGroupRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -450,7 +418,7 @@ func (h *ActionHandler) DeleteProjectGroup(ctx context.Context, projectGroupRef 
 func (h *ActionHandler) getAllProjectGroupSubgroups(tx *sql.Tx, projectGroupRef string) ([]*types.ProjectGroup, error) {
 	resp := make([]*types.ProjectGroup, 0)
 
-	projectGroup, err := h.d.GetProjectGroup(tx, projectGroupRef)
+	projectGroup, err := h.GetProjectGroupByRef(tx, projectGroupRef)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

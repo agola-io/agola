@@ -25,6 +25,80 @@ import (
 	"agola.io/agola/services/configstore/types"
 )
 
+func (h *ActionHandler) GetSecretTree(tx *sql.Tx, parentKind types.ObjectKind, parentID, name string) (*types.Secret, error) {
+	for parentKind == types.ObjectKindProjectGroup || parentKind == types.ObjectKindProject {
+		secret, err := h.d.GetSecretByName(tx, parentID, name)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get secret with name %q", name)
+		}
+		if secret != nil {
+			return secret, nil
+		}
+
+		switch parentKind {
+		case types.ObjectKindProjectGroup:
+			projectGroup, err := h.GetProjectGroupByRef(tx, parentID)
+			if err != nil {
+				return nil, errors.WithStack(err)
+			}
+			if projectGroup == nil {
+				return nil, errors.Errorf("projectgroup with id %q doesn't exist", parentID)
+			}
+			parentKind = projectGroup.Parent.Kind
+			parentID = projectGroup.Parent.ID
+		case types.ObjectKindProject:
+			project, err := h.GetProjectByRef(tx, parentID)
+			if err != nil {
+				return nil, errors.WithStack(err)
+			}
+			if project == nil {
+				return nil, errors.Errorf("project with id %q doesn't exist", parentID)
+			}
+			parentKind = project.Parent.Kind
+			parentID = project.Parent.ID
+		}
+	}
+
+	return nil, nil
+}
+
+func (h *ActionHandler) GetSecretsTree(tx *sql.Tx, parentKind types.ObjectKind, parentID string) ([]*types.Secret, error) {
+	allSecrets := []*types.Secret{}
+
+	for parentKind == types.ObjectKindProjectGroup || parentKind == types.ObjectKindProject {
+		secrets, err := h.d.GetSecrets(tx, parentID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get secrets for %s %q", parentKind, parentID)
+		}
+		allSecrets = append(allSecrets, secrets...)
+
+		switch parentKind {
+		case types.ObjectKindProjectGroup:
+			projectGroup, err := h.GetProjectGroupByRef(tx, parentID)
+			if err != nil {
+				return nil, errors.WithStack(err)
+			}
+			if projectGroup == nil {
+				return nil, errors.Errorf("projectgroup with id %q doesn't exist", parentID)
+			}
+			parentKind = projectGroup.Parent.Kind
+			parentID = projectGroup.Parent.ID
+		case types.ObjectKindProject:
+			project, err := h.GetProjectByRef(tx, parentID)
+			if err != nil {
+				return nil, errors.WithStack(err)
+			}
+			if project == nil {
+				return nil, errors.Errorf("project with id %q doesn't exist", parentID)
+			}
+			parentKind = project.Parent.Kind
+			parentID = project.Parent.ID
+		}
+	}
+
+	return allSecrets, nil
+}
+
 func (h *ActionHandler) GetSecret(ctx context.Context, secretID string) (*types.Secret, error) {
 	var secret *types.Secret
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
@@ -58,7 +132,7 @@ func (h *ActionHandler) GetSecrets(ctx context.Context, parentKind types.ObjectK
 		}
 
 		if tree {
-			secrets, err = h.d.GetSecretsTree(tx, parentKind, parentID)
+			secrets, err = h.GetSecretsTree(tx, parentKind, parentID)
 		} else {
 			secrets, err = h.d.GetSecrets(tx, parentID)
 		}
@@ -68,7 +142,7 @@ func (h *ActionHandler) GetSecrets(ctx context.Context, parentKind types.ObjectK
 
 		// populate secrets parent paths
 		for _, s := range secrets {
-			pp, err := h.d.GetPath(tx, s.Parent.Kind, s.Parent.ID)
+			pp, err := h.GetPath(tx, s.Parent.Kind, s.Parent.ID)
 			if err != nil {
 				return errors.WithStack(err)
 			}

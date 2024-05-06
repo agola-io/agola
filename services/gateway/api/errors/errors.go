@@ -11,6 +11,9 @@ const (
 
 	ErrorCodeInvalidRole util.ErrorCode = "invalidRole"
 
+	ErrorCodeInvalidPath util.ErrorCode = "invalidPath"
+	ErrorCodeInvalidRef  util.ErrorCode = "invalidRef"
+
 	ErrorCodeUserDoesNotExist  util.ErrorCode = "userDoesNotExist"
 	ErrorCodeUserAlreadyExists util.ErrorCode = "userAlreadyExists"
 	ErrorCodeInvalidUserName   util.ErrorCode = "invalidUserName"

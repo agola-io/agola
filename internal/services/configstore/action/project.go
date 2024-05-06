@@ -38,12 +38,12 @@ type ProjectDynamicData struct {
 func (h *ActionHandler) projectDynamicData(tx *sql.Tx, project *types.Project) (*ProjectDynamicData, error) {
 	var projectDynamicData *ProjectDynamicData
 
-	pp, err := h.d.GetPath(tx, project.Parent.Kind, project.Parent.ID)
+	pp, err := h.GetPath(tx, project.Parent.Kind, project.Parent.ID)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	ownerType, ownerID, err := h.d.GetProjectOwnerID(tx, project)
+	ownerType, ownerID, err := h.GetProjectOwnerID(tx, project)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -111,7 +111,7 @@ func (h *ActionHandler) GetProject(ctx context.Context, projectRef string) (*Get
 	var projectDynamicData *ProjectDynamicData
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		project, err = h.d.GetProject(tx, projectRef)
+		project, err = h.GetProjectByRef(tx, projectRef)
 
 		if err != nil {
 			return errors.WithStack(err)
@@ -161,7 +161,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateUpdateProj
 	var projectDynamicData *ProjectDynamicData
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
-		group, err := h.d.GetProjectGroup(tx, req.Parent.ID)
+		group, err := h.GetProjectGroupByRef(tx, req.Parent.ID)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -170,7 +170,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateUpdateProj
 		}
 		req.Parent.ID = group.ID
 
-		ownerType, _, err := h.d.GetProjectGroupOwnerID(tx, group)
+		ownerType, _, err := h.GetProjectGroupOwnerID(tx, group)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -178,7 +178,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateUpdateProj
 			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("cannot set MembersCanPerformRunActions on an user project."), serrors.CannotSetMembersCanPerformRunActionsOnUserProject())
 		}
 
-		groupPath, err := h.d.GetProjectGroupPath(tx, group)
+		groupPath, err := h.GetProjectGroupPath(tx, group)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -264,7 +264,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, curProjectRef string,
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
 		// check project exists
-		project, err = h.d.GetProject(tx, curProjectRef)
+		project, err = h.GetProjectByRef(tx, curProjectRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -273,7 +273,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, curProjectRef string,
 		}
 
 		// check parent project group exists
-		group, err := h.d.GetProjectGroup(tx, req.Parent.ID)
+		group, err := h.GetProjectGroupByRef(tx, req.Parent.ID)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -282,7 +282,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, curProjectRef string,
 		}
 		req.Parent.ID = group.ID
 
-		ownerType, _, err := h.d.GetProjectGroupOwnerID(tx, group)
+		ownerType, _, err := h.GetProjectGroupOwnerID(tx, group)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -290,7 +290,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, curProjectRef string,
 			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("cannot set MembersCanPerformRunActions on an user project."), serrors.CannotSetMembersCanPerformRunActionsOnUserProject())
 		}
 
-		groupPath, err := h.d.GetProjectGroupPath(tx, group)
+		groupPath, err := h.GetProjectGroupPath(tx, group)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -309,7 +309,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, curProjectRef string,
 
 		if project.Parent.ID != req.Parent.ID {
 			// get old parent project group
-			curGroup, err := h.d.GetProjectGroup(tx, project.Parent.ID)
+			curGroup, err := h.GetProjectGroupByRef(tx, project.Parent.ID)
 			if err != nil {
 				return errors.WithStack(err)
 			}
@@ -377,7 +377,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, curProjectRef string,
 func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) error {
 	err := h.d.Do(ctx, func(tx *sql.Tx) error {
 		// check project existance
-		project, err := h.d.GetProject(tx, projectRef)
+		project, err := h.GetProjectByRef(tx, projectRef)
 		if err != nil {
 			return errors.WithStack(err)
 		}
