@@ -202,6 +202,60 @@ func TestParseConfig(t *testing.T) {
                 `,
 			err: errors.Errorf("task %q and its dependency %q have both a dependency on task %q", "task04", "task03", "task01"),
 		},
+		{
+			name: "test empty docker registries auth",
+			in: `
+                docker_registries_auth:
+                  'index.docker.io':
+                runs:
+                  - name: run01
+                    tasks:
+                      - name: task01
+                        runtime:
+                          type: pod
+                          containers:
+                            - image: alpine/git
+                        steps:
+                          - type: clone
+                `,
+			err: errors.Errorf(`docker registries auth "index.docker.io" is empty`),
+		},
+		{
+			name: "test run empty docker registries auth",
+			in: `
+                runs:
+                  - name: run01
+                    docker_registries_auth:
+                      'index.docker.io':
+                    tasks:
+                      - name: task01
+                        runtime:
+                          type: pod
+                          containers:
+                            - image: alpine/git
+                        steps:
+                          - type: clone
+                `,
+			err: errors.Errorf(`run "run01", docker registries auth "index.docker.io" is empty`),
+		},
+		{
+			name: "test task empty docker registries auth",
+			in: `
+                runs:
+                  - name: run01
+                    tasks:
+                      - name: task01
+                        docker_registries_auth:
+                          'index.docker.io':
+                        runtime:
+                          type: pod
+                          containers:
+                            - image: alpine/git
+                        steps:
+                          - type: clone
+                `,
+			err: errors.Errorf(`run "run01", task "task01", docker registries auth "index.docker.io" is empty`),
+		},
 	}
 
 	for _, tt := range tests {
