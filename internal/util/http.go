@@ -58,6 +58,8 @@ func HTTPError(w http.ResponseWriter, err error) bool {
 		return false
 	}
 
+	w.Header().Set("Content-Type", "application/json")
+
 	response := ErrorResponseFromError(err)
 	resj, merr := json.Marshal(response)
 	if merr != nil {
