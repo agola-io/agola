@@ -588,6 +588,7 @@ func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// header also if there're currently no lines to send
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Content-Type", "text/plain;charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
 	var flusher http.Flusher
 	if fl, ok := w.(http.Flusher); ok {
