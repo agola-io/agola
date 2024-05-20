@@ -87,10 +87,10 @@ func addHasMoreHeader(w http.ResponseWriter, hasMore bool) {
 type LogsHandler struct {
 	log zerolog.Logger
 	d   *db.DB
-	ost *objectstorage.ObjStorage
+	ost objectstorage.ObjStorage
 }
 
-func NewLogsHandler(log zerolog.Logger, d *db.DB, ost *objectstorage.ObjStorage) *LogsHandler {
+func NewLogsHandler(log zerolog.Logger, d *db.DB, ost objectstorage.ObjStorage) *LogsHandler {
 	return &LogsHandler{
 		log: log,
 		d:   d,
@@ -192,7 +192,7 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 		} else {
 			logPath = store.OSTRunTaskStepLogPath(task.ID, step)
 		}
-		f, err := h.ost.ReadObject(logPath)
+		f, err := h.ost.ReadObject(ctx, logPath)
 		if err != nil {
 			if objectstorage.IsNotExist(err) {
 				return true, util.NewAPIErrorWrap(util.ErrNotExist, err)
@@ -303,10 +303,10 @@ func sendLogs(w http.ResponseWriter, r io.Reader) error {
 type LogsDeleteHandler struct {
 	log zerolog.Logger
 	d   *db.DB
-	ost *objectstorage.ObjStorage
+	ost objectstorage.ObjStorage
 }
 
-func NewLogsDeleteHandler(log zerolog.Logger, d *db.DB, ost *objectstorage.ObjStorage) *LogsDeleteHandler {
+func NewLogsDeleteHandler(log zerolog.Logger, d *db.DB, ost objectstorage.ObjStorage) *LogsDeleteHandler {
 	return &LogsDeleteHandler{
 		log: log,
 		d:   d,
@@ -404,7 +404,7 @@ func (h *LogsDeleteHandler) deleteTaskLogs(ctx context.Context, runID, taskID st
 		} else {
 			logPath = store.OSTRunTaskStepLogPath(task.ID, step)
 		}
-		err := h.ost.DeleteObject(logPath)
+		err := h.ost.DeleteObject(ctx, logPath)
 		if err != nil {
 			if objectstorage.IsNotExist(err) {
 				return util.NewAPIErrorWrap(util.ErrNotExist, err)
@@ -1005,10 +1005,10 @@ func (h *RunTaskActionsHandler) do(r *http.Request) error {
 type RunEventsHandler struct {
 	log zerolog.Logger
 	d   *db.DB
-	ost *objectstorage.ObjStorage
+	ost objectstorage.ObjStorage
 }
 
-func NewRunEventsHandler(log zerolog.Logger, d *db.DB, ost *objectstorage.ObjStorage) *RunEventsHandler {
+func NewRunEventsHandler(log zerolog.Logger, d *db.DB, ost objectstorage.ObjStorage) *RunEventsHandler {
 	return &RunEventsHandler{
 		log: log,
 		d:   d,

@@ -16,6 +16,7 @@ package objectstorage
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -27,6 +28,7 @@ import (
 )
 
 func TestPosixDeleteObject(t *testing.T) {
+	ctx := context.Background()
 	objects := []string{"☺☺☺☺a☺☺☺☺☺☺b☺☺☺☺", "s3/is/nota/fil.fa", "s3/is/not/a/file///system/fi%l%%e01"}
 
 	dir := t.TempDir()
@@ -35,10 +37,10 @@ func TestPosixDeleteObject(t *testing.T) {
 	testutil.NilError(t, err)
 
 	for _, obj := range objects {
-		err := ls.WriteObject(obj, bytes.NewReader([]byte{}), 0, true)
+		err := ls.WriteObject(ctx, obj, bytes.NewReader([]byte{}), 0, true)
 		testutil.NilError(t, err)
 
-		err = ls.DeleteObject(obj)
+		err = ls.DeleteObject(ctx, obj)
 		testutil.NilError(t, err)
 	}
 

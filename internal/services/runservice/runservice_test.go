@@ -297,10 +297,10 @@ func TestLogleaner(t *testing.T) {
 	body := io.NopCloser(bytes.NewBufferString("log test"))
 	logPath := store.OSTRunTaskStepLogPath("task01", 0)
 
-	err := rs.ost.WriteObject(logPath, body, -1, false)
+	err := rs.ost.WriteObject(ctx, logPath, body, -1, false)
 	testutil.NilError(t, err)
 
-	_, err = rs.ost.ReadObject(logPath)
+	_, err = rs.ost.ReadObject(ctx, logPath)
 	testutil.NilError(t, err)
 
 	time.Sleep(1 * time.Second)
@@ -308,7 +308,7 @@ func TestLogleaner(t *testing.T) {
 	err = rs.objectsCleaner(ctx, store.OSTLogsBaseDir(), common.LogCleanerLockKey, 1*time.Millisecond)
 	testutil.NilError(t, err)
 
-	_, err = rs.ost.ReadObject(logPath)
+	_, err = rs.ost.ReadObject(ctx, logPath)
 	assert.ErrorType(t, err, objectstorage.IsNotExist)
 }
 

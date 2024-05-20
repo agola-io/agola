@@ -76,7 +76,7 @@ func (s *Runservice) maintenanceModeWatcher(ctx context.Context, runCtxCancel co
 type Runservice struct {
 	log             zerolog.Logger
 	c               *config.Runservice
-	ost             *objectstorage.ObjStorage
+	ost             objectstorage.ObjStorage
 	d               *db.DB
 	lf              lock.LockFactory
 	ah              *action.ActionHandler
@@ -88,7 +88,7 @@ func NewRunservice(ctx context.Context, log zerolog.Logger, c *config.Runservice
 		log = log.Level(zerolog.DebugLevel)
 	}
 
-	ost, err := scommon.NewObjectStorage(&c.ObjectStorage)
+	ost, err := scommon.NewObjectStorage(ctx, &c.ObjectStorage)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

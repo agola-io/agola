@@ -360,10 +360,10 @@ func (h *ExecutorTasksHandler) do(r *http.Request) ([]*rsapitypes.ExecutorTask, 
 
 type ArchivesHandler struct {
 	log zerolog.Logger
-	ost *objectstorage.ObjStorage
+	ost objectstorage.ObjStorage
 }
 
-func NewArchivesHandler(log zerolog.Logger, ost *objectstorage.ObjStorage) *ArchivesHandler {
+func NewArchivesHandler(log zerolog.Logger, ost objectstorage.ObjStorage) *ArchivesHandler {
 	return &ArchivesHandler{
 		log: log,
 		ost: ost,
@@ -380,6 +380,7 @@ func (h *ArchivesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *ArchivesHandler) do(w http.ResponseWriter, r *http.Request) error {
 	// TODO(sgotti) Check authorized call from executors
+	ctx := r.Context()
 
 	taskID := r.URL.Query().Get("taskid")
 	if taskID == "" {
@@ -396,7 +397,7 @@ func (h *ArchivesHandler) do(w http.ResponseWriter, r *http.Request) error {
 
 	w.Header().Set("Cache-Control", "no-cache")
 
-	if err := h.readArchive(taskID, step, w); err != nil {
+	if err := h.readArchive(ctx, taskID, step, w); err != nil {
 		switch {
 		case util.APIErrorIs(err, util.ErrNotExist):
 			return util.NewAPIErrorWrap(util.ErrNotExist, err)
@@ -408,9 +409,9 @@ func (h *ArchivesHandler) do(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (h *ArchivesHandler) readArchive(rtID string, step int, w io.Writer) error {
+func (h *ArchivesHandler) readArchive(ctx context.Context, rtID string, step int, w io.Writer) error {
 	archivePath := store.OSTRunTaskArchivePath(rtID, step)
-	f, err := h.ost.ReadObject(archivePath)
+	f, err := h.ost.ReadObject(ctx, archivePath)
 	if err != nil {
 		if objectstorage.IsNotExist(err) {
 			return util.NewAPIErrorWrap(util.ErrNotExist, err)
@@ -427,10 +428,10 @@ func (h *ArchivesHandler) readArchive(rtID string, step int, w io.Writer) error 
 
 type CacheHandler struct {
 	log zerolog.Logger
-	ost *objectstorage.ObjStorage
+	ost objectstorage.ObjStorage
 }
 
-func NewCacheHandler(log zerolog.Logger, ost *objectstorage.ObjStorage) *CacheHandler {
+func NewCacheHandler(log zerolog.Logger, ost objectstorage.ObjStorage) *CacheHandler {
 	return &CacheHandler{
 		log: log,
 		ost: ost,
@@ -446,6 +447,7 @@ func (h *CacheHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *CacheHandler) do(w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
 	vars := mux.Vars(r)
 	// TODO(sgotti) Check authorized call from executors
 
@@ -460,7 +462,7 @@ func (h *CacheHandler) do(w http.ResponseWriter, r *http.Request) error {
 	query := r.URL.Query()
 	_, prefix := query["prefix"]
 
-	matchedKey, err := matchCache(h.ost, key, prefix)
+	matchedKey, err := matchCache(ctx, h.ost, key, prefix)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -474,7 +476,7 @@ func (h *CacheHandler) do(w http.ResponseWriter, r *http.Request) error {
 
 	w.Header().Set("Cache-Control", "no-cache")
 
-	if err := h.readCache(matchedKey, w); err != nil {
+	if err := h.readCache(ctx, matchedKey, w); err != nil {
 		switch {
 		case util.APIErrorIs(err, util.ErrNotExist):
 			return util.NewAPIErrorWrap(util.ErrNotExist, err)
@@ -486,16 +488,13 @@ func (h *CacheHandler) do(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func matchCache(ost *objectstorage.ObjStorage, key string, prefix bool) (string, error) {
+func matchCache(ctx context.Context, ost objectstorage.ObjStorage, key string, prefix bool) (string, error) {
 	cachePath := store.OSTCachePath(key)
 
 	if prefix {
-		doneCh := make(chan struct{})
-		defer close(doneCh)
-
 		// get the latest modified object
 		var lastObject *objectstorage.ObjectInfo
-		for object := range ost.List(store.OSTCacheDir()+"/"+key, "", false, doneCh) {
+		for object := range ost.List(ctx, store.OSTCacheDir()+"/"+key, "", false) {
 			if object.Err != nil {
 				return "", errors.WithStack(object.Err)
 			}
@@ -512,7 +511,7 @@ func matchCache(ost *objectstorage.ObjStorage, key string, prefix bool) (string,
 		return store.OSTCacheKey(lastObject.Path), nil
 	}
 
-	_, err := ost.Stat(cachePath)
+	_, err := ost.Stat(ctx, cachePath)
 	if objectstorage.IsNotExist(err) {
 		return "", nil
 	}
@@ -522,9 +521,9 @@ func matchCache(ost *objectstorage.ObjStorage, key string, prefix bool) (string,
 	return key, nil
 }
 
-func (h *CacheHandler) readCache(key string, w io.Writer) error {
+func (h *CacheHandler) readCache(ctx context.Context, key string, w io.Writer) error {
 	cachePath := store.OSTCachePath(key)
-	f, err := h.ost.ReadObject(cachePath)
+	f, err := h.ost.ReadObject(ctx, cachePath)
 	if err != nil {
 		if objectstorage.IsNotExist(err) {
 			return util.NewAPIErrorWrap(util.ErrNotExist, err)
@@ -541,10 +540,10 @@ func (h *CacheHandler) readCache(key string, w io.Writer) error {
 
 type CacheCreateHandler struct {
 	log zerolog.Logger
-	ost *objectstorage.ObjStorage
+	ost objectstorage.ObjStorage
 }
 
-func NewCacheCreateHandler(log zerolog.Logger, ost *objectstorage.ObjStorage) *CacheCreateHandler {
+func NewCacheCreateHandler(log zerolog.Logger, ost objectstorage.ObjStorage) *CacheCreateHandler {
 	return &CacheCreateHandler{
 		log: log,
 		ost: ost,
@@ -560,6 +559,7 @@ func (h *CacheCreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *CacheCreateHandler) do(w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
 	vars := mux.Vars(r)
 	// TODO(sgotti) Check authorized call from executors
 
@@ -574,7 +574,7 @@ func (h *CacheCreateHandler) do(w http.ResponseWriter, r *http.Request) error {
 
 	w.Header().Set("Cache-Control", "no-cache")
 
-	matchedKey, err := matchCache(h.ost, key, false)
+	matchedKey, err := matchCache(ctx, h.ost, key, false)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -593,7 +593,7 @@ func (h *CacheCreateHandler) do(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	cachePath := store.OSTCachePath(key)
-	if err := h.ost.WriteObject(cachePath, r.Body, size, false); err != nil {
+	if err := h.ost.WriteObject(ctx, cachePath, r.Body, size, false); err != nil {
 		return errors.WithStack(err)
 	}
 

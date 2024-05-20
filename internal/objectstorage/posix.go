@@ -15,6 +15,7 @@
 package objectstorage
 
 import (
+	"context"
 	"io"
 	"os"
 	"path"
@@ -22,6 +23,8 @@ import (
 	"strings"
 
 	"github.com/sorintlab/errors"
+
+	"agola.io/agola/internal/util"
 )
 
 const (
@@ -56,7 +59,7 @@ func (s *PosixStorage) fsPath(p string) (string, error) {
 	return filepath.Join(s.dataDir, p), nil
 }
 
-func (s *PosixStorage) Stat(p string) (*ObjectInfo, error) {
+func (s *PosixStorage) Stat(ctx context.Context, p string) (*ObjectInfo, error) {
 	fspath, err := s.fsPath(p)
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -73,7 +76,7 @@ func (s *PosixStorage) Stat(p string) (*ObjectInfo, error) {
 	return &ObjectInfo{Path: p, LastModified: fi.ModTime(), Size: fi.Size()}, nil
 }
 
-func (s *PosixStorage) ReadObject(p string) (ReadSeekCloser, error) {
+func (s *PosixStorage) ReadObject(ctx context.Context, p string) (ReadSeekCloser, error) {
 	fspath, err := s.fsPath(p)
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -86,7 +89,7 @@ func (s *PosixStorage) ReadObject(p string) (ReadSeekCloser, error) {
 	return f, errors.WithStack(err)
 }
 
-func (s *PosixStorage) WriteObject(p string, data io.Reader, size int64, persist bool) error {
+func (s *PosixStorage) WriteObject(ctx context.Context, p string, data io.Reader, size int64, persist bool) error {
 	fspath, err := s.fsPath(p)
 	if err != nil {
 		return errors.WithStack(err)
@@ -106,7 +109,7 @@ func (s *PosixStorage) WriteObject(p string, data io.Reader, size int64, persist
 	})
 }
 
-func (s *PosixStorage) DeleteObject(p string) error {
+func (s *PosixStorage) DeleteObject(ctx context.Context, p string) error {
 	fspath, err := s.fsPath(p)
 	if err != nil {
 		return errors.WithStack(err)
@@ -148,20 +151,13 @@ func (s *PosixStorage) DeleteObject(p string) error {
 	return nil
 }
 
-func (s *PosixStorage) List(prefix, startWith, delimiter string, doneCh <-chan struct{}) <-chan ObjectInfo {
+func (s *PosixStorage) List(ctx context.Context, prefix, startAfter string, recursive bool) <-chan ObjectInfo {
 	objectCh := make(chan ObjectInfo, 1)
 
-	if len(delimiter) > 1 {
-		objectCh <- ObjectInfo{Err: errors.Errorf("wrong delimiter %q", delimiter)}
+	if startAfter != "" && !strings.Contains(startAfter, prefix) {
+		objectCh <- ObjectInfo{Err: errors.Errorf("wrong startAfter value %q for prefix %q", startAfter, prefix)}
 		return objectCh
 	}
-
-	if startWith != "" && !strings.Contains(startWith, prefix) {
-		objectCh <- ObjectInfo{Err: errors.Errorf("wrong startwith value %q for prefix %q", startWith, prefix)}
-		return objectCh
-	}
-
-	recursive := delimiter == ""
 
 	// remove leading slash from prefix
 	prefix = strings.TrimPrefix(prefix, "/")
@@ -173,10 +169,18 @@ func (s *PosixStorage) List(prefix, startWith, delimiter string, doneCh <-chan s
 	}
 
 	// remove leading slash
-	startWith = strings.TrimPrefix(startWith, "/")
+	startAfter = strings.TrimPrefix(startAfter, "/")
 
 	go func(objectCh chan<- ObjectInfo) {
-		defer close(objectCh)
+		defer func() {
+			if util.ContextCanceled(ctx) {
+				objectCh <- ObjectInfo{
+					Err: ctx.Err(),
+				}
+			}
+			close(objectCh)
+		}()
+
 		err := filepath.Walk(root, func(ep string, info os.FileInfo, err error) error {
 			if err != nil && !errors.Is(err, os.ErrNotExist) {
 				return errors.WithStack(err)
@@ -195,7 +199,7 @@ func (s *PosixStorage) List(prefix, startWith, delimiter string, doneCh <-chan s
 			}
 			if !recursive && len(p) > len(prefix) {
 				rel := strings.TrimPrefix(p, prefix)
-				skip := strings.Contains(rel, delimiter)
+				skip := strings.Contains(rel, "/")
 
 				if info.IsDir() && skip {
 					return filepath.SkipDir
@@ -209,21 +213,20 @@ func (s *PosixStorage) List(prefix, startWith, delimiter string, doneCh <-chan s
 				return nil
 			}
 
-			if strings.HasPrefix(p, prefix) && p > startWith {
+			if strings.HasPrefix(p, prefix) && p > startAfter {
 				select {
-				// Send object content.
 				case objectCh <- ObjectInfo{Path: p, LastModified: info.ModTime(), Size: info.Size()}:
-				// If receives done from the caller, return here.
-				case <-doneCh:
-					return io.EOF
+				case <-ctx.Done():
+					return nil
 				}
 			}
 
 			return nil
 		})
-		if err != nil && !errors.Is(err, io.EOF) {
-			objectCh <- ObjectInfo{
-				Err: err,
+		if err != nil {
+			select {
+			case objectCh <- ObjectInfo{Err: err}:
+			case <-ctx.Done():
 			}
 			return
 		}
