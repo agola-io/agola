@@ -460,7 +460,7 @@ func TestParseOutput(t *testing.T) {
 											Name: "command01",
 										},
 										Command: "command01",
-										Tty:     util.BoolP(true),
+										Tty:     util.Ptr(true),
 									},
 									&RunStep{
 										BaseStep: BaseStep{
@@ -468,7 +468,7 @@ func TestParseOutput(t *testing.T) {
 											Name: "name different than command",
 										},
 										Command: "command02",
-										Tty:     util.BoolP(true),
+										Tty:     util.Ptr(true),
 									},
 									&RunStep{
 										BaseStep: BaseStep{
@@ -480,7 +480,7 @@ func TestParseOutput(t *testing.T) {
 											"ENV01":             {Type: ValueTypeString, Value: "ENV01"},
 											"ENVFROMVARIABLE01": {Type: ValueTypeFromVariable, Value: "variable01"},
 										},
-										Tty: util.BoolP(true),
+										Tty: util.Ptr(true),
 									},
 									&SaveCacheStep{
 										BaseStep: BaseStep{Type: "save_cache"},
@@ -494,7 +494,7 @@ func TestParseOutput(t *testing.T) {
 											Name: "command01",
 										},
 										Command: "command01",
-										Tty:     util.BoolP(true),
+										Tty:     util.Ptr(true),
 									},
 									&RunStep{
 										BaseStep: BaseStep{
@@ -502,7 +502,7 @@ func TestParseOutput(t *testing.T) {
 											Name: "name different than command",
 										},
 										Command: "command02",
-										Tty:     util.BoolP(true),
+										Tty:     util.Ptr(true),
 									},
 									&RunStep{
 										BaseStep: BaseStep{
@@ -514,7 +514,7 @@ func TestParseOutput(t *testing.T) {
 											"ENV01":             {Type: ValueTypeString, Value: "ENV01"},
 											"ENVFROMVARIABLE01": {Type: ValueTypeFromVariable, Value: "variable01"},
 										},
-										Tty: util.BoolP(true),
+										Tty: util.Ptr(true),
 									},
 									&SaveCacheStep{
 										BaseStep: BaseStep{Type: "save_cache"},
@@ -618,7 +618,7 @@ func TestParseOutput(t *testing.T) {
 											Name: "command with default tty",
 										},
 										Command: "command01",
-										Tty:     util.BoolP(true),
+										Tty:     util.Ptr(true),
 									},
 									&RunStep{
 										BaseStep: BaseStep{
@@ -626,7 +626,7 @@ func TestParseOutput(t *testing.T) {
 											Name: "command with tty as true",
 										},
 										Command: "command02",
-										Tty:     util.BoolP(true),
+										Tty:     util.Ptr(true),
 									},
 									&RunStep{
 										BaseStep: BaseStep{
@@ -634,7 +634,7 @@ func TestParseOutput(t *testing.T) {
 											Name: "command with tty as false",
 										},
 										Command: "command03",
-										Tty:     util.BoolP(false),
+										Tty:     util.Ptr(false),
 									},
 								},
 								Depends: nil,

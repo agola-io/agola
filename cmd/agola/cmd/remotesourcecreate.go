@@ -22,9 +22,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"agola.io/agola/internal/gitsources/github"
+	"agola.io/agola/internal/util"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
 	gwclient "agola.io/agola/services/gateway/client"
-	"agola.io/agola/util"
 )
 
 var cmdRemoteSourceCreate = &cobra.Command{
@@ -110,8 +110,8 @@ func remoteSourceCreate(cmd *cobra.Command, args []string) error {
 		Oauth2ClientSecret:  remoteSourceCreateOpts.oauth2ClientSecret,
 		SSHHostKey:          remoteSourceCreateOpts.sshHostKey,
 		SkipSSHHostKeyCheck: remoteSourceCreateOpts.skipSSHHostKeyCheck,
-		RegistrationEnabled: util.BoolP(remoteSourceCreateOpts.registrationEnabled),
-		LoginEnabled:        util.BoolP(remoteSourceCreateOpts.loginEnabled),
+		RegistrationEnabled: util.Ptr(remoteSourceCreateOpts.registrationEnabled),
+		LoginEnabled:        util.Ptr(remoteSourceCreateOpts.loginEnabled),
 	}
 
 	log.Info().Msgf("creating remotesource")

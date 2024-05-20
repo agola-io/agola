@@ -133,7 +133,7 @@ func (n *NotificationService) handleCommitStatusDelivery(ctx context.Context, co
 
 	var deliveredAt *time.Time
 	if delivered {
-		deliveredAt = util.TimeP(time.Now())
+		deliveredAt = util.Ptr(time.Now())
 	}
 
 	err = n.d.Do(ctx, func(tx *sql.Tx) error {

@@ -8,7 +8,7 @@ import (
 
 	"agola.io/agola/internal/sqlg"
 	"agola.io/agola/internal/sqlg/sql"
-	"agola.io/agola/util"
+	"agola.io/agola/internal/util"
 )
 
 type RunPhase string
@@ -110,9 +110,9 @@ func (r *Run) ChangePhase(phase RunPhase) {
 	r.Phase = phase
 	switch {
 	case phase == RunPhaseRunning:
-		r.StartTime = util.TimeP(time.Now())
+		r.StartTime = util.Ptr(time.Now())
 	case phase.IsFinished():
-		r.EndTime = util.TimeP(time.Now())
+		r.EndTime = util.Ptr(time.Now())
 	}
 }
 

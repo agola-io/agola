@@ -2468,7 +2468,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		testutil.NilError(t, err)
 
 		// set a fake APIURL to make the delivery fail
-		_, _, err = gwUserAdminClient.UpdateRemoteSource(ctx, "gitea", &gwapitypes.UpdateRemoteSourceRequest{APIURL: util.StringP("fakeGiteaAPIURL")})
+		_, _, err = gwUserAdminClient.UpdateRemoteSource(ctx, "gitea", &gwapitypes.UpdateRemoteSourceRequest{APIURL: util.Ptr("fakeGiteaAPIURL")})
 		testutil.NilError(t, err)
 
 		commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})

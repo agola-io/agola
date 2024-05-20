@@ -480,14 +480,14 @@ func TestUpdateProject(t *testing.T) {
 		assert.Assert(t, !project.PassVarsToForkedPR)
 
 		project, _, err = gwClient.UpdateProject(ctx, project.ID, &gwapitypes.UpdateProjectRequest{
-			PassVarsToForkedPR: util.BoolP(false),
+			PassVarsToForkedPR: util.Ptr(false),
 		})
 		testutil.NilError(t, err)
 
 		assert.Assert(t, !project.PassVarsToForkedPR)
 
 		project, _, err = gwClient.UpdateProject(ctx, project.ID, &gwapitypes.UpdateProjectRequest{
-			PassVarsToForkedPR: util.BoolP(true),
+			PassVarsToForkedPR: util.Ptr(true),
 		})
 		testutil.NilError(t, err)
 
@@ -556,7 +556,7 @@ func TestUpdateProject(t *testing.T) {
 
 		_, _, err = gwClient.UpdateProject(ctx, project.ID, &gwapitypes.UpdateProjectRequest{
 			Name:                        &project.Name,
-			MembersCanPerformRunActions: util.BoolP(true),
+			MembersCanPerformRunActions: util.Ptr(true),
 		})
 		expectedErr := util.NewRemoteError(util.ErrBadRequest, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeCannotSetMembersCanPerformRunActionsOnUserProject}))
 		assert.Error(t, err, expectedErr.Error())
@@ -590,7 +590,7 @@ func TestUpdateProject(t *testing.T) {
 		// test update org project with MembersCanPerformRunActions true
 		project, _, err = gwClient.UpdateProject(ctx, project.ID, &gwapitypes.UpdateProjectRequest{
 			Name:                        &project.Name,
-			MembersCanPerformRunActions: util.BoolP(true),
+			MembersCanPerformRunActions: util.Ptr(true),
 		})
 		testutil.NilError(t, err)
 
@@ -612,7 +612,7 @@ func TestUpdateProject(t *testing.T) {
 		// test update org project with MembersCanPerformRunActions false
 		project, _, err = gwClient.UpdateProject(ctx, project.ID, &gwapitypes.UpdateProjectRequest{
 			Name:                        &project.Name,
-			MembersCanPerformRunActions: util.BoolP(false),
+			MembersCanPerformRunActions: util.Ptr(false),
 		})
 		testutil.NilError(t, err)
 
@@ -644,7 +644,7 @@ func TestRefreshRemoteRepositoryInfo(t *testing.T) {
 
 	assert.Equal(t, project.DefaultBranch, "master")
 
-	_, _, err = giteaClient.EditRepo(giteaRepo.Owner.UserName, giteaRepo.Name, gitea.EditRepoOption{DefaultBranch: util.StringP("testbranch")})
+	_, _, err = giteaClient.EditRepo(giteaRepo.Owner.UserName, giteaRepo.Name, gitea.EditRepoOption{DefaultBranch: util.Ptr("testbranch")})
 	testutil.NilError(t, err)
 
 	project, _, err = gwClient.RefreshRemoteRepo(ctx, project.ID)
@@ -791,7 +791,7 @@ func TestProjectRunActions(t *testing.T) {
 		// test org run actions executed by an organization member type with MembersCanPerformRunActions false
 
 		_, _, err = gwUser01Client.UpdateProject(ctx, project.ID, &gwapitypes.UpdateProjectRequest{
-			MembersCanPerformRunActions: util.BoolP(false),
+			MembersCanPerformRunActions: util.Ptr(false),
 		})
 		testutil.NilError(t, err)
 

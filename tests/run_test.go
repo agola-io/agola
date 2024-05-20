@@ -789,7 +789,7 @@ func TestPullRequest(t *testing.T) {
 
 			giteaRepo, project := createProject(ctx, t, giteaClient, gwClient)
 
-			project, _, err = gwClient.UpdateProject(ctx, project.ID, &gwapitypes.UpdateProjectRequest{PassVarsToForkedPR: util.BoolP(tt.passVarsToForkedPR)})
+			project, _, err = gwClient.UpdateProject(ctx, project.ID, &gwapitypes.UpdateProjectRequest{PassVarsToForkedPR: util.Ptr(tt.passVarsToForkedPR)})
 			testutil.NilError(t, err, "failed to update project")
 
 			//create project secret
@@ -852,7 +852,7 @@ func TestPullRequest(t *testing.T) {
 					Username:           giteaUser02,
 					Password:           giteaUser02Password,
 					Email:              "user02@example.com",
-					MustChangePassword: util.BoolP(false),
+					MustChangePassword: util.Ptr(false),
 				}
 				_, _, err := giteaClient.AdminCreateUser(userOpts)
 				testutil.NilError(t, err, "failed to create user02")
