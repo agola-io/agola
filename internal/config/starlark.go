@@ -21,6 +21,7 @@ import (
 
 	"github.com/sorintlab/errors"
 	"go.starlark.net/starlark"
+	"go.starlark.net/syntax"
 )
 
 func starlarkArgs(cc *ConfigContext) (starlark.Tuple, error) {
@@ -122,7 +123,7 @@ func execStarlark(configData []byte, configContext *ConfigContext) ([]byte, erro
 		// TODO(sgotti) redirect print to a logger?
 		Print: func(_ *starlark.Thread, msg string) {},
 	}
-	globals, err := starlark.ExecFile(thread, "config.star", configData, nil)
+	globals, err := starlark.ExecFileOptions(&syntax.FileOptions{}, thread, "config.star", configData, nil)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

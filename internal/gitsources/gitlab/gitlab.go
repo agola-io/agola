@@ -127,7 +127,7 @@ func (c *Client) GetUserInfo() (*gitsource.UserInfo, error) {
 }
 
 func (c *Client) GetFile(repopath, commit, file string) ([]byte, error) {
-	f, _, err := c.client.RepositoryFiles.GetFile(repopath, file, &gitlab.GetFileOptions{Ref: gitlab.String(commit)})
+	f, _, err := c.client.RepositoryFiles.GetFile(repopath, file, &gitlab.GetFileOptions{Ref: gitlab.Ptr(commit)})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -140,8 +140,8 @@ func (c *Client) GetFile(repopath, commit, file string) ([]byte, error) {
 
 func (c *Client) CreateDeployKey(repopath, title, pubKey string, readonly bool) error {
 	if _, _, err := c.client.DeployKeys.AddDeployKey(repopath, &gitlab.AddDeployKeyOptions{
-		Title: gitlab.String(title),
-		Key:   gitlab.String(pubKey),
+		Title: gitlab.Ptr(title),
+		Key:   gitlab.Ptr(pubKey),
 	}); err != nil {
 		return errors.Wrapf(err, "error creating deploy key")
 	}
@@ -195,11 +195,11 @@ func (c *Client) DeleteDeployKey(repopath, title string) error {
 
 func (c *Client) CreateRepoWebhook(repopath, url, secret string) error {
 	opts := &gitlab.AddProjectHookOptions{
-		URL:                 gitlab.String(url),
-		PushEvents:          gitlab.Bool(true),
-		TagPushEvents:       gitlab.Bool(true),
-		MergeRequestsEvents: gitlab.Bool(true),
-		Token:               gitlab.String(secret),
+		URL:                 gitlab.Ptr(url),
+		PushEvents:          gitlab.Ptr(true),
+		TagPushEvents:       gitlab.Ptr(true),
+		MergeRequestsEvents: gitlab.Ptr(true),
+		Token:               gitlab.Ptr(secret),
 	}
 	if _, _, err := c.client.Projects.AddProjectHook(repopath, opts); err != nil {
 		return errors.Wrapf(err, "error creating repository webhook")
@@ -230,9 +230,9 @@ func (c *Client) DeleteRepoWebhook(repopath, u string) error {
 func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource.CommitStatus, targetURL, description, context string) (bool, error) {
 	_, resp, err := c.client.Commits.SetCommitStatus(repopath, commitSHA, &gitlab.SetCommitStatusOptions{
 		State:       fromCommitStatus(status),
-		TargetURL:   gitlab.String(targetURL),
-		Description: gitlab.String(description),
-		Context:     gitlab.String(context),
+		TargetURL:   gitlab.Ptr(targetURL),
+		Description: gitlab.Ptr(description),
+		Context:     gitlab.Ptr(context),
 	})
 	var delivered bool
 	if resp != nil {
@@ -243,7 +243,7 @@ func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource
 
 func (c *Client) ListUserRepos() ([]*gitsource.RepoInfo, error) {
 	// get only repos with permission greater or equal to maintainer
-	opts := &gitlab.ListProjectsOptions{MinAccessLevel: gitlab.AccessLevel(gitlab.MaintainerPermissions)}
+	opts := &gitlab.ListProjectsOptions{MinAccessLevel: gitlab.Ptr(gitlab.MaintainerPermissions)}
 	remoteRepos, _, err := c.client.Projects.ListProjects(opts)
 	if err != nil {
 		return nil, errors.WithStack(err)
