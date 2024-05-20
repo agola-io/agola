@@ -378,7 +378,7 @@ func (d *K8sDriver) NewPod(ctx context.Context, podConfig *PodConfig, out io.Wri
 			ImagePullSecrets: []corev1.LocalObjectReference{{Name: name}},
 			// don't mount service account secrets or pods will be able to talk with k8s
 			// api
-			AutomountServiceAccountToken: util.BoolP(false),
+			AutomountServiceAccountToken: util.Ptr(false),
 			InitContainers: []corev1.Container{
 				{
 					Name:  "initcontainer",

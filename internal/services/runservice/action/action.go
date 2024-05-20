@@ -573,7 +573,7 @@ func (h *ActionHandler) saveRun(ctx context.Context, rb *types.RunBundle, runcgt
 		return errors.WithStack(err)
 	}
 
-	run.EnqueueTime = util.TimeP(time.Now())
+	run.EnqueueTime = util.Ptr(time.Now())
 
 	err = h.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error

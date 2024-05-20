@@ -20,8 +20,8 @@ import (
 
 	"github.com/sorintlab/errors"
 
+	"agola.io/agola/internal/util"
 	"agola.io/agola/services/types"
-	"agola.io/agola/util"
 )
 
 // Configstore types
@@ -194,10 +194,10 @@ func (rs *RemoteSource) UnmarshalJSON(b []byte) error {
 	}
 
 	if trs.RegistrationEnabled == nil {
-		trs.RegistrationEnabled = util.BoolP(true)
+		trs.RegistrationEnabled = util.Ptr(true)
 	}
 	if trs.LoginEnabled == nil {
-		trs.LoginEnabled = util.BoolP(true)
+		trs.LoginEnabled = util.Ptr(true)
 	}
 
 	return nil

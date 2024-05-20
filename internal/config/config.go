@@ -241,7 +241,7 @@ func (s *Steps) UnmarshalJSON(b []byte) error {
 					return errors.WithStack(err)
 				}
 				if s.Tty == nil {
-					s.Tty = util.BoolP(true)
+					s.Tty = util.Ptr(true)
 				}
 				s.Type = stepType
 				step = &s
@@ -939,7 +939,7 @@ func checkConfig(config *Config) error {
 					}
 					// if tty is omitted its default is true
 					if step.Tty == nil {
-						step.Tty = util.BoolP(true)
+						step.Tty = util.Ptr(true)
 					}
 				case *SaveCacheStep:
 					for _, content := range step.Contents {

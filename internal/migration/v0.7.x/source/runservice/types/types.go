@@ -23,8 +23,8 @@ import (
 	"github.com/mitchellh/copystructure"
 	"github.com/sorintlab/errors"
 
+	"agola.io/agola/internal/util"
 	"agola.io/agola/services/types"
-	"agola.io/agola/util"
 )
 
 const (
@@ -144,9 +144,9 @@ func (r *Run) ChangePhase(phase RunPhase) {
 	r.Phase = phase
 	switch {
 	case phase == RunPhaseRunning:
-		r.StartTime = util.TimeP(time.Now())
+		r.StartTime = util.Ptr(time.Now())
 	case phase.IsFinished():
-		r.EndTime = util.TimeP(time.Now())
+		r.EndTime = util.Ptr(time.Now())
 	}
 }
 
@@ -585,7 +585,7 @@ func (et *Steps) UnmarshalJSON(b []byte) error {
 				return errors.WithStack(err)
 			}
 			if s.Tty == nil {
-				s.Tty = util.BoolP(true)
+				s.Tty = util.Ptr(true)
 			}
 			steps[i] = &s
 		case "save_to_workspace":

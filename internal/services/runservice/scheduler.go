@@ -938,11 +938,11 @@ func (s *Runservice) executorTaskCleaner(ctx context.Context, executorTaskID str
 				s.log.Warn().Msgf("executor with id %q doesn't exist. marking executor task %q as failed", et.ExecutorID, et.ID)
 				et.FailError = "executor deleted"
 				et.Phase = types.ExecutorTaskPhaseFailed
-				et.EndTime = util.TimeP(time.Now())
+				et.EndTime = util.Ptr(time.Now())
 				for _, s := range et.Steps {
 					if s.Phase == types.ExecutorTaskPhaseRunning {
 						s.Phase = types.ExecutorTaskPhaseFailed
-						s.EndTime = util.TimeP(time.Now())
+						s.EndTime = util.Ptr(time.Now())
 					}
 				}
 				if err := s.d.UpdateExecutorTask(tx, et); err != nil {

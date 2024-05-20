@@ -9,8 +9,8 @@ import (
 
 	"agola.io/agola/internal/sqlg"
 	"agola.io/agola/internal/sqlg/sql"
+	"agola.io/agola/internal/util"
 	stypes "agola.io/agola/services/types"
-	"agola.io/agola/util"
 )
 
 // RunConfig
@@ -217,7 +217,7 @@ func (et *Steps) UnmarshalJSON(b []byte) error {
 				return errors.WithStack(err)
 			}
 			if s.Tty == nil {
-				s.Tty = util.BoolP(true)
+				s.Tty = util.Ptr(true)
 			}
 			steps[i] = &s
 		case "save_to_workspace":

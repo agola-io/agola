@@ -136,7 +136,7 @@ func (n *NotificationService) handleRunWebhookDelivery(ctx context.Context, runW
 	var statusCode int
 
 	if resp != nil {
-		deliveredAt = util.TimeP(time.Now())
+		deliveredAt = util.Ptr(time.Now())
 		statusCode = resp.StatusCode
 	}
 
