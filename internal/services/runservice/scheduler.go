@@ -1623,6 +1623,8 @@ func (s *Runservice) cacheCleaner(ctx context.Context, cacheExpireInterval time.
 }
 
 func (s *Runservice) workspaceCleanerLoop(ctx context.Context, workspaceExpireInterval time.Duration) {
+	s.log.Debug().Msgf("workspaceCleanerLoop")
+
 	for {
 		if err := s.objectsCleaner(ctx, store.OSTArchivesBaseDir(), common.WorkspaceCleanerLockKey, workspaceExpireInterval); err != nil {
 			s.log.Err(err).Send()
@@ -1654,10 +1656,8 @@ func (s *Runservice) logCleanerLoop(ctx context.Context, logExpireInterval time.
 	}
 }
 
-func (s *Runservice) objectsCleaner(ctx context.Context, prefix string, etcdLockKey string, objectExpireInterval time.Duration) error {
-	s.log.Debug().Msgf("objectsCleaner")
-
-	l := s.lf.NewLock(common.WorkspaceCleanerLockKey)
+func (s *Runservice) objectsCleaner(ctx context.Context, prefix string, lockKey string, objectExpireInterval time.Duration) error {
+	l := s.lf.NewLock(lockKey)
 	if err := l.Lock(ctx); err != nil {
 		return errors.Wrap(err, "failed to acquire object cleaner lock")
 	}
