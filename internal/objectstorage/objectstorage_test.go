@@ -16,6 +16,7 @@ package objectstorage
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -29,12 +30,8 @@ import (
 	"agola.io/agola/internal/testutil"
 )
 
-func setupPosix(t *testing.T, dir string) (*PosixStorage, error) {
+func setupPosix(dir string) (*PosixStorage, error) {
 	return NewPosix(path.Join(dir, "posix"))
-}
-
-func setupPosixFlat(t *testing.T, dir string) (*PosixFlatStorage, error) {
-	return NewPosixFlat(path.Join(dir, "posixflat"))
 }
 
 func setupS3(t *testing.T, dir string) (*S3Storage, error) {
@@ -46,16 +43,13 @@ func setupS3(t *testing.T, dir string) (*S3Storage, error) {
 		return nil, nil
 	}
 
-	return NewS3(filepath.Base(dir), "", minioEndpoint, minioAccessKey, minioSecretKey, false)
+	return NewS3(context.Background(), filepath.Base(dir), "", minioEndpoint, minioAccessKey, minioSecretKey, false)
 }
 
 func TestList(t *testing.T) {
 	dir := t.TempDir()
 
-	ps, err := setupPosix(t, dir)
-	testutil.NilError(t, err)
-
-	pfs, err := setupPosixFlat(t, dir)
+	ps, err := setupPosix(dir)
 	testutil.NilError(t, err)
 
 	s3s, err := setupS3(t, dir)
@@ -68,31 +62,23 @@ func TestList(t *testing.T) {
 		expected  []string
 	}
 	tests := []struct {
-		s       map[string]Storage
+		s       map[string]ObjStorage
 		objects []string
 		ops     []listop
 	}{
 		{
-			map[string]Storage{"posixflat": pfs},
+			map[string]ObjStorage{},
 			[]string{
 				// Minio (as of 20190201) IMHO is not real S3 since it tries to map to a
 				// file system and not a flat namespace like S3. For this reason this test
-				// won't work with minio beacuse it creates a file called "path/of" and so
+				// won't work with minio because it creates a file called "path/of" and so
 				// it's not possible to create a file "path/of/a" because it needs "of" to
 				// be a directory
+				// The same for the posix storage since it uses a posix filesystem.
 
-				// All of the below tests will fail on Minio due to the above reason and also the multiple '/'
-				// so we aren't testing these with it
+				// All of the below tests will fail on Minio and posix due to the above
+				// reasons also due to the multiple '/' so we aren't testing these with them.
 
-				//"path/of",
-				//"path/of/a/file02",
-				//"path/of/a/file03",
-				//"path/of/a/file04",
-				//"path/of/a/file05",
-
-				// These are multiple of 8 chars on purpose to test the filemarker behavior to
-				// distinguish between a file or a directory when the files ends at the path
-				// separator point
 				"s3/is/not/a/file///system/file01",
 				"s3/is/not/a/file///system/file02",
 				"s3/is/not/a/file///system/file03",
@@ -183,11 +169,8 @@ func TestList(t *testing.T) {
 			},
 		},
 		{
-			map[string]Storage{"posix": ps, "posixflat": pfs, "minio": s3s},
+			map[string]ObjStorage{"posix": ps, "minio": s3s},
 			[]string{
-				// These are multiple of 8 chars on purpose to test the filemarker behavior to
-				// distinguish between a file or a directory when the files ends at the path
-				// separator point
 				"s3/is/not/a/file/sy/st/em/file01",
 				"s3/is/not/a/file/sy/st/em/file02",
 				"s3/is/not/a/file/sy/st/em/file03",
@@ -260,27 +243,26 @@ func TestList(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		for sname, s := range tt.s {
-			t.Run(fmt.Sprintf("test with storage type %s", sname), func(t *testing.T) {
-				switch s := s.(type) {
+		for sname, os := range tt.s {
+			t.Run(fmt.Sprintf("with storage type %s", sname), func(t *testing.T) {
+				ctx := context.Background()
+				switch s := os.(type) {
 				case *S3Storage:
 					if s == nil {
 						t.SkipNow()
 					}
 				}
-				os := NewObjStorage(s, "/")
+
 				// populate
 				for _, p := range tt.objects {
-					if err := os.WriteObject(p, strings.NewReader(""), 0, true); err != nil {
+					if err := os.WriteObject(ctx, p, strings.NewReader(""), 0, true); err != nil {
 						t.Fatalf("%s %d err: %v", sname, i, err)
 					}
 				}
 
-				doneCh := make(chan struct{})
-				defer close(doneCh)
 				for j, op := range tt.ops {
 					paths := []string{}
-					for object := range os.List(op.prefix, op.start, op.recursive, doneCh) {
+					for object := range os.List(ctx, op.prefix, op.start, op.recursive) {
 						if object.Err != nil {
 							t.Fatalf("%s %d-%d err: %v", sname, i, j, object.Err)
 							return
@@ -299,10 +281,7 @@ func TestList(t *testing.T) {
 func TestWriteObject(t *testing.T) {
 	dir := t.TempDir()
 
-	ps, err := setupPosix(t, dir)
-	testutil.NilError(t, err)
-
-	pfs, err := setupPosixFlat(t, dir)
+	ps, err := setupPosix(dir)
 	testutil.NilError(t, err)
 
 	s3s, err := setupS3(t, dir)
@@ -316,25 +295,26 @@ func TestWriteObject(t *testing.T) {
 		return bytes.NewBuffer(testBytes)
 	}
 
-	for sname, s := range map[string]Storage{"posix": ps, "posixflat": pfs, "minio": s3s} {
-		t.Run(fmt.Sprintf("test with storage type %s", sname), func(t *testing.T) {
-			switch s := s.(type) {
+	for sname, os := range map[string]ObjStorage{"posix": ps, "minio": s3s} {
+		t.Run(fmt.Sprintf("with storage type %s", sname), func(t *testing.T) {
+			ctx := context.Background()
+
+			switch s := os.(type) {
 			case *S3Storage:
 				if s == nil {
 					t.SkipNow()
 				}
 			}
-			os := NewObjStorage(s, "/")
 
 			n := int64(10000)
 
 			// Test write without size. Should write whole buffer.
 			buf := newBuf(n)
 			objName := "obj01"
-			err := os.WriteObject(objName, buf, -1, false)
+			err := os.WriteObject(ctx, objName, buf, -1, false)
 			testutil.NilError(t, err)
 
-			oi, err := os.Stat(objName)
+			oi, err := os.Stat(ctx, objName)
 			testutil.NilError(t, err)
 
 			assert.Equal(t, oi.Size, n, "expected object size")
@@ -342,10 +322,10 @@ func TestWriteObject(t *testing.T) {
 			// Test write with object size equal to buf size.
 			buf = newBuf(n)
 			objName = "obj02"
-			err = os.WriteObject(objName, buf, n, false)
+			err = os.WriteObject(ctx, objName, buf, n, false)
 			testutil.NilError(t, err)
 
-			oi, err = os.Stat(objName)
+			oi, err = os.Stat(ctx, objName)
 			testutil.NilError(t, err)
 
 			assert.Equal(t, oi.Size, n, "expected object size")
@@ -354,10 +334,10 @@ func TestWriteObject(t *testing.T) {
 			buf = newBuf(n)
 			objName = "obj03"
 			size := int64(800)
-			err = os.WriteObject(objName, buf, int64(size), false)
+			err = os.WriteObject(ctx, objName, buf, int64(size), false)
 			testutil.NilError(t, err)
 
-			oi, err = os.Stat(objName)
+			oi, err = os.Stat(ctx, objName)
 			testutil.NilError(t, err)
 
 			assert.Equal(t, oi.Size, size, "expected object size")

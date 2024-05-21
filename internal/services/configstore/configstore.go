@@ -77,7 +77,7 @@ func (s *Configstore) maintenanceModeWatcher(ctx context.Context, runCtxCancel c
 type Configstore struct {
 	log             zerolog.Logger
 	c               *config.Configstore
-	ost             *objectstorage.ObjStorage
+	ost             objectstorage.ObjStorage
 	d               *db.DB
 	lf              lock.LockFactory
 	ah              *action.ActionHandler
@@ -89,7 +89,7 @@ func NewConfigstore(ctx context.Context, log zerolog.Logger, c *config.Configsto
 		log = log.Level(zerolog.DebugLevel)
 	}
 
-	ost, err := scommon.NewObjectStorage(&c.ObjectStorage)
+	ost, err := scommon.NewObjectStorage(ctx, &c.ObjectStorage)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

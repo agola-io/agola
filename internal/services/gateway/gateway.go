@@ -51,7 +51,7 @@ type Gateway struct {
 	log zerolog.Logger
 	c   *config.Gateway
 
-	ost                *objectstorage.ObjStorage
+	ost                objectstorage.ObjStorage
 	runserviceClient   *rsclient.Client
 	configstoreClient  *csclient.Client
 	notificationClient *nsclient.Client
@@ -124,7 +124,7 @@ func NewGateway(ctx context.Context, log zerolog.Logger, gc *config.Config) (*Ga
 		Key:      c.CookieSigning.Key,
 	})
 
-	ost, err := icommon.NewObjectStorage(&c.ObjectStorage)
+	ost, err := icommon.NewObjectStorage(ctx, &c.ObjectStorage)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

@@ -15,13 +15,17 @@
 package objectstorage
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"os"
 	"strings"
 
-	minio "github.com/minio/minio-go/v6"
+	minio "github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/sorintlab/errors"
+
+	"agola.io/agola/internal/util"
 )
 
 type S3Storage struct {
@@ -31,23 +35,23 @@ type S3Storage struct {
 	minioCore *minio.Core
 }
 
-func NewS3(bucket, location, endpoint, accessKeyID, secretAccessKey string, secure bool) (*S3Storage, error) {
-	minioClient, err := minio.New(endpoint, accessKeyID, secretAccessKey, secure)
+func NewS3(ctx context.Context, bucket, location, endpoint, accessKeyID, secretAccessKey string, secure bool) (*S3Storage, error) {
+	minioClient, err := minio.New(endpoint, &minio.Options{Creds: credentials.NewStaticV4(accessKeyID, secretAccessKey, ""), Secure: secure})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	minioCore, err := minio.NewCore(endpoint, accessKeyID, secretAccessKey, secure)
+	minioCore, err := minio.NewCore(endpoint, &minio.Options{Creds: credentials.NewStaticV4(accessKeyID, secretAccessKey, ""), Secure: secure})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	exists, err := minioClient.BucketExists(bucket)
+	exists, err := minioClient.BucketExists(ctx, bucket)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot check if bucket %q in location %q exits", bucket, location)
 	}
 	if !exists {
-		if err := minioClient.MakeBucket(bucket, location); err != nil {
+		if err := minioClient.MakeBucket(ctx, bucket, minio.MakeBucketOptions{Region: location}); err != nil {
 			return nil, errors.Wrapf(err, "cannot create bucket %q in location %q", bucket, location)
 		}
 	}
@@ -59,8 +63,8 @@ func NewS3(bucket, location, endpoint, accessKeyID, secretAccessKey string, secu
 	}, nil
 }
 
-func (s *S3Storage) Stat(p string) (*ObjectInfo, error) {
-	oi, err := s.minioClient.StatObject(s.bucket, p, minio.StatObjectOptions{})
+func (s *S3Storage) Stat(ctx context.Context, p string) (*ObjectInfo, error) {
+	oi, err := s.minioClient.StatObject(ctx, s.bucket, p, minio.StatObjectOptions{})
 	if err != nil {
 		merr := minio.ToErrorResponse(err)
 		if merr.StatusCode == http.StatusNotFound {
@@ -72,8 +76,8 @@ func (s *S3Storage) Stat(p string) (*ObjectInfo, error) {
 	return &ObjectInfo{Path: p, LastModified: oi.LastModified, Size: oi.Size}, nil
 }
 
-func (s *S3Storage) ReadObject(filepath string) (ReadSeekCloser, error) {
-	if _, err := s.minioClient.StatObject(s.bucket, filepath, minio.StatObjectOptions{}); err != nil {
+func (s *S3Storage) ReadObject(ctx context.Context, filepath string) (ReadSeekCloser, error) {
+	if _, err := s.minioClient.StatObject(ctx, s.bucket, filepath, minio.StatObjectOptions{}); err != nil {
 		merr := minio.ToErrorResponse(err)
 		if merr.StatusCode == http.StatusNotFound {
 			return nil, NewErrNotExist(err, "object %q doesn't exist", filepath)
@@ -81,19 +85,19 @@ func (s *S3Storage) ReadObject(filepath string) (ReadSeekCloser, error) {
 		return nil, errors.WithStack(merr)
 	}
 
-	o, err := s.minioClient.GetObject(s.bucket, filepath, minio.GetObjectOptions{})
+	o, err := s.minioClient.GetObject(ctx, s.bucket, filepath, minio.GetObjectOptions{})
 
 	return o, errors.WithStack(err)
 }
 
-func (s *S3Storage) WriteObject(filepath string, data io.Reader, size int64, persist bool) error {
+func (s *S3Storage) WriteObject(ctx context.Context, filepath string, data io.Reader, size int64, persist bool) error {
 	// if size is not specified, limit max object size to defaultMaxObjectSize so
 	// minio client will not calculate a very big part size using tons of ram.
 	// An alternative is to write the file locally so we can calculate the size and
 	// then put it. See commented out code below.
 	if size >= 0 {
 		lr := io.LimitReader(data, size)
-		_, err := s.minioClient.PutObject(s.bucket, filepath, lr, size, minio.PutObjectOptions{ContentType: "application/octet-stream"})
+		_, err := s.minioClient.PutObject(ctx, s.bucket, filepath, lr, size, minio.PutObjectOptions{ContentType: "application/octet-stream"})
 		return errors.WithStack(err)
 	}
 
@@ -112,61 +116,48 @@ func (s *S3Storage) WriteObject(filepath string, data io.Reader, size int64, per
 	if _, err := tmpfile.Seek(0, 0); err != nil {
 		return errors.WithStack(err)
 	}
-	_, err = s.minioClient.PutObject(s.bucket, filepath, tmpfile, size, minio.PutObjectOptions{ContentType: "application/octet-stream"})
+	_, err = s.minioClient.PutObject(ctx, s.bucket, filepath, tmpfile, size, minio.PutObjectOptions{ContentType: "application/octet-stream"})
 	return errors.WithStack(err)
 }
 
-func (s *S3Storage) DeleteObject(filepath string) error {
-	return errors.WithStack(s.minioClient.RemoveObject(s.bucket, filepath))
+func (s *S3Storage) DeleteObject(ctx context.Context, filepath string) error {
+	return errors.WithStack(s.minioClient.RemoveObject(ctx, s.bucket, filepath, minio.RemoveObjectOptions{}))
 }
 
-func (s *S3Storage) List(prefix, startWith, delimiter string, doneCh <-chan struct{}) <-chan ObjectInfo {
+func (s *S3Storage) List(ctx context.Context, prefix, startAfter string, recursive bool) <-chan ObjectInfo {
 	objectCh := make(chan ObjectInfo, 1)
-
-	if len(delimiter) > 1 {
-		objectCh <- ObjectInfo{
-			Err: errors.Errorf("wrong delimiter %q", delimiter),
-		}
-		return objectCh
-	}
 
 	// remove leading slash
 	prefix = strings.TrimPrefix(prefix, "/")
-	startWith = strings.TrimPrefix(startWith, "/")
+	startAfter = strings.TrimPrefix(startAfter, "/")
 
-	// Initiate list objects goroutine here.
 	go func(objectCh chan<- ObjectInfo) {
-		defer close(objectCh)
-		// Save continuationToken for next request.
-		var continuationToken string
-		for {
-			// Get list of objects a maximum of 1000 per request.
-			result, err := s.minioCore.ListObjectsV2(s.bucket, prefix, continuationToken, false, delimiter, 1000, startWith)
-			if err != nil {
+		defer func() {
+			if util.ContextCanceled(ctx) {
 				objectCh <- ObjectInfo{
-					Err: err,
+					Err: ctx.Err(),
+				}
+			}
+			close(objectCh)
+		}()
+
+		for object := range s.minioClient.ListObjects(ctx, s.bucket, minio.ListObjectsOptions{Prefix: prefix, Recursive: recursive, StartAfter: startAfter}) {
+			if object.Err != nil {
+				select {
+				case objectCh <- ObjectInfo{Err: object.Err}:
+				case <-ctx.Done():
 				}
 				return
 			}
 
-			// If contents are available loop through and send over channel.
-			for _, object := range result.Contents {
-				select {
-				// Send object content.
-				case objectCh <- ObjectInfo{Path: object.Key, LastModified: object.LastModified, Size: object.Size}:
-				// If receives done from the caller, return here.
-				case <-doneCh:
-					return
-				}
+			// minioClient.ListObject also returns common prefixes as objects, but we only want objects
+			if strings.HasSuffix(object.Key, "/") {
+				continue
 			}
 
-			// If continuation token present, save it for next request.
-			if result.NextContinuationToken != "" {
-				continuationToken = result.NextContinuationToken
-			}
-
-			// Listing ends result is not truncated, return right here.
-			if !result.IsTruncated {
+			select {
+			case objectCh <- ObjectInfo{Path: object.Key, LastModified: object.LastModified, Size: object.Size}:
+			case <-ctx.Done():
 				return
 			}
 		}

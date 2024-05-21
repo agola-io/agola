@@ -15,6 +15,7 @@
 package objectstorage
 
 import (
+	"context"
 	"io"
 	"time"
 
@@ -23,17 +24,17 @@ import (
 	"agola.io/agola/internal/util"
 )
 
-type Storage interface {
-	Stat(filepath string) (*ObjectInfo, error)
-	ReadObject(filepath string) (ReadSeekCloser, error)
+type ObjStorage interface {
+	Stat(ctx context.Context, filepath string) (*ObjectInfo, error)
+	ReadObject(ctx context.Context, filepath string) (ReadSeekCloser, error)
 	// WriteObject atomically writes an object. If size is greater or equal to
 	// zero then only size bytes will be read from data and wrote. If size is
 	// less than zero data will be wrote until EOF. When persist is true the
 	// implementation must ensure that data is persisted to the underlying
 	// storage.
-	WriteObject(filepath string, data io.Reader, size int64, persist bool) error
-	DeleteObject(filepath string) error
-	List(prefix, startWith, delimiter string, doneCh <-chan struct{}) <-chan ObjectInfo
+	WriteObject(ctx context.Context, filepath string, data io.Reader, size int64, persist bool) error
+	DeleteObject(ctx context.Context, filepath string) error
+	List(ctx context.Context, prefix, startAfter string, recursive bool) <-chan ObjectInfo
 }
 
 type ErrNotExist struct {
@@ -63,27 +64,4 @@ type ObjectInfo struct {
 	Size         int64
 
 	Err error
-}
-
-// ObjStorage wraps a Storage providing additional helper functions
-type ObjStorage struct {
-	Storage
-	delimiter string
-}
-
-func NewObjStorage(s Storage, delimiter string) *ObjStorage {
-	return &ObjStorage{Storage: s, delimiter: delimiter}
-}
-
-func (s *ObjStorage) Delimiter() string {
-	return s.delimiter
-}
-
-func (s *ObjStorage) List(prefix, startWith string, recursive bool, doneCh <-chan struct{}) <-chan ObjectInfo {
-	delimiter := s.delimiter
-	if recursive {
-		delimiter = ""
-	}
-
-	return s.Storage.List(prefix, startWith, delimiter, doneCh)
 }

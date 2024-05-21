@@ -15,6 +15,7 @@
 package common
 
 import (
+	"context"
 	"io"
 	"net/url"
 	"os"
@@ -73,11 +74,9 @@ func WriteFileAtomic(filename string, data []byte, perm os.FileMode) error {
 		})
 }
 
-func NewObjectStorage(c *config.ObjectStorage) (*objectstorage.ObjStorage, error) {
-	var (
-		err error
-		ost objectstorage.Storage
-	)
+func NewObjectStorage(ctx context.Context, c *config.ObjectStorage) (objectstorage.ObjStorage, error) {
+	var err error
+	var ost objectstorage.ObjStorage
 
 	switch c.Type {
 	case config.ObjectStorageTypePosix:
@@ -100,11 +99,11 @@ func NewObjectStorage(c *config.ObjectStorage) (*objectstorage.ObjStorage, error
 				return nil, errors.Errorf("wrong s3 endpoint scheme %q (must be http or https)", u.Scheme)
 			}
 		}
-		ost, err = objectstorage.NewS3(c.Bucket, c.Location, endpoint, c.AccessKey, c.SecretAccessKey, secure)
+		ost, err = objectstorage.NewS3(ctx, c.Bucket, c.Location, endpoint, c.AccessKey, c.SecretAccessKey, secure)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create s3 object storage")
 		}
 	}
 
-	return objectstorage.NewObjStorage(ost, "/"), nil
+	return ost, nil
 }
