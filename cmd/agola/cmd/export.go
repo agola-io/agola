@@ -70,6 +70,7 @@ func export(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return errors.WithStack(err)
 		}
+		defer w.Close()
 	}
 
 	r := bufio.NewReader(resp.Body)
