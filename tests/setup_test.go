@@ -143,6 +143,13 @@ const FailingRunConfig = `
 }
 `
 
+type RefType int
+
+const (
+	RefTypeID RefType = iota
+	RefTypePath
+)
+
 func setupGitea(t *testing.T, dir, dockerBridgeAddress string) *testutil.TestGitea {
 	tgitea, err := testutil.NewTestGitea(t, dir, dockerBridgeAddress)
 	testutil.NilError(t, err)

@@ -16,6 +16,7 @@ package api
 
 import (
 	"net/http"
+	"net/url"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
@@ -63,7 +64,10 @@ func (h *ProjectCommitStatusDeliveries) do(w http.ResponseWriter, r *http.Reques
 	query := r.URL.Query()
 
 	vars := mux.Vars(r)
-	projectRef := vars["projectref"]
+	projectRef, err := url.PathUnescape(vars["projectref"])
+	if err != nil {
+		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err)
+	}
 
 	ropts, err := parseRequestOptions(r)
 	if err != nil {
@@ -120,14 +124,17 @@ func (h *ProjectCommitStatusRedelivery) do(r *http.Request) error {
 	ctx := r.Context()
 
 	vars := mux.Vars(r)
-	projectRef := vars["projectref"]
+	projectRef, err := url.PathUnescape(vars["projectref"])
+	if err != nil {
+		return util.NewAPIErrorWrap(util.ErrBadRequest, err)
+	}
 	commitStatusDeliveryID := vars["commitstatusdeliveryid"]
 
 	areq := &action.ProjectCommitStatusRedeliveryRequest{
 		ProjectRef:             projectRef,
 		CommitStatusDeliveryID: commitStatusDeliveryID,
 	}
-	err := h.ah.ProjectCommitStatusRedelivery(ctx, areq)
+	err = h.ah.ProjectCommitStatusRedelivery(ctx, areq)
 	if err != nil {
 		return errors.WithStack(err)
 	}
