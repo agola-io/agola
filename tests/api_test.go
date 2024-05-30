@@ -2532,17 +2532,13 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		assert.Error(t, err, expectedErr.Error())
 	})
 
-	t.Run("redelivery project run webhook delivery with deliverystatus = delivered", func(t *testing.T) {
+	t.Run("redelivery project commit status delivery with deliverystatus = delivered", func(t *testing.T) {
 		dir := t.TempDir()
-		wrDir := t.TempDir()
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		wr := setupWebhooksReceiver(ctx, t, wrDir)
-		defer wr.stop()
-
-		sc := setup(ctx, t, dir, withGitea(true), withWebhooks(fmt.Sprintf("%s/%s", wr.exposedURL, "webhooks"), webhookSecret))
+		sc := setup(ctx, t, dir, withGitea(true))
 		defer sc.stop()
 
 		giteaToken, tokenUser01 := createLinkedAccount(ctx, t, sc.gitea, sc.config)
@@ -2592,15 +2588,15 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
 
 		err = testutil.Wait(60*time.Second, func() (bool, error) {
-			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
+			commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 			if err != nil {
 				return false, nil
 			}
 
-			if len(runWebhookDeliveries) != 4 {
+			if len(commitStatusDeliveries) != 2 {
 				return false, nil
 			}
-			for _, r := range runWebhookDeliveries {
+			for _, r := range commitStatusDeliveries {
 				if r.DeliveryStatus != gwapitypes.DeliveryStatusDelivered {
 					return false, nil
 				}
@@ -2610,28 +2606,28 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		})
 		testutil.NilError(t, err)
 
-		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
+		commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 		testutil.NilError(t, err)
 
-		assert.Assert(t, cmp.Len(runWebhookDeliveries, 4))
-		for _, r := range runWebhookDeliveries {
+		assert.Assert(t, cmp.Len(commitStatusDeliveries, 2))
+		for _, r := range commitStatusDeliveries {
 			assert.Assert(t, cmp.Equal(r.DeliveryStatus, gwapitypes.DeliveryStatusDelivered))
 		}
 
-		_, err = gwUser01Client.ProjectRunWebhookRedelivery(ctx, project.ID, runWebhookDeliveries[0].ID)
+		_, err = gwUser01Client.ProjectCommitStatusRedelivery(ctx, project.ID, commitStatusDeliveries[0].ID)
 		testutil.NilError(t, err)
 
-		runWebhookDeliveries, _, err = gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
+		commitStatusDeliveries, _, err = gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 		testutil.NilError(t, err)
 
-		assert.Assert(t, cmp.Len(runWebhookDeliveries, 5))
+		assert.Assert(t, cmp.Len(commitStatusDeliveries, 3))
 
-		_, err = gwUser02Client.ProjectRunWebhookRedelivery(ctx, project.ID, runWebhookDeliveries[0].ID)
+		_, err = gwUser02Client.ProjectCommitStatusRedelivery(ctx, project.ID, commitStatusDeliveries[0].ID)
 		expectedErr := remoteErrorForbidden
 		assert.Error(t, err, expectedErr.Error())
 	})
 
-	t.Run("redelivery project run webhook delivery with not existing project", func(t *testing.T) {
+	t.Run("redelivery project commit status delivery with not existing project", func(t *testing.T) {
 		dir := t.TempDir()
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -2643,12 +2639,12 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		_, tokenUser01 := createLinkedAccount(ctx, t, sc.gitea, sc.config)
 		gwUser01Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01)
 
-		_, err := gwUser01Client.ProjectRunWebhookRedelivery(ctx, "projecttestid", "runwebhookdeliverytestid")
+		_, err := gwUser01Client.ProjectCommitStatusRedelivery(ctx, "projecttestid", "commitstatusdeliverytestid")
 		expectedErr := util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeProjectDoesNotExist}))
 		assert.Error(t, err, expectedErr.Error())
 	})
 
-	t.Run("redelivery project run webhook delivery with not existing run webhook delivery", func(t *testing.T) {
+	t.Run("redelivery project commit status delivery with not existing commit status delivery", func(t *testing.T) {
 		dir := t.TempDir()
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -2667,19 +2663,18 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 
 		_, project := createProject(ctx, t, giteaClient, gwUser01Client, withVisibility(gwapitypes.VisibilityPrivate))
 
-		_, err = gwUser01Client.ProjectRunWebhookRedelivery(ctx, project.ID, "runwebhookdeliverytestid")
-		expectedErr := util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeRunWebhookDeliveryDoesNotExist}))
+		_, err = gwUser01Client.ProjectCommitStatusRedelivery(ctx, project.ID, "commitstatusdeliverytestid")
+		expectedErr := util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeCommitStatusDeliveryDoesNotExist}))
 		assert.Error(t, err, expectedErr.Error())
 	})
 
-	t.Run("redelivery project run webhook delivery with projectRef that belong to another project", func(t *testing.T) {
+	t.Run("redelivery project commit status delivery with projectRef that belong to another project", func(t *testing.T) {
 		dir := t.TempDir()
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		// set a fake webhookURL to make the delivery fail
-		sc := setup(ctx, t, dir, withGitea(true), withWebhooks("fakeWebhookURL", webhookSecret))
+		sc := setup(ctx, t, dir, withGitea(true))
 		defer sc.stop()
 
 		giteaToken, tokenUser01 := createLinkedAccount(ctx, t, sc.gitea, sc.config)
@@ -2729,16 +2724,16 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
 
 		err = testutil.Wait(60*time.Second, func() (bool, error) {
-			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project01.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
+			commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project01.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 			if err != nil {
 				return false, nil
 			}
 
-			if len(runWebhookDeliveries) != 4 {
+			if len(commitStatusDeliveries) != 2 {
 				return false, nil
 			}
-			for _, r := range runWebhookDeliveries {
-				if r.DeliveryStatus != gwapitypes.DeliveryStatusDeliveryError {
+			for _, r := range commitStatusDeliveries {
+				if r.DeliveryStatus != gwapitypes.DeliveryStatusDelivered {
 					return false, nil
 				}
 			}
@@ -2747,16 +2742,16 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		})
 		testutil.NilError(t, err)
 
-		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project01.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
+		commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project01.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
 		testutil.NilError(t, err)
 
-		assert.Assert(t, cmp.Len(runWebhookDeliveries, 4))
-		for _, r := range runWebhookDeliveries {
-			assert.Equal(t, r.DeliveryStatus, gwapitypes.DeliveryStatusDeliveryError)
+		assert.Assert(t, cmp.Len(commitStatusDeliveries, 2))
+		for _, r := range commitStatusDeliveries {
+			assert.Equal(t, r.DeliveryStatus, gwapitypes.DeliveryStatusDelivered)
 		}
 
-		_, err = gwUser01Client.ProjectRunWebhookRedelivery(ctx, project02.ID, runWebhookDeliveries[0].ID)
-		expectedErr := util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeRunWebhookDeliveryDoesNotExist}))
+		_, err = gwUser01Client.ProjectCommitStatusRedelivery(ctx, project02.ID, commitStatusDeliveries[0].ID)
+		expectedErr := util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeCommitStatusDeliveryDoesNotExist}))
 		assert.Error(t, err, expectedErr.Error())
 	})
 }
