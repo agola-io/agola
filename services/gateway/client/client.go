@@ -856,7 +856,7 @@ func (c *Client) GetProjectRunWebhookDeliveries(ctx context.Context, projectRef 
 }
 
 func (c *Client) ProjectRunWebhookRedelivery(ctx context.Context, projectRef string, runWebhookDeliveryID string) (*Response, error) {
-	return c.getResponse(ctx, "PUT", fmt.Sprintf("/projects/%s/runwebhookdeliveries/%s/redelivery", projectRef, runWebhookDeliveryID), nil, jsonContent, nil)
+	return c.getResponse(ctx, "PUT", fmt.Sprintf("/projects/%s/runwebhookdeliveries/%s/redelivery", url.PathEscape(projectRef), runWebhookDeliveryID), nil, jsonContent, nil)
 }
 
 func (c *Client) GetProjectCommitStatusDeliveries(ctx context.Context, projectRef string, opts *DeliveriesOptions) ([]*gwapitypes.CommitStatusDeliveryResponse, *Response, error) {
@@ -869,5 +869,5 @@ func (c *Client) GetProjectCommitStatusDeliveries(ctx context.Context, projectRe
 }
 
 func (c *Client) ProjectCommitStatusRedelivery(ctx context.Context, projectRef string, commitStatusDeliveryID string) (*Response, error) {
-	return c.getResponse(ctx, "PUT", fmt.Sprintf("/projects/%s/commitstatusdeliveries/%s/redelivery", projectRef, commitStatusDeliveryID), nil, jsonContent, nil)
+	return c.getResponse(ctx, "PUT", fmt.Sprintf("/projects/%s/commitstatusdeliveries/%s/redelivery", url.PathEscape(projectRef), commitStatusDeliveryID), nil, jsonContent, nil)
 }

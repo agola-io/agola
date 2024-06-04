@@ -1714,6 +1714,12 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 			sortDirection: gwapitypes.SortDirectionAsc,
 			expectedErr:   util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeProjectDoesNotExist})),
 		},
+		{
+			name:                "get project run webhook deliveries with projectref = project path",
+			client:              gwUser01Client,
+			projectRef:          project.Path,
+			expectedCallsNumber: 1,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1764,6 +1770,17 @@ func TestGetProjectRunWebhookDeliveries(t *testing.T) {
 			assert.DeepEqual(t, expectedProject01RunWebhookDeliveries, respAllRunWebhookDeliveries)
 			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
 		})
+	}
+}
+
+func getProjectRef(project *gwapitypes.ProjectResponse, refType RefType) (string, error) {
+	switch refType {
+	case RefTypeID:
+		return project.ID, nil
+	case RefTypePath:
+		return project.Path, nil
+	default:
+		return "", errors.New(fmt.Sprintf("reftype %q is not valid", refType))
 	}
 }
 
@@ -1882,104 +1899,122 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		assert.Error(t, err, expectedErr.Error())
 	})
 
-	t.Run("redelivery project run webhook delivery with deliverystatus = delivered", func(t *testing.T) {
-		dir := t.TempDir()
-		wrDir := t.TempDir()
+	tests := []struct {
+		name    string
+		refType RefType
+	}{
+		{
+			name:    "redelivery project run webhook delivery with deliverystatus = delivered by projectref = project id",
+			refType: RefTypeID,
+		},
+		{
+			name:    "redelivery project run webhook delivery with deliverystatus = delivered by projectref = project path",
+			refType: RefTypePath,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			wrDir := t.TempDir()
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-		wr := setupWebhooksReceiver(ctx, t, wrDir)
-		defer wr.stop()
+			wr := setupWebhooksReceiver(ctx, t, wrDir)
+			defer wr.stop()
 
-		sc := setup(ctx, t, dir, withGitea(true), withWebhooks(fmt.Sprintf("%s/%s", wr.exposedURL, "webhooks"), webhookSecret))
-		defer sc.stop()
+			sc := setup(ctx, t, dir, withGitea(true), withWebhooks(fmt.Sprintf("%s/%s", wr.exposedURL, "webhooks"), webhookSecret))
+			defer sc.stop()
 
-		giteaToken, tokenUser01 := createLinkedAccount(ctx, t, sc.gitea, sc.config)
-		gwUser01Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01)
-		gwUserAdminClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
+			giteaToken, tokenUser01 := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+			gwUser01Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01)
+			gwUserAdminClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
 
-		_, _, err := gwUserAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser02})
-		testutil.NilError(t, err)
+			_, _, err := gwUserAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser02})
+			testutil.NilError(t, err)
 
-		user02Token, _, err := gwUserAdminClient.CreateUserToken(ctx, agolaUser02, &gwapitypes.CreateUserTokenRequest{TokenName: "token01"})
-		testutil.NilError(t, err)
+			user02Token, _, err := gwUserAdminClient.CreateUserToken(ctx, agolaUser02, &gwapitypes.CreateUserTokenRequest{TokenName: "token01"})
+			testutil.NilError(t, err)
 
-		gwUser02Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, user02Token.Token)
+			gwUser02Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, user02Token.Token)
 
-		giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+			giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
 
-		giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
-		testutil.NilError(t, err)
+			giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+			testutil.NilError(t, err)
 
-		giteaRepo, project := createProject(ctx, t, giteaClient, gwUser01Client, withVisibility(gwapitypes.VisibilityPrivate))
+			giteaRepo, project := createProject(ctx, t, giteaClient, gwUser01Client, withVisibility(gwapitypes.VisibilityPrivate))
 
-		push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
+			projectRef, err := getProjectRef(project, tt.refType)
+			testutil.NilError(t, err)
 
-		err = testutil.Wait(60*time.Second, func() (bool, error) {
-			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc}})
-			if err != nil {
-				return false, nil
-			}
+			push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
-			if len(runs) == 0 {
-				return false, nil
-			}
-			if runs[0].Phase != rstypes.RunPhaseFinished {
-				return false, nil
-			}
-
-			return true, nil
-		})
-		testutil.NilError(t, err)
-
-		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc}})
-		testutil.NilError(t, err)
-
-		assert.Assert(t, len(runs) > 0)
-
-		assert.Equal(t, runs[0].Phase, rstypes.RunPhaseFinished)
-		assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
-
-		err = testutil.Wait(60*time.Second, func() (bool, error) {
-			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
-			if err != nil {
-				return false, nil
-			}
-
-			if len(runWebhookDeliveries) != 4 {
-				return false, nil
-			}
-			for _, r := range runWebhookDeliveries {
-				if r.DeliveryStatus != gwapitypes.DeliveryStatusDelivered {
+			err = testutil.Wait(60*time.Second, func() (bool, error) {
+				runs, _, err := gwUser01Client.GetProjectRuns(ctx, projectRef, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc}})
+				if err != nil {
 					return false, nil
 				}
+
+				if len(runs) == 0 {
+					return false, nil
+				}
+				if runs[0].Phase != rstypes.RunPhaseFinished {
+					return false, nil
+				}
+
+				return true, nil
+			})
+			testutil.NilError(t, err)
+
+			runs, _, err := gwUser01Client.GetProjectRuns(ctx, projectRef, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc}})
+			testutil.NilError(t, err)
+
+			assert.Assert(t, len(runs) > 0)
+
+			assert.Equal(t, runs[0].Phase, rstypes.RunPhaseFinished)
+			assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
+
+			err = testutil.Wait(60*time.Second, func() (bool, error) {
+				runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, projectRef, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
+				if err != nil {
+					return false, nil
+				}
+
+				if len(runWebhookDeliveries) != 4 {
+					return false, nil
+				}
+				for _, r := range runWebhookDeliveries {
+					if r.DeliveryStatus != gwapitypes.DeliveryStatusDelivered {
+						return false, nil
+					}
+				}
+
+				return true, nil
+			})
+			testutil.NilError(t, err)
+
+			runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, projectRef, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
+			testutil.NilError(t, err)
+
+			assert.Assert(t, cmp.Len(runWebhookDeliveries, 4))
+			for _, r := range runWebhookDeliveries {
+				assert.Equal(t, r.DeliveryStatus, gwapitypes.DeliveryStatusDelivered)
 			}
 
-			return true, nil
+			_, err = gwUser01Client.ProjectRunWebhookRedelivery(ctx, projectRef, runWebhookDeliveries[0].ID)
+			testutil.NilError(t, err)
+
+			runWebhookDeliveries, _, err = gwUser01Client.GetProjectRunWebhookDeliveries(ctx, projectRef, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
+			testutil.NilError(t, err)
+
+			assert.Assert(t, cmp.Len(runWebhookDeliveries, 5))
+
+			_, err = gwUser02Client.ProjectRunWebhookRedelivery(ctx, projectRef, runWebhookDeliveries[0].ID)
+			expectedErr := remoteErrorForbidden
+			assert.Error(t, err, expectedErr.Error())
 		})
-		testutil.NilError(t, err)
-
-		runWebhookDeliveries, _, err := gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
-		testutil.NilError(t, err)
-
-		assert.Assert(t, cmp.Len(runWebhookDeliveries, 4))
-		for _, r := range runWebhookDeliveries {
-			assert.Equal(t, r.DeliveryStatus, gwapitypes.DeliveryStatusDelivered)
-		}
-
-		_, err = gwUser01Client.ProjectRunWebhookRedelivery(ctx, project.ID, runWebhookDeliveries[0].ID)
-		testutil.NilError(t, err)
-
-		runWebhookDeliveries, _, err = gwUser01Client.GetProjectRunWebhookDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
-		testutil.NilError(t, err)
-
-		assert.Assert(t, cmp.Len(runWebhookDeliveries, 5))
-
-		_, err = gwUser02Client.ProjectRunWebhookRedelivery(ctx, project.ID, runWebhookDeliveries[0].ID)
-		expectedErr := remoteErrorForbidden
-		assert.Error(t, err, expectedErr.Error())
-	})
+	}
 
 	t.Run("redelivery project run webhook delivery with not existing project", func(t *testing.T) {
 		dir := t.TempDir()
@@ -2333,6 +2368,12 @@ func TestGetProjectCommitStatusDeliveries(t *testing.T) {
 			sortDirection: gwapitypes.SortDirectionAsc,
 			expectedErr:   util.NewRemoteError(util.ErrNotExist, util.WithRemoteErrorDetailedError(&util.RemoteDetailedError{Code: gwapierrors.ErrorCodeProjectDoesNotExist})),
 		},
+		{
+			name:                "get project commit status deliveries with projectref = project path",
+			client:              gwUser01Client,
+			projectRef:          project.Path,
+			expectedCallsNumber: 1,
+		},
 	}
 
 	for _, tt := range tests {
@@ -2532,100 +2573,118 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		assert.Error(t, err, expectedErr.Error())
 	})
 
-	t.Run("redelivery project commit status delivery with deliverystatus = delivered", func(t *testing.T) {
-		dir := t.TempDir()
+	tests := []struct {
+		name    string
+		refType RefType
+	}{
+		{
+			name:    "redelivery project commit status delivery with deliverystatus = delivered by projectref = project id",
+			refType: RefTypeID,
+		},
+		{
+			name:    "redelivery project commit status delivery with deliverystatus = delivered by projectref = project path",
+			refType: RefTypePath,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-		sc := setup(ctx, t, dir, withGitea(true))
-		defer sc.stop()
+			sc := setup(ctx, t, dir, withGitea(true))
+			defer sc.stop()
 
-		giteaToken, tokenUser01 := createLinkedAccount(ctx, t, sc.gitea, sc.config)
-		gwUser01Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01)
-		gwUserAdminClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
+			giteaToken, tokenUser01 := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+			gwUser01Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01)
+			gwUserAdminClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
 
-		_, _, err := gwUserAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser02})
-		testutil.NilError(t, err)
+			_, _, err := gwUserAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser02})
+			testutil.NilError(t, err)
 
-		user02Token, _, err := gwUserAdminClient.CreateUserToken(ctx, agolaUser02, &gwapitypes.CreateUserTokenRequest{TokenName: "token01"})
-		testutil.NilError(t, err)
+			user02Token, _, err := gwUserAdminClient.CreateUserToken(ctx, agolaUser02, &gwapitypes.CreateUserTokenRequest{TokenName: "token01"})
+			testutil.NilError(t, err)
 
-		gwUser02Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, user02Token.Token)
+			gwUser02Client := gwclient.NewClient(sc.config.Gateway.APIExposedURL, user02Token.Token)
 
-		giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+			giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
 
-		giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
-		testutil.NilError(t, err)
+			giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+			testutil.NilError(t, err)
 
-		giteaRepo, project := createProject(ctx, t, giteaClient, gwUser01Client, withVisibility(gwapitypes.VisibilityPrivate))
+			giteaRepo, project := createProject(ctx, t, giteaClient, gwUser01Client, withVisibility(gwapitypes.VisibilityPrivate))
 
-		push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
+			projectRef, err := getProjectRef(project, tt.refType)
+			testutil.NilError(t, err)
 
-		err = testutil.Wait(60*time.Second, func() (bool, error) {
-			runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc}})
-			if err != nil {
-				return false, nil
-			}
+			push(t, config, giteaRepo.CloneURL, giteaToken, "commit", false)
 
-			if len(runs) == 0 {
-				return false, nil
-			}
-			if runs[0].Phase != rstypes.RunPhaseFinished {
-				return false, nil
-			}
-
-			return true, nil
-		})
-		testutil.NilError(t, err)
-
-		runs, _, err := gwUser01Client.GetProjectRuns(ctx, project.ID, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc}})
-		testutil.NilError(t, err)
-
-		assert.Assert(t, cmp.Len(runs, 1))
-
-		assert.Equal(t, runs[0].Phase, rstypes.RunPhaseFinished)
-		assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
-
-		err = testutil.Wait(60*time.Second, func() (bool, error) {
-			commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
-			if err != nil {
-				return false, nil
-			}
-
-			if len(commitStatusDeliveries) != 2 {
-				return false, nil
-			}
-			for _, r := range commitStatusDeliveries {
-				if r.DeliveryStatus != gwapitypes.DeliveryStatusDelivered {
+			err = testutil.Wait(60*time.Second, func() (bool, error) {
+				runs, _, err := gwUser01Client.GetProjectRuns(ctx, projectRef, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc}})
+				if err != nil {
 					return false, nil
 				}
+
+				if len(runs) == 0 {
+					return false, nil
+				}
+				if runs[0].Phase != rstypes.RunPhaseFinished {
+					return false, nil
+				}
+
+				return true, nil
+			})
+			testutil.NilError(t, err)
+
+			runs, _, err := gwUser01Client.GetProjectRuns(ctx, projectRef, &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{SortDirection: gwapitypes.SortDirectionAsc}})
+			testutil.NilError(t, err)
+
+			assert.Assert(t, cmp.Len(runs, 1))
+
+			assert.Equal(t, runs[0].Phase, rstypes.RunPhaseFinished)
+			assert.Equal(t, runs[0].Result, rstypes.RunResultSuccess)
+
+			err = testutil.Wait(60*time.Second, func() (bool, error) {
+				commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, projectRef, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
+				if err != nil {
+					return false, nil
+				}
+
+				if len(commitStatusDeliveries) != 2 {
+					return false, nil
+				}
+				for _, r := range commitStatusDeliveries {
+					if r.DeliveryStatus != gwapitypes.DeliveryStatusDelivered {
+						return false, nil
+					}
+				}
+
+				return true, nil
+			})
+			testutil.NilError(t, err)
+
+			commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, projectRef, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
+			testutil.NilError(t, err)
+
+			assert.Assert(t, cmp.Len(commitStatusDeliveries, 2))
+			for _, r := range commitStatusDeliveries {
+				assert.Assert(t, cmp.Equal(r.DeliveryStatus, gwapitypes.DeliveryStatusDelivered))
 			}
 
-			return true, nil
+			_, err = gwUser01Client.ProjectCommitStatusRedelivery(ctx, projectRef, commitStatusDeliveries[0].ID)
+			testutil.NilError(t, err)
+
+			commitStatusDeliveries, _, err = gwUser01Client.GetProjectCommitStatusDeliveries(ctx, projectRef, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
+			testutil.NilError(t, err)
+
+			assert.Assert(t, cmp.Len(commitStatusDeliveries, 3))
+
+			_, err = gwUser02Client.ProjectCommitStatusRedelivery(ctx, projectRef, commitStatusDeliveries[0].ID)
+			expectedErr := remoteErrorForbidden
+			assert.Error(t, err, expectedErr.Error())
 		})
-		testutil.NilError(t, err)
-
-		commitStatusDeliveries, _, err := gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
-		testutil.NilError(t, err)
-
-		assert.Assert(t, cmp.Len(commitStatusDeliveries, 2))
-		for _, r := range commitStatusDeliveries {
-			assert.Assert(t, cmp.Equal(r.DeliveryStatus, gwapitypes.DeliveryStatusDelivered))
-		}
-
-		_, err = gwUser01Client.ProjectCommitStatusRedelivery(ctx, project.ID, commitStatusDeliveries[0].ID)
-		testutil.NilError(t, err)
-
-		commitStatusDeliveries, _, err = gwUser01Client.GetProjectCommitStatusDeliveries(ctx, project.ID, &gwclient.DeliveriesOptions{ListOptions: &gwclient.ListOptions{Limit: 0, SortDirection: gwapitypes.SortDirectionAsc}})
-		testutil.NilError(t, err)
-
-		assert.Assert(t, cmp.Len(commitStatusDeliveries, 3))
-
-		_, err = gwUser02Client.ProjectCommitStatusRedelivery(ctx, project.ID, commitStatusDeliveries[0].ID)
-		expectedErr := remoteErrorForbidden
-		assert.Error(t, err, expectedErr.Error())
-	})
+	}
 
 	t.Run("redelivery project commit status delivery with not existing project", func(t *testing.T) {
 		dir := t.TempDir()
