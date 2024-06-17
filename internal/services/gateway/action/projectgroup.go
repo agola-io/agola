@@ -21,6 +21,7 @@ import (
 	"github.com/sorintlab/errors"
 
 	serrors "agola.io/agola/internal/services/errors"
+	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"
@@ -64,13 +65,22 @@ func (h *ActionHandler) GetProjectGroupProjects(ctx context.Context, projectGrou
 }
 
 type CreateProjectGroupRequest struct {
-	CurrentUserID string
-	Name          string
-	ParentRef     string
-	Visibility    cstypes.Visibility
+	Name       string
+	ParentRef  string
+	Visibility cstypes.Visibility
 }
 
 func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProjectGroupRequest) (*csapitypes.ProjectGroup, error) {
+	if !common.IsUserLogged(ctx) {
+		return nil, util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authenticated"))
+	}
+	curUserID := common.CurrentUserID(ctx)
+
+	user, _, err := h.configstoreClient.GetUser(ctx, curUserID)
+	if err != nil {
+		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get user %q", curUserID))
+	}
+
 	if !util.ValidateName(req.Name) {
 		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid project group name %q", req.Name), serrors.InvalidProjectName())
 	}
@@ -89,11 +99,6 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProje
 	}
 	if !isProjectOwner {
 		return nil, util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authorized"))
-	}
-
-	user, _, err := h.configstoreClient.GetUser(ctx, req.CurrentUserID)
-	if err != nil {
-		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get user %q", req.CurrentUserID))
 	}
 
 	parentRef := req.ParentRef

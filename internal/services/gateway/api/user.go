@@ -27,7 +27,6 @@ import (
 
 	serrors "agola.io/agola/internal/services/errors"
 	"agola.io/agola/internal/services/gateway/action"
-	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"
@@ -136,12 +135,7 @@ func (h *CurrentUserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *CurrentUserHandler) do(r *http.Request) (*gwapitypes.PrivateUserResponse, error) {
 	ctx := r.Context()
 
-	userID := common.CurrentUserID(ctx)
-	if userID == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user not authenticated"))
-	}
-
-	user, err := h.ah.GetCurrentUser(ctx, userID)
+	user, err := h.ah.GetCurrentUser(ctx)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -730,17 +724,12 @@ func (h *UserOrgsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *UserOrgsHandler) do(w http.ResponseWriter, r *http.Request) ([]*gwapitypes.UserOrgResponse, error) {
 	ctx := r.Context()
 
-	userID := common.CurrentUserID(ctx)
-	if userID == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user not authenticated"))
-	}
-
 	ropts, err := parseRequestOptions(r)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	ares, err := h.ah.GetUserOrgs(ctx, &action.GetUserOrgsRequest{UserRef: userID, Cursor: ropts.Cursor, Limit: ropts.Limit, SortDirection: action.SortDirection(ropts.SortDirection)})
+	ares, err := h.ah.GetCurrentUserOrgs(ctx, &action.GetUserOrgsRequest{Cursor: ropts.Cursor, Limit: ropts.Limit, SortDirection: action.SortDirection(ropts.SortDirection)})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -788,16 +777,6 @@ func (h *UserOrgInvitationsHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 func (h *UserOrgInvitationsHandler) do(r *http.Request) ([]*gwapitypes.OrgInvitationResponse, error) {
 	ctx := r.Context()
 
-	userID := common.CurrentUserID(ctx)
-	if userID == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user not authenticated"))
-	}
-
-	user, err := h.ah.GetUser(ctx, userID)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
 	query := r.URL.Query()
 
 	limitS := query.Get("limit")
@@ -816,7 +795,7 @@ func (h *UserOrgInvitationsHandler) do(r *http.Request) ([]*gwapitypes.OrgInvita
 		limit = MaxOrgInvitationsLimit
 	}
 
-	userInvitations, err := h.ah.GetUserOrgInvitations(ctx, user.ID, limit)
+	userInvitations, err := h.ah.GetCurrentUserOrgInvitations(ctx, limit)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

@@ -184,14 +184,13 @@ func (h *ActionHandler) GetOrgMembers(ctx context.Context, req *GetOrgMembersReq
 type CreateOrgRequest struct {
 	Name       string
 	Visibility cstypes.Visibility
-
-	CreatorUserID string
 }
 
 func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*cstypes.Organization, error) {
 	if !common.IsUserLoggedOrAdmin(ctx) {
-		return nil, errors.Errorf("user not logged in")
+		return nil, util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authenticated"))
 	}
+	curUserID := common.CurrentUserID(ctx)
 
 	if req.Name == "" {
 		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("organization name required"), serrors.InvalidOrganizationName())
@@ -204,11 +203,9 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*
 	}
 
 	creq := &csapitypes.CreateOrgRequest{
-		Name:       req.Name,
-		Visibility: req.Visibility,
-	}
-	if req.CreatorUserID != "" {
-		creq.CreatorUserID = req.CreatorUserID
+		Name:          req.Name,
+		Visibility:    req.Visibility,
+		CreatorUserID: curUserID,
 	}
 
 	h.log.Info().Msgf("creating organization")
@@ -448,13 +445,13 @@ type OrgInvitationActionRequest struct {
 
 func (h *ActionHandler) OrgInvitationAction(ctx context.Context, req *OrgInvitationActionRequest) error {
 	if !req.Action.IsValid() {
-		return errors.Errorf("action is not valid")
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid action"))
 	}
 
-	userID := common.CurrentUserID(ctx)
-	if userID == "" {
+	if !common.IsUserLogged(ctx) {
 		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user not authenticated"))
 	}
+	userID := common.CurrentUserID(ctx)
 
 	orgInvitation, _, err := h.configstoreClient.GetOrgInvitation(ctx, req.OrgRef, userID)
 	if err != nil {

@@ -25,7 +25,6 @@ import (
 
 	serrors "agola.io/agola/internal/services/errors"
 	"agola.io/agola/internal/services/gateway/action"
-	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
 	cstypes "agola.io/agola/services/configstore/types"
 	gwapitypes "agola.io/agola/services/gateway/api/types"
@@ -55,8 +54,6 @@ func (h *CreateOrgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *CreateOrgHandler) do(r *http.Request) (*gwapitypes.OrgResponse, error) {
 	ctx := r.Context()
 
-	userID := common.CurrentUserID(ctx)
-
 	var req gwapitypes.CreateOrgRequest
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&req); err != nil {
@@ -64,9 +61,8 @@ func (h *CreateOrgHandler) do(r *http.Request) (*gwapitypes.OrgResponse, error) 
 	}
 
 	creq := &action.CreateOrgRequest{
-		Name:          req.Name,
-		Visibility:    cstypes.Visibility(req.Visibility),
-		CreatorUserID: userID,
+		Name:       req.Name,
+		Visibility: cstypes.Visibility(req.Visibility),
 	}
 
 	org, err := h.ah.CreateOrg(ctx, creq)
