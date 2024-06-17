@@ -55,12 +55,14 @@ type PrivateUserResponse struct {
 	LinkedAccounts []*cstypes.LinkedAccount
 }
 
-func (h *ActionHandler) GetCurrentUser(ctx context.Context, userRef string) (*PrivateUserResponse, error) {
-	if !common.IsUserLoggedOrAdmin(ctx) {
-		return nil, errors.Errorf("user not logged in")
+func (h *ActionHandler) GetCurrentUser(ctx context.Context) (*PrivateUserResponse, error) {
+	if !common.IsUserLogged(ctx) {
+		return nil, util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authenticated"))
 	}
 
-	user, _, err := h.configstoreClient.GetUser(ctx, userRef)
+	userID := common.CurrentUserID(ctx)
+
+	user, _, err := h.configstoreClient.GetUser(ctx, userID)
 	if err != nil {
 		return nil, APIErrorFromRemoteError(err)
 	}
@@ -91,8 +93,6 @@ func (h *ActionHandler) GetUser(ctx context.Context, userRef string) (*cstypes.U
 }
 
 type GetUserOrgsRequest struct {
-	UserRef string
-
 	Cursor string
 
 	Limit         int
@@ -104,11 +104,16 @@ type GetUserOrgsResponse struct {
 	Cursor string
 }
 
-func (h *ActionHandler) GetUserOrgs(ctx context.Context, req *GetUserOrgsRequest) (*GetUserOrgsResponse, error) {
+func (h *ActionHandler) GetCurrentUserOrgs(ctx context.Context, req *GetUserOrgsRequest) (*GetUserOrgsResponse, error) {
 	if !common.IsUserLogged(ctx) {
-		return nil, errors.Errorf("user not logged in")
+		return nil, util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authenticated"))
 	}
+	curUserID := common.CurrentUserID(ctx)
 
+	return h.getUserOrgs(ctx, curUserID, req)
+}
+
+func (h *ActionHandler) getUserOrgs(ctx context.Context, userRef string, req *GetUserOrgsRequest) (*GetUserOrgsResponse, error) {
 	inCursor := &StartCursor{}
 	sortDirection := req.SortDirection
 	if req.Cursor != "" {
@@ -121,7 +126,7 @@ func (h *ActionHandler) GetUserOrgs(ctx context.Context, req *GetUserOrgsRequest
 		sortDirection = SortDirectionAsc
 	}
 
-	orgs, resp, err := h.configstoreClient.GetUserOrgs(ctx, req.UserRef, &client.GetUserOrgsOptions{ListOptions: &client.ListOptions{Limit: req.Limit, SortDirection: cstypes.SortDirection(sortDirection)}, StartOrgName: inCursor.Start})
+	orgs, resp, err := h.configstoreClient.GetUserOrgs(ctx, userRef, &client.GetUserOrgsOptions{ListOptions: &client.ListOptions{Limit: req.Limit, SortDirection: cstypes.SortDirection(sortDirection)}, StartOrgName: inCursor.Start})
 	if err != nil {
 		return nil, APIErrorFromRemoteError(err)
 	}
@@ -1178,7 +1183,16 @@ func (h *ActionHandler) UserCreateRun(ctx context.Context, req *UserCreateRunReq
 	return h.CreateRuns(ctx, creq)
 }
 
-func (h *ActionHandler) GetUserGitSource(ctx context.Context, remoteSourceRef, userRef string) (gitsource.GitSource, *cstypes.RemoteSource, *cstypes.LinkedAccount, error) {
+func (h *ActionHandler) GetCurrentUserGitSource(ctx context.Context, remoteSourceRef string) (gitsource.GitSource, *cstypes.RemoteSource, *cstypes.LinkedAccount, error) {
+	if !common.IsUserLogged(ctx) {
+		return nil, nil, nil, util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authenticated"))
+	}
+	curUserID := common.CurrentUserID(ctx)
+
+	return h.getUserGitSource(ctx, remoteSourceRef, curUserID)
+}
+
+func (h *ActionHandler) getUserGitSource(ctx context.Context, remoteSourceRef, userRef string) (gitsource.GitSource, *cstypes.RemoteSource, *cstypes.LinkedAccount, error) {
 	rs, _, err := h.configstoreClient.GetRemoteSource(ctx, remoteSourceRef)
 	if err != nil {
 		return nil, nil, nil, errors.Wrapf(err, "failed to get remote source %q", remoteSourceRef)
@@ -1208,7 +1222,16 @@ func (h *ActionHandler) GetUserGitSource(ctx context.Context, remoteSourceRef, u
 	return gitSource, rs, la, nil
 }
 
-func (h *ActionHandler) GetUserOrgInvitations(ctx context.Context, userRef string, limit int) ([]*OrgInvitationResponse, error) {
+func (h *ActionHandler) GetCurrentUserOrgInvitations(ctx context.Context, limit int) ([]*OrgInvitationResponse, error) {
+	if !common.IsUserLogged(ctx) {
+		return nil, util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authenticated"))
+	}
+	curUserID := common.CurrentUserID(ctx)
+
+	return h.getUserOrgInvitations(ctx, curUserID, limit)
+}
+
+func (h *ActionHandler) getUserOrgInvitations(ctx context.Context, userRef string, limit int) ([]*OrgInvitationResponse, error) {
 	cOrgInvitations, _, err := h.configstoreClient.GetUserOrgInvitations(ctx, userRef, limit)
 	if err != nil {
 		return nil, APIErrorFromRemoteError(err)

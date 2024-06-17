@@ -24,7 +24,6 @@ import (
 	"github.com/sorintlab/errors"
 
 	"agola.io/agola/internal/services/gateway/action"
-	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/util"
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"
@@ -61,16 +60,10 @@ func (h *CreateProjectGroupHandler) do(r *http.Request) (*gwapitypes.ProjectGrou
 		return nil, util.NewAPIErrorWrap(util.ErrBadRequest, err)
 	}
 
-	userID := common.CurrentUserID(ctx)
-	if userID == "" {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user not authenticated"))
-	}
-
 	creq := &action.CreateProjectGroupRequest{
-		Name:          req.Name,
-		ParentRef:     req.ParentRef,
-		Visibility:    cstypes.Visibility(req.Visibility),
-		CurrentUserID: userID,
+		Name:       req.Name,
+		ParentRef:  req.ParentRef,
+		Visibility: cstypes.Visibility(req.Visibility),
 	}
 
 	projectGroup, err := h.ah.CreateProjectGroup(ctx, creq)
