@@ -342,7 +342,7 @@ type OrgInvitationResponse struct {
 
 func (h *ActionHandler) GetOrgInvitations(ctx context.Context, orgRef string, limit int) ([]*cstypes.OrgInvitation, error) {
 	if !common.IsUserLogged(ctx) {
-		return nil, errors.Errorf("user not logged in")
+		return nil, util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authenticated"))
 	}
 
 	org, _, err := h.configstoreClient.GetOrg(ctx, orgRef)
@@ -373,7 +373,7 @@ type CreateOrgInvitationRequest struct {
 
 func (h *ActionHandler) CreateOrgInvitation(ctx context.Context, req *CreateOrgInvitationRequest) (*OrgInvitationResponse, error) {
 	if !common.IsUserLogged(ctx) {
-		return nil, errors.Errorf("user not logged in")
+		return nil, util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authenticated"))
 	}
 
 	if h.organizationMemberAddingMode != OrganizationMemberAddingModeInvitation {
@@ -484,9 +484,8 @@ func (h *ActionHandler) OrgInvitationAction(ctx context.Context, req *OrgInvitat
 }
 
 func (h *ActionHandler) DeleteOrgInvitation(ctx context.Context, orgRef string, userRef string) error {
-	userID := common.CurrentUserID(ctx)
-	if userID == "" {
-		return errors.Errorf("user not authenticated")
+	if !common.IsUserLogged(ctx) {
+		return util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authenticated"))
 	}
 
 	orgInvitation, _, err := h.configstoreClient.GetOrgInvitation(ctx, orgRef, userRef)

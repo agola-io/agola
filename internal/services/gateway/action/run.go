@@ -330,6 +330,11 @@ type RunTaskActionsRequest struct {
 }
 
 func (h *ActionHandler) RunTaskAction(ctx context.Context, req *RunTaskActionsRequest) error {
+	if !common.IsUserLogged(ctx) {
+		return util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authenticated"))
+	}
+	curUserID := common.CurrentUserID(ctx)
+
 	canDoRunAction, groupID, err := h.CanAuthUserDoRunActions(ctx, req.GroupType, req.Ref, actionTypeTaskAction)
 	if err != nil {
 		return errors.Wrapf(err, "failed to determine permissions")
@@ -346,11 +351,6 @@ func (h *ActionHandler) RunTaskAction(ctx context.Context, req *RunTaskActionsRe
 	}
 
 	runID := runResp.Run.ID
-
-	curUserID := common.CurrentUserID(ctx)
-	if curUserID == "" {
-		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("no logged in user"))
-	}
 
 	switch req.ActionType {
 	case RunTaskActionTypeApprove:

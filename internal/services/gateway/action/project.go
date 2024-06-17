@@ -64,6 +64,9 @@ type CreateProjectRequest struct {
 }
 
 func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectRequest) (*csapitypes.Project, error) {
+	if !common.IsUserLogged(ctx) {
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user not authenticated"))
+	}
 	curUserID := common.CurrentUserID(ctx)
 
 	user, _, err := h.configstoreClient.GetUser(ctx, curUserID)

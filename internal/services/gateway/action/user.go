@@ -59,7 +59,6 @@ func (h *ActionHandler) GetCurrentUser(ctx context.Context) (*PrivateUserRespons
 	if !common.IsUserLogged(ctx) {
 		return nil, util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authenticated"))
 	}
-
 	userID := common.CurrentUserID(ctx)
 
 	user, _, err := h.configstoreClient.GetUser(ctx, userID)
@@ -82,7 +81,7 @@ func (h *ActionHandler) GetCurrentUser(ctx context.Context) (*PrivateUserRespons
 
 func (h *ActionHandler) GetUser(ctx context.Context, userRef string) (*cstypes.User, error) {
 	if !common.IsUserLoggedOrAdmin(ctx) {
-		return nil, errors.Errorf("user not logged in")
+		return nil, util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authenticated"))
 	}
 
 	user, _, err := h.configstoreClient.GetUser(ctx, userRef)
@@ -257,6 +256,10 @@ type CreateUserTokenRequest struct {
 }
 
 func (h *ActionHandler) CreateUserToken(ctx context.Context, req *CreateUserTokenRequest) (string, error) {
+	if !common.IsUserLoggedOrAdmin(ctx) {
+		return "", util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authenticated"))
+	}
+
 	isAdmin := common.IsUserAdmin(ctx)
 	userID := common.CurrentUserID(ctx)
 
@@ -738,10 +741,13 @@ func (h *ActionHandler) HandleRemoteSourceAuth(ctx context.Context, remoteSource
 			return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get user %q", req.UserRef))
 		}
 
-		curUserID := common.CurrentUserID(ctx)
-
 		// user must be already logged in the create a linked account and can create a
 		// linked account only on itself.
+		if !common.IsUserLogged(ctx) {
+			return nil, util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authenticated"))
+		}
+		curUserID := common.CurrentUserID(ctx)
+
 		if user.ID != curUserID {
 			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("logged in user cannot create linked account for another user"))
 		}
@@ -1003,7 +1009,7 @@ func (h *ActionHandler) DeleteUser(ctx context.Context, userRef string) error {
 
 func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) error {
 	if !common.IsUserLoggedOrAdmin(ctx) {
-		return errors.Errorf("user not logged in")
+		return util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authenticated"))
 	}
 
 	isAdmin := common.IsUserAdmin(ctx)
@@ -1027,7 +1033,7 @@ func (h *ActionHandler) DeleteUserLA(ctx context.Context, userRef, laID string) 
 
 func (h *ActionHandler) DeleteUserToken(ctx context.Context, userRef, tokenName string) error {
 	if !common.IsUserLoggedOrAdmin(ctx) {
-		return errors.Errorf("user not logged in")
+		return util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authenticated"))
 	}
 
 	isAdmin := common.IsUserAdmin(ctx)
@@ -1063,6 +1069,11 @@ type UserCreateRunRequest struct {
 }
 
 func (h *ActionHandler) UserCreateRun(ctx context.Context, req *UserCreateRunRequest) error {
+	if !common.IsUserLogged(ctx) {
+		return util.NewAPIError(util.ErrForbidden, util.WithAPIErrorMsg("user not authenticated"))
+	}
+	curUserID := common.CurrentUserID(ctx)
+
 	prRefRegexes := []*regexp.Regexp{}
 	for _, res := range req.PullRequestRefRegexes {
 		re, err := regexp.Compile(res)
@@ -1071,8 +1082,6 @@ func (h *ActionHandler) UserCreateRun(ctx context.Context, req *UserCreateRunReq
 		}
 		prRefRegexes = append(prRefRegexes, re)
 	}
-
-	curUserID := common.CurrentUserID(ctx)
 
 	user, _, err := h.configstoreClient.GetUser(ctx, curUserID)
 	if err != nil {
