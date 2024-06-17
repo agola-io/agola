@@ -227,7 +227,7 @@ func TestCookieAuth(t *testing.T) {
 	}, nil)
 	testutil.NilError(t, err)
 
-	// Test auth passing recevied login response cookies
+	// Test auth passing received login response cookies
 	authCookieName := common.AuthCookieName(false)
 	secondaryAuthCookieName := common.SecondaryAuthCookieName()
 	cookies := resp.Cookies()
