@@ -1,5 +1,30 @@
 ## Changelog
 
+### v0.10.0
+
+- gateway: unify/improve handling of authenticated user (@sgotti)                      [#525](https://github.com/agola-io/agola/pull/525)
+- gateway: move remaining get of current user from api to action (@sgotti)             [#524](https://github.com/agola-io/agola/pull/524)
+- gateway: fix commit status and run webhook deliveries api (@alessandro-sorint)       [#521](https://github.com/agola-io/agola/pull/521)
+- tests: fix wrong ProjectCommitStatusRedelivery test (@alessandro-sorint)             [#522](https://github.com/agola-io/agola/pull/522)
+- cmd/export: close file descriptor (@testwill)                                        [#516](https://github.com/agola-io/agola/pull/516)
+- objectstorage: multiple updates and changes (@sgotti)                                [#519](https://github.com/agola-io/agola/pull/519)
+- runservice: fix objectsCleaner lock key usage (@sgotti)                              [#520](https://github.com/agola-io/agola/pull/520)
+- util: use generic Ptr function (@sgotti)                                             [#518](https://github.com/agola-io/agola/pull/518)
+- *: update dependencies (@sgotti)                                                     [#517](https://github.com/agola-io/agola/pull/517)
+- api: add some missing http content types headers. (@sgotti)                          [#514](https://github.com/agola-io/agola/pull/514)
+- config: add docker registries auth nil check (@alessandro-sorint)                    [#513](https://github.com/agola-io/agola/pull/513)
+- configstore: move logic from db to action handler (@sgotti)                          [#511](https://github.com/agola-io/agola/pull/511)
+- *: update dependencies (@sgotti)                                                     [#512](https://github.com/agola-io/agola/pull/512)
+- *: add detailed errors to api responses (@sgotti)                                    [#507](https://github.com/agola-io/agola/pull/507)
+- *: use do method in http handlers (@sgotti)                                          [#508](https://github.com/agola-io/agola/pull/508)
+- gateway: add action.APIErrorFromRemoteError (@sgotti)                                [#506](https://github.com/agola-io/agola/pull/506)
+- errors: split wrapped error from APIError message (@sgotti)                          [#505](https://github.com/agola-io/agola/pull/505)
+- configstore: move last bits of logic from api to action (@sgotti)                    [#504](https://github.com/agola-io/agola/pull/504)
+- configstore: fix wrong error handling (@sgotti)                                      [#503](https://github.com/agola-io/agola/pull/503)
+- validation: add min/max length check to name validation (@sgotti)                    [#499](https://github.com/agola-io/agola/pull/499)
+- *: update to go 1.22 (@sgotti)                                                       [#498](https://github.com/agola-io/agola/pull/498)
+- sqlg updates (@sgotti)                                                               [#495](https://github.com/agola-io/agola/pull/495)
+
 ### v0.9.0
 
 - agolademo: use docker compose (@sgotti)                                                                      [#494](https://github.com/agola-io/agola/pull/494)
