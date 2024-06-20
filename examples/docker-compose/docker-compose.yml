@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+    minio:
+        image: minio/minio
+        restart: unless-stopped
+        volumes:
+            - minio-data:/configstore
+        ports:
+            - 9000:9000
+        command: minio server /configstore
+        environment:
+            MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY} # Must be the same as in the config.yml
+            MINIO_SECRET_KEY: ${MINIO_SECRET_KEY} # Must be the same as in the config.yml
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+            interval: 30s
+            timeout: 20s
+            retries: 3
+
+    etcd:
+        image: quay.io/coreos/etcd
+        restart: unless-stopped
+        volumes:
+            - etcd-data:/etcd-data
+        environment:
+            ETCD_NAME: agola-etcd
+            ETCD_DATA_DIR: /etcd-data
+            ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+            ETCD_ADVERTISE_CLIENT_URLS: http://0.0.0.0:2379
+            ETCD_INITIAL_CLUSTER_TOKEN: agola-etcd-1
+
+    agola:
+        image: sorintlab/agola:latest
+        restart: unless-stopped
+        volumes:
+            - /etc/timezone:/etc/timezone:ro
+            - /etc/localtime:/etc/localtime:ro
+            - /var/run/docker.sock:/var/run/docker.sock
+            # The config is mapped to the host system, for an example config file,
+            # please take a look at 'examples/agolademo/config.yml'
+            - ./config.yml:/config.yml
+            - agola-data:/data/agola
+            - agola-tmp:/tmp/agola
+        ports:
+        - 8000:8000
+        command: ["serve", "--components", "all-base,executor", "--config", "/config.yml"]
+        depends_on:
+            - minio
+            - etcd
+
+
+volumes:
+    minio-data:
+    agola-data:
+    agola-tmp:
+    etcd-data:
