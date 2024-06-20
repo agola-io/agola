@@ -543,3 +543,49 @@ func (d *DB) insertRawOrgInvitationSqlite3(tx *sql.Tx, orginvitation *types.OrgI
 
 	return nil
 }
+var (
+	userProjectFavoriteInsertSqlite3 = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inUserID string, inProjectID string) *sq.InsertBuilder {
+		ib:= sq.NewInsertBuilder()
+		return ib.InsertInto("userprojectfavorite").Cols("id", "revision", "creation_time", "update_time", "user_id", "project_id").Values(inID, inRevision, inCreationTime, inUpdateTime, inUserID, inProjectID)
+	}
+	userProjectFavoriteUpdateSqlite3 = func(curRevision uint64, inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inUserID string, inProjectID string) *sq.UpdateBuilder {
+		ub:= sq.NewUpdateBuilder()
+		return ub.Update("userprojectfavorite").Set(ub.Assign("id", inID), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("user_id", inUserID), ub.Assign("project_id", inProjectID)).Where(ub.E("id", inID), ub.E("revision", curRevision))
+	}
+
+	userProjectFavoriteInsertRawSqlite3 = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inUserID string, inProjectID string) *sq.InsertBuilder {
+		ib:= sq.NewInsertBuilder()
+		return ib.InsertInto("userprojectfavorite").Cols("id", "revision", "creation_time", "update_time", "user_id", "project_id").SQL("").Values(inID, inRevision, inCreationTime, inUpdateTime, inUserID, inProjectID)
+	}
+)
+
+func (d *DB) insertUserProjectFavoriteSqlite3(tx *sql.Tx, userprojectfavorite *types.UserProjectFavorite) error {
+	q := userProjectFavoriteInsertSqlite3(userprojectfavorite.ID, userprojectfavorite.Revision, userprojectfavorite.CreationTime, userprojectfavorite.UpdateTime, userprojectfavorite.UserID, userprojectfavorite.ProjectID)
+
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to insert userProjectFavorite")
+	}
+
+	return nil
+}
+
+func (d *DB) updateUserProjectFavoriteSqlite3(tx *sql.Tx, curRevision uint64, userprojectfavorite *types.UserProjectFavorite) (stdsql.Result, error) {
+	q := userProjectFavoriteUpdateSqlite3(curRevision, userprojectfavorite.ID, userprojectfavorite.Revision, userprojectfavorite.CreationTime, userprojectfavorite.UpdateTime, userprojectfavorite.UserID, userprojectfavorite.ProjectID)
+
+	res, err := d.exec(tx, q)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to update userProjectFavorite")
+	}
+
+	return res, nil
+}
+
+func (d *DB) insertRawUserProjectFavoriteSqlite3(tx *sql.Tx, userprojectfavorite *types.UserProjectFavorite) error {
+	q := userProjectFavoriteInsertRawSqlite3(userprojectfavorite.ID, userprojectfavorite.Revision, userprojectfavorite.CreationTime, userprojectfavorite.UpdateTime, userprojectfavorite.UserID, userprojectfavorite.ProjectID)
+
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to insert userProjectFavorite")
+	}
+
+	return nil
+}

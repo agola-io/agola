@@ -543,3 +543,49 @@ func (d *DB) insertRawOrgInvitationPostgres(tx *sql.Tx, orginvitation *types.Org
 
 	return nil
 }
+var (
+	userProjectFavoriteInsertPostgres = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inUserID string, inProjectID string) *sq.InsertBuilder {
+		ib:= sq.NewInsertBuilder()
+		return ib.InsertInto("userprojectfavorite").Cols("id", "revision", "creation_time", "update_time", "user_id", "project_id").Values(inID, inRevision, inCreationTime, inUpdateTime, inUserID, inProjectID)
+	}
+	userProjectFavoriteUpdatePostgres = func(curRevision uint64, inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inUserID string, inProjectID string) *sq.UpdateBuilder {
+		ub:= sq.NewUpdateBuilder()
+		return ub.Update("userprojectfavorite").Set(ub.Assign("id", inID), ub.Assign("revision", inRevision), ub.Assign("creation_time", inCreationTime), ub.Assign("update_time", inUpdateTime), ub.Assign("user_id", inUserID), ub.Assign("project_id", inProjectID)).Where(ub.E("id", inID), ub.E("revision", curRevision))
+	}
+
+	userProjectFavoriteInsertRawPostgres = func(inID string, inRevision uint64, inCreationTime time.Time, inUpdateTime time.Time, inUserID string, inProjectID string) *sq.InsertBuilder {
+		ib:= sq.NewInsertBuilder()
+		return ib.InsertInto("userprojectfavorite").Cols("id", "revision", "creation_time", "update_time", "user_id", "project_id").SQL("OVERRIDING SYSTEM VALUE").Values(inID, inRevision, inCreationTime, inUpdateTime, inUserID, inProjectID)
+	}
+)
+
+func (d *DB) insertUserProjectFavoritePostgres(tx *sql.Tx, userprojectfavorite *types.UserProjectFavorite) error {
+	q := userProjectFavoriteInsertPostgres(userprojectfavorite.ID, userprojectfavorite.Revision, userprojectfavorite.CreationTime, userprojectfavorite.UpdateTime, userprojectfavorite.UserID, userprojectfavorite.ProjectID)
+
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to insert userProjectFavorite")
+	}
+
+	return nil
+}
+
+func (d *DB) updateUserProjectFavoritePostgres(tx *sql.Tx, curRevision uint64, userprojectfavorite *types.UserProjectFavorite) (stdsql.Result, error) {
+	q := userProjectFavoriteUpdatePostgres(curRevision, userprojectfavorite.ID, userprojectfavorite.Revision, userprojectfavorite.CreationTime, userprojectfavorite.UpdateTime, userprojectfavorite.UserID, userprojectfavorite.ProjectID)
+
+	res, err := d.exec(tx, q)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to update userProjectFavorite")
+	}
+
+	return res, nil
+}
+
+func (d *DB) insertRawUserProjectFavoritePostgres(tx *sql.Tx, userprojectfavorite *types.UserProjectFavorite) error {
+	q := userProjectFavoriteInsertRawPostgres(userprojectfavorite.ID, userprojectfavorite.Revision, userprojectfavorite.CreationTime, userprojectfavorite.UpdateTime, userprojectfavorite.UserID, userprojectfavorite.ProjectID)
+
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to insert userProjectFavorite")
+	}
+
+	return nil
+}
