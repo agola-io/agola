@@ -23,6 +23,8 @@ make
 
 - Copy the `example/agolademo/config.yml` where you prefer
 
+- Some directories made need to be manually created by you. Create the `notification` and `gitserver` directories where specified in your `config.yml`. The other `dataDir` directories at run time
+
 ``` sh
 ./bin/agola serve --config /path/to/your/config.yml --components all-base,executor
 ```
