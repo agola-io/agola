@@ -34,7 +34,7 @@ import (
 func (h *ActionHandler) GetProject(ctx context.Context, projectRef string) (*csapitypes.Project, error) {
 	project, _, err := h.configstoreClient.GetProject(ctx, projectRef)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get project %q", projectRef))
 	}
 
 	if project.GlobalVisibility == cstypes.VisibilityPublic {
