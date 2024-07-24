@@ -128,6 +128,10 @@ type Gitserver struct {
 }
 
 func NewGitserver(ctx context.Context, log zerolog.Logger, c *config.Gitserver) (*Gitserver, error) {
+	if err := os.MkdirAll(c.DataDir, 0770); err != nil {
+		return nil, errors.WithStack(err)
+	}
+
 	if c.Debug {
 		log = log.Level(zerolog.DebugLevel)
 	}

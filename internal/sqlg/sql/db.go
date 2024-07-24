@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"math/rand"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/gofrs/uuid"
@@ -62,6 +64,12 @@ type DB struct {
 func NewDB(dbType Type, dbConnString string) (*DB, error) {
 	var data dbData
 	var driverName string
+
+	p := filepath.Dir(dbConnString)
+	if err := os.MkdirAll(p, 0770); err != nil {
+		return nil, errors.WithStack(err)
+	}
+
 	switch dbType {
 	case Postgres:
 		data = dbDataPostgres
