@@ -1434,6 +1434,10 @@ func NewExecutor(ctx context.Context, log zerolog.Logger, c *config.Executor) (*
 		},
 	}
 
+	if err := os.MkdirAll(c.DataDir, 0770); err != nil {
+		return nil, errors.WithStack(err)
+	}
+
 	if err := os.MkdirAll(e.tasksDir(), 0770); err != nil {
 		return nil, errors.WithStack(err)
 	}

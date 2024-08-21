@@ -132,6 +132,10 @@ func NewGitserver(ctx context.Context, log zerolog.Logger, c *config.Gitserver) 
 		log = log.Level(zerolog.DebugLevel)
 	}
 
+	if err := os.MkdirAll(c.DataDir, 0770); err != nil {
+		return nil, errors.WithStack(err)
+	}
+
 	return &Gitserver{
 		log: log,
 		c:   c,

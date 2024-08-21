@@ -18,6 +18,8 @@ import (
 	"context"
 	"crypto/tls"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -87,6 +89,16 @@ type Configstore struct {
 func NewConfigstore(ctx context.Context, log zerolog.Logger, c *config.Configstore) (*Configstore, error) {
 	if c.Debug {
 		log = log.Level(zerolog.DebugLevel)
+	}
+
+	if err := os.MkdirAll(c.DataDir, 0770); err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	if c.DB.Type == sql.Sqlite3 {
+		if err := os.MkdirAll(filepath.Dir(c.DB.ConnString), 0770); err != nil {
+			return nil, errors.WithStack(err)
+		}
 	}
 
 	ost, err := scommon.NewObjectStorage(ctx, &c.ObjectStorage)

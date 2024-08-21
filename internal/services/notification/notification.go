@@ -18,6 +18,8 @@ import (
 	"context"
 	"crypto/tls"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -63,6 +65,12 @@ func NewNotificationService(ctx context.Context, log zerolog.Logger, gc *config.
 
 	if c.Debug {
 		log = log.Level(zerolog.DebugLevel)
+	}
+
+	if c.DB.Type == sql.Sqlite3 {
+		if err := os.MkdirAll(filepath.Dir(c.DB.ConnString), 0770); err != nil {
+			return nil, errors.WithStack(err)
+		}
 	}
 
 	sdb, err := sql.NewDB(c.DB.Type, c.DB.ConnString)
