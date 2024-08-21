@@ -16,6 +16,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"slices"
 	"time"
 
@@ -512,6 +513,12 @@ func validateDB(db *DB) error {
 
 	if db.ConnString == "" {
 		return errors.Errorf("db connection string undefined")
+	}
+
+	if db.Type == sql.Sqlite3 {
+		if !filepath.IsAbs(db.ConnString) {
+			return errors.Errorf("sqlite3 db connection string must be an absolute path")
+		}
 	}
 
 	return nil
