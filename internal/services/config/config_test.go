@@ -61,6 +61,9 @@ notification:
   webExposedURL: "http://localhost:8000"
   runserviceURL: "http://localhost:4000"
   configstoreURL: "http://localhost:4002"
+  db:
+    type: sqlite3
+    connString: /data/agola/notification/db
 
 configstore:
   dataDir: /data/agola/configstore
@@ -120,6 +123,7 @@ gitserver:
 					WebExposedURL:              "http://localhost:8000",
 					RunserviceURL:              "http://localhost:4000",
 					ConfigstoreURL:             "http://localhost:4002",
+					DB:                         DB{Type: "sqlite3", ConnString: "/data/agola/notification/db"},
 					RunWebhookExpireInterval:   7 * 24 * time.Hour,
 					CommitStatusExpireInterval: 7 * 24 * time.Hour,
 				},
@@ -183,6 +187,9 @@ notification:
   webExposedURL: "http://localhost:8000"
   runserviceURL: "http://localhost:4000"
   configstoreURL: "http://localhost:4002"
+  db:
+    type: sqlite3
+    connString: /data/agola/notification/db
 
 configstore:
   dataDir: /data/agola/configstore
@@ -230,6 +237,7 @@ gitserver:
 					WebExposedURL:              "http://localhost:8000",
 					RunserviceURL:              "http://localhost:4000",
 					ConfigstoreURL:             "http://localhost:4002",
+					DB:                         DB{Type: "sqlite3", ConnString: "/data/agola/notification/db"},
 					RunWebhookExpireInterval:   7 * 24 * time.Hour,
 					CommitStatusExpireInterval: 7 * 24 * time.Hour,
 				},
@@ -289,6 +297,9 @@ notification:
   webExposedURL: "http://localhost:8000"
   runserviceURL: "http://localhost:4000"
   configstoreURL: "http://localhost:4002"
+  db:
+    type: sqlite3
+    connString: /data/agola/notification/db
 
 configstore:
   dataDir:
@@ -318,6 +329,7 @@ gitserver:
 					WebExposedURL:              "http://localhost:8000",
 					RunserviceURL:              "http://localhost:4000",
 					ConfigstoreURL:             "http://localhost:4002",
+					DB:                         DB{Type: "sqlite3", ConnString: "/data/agola/notification/db"},
 					RunWebhookExpireInterval:   7 * 24 * time.Hour,
 					CommitStatusExpireInterval: 7 * 24 * time.Hour,
 				},
@@ -334,8 +346,8 @@ gitserver:
 			},
 		},
 		{
-			name:     "test config for gateway, scheduler, notification and gitserver without dataDir",
-			services: []string{"gateway", "scheduler", "notification", "gitserver"},
+			name:     "test config for gitserver without dataDir",
+			services: []string{"gitserver"},
 			in: `
 gateway:
   apiExposedURL: "http://localhost:8000"
@@ -360,6 +372,9 @@ notification:
   webExposedURL: "http://localhost:8000"
   runserviceURL: "http://localhost:4000"
   configstoreURL: "http://localhost:4002"
+  db:
+    type: sqlite3
+    connString: /data/agola/notification/db
 
 configstore:
   dataDir:
@@ -370,7 +385,7 @@ runservice:
 gitserver:
   dataDir:
 `,
-			err: errors.Errorf("git server dataDir is empty"),
+			err: errors.Errorf("gitserver dataDir is empty"),
 		},
 
 		{
@@ -396,6 +411,9 @@ gateway:
 scheduler:
 
 notification:
+  db:
+    type: sqlite3
+    connString: /data/agola/notification/db
 
 configstore:
   dataDir: /data/agola/configstore
@@ -459,6 +477,7 @@ gitserver:
 					WebExposedURL:              "http://localhost:8000",
 					RunserviceURL:              "http://localhost:4000",
 					ConfigstoreURL:             "http://localhost:4002",
+					DB:                         DB{Type: "sqlite3", ConnString: "/data/agola/notification/db"},
 					RunWebhookExpireInterval:   7 * 24 * time.Hour,
 					CommitStatusExpireInterval: 7 * 24 * time.Hour,
 				},
