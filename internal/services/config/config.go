@@ -566,7 +566,7 @@ func Validate(c *Config, componentsNames []string) error {
 			return errors.Errorf("gateway runserviceURL is empty")
 		}
 		if err := validateCookieSigning(&c.Gateway.CookieSigning); err != nil {
-			return errors.Wrap(err, "cookie signing configuration error")
+			return errors.Wrap(err, "gateway cookie signing configuration error")
 		}
 		if err := validateWeb(&c.Gateway.Web); err != nil {
 			return errors.Wrapf(err, "gateway web configuration error")
@@ -578,8 +578,8 @@ func Validate(c *Config, componentsNames []string) error {
 
 	// Configstore
 	if isComponentEnabled(componentsNames, "configstore") {
-		if err := validateDB(&c.Runservice.DB); err != nil {
-			return errors.Wrapf(err, "db configuration error")
+		if err := validateDB(&c.Configstore.DB); err != nil {
+			return errors.Wrapf(err, "configstore db configuration error")
 		}
 		if c.Configstore.DataDir == "" {
 			return errors.Errorf("configstore dataDir is empty")
@@ -592,7 +592,7 @@ func Validate(c *Config, componentsNames []string) error {
 	// Runservice
 	if isComponentEnabled(componentsNames, "runservice") {
 		if err := validateDB(&c.Runservice.DB); err != nil {
-			return errors.Wrapf(err, "db configuration error")
+			return errors.Wrapf(err, "runservice db configuration error")
 		}
 		if c.Runservice.DataDir == "" {
 			return errors.Errorf("runservice dataDir is empty")
@@ -608,7 +608,7 @@ func Validate(c *Config, componentsNames []string) error {
 			return errors.Errorf("executor dataDir is empty")
 		}
 		if c.Executor.ToolboxPath == "" {
-			return errors.Errorf("git server toolboxPath is empty")
+			return errors.Errorf("executor toolboxPath is empty")
 		}
 		if c.Executor.RunserviceURL == "" {
 			return errors.Errorf("executor runserviceURL is empty")
@@ -637,6 +637,9 @@ func Validate(c *Config, componentsNames []string) error {
 
 	// Notification
 	if isComponentEnabled(componentsNames, "notification") {
+		if err := validateDB(&c.Notification.DB); err != nil {
+			return errors.Wrapf(err, "notification db configuration error")
+		}
 		if c.Notification.WebExposedURL == "" {
 			return errors.Errorf("notification webExposedURL is empty")
 		}
@@ -651,7 +654,7 @@ func Validate(c *Config, componentsNames []string) error {
 	// Git server
 	if isComponentEnabled(componentsNames, "gitserver") {
 		if c.Gitserver.DataDir == "" {
-			return errors.Errorf("git server dataDir is empty")
+			return errors.Errorf("gitserver dataDir is empty")
 		}
 	}
 
