@@ -1260,3 +1260,107 @@ func (d *DB) OrgInvitationFromArray(a []any, txID string) (*types.OrgInvitation,
 
 	return v, v.ID, nil
 }
+
+func (d *DB) fetchUserProjectFavorites(tx *sql.Tx, q sq.Builder) ([]*types.UserProjectFavorite, []string, error) {
+	rows, err := d.query(tx, q)
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+	defer rows.Close()
+
+	return d.scanUserProjectFavorites(rows, tx.ID(), 0)
+}
+
+func (d *DB) fetchUserProjectFavoritesSkipLastFields(tx *sql.Tx, q sq.Builder, skipFieldsCount uint) ([]*types.UserProjectFavorite, []string, error) {
+	rows, err := d.query(tx, q)
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+	defer rows.Close()
+
+	return d.scanUserProjectFavorites(rows, tx.ID(), skipFieldsCount)
+}
+
+func (d *DB) scanUserProjectFavorite(rows *stdsql.Rows, skipFieldsCount uint) (*types.UserProjectFavorite, string, error) {
+
+	v := &types.UserProjectFavorite{}
+
+	var vi any = v
+	if x, ok := vi.(sqlg.Initer); ok {
+		x.Init()
+	}
+
+	fields := []any{&v.ID, &v.Revision, &v.CreationTime, &v.UpdateTime, &v.UserID, &v.ProjectID}
+
+	for i := uint(0); i < skipFieldsCount; i++ {
+		fields = append(fields, new(any))
+	}
+
+	if err := rows.Scan(fields...); err != nil {
+		return nil, "", errors.Wrap(err, "failed to scan row")
+	}
+
+	if x, ok := vi.(sqlg.PreJSONSetupper); ok {
+		if err := x.PreJSON(); err != nil {
+			return nil, "", errors.Wrap(err, "prejson error")
+		}
+	}
+
+	return v, v.ID, nil
+}
+
+func (d *DB) scanUserProjectFavorites(rows *stdsql.Rows, txID string, skipFieldsCount uint) ([]*types.UserProjectFavorite, []string, error) {
+	vs := []*types.UserProjectFavorite{}
+	ids := []string{}
+	for rows.Next() {
+		v, id, err := d.scanUserProjectFavorite(rows, skipFieldsCount)
+		if err != nil {
+			rows.Close()
+			return nil, nil, errors.WithStack(err)
+		}
+		v.TxID = txID
+		vs = append(vs, v)
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+	return vs, ids, nil
+}
+
+func (d *DB) UserProjectFavoriteArray() []any {
+	a := []any{}
+	a = append(a, new(string))
+	a = append(a, new(uint64))
+	a = append(a, new(time.Time))
+	a = append(a, new(time.Time))
+	a = append(a, new(string))
+	a = append(a, new(string))
+
+	return a
+}
+
+func (d *DB) UserProjectFavoriteFromArray(a []any, txID string) (*types.UserProjectFavorite, string, error) {
+	v := &types.UserProjectFavorite{}
+
+	var vi any = v
+	if x, ok := vi.(sqlg.Initer); ok {
+		x.Init()
+	}
+	v.ID = *a[0].(*string)
+	v.Revision = *a[1].(*uint64)
+	v.CreationTime = *a[2].(*time.Time)
+	v.UpdateTime = *a[3].(*time.Time)
+	v.UserID = *a[4].(*string)
+	v.ProjectID = *a[5].(*string)
+
+	if x, ok := vi.(sqlg.PreJSONSetupper); ok {
+		if err := x.PreJSON(); err != nil {
+			return nil, "", errors.Wrap(err, "prejson error")
+		}
+	}
+
+	v.TxID = txID
+
+	return v, v.ID, nil
+}

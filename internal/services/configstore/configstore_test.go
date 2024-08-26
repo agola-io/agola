@@ -152,6 +152,21 @@ func getVariables(ctx context.Context, cs *Configstore) ([]*types.Variable, erro
 	return variables, errors.WithStack(err)
 }
 
+func getUserProjectFavorites(ctx context.Context, cs *Configstore) ([]*types.UserProjectFavorite, error) {
+	var userProjectFavorites []*types.UserProjectFavorite
+	err := cs.d.Do(ctx, func(tx *sql.Tx) error {
+		var err error
+		userProjectFavorites, err = cs.d.GetUserProjectFavorites(tx)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		return nil
+	})
+
+	return userProjectFavorites, errors.WithStack(err)
+}
+
 func cmpDiffObject(x, y interface{}) cmp.Comparison {
 	// Since postgres has microsecond time precision while go has nanosecond time precision we should check times with a microsecond margin
 	return cmp.DeepEqual(x, y, cmpopts.IgnoreFields(sqlg.ObjectMeta{}, "TxID"), cmpopts.EquateApproxTime(1*time.Microsecond))
@@ -1936,6 +1951,244 @@ func TestOrgInvitation(t *testing.T) {
 				testutil.NilError(t, err)
 
 				assert.Assert(t, cmp.Len(orgInvitations, 0))
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+
+			ctx := context.Background()
+
+			cs := setupConfigstore(ctx, t, log, dir)
+
+			t.Logf("starting cs")
+			go func() { _ = cs.Run(ctx) }()
+
+			tt.f(ctx, t, cs)
+		})
+	}
+}
+
+func TestUserProjectFavorite(t *testing.T) {
+	t.Parallel()
+
+	log := testutil.NewLogger(t)
+
+	setupUsers := func(t *testing.T, ctx context.Context, cs *Configstore, limit int) {
+		for i := 1; i <= limit; i++ {
+			_, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: fmt.Sprintf("user%d", i)})
+			testutil.NilError(t, err)
+		}
+	}
+
+	setupOrg := func(t *testing.T, ctx context.Context, cs *Configstore, creatorUserID string) {
+		_, err := cs.ah.CreateOrg(ctx, &action.CreateOrgRequest{Name: "org01", Visibility: types.VisibilityPublic, CreatorUserID: creatorUserID})
+		testutil.NilError(t, err)
+	}
+
+	setupProjects := func(t *testing.T, ctx context.Context, cs *Configstore, limit int) {
+		for i := 1; i <= limit; i++ {
+			_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: fmt.Sprintf("project%d", i), Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", "org01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
+			testutil.NilError(t, err)
+		}
+	}
+
+	tests := []struct {
+		name string
+		f    func(ctx context.Context, t *testing.T, cs *Configstore)
+	}{
+		{
+			name: "test create user project favorites",
+			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
+				setupUsers(t, ctx, cs, 4)
+				users, err := getUsers(ctx, cs)
+				testutil.NilError(t, err)
+
+				userOwner := users[0]
+
+				setupOrg(t, ctx, cs, userOwner.ID)
+
+				setupProjects(t, ctx, cs, 4)
+				projects, err := getProjects(ctx, cs)
+				testutil.NilError(t, err)
+
+				var expectedUserProjectFavorites []*types.UserProjectFavorite
+
+				for i := 0; i < len(users); i++ {
+					userProjectFavorite, err := cs.ah.CreateUserProjectFavorite(ctx, &action.CreateUserProjectFavoriteRequest{UserRef: fmt.Sprintf("user%d", i+1), ProjectRef: projects[i].ID})
+					testutil.NilError(t, err)
+
+					expectedUserProjectFavorites = append(expectedUserProjectFavorites, userProjectFavorite)
+				}
+
+				userProjectFavorites, err := getUserProjectFavorites(ctx, cs)
+				testutil.NilError(t, err)
+
+				assert.Assert(t, cmpDiffObject(expectedUserProjectFavorites, userProjectFavorites))
+			},
+		},
+		{
+			name: "test user project favorite creation with already existing user project favorite",
+			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
+				setupUsers(t, ctx, cs, 1)
+				users, err := getUsers(ctx, cs)
+				testutil.NilError(t, err)
+
+				user := users[0]
+
+				setupOrg(t, ctx, cs, user.ID)
+
+				setupProjects(t, ctx, cs, 1)
+				projects, err := getProjects(ctx, cs)
+				testutil.NilError(t, err)
+
+				_, err = cs.ah.CreateUserProjectFavorite(ctx, &action.CreateUserProjectFavoriteRequest{UserRef: "user1", ProjectRef: projects[0].ID})
+				testutil.NilError(t, err)
+
+				expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("user project favorite with user ref %q, project ref %q already exists", "user1", projects[0].ID))
+				_, err = cs.ah.CreateUserProjectFavorite(ctx, &action.CreateUserProjectFavoriteRequest{UserRef: "user1", ProjectRef: projects[0].ID})
+				assert.Error(t, err, expectedErr.Error())
+			},
+		},
+		{
+			name: "test user project favorite creation with not existing user",
+			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
+				setupUsers(t, ctx, cs, 1)
+				users, err := getUsers(ctx, cs)
+				testutil.NilError(t, err)
+
+				userOwner := users[0]
+
+				setupOrg(t, ctx, cs, userOwner.ID)
+
+				setupProjects(t, ctx, cs, 1)
+				projects, err := getProjects(ctx, cs)
+				testutil.NilError(t, err)
+
+				expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("user with ref %q doesn't exist", "usertest"))
+				_, err = cs.ah.CreateUserProjectFavorite(ctx, &action.CreateUserProjectFavoriteRequest{UserRef: "usertest", ProjectRef: projects[0].ID})
+				assert.Error(t, err, expectedErr.Error())
+			},
+		},
+		{
+			name: "test user project favorite creation with not existing project",
+			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
+				setupUsers(t, ctx, cs, 1)
+				users, err := getUsers(ctx, cs)
+				testutil.NilError(t, err)
+
+				userOwner := users[0]
+
+				setupOrg(t, ctx, cs, userOwner.ID)
+
+				setupProjects(t, ctx, cs, 1)
+
+				expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("project with ref %q doesn't exist", "projecttest"))
+				_, err = cs.ah.CreateUserProjectFavorite(ctx, &action.CreateUserProjectFavoriteRequest{UserRef: users[0].ID, ProjectRef: "projecttest"})
+				assert.Error(t, err, expectedErr.Error())
+			},
+		},
+		{
+			name: "test user project favorite deletion",
+			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
+				setupUsers(t, ctx, cs, 1)
+				users, err := getUsers(ctx, cs)
+				testutil.NilError(t, err)
+
+				userOwner := users[0]
+
+				setupOrg(t, ctx, cs, userOwner.ID)
+
+				setupProjects(t, ctx, cs, 1)
+				projects, err := getProjects(ctx, cs)
+				testutil.NilError(t, err)
+
+				_, err = cs.ah.CreateUserProjectFavorite(ctx, &action.CreateUserProjectFavoriteRequest{UserRef: "user1", ProjectRef: projects[0].ID})
+				testutil.NilError(t, err)
+
+				err = cs.ah.DeleteUserProjectFavorite(ctx, "user1", projects[0].ID)
+				testutil.NilError(t, err)
+
+				aresp, err := cs.ah.GetUserProjectFavorites(ctx, &action.GetUserProjectFavoritesRequest{UserRef: "user1"})
+				testutil.NilError(t, err)
+
+				assert.Assert(t, cmp.Len(aresp.UserProjectFavorites, 0))
+			},
+		},
+		{
+			name: "test user project favorite deletion with not existing user project favorite",
+			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
+				setupUsers(t, ctx, cs, 1)
+				users, err := getUsers(ctx, cs)
+				testutil.NilError(t, err)
+
+				userOwner := users[0]
+
+				setupOrg(t, ctx, cs, userOwner.ID)
+
+				setupProjects(t, ctx, cs, 1)
+				projects, err := getProjects(ctx, cs)
+				testutil.NilError(t, err)
+
+				expectedErr := util.NewAPIError(util.ErrBadRequest, errors.Errorf("user project favorite for user %q, project %q doesn't exist", "user1", projects[0].ID))
+				err = cs.ah.DeleteUserProjectFavorite(ctx, "user1", projects[0].ID)
+				assert.Error(t, err, expectedErr.Error())
+			},
+		},
+		{
+			name: "test user deletion with existing user project favorite",
+			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
+				setupUsers(t, ctx, cs, 1)
+				users, err := getUsers(ctx, cs)
+				testutil.NilError(t, err)
+
+				userOwner := users[0]
+
+				setupOrg(t, ctx, cs, userOwner.ID)
+
+				setupProjects(t, ctx, cs, 1)
+				projects, err := getProjects(ctx, cs)
+				testutil.NilError(t, err)
+
+				_, err = cs.ah.CreateUserProjectFavorite(ctx, &action.CreateUserProjectFavoriteRequest{UserRef: "user1", ProjectRef: projects[0].ID})
+				testutil.NilError(t, err)
+
+				err = cs.ah.DeleteUser(ctx, "user1")
+				testutil.NilError(t, err)
+
+				userProjectFavorites, err := getUserProjectFavorites(ctx, cs)
+				testutil.NilError(t, err)
+
+				assert.Assert(t, cmp.Len(userProjectFavorites, 0))
+			},
+		},
+		{
+			name: "test user project deletion with existing project favorite",
+			f: func(ctx context.Context, t *testing.T, cs *Configstore) {
+				setupUsers(t, ctx, cs, 1)
+				users, err := getUsers(ctx, cs)
+				testutil.NilError(t, err)
+
+				userOwner := users[0]
+
+				setupOrg(t, ctx, cs, userOwner.ID)
+
+				setupProjects(t, ctx, cs, 1)
+				projects, err := getProjects(ctx, cs)
+				testutil.NilError(t, err)
+
+				_, err = cs.ah.CreateUserProjectFavorite(ctx, &action.CreateUserProjectFavoriteRequest{UserRef: "user1", ProjectRef: projects[0].ID})
+				testutil.NilError(t, err)
+
+				err = cs.ah.DeleteProject(ctx, projects[0].ID)
+				testutil.NilError(t, err)
+
+				userProjectFavorites, err := getUserProjectFavorites(ctx, cs)
+				testutil.NilError(t, err)
+
+				assert.Assert(t, cmp.Len(userProjectFavorites, 0))
 			},
 		},
 	}
