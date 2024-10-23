@@ -1,6 +1,6 @@
 module agola.io/agola
 
-go 1.21
+go 1.22
 
 require (
 	ariga.io/atlas v0.12.0
