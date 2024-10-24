@@ -116,9 +116,15 @@ func NewWrapperError(err error, options ...WrapperErrorOption) *WrapperError {
 
 type WrapperErrorOption func(e *WrapperError)
 
-func WithWrapperErrorMsg(format string, args ...interface{}) WrapperErrorOption {
+func WithWrapperErrorMsgf(format string, args ...any) WrapperErrorOption {
 	return func(e *WrapperError) {
 		e.msg = fmt.Sprintf(format, args...)
+	}
+}
+
+func WithWrapperErrorMsg(format string, a ...any) WrapperErrorOption {
+	return func(e *WrapperError) {
+		e.msg = fmt.Sprint(a...)
 	}
 }
 
