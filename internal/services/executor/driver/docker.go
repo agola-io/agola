@@ -142,7 +142,7 @@ func (d *DockerDriver) createToolboxVolume(ctx context.Context, podID string, ou
 	}
 	defer srcArchive.Close()
 
-	options := dockertypes.CopyToContainerOptions{
+	options := container.CopyToContainerOptions{
 		AllowOverwriteDirWithFile: false,
 		CopyUIDGID:                false,
 	}
@@ -592,7 +592,7 @@ func (dp *DockerPod) Exec(ctx context.Context, execConfig *ExecConfig) (Containe
 	cmd := []string{filepath.Join(dp.initVolumeDir, "agola-toolbox"), "exec", "-e", string(envj), "-w", execConfig.WorkingDir, "--"}
 	cmd = append(cmd, execConfig.Cmd...)
 
-	dockerExecConfig := dockertypes.ExecConfig{
+	dockerExecConfig := container.ExecOptions{
 		Cmd:          cmd,
 		Tty:          execConfig.Tty,
 		AttachStdin:  execConfig.AttachStdin,
@@ -605,7 +605,7 @@ func (dp *DockerPod) Exec(ctx context.Context, execConfig *ExecConfig) (Containe
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	execStartCheck := dockertypes.ExecStartCheck{
+	execStartCheck := container.ExecAttachOptions{
 		Detach: dockerExecConfig.Detach,
 		Tty:    dockerExecConfig.Tty,
 	}

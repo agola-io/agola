@@ -28,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v56/github"
+	"github.com/google/go-github/v66/github"
 	"github.com/sorintlab/errors"
 	"golang.org/x/oauth2"
 
@@ -289,10 +289,10 @@ func (c *Client) CreateRepoWebhook(repopath, url, secret string) error {
 	}
 
 	hook := &github.Hook{
-		Config: map[string]interface{}{
-			"url":          url,
-			"content_type": "json",
-			"secret":       secret,
+		Config: &github.HookConfig{
+			URL:         github.String(url),
+			ContentType: github.String("json"),
+			Secret:      github.String(secret),
 		},
 		Events: []string{"push", "pull_request"},
 		Active: github.Bool(true),
@@ -329,7 +329,7 @@ func (c *Client) DeleteRepoWebhook(repopath, u string) error {
 	// match the full url so we can have multiple webhooks for different agola
 	// projects
 	for _, hook := range hooks {
-		if hook.Config["url"] == u {
+		if hook.Config != nil && hook.Config.URL != nil && *hook.Config.URL == u {
 			if _, err := c.client.Repositories.DeleteHook(context.TODO(), owner, reponame, *hook.ID); err != nil {
 				return errors.Wrapf(err, "error deleting existing repository webhook")
 			}
@@ -361,9 +361,9 @@ func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource
 func (c *Client) ListUserRepos() ([]*gitsource.RepoInfo, error) {
 	remoteRepos := []*github.Repository{}
 
-	opt := &github.RepositoryListOptions{}
+	opt := &github.RepositoryListByAuthenticatedUserOptions{}
 	for {
-		pRemoteRepos, resp, err := c.client.Repositories.List(context.TODO(), "", opt)
+		pRemoteRepos, resp, err := c.client.Repositories.ListByAuthenticatedUser(context.TODO(), opt)
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
