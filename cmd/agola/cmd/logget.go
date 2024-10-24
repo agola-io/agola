@@ -133,7 +133,7 @@ func logGet(cmd *cobra.Command, args []string) error {
 		taskid = task.ID
 	}
 
-	log.Info().Msgf("getting log")
+	log.Info().Msg("getting log")
 
 	var resp *gwclient.Response
 	var err error

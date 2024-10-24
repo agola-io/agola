@@ -74,7 +74,7 @@ func projectGroupCreate(cmd *cobra.Command, args []string) error {
 		Visibility: gwapitypes.Visibility(projectGroupCreateOpts.visibility),
 	}
 
-	log.Info().Msgf("creating project group")
+	log.Info().Msg("creating project group")
 
 	projectGroup, _, err := gwClient.CreateProjectGroup(context.TODO(), req)
 	if err != nil {

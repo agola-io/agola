@@ -116,7 +116,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateProje
 		Visibility: req.Visibility,
 	}
 
-	h.log.Info().Msgf("creating projectGroup")
+	h.log.Info().Msg("creating projectGroup")
 	rp, _, err := h.configstoreClient.CreateProjectGroup(ctx, creq)
 	if err != nil {
 		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to create project group"))
@@ -163,7 +163,7 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, projectGroupRef 
 		Visibility: pg.Visibility,
 	}
 
-	h.log.Info().Msgf("updating project group")
+	h.log.Info().Msg("updating project group")
 	rp, _, err := h.configstoreClient.UpdateProjectGroup(ctx, pg.ID, creq)
 	if err != nil {
 		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to create project group"))

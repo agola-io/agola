@@ -163,13 +163,13 @@ func (n *NotificationService) setupDefaultRouter() http.Handler {
 func (n *NotificationService) Run(ctx context.Context) error {
 	for {
 		if err := n.run(ctx); err != nil {
-			n.log.Err(err).Msgf("run error")
+			n.log.Err(err).Msg("run error")
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
 		select {
 		case <-ctx.Done():
-			n.log.Info().Msgf("notification service exiting")
+			n.log.Info().Msg("notification service exiting")
 			return nil
 		case <-sleepCh:
 		}
@@ -216,10 +216,10 @@ func (n *NotificationService) run(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		n.log.Info().Msgf("notification service run exiting")
+		n.log.Info().Msg("notification service run exiting")
 	case err = <-lerrCh:
 		if err != nil {
-			n.log.Err(err).Msgf("http server listen error")
+			n.log.Err(err).Msg("http server listen error")
 		}
 	case err = <-errCh:
 		if err != nil {

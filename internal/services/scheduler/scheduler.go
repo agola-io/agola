@@ -70,7 +70,7 @@ func (s *Scheduler) schedule(ctx context.Context) error {
 
 	for groupID := range groups {
 		if err := s.scheduleRun(ctx, groupID); err != nil {
-			s.log.Err(err).Msgf("scheduler err")
+			s.log.Err(err).Msg("scheduler err")
 		}
 	}
 
@@ -209,7 +209,7 @@ func (s *Scheduler) Run(ctx context.Context) error {
 	go s.approveLoop(ctx)
 
 	<-ctx.Done()
-	log.Info().Msgf("scheduler exiting")
+	log.Info().Msg("scheduler exiting")
 
 	return nil
 }

@@ -590,7 +590,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 
 	config, err := config.ParseConfig([]byte(data), configFormat, configContext)
 	if err != nil {
-		h.log.Err(err).Msgf("failed to parse config")
+		h.log.Err(err).Msg("failed to parse config")
 
 		// create a run (per config file) with a generic error since we cannot parse
 		// it and know how many runs are defined
@@ -605,7 +605,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 		}
 
 		if _, _, err := h.runserviceClient.CreateRun(ctx, createRunReq); err != nil {
-			h.log.Err(err).Msgf("failed to create run")
+			h.log.Err(err).Msg("failed to create run")
 			return APIErrorFromRemoteError(err)
 		}
 		return nil
@@ -613,12 +613,12 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 
 	for _, run := range config.Runs {
 		if SkipRunMessage.MatchString(req.Message) {
-			h.log.Debug().Msgf("skipping run since special commit message")
+			h.log.Debug().Msg("skipping run since special commit message")
 			continue
 		}
 
 		if match := types.MatchWhen(run.When.ToWhen(), req.RefType, req.Branch, req.Tag, req.Ref); !match {
-			h.log.Debug().Msgf("skipping run since when condition doesn't match")
+			h.log.Debug().Msg("skipping run since when condition doesn't match")
 			continue
 		}
 
@@ -635,7 +635,7 @@ func (h *ActionHandler) CreateRuns(ctx context.Context, req *CreateRunRequest) e
 		}
 
 		if _, _, err := h.runserviceClient.CreateRun(ctx, createRunReq); err != nil {
-			h.log.Err(err).Msgf("failed to create run")
+			h.log.Err(err).Msg("failed to create run")
 			return APIErrorFromRemoteError(err)
 		}
 	}
@@ -653,7 +653,7 @@ func (h *ActionHandler) fetchConfigFiles(ctx context.Context, gitSource gitsourc
 			if err == nil {
 				return true, nil
 			}
-			h.log.Err(err).Msgf("get file err")
+			h.log.Err(err).Msg("get file err")
 		}
 		return false, nil
 	})

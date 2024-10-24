@@ -135,11 +135,11 @@ func statusDescription(state types.CommitState) string {
 }
 
 func (n *NotificationService) commitStatusesCleanerLoop(ctx context.Context, commitStatusExpireInterval time.Duration) {
-	n.log.Debug().Msgf("commitStatusesCleanerLoop")
+	n.log.Debug().Msg("commitStatusesCleanerLoop")
 
 	for {
 		if err := n.commitStatusesCleaner(ctx, commitStatusExpireInterval); err != nil {
-			n.log.Warn().Err(err).Msgf("commitStatusesCleaner error")
+			n.log.Warn().Err(err).Msg("commitStatusesCleaner error")
 		}
 
 		sleepCh := time.NewTimer(commitStatusesCleanerInterval).C

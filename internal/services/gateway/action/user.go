@@ -240,7 +240,7 @@ func (h *ActionHandler) CreateUser(ctx context.Context, req *CreateUserRequest) 
 		UserName: req.UserName,
 	}
 
-	h.log.Info().Msgf("creating user")
+	h.log.Info().Msg("creating user")
 	u, _, err := h.configstoreClient.CreateUser(ctx, creq)
 	if err != nil {
 		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to create user"))
@@ -290,7 +290,7 @@ func (h *ActionHandler) CreateUserToken(ctx context.Context, req *CreateUserToke
 		return "", util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("user %q already have a token with name %q", userRef, req.TokenName), serrors.UserTokenAlreadyExists())
 	}
 
-	h.log.Info().Msgf("creating user token")
+	h.log.Info().Msg("creating user token")
 	creq := &csapitypes.CreateUserTokenRequest{
 		TokenName: req.TokenName,
 	}
@@ -375,7 +375,7 @@ func (h *ActionHandler) CreateUserLA(ctx context.Context, req *CreateUserLAReque
 		Oauth2AccessTokenExpiresAt: req.Oauth2AccessTokenExpiresAt,
 	}
 
-	h.log.Info().Msgf("creating linked account")
+	h.log.Info().Msg("creating linked account")
 	la, _, err = h.configstoreClient.CreateUserLA(ctx, userRef, creq)
 	if err != nil {
 		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to create linked account"))
@@ -538,7 +538,7 @@ func (h *ActionHandler) RegisterUser(ctx context.Context, req *RegisterUserReque
 		},
 	}
 
-	h.log.Info().Msgf("creating user account")
+	h.log.Info().Msg("creating user account")
 	u, _, err := h.configstoreClient.CreateUser(ctx, creq)
 	if err != nil {
 		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to create linked account"))

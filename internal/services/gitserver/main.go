@@ -187,11 +187,11 @@ func (s *Gitserver) Run(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		log.Info().Msgf("gitserver exiting")
+		log.Info().Msg("gitserver exiting")
 		httpServer.Close()
 	case err := <-lerrCh:
 		if err != nil {
-			s.log.Err(err).Msgf("http server listen error")
+			s.log.Err(err).Msg("http server listen error")
 			return errors.WithStack(err)
 		}
 	}

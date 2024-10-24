@@ -103,14 +103,14 @@ func secretCreate(cmd *cobra.Command, ownertype string, args []string) error {
 
 	switch ownertype {
 	case "project":
-		log.Info().Msgf("creating project secret")
+		log.Info().Msg("creating project secret")
 		secret, _, err := gwClient.CreateProjectSecret(context.TODO(), secretCreateOpts.parentRef, req)
 		if err != nil {
 			return errors.Wrapf(err, "failed to create project secret")
 		}
 		log.Info().Msgf("project secret %q created, ID: %q", secret.Name, secret.ID)
 	case "projectgroup":
-		log.Info().Msgf("creating project group secret")
+		log.Info().Msg("creating project group secret")
 		secret, _, err := gwClient.CreateProjectGroupSecret(context.TODO(), secretCreateOpts.parentRef, req)
 		if err != nil {
 			return errors.Wrapf(err, "failed to create project group secret")

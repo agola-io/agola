@@ -159,7 +159,7 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemot
 		LoginEnabled:        loginEnabled,
 	}
 
-	h.log.Info().Msgf("creating remotesource")
+	h.log.Info().Msg("creating remotesource")
 	rs, _, err := h.configstoreClient.CreateRemoteSource(ctx, creq)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create remotesource")
@@ -257,7 +257,7 @@ func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, req *UpdateRemot
 		LoginEnabled:        rs.LoginEnabled,
 	}
 
-	h.log.Info().Msgf("updating remotesource")
+	h.log.Info().Msg("updating remotesource")
 	rs, _, err = h.configstoreClient.UpdateRemoteSource(ctx, req.RemoteSourceRef, creq)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to update remotesource")

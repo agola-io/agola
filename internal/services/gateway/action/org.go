@@ -208,7 +208,7 @@ func (h *ActionHandler) CreateOrg(ctx context.Context, req *CreateOrgRequest) (*
 		CreatorUserID: curUserID,
 	}
 
-	h.log.Info().Msgf("creating organization")
+	h.log.Info().Msg("creating organization")
 	org, _, err := h.configstoreClient.CreateOrg(ctx, creq)
 	if err != nil {
 		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to create organization"))
@@ -244,7 +244,7 @@ func (h *ActionHandler) UpdateOrg(ctx context.Context, orgRef string, req *Updat
 		Visibility: org.Visibility,
 	}
 
-	h.log.Info().Msgf("updating organization")
+	h.log.Info().Msg("updating organization")
 	org, _, err = h.configstoreClient.UpdateOrg(ctx, orgRef, creq)
 	if err != nil {
 		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to update organization"))
@@ -425,7 +425,7 @@ func (h *ActionHandler) CreateOrgInvitation(ctx context.Context, req *CreateOrgI
 		Role:    req.Role,
 	}
 
-	h.log.Info().Msgf("creating org invitation")
+	h.log.Info().Msg("creating org invitation")
 	orgInvitation, _, err := h.configstoreClient.CreateOrgInvitation(ctx, org.ID, creq)
 	if err != nil {
 		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to create org invitation"))

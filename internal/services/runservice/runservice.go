@@ -45,11 +45,11 @@ func (s *Runservice) maintenanceModeWatcherLoop(ctx context.Context, runCtxCance
 	s.log.Info().Msgf("maintenance mode watcher: maintenance mode enabled: %t", maintenanceMode)
 
 	for {
-		s.log.Debug().Msgf("maintenanceModeWatcherLoop")
+		s.log.Debug().Msg("maintenanceModeWatcherLoop")
 
 		// at first watch restart from previous processed revision
 		if err := s.maintenanceModeWatcher(ctx, runCtxCancel, maintenanceMode); err != nil {
-			s.log.Err(err).Msgf("maintenance mode watcher error")
+			s.log.Err(err).Msg("maintenance mode watcher error")
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
@@ -253,13 +253,13 @@ func (s *Runservice) setupMaintenanceRouter() http.Handler {
 func (s *Runservice) Run(ctx context.Context) error {
 	for {
 		if err := s.run(ctx); err != nil {
-			s.log.Err(err).Msgf("run error")
+			s.log.Err(err).Msg("run error")
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
 		select {
 		case <-ctx.Done():
-			s.log.Info().Msgf("runservice exiting")
+			s.log.Info().Msg("runservice exiting")
 			return nil
 		case <-sleepCh:
 		}
@@ -331,10 +331,10 @@ func (s *Runservice) run(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		s.log.Info().Msgf("runservice run exiting")
+		s.log.Info().Msg("runservice run exiting")
 	case err = <-lerrCh:
 		if err != nil {
-			s.log.Err(err).Msgf("http server listen error")
+			s.log.Err(err).Msg("http server listen error")
 		}
 	case err = <-errCh:
 		if err != nil {

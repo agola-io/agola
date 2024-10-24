@@ -862,7 +862,7 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 		return errors.Errorf("executor doesn't allow executing privileged containers")
 	}
 
-	e.log.Debug().Msgf("starting pod")
+	e.log.Debug().Msg("starting pod")
 
 	dockerRegistriesAuth := map[string]registry.DockerRegistryAuth{}
 	for n, v := range et.Spec.DockerRegistriesAuth {
@@ -1030,7 +1030,7 @@ func (e *Executor) executeTaskSteps(ctx context.Context, rt *runningTask, pod dr
 
 func (e *Executor) podsCleanerLoop(ctx context.Context) {
 	for {
-		e.log.Debug().Msgf("podsCleaner")
+		e.log.Debug().Msg("podsCleaner")
 
 		if err := e.podsCleaner(ctx); err != nil {
 			e.log.Err(err).Send()
@@ -1086,7 +1086,7 @@ func (e *Executor) podsCleaner(ctx context.Context) error {
 
 func (e *Executor) executorStatusSenderLoop(ctx context.Context) {
 	for {
-		e.log.Debug().Msgf("executorStatusSenderLoop")
+		e.log.Debug().Msg("executorStatusSenderLoop")
 
 		if err := e.sendExecutorStatus(ctx); err != nil {
 			e.log.Err(err).Send()
@@ -1103,7 +1103,7 @@ func (e *Executor) executorStatusSenderLoop(ctx context.Context) {
 
 func (e *Executor) executorTasksStatusSenderLoop(ctx context.Context) {
 	for {
-		e.log.Debug().Msgf("executorTasksStatusSenderLoop")
+		e.log.Debug().Msg("executorTasksStatusSenderLoop")
 
 		for _, rtID := range e.runningTasks.ids() {
 			rt, ok := e.runningTasks.get(rtID)
@@ -1139,7 +1139,7 @@ func (e *Executor) executorTasksStatusSenderLoop(ctx context.Context) {
 
 func (e *Executor) tasksUpdaterLoop(ctx context.Context) {
 	for {
-		e.log.Debug().Msgf("tasksUpdater")
+		e.log.Debug().Msg("tasksUpdater")
 
 		if err := e.tasksUpdater(ctx); err != nil {
 			e.log.Err(err).Send()
@@ -1267,7 +1267,7 @@ func (e *Executor) taskUpdater(ctx context.Context, et *rsapitypes.ExecutorTask)
 
 func (e *Executor) tasksDataCleanerLoop(ctx context.Context) {
 	for {
-		e.log.Debug().Msgf("tasksDataCleaner")
+		e.log.Debug().Msg("tasksDataCleaner")
 
 		if err := e.tasksDataCleaner(ctx); err != nil {
 			e.log.Err(err).Send()
@@ -1563,11 +1563,11 @@ func (e *Executor) Run(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		log.Info().Msgf("runservice executor exiting")
+		log.Info().Msg("runservice executor exiting")
 		httpServer.Close()
 	case err := <-lerrCh:
 		if err != nil {
-			log.Err(err).Msgf("http server listen error")
+			log.Err(err).Msg("http server listen error")
 			return errors.WithStack(err)
 		}
 	}
@@ -1577,7 +1577,7 @@ func (e *Executor) Run(ctx context.Context) error {
 
 func (e *Executor) tasksTimeoutCleanerLoop(ctx context.Context) {
 	for {
-		e.log.Debug().Msgf("tasksTimeoutCleaner")
+		e.log.Debug().Msg("tasksTimeoutCleaner")
 
 		e.tasksTimeoutCleaner()
 

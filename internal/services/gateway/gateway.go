@@ -442,11 +442,11 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		log.Info().Msgf("configstore exiting")
+		log.Info().Msg("configstore exiting")
 		httpServer.Close()
 	case err := <-lerrCh:
 		if err != nil {
-			log.Err(err).Msgf("http server listen error")
+			log.Err(err).Msg("http server listen error")
 			return errors.WithStack(err)
 		}
 	}

@@ -102,7 +102,7 @@ func projectCreate(cmd *cobra.Command, args []string) error {
 		PassVarsToForkedPR:  projectCreateOpts.passVarsToForkedPR,
 	}
 
-	log.Info().Msgf("creating project")
+	log.Info().Msg("creating project")
 
 	project, _, err := gwClient.CreateProject(context.TODO(), req)
 	if err != nil {

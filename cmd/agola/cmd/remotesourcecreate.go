@@ -114,7 +114,7 @@ func remoteSourceCreate(cmd *cobra.Command, args []string) error {
 		LoginEnabled:        util.Ptr(remoteSourceCreateOpts.loginEnabled),
 	}
 
-	log.Info().Msgf("creating remotesource")
+	log.Info().Msg("creating remotesource")
 	remoteSource, _, err := gwClient.CreateRemoteSource(context.TODO(), req)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create remotesource")

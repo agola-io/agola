@@ -46,11 +46,11 @@ func (s *Configstore) maintenanceModeWatcherLoop(ctx context.Context, runCtxCanc
 	s.log.Info().Msgf("maintenance mode watcher: maintenance mode enabled: %t", maintenanceMode)
 
 	for {
-		s.log.Debug().Msgf("maintenanceModeWatcherLoop")
+		s.log.Debug().Msg("maintenanceModeWatcherLoop")
 
 		// at first watch restart from previous processed revision
 		if err := s.maintenanceModeWatcher(ctx, runCtxCancel, maintenanceMode); err != nil {
-			s.log.Err(err).Msgf("maintenance mode watcher error")
+			s.log.Err(err).Msg("maintenance mode watcher error")
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
@@ -331,13 +331,13 @@ func (s *Configstore) setupMaintenanceRouter() http.Handler {
 func (s *Configstore) Run(ctx context.Context) error {
 	for {
 		if err := s.run(ctx); err != nil {
-			log.Err(err).Msgf("run error")
+			log.Err(err).Msg("run error")
 		}
 
 		sleepCh := time.NewTimer(1 * time.Second).C
 		select {
 		case <-ctx.Done():
-			s.log.Info().Msgf("configstore exiting")
+			s.log.Info().Msg("configstore exiting")
 			return nil
 		case <-sleepCh:
 		}
@@ -399,10 +399,10 @@ func (s *Configstore) run(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		log.Info().Msgf("configstore run exiting")
+		log.Info().Msg("configstore run exiting")
 	case err = <-lerrCh:
 		if err != nil {
-			log.Err(err).Msgf("http server listen error")
+			log.Err(err).Msg("http server listen error")
 		}
 	case err = <-errCh:
 		if err != nil {

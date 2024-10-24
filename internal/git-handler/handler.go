@@ -208,7 +208,7 @@ func (h *GitSmartHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		res, err := InfoRefsResponse(ctx, repoAbsPath, serviceName)
 		if err != nil {
 			// we cannot return any http error since the http header has already been written
-			h.log.Err(err).Msgf("git command error")
+			h.log.Err(err).Msg("git command error")
 			return
 		}
 
@@ -220,14 +220,14 @@ func (h *GitSmartHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		if err := gitService(ctx, w, body, repoAbsPath, "upload-pack"); err != nil {
 			// we cannot return any http error since the http header has already been written
-			h.log.Err(err).Msgf("git command error")
+			h.log.Err(err).Msg("git command error")
 		}
 	case RequestTypeReceivePack:
 		w.Header().Set("Content-Type", "application/x-git-receive-pack-result")
 
 		if err := gitService(ctx, w, body, repoAbsPath, "receive-pack"); err != nil {
 			// we cannot return any http error since the http header has already been written
-			h.log.Err(err).Msgf("git command error")
+			h.log.Err(err).Msg("git command error")
 		}
 	}
 }
@@ -266,7 +266,7 @@ func (h *FetchFileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := gitFetchFile(ctx, w, r.Body, repoAbsPath, fetchData.Ref, fetchData.Path); err != nil {
-		h.log.Err(err).Msgf("git command error")
+		h.log.Err(err).Msg("git command error")
 
 		// since we already answered with a 200 we cannot return another error code
 		// So abort the connection and the client will detect the missing ending chunk

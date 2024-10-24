@@ -84,7 +84,7 @@ func (n *NotificationService) runWebhookDeliveriesHandler(ctx context.Context) e
 
 		for _, r := range runWebhookDeliveries {
 			if err := n.handleRunWebhookDelivery(ctx, r.ID); err != nil {
-				n.log.Err(err).Msgf("failed to trigger run webhook delivery event")
+				n.log.Err(err).Msg("failed to trigger run webhook delivery event")
 			}
 
 			curRunWebhookDeliverySequence = r.Sequence

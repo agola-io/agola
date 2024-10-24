@@ -324,7 +324,7 @@ func (h *CreateUserLAHandler) createUserLA(ctx context.Context, userRef string, 
 		RemoteSourceName: req.RemoteSourceName,
 	}
 
-	h.log.Info().Msgf("creating linked account")
+	h.log.Info().Msg("creating linked account")
 	cresp, err := h.ah.HandleRemoteSourceAuth(ctx, req.RemoteSourceName, req.RemoteSourceLoginName, req.RemoteSourceLoginPassword, action.RemoteSourceRequestTypeCreateUserLA, creq)
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -629,7 +629,7 @@ func (h *LoginUserHandler) do(w http.ResponseWriter, r *http.Request) (*gwapityp
 		RemoteSourceName: req.RemoteSourceName,
 	}
 
-	h.log.Info().Msgf("logging in user")
+	h.log.Info().Msg("logging in user")
 	cresp, err := h.ah.HandleRemoteSourceAuth(ctx, req.RemoteSourceName, req.LoginName, req.LoginPassword, action.RemoteSourceRequestTypeLoginUser, creq)
 	if err != nil {
 		return nil, errors.WithStack(err)

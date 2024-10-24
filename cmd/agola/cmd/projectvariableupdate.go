@@ -110,14 +110,14 @@ func variableUpdate(cmd *cobra.Command, ownertype string, args []string) error {
 
 	switch ownertype {
 	case "project":
-		log.Info().Msgf("updating project variable")
+		log.Info().Msg("updating project variable")
 		variable, _, err := gwClient.UpdateProjectVariable(context.TODO(), variableUpdateOpts.parentRef, variableUpdateOpts.name, req)
 		if err != nil {
 			return errors.Wrapf(err, "failed to update project variable")
 		}
 		log.Info().Msgf("project variable %q updated, ID: %q", variable.Name, variable.ID)
 	case "projectgroup":
-		log.Info().Msgf("updating project group variable")
+		log.Info().Msg("updating project group variable")
 		variable, _, err := gwClient.UpdateProjectGroupVariable(context.TODO(), variableUpdateOpts.parentRef, variableUpdateOpts.name, req)
 		if err != nil {
 			return errors.Wrapf(err, "failed to update project group variable")

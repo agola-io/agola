@@ -93,10 +93,10 @@ func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretReque
 	var rs *csapitypes.Secret
 	switch req.ParentType {
 	case cstypes.ObjectKindProjectGroup:
-		h.log.Info().Msgf("creating project group secret")
+		h.log.Info().Msg("creating project group secret")
 		rs, _, err = h.configstoreClient.CreateProjectGroupSecret(ctx, req.ParentRef, creq)
 	case cstypes.ObjectKindProject:
-		h.log.Info().Msgf("creating project secret")
+		h.log.Info().Msg("creating project secret")
 		rs, _, err = h.configstoreClient.CreateProjectSecret(ctx, req.ParentRef, creq)
 	}
 	if err != nil {
@@ -147,10 +147,10 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretReque
 	var rs *csapitypes.Secret
 	switch req.ParentType {
 	case cstypes.ObjectKindProjectGroup:
-		h.log.Info().Msgf("updating project group secret")
+		h.log.Info().Msg("updating project group secret")
 		rs, _, err = h.configstoreClient.UpdateProjectGroupSecret(ctx, req.ParentRef, req.SecretName, creq)
 	case cstypes.ObjectKindProject:
-		h.log.Info().Msgf("updating project secret")
+		h.log.Info().Msg("updating project secret")
 		rs, _, err = h.configstoreClient.UpdateProjectSecret(ctx, req.ParentRef, req.SecretName, creq)
 	}
 	if err != nil {
@@ -172,10 +172,10 @@ func (h *ActionHandler) DeleteSecret(ctx context.Context, parentType cstypes.Obj
 
 	switch parentType {
 	case cstypes.ObjectKindProjectGroup:
-		h.log.Info().Msgf("deleting project group secret")
+		h.log.Info().Msg("deleting project group secret")
 		_, err = h.configstoreClient.DeleteProjectGroupSecret(ctx, parentRef, name)
 	case cstypes.ObjectKindProject:
-		h.log.Info().Msgf("deleting project secret")
+		h.log.Info().Msg("deleting project secret")
 		_, err = h.configstoreClient.DeleteProjectSecret(ctx, parentRef, name)
 	}
 	if err != nil {

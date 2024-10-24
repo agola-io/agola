@@ -68,7 +68,7 @@ func orgCreate(cmd *cobra.Command, args []string) error {
 		Visibility: gwapitypes.Visibility(orgCreateOpts.visibility),
 	}
 
-	log.Info().Msgf("creating org")
+	log.Info().Msg("creating org")
 	org, _, err := gwClient.CreateOrg(context.TODO(), req)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create org")

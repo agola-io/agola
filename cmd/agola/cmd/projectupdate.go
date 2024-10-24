@@ -85,7 +85,7 @@ func projectUpdate(cmd *cobra.Command, args []string) error {
 		req.PassVarsToForkedPR = &projectUpdateOpts.passVarsToForkedPR
 	}
 
-	log.Info().Msgf("updating project")
+	log.Info().Msg("updating project")
 	project, _, err := gwClient.UpdateProject(context.TODO(), projectUpdateOpts.ref, req)
 	if err != nil {
 		return errors.Wrapf(err, "failed to update project")

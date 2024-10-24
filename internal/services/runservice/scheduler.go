@@ -259,7 +259,7 @@ func (s *Runservice) submitRunTasks(ctx context.Context, r *types.Run, rc *types
 			return errors.WithStack(err)
 		}
 		if executor == nil {
-			s.log.Warn().Msgf("cannot choose an executor")
+			s.log.Warn().Msg("cannot choose an executor")
 			return nil
 		}
 
@@ -846,7 +846,7 @@ func (s *Runservice) executorTaskUpdateHandler(ctx context.Context, c <-chan str
 
 func (s *Runservice) executorTasksCleanerLoop(ctx context.Context) {
 	for {
-		s.log.Debug().Msgf("executorTasksCleaner")
+		s.log.Debug().Msg("executorTasksCleaner")
 
 		if err := s.executorTasksCleaner(ctx); err != nil {
 			s.log.Err(err).Send()
@@ -967,7 +967,7 @@ func (s *Runservice) executorTaskCleaner(ctx context.Context, executorTaskID str
 
 func (s *Runservice) runTasksUpdaterLoop(ctx context.Context) {
 	for {
-		s.log.Debug().Msgf("runTasksUpdater")
+		s.log.Debug().Msg("runTasksUpdater")
 
 		if err := s.runTasksUpdater(ctx); err != nil {
 			s.log.Err(err).Send()
@@ -983,7 +983,7 @@ func (s *Runservice) runTasksUpdaterLoop(ctx context.Context) {
 }
 
 func (s *Runservice) runTasksUpdater(ctx context.Context) error {
-	s.log.Debug().Msgf("runTasksUpdater")
+	s.log.Debug().Msg("runTasksUpdater")
 
 	l := s.lf.NewLock(common.TaskUpdaterLockKey)
 	if err := l.Lock(ctx); err != nil {
@@ -1212,7 +1212,7 @@ func (s *Runservice) finishArchivePhase(ctx context.Context, runID, runTaskID st
 }
 
 func (s *Runservice) fetchTaskLogs(ctx context.Context, runID string, rt *types.RunTask) {
-	s.log.Debug().Msgf("fetchTaskLogs")
+	s.log.Debug().Msg("fetchTaskLogs")
 
 	// fetch setup log
 	if rt.SetupStep.LogPhase == types.RunTaskFetchPhaseNotStarted {
@@ -1323,7 +1323,7 @@ func (s *Runservice) fetchArchive(ctx context.Context, runID string, rt *types.R
 }
 
 func (s *Runservice) fetchTaskArchives(ctx context.Context, runID string, rt *types.RunTask) {
-	s.log.Debug().Msgf("fetchTaskArchives")
+	s.log.Debug().Msg("fetchTaskArchives")
 
 	for i, stepnum := range rt.WorkspaceArchives {
 		phase := rt.WorkspaceArchivesPhase[i]
@@ -1342,7 +1342,7 @@ func (s *Runservice) fetchTaskArchives(ctx context.Context, runID string, rt *ty
 
 func (s *Runservice) fetcherLoop(ctx context.Context) {
 	for {
-		s.log.Debug().Msgf("fetcher")
+		s.log.Debug().Msg("fetcher")
 
 		if err := s.fetcher(ctx); err != nil {
 			s.log.Err(err).Send()
@@ -1358,7 +1358,7 @@ func (s *Runservice) fetcherLoop(ctx context.Context) {
 }
 
 func (s *Runservice) fetcher(ctx context.Context) error {
-	s.log.Debug().Msgf("fetcher")
+	s.log.Debug().Msg("fetcher")
 
 	var runs []*types.Run
 	err := s.d.Do(ctx, func(tx *sql.Tx) error {
@@ -1447,7 +1447,7 @@ func (s *Runservice) taskFetcher(ctx context.Context, r *types.Run, rt *types.Ru
 
 func (s *Runservice) runsSchedulerLoop(ctx context.Context) {
 	for {
-		s.log.Debug().Msgf("runsSchedulerLoop")
+		s.log.Debug().Msg("runsSchedulerLoop")
 
 		if err := s.runsScheduler(ctx); err != nil {
 			s.log.Err(err).Send()
@@ -1463,7 +1463,7 @@ func (s *Runservice) runsSchedulerLoop(ctx context.Context) {
 }
 
 func (s *Runservice) runsScheduler(ctx context.Context) error {
-	s.log.Debug().Msgf("runsScheduler")
+	s.log.Debug().Msg("runsScheduler")
 	var runs []*types.Run
 	err := s.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
@@ -1492,7 +1492,7 @@ func (s *Runservice) runScheduler(ctx context.Context, r *types.Run) error {
 
 func (s *Runservice) finishedRunsArchiverLoop(ctx context.Context) {
 	for {
-		s.log.Debug().Msgf("finished run archiver loop")
+		s.log.Debug().Msg("finished run archiver loop")
 
 		if err := s.finishedRunsArchiver(ctx); err != nil {
 			s.log.Err(err).Send()
@@ -1508,7 +1508,7 @@ func (s *Runservice) finishedRunsArchiverLoop(ctx context.Context) {
 }
 
 func (s *Runservice) finishedRunsArchiver(ctx context.Context) error {
-	s.log.Debug().Msgf("finished run archiver")
+	s.log.Debug().Msg("finished run archiver")
 	var runs []*types.Run
 	err := s.d.Do(ctx, func(tx *sql.Tx) error {
 		var err error
@@ -1596,7 +1596,7 @@ func (s *Runservice) cacheCleanerLoop(ctx context.Context, cacheExpireInterval t
 }
 
 func (s *Runservice) cacheCleaner(ctx context.Context, cacheExpireInterval time.Duration) error {
-	s.log.Debug().Msgf("cacheCleaner")
+	s.log.Debug().Msg("cacheCleaner")
 
 	l := s.lf.NewLock(common.CacheCleanerLockKey)
 	if err := l.Lock(ctx); err != nil {
@@ -1621,7 +1621,7 @@ func (s *Runservice) cacheCleaner(ctx context.Context, cacheExpireInterval time.
 }
 
 func (s *Runservice) workspaceCleanerLoop(ctx context.Context, workspaceExpireInterval time.Duration) {
-	s.log.Debug().Msgf("workspaceCleanerLoop")
+	s.log.Debug().Msg("workspaceCleanerLoop")
 
 	for {
 		if err := s.objectsCleaner(ctx, store.OSTArchivesBaseDir(), common.WorkspaceCleanerLockKey, workspaceExpireInterval); err != nil {
@@ -1638,11 +1638,11 @@ func (s *Runservice) workspaceCleanerLoop(ctx context.Context, workspaceExpireIn
 }
 
 func (s *Runservice) logCleanerLoop(ctx context.Context, logExpireInterval time.Duration) {
-	s.log.Debug().Msgf("logCleanerLoop")
+	s.log.Debug().Msg("logCleanerLoop")
 
 	for {
 		if err := s.objectsCleaner(ctx, store.OSTLogsBaseDir(), common.LogCleanerLockKey, logExpireInterval); err != nil {
-			s.log.Warn().Err(err).Msgf("objectsCleaner error")
+			s.log.Warn().Err(err).Msg("objectsCleaner error")
 		}
 
 		sleepCh := time.NewTimer(logCleanerInterval).C

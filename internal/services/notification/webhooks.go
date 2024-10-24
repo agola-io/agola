@@ -129,11 +129,11 @@ func (n *NotificationService) generatewebhook(ctx context.Context, ev *rstypes.R
 }
 
 func (n *NotificationService) runWebhooksCleanerLoop(ctx context.Context, runWebhookExpireInterval time.Duration) {
-	n.log.Debug().Msgf("webhookCleanerLoop")
+	n.log.Debug().Msg("webhookCleanerLoop")
 
 	for {
 		if err := n.runWebhooksCleaner(ctx, runWebhookExpireInterval); err != nil {
-			n.log.Warn().Err(err).Msgf("webhooksCleaner error")
+			n.log.Warn().Err(err).Msg("webhooksCleaner error")
 		}
 
 		sleepCh := time.NewTimer(runWebhooksCleanerInterval).C
