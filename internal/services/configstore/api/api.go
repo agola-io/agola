@@ -34,7 +34,7 @@ func GetObjectKindRef(r *http.Request) (types.ObjectKind, string, error) {
 	vars := mux.Vars(r)
 	projectRef, err := url.PathUnescape(vars["projectref"])
 	if err != nil {
-		return "", "", util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("wrong projectref %q", vars["projectref"]))
+		return "", "", util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsgf("wrong projectref %q", vars["projectref"]))
 	}
 	if projectRef != "" {
 		return types.ObjectKindProject, projectRef, nil
@@ -42,7 +42,7 @@ func GetObjectKindRef(r *http.Request) (types.ObjectKind, string, error) {
 
 	projectGroupRef, err := url.PathUnescape(vars["projectgroupref"])
 	if err != nil {
-		return "", "", util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsg("wrong projectgroupref %q", vars["projectgroupref"]))
+		return "", "", util.NewAPIErrorWrap(util.ErrBadRequest, err, util.WithAPIErrorMsgf("wrong projectgroupref %q", vars["projectgroupref"]))
 	}
 	if projectGroupRef != "" {
 		return types.ObjectKindProjectGroup, projectGroupRef, nil
@@ -78,7 +78,7 @@ func parseRequestOptions(r *http.Request) (*requestOptions, error) {
 		case types.SortDirectionAsc:
 		case types.SortDirectionDesc:
 		default:
-			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("wrong sort direction %q", sortDirection), serrors.InvalidSortDirection())
+			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("wrong sort direction %q", sortDirection), serrors.InvalidSortDirection())
 		}
 	}
 

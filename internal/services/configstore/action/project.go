@@ -70,19 +70,19 @@ func (h *ActionHandler) ValidateProjectReq(ctx context.Context, req *CreateUpdat
 		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project name required"), serrors.InvalidProjectName())
 	}
 	if !util.ValidateName(req.Name) {
-		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid project name %q", req.Name), serrors.InvalidProjectName())
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("invalid project name %q", req.Name), serrors.InvalidProjectName())
 	}
 	if req.Parent.ID == "" {
 		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project parent id required"))
 	}
 	if req.Parent.Kind != types.ObjectKindProjectGroup {
-		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid project parent kind %q", req.Parent.Kind))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("invalid project parent kind %q", req.Parent.Kind))
 	}
 	if !types.IsValidVisibility(req.Visibility) {
 		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid project visibility"))
 	}
 	if !types.IsValidRemoteRepositoryConfigType(req.RemoteRepositoryConfigType) {
-		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid project remote repository config type %q", req.RemoteRepositoryConfigType))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("invalid project remote repository config type %q", req.RemoteRepositoryConfigType))
 	}
 	if req.RemoteRepositoryConfigType == types.RemoteRepositoryConfigTypeRemoteSource {
 		if req.RemoteSourceID == "" {
@@ -118,7 +118,7 @@ func (h *ActionHandler) GetProject(ctx context.Context, projectRef string) (*Get
 		}
 
 		if project == nil {
-			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("project %q doesn't exist", projectRef), serrors.ProjectDoesNotExist())
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("project %q doesn't exist", projectRef), serrors.ProjectDoesNotExist())
 		}
 
 		projectDynamicData, err = h.projectDynamicData(tx, project)
@@ -166,7 +166,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateUpdateProj
 			return errors.WithStack(err)
 		}
 		if group == nil {
-			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("parent project group with id %q doesn't exist", req.Parent.ID), serrors.ParentProjectGroupDoesNotExist())
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("parent project group with id %q doesn't exist", req.Parent.ID), serrors.ParentProjectGroupDoesNotExist())
 		}
 		req.Parent.ID = group.ID
 
@@ -190,7 +190,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateUpdateProj
 			return errors.WithStack(err)
 		}
 		if p != nil {
-			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project with name %q, path %q already exists", p.Name, pp), serrors.ProjectAlreadyExists())
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("project with name %q, path %q already exists", p.Name, pp), serrors.ProjectAlreadyExists())
 		}
 
 		if req.RemoteRepositoryConfigType == types.RemoteRepositoryConfigTypeRemoteSource {
@@ -199,7 +199,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateUpdateProj
 				return errors.Wrapf(err, "failed to get user with linked account id %q", req.LinkedAccountID)
 			}
 			if la == nil {
-				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("linked account id %q doesn't exist", req.LinkedAccountID))
+				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("linked account id %q doesn't exist", req.LinkedAccountID))
 			}
 
 			user, err := h.d.GetUserByID(tx, la.UserID)
@@ -207,12 +207,12 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateUpdateProj
 				return errors.Wrapf(err, "failed to get user with linked account id %q", req.LinkedAccountID)
 			}
 			if user == nil {
-				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user for linked account %q doesn't exist", req.LinkedAccountID))
+				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("user for linked account %q doesn't exist", req.LinkedAccountID))
 			}
 
 			// check that the linked account matches the remote source
 			if la.RemoteSourceID != req.RemoteSourceID {
-				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("linked account id %q remote source %q different than project remote source %q", req.LinkedAccountID, la.RemoteSourceID, req.RemoteSourceID))
+				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("linked account id %q remote source %q different than project remote source %q", req.LinkedAccountID, la.RemoteSourceID, req.RemoteSourceID))
 			}
 		}
 
@@ -269,7 +269,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, curProjectRef string,
 			return errors.WithStack(err)
 		}
 		if project == nil {
-			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("project with ref %q doesn't exist", curProjectRef), serrors.ProjectDoesNotExist())
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("project with ref %q doesn't exist", curProjectRef), serrors.ProjectDoesNotExist())
 		}
 
 		// check parent project group exists
@@ -278,7 +278,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, curProjectRef string,
 			return errors.WithStack(err)
 		}
 		if group == nil {
-			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("parent project group with id %q doesn't exist", req.Parent.ID), serrors.ParentProjectGroupDoesNotExist())
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("parent project group with id %q doesn't exist", req.Parent.ID), serrors.ParentProjectGroupDoesNotExist())
 		}
 		req.Parent.ID = group.ID
 
@@ -303,7 +303,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, curProjectRef string,
 				return errors.WithStack(err)
 			}
 			if ap != nil {
-				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project with name %q, path %q already exists", req.Name, pp), serrors.ProjectAlreadyExists())
+				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("project with name %q, path %q already exists", req.Name, pp), serrors.ProjectAlreadyExists())
 			}
 		}
 
@@ -314,7 +314,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, curProjectRef string,
 				return errors.WithStack(err)
 			}
 			if curGroup == nil {
-				return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("parent project group with id %q doesn't exist", project.Parent.ID), serrors.ParentProjectGroupDoesNotExist())
+				return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("parent project group with id %q doesn't exist", project.Parent.ID), serrors.ParentProjectGroupDoesNotExist())
 			}
 		}
 
@@ -324,7 +324,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, curProjectRef string,
 				return errors.Wrapf(err, "failed to get user with linked account id %q", req.LinkedAccountID)
 			}
 			if la == nil {
-				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("linked account id %q doesn't exist", req.LinkedAccountID))
+				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("linked account id %q doesn't exist", req.LinkedAccountID))
 			}
 
 			user, err := h.d.GetUserByID(tx, la.UserID)
@@ -332,12 +332,12 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, curProjectRef string,
 				return errors.Wrapf(err, "failed to get user with linked account id %q", req.LinkedAccountID)
 			}
 			if user == nil {
-				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user for linked account %q doesn't exist", req.LinkedAccountID))
+				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("user for linked account %q doesn't exist", req.LinkedAccountID))
 			}
 
 			// check that the linked account matches the remote source
 			if la.RemoteSourceID != req.RemoteSourceID {
-				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("linked account id %q remote source %q different than project remote source %q", req.LinkedAccountID, la.RemoteSourceID, req.RemoteSourceID))
+				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("linked account id %q remote source %q different than project remote source %q", req.LinkedAccountID, la.RemoteSourceID, req.RemoteSourceID))
 			}
 		}
 
@@ -382,7 +382,7 @@ func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) er
 			return errors.WithStack(err)
 		}
 		if project == nil {
-			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("project %q doesn't exist", projectRef), serrors.ProjectDoesNotExist())
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("project %q doesn't exist", projectRef), serrors.ProjectDoesNotExist())
 		}
 
 		// TODO(sgotti) implement childs garbage collection

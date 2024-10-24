@@ -342,7 +342,7 @@ func TestUser(t *testing.T) {
 	})
 
 	t.Run("create duplicated user", func(t *testing.T) {
-		expectedErr := util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user with name %q already exists", "user01"), serrors.UserAlreadyExists())
+		expectedErr := util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("user with name %q already exists", "user01"), serrors.UserAlreadyExists())
 		_, err := cs.ah.CreateUser(ctx, &action.CreateUserRequest{UserName: "user01"})
 		assert.Error(t, err, expectedErr.Error())
 	})
@@ -432,26 +432,26 @@ func TestProjectGroupsAndProjectsCreate(t *testing.T) {
 
 	t.Run("create duplicated project in user root project group", func(t *testing.T) {
 		projectName := "project01"
-		expectedErr := util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project with name %q, path %q already exists", projectName, path.Join("user", user.Name, projectName)), serrors.ProjectAlreadyExists())
+		expectedErr := util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("project with name %q, path %q already exists", projectName, path.Join("user", user.Name, projectName)), serrors.ProjectAlreadyExists())
 		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: projectName, Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		assert.Error(t, err, expectedErr.Error())
 	})
 	t.Run("create duplicated project in org root project group", func(t *testing.T) {
 		projectName := "project01"
-		expectedErr := util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project with name %q, path %q already exists", projectName, path.Join("org", org.Name, projectName)), serrors.ProjectAlreadyExists())
+		expectedErr := util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("project with name %q, path %q already exists", projectName, path.Join("org", org.Name, projectName)), serrors.ProjectAlreadyExists())
 		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: projectName, Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name)}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		assert.Error(t, err, expectedErr.Error())
 	})
 
 	t.Run("create duplicated project in user non root project group", func(t *testing.T) {
 		projectName := "project01"
-		expectedErr := util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project with name %q, path %q already exists", projectName, path.Join("user", user.Name, "projectgroup01", projectName)), serrors.ProjectAlreadyExists())
+		expectedErr := util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("project with name %q, path %q already exists", projectName, path.Join("user", user.Name, "projectgroup01", projectName)), serrors.ProjectAlreadyExists())
 		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: projectName, Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("user", user.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		assert.Error(t, err, expectedErr.Error())
 	})
 	t.Run("create duplicated project in org non root project group", func(t *testing.T) {
 		projectName := "project01"
-		expectedErr := util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project with name %q, path %q already exists", projectName, path.Join("org", org.Name, "projectgroup01", projectName)), serrors.ProjectAlreadyExists())
+		expectedErr := util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("project with name %q, path %q already exists", projectName, path.Join("org", org.Name, "projectgroup01", projectName)), serrors.ProjectAlreadyExists())
 		_, err := cs.ah.CreateProject(ctx, &action.CreateUpdateProjectRequest{Name: projectName, Parent: types.Parent{Kind: types.ObjectKindProjectGroup, ID: path.Join("org", org.Name, "projectgroup01")}, Visibility: types.VisibilityPublic, RemoteRepositoryConfigType: types.RemoteRepositoryConfigTypeManual})
 		assert.Error(t, err, expectedErr.Error())
 	})
@@ -528,7 +528,7 @@ func TestProjectUpdate(t *testing.T) {
 	})
 	t.Run("move project to project group having project with same name", func(t *testing.T) {
 		projectName := "project01"
-		expectedErr := util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project with name %q, path %q already exists", projectName, path.Join("user", user.Name, projectName)), serrors.ProjectAlreadyExists())
+		expectedErr := util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("project with name %q, path %q already exists", projectName, path.Join("user", user.Name, projectName)), serrors.ProjectAlreadyExists())
 		p02req.Parent.ID = path.Join("user", user.Name)
 		_, err := cs.ah.UpdateProject(ctx, path.Join("user", user.Name, "projectgroup01", projectName), p02req)
 		assert.Error(t, err, expectedErr.Error())
@@ -607,7 +607,7 @@ func TestProjectGroupUpdate(t *testing.T) {
 	})
 	t.Run("move project to project group having project with same name", func(t *testing.T) {
 		projectGroupName := "pg01"
-		expectedErr := util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project group with name %q, path %q already exists", projectGroupName, path.Join("user", user.Name, projectGroupName)), serrors.ProjectGroupAlreadyExists())
+		expectedErr := util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("project group with name %q, path %q already exists", projectGroupName, path.Join("user", user.Name, projectGroupName)), serrors.ProjectGroupAlreadyExists())
 		pg05req.Parent.ID = path.Join("user", user.Name)
 		_, err := cs.ah.UpdateProjectGroup(ctx, path.Join("user", user.Name, "pg02", projectGroupName), pg05req)
 		assert.Error(t, err, expectedErr.Error())

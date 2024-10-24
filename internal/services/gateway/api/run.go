@@ -288,7 +288,7 @@ func (h *RuntaskHandler) do(r *http.Request) (*gwapitypes.RunTaskResponse, error
 
 	rt, ok := run.Tasks[taskID]
 	if !ok {
-		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("run %q task %q not found", runNumber, taskID))
+		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("run %q task %q not found", runNumber, taskID))
 	}
 	rct := rc.Tasks[rt.ID]
 

@@ -267,7 +267,7 @@ func (h *UsersHandler) do(w http.ResponseWriter, r *http.Request) ([]*gwapitypes
 		ausers = ares.Users
 		addCursorHeader(w, ares.Cursor)
 	default:
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("unknown query_type: %q", queryType))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("unknown query_type: %q", queryType))
 	}
 
 	users := make([]*gwapitypes.PrivateUserResponse, len(ausers))

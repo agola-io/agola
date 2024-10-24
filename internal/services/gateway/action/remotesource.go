@@ -105,7 +105,7 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemot
 	}
 
 	if !util.ValidateName(req.Name) {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid remotesource name %q", req.Name), serrors.InvalidRemoteSourceName())
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("invalid remotesource name %q", req.Name), serrors.InvalidRemoteSourceName())
 	}
 
 	if req.Name == "" {
@@ -123,7 +123,7 @@ func (h *ActionHandler) CreateRemoteSource(ctx context.Context, req *CreateRemot
 
 	// validate if the remote source type supports the required auth type
 	if !cstypes.SourceSupportsAuthType(cstypes.RemoteSourceType(req.Type), cstypes.RemoteSourceAuthType(req.AuthType)) {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource type %q doesn't support auth type %q", req.Type, req.AuthType), serrors.InvalidRemoteSourceAuthType())
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("remotesource type %q doesn't support auth type %q", req.Type, req.AuthType), serrors.InvalidRemoteSourceAuthType())
 	}
 
 	if req.AuthType == string(cstypes.RemoteSourceAuthTypeOauth2) {
@@ -195,7 +195,7 @@ func (h *ActionHandler) UpdateRemoteSource(ctx context.Context, req *UpdateRemot
 
 	if req.Name != nil {
 		if !util.ValidateName(*req.Name) {
-			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid remotesource name %q", *req.Name), serrors.InvalidRemoteSourceName())
+			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("invalid remotesource name %q", *req.Name), serrors.InvalidRemoteSourceName())
 		}
 		if *req.Name == "" {
 			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("remotesource name required"), serrors.InvalidRemoteSourceName())

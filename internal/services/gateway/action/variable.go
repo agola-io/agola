@@ -88,7 +88,7 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateVariableR
 	}
 
 	if !util.ValidateName(req.Name) {
-		return nil, nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid variable name %q", req.Name), serrors.InvalidVariableName())
+		return nil, nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("invalid variable name %q", req.Name), serrors.InvalidVariableName())
 	}
 
 	if len(req.Values) == 0 {
@@ -108,7 +108,7 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateVariableR
 		var err error
 		cssecrets, _, err = h.configstoreClient.GetProjectGroupSecrets(ctx, req.ParentRef, true)
 		if err != nil {
-			return nil, nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get project group %q secrets", req.ParentRef))
+			return nil, nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsgf("failed to get project group %q secrets", req.ParentRef))
 		}
 
 		h.log.Info().Msgf("creating project group variable")
@@ -120,7 +120,7 @@ func (h *ActionHandler) CreateVariable(ctx context.Context, req *CreateVariableR
 		var err error
 		cssecrets, _, err = h.configstoreClient.GetProjectSecrets(ctx, req.ParentRef, true)
 		if err != nil {
-			return nil, nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get project %q secrets", req.ParentRef))
+			return nil, nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsgf("failed to get project %q secrets", req.ParentRef))
 		}
 
 		h.log.Info().Msgf("creating project variable")
@@ -155,7 +155,7 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableR
 	}
 
 	if !util.ValidateName(req.Name) {
-		return nil, nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid variable name %q", req.Name), serrors.InvalidVariableName())
+		return nil, nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("invalid variable name %q", req.Name), serrors.InvalidVariableName())
 	}
 
 	if len(req.Values) == 0 {
@@ -175,7 +175,7 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableR
 		var err error
 		cssecrets, _, err = h.configstoreClient.GetProjectGroupSecrets(ctx, req.ParentRef, true)
 		if err != nil {
-			return nil, nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get project group %q secrets", req.ParentRef))
+			return nil, nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsgf("failed to get project group %q secrets", req.ParentRef))
 		}
 
 		h.log.Info().Msgf("creating project group variable")
@@ -187,7 +187,7 @@ func (h *ActionHandler) UpdateVariable(ctx context.Context, req *UpdateVariableR
 		var err error
 		cssecrets, _, err = h.configstoreClient.GetProjectSecrets(ctx, req.ParentRef, true)
 		if err != nil {
-			return nil, nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get project %q secrets", req.ParentRef))
+			return nil, nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsgf("failed to get project %q secrets", req.ParentRef))
 		}
 
 		h.log.Info().Msgf("creating project variable")
