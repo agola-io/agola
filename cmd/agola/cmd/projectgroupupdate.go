@@ -79,7 +79,7 @@ func projectGroupUpdate(cmd *cobra.Command, args []string) error {
 		req.Name = &projectGroupUpdateOpts.visibility
 	}
 
-	log.Info().Msgf("updating project group")
+	log.Info().Msg("updating project group")
 	projectGroup, _, err := gwClient.UpdateProjectGroup(context.TODO(), projectGroupUpdateOpts.ref, req)
 	if err != nil {
 		return errors.Wrapf(err, "failed to update project group")

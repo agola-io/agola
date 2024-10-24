@@ -125,7 +125,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 		return nil, errors.Wrapf(err, "failed to get repository info from gitsource")
 	}
 
-	h.log.Info().Msgf("generating ssh key pairs")
+	h.log.Info().Msg("generating ssh key pairs")
 	privateKey, _, err := util.GenSSHKeyPair(4096)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to generate ssh key pair")
@@ -150,7 +150,7 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 		MembersCanPerformRunActions: req.MembersCanPerformRunActions,
 	}
 
-	h.log.Info().Msgf("creating project")
+	h.log.Info().Msg("creating project")
 	rp, _, err := h.configstoreClient.CreateProject(ctx, creq)
 	if err != nil {
 		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to create project"))
@@ -159,16 +159,16 @@ func (h *ActionHandler) CreateProject(ctx context.Context, req *CreateProjectReq
 
 	if serr := h.setupGitSourceRepo(ctx, rs, user, la, rp); serr != nil {
 		var err error
-		h.log.Err(err).Msgf("failed to setup git source repo, trying to cleanup")
+		h.log.Err(err).Msg("failed to setup git source repo, trying to cleanup")
 		// try to cleanup gitsource configs and remove project
 		// we'll log but ignore errors
 		h.log.Info().Msgf("deleting project with ID: %q", rp.ID)
 		if _, err := h.configstoreClient.DeleteProject(ctx, rp.ID); err != nil {
-			h.log.Err(err).Msgf("failed to delete project ")
+			h.log.Err(err).Msg("failed to delete project ")
 		}
-		h.log.Info().Msgf("cleanup git source repo")
+		h.log.Info().Msg("cleanup git source repo")
 		if err := h.cleanupGitSourceRepo(ctx, rs, user, la, rp); err != nil {
-			h.log.Err(err).Msgf("failed to cleanup git source repo")
+			h.log.Err(err).Msg("failed to cleanup git source repo")
 		}
 		return nil, errors.Wrapf(serr, "failed to setup git source repo")
 	}
@@ -231,7 +231,7 @@ func (h *ActionHandler) UpdateProject(ctx context.Context, projectRef string, re
 		MembersCanPerformRunActions: p.MembersCanPerformRunActions,
 	}
 
-	h.log.Info().Msgf("updating project")
+	h.log.Info().Msg("updating project")
 	rp, _, err := h.configstoreClient.UpdateProject(ctx, p.ID, creq)
 	if err != nil {
 		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to update project"))
@@ -288,7 +288,7 @@ func (h *ActionHandler) ProjectUpdateRepoLinkedAccount(ctx context.Context, proj
 		DefaultBranch:              p.DefaultBranch,
 	}
 
-	h.log.Info().Msgf("updating project")
+	h.log.Info().Msg("updating project")
 	rp, _, err := h.configstoreClient.UpdateProject(ctx, p.ID, creq)
 	if err != nil {
 		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to update project"))
@@ -322,7 +322,7 @@ func (h *ActionHandler) setupGitSourceRepo(ctx context.Context, rs *cstypes.Remo
 	if err := gitsource.UpdateDeployKey(project.RepositoryPath, deployKeyName, string(pubKey), true); err != nil {
 		return errors.Wrapf(err, "failed to create deploy key")
 	}
-	h.log.Info().Msgf("deleting existing webhooks")
+	h.log.Info().Msg("deleting existing webhooks")
 	if err := gitsource.DeleteRepoWebhook(project.RepositoryPath, webhookURL); err != nil {
 		return errors.Wrapf(err, "failed to delete repository webhook")
 	}
@@ -353,7 +353,7 @@ func (h *ActionHandler) cleanupGitSourceRepo(ctx context.Context, rs *cstypes.Re
 	if err := gitsource.DeleteDeployKey(project.RepositoryPath, deployKeyName); err != nil {
 		return errors.Wrapf(err, "failed to create deploy key")
 	}
-	h.log.Info().Msgf("deleting existing webhooks")
+	h.log.Info().Msg("deleting existing webhooks")
 	if err := gitsource.DeleteRepoWebhook(project.RepositoryPath, webhookURL); err != nil {
 		return errors.Wrapf(err, "failed to delete repository webhook")
 	}
@@ -430,7 +430,7 @@ func (h *ActionHandler) DeleteProject(ctx context.Context, projectRef string) er
 	// try to cleanup gitsource configs
 	// we'll log but ignore errors
 	if canDoRepCleanup {
-		h.log.Info().Msgf("cleanup git source repo")
+		h.log.Info().Msg("cleanup git source repo")
 		if err := h.cleanupGitSourceRepo(ctx, rs, user, la, p); err != nil {
 			h.log.Err(err).Msgf("failed to cleanup git source repo: %+v", err)
 		}
@@ -655,7 +655,7 @@ func (h *ActionHandler) RefreshRemoteRepositoryInfo(ctx context.Context, project
 		DefaultBranch:              repoInfo.DefaultBranch,
 	}
 
-	h.log.Info().Msgf("updating project")
+	h.log.Info().Msg("updating project")
 	rp, _, err := h.configstoreClient.UpdateProject(ctx, p.ID, creq)
 	if err != nil {
 		return nil, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to update project"))

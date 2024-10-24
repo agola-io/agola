@@ -84,7 +84,7 @@ func (n *NotificationService) commitStatusDeliveriesHandler(ctx context.Context)
 
 		for _, c := range commitStatusDeliveries {
 			if err := n.handleCommitStatusDelivery(ctx, c.ID); err != nil {
-				n.log.Err(err).Msgf("failed to trigger commit status data delivery event")
+				n.log.Err(err).Msg("failed to trigger commit status data delivery event")
 			}
 
 			curCommitStatusDeliverySequence = c.Sequence

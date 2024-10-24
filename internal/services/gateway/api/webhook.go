@@ -116,7 +116,7 @@ func (h *webhooksHandler) do(r *http.Request) error {
 	// skip nil webhook data
 	// TODO(sgotti) report the reason of the skip
 	if webhookData == nil {
-		h.log.Info().Msgf("skipping webhook")
+		h.log.Info().Msg("skipping webhook")
 		return nil
 	}
 

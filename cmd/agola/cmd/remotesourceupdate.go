@@ -106,7 +106,7 @@ func remoteSourceUpdate(cmd *cobra.Command, args []string) error {
 		req.LoginEnabled = &remoteSourceUpdateOpts.loginEnabled
 	}
 
-	log.Info().Msgf("updating remotesource")
+	log.Info().Msg("updating remotesource")
 	remoteSource, _, err := gwClient.UpdateRemoteSource(context.TODO(), remoteSourceUpdateOpts.ref, req)
 	if err != nil {
 		return errors.Wrapf(err, "failed to update remotesource")

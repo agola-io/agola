@@ -361,14 +361,14 @@ func (h *ActionHandler) newRun(ctx context.Context, req *RunCreateRequest) (*typ
 	}
 
 	if err := runconfig.CheckRunConfigTasks(rcts); err != nil {
-		h.log.Err(err).Msgf("check run config tasks failed")
+		h.log.Err(err).Msg("check run config tasks failed")
 		setupErrors = append(setupErrors, err.Error())
 	}
 
 	// generate tasks levels
 	if len(setupErrors) == 0 {
 		if err := runconfig.GenTasksLevels(rcts); err != nil {
-			h.log.Err(err).Msgf("gen tasks leveles failed")
+			h.log.Err(err).Msg("gen tasks leveles failed")
 			setupErrors = append(setupErrors, err.Error())
 		}
 	}
@@ -394,7 +394,7 @@ func (h *ActionHandler) newRun(ctx context.Context, req *RunCreateRequest) (*typ
 
 func (h *ActionHandler) recreateRun(ctx context.Context, req *RunCreateRequest) (*types.RunBundle, error) {
 	// fetch the existing runconfig and run
-	h.log.Info().Msgf("creating run from existing run")
+	h.log.Info().Msg("creating run from existing run")
 
 	var rc *types.RunConfig
 	var run *types.Run

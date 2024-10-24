@@ -144,7 +144,7 @@ func NewK8sDriver(log zerolog.Logger, executorID, toolboxPath, initImage string,
 	sv, err := parseGitVersion(serverVersion.GitVersion)
 	// if server version parsing fails just warn but ignore it
 	if err != nil {
-		d.log.Warn().Err(err).Msgf("failed to parse k8s server version")
+		d.log.Warn().Err(err).Msg("failed to parse k8s server version")
 	}
 	if sv != nil {
 		// for k8s version < v1.14.x use old arch label
@@ -205,7 +205,7 @@ func NewK8sDriver(log zerolog.Logger, executorID, toolboxPath, initImage string,
 	go func() {
 		for {
 			if err := d.updateLease(ctx); err != nil {
-				d.log.Err(err).Msgf("failed to update executor lease")
+				d.log.Err(err).Msg("failed to update executor lease")
 			}
 
 			select {
@@ -221,7 +221,7 @@ func NewK8sDriver(log zerolog.Logger, executorID, toolboxPath, initImage string,
 	go func() {
 		for {
 			if err := d.cleanStaleExecutorsLease(ctx); err != nil {
-				d.log.Err(err).Msgf("failed to clean stale executors lease")
+				d.log.Err(err).Msg("failed to clean stale executors lease")
 			}
 
 			select {

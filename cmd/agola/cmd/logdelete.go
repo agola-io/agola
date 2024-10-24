@@ -123,7 +123,7 @@ func logDelete(cmd *cobra.Command, args []string) error {
 		taskid = task.ID
 	}
 
-	log.Info().Msgf("deleting log")
+	log.Info().Msg("deleting log")
 
 	var err error
 	if isProject {

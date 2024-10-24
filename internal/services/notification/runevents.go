@@ -124,13 +124,13 @@ func (n *NotificationService) runEventsHandler(ctx context.Context) error {
 			case rstypes.RunPhaseChanged:
 				commitStatus, err = n.generateCommitStatus(ctx, ev)
 				if err != nil {
-					n.log.Error().Msgf("failed to generate commit status")
+					n.log.Error().Msg("failed to generate commit status")
 				}
 				if n.c.WebhookURL != "" {
 					runWebhook := n.generatewebhook(ctx, ev)
 					webhookPayload, err = json.Marshal(runWebhook)
 					if err != nil {
-						n.log.Error().Msgf("failed to unmarshal run webhook")
+						n.log.Error().Msg("failed to unmarshal run webhook")
 					}
 				}
 			default:

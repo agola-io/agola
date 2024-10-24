@@ -110,14 +110,14 @@ func secretUpdate(cmd *cobra.Command, ownertype string, args []string) error {
 
 	switch ownertype {
 	case "project":
-		log.Info().Msgf("creating project secret")
+		log.Info().Msg("creating project secret")
 		secret, _, err := gwClient.UpdateProjectSecret(context.TODO(), secretUpdateOpts.parentRef, secretUpdateOpts.name, req)
 		if err != nil {
 			return errors.Wrapf(err, "failed to update project secret")
 		}
 		log.Info().Msgf("project secret %q updated, ID: %q", secret.Name, secret.ID)
 	case "projectgroup":
-		log.Info().Msgf("creating project group secret")
+		log.Info().Msg("creating project group secret")
 		secret, _, err := gwClient.UpdateProjectGroupSecret(context.TODO(), secretUpdateOpts.parentRef, secretUpdateOpts.name, req)
 		if err != nil {
 			return errors.Wrapf(err, "failed to update project group secret")

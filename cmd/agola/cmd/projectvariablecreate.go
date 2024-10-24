@@ -133,14 +133,14 @@ func variableCreate(cmd *cobra.Command, ownertype string, args []string) error {
 
 	switch ownertype {
 	case "project":
-		log.Info().Msgf("creating project variable")
+		log.Info().Msg("creating project variable")
 		variable, _, err := gwClient.CreateProjectVariable(context.TODO(), variableCreateOpts.parentRef, req)
 		if err != nil {
 			return errors.Wrapf(err, "failed to create project variable")
 		}
 		log.Info().Msgf("project variable %q created, ID: %q", variable.Name, variable.ID)
 	case "projectgroup":
-		log.Info().Msgf("creating project group variable")
+		log.Info().Msg("creating project group variable")
 		variable, _, err := gwClient.CreateProjectGroupVariable(context.TODO(), variableCreateOpts.parentRef, req)
 		if err != nil {
 			return errors.Wrapf(err, "failed to create project group variable")

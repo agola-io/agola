@@ -212,40 +212,40 @@ func (s *GitSave) Save(message, branchName string) (string, error) {
 		s.log.Info().Msgf("index %s does not exist", indexPath)
 	}
 
-	s.log.Info().Msgf("updating files already in the index")
+	s.log.Info().Msg("updating files already in the index")
 	if err := gitUpdateFiles(tmpIndexPath); err != nil {
 		return "", errors.WithStack(err)
 	}
 
 	if s.conf.AddUntracked {
-		s.log.Info().Msgf("adding untracked files")
+		s.log.Info().Msg("adding untracked files")
 		if err := gitAddUntrackedFiles(tmpIndexPath); err != nil {
 			return "", errors.WithStack(err)
 		}
 	}
 
 	if s.conf.AddIgnored {
-		s.log.Info().Msgf("adding ignored files")
+		s.log.Info().Msg("adding ignored files")
 		if err := gitAddIgnoredFiles(tmpIndexPath); err != nil {
 			return "", errors.WithStack(err)
 		}
 	}
 
-	s.log.Info().Msgf("writing tree file")
+	s.log.Info().Msg("writing tree file")
 	treeSHA, err := gitWriteTree(tmpIndexPath)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
 	s.log.Info().Msgf("tree: %s", treeSHA)
 
-	s.log.Info().Msgf("committing tree")
+	s.log.Info().Msg("committing tree")
 	commitSHA, err := gitCommitTree(message, treeSHA)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
 	s.log.Info().Msgf("commit: %s", commitSHA)
 
-	s.log.Info().Msgf("updating ref")
+	s.log.Info().Msg("updating ref")
 	if err = gitUpdateRef("git-save", filepath.Join(s.refsPrefix, branchName), commitSHA); err != nil {
 		return "", errors.WithStack(err)
 	}

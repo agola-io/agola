@@ -60,7 +60,7 @@ func userCreate(cmd *cobra.Command, args []string) error {
 		UserName: userCreateOpts.username,
 	}
 
-	log.Info().Msgf("creating user")
+	log.Info().Msg("creating user")
 	user, _, err := gwClient.CreateUser(context.TODO(), req)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create user")

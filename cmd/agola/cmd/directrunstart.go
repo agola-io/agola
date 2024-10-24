@@ -183,7 +183,7 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 		return errors.WithStack(err)
 	}
 
-	log.Info().Msgf("pushing branch")
+	log.Info().Msg("pushing branch")
 	repoPath := fmt.Sprintf("%s/%s", user.ID, repoUUID)
 	repoURL := fmt.Sprintf("%s/repos/%s/%s.git", gatewayURL, user.ID, repoUUID)
 
@@ -202,7 +202,7 @@ func directRunStart(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	log.Info().Msgf("starting direct run")
+	log.Info().Msg("starting direct run")
 	req := &gwapitypes.UserCreateRunRequest{
 		RepoUUID:              repoUUID,
 		RepoPath:              repoPath,

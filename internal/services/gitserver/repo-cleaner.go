@@ -15,19 +15,19 @@ func (s *Gitserver) repoCleanerLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			s.log.Info().Msgf("repoCleaner exiting")
+			s.log.Info().Msg("repoCleaner exiting")
 
 			return
 		case <-time.After(s.c.RepositoryCleanupInterval):
 			if err := s.scanRepos(ctx); err != nil {
-				s.log.Err(err).Msgf("scanRepos error")
+				s.log.Err(err).Msg("scanRepos error")
 			}
 		}
 	}
 }
 
 func (s *Gitserver) scanRepos(ctx context.Context) error {
-	s.log.Info().Msgf("repoCleaner scanRepos start")
+	s.log.Info().Msg("repoCleaner scanRepos start")
 
 	usersDir, err := os.ReadDir(s.c.DataDir)
 	if err != nil {
@@ -46,12 +46,12 @@ func (s *Gitserver) scanRepos(ctx context.Context) error {
 			}
 
 			if err := s.scanRepo(ctx, filepath.Join(s.c.DataDir, u.Name(), r.Name())); err != nil {
-				s.log.Err(err).Msgf("scanRepo error")
+				s.log.Err(err).Msg("scanRepo error")
 			}
 		}
 	}
 
-	s.log.Info().Msgf("repoCleaner scanRepos end")
+	s.log.Info().Msg("repoCleaner scanRepos end")
 
 	return nil
 }
