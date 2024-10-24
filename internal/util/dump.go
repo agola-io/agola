@@ -32,7 +32,7 @@ type dump struct {
 }
 
 func (d *dump) Format(f fmt.State, c rune) {
-	f.Write([]byte(litter.Sdump(d.data)))
+	_, _ = f.Write([]byte(litter.Sdump(d.data)))
 }
 
 func Dump(data interface{}) *dump {

@@ -39,8 +39,8 @@ local task_build_go(version, arch) = {
     { type: 'run', command: 'make' },
     { type: 'save_cache', key: 'cache-sum-{{ md5sum "go.sum" }}', contents: [{ source_dir: '/go/pkg/mod/cache' }] },
     { type: 'save_cache', key: 'cache-date-{{ year }}-{{ month }}-{{ day }}', contents: [{ source_dir: '/go/pkg/mod/cache' }] },
-    { type: 'run', name: 'install golangci-lint', command: 'curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2' },
-    { type: 'run', command: 'golangci-lint run --deadline 5m' },
+    { type: 'run', name: 'install golangci-lint', command: 'curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.61.0' },
+    { type: 'run', command: 'golangci-lint run --timeout 10m' },
     { type: 'run', name: 'build docker/k8s drivers tests binary', command: 'CGO_ENABLED=0 go test -c ./internal/services/executor/driver -o ./bin/docker-tests' },
     { type: 'run', name: 'build integration tests binary', command: 'go test -tags "sqlite_unlock_notify" -c ./tests -o ./bin/integration-tests' },
     { type: 'run', name: 'run tests (sqlite3)',
@@ -128,7 +128,7 @@ local task_build_push_images(name, target, push) =
         [
           task_build_go(version, arch),
         ]
-        for version in ['1.21', '1.22']
+        for version in ['1.22', '1.23']
         for arch in ['amd64' /*, 'arm64' */]
       ]) + [
         {
@@ -139,7 +139,7 @@ local task_build_push_images(name, target, push) =
             { type: 'run', command: 'SKIP_K8S_TESTS=1 AGOLA_TOOLBOX_PATH="./bin" ./bin/docker-tests -test.parallel 5 -test.v' },
           ],
           depends: [
-            'build go 1.22 amd64',
+            'build go 1.23 amd64',
           ],
         },
         {
@@ -162,7 +162,7 @@ local task_build_push_images(name, target, push) =
             { type: 'run', name: 'integration tests', command: 'AGOLA_BIN_DIR="./bin" GITEA_PATH=${PWD}/bin/gitea DOCKER_BRIDGE_ADDRESS="172.18.0.1" ./bin/integration-tests -test.parallel 3 -test.v' },
           ],
           depends: [
-            'build go 1.22 amd64',
+            'build go 1.23 amd64',
           ],
         },
         {
