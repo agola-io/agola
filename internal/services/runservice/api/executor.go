@@ -640,7 +640,7 @@ func (h *ExecutorDeleteHandler) do(r *http.Request) error {
 			return errors.WithStack(err)
 		}
 		if executor == nil {
-			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("executor with executor id %s doesn't exist", executorID))
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("executor with executor id %s doesn't exist", executorID))
 		}
 
 		if err := h.d.DeleteExecutor(tx, executor.ID); err != nil {

@@ -70,7 +70,7 @@ func parseRequestOptions(r *http.Request) (*requestOptions, error) {
 		case types.SortDirectionAsc:
 		case types.SortDirectionDesc:
 		default:
-			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("wrong sort direction %q", sortDirection), serrors.InvalidSortDirection())
+			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("wrong sort direction %q", sortDirection), serrors.InvalidSortDirection())
 		}
 	}
 
@@ -173,15 +173,15 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 	}
 
 	if r == nil {
-		return true, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("no such run with id: %s", runID), serrors.RunDoesNotExist())
+		return true, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("no such run with id: %s", runID), serrors.RunDoesNotExist())
 	}
 
 	task, ok := r.Tasks[taskID]
 	if !ok {
-		return true, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("no such task with ID %s in run %s", taskID, runID), serrors.RunTaskDoesNotExist())
+		return true, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("no such task with ID %s in run %s", taskID, runID), serrors.RunTaskDoesNotExist())
 	}
 	if len(task.Steps) <= step {
-		return true, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("no such step for task %s in run %s", taskID, runID), serrors.RunTaskStepDoesNotExist())
+		return true, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("no such step for task %s in run %s", taskID, runID), serrors.RunTaskStepDoesNotExist())
 	}
 
 	// if the log has been already fetched use it, otherwise fetch it from the executor
@@ -213,7 +213,7 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 			return errors.WithStack(err)
 		}
 		if et == nil {
-			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("executor task for run task with id %q doesn't exist", task.ID))
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("executor task for run task with id %q doesn't exist", task.ID))
 		}
 
 		executor, err = h.d.GetExecutorByExecutorID(tx, et.ExecutorID)
@@ -221,7 +221,7 @@ func (h *LogsHandler) readTaskLogs(ctx context.Context, runID, taskID string, se
 			return errors.WithStack(err)
 		}
 		if executor == nil {
-			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("executor with id %q doesn't exist", et.ExecutorID))
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("executor with id %q doesn't exist", et.ExecutorID))
 		}
 
 		return nil
@@ -346,7 +346,7 @@ func (h *LogsDeleteHandler) do(r *http.Request) error {
 		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("setup is false and step is empty"))
 	}
 	if setup && stepStr != "" {
-		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("setup is true and step is %s", stepStr))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("setup is true and step is %s", stepStr))
 	}
 
 	var step int
@@ -354,7 +354,7 @@ func (h *LogsDeleteHandler) do(r *http.Request) error {
 		var err error
 		step, err = strconv.Atoi(stepStr)
 		if err != nil {
-			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("step %s is not a valid number", stepStr))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("step %s is not a valid number", stepStr))
 		}
 	}
 
@@ -386,15 +386,15 @@ func (h *LogsDeleteHandler) deleteTaskLogs(ctx context.Context, runID, taskID st
 	}
 
 	if r == nil {
-		return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("no such run with id: %s", runID))
+		return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("no such run with id: %s", runID))
 	}
 
 	task, ok := r.Tasks[taskID]
 	if !ok {
-		return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("no such task with ID %s in run %s", taskID, runID))
+		return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("no such task with ID %s in run %s", taskID, runID))
 	}
 	if len(task.Steps) <= step {
-		return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("no such step for task %s in run %s", taskID, runID))
+		return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("no such step for task %s in run %s", taskID, runID))
 	}
 
 	if task.Steps[step].LogPhase == types.RunTaskFetchPhaseFinished {
@@ -413,7 +413,7 @@ func (h *LogsDeleteHandler) deleteTaskLogs(ctx context.Context, runID, taskID st
 		}
 		return nil
 	}
-	return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("Log for task %s in run %s is not yet archived", taskID, runID))
+	return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("Log for task %s in run %s is not yet archived", taskID, runID))
 }
 
 type ChangeGroupsUpdateTokensHandler struct {
@@ -528,11 +528,11 @@ func (h *RunHandler) do(r *http.Request) (*rsapitypes.RunResponse, error) {
 	}
 
 	if run == nil {
-		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("run with id %q doesn't exist", runRef), serrors.RunDoesNotExist())
+		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("run with id %q doesn't exist", runRef), serrors.RunDoesNotExist())
 	}
 
 	if rc == nil {
-		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("run config for run with id %q doesn't exist", runRef), serrors.RunDoesNotExist())
+		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("run config for run with id %q doesn't exist", runRef), serrors.RunDoesNotExist())
 	}
 
 	cgts, err := types.MarshalChangeGroupsUpdateToken(cgt)
@@ -628,11 +628,11 @@ func (h *RunByGroupHandler) do(r *http.Request) (*rsapitypes.RunResponse, error)
 		return nil, errors.WithStack(err)
 	}
 	if run == nil {
-		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("run for group %q with counter %d doesn't exist", group, runCounter), serrors.RunDoesNotExist())
+		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("run for group %q with counter %d doesn't exist", group, runCounter), serrors.RunDoesNotExist())
 	}
 
 	if rc == nil {
-		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("run config for run with id %q doesn't exist", run.ID), serrors.RunDoesNotExist())
+		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("run config for run with id %q doesn't exist", run.ID), serrors.RunDoesNotExist())
 	}
 
 	cgts, err := types.MarshalChangeGroupsUpdateToken(cgt)

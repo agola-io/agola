@@ -81,7 +81,7 @@ func (h *ActionHandler) GetProjectGroup(ctx context.Context, projectGroupRef str
 		}
 
 		if projectGroup == nil {
-			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("project group %q doesn't exist", projectGroupRef), serrors.ProjectGroupDoesNotExist())
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("project group %q doesn't exist", projectGroupRef), serrors.ProjectGroupDoesNotExist())
 		}
 
 		projectGroupDynamicData, err = h.projectGroupDynamicData(tx, projectGroup)
@@ -114,7 +114,7 @@ func (h *ActionHandler) GetProjectGroupSubgroups(ctx context.Context, projectGro
 		}
 
 		if projectGroup == nil {
-			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("project group %q doesn't exist", projectGroupRef), serrors.ProjectGroupDoesNotExist())
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("project group %q doesn't exist", projectGroupRef), serrors.ProjectGroupDoesNotExist())
 		}
 
 		projectGroups, err = h.d.GetProjectGroupSubgroups(tx, projectGroup.ID)
@@ -158,7 +158,7 @@ func (h *ActionHandler) GetProjectGroupProjects(ctx context.Context, projectGrou
 		}
 
 		if projectGroup == nil {
-			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("project group %q doesn't exist", projectGroupRef), serrors.ProjectGroupDoesNotExist())
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("project group %q doesn't exist", projectGroupRef), serrors.ProjectGroupDoesNotExist())
 		}
 
 		projects, err = h.d.GetProjectGroupProjects(tx, projectGroup.ID)
@@ -190,7 +190,7 @@ func (h *ActionHandler) ValidateProjectGroupReq(ctx context.Context, req *Create
 	if req.Parent.Kind != types.ObjectKindProjectGroup &&
 		req.Parent.Kind != types.ObjectKindOrg &&
 		req.Parent.Kind != types.ObjectKindUser {
-		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid project group parent kind %q", req.Parent.Kind))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("invalid project group parent kind %q", req.Parent.Kind))
 	}
 	if req.Parent.ID == "" {
 		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project group parent id required"))
@@ -230,7 +230,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateUpdat
 
 	// We cannot create a root project group for org/user since it's created on user/org creation
 	if req.Parent.Kind != types.ObjectKindProjectGroup {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("wrong project group parent kind %q", req.Parent.Kind))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("wrong project group parent kind %q", req.Parent.Kind))
 	}
 
 	var projectGroup *types.ProjectGroup
@@ -241,7 +241,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateUpdat
 			return errors.WithStack(err)
 		}
 		if parentProjectGroup == nil {
-			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("project group with id %q doesn't exist", req.Parent.ID), serrors.ParentProjectGroupDoesNotExist())
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("project group with id %q doesn't exist", req.Parent.ID), serrors.ParentProjectGroupDoesNotExist())
 		}
 		// TODO(sgotti) now we are doing a very ugly thing setting the request
 		// projectgroup parent ID that can be both an ID or a ref. Then we are fixing
@@ -260,7 +260,7 @@ func (h *ActionHandler) CreateProjectGroup(ctx context.Context, req *CreateUpdat
 			return errors.WithStack(err)
 		}
 		if tpg != nil {
-			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project group with name %q, path %q already exists", req.Name, pp), serrors.ProjectGroupAlreadyExists())
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("project group with name %q, path %q already exists", req.Name, pp), serrors.ProjectGroupAlreadyExists())
 		}
 
 		projectGroup = types.NewProjectGroup(tx)
@@ -301,7 +301,7 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, curProjectGroupR
 			return errors.WithStack(err)
 		}
 		if projectGroup == nil {
-			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("project group with ref %q doesn't exist", curProjectGroupRef), serrors.ProjectGroupDoesNotExist())
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("project group with ref %q doesn't exist", curProjectGroupRef), serrors.ProjectGroupDoesNotExist())
 		}
 
 		if projectGroup.Parent.Kind != req.Parent.Kind {
@@ -326,7 +326,7 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, curProjectGroupR
 				return errors.WithStack(err)
 			}
 			if group == nil {
-				return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("parent project group with id %q doesn't exist", req.Parent.ID), serrors.ParentProjectGroupDoesNotExist())
+				return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("parent project group with id %q doesn't exist", req.Parent.ID), serrors.ParentProjectGroupDoesNotExist())
 			}
 			// TODO(sgotti) now we are doing a very ugly thing setting the request
 			// projectgroup parent ID that can be both an ID or a ref. Then we are fixing
@@ -353,7 +353,7 @@ func (h *ActionHandler) UpdateProjectGroup(ctx context.Context, curProjectGroupR
 				return errors.WithStack(err)
 			}
 			if ap != nil {
-				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("project group with name %q, path %q already exists", req.Name, pgp), serrors.ProjectGroupAlreadyExists())
+				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("project group with name %q, path %q already exists", req.Name, pgp), serrors.ProjectGroupAlreadyExists())
 			}
 			// Cannot move inside itself or a child project group
 			if strings.HasPrefix(pgp, curPGP+"/") {
@@ -392,7 +392,7 @@ func (h *ActionHandler) DeleteProjectGroup(ctx context.Context, projectGroupRef 
 			return errors.WithStack(err)
 		}
 		if projectGroup == nil {
-			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("project group %q doesn't exist", projectGroupRef), serrors.ProjectGroupDoesNotExist())
+			return util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("project group %q doesn't exist", projectGroupRef), serrors.ProjectGroupDoesNotExist())
 		}
 
 		// cannot delete root project group
@@ -424,7 +424,7 @@ func (h *ActionHandler) getAllProjectGroupSubgroups(tx *sql.Tx, projectGroupRef 
 	}
 
 	if projectGroup == nil {
-		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("project group %q doesn't exist", projectGroupRef), serrors.ProjectGroupDoesNotExist())
+		return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("project group %q doesn't exist", projectGroupRef), serrors.ProjectGroupDoesNotExist())
 	}
 
 	projectGroups, err := h.d.GetProjectGroupSubgroups(tx, projectGroup.ID)

@@ -126,14 +126,14 @@ func (h *ActionHandler) IsAuthUserVariableOwner(ctx context.Context, parentType 
 	case cstypes.ObjectKindProjectGroup:
 		pg, _, err := h.configstoreClient.GetProjectGroup(ctx, parentRef)
 		if err != nil {
-			return false, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get project group %q", parentRef))
+			return false, APIErrorFromRemoteError(err, util.WithAPIErrorMsgf("failed to get project group %q", parentRef))
 		}
 		ownerType = pg.OwnerType
 		ownerID = pg.OwnerID
 	case cstypes.ObjectKindProject:
 		p, _, err := h.configstoreClient.GetProject(ctx, parentRef)
 		if err != nil {
-			return false, APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get project  %q", parentRef))
+			return false, APIErrorFromRemoteError(err, util.WithAPIErrorMsgf("failed to get project  %q", parentRef))
 		}
 		ownerType = p.OwnerType
 		ownerID = p.OwnerID

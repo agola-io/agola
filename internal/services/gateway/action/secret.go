@@ -81,7 +81,7 @@ func (h *ActionHandler) CreateSecret(ctx context.Context, req *CreateSecretReque
 	}
 
 	if !util.ValidateName(req.Name) {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid secret name %q", req.Name), serrors.InvalidSecretName())
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("invalid secret name %q", req.Name), serrors.InvalidSecretName())
 	}
 
 	creq := &csapitypes.CreateUpdateSecretRequest{
@@ -135,7 +135,7 @@ func (h *ActionHandler) UpdateSecret(ctx context.Context, req *UpdateSecretReque
 	}
 
 	if !util.ValidateName(req.Name) {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid secret name %q", req.Name), serrors.InvalidSecretName())
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("invalid secret name %q", req.Name), serrors.InvalidSecretName())
 	}
 
 	creq := &csapitypes.CreateUpdateSecretRequest{

@@ -308,7 +308,7 @@ func (h *ActionHandler) RunAction(ctx context.Context, req *RunActionsRequest) (
 		}
 
 	default:
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("wrong run action type %q", req.ActionType))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("wrong run action type %q", req.ActionType))
 	}
 
 	return runResp, nil
@@ -356,7 +356,7 @@ func (h *ActionHandler) RunTaskAction(ctx context.Context, req *RunTaskActionsRe
 	case RunTaskActionTypeApprove:
 		rt, ok := runResp.Run.Tasks[req.TaskID]
 		if !ok {
-			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("run %q doesn't have task %q", req.RunNumber, req.TaskID))
+			return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("run %q doesn't have task %q", req.RunNumber, req.TaskID))
 		}
 
 		approvers := []string{}
@@ -373,7 +373,7 @@ func (h *ActionHandler) RunTaskAction(ctx context.Context, req *RunTaskActionsRe
 
 		for _, approver := range approvers {
 			if approver == curUserID {
-				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("user %q alredy approved the task", approver))
+				return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("user %q alredy approved the task", approver))
 			}
 		}
 		approvers = append(approvers, curUserID)
@@ -396,7 +396,7 @@ func (h *ActionHandler) RunTaskAction(ctx context.Context, req *RunTaskActionsRe
 		}
 
 	default:
-		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("wrong run task action type %q", req.ActionType))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("wrong run task action type %q", req.ActionType))
 	}
 
 	return nil

@@ -270,12 +270,21 @@ func (e *APIError) message() string {
 
 type APIErrorOption func(e *APIError)
 
+// WithAPIErrorMsgf adds an internal message to the error. This message could
+// contain sensitive data so it's just for internal logging and will not be sent
+// to the api caller.
+func WithAPIErrorMsgf(format string, args ...any) APIErrorOption {
+	return func(e *APIError) {
+		e.msg = fmt.Sprintf(format, args...)
+	}
+}
+
 // WithAPIErrorMsg adds an internal message to the error. This message could
 // contain sensitive data so it's just for internal logging and will not be sent
 // to the api caller.
-func WithAPIErrorMsg(format string, args ...interface{}) APIErrorOption {
+func WithAPIErrorMsg(a ...any) APIErrorOption {
 	return func(e *APIError) {
-		e.msg = fmt.Sprintf(format, args...)
+		e.msg = fmt.Sprint(a...)
 	}
 }
 

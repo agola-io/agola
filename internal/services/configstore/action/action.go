@@ -51,7 +51,7 @@ func NewActionHandler(log zerolog.Logger, d *db.DB, lf lock.LockFactory) *Action
 func (h *ActionHandler) GetProjectGroupByPath(tx *sql.Tx, projectGroupPath string) (*types.ProjectGroup, error) {
 	parts := strings.Split(projectGroupPath, "/")
 	if len(parts) < 2 {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("wrong project group path: %q", projectGroupPath), serrors.InvalidPath())
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("wrong project group path: %q", projectGroupPath), serrors.InvalidPath())
 	}
 	var parentID string
 	switch parts[0] {
@@ -61,7 +61,7 @@ func (h *ActionHandler) GetProjectGroupByPath(tx *sql.Tx, projectGroupPath strin
 			return nil, errors.Wrapf(err, "failed to get organization %q", parts[1])
 		}
 		if org == nil {
-			return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("organization with name %q doesn't exist", parts[1]), serrors.OrganizationDoesNotExist())
+			return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("organization with name %q doesn't exist", parts[1]), serrors.OrganizationDoesNotExist())
 		}
 		parentID = org.ID
 	case "user":
@@ -70,11 +70,11 @@ func (h *ActionHandler) GetProjectGroupByPath(tx *sql.Tx, projectGroupPath strin
 			return nil, errors.Wrapf(err, "failed to get user %q", parts[1])
 		}
 		if user == nil {
-			return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("user with name %q doesn't exist", parts[1]), serrors.UserDoesNotExist())
+			return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("user with name %q doesn't exist", parts[1]), serrors.UserDoesNotExist())
 		}
 		parentID = user.ID
 	default:
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("wrong project group path: %q", projectGroupPath), serrors.InvalidPath())
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("wrong project group path: %q", projectGroupPath), serrors.InvalidPath())
 	}
 
 	var projectGroup *types.ProjectGroup
@@ -96,7 +96,7 @@ func (h *ActionHandler) GetProjectGroupByPath(tx *sql.Tx, projectGroupPath strin
 
 func (h *ActionHandler) GetProjectByPath(tx *sql.Tx, projectPath string) (*types.Project, error) {
 	if len(strings.Split(projectPath, "/")) < 3 {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("wrong project path: %q", projectPath), serrors.InvalidPath())
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("wrong project path: %q", projectPath), serrors.InvalidPath())
 	}
 
 	projectGroupPath := path.Dir(projectPath)
@@ -153,7 +153,7 @@ func (h *ActionHandler) GetProjectPath(tx *sql.Tx, project *types.Project) (stri
 		return "", errors.WithStack(err)
 	}
 	if pgroup == nil {
-		return "", util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("parent project group %q for project %q doesn't exist", project.Parent.ID, project.ID), serrors.ParentProjectGroupDoesNotExist())
+		return "", util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("parent project group %q for project %q doesn't exist", project.Parent.ID, project.ID), serrors.ParentProjectGroupDoesNotExist())
 	}
 	p, err := h.GetProjectGroupPath(tx, pgroup)
 	if err != nil {
@@ -168,7 +168,7 @@ func (h *ActionHandler) GetProjectPath(tx *sql.Tx, project *types.Project) (stri
 func (h *ActionHandler) GetProjectGroupByRef(tx *sql.Tx, projectGroupRef string) (*types.ProjectGroup, error) {
 	groupRef, err := common.ParsePathRef(projectGroupRef)
 	if err != nil {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("wrong project group ref: %q", projectGroupRef), serrors.InvalidRef())
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("wrong project group ref: %q", projectGroupRef), serrors.InvalidRef())
 	}
 
 	var group *types.ProjectGroup
@@ -184,7 +184,7 @@ func (h *ActionHandler) GetProjectGroupByRef(tx *sql.Tx, projectGroupRef string)
 func (h *ActionHandler) GetProjectByRef(tx *sql.Tx, projectRef string) (*types.Project, error) {
 	projectRefType, err := common.ParsePathRef(projectRef)
 	if err != nil {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("wrong project ref: %q", projectRef), serrors.InvalidRef())
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("wrong project ref: %q", projectRef), serrors.InvalidRef())
 	}
 
 	var project *types.Project
@@ -200,7 +200,7 @@ func (h *ActionHandler) GetProjectByRef(tx *sql.Tx, projectRef string) (*types.P
 func (h *ActionHandler) GetOrgByRef(tx *sql.Tx, orgRef string) (*types.Organization, error) {
 	refType, err := common.ParseNameRef(orgRef)
 	if err != nil {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("wrong organization ref: %q", orgRef), serrors.InvalidRef())
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("wrong organization ref: %q", orgRef), serrors.InvalidRef())
 	}
 
 	var org *types.Organization
@@ -216,7 +216,7 @@ func (h *ActionHandler) GetOrgByRef(tx *sql.Tx, orgRef string) (*types.Organizat
 func (h *ActionHandler) GetUserByRef(tx *sql.Tx, userRef string) (*types.User, error) {
 	refType, err := common.ParseNameRef(userRef)
 	if err != nil {
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("wrong user ref: %q", userRef), serrors.InvalidRef())
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("wrong user ref: %q", userRef), serrors.InvalidRef())
 	}
 
 	var user *types.User
@@ -238,7 +238,7 @@ func (h *ActionHandler) GetPath(tx *sql.Tx, objectKind types.ObjectKind, id stri
 			return "", errors.WithStack(err)
 		}
 		if projectGroup == nil {
-			return "", util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("projectgroup with id %q doesn't exist", id), serrors.ProjectGroupDoesNotExist())
+			return "", util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("projectgroup with id %q doesn't exist", id), serrors.ProjectGroupDoesNotExist())
 		}
 		p, err = h.GetProjectGroupPath(tx, projectGroup)
 		if err != nil {
@@ -250,7 +250,7 @@ func (h *ActionHandler) GetPath(tx *sql.Tx, objectKind types.ObjectKind, id stri
 			return "", errors.WithStack(err)
 		}
 		if project == nil {
-			return "", util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("project with id %q doesn't exist", id), serrors.ProjectDoesNotExist())
+			return "", util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("project with id %q doesn't exist", id), serrors.ProjectDoesNotExist())
 		}
 		p, err = h.GetProjectPath(tx, project)
 		if err != nil {
@@ -262,7 +262,7 @@ func (h *ActionHandler) GetPath(tx *sql.Tx, objectKind types.ObjectKind, id stri
 			return "", errors.Wrapf(err, "failed to get organization %q", id)
 		}
 		if org == nil {
-			return "", util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("organization with id %q doesn't exist", id), serrors.OrganizationDoesNotExist())
+			return "", util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("organization with id %q doesn't exist", id), serrors.OrganizationDoesNotExist())
 		}
 		p = path.Join("org", org.Name)
 	case types.ObjectKindUser:
@@ -271,7 +271,7 @@ func (h *ActionHandler) GetPath(tx *sql.Tx, objectKind types.ObjectKind, id stri
 			return "", errors.Wrapf(err, "failed to get user %q", id)
 		}
 		if user == nil {
-			return "", util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("user with id %q doesn't exist", id), serrors.UserDoesNotExist())
+			return "", util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("user with id %q doesn't exist", id), serrors.UserDoesNotExist())
 		}
 		p = path.Join("user", user.Name)
 	default:
@@ -308,7 +308,7 @@ func (h *ActionHandler) GetProjectGroupHierarchy(tx *sql.Tx, projectGroup *types
 			return nil, errors.Wrapf(err, "failed to get project group %q", projectGroupID)
 		}
 		if projectGroup == nil {
-			return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("project group %q doesn't exist", projectGroupID), serrors.ProjectGroupDoesNotExist())
+			return nil, util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("project group %q doesn't exist", projectGroupID), serrors.ProjectGroupDoesNotExist())
 		}
 		elements = append([]*hierarchyElement{
 			{
@@ -342,7 +342,7 @@ func (h *ActionHandler) GetProjectOwnerID(tx *sql.Tx, project *types.Project) (t
 		return "", "", errors.WithStack(err)
 	}
 	if pgroup == nil {
-		return "", "", util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("parent project group %q for project %q doesn't exist", project.Parent.ID, project.ID), serrors.ParentProjectGroupDoesNotExist())
+		return "", "", util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("parent project group %q for project %q doesn't exist", project.Parent.ID, project.ID), serrors.ParentProjectGroupDoesNotExist())
 	}
 	return h.GetProjectGroupOwnerID(tx, pgroup)
 }
@@ -355,7 +355,7 @@ func (h *ActionHandler) ResolveObjectID(tx *sql.Tx, objectKind types.ObjectKind,
 			return "", errors.WithStack(err)
 		}
 		if group == nil {
-			return "", util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("project group with ref %q doesn't exists", ref), serrors.ProjectGroupDoesNotExist())
+			return "", util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("project group with ref %q doesn't exists", ref), serrors.ProjectGroupDoesNotExist())
 		}
 		return group.ID, nil
 
@@ -365,7 +365,7 @@ func (h *ActionHandler) ResolveObjectID(tx *sql.Tx, objectKind types.ObjectKind,
 			return "", errors.WithStack(err)
 		}
 		if project == nil {
-			return "", util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("project with ref %q doesn't exists", ref), serrors.ProjectDoesNotExist())
+			return "", util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("project with ref %q doesn't exists", ref), serrors.ProjectDoesNotExist())
 		}
 		return project.ID, nil
 

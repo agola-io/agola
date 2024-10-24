@@ -54,7 +54,7 @@ func parseRequestOptions(r *http.Request) (*requestOptions, error) {
 		case types.SortDirectionAsc:
 		case types.SortDirectionDesc:
 		default:
-			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("wrong sort direction %q", sortDirection), serrors.InvalidSortDirection())
+			return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("wrong sort direction %q", sortDirection), serrors.InvalidSortDirection())
 		}
 	}
 

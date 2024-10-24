@@ -58,7 +58,7 @@ func (h *ActionHandler) IsMaintenanceEnabled(ctx context.Context, serviceName st
 
 		return &MaintenanceStatusResponse{RequestedStatus: rsresp.RequestedStatus, CurrentStatus: rsresp.CurrentStatus}, nil
 	default:
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid service name %q", serviceName))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("invalid service name %q", serviceName))
 	}
 }
 
@@ -82,7 +82,7 @@ func (h *ActionHandler) MaintenanceMode(ctx context.Context, serviceName string,
 			_, err = h.runserviceClient.DisableMaintenance(ctx)
 		}
 	default:
-		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid service name %q", serviceName))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("invalid service name %q", serviceName))
 	}
 
 	if err != nil {
@@ -108,7 +108,7 @@ func (h *ActionHandler) Export(ctx context.Context, serviceName string) (*http.R
 		resp, err = h.runserviceClient.Export(ctx)
 		res = resp.Response
 	default:
-		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid service name %q", serviceName))
+		return nil, util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("invalid service name %q", serviceName))
 	}
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -129,7 +129,7 @@ func (h *ActionHandler) Import(ctx context.Context, r io.Reader, serviceName str
 	case RunserviceService:
 		_, err = h.runserviceClient.Import(ctx, r)
 	default:
-		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("invalid service name %q", serviceName))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("invalid service name %q", serviceName))
 	}
 	if err != nil {
 		return errors.WithStack(err)

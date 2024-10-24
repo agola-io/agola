@@ -823,7 +823,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 
 		runWebhook := createRunWebhook(t, ctx, ns, project01)
 
-		expectedErr := util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("runWebhookDelivery %q doesn't exist", runWebhookDelivery01), serrors.RunWebhookDeliveryDoesNotExist())
+		expectedErr := util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("runWebhookDelivery %q doesn't exist", runWebhookDelivery01), serrors.RunWebhookDeliveryDoesNotExist())
 		err := ns.ah.RunWebhookRedelivery(ctx, runWebhook.ProjectID, runWebhookDelivery01)
 		assert.Error(t, err, expectedErr.Error())
 	})
@@ -843,7 +843,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		runWebhook = createRunWebhook(t, ctx, ns, project02)
 		createRunWebhookDelivery(t, ctx, ns, runWebhook.ID, types.DeliveryStatusDelivered)
 
-		expectedErr := util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("runWebhookDelivery %q doesn't belong to project %q", runWebhookDelivery.ID, project02), serrors.RunWebhookDeliveryDoesNotExist())
+		expectedErr := util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("runWebhookDelivery %q doesn't belong to project %q", runWebhookDelivery.ID, project02), serrors.RunWebhookDeliveryDoesNotExist())
 
 		err := ns.ah.RunWebhookRedelivery(ctx, project02, runWebhookDelivery.ID)
 		assert.Error(t, err, expectedErr.Error())
@@ -869,7 +869,7 @@ func TestProjectRunWebhookRedelivery(t *testing.T) {
 		ns.c.WebhookSecret = webhookSecret
 		ns.c.WebhookURL = fmt.Sprintf("%s/%s", wr.exposedURL, "webhooks")
 
-		expectedErr := util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("the previous delivery of run webhook %q hasn't already been delivered", runWebhookDelivery.RunWebhookID), serrors.RunWebhookDeliveryAlreadyInProgress())
+		expectedErr := util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("the previous delivery of run webhook %q hasn't already been delivered", runWebhookDelivery.RunWebhookID), serrors.RunWebhookDeliveryAlreadyInProgress())
 
 		err := ns.ah.RunWebhookRedelivery(ctx, runWebhook.ProjectID, runWebhookDelivery.ID)
 		assert.Error(t, err, expectedErr.Error())
@@ -1177,7 +1177,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 
 		commitStatus := createCommitStatus(t, ctx, ns, 1, project01)
 
-		expectedErr := util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("commitStatusDelivery %q doesn't exist", commitStatusDelivery01), serrors.CommitStatusDeliveryDoesNotExist())
+		expectedErr := util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("commitStatusDelivery %q doesn't exist", commitStatusDelivery01), serrors.CommitStatusDeliveryDoesNotExist())
 		err := ns.ah.CommitStatusRedelivery(ctx, commitStatus.ProjectID, commitStatusDelivery01)
 		if err == nil {
 			t.Fatalf("expected error %v, got nil err", expectedErr)
@@ -1202,7 +1202,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		commitStatus = createCommitStatus(t, ctx, ns, 1, project02)
 		createCommitStatusDelivery(t, ctx, ns, commitStatus.ID, types.DeliveryStatusDelivered)
 
-		expectedErr := util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsg("commitStatusDelivery %q doesn't belong to project %q", commitStatusDelivery.ID, project02), serrors.CommitStatusDeliveryDoesNotExist())
+		expectedErr := util.NewAPIError(util.ErrNotExist, util.WithAPIErrorMsgf("commitStatusDelivery %q doesn't belong to project %q", commitStatusDelivery.ID, project02), serrors.CommitStatusDeliveryDoesNotExist())
 
 		err := ns.ah.CommitStatusRedelivery(ctx, project02, commitStatusDelivery.ID)
 		if err == nil {
@@ -1230,7 +1230,7 @@ func TestProjectCommitStatusRedelivery(t *testing.T) {
 		cs := setupStubCommitStatusUpdater()
 		ns.u = cs
 
-		expectedErr := util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("the previous delivery of commit status %q hasn't already been delivered", commitStatusDelivery.CommitStatusID), serrors.CommitStatusDeliveryAlreadyInProgress())
+		expectedErr := util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("the previous delivery of commit status %q hasn't already been delivered", commitStatusDelivery.CommitStatusID), serrors.CommitStatusDeliveryAlreadyInProgress())
 
 		err := ns.ah.CommitStatusRedelivery(ctx, commitStatus.ProjectID, commitStatusDelivery.ID)
 		if err == nil {

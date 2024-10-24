@@ -59,24 +59,24 @@ func (h *webhooksHandler) do(r *http.Request) error {
 
 	projectID := r.URL.Query().Get("projectid")
 	if projectID == "" {
-		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsg("bad webhook url %q. Missing projectid", r.URL))
+		return util.NewAPIError(util.ErrBadRequest, util.WithAPIErrorMsgf("bad webhook url %q. Missing projectid", r.URL))
 	}
 
 	defer r.Body.Close()
 
 	csProject, _, err := h.configstoreClient.GetProject(ctx, projectID)
 	if err != nil {
-		return action.APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get project %s", projectID))
+		return action.APIErrorFromRemoteError(err, util.WithAPIErrorMsgf("failed to get project %s", projectID))
 	}
 	project := csProject.Project
 
 	user, _, err := h.configstoreClient.GetUserByLinkedAccount(ctx, project.LinkedAccountID)
 	if err != nil {
-		return action.APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get user by linked account %q", project.LinkedAccountID))
+		return action.APIErrorFromRemoteError(err, util.WithAPIErrorMsgf("failed to get user by linked account %q", project.LinkedAccountID))
 	}
 	linkedAccounts, _, err := h.configstoreClient.GetUserLinkedAccounts(ctx, user.ID)
 	if err != nil {
-		return action.APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get user %q linked accounts", user.ID))
+		return action.APIErrorFromRemoteError(err, util.WithAPIErrorMsgf("failed to get user %q linked accounts", user.ID))
 	}
 
 	var la *cstypes.LinkedAccount
@@ -88,12 +88,12 @@ func (h *webhooksHandler) do(r *http.Request) error {
 	}
 
 	if la == nil {
-		return util.NewAPIError(util.ErrInternal, util.WithAPIErrorMsg("linked account %q for user %q doesn't exist", project.LinkedAccountID, user.Name))
+		return util.NewAPIError(util.ErrInternal, util.WithAPIErrorMsgf("linked account %q for user %q doesn't exist", project.LinkedAccountID, user.Name))
 	}
 
 	rs, _, err := h.configstoreClient.GetRemoteSource(ctx, la.RemoteSourceID)
 	if err != nil {
-		return action.APIErrorFromRemoteError(err, util.WithAPIErrorMsg("failed to get remote source %q", la.RemoteSourceID))
+		return action.APIErrorFromRemoteError(err, util.WithAPIErrorMsgf("failed to get remote source %q", la.RemoteSourceID))
 	}
 
 	gitSource, err := h.ah.GetGitSource(ctx, rs, user.Name, la)

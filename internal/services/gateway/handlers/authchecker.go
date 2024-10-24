@@ -196,9 +196,9 @@ func (h *AuthChecker) checkAuthResponse(name string, res *checkerResponse) (bool
 
 	if res.failAuth {
 		if res.authErr != nil {
-			return false, util.NewAPIErrorWrap(util.ErrUnauthorized, res.authErr, util.WithAPIErrorMsg("checker %s: auth failed", name))
+			return false, util.NewAPIErrorWrap(util.ErrUnauthorized, res.authErr, util.WithAPIErrorMsgf("checker %s: auth failed", name))
 		}
-		return false, util.NewAPIError(util.ErrUnauthorized, util.WithAPIErrorMsg("checker %s: auth failed (no auth err reported by checker)", name))
+		return false, util.NewAPIError(util.ErrUnauthorized, util.WithAPIErrorMsgf("checker %s: auth failed (no auth err reported by checker)", name))
 	}
 
 	if res.authErr != nil {
