@@ -1479,6 +1479,139 @@ func (d *DB) insertRawOrgInvitation(tx *sql.Tx, v *types.OrgInvitation) error {
 	return nil
 }
 
+var (
+	userProjectFavoriteSelectColumns = func(additionalCols ...string) []string {
+		columns := []string{"userprojectfavorite.id", "userprojectfavorite.revision", "userprojectfavorite.creation_time", "userprojectfavorite.update_time", "userprojectfavorite.user_id", "userprojectfavorite.project_id"}
+		columns = append(columns, additionalCols...)
+
+		return columns
+	}
+
+	userProjectFavoriteSelect = func(additionalCols ...string) *sq.SelectBuilder {
+		return sq.NewSelectBuilder().Select(userProjectFavoriteSelectColumns(additionalCols...)...).From("userprojectfavorite")
+	}
+)
+
+func (d *DB) InsertOrUpdateUserProjectFavorite(tx *sql.Tx, v *types.UserProjectFavorite) error {
+	var err error
+	if v.Revision == 0 {
+		err = d.InsertUserProjectFavorite(tx, v)
+	} else {
+		err = d.UpdateUserProjectFavorite(tx, v)
+	}
+
+	return errors.WithStack(err)
+}
+
+func (d *DB) InsertUserProjectFavorite(tx *sql.Tx, v *types.UserProjectFavorite) error {
+	if v.Revision != 0 {
+		return errors.Errorf("expected revision 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not created by this transaction")
+	}
+
+	v.Revision = 1
+
+	now := time.Now()
+	v.CreationTime = now
+	v.UpdateTime = now
+
+	var err error
+
+	switch d.DBType() {
+	case sql.Postgres:
+		err = d.insertRawUserProjectFavoritePostgres(tx, v);
+	case sql.Sqlite3:
+		err = d.insertUserProjectFavoriteSqlite3(tx, v);
+	}
+
+	if err != nil {
+		v.Revision = 0
+		return errors.Wrap(err, "failed to insert userprojectfavorite")
+	}
+
+	return nil
+}
+
+func (d *DB) UpdateUserProjectFavorite(tx *sql.Tx, v *types.UserProjectFavorite) error {
+	if v.Revision < 1 {
+		return errors.Errorf("expected revision > 0 got %d", v.Revision)
+	}
+
+	if v.TxID != tx.ID() {
+		return errors.Errorf("object was not fetched by this transaction")
+	}
+
+	curRevision := v.Revision
+	v.Revision++
+
+	v.UpdateTime = time.Now()
+
+	var res stdsql.Result
+	var err error
+	switch d.DBType() {
+	case sql.Postgres:
+		res, err = d.updateUserProjectFavoritePostgres(tx, curRevision, v);
+	case sql.Sqlite3:
+		res, err = d.updateUserProjectFavoriteSqlite3(tx, curRevision, v);
+	}
+	if err != nil {
+		v.Revision = curRevision
+		return errors.Wrap(err, "failed to update userprojectfavorite")
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		v.Revision = curRevision
+		return errors.Wrap(err, "failed to update userprojectfavorite")
+	}
+
+	if rows != 1 {
+		v.Revision = curRevision
+		return sqlg.ErrConcurrent
+	}
+
+	return nil
+}
+
+func (d *DB) deleteUserProjectFavorite(tx *sql.Tx, userProjectFavoriteID string) error {
+	q := sq.NewDeleteBuilder()
+	q.DeleteFrom("userprojectfavorite").Where(q.E("id", userProjectFavoriteID))
+
+	if _, err := d.exec(tx, q); err != nil {
+		return errors.Wrap(err, "failed to delete userProjectFavorite")
+	}
+
+	return nil
+}
+
+func (d *DB) DeleteUserProjectFavorite(tx *sql.Tx, id string) error {
+	return d.deleteUserProjectFavorite(tx, id)
+}
+
+// insertRawUserProjectFavorite should be used only for import.
+// * It won't update object times.
+// * It will insert values for sequences.
+func (d *DB) insertRawUserProjectFavorite(tx *sql.Tx, v *types.UserProjectFavorite) error {
+	v.Revision = 1
+
+	var err error
+	switch d.DBType() {
+	case sql.Postgres:
+		err = d.insertRawUserProjectFavoritePostgres(tx, v);
+	case sql.Sqlite3:
+		err = d.insertRawUserProjectFavoriteSqlite3(tx, v);
+	}
+	if err != nil {
+		v.Revision = 0
+		return errors.Wrap(err, "failed to insert userprojectfavorite")
+	}
+
+	return nil
+}
+
 func (d *DB) UnmarshalExportObject(data []byte) (sqlg.Object, error) {
 	type exportObjectExportMeta struct {
 		ExportMeta sqlg.ExportMeta `json:"exportMeta"`
@@ -1514,6 +1647,8 @@ func (d *DB) UnmarshalExportObject(data []byte) (sqlg.Object, error) {
 		obj = &types.Variable{}
 	case "OrgInvitation":
 		obj = &types.OrgInvitation{}
+	case "UserProjectFavorite":
+		obj = &types.UserProjectFavorite{}
 
 	default:
 		panic(errors.Errorf("unknown object kind %q, data: %s", om.ExportMeta.Kind, data))
@@ -1550,6 +1685,8 @@ func (d *DB) InsertRawObject(tx *sql.Tx, obj sqlg.Object) error {
 		return d.insertRawVariable(tx, o)
 	case *types.OrgInvitation:
 		return d.insertRawOrgInvitation(tx, o)
+	case *types.UserProjectFavorite:
+		return d.insertRawUserProjectFavorite(tx, o)
 
 	default:
 		panic(errors.Errorf("unknown object type %T", obj))
@@ -1580,6 +1717,8 @@ func (d *DB) SelectObject(kind string) *sq.SelectBuilder {
 		return variableSelect()
 	case "OrgInvitation":
 		return orgInvitationSelect()
+	case "UserProjectFavorite":
+		return userProjectFavoriteSelect()
 
 	default:
 		panic(errors.Errorf("unknown object kind %q", kind))
@@ -1710,6 +1849,18 @@ func (d *DB) FetchObjects(tx *sql.Tx, kind string, q sq.Builder) ([]sqlg.Object,
 		return objs, nil
 	case "OrgInvitation":
 		fobjs, _, err := d.fetchOrgInvitations(tx, q)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		objs := make([]sqlg.Object, len(fobjs))
+		for i, fobj := range fobjs {
+		        objs[i] = fobj
+		}
+
+		return objs, nil
+	case "UserProjectFavorite":
+		fobjs, _, err := d.fetchUserProjectFavorites(tx, q)
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
@@ -1856,6 +2007,18 @@ func (d *DB) ObjectToExportJSON(obj sqlg.Object, e *json.Encoder) error {
 		}
 
 		if err := e.Encode(&exportObject{ExportMeta: sqlg.ExportMeta{ Kind: "OrgInvitation" }, OrgInvitation: o}); err != nil {
+			return errors.WithStack(err)
+		}
+
+		return nil
+	case *types.UserProjectFavorite:
+		type exportObject struct {
+			ExportMeta sqlg.ExportMeta `json:"exportMeta"`
+
+			*types.UserProjectFavorite
+		}
+
+		if err := e.Encode(&exportObject{ExportMeta: sqlg.ExportMeta{ Kind: "UserProjectFavorite" }, UserProjectFavorite: o}); err != nil {
 			return errors.WithStack(err)
 		}
 
