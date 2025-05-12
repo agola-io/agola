@@ -56,10 +56,7 @@ func writeFileAtomicFunc(p, baseDir, tmpDir string, perm os.FileMode, persist bo
 	}
 	// sync parent dirs
 	pdir := filepath.Dir(p)
-	for {
-		if !strings.HasPrefix(pdir, baseDir) {
-			break
-		}
+	for strings.HasPrefix(pdir, baseDir) {
 		f, err := os.Open(pdir)
 		if err != nil {
 			f.Close()

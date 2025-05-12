@@ -119,7 +119,7 @@ func runList(cmd *cobra.Command, args []string) error {
 		} else {
 			getRunsOptions = &gwclient.GetRunsOptions{ListOptions: &gwclient.ListOptions{Cursor: cursor}}
 		}
-		getRunsOptions.ListOptions.Limit = limit - runCount
+		getRunsOptions.Limit = limit - runCount
 
 		var resp *gwclient.Response
 		if isProject {

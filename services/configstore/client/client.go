@@ -75,7 +75,7 @@ func NewClient(url, token string) *Client {
 }
 
 func (c *Client) GetResponse(ctx context.Context, method, path string, query url.Values, contentLength int64, header http.Header, ibody io.Reader) (*Response, error) {
-	cresp, err := c.Client.DoRequest(ctx, method, path, query, contentLength, header, ibody)
+	cresp, err := c.DoRequest(ctx, method, path, query, contentLength, header, ibody)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

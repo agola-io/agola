@@ -124,11 +124,8 @@ func newHTTPTransport(opts httpOpts) *http.Transport {
 }
 
 func getURLs(apiURL, webURL string) (string, string) {
-	isPublicGithub := false
 	// TODO(sgotti) improve detection of public github url (handle also trailing slash)
-	if apiURL == GitHubAPIURL {
-		isPublicGithub = true
-	}
+	isPublicGithub := apiURL == GitHubAPIURL
 
 	if isPublicGithub {
 		webURL = GitHubWebURL

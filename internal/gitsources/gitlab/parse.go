@@ -139,10 +139,7 @@ func webhookDataFromPullRequest(hook *pullRequestHook) *types.WebhookData {
 	if sender == "" {
 		sender = hook.User.Username
 	}
-	prFromSameRepo := false
-	if hook.ObjectAttributes.Source.URL == hook.ObjectAttributes.Target.URL {
-		prFromSameRepo = true
-	}
+	prFromSameRepo := hook.ObjectAttributes.Source.URL == hook.ObjectAttributes.Target.URL
 
 	whd := &types.WebhookData{
 		Event:           types.WebhookEventPullRequest,

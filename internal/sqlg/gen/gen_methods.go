@@ -6,8 +6,9 @@ import (
 	"strings"
 	"text/template"
 
-	"agola.io/agola/internal/sqlg"
 	"github.com/Masterminds/sprig/v3"
+
+	"agola.io/agola/internal/sqlg"
 )
 
 type MethodsData struct {
