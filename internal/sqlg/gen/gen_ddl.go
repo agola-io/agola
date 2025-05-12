@@ -6,11 +6,11 @@ import (
 	"strings"
 	"text/template"
 
-	"agola.io/agola/internal/sqlg"
-	"agola.io/agola/internal/sqlg/sql"
-
 	"github.com/Masterminds/sprig/v3"
 	"github.com/huandu/xstrings"
+
+	"agola.io/agola/internal/sqlg"
+	"agola.io/agola/internal/sqlg/sql"
 )
 
 type DDLGenericData struct {

@@ -29,10 +29,7 @@ func CountLines(s string) (uint, error) {
 	br := bufio.NewReader(strings.NewReader(s))
 
 	stop := false
-	for {
-		if stop {
-			break
-		}
+	for !stop {
 		_, err := br.ReadBytes('\n')
 		if err != nil {
 			if err != io.EOF {

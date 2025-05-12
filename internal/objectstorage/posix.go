@@ -126,10 +126,7 @@ func (s *PosixStorage) DeleteObject(ctx context.Context, p string) error {
 	// TODO(sgotti) if this fails we ignore errors and the dirs will be left as
 	// empty, clean them asynchronously
 	pdir := filepath.Dir(fspath)
-	for {
-		if pdir == s.dataDir || !strings.HasPrefix(pdir, s.dataDir) {
-			break
-		}
+	for pdir != s.dataDir && strings.HasPrefix(pdir, s.dataDir) {
 		f, err := os.Open(pdir)
 		if err != nil {
 			return nil

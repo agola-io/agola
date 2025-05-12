@@ -1,40 +1,56 @@
+version: "2"
 linters:
   enable:
-    - gci
-    - stylecheck
     - errorlint
-    - wrapcheck
     - paralleltest
-
-linters-settings:
-  gci:
-    sections:
-      - standard
-      - default
-      - prefix(agola.io/agola)
-      - blank
-      - dot
-  wrapcheck:
-    # An array of strings that specify substrings of signatures to ignore.
-    # If this set, it will override the default set of ignored signatures.
-    # See https://github.com/tomarrell/wrapcheck#configuration for more information.
-    ignoreSigs:
-      - .Errorf(
-      - errors.New(
-      - errors.Unwrap(
-      - .Wrap(
-      - .Wrapf(
-      - .WithMessage(
-      - .WithMessagef(
-      - .WithStack(
-      - .NewAPIError(
-      - .NewAPIErrorWrap(
-      - .APIErrorFromRemoteError(
-    ignoreSigRegexps:
-      - \.New.*Error\(
-    ignorePackageGlobs:
-      - encoding/*
-      - github.com/pkg/*
-
-  paralleltest:
-    ignore-missing: true
+    - staticcheck
+    - wrapcheck
+  settings:
+    paralleltest:
+      ignore-missing: true
+    wrapcheck:
+      ignore-sigs:
+        - .Errorf(
+        - errors.New(
+        - errors.Unwrap(
+        - .Wrap(
+        - .Wrapf(
+        - .WithMessage(
+        - .WithMessagef(
+        - .WithStack(
+        - .NewAPIError(
+        - .NewAPIErrorWrap(
+        - .APIErrorFromRemoteError(
+      ignore-sig-regexps:
+        - \.New.*Error\(
+      ignore-package-globs:
+        - encoding/*
+        - github.com/pkg/*
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gci
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(agola.io/agola)
+        - blank
+        - dot
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

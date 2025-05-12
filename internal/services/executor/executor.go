@@ -162,7 +162,7 @@ func (e *Executor) doRunStep(ctx context.Context, s *types.RunStep, et *rsapityp
 
 	workingDir, err = e.expandDir(ctx, et, pod, outf, workingDir)
 	if err != nil {
-		_, _ = outf.WriteString(fmt.Sprintf("failed to expand working dir %q. Error: %s\n", workingDir, err))
+		_, _ = fmt.Fprintf(outf, "failed to expand working dir %q. Error: %s\n", workingDir, err)
 		return -1, errors.WithStack(err)
 	}
 
@@ -213,7 +213,7 @@ func (e *Executor) doSaveToWorkspaceStep(ctx context.Context, s *types.SaveToWor
 
 	workingDir, err := e.expandDir(ctx, et, pod, logf, et.Spec.WorkingDir)
 	if err != nil {
-		_, _ = logf.WriteString(fmt.Sprintf("failed to expand working dir %q. Error: %s\n", et.Spec.WorkingDir, err))
+		_, _ = fmt.Fprintf(logf, "failed to expand working dir %q. Error: %s\n", et.Spec.WorkingDir, err)
 		return -1, errors.WithStack(err)
 	}
 
@@ -340,7 +340,7 @@ func (e *Executor) template(ctx context.Context, et *rsapitypes.ExecutorTask, po
 
 	workingDir, err := e.expandDir(ctx, et, pod, logf, et.Spec.WorkingDir)
 	if err != nil {
-		_, _ = io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", et.Spec.WorkingDir, err))
+		_, _ = fmt.Fprintf(logf, "failed to expand working dir %q. Error: %s\n", et.Spec.WorkingDir, err)
 		return "", errors.WithStack(err)
 	}
 
@@ -388,7 +388,7 @@ func (e *Executor) unarchive(ctx context.Context, et *rsapitypes.ExecutorTask, s
 
 	workingDir, err := e.expandDir(ctx, et, pod, logf, et.Spec.WorkingDir)
 	if err != nil {
-		_, _ = io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", et.Spec.WorkingDir, err))
+		_, _ = fmt.Fprintf(logf, "failed to expand working dir %q. Error: %s\n", et.Spec.WorkingDir, err)
 		return errors.WithStack(err)
 	}
 
@@ -518,7 +518,7 @@ func (e *Executor) archiveCache(ctx context.Context, s *types.SaveCacheStep, et 
 
 	workingDir, err := e.expandDir(ctx, et, pod, logf, et.Spec.WorkingDir)
 	if err != nil {
-		_, _ = io.WriteString(logf, fmt.Sprintf("failed to expand working dir %q. Error: %s\n", et.Spec.WorkingDir, err))
+		_, _ = fmt.Fprintf(logf, "failed to expand working dir %q. Error: %s\n", et.Spec.WorkingDir, err)
 		return -1, errors.WithStack(err)
 	}
 
@@ -926,15 +926,15 @@ func (e *Executor) setupTask(ctx context.Context, rt *runningTask) error {
 	defer cancel()
 	pod, err := e.driver.NewPod(podCtx, podConfig, outf)
 	if err != nil {
-		_, _ = outf.WriteString(fmt.Sprintf("Pod failed to start. Error: %s\n", err))
+		_, _ = fmt.Fprintf(outf, "Pod failed to start. Error: %s\n", err)
 		return errors.WithStack(err)
 	}
 	_, _ = outf.WriteString("Pod started.\n")
 
 	if et.Spec.WorkingDir != "" {
-		_, _ = outf.WriteString(fmt.Sprintf("Creating working dir %q.\n", et.Spec.WorkingDir))
+		_, _ = fmt.Fprintf(outf, "Creating working dir %q.\n", et.Spec.WorkingDir)
 		if err := e.mkdir(ctx, et, pod, outf, et.Spec.WorkingDir); err != nil {
-			_, _ = outf.WriteString(fmt.Sprintf("Failed to create working dir %q. Error: %s\n", et.Spec.WorkingDir, err))
+			_, _ = fmt.Fprintf(outf, "Failed to create working dir %q. Error: %s\n", et.Spec.WorkingDir, err)
 			return errors.WithStack(err)
 		}
 	}

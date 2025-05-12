@@ -1105,7 +1105,7 @@ func (h *RunEventsHandler) sendRunEvents(ctx context.Context, afterRunEventSeque
 				return errors.WithStack(err)
 			}
 
-			if _, err := w.Write([]byte(fmt.Sprintf("data: %s\n\n", runEventj))); err != nil {
+			if _, err := fmt.Fprintf(w, "data: %s\n\n", runEventj); err != nil {
 				return errors.WithStack(err)
 			}
 

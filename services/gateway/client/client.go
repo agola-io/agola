@@ -127,7 +127,7 @@ func (c *Client) getResponse(ctx context.Context, method, path string, query url
 		return resp, errors.WithStack(err)
 	}
 
-	resp.Cursor = resp.Response.Header.Get(agolaCursorHeader)
+	resp.Cursor = resp.Header.Get(agolaCursorHeader)
 
 	return resp, nil
 }

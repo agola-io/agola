@@ -509,13 +509,13 @@ func (h *RegisterUserHandler) do(r *http.Request) (*gwapitypes.RegisterUserRespo
 
 func (h *RegisterUserHandler) registerUser(ctx context.Context, req *gwapitypes.RegisterUserRequest) (*gwapitypes.RegisterUserResponse, error) {
 	creq := &action.RegisterUserRequest{
-		UserName:         req.CreateUserRequest.UserName,
-		RemoteUserName:   req.CreateUserLARequest.RemoteSourceLoginName,
-		RemotePassword:   req.CreateUserLARequest.RemoteSourceLoginPassword,
-		RemoteSourceName: req.CreateUserLARequest.RemoteSourceName,
+		UserName:         req.UserName,
+		RemoteUserName:   req.RemoteSourceLoginName,
+		RemotePassword:   req.RemoteSourceLoginPassword,
+		RemoteSourceName: req.RemoteSourceName,
 	}
 
-	cresp, err := h.ah.HandleRemoteSourceAuth(ctx, req.CreateUserLARequest.RemoteSourceName, req.CreateUserLARequest.RemoteSourceLoginName, req.CreateUserLARequest.RemoteSourceLoginPassword, action.RemoteSourceRequestTypeRegisterUser, creq)
+	cresp, err := h.ah.HandleRemoteSourceAuth(ctx, req.RemoteSourceName, req.RemoteSourceLoginName, req.RemoteSourceLoginPassword, action.RemoteSourceRequestTypeRegisterUser, creq)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

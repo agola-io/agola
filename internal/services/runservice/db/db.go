@@ -135,10 +135,7 @@ func (d *DB) GetRuns(tx *sql.Tx, groups []string, lastRun bool, phaseFilter []ty
 }
 
 func (d *DB) getRunsFilteredQuery(phaseFilter []types.RunPhase, resultFilter []types.RunResult, groups []string, lastRun bool, startRunSequence uint64, limit int, sortDirection types.SortDirection) *sq.SelectBuilder {
-	useSubquery := false
-	if len(groups) > 0 && lastRun {
-		useSubquery = true
-	}
+	useSubquery := len(groups) > 0 && lastRun
 
 	q := runSelect()
 	if useSubquery {

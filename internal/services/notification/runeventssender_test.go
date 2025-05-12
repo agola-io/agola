@@ -195,7 +195,7 @@ func (h *runEventsHandler) do(w http.ResponseWriter, r *http.Request) error {
 			continue
 		}
 
-		if _, err := w.Write([]byte(fmt.Sprintf("data: %s\n\n", runEventj))); err != nil {
+		if _, err := fmt.Fprintf(w, "data: %s\n\n", runEventj); err != nil {
 			h.log.Err(err).Send()
 			continue
 		}
