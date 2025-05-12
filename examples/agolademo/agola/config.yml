@@ -32,6 +32,8 @@ notification:
   db:
     type: sqlite3
     connString: /data/agola/notification/db
+  web:
+    listenAddress: ":4004"
 
 configstore:
   dataDir: /data/agola/configstore
