@@ -778,3 +778,42 @@ func (c *Client) Import(ctx context.Context, r io.Reader) (*Response, error) {
 	resp, err := c.GetResponse(ctx, "POST", "/import", nil, -1, common.JSONContent, r)
 	return resp, errors.WithStack(err)
 }
+
+func (c *Client) CreateUserProjectFavorite(ctx context.Context, req *csapitypes.CreateUserProjectFavoriteRequest) (*cstypes.UserProjectFavorite, *Response, error) {
+	reqj, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+
+	userProjectFavorite := new(cstypes.UserProjectFavorite)
+	resp, err := c.GetParsedResponse(ctx, "POST", fmt.Sprintf("/users/%s/projects/%s/projectfavorites", req.UserRef, req.ProjectRef), nil, common.JSONContent, bytes.NewReader(reqj), userProjectFavorite)
+	return userProjectFavorite, resp, errors.WithStack(err)
+}
+
+func (c *Client) DeleteUserProjectFavorite(ctx context.Context, userRef string, projectRef string) (*Response, error) {
+	resp, err := c.GetResponse(ctx, "DELETE", fmt.Sprintf("/users/%s/projects/%s/projectfavorites", userRef, projectRef), nil, -1, common.JSONContent, nil)
+	return resp, errors.WithStack(err)
+}
+
+type GetUserProjectFavoritesOptions struct {
+	*ListOptions
+
+	StartUserProjectFavoriteID string
+}
+
+func (o *GetUserProjectFavoritesOptions) Add(q url.Values) {
+	o.ListOptions.Add(q)
+
+	if o.StartUserProjectFavoriteID != "" {
+		q.Add("startuserprojectfavoriteid", o.StartUserProjectFavoriteID)
+	}
+}
+
+func (c *Client) GetUserProjectFavorites(ctx context.Context, userRef string, opts *GetUserProjectFavoritesOptions) ([]*cstypes.UserProjectFavorite, *Response, error) {
+	q := url.Values{}
+	opts.Add(q)
+
+	userProjectFavorites := []*cstypes.UserProjectFavorite{}
+	resp, err := c.GetParsedResponse(ctx, "GET", fmt.Sprintf("/users/%s/projectfavorites", userRef), q, common.JSONContent, nil, &userProjectFavorites)
+	return userProjectFavorites, resp, errors.WithStack(err)
+}

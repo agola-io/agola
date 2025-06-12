@@ -289,6 +289,10 @@ func (h *ActionHandler) DeleteUser(ctx context.Context, userRef string) error {
 			return errors.WithStack(err)
 		}
 
+		if err := h.d.DeleteUserProjectFavoritesByUserID(tx, user.ID); err != nil {
+			return util.NewAPIError(util.KindFromRemoteError(err), err)
+		}
+
 		if err := h.d.DeleteUser(tx, user.ID); err != nil {
 			return errors.WithStack(err)
 		}

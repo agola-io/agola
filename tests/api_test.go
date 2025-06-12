@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strconv"
 	"testing"
 	"time"
@@ -3582,6 +3583,330 @@ func testGetGroupRuns(t *testing.T, userRun bool) {
 			assert.Assert(t, cmp.Len(respAllRuns, tt.expectedRunsNumber))
 			assert.DeepEqual(t, expectedRuns, respAllRuns)
 			assert.Equal(t, callsNumber, tt.expectedCallsNumber)
+		})
+	}
+}
+
+type userProjectFavoritesByID []*gwapitypes.UserProjectFavoriteResponse
+
+func (p userProjectFavoritesByID) Len() int { return len(p) }
+func (p userProjectFavoritesByID) Less(i, j int) bool {
+	return p[i].ID < p[j].ID
+}
+func (p userProjectFavoritesByID) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
+
+func TestUserProjectFavorite(t *testing.T) {
+	t.Parallel()
+
+	type testUserProjectFavoriteConfig struct {
+		sc             *setupContext
+		tokenUser01    string
+		tokenUser02    string
+		gwAdminClient  *gwclient.Client
+		gwClientUser01 *gwclient.Client
+		gwClientUser02 *gwclient.Client
+		projects       []*gwapitypes.ProjectResponse
+	}
+
+	tests := []struct {
+		name string
+		f    func(ctx context.Context, t *testing.T, tc *testUserProjectFavoriteConfig)
+	}{
+		{
+			name: "create user project favorite",
+			f: func(ctx context.Context, t *testing.T, tc *testUserProjectFavoriteConfig) {
+				var expectedUser01ProjectFavorites []*gwapitypes.UserProjectFavoriteResponse
+				var expectedUser02ProjectFavorites []*gwapitypes.UserProjectFavoriteResponse
+
+				for i := 0; i < 2; i++ {
+					projectFavorite, _, err := tc.gwClientUser01.CreateUserProjectFavorite(ctx, &gwapitypes.CreateUserProjectFavoriteRequest{ProjectRef: tc.projects[i].ID})
+					testutil.NilError(t, err)
+
+					expectedUser01ProjectFavorites = append(expectedUser01ProjectFavorites, projectFavorite)
+				}
+				sort.Sort(userProjectFavoritesByID(expectedUser01ProjectFavorites))
+
+				for i := 2; i < 4; i++ {
+					userProjectFavorite, _, err := tc.gwClientUser02.CreateUserProjectFavorite(ctx, &gwapitypes.CreateUserProjectFavoriteRequest{ProjectRef: tc.projects[i].ID})
+					testutil.NilError(t, err)
+
+					expectedUser02ProjectFavorites = append(expectedUser02ProjectFavorites, userProjectFavorite)
+				}
+				sort.Sort(userProjectFavoritesByID(expectedUser02ProjectFavorites))
+
+				userProjectFavorites, _, err := tc.gwClientUser01.GetUserProjectFavorites(ctx, nil)
+				testutil.NilError(t, err)
+				assert.DeepEqual(t, userProjectFavorites, expectedUser01ProjectFavorites)
+
+				userProjectFavorites, _, err = tc.gwClientUser02.GetUserProjectFavorites(ctx, nil)
+				testutil.NilError(t, err)
+				assert.DeepEqual(t, userProjectFavorites, expectedUser02ProjectFavorites)
+			},
+		},
+		{
+			name: "test user project favorite creation with already existing project favorite",
+			f: func(ctx context.Context, t *testing.T, tc *testUserProjectFavoriteConfig) {
+				userProjectFavorite, _, err := tc.gwClientUser01.CreateUserProjectFavorite(ctx, &gwapitypes.CreateUserProjectFavoriteRequest{ProjectRef: tc.projects[0].ID})
+				testutil.NilError(t, err)
+
+				_, _, err = tc.gwClientUser01.CreateUserProjectFavorite(ctx, &gwapitypes.CreateUserProjectFavoriteRequest{ProjectRef: tc.projects[0].ID})
+				expectedErr := remoteErrorBadRequest
+				assert.Error(t, err, expectedErr)
+
+				userProjectFavorites, _, err := tc.gwClientUser01.GetUserProjectFavorites(ctx, nil)
+				testutil.NilError(t, err)
+				assert.Assert(t, cmp.Equal(len(userProjectFavorites), 1))
+				assert.DeepEqual(t, userProjectFavorites[0], userProjectFavorite)
+			},
+		},
+		{
+			name: "test user project favorite creation with not existing project",
+			f: func(ctx context.Context, t *testing.T, tc *testUserProjectFavoriteConfig) {
+				_, _, err := tc.gwClientUser01.CreateUserProjectFavorite(ctx, &gwapitypes.CreateUserProjectFavoriteRequest{ProjectRef: "projecttest"})
+				expectedErr := remoteErrorBadRequest
+				assert.Error(t, err, expectedErr)
+
+				userProjectFavorites, _, err := tc.gwClientUser01.GetUserProjectFavorites(ctx, nil)
+				testutil.NilError(t, err)
+				assert.Assert(t, cmp.Equal(len(userProjectFavorites), 0))
+			},
+		},
+		{
+			name: "test user project favorite deletion",
+			f: func(ctx context.Context, t *testing.T, tc *testUserProjectFavoriteConfig) {
+				_, _, err := tc.gwClientUser01.CreateUserProjectFavorite(ctx, &gwapitypes.CreateUserProjectFavoriteRequest{ProjectRef: tc.projects[0].ID})
+				testutil.NilError(t, err)
+
+				_, err = tc.gwClientUser01.DeleteUserProjectFavorite(ctx, tc.projects[0].ID)
+				testutil.NilError(t, err)
+
+				userProjectFavorites, _, err := tc.gwClientUser01.GetUserProjectFavorites(ctx, nil)
+				testutil.NilError(t, err)
+				assert.Assert(t, cmp.Equal(len(userProjectFavorites), 0))
+			},
+		},
+		{
+			name: "test user project favorite deletion with not existing project favorite",
+			f: func(ctx context.Context, t *testing.T, tc *testUserProjectFavoriteConfig) {
+				_, err := tc.gwClientUser01.DeleteUserProjectFavorite(ctx, tc.projects[0].ID)
+				expectedErr := remoteErrorBadRequest
+				assert.Error(t, err, expectedErr)
+			},
+		},
+		{
+			name: "test user project deletion with existing project favorite",
+			f: func(ctx context.Context, t *testing.T, tc *testUserProjectFavoriteConfig) {
+				_, _, err := tc.gwClientUser01.CreateUserProjectFavorite(ctx, &gwapitypes.CreateUserProjectFavoriteRequest{ProjectRef: tc.projects[0].ID})
+				testutil.NilError(t, err)
+
+				_, err = tc.gwClientUser01.DeleteProject(ctx, tc.projects[0].ID)
+				testutil.NilError(t, err)
+
+				userProjectFavorites, _, err := tc.gwClientUser01.GetUserProjectFavorites(ctx, nil)
+				testutil.NilError(t, err)
+				assert.Assert(t, cmp.Equal(len(userProjectFavorites), 0))
+			},
+		},
+		{
+			name: "test get user project preferites with admin user",
+			f: func(ctx context.Context, t *testing.T, tc *testUserProjectFavoriteConfig) {
+				_, _, err := tc.gwAdminClient.GetUserProjectFavorites(ctx, nil)
+				expectedErr := remoteErrorInternal
+				assert.Error(t, err, expectedErr)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			dir := t.TempDir()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			sc := setup(ctx, t, dir, withGitea(true))
+			defer sc.stop()
+
+			gwAdminClient := gwclient.NewClient(sc.config.Gateway.APIExposedURL, sc.config.Gateway.AdminToken)
+
+			giteaToken, tokenUser01 := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+			gwClientUser01 := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01)
+
+			_, _, err := gwAdminClient.CreateUser(ctx, &gwapitypes.CreateUserRequest{UserName: agolaUser02})
+			testutil.NilError(t, err)
+
+			tokenUser02, _, err := gwAdminClient.CreateUserToken(ctx, agolaUser02, &gwapitypes.CreateUserTokenRequest{TokenName: "test"})
+			testutil.NilError(t, err)
+
+			gwClientUser02 := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser02.Token)
+
+			_, _, err = gwClientUser01.CreateOrg(ctx, &gwapitypes.CreateOrgRequest{Name: agolaOrg01, Visibility: gwapitypes.VisibilityPublic})
+			testutil.NilError(t, err)
+
+			giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+
+			giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+			testutil.NilError(t, err)
+
+			var projects []*gwapitypes.ProjectResponse
+
+			_, project := createProject(ctx, t, giteaClient, gwClientUser01, withVisibility(gwapitypes.VisibilityPrivate))
+			projects = append(projects, project)
+
+			for i := 2; i < 5; i++ {
+				project, _, err = gwClientUser01.CreateProject(ctx, &gwapitypes.CreateProjectRequest{
+					Name:             fmt.Sprintf("project0%d", i),
+					ParentRef:        path.Join("org", agolaOrg01),
+					RemoteSourceName: "gitea",
+					RepoPath:         path.Join(giteaUser01, "repo01"),
+					Visibility:       gwapitypes.VisibilityPublic,
+				})
+				testutil.NilError(t, err)
+
+				projects = append(projects, project)
+			}
+
+			tc := &testUserProjectFavoriteConfig{
+				sc:             sc,
+				tokenUser01:    tokenUser01,
+				tokenUser02:    tokenUser02.Token,
+				gwClientUser01: gwClientUser01,
+				gwClientUser02: gwClientUser02,
+				gwAdminClient:  gwAdminClient,
+				projects:       projects,
+			}
+
+			tt.f(ctx, t, tc)
+		})
+	}
+}
+
+func TestGetUserProjectFavorites(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sc := setup(ctx, t, dir, withGitea(true))
+	defer sc.stop()
+
+	giteaToken, tokenUser01 := createLinkedAccount(ctx, t, sc.gitea, sc.config)
+	gwClientUser01 := gwclient.NewClient(sc.config.Gateway.APIExposedURL, tokenUser01)
+
+	giteaAPIURL := fmt.Sprintf("http://%s:%s", sc.gitea.HTTPListenAddress, sc.gitea.HTTPPort)
+
+	giteaClient, err := gitea.NewClient(giteaAPIURL, gitea.SetToken(giteaToken))
+	testutil.NilError(t, err)
+
+	allUserProjectFavorites := []*gwapitypes.UserProjectFavoriteResponse{}
+
+	_, project := createProject(ctx, t, giteaClient, gwClientUser01, withVisibility(gwapitypes.VisibilityPrivate))
+
+	userProjectFavorite, _, err := gwClientUser01.CreateUserProjectFavorite(ctx, &gwapitypes.CreateUserProjectFavoriteRequest{ProjectRef: project.ID})
+	testutil.NilError(t, err)
+	allUserProjectFavorites = append(allUserProjectFavorites, userProjectFavorite)
+
+	for i := 2; i < 10; i++ {
+		project, _, err := gwClientUser01.CreateProject(ctx, &gwapitypes.CreateProjectRequest{
+			Name:             fmt.Sprintf("project0%d", i),
+			ParentRef:        path.Join("user", agolaUser01),
+			RemoteSourceName: "gitea",
+			RepoPath:         path.Join(giteaUser01, "repo01"),
+			Visibility:       gwapitypes.VisibilityPublic,
+		})
+		testutil.NilError(t, err)
+
+		userProjectFavorite, _, err := gwClientUser01.CreateUserProjectFavorite(ctx, &gwapitypes.CreateUserProjectFavoriteRequest{ProjectRef: project.ID})
+		testutil.NilError(t, err)
+
+		allUserProjectFavorites = append(allUserProjectFavorites, userProjectFavorite)
+	}
+	sort.Sort(userProjectFavoritesByID(allUserProjectFavorites))
+
+	tests := []struct {
+		name                string
+		limit               int
+		sortDirection       gwapitypes.SortDirection
+		expectedCallsNumber int
+	}{
+		{
+			name:                "get user project stars with limit = 0, no sortdirection",
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "get user project stars with limit = 0",
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "get user project stars with limit less than results length",
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "get user project stars with limit greater than results length",
+			limit:               MaxLimit,
+			sortDirection:       gwapitypes.SortDirectionAsc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "get user project stars with limit = 0, sortDirection desc",
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+		{
+			name:                "get user project stars with limit less than results length, sortDirection desc",
+			limit:               2,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 5,
+		},
+		{
+			name:                "get user project stars with limit greater than results length, sortDirection desc",
+			limit:               MaxLimit,
+			sortDirection:       gwapitypes.SortDirectionDesc,
+			expectedCallsNumber: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			var expectedUserProjectFavorites []*gwapitypes.UserProjectFavoriteResponse
+			expectedUserProjectFavorites = append(expectedUserProjectFavorites, allUserProjectFavorites...)
+			// default sortdirection is asc
+
+			// reverse if sortDirection is desc
+			if tt.sortDirection == gwapitypes.SortDirectionDesc {
+				slices.Reverse(expectedUserProjectFavorites)
+			}
+
+			respAllUserProjectFavorites := []*gwapitypes.UserProjectFavoriteResponse{}
+			sortDirection := tt.sortDirection
+			callsNumber := 0
+			var cursor string
+
+			for {
+				respUserProjectFavorites, res, err := gwClientUser01.GetUserProjectFavorites(ctx, &gwclient.ListOptions{Cursor: cursor, Limit: tt.limit, SortDirection: sortDirection})
+				testutil.NilError(t, err)
+
+				callsNumber++
+
+				respAllUserProjectFavorites = append(respAllUserProjectFavorites, respUserProjectFavorites...)
+
+				if res.Cursor == "" {
+					break
+				}
+				cursor = res.Cursor
+				sortDirection = ""
+			}
+
+			assert.DeepEqual(t, expectedUserProjectFavorites, respAllUserProjectFavorites)
+			assert.Assert(t, cmp.Equal(callsNumber, tt.expectedCallsNumber))
 		})
 	}
 }
