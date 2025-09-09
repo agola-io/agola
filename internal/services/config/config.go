@@ -265,7 +265,7 @@ type Web struct {
 	// TODO(sgotti) support encrypted private keys (add a private key password config entry)
 	TLSKeyFile string `yaml:"tlsKeyFile"`
 
-	// CORS allowed origins. Must be URLs. Wildcard ("*") is not accepted since cross origin requests will have credentials.
+	// CORS and CSRF allowed origins. Must be URLs. Wildcard ("*") is not accepted since cross origin requests will have credentials.
 	AllowedOrigins []string `yaml:"allowedOrigins"`
 }
 

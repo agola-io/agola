@@ -19,6 +19,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -48,8 +49,10 @@ const (
 )
 
 type Gateway struct {
-	log zerolog.Logger
-	c   *config.Gateway
+	log                zerolog.Logger
+	c                  *config.Gateway
+	corsAllowedOrigins []string
+	csrfTrustedOrigins []string
 
 	ost                objectstorage.ObjStorage
 	runserviceClient   *rsclient.Client
@@ -77,6 +80,23 @@ func NewGateway(ctx context.Context, log zerolog.Logger, gc *config.Config) (*Ga
 		}
 		if c.Web.TLSCertFile == "" {
 			return nil, errors.Errorf("no tls cert file specified")
+		}
+	}
+
+	corsAllowedOrigins := []string{}
+	// gorilla CSRF trusted origins are a list of host[:port]. Convert web.AllowedOrigins urls to this list. Assume AllowedOrigins are valid urls (no wildcards)
+	csrfTrustedOrigins := []string{}
+	for _, allowedOrigin := range c.Web.AllowedOrigins {
+		u, err := url.Parse(allowedOrigin)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		urls := util.ExpandURLDefaultPorts(u)
+
+		for _, u := range urls {
+			corsAllowedOrigins = append(corsAllowedOrigins, u.String())
+			csrfTrustedOrigins = append(csrfTrustedOrigins, u.Host)
 		}
 	}
 
@@ -138,6 +158,8 @@ func NewGateway(ctx context.Context, log zerolog.Logger, gc *config.Config) (*Ga
 	return &Gateway{
 		log:                log,
 		c:                  c,
+		corsAllowedOrigins: corsAllowedOrigins,
+		csrfTrustedOrigins: csrfTrustedOrigins,
 		ost:                ost,
 		runserviceClient:   runserviceClient,
 		configstoreClient:  configstoreClient,
@@ -154,10 +176,10 @@ func (g *Gateway) Run(ctx context.Context) error {
 		return h
 	}
 
-	if len(g.c.Web.AllowedOrigins) > 0 {
+	if len(g.corsAllowedOrigins) > 0 {
 		corsAllowedMethodsOptions := ghandlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "DELETE"})
 		corsAllowedHeadersOptions := ghandlers.AllowedHeaders([]string{"Accept", "Accept-Encoding", "Content-Length", "Content-Type", "Content-Range", "X-Csrf-Token", "X-Agola-Cursor", "Authorization"})
-		corsAllowedOriginsOptions := ghandlers.AllowedOrigins(g.c.Web.AllowedOrigins)
+		corsAllowedOriginsOptions := ghandlers.AllowedOrigins(g.corsAllowedOrigins)
 		corsExposeHeadersOptions := ghandlers.ExposedHeaders([]string{"X-Csrf-Token", "X-Agola-Cursor"})
 		corsHandler = ghandlers.CORS(corsAllowedMethodsOptions, corsAllowedHeadersOptions, corsAllowedOriginsOptions, corsExposeHeadersOptions, ghandlers.AllowCredentials())
 	}
@@ -166,7 +188,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 	// make the csrf cookie max age 0 so it'll be a session cookie and won't expire.
 	csrfCookieMaxAge := 0
 
-	protectCSRF := csrf.Protect([]byte(g.c.CookieSigning.Key), csrf.Path("/"), csrf.CookieName(csrfCookieName), csrf.MaxAge(csrfCookieMaxAge), csrf.Secure(!g.c.UnsecureCookies), csrf.ErrorHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	protectCSRF := csrf.Protect([]byte(g.c.CookieSigning.Key), csrf.Path("/"), csrf.CookieName(csrfCookieName), csrf.MaxAge(csrfCookieMaxAge), csrf.Secure(!g.c.UnsecureCookies), csrf.TrustedOrigins(g.csrfTrustedOrigins), csrf.ErrorHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// on failed csrf return a csrf token so next request will have it
 		w.Header().Set("X-Csrf-Token", csrf.Token(r))
 
