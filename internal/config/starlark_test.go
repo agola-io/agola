@@ -21,7 +21,7 @@ import (
 
 	"github.com/sorintlab/errors"
 	"go.starlark.net/starlark"
-	"gotest.tools/assert"
+	"gotest.tools/v3/assert"
 
 	"agola.io/agola/internal/testutil"
 )

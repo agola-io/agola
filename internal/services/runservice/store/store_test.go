@@ -18,7 +18,7 @@ import (
 	"testing"
 
 	"github.com/sorintlab/errors"
-	"gotest.tools/assert"
+	"gotest.tools/v3/assert"
 
 	"agola.io/agola/internal/testutil"
 )

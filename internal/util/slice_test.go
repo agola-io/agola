@@ -17,7 +17,7 @@ package util
 import (
 	"testing"
 
-	"gotest.tools/assert"
+	"gotest.tools/v3/assert"
 )
 
 func TestEqualStringSlice(t *testing.T) {
