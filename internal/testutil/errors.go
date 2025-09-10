@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/sorintlab/errors"
-	"gotest.tools/assert"
+	"gotest.tools/v3/assert"
 )
 
 func NilError(t assert.TestingT, err error, msgAndArgs ...interface{}) {

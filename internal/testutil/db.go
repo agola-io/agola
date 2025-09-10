@@ -23,8 +23,8 @@ import (
 	sq "github.com/huandu/go-sqlbuilder"
 	"github.com/rs/zerolog"
 	"github.com/sorintlab/errors"
-	"gotest.tools/assert"
-	"gotest.tools/assert/cmp"
+	"gotest.tools/v3/assert"
+	"gotest.tools/v3/assert/cmp"
 	"muzzammil.xyz/jsonc"
 
 	"agola.io/agola/internal/sqlg"

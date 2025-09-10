@@ -17,7 +17,7 @@ package action
 import (
 	"testing"
 
-	"gotest.tools/assert"
+	"gotest.tools/v3/assert"
 
 	"agola.io/agola/internal/sqlg"
 	"agola.io/agola/internal/util"

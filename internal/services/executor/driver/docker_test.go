@@ -24,8 +24,8 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/gofrs/uuid"
-	"gotest.tools/assert"
-	"gotest.tools/assert/cmp"
+	"gotest.tools/v3/assert"
+	"gotest.tools/v3/assert/cmp"
 
 	"agola.io/agola/internal/testutil"
 )

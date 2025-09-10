@@ -17,7 +17,7 @@ package types
 import (
 	"testing"
 
-	"gotest.tools/assert"
+	"gotest.tools/v3/assert"
 
 	itypes "agola.io/agola/internal/services/types"
 )

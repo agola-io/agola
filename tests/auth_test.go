@@ -8,7 +8,7 @@ import (
 
 	"code.gitea.io/sdk/gitea"
 	"github.com/pkg/errors"
-	"gotest.tools/assert"
+	"gotest.tools/v3/assert"
 
 	"agola.io/agola/internal/services/gateway/common"
 	"agola.io/agola/internal/testutil"

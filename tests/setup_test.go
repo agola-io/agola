@@ -39,7 +39,7 @@ import (
 	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/rs/zerolog"
 	"github.com/sorintlab/errors"
-	"gotest.tools/assert"
+	"gotest.tools/v3/assert"
 
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/configstore"

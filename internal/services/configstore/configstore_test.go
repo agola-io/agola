@@ -29,8 +29,8 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/rs/zerolog"
 	"github.com/sorintlab/errors"
-	"gotest.tools/assert"
-	"gotest.tools/assert/cmp"
+	"gotest.tools/v3/assert"
+	"gotest.tools/v3/assert/cmp"
 
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/services/configstore/action"

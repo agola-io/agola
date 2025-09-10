@@ -17,7 +17,7 @@ package common
 import (
 	"testing"
 
-	"gotest.tools/assert"
+	"gotest.tools/v3/assert"
 
 	csapitypes "agola.io/agola/services/configstore/api/types"
 	cstypes "agola.io/agola/services/configstore/types"

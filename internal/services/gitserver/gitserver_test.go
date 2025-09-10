@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"gotest.tools/assert"
+	"gotest.tools/v3/assert"
 
 	"agola.io/agola/internal/services/config"
 	"agola.io/agola/internal/testutil"

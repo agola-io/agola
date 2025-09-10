@@ -32,7 +32,7 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/sgotti/gexpect"
 	"github.com/sorintlab/errors"
-	"gotest.tools/assert"
+	"gotest.tools/v3/assert"
 )
 
 const (
