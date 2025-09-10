@@ -49,11 +49,12 @@ func (c *CookieClient) doRequest(ctx context.Context, method, path string, query
 		return nil, errors.WithStack(err)
 	}
 	u.RawQuery = query.Encode()
-	req, err := http.NewRequest(method, u.String(), ibody)
-	req = req.WithContext(ctx)
+	req, err := http.NewRequestWithContext(ctx, method, u.String(), ibody)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
+
+	req.Header.Set("Referer", "https://localhost:8080")
 
 	for k, v := range header {
 		req.Header[k] = v

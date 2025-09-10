@@ -347,8 +347,9 @@ func setup(ctx context.Context, t *testing.T, dir string, opts ...setupOption) *
 			GitserverURL:    "",
 			NotificationURL: "",
 			Web: config.Web{
-				ListenAddress: "",
-				TLS:           false,
+				ListenAddress:  "",
+				TLS:            false,
+				AllowedOrigins: []string{"https://localhost:8080"},
 			},
 			TokenSigning: config.TokenSigning{
 				Duration: 12 * time.Hour,
@@ -526,6 +527,7 @@ func setup(ctx context.Context, t *testing.T, dir string, opts ...setupOption) *
 	sc.config.Notification.ConfigstoreURL = csURL
 
 	sc.config.Executor.RunserviceURL = rsURL
+
 	err = sc.startAgola()
 	testutil.NilError(t, err)
 
