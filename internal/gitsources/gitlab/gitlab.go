@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/sorintlab/errors"
-	gitlab "github.com/xanzy/go-gitlab"
+	gitlab "gitlab.com/gitlab-org/api/client-go"
 	"golang.org/x/oauth2"
 
 	gitsource "agola.io/agola/internal/gitsources"
@@ -95,7 +95,10 @@ func newHTTPClient(opts httpOpts) *http.Client {
 func New(opts Opts) (*Client, error) {
 	httpClient := newHTTPClient(httpOpts{SkipVerify: opts.SkipVerify})
 
-	client, err := gitlab.NewOAuthClient(opts.Token, gitlab.WithHTTPClient(httpClient), gitlab.WithBaseURL(opts.APIURL))
+	ts := oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: opts.Token},
+	)
+	client, err := gitlab.NewAuthSourceClient(gitlab.OAuthTokenSource{TokenSource: ts}, gitlab.WithHTTPClient(httpClient), gitlab.WithBaseURL(opts.APIURL))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create gitlab client")
 	}

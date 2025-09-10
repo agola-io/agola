@@ -29,7 +29,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/sgotti/gexpect"
 	"github.com/sorintlab/errors"
 	"gotest.tools/v3/assert"

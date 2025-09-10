@@ -35,8 +35,8 @@ import (
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/moby/go-archive"
 	"github.com/rs/zerolog"
 	"github.com/sorintlab/errors"
 
@@ -606,8 +606,7 @@ func (dp *DockerPod) Exec(ctx context.Context, execConfig *ExecConfig) (Containe
 		return nil, errors.WithStack(err)
 	}
 	execStartCheck := container.ExecAttachOptions{
-		Detach: dockerExecConfig.Detach,
-		Tty:    dockerExecConfig.Tty,
+		Tty: dockerExecConfig.Tty,
 	}
 	hresp, err := dp.client.ContainerExecAttach(ctx, response.ID, execStartCheck)
 	if err != nil {

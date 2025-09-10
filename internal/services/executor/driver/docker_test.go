@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types/container"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/assert/cmp"
 

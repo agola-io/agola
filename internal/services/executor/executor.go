@@ -29,7 +29,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/gorilla/mux"
 	sockaddr "github.com/hashicorp/go-sockaddr"
 	"github.com/rs/zerolog"
