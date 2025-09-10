@@ -15,6 +15,7 @@
 package config
 
 import (
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -264,7 +265,7 @@ type Web struct {
 	// TODO(sgotti) support encrypted private keys (add a private key password config entry)
 	TLSKeyFile string `yaml:"tlsKeyFile"`
 
-	// CORS allowed origins
+	// CORS allowed origins. Must be URLs. Wildcard ("*") is not accepted since cross origin requests will have credentials.
 	AllowedOrigins []string `yaml:"allowedOrigins"`
 }
 
@@ -535,6 +536,13 @@ func validateWeb(w *Web) error {
 		}
 		if w.TLSCertFile == "" {
 			return errors.Errorf("no tls cert file specified")
+		}
+	}
+
+	for _, o := range w.AllowedOrigins {
+		// allowed origin must be valid URLs. Don't accept wildcard ("*") origins since the cross origin requests will use credentials.
+		if _, err := url.Parse(o); err != nil {
+			return errors.Wrapf(err, "invalid allowed origin %q", o)
 		}
 	}
 
