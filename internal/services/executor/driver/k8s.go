@@ -26,8 +26,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/pkg/archive"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
+	"github.com/moby/go-archive"
 	"github.com/rs/zerolog"
 	"github.com/sorintlab/errors"
 	corev1 "k8s.io/api/core/v1"

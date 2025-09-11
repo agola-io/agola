@@ -6,7 +6,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/lib/pq"
 	"github.com/sorintlab/errors"
 )

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/huandu/xstrings"
 	"github.com/sorintlab/errors"
 

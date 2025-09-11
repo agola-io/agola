@@ -24,7 +24,7 @@ import (
 	"unicode"
 
 	"github.com/ghodss/yaml"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/rs/zerolog/log"
 	"github.com/sorintlab/errors"
 	"github.com/spf13/cobra"

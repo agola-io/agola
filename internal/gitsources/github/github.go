@@ -28,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v66/github"
+	"github.com/google/go-github/v74/github"
 	"github.com/sorintlab/errors"
 	"golang.org/x/oauth2"
 
@@ -213,9 +213,9 @@ func (c *Client) CreateDeployKey(repopath, title, pubKey string, readonly bool) 
 		return errors.WithStack(err)
 	}
 	if _, _, err = c.client.Repositories.CreateKey(context.TODO(), owner, reponame, &github.Key{
-		Title:    github.String(title),
-		Key:      github.String(pubKey),
-		ReadOnly: github.Bool(readonly),
+		Title:    github.Ptr(title),
+		Key:      github.Ptr(pubKey),
+		ReadOnly: github.Ptr(readonly),
 	}); err != nil {
 		return errors.Wrapf(err, "error creating deploy key")
 	}
@@ -248,9 +248,9 @@ func (c *Client) UpdateDeployKey(repopath, title, pubKey string, readonly bool) 
 	}
 
 	if _, _, err = c.client.Repositories.CreateKey(context.TODO(), owner, reponame, &github.Key{
-		Title:    github.String(title),
-		Key:      github.String(pubKey),
-		ReadOnly: github.Bool(readonly),
+		Title:    github.Ptr(title),
+		Key:      github.Ptr(pubKey),
+		ReadOnly: github.Ptr(readonly),
 	}); err != nil {
 		return errors.Wrapf(err, "error creating deploy key")
 	}
@@ -287,12 +287,12 @@ func (c *Client) CreateRepoWebhook(repopath, url, secret string) error {
 
 	hook := &github.Hook{
 		Config: &github.HookConfig{
-			URL:         github.String(url),
-			ContentType: github.String("json"),
-			Secret:      github.String(secret),
+			URL:         github.Ptr(url),
+			ContentType: github.Ptr("json"),
+			Secret:      github.Ptr(secret),
 		},
 		Events: []string{"push", "pull_request"},
-		Active: github.Bool(true),
+		Active: github.Ptr(true),
 	}
 
 	if _, _, err = c.client.Repositories.CreateHook(context.TODO(), owner, reponame, hook); err != nil {
@@ -342,10 +342,10 @@ func (c *Client) CreateCommitStatus(repopath, commitSHA string, status gitsource
 		return false, errors.WithStack(err)
 	}
 	_, resp, err := c.client.Repositories.CreateStatus(context.TODO(), owner, reponame, commitSHA, &github.RepoStatus{
-		State:       github.String(fromCommitStatus(status)),
-		TargetURL:   github.String(targetURL),
-		Description: github.String(description),
-		Context:     github.String(statusContext),
+		State:       github.Ptr(fromCommitStatus(status)),
+		TargetURL:   github.Ptr(targetURL),
+		Description: github.Ptr(description),
+		Context:     github.Ptr(statusContext),
 	})
 
 	var delivered bool
