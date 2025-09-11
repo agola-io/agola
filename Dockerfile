@@ -1,13 +1,13 @@
 ARG AGOLAWEB_IMAGE="agola-web"
 
-FROM $AGOLAWEB_IMAGE as agola-web
+FROM $AGOLAWEB_IMAGE AS agola-web
 
 #######
 ####### Build the backend
 #######
 
 # base build image
-FROM golang:1.24-bookworm AS build_base
+FROM golang:1.25-bookworm AS build_base
 
 WORKDIR /agola
 
@@ -52,7 +52,7 @@ ENTRYPOINT ["/bin/agola"]
 ####### Build the demo image
 #######
 
-FROM agola as agolademo
+FROM agola AS agolademo
 
 WORKDIR /
 
