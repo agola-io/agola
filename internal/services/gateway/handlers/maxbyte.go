@@ -21,10 +21,12 @@ type maxBytesHandler struct {
 	n int64
 }
 
-func NewMaxBytesHandler(h http.Handler, n int64) *maxBytesHandler {
-	return &maxBytesHandler{
-		h: h,
-		n: n,
+func NewMaxBytesHandler(n int64) func(http.Handler) http.Handler {
+	return func(h http.Handler) http.Handler {
+		return &maxBytesHandler{
+			h: h,
+			n: n,
+		}
 	}
 }
 
