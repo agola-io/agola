@@ -305,11 +305,6 @@ func (g *Gateway) Run(ctx context.Context) error {
 	exportHandler := api.NewExportHandler(g.log, g.ah)
 	importHandler := api.NewImportHandler(g.log, g.ah)
 
-	router := mux.NewRouter()
-	reposRouter := mux.NewRouter()
-
-	apirouter := mux.NewRouter().PathPrefix("/api/v1alpha").Subrouter().UseEncodedPath()
-
 	authForcedHandler := func(h http.Handler) http.Handler {
 		// first do auth, then check csrf (skipping it only on successful token auth)
 		return handlers.NewAuthChecker(g.log, g.configstoreClient, handlers.WithTokenChecker(g.c.AdminToken), handlers.WithCookieChecker(g.sc, g.c.UnsecureCookies), handlers.WithRequired(true))(CSRF(h))
@@ -319,7 +314,23 @@ func (g *Gateway) Run(ctx context.Context) error {
 		return handlers.NewAuthChecker(g.log, g.configstoreClient, handlers.WithTokenChecker(g.c.AdminToken), handlers.WithCookieChecker(g.sc, g.c.UnsecureCookies), handlers.WithRequired(false))(CSRF(h))
 	}
 
-	router.PathPrefix("/api/v1alpha").Handler(apirouter)
+	// router is the main router. It uses the recovery and cors middlewares
+	router := mux.NewRouter()
+	router.Use(
+		ghandlers.RecoveryHandler(ghandlers.PrintRecoveryStack(true)),
+		corsHandler,
+	)
+
+	// reposRouter doesn't use max bytes handler since git data can be quite big
+	reposRouter := router.PathPrefix("/repos/").Subrouter()
+
+	// stdRouter additionally uses max bytes handler
+	stdRouter := router.PathPrefix("/").Subrouter()
+	stdRouter.Use(
+		handlers.NewMaxBytesHandler(maxRequestSize),
+	)
+
+	apirouter := stdRouter.PathPrefix("/api/v1alpha/").Subrouter().UseEncodedPath()
 
 	//apirouter.Handle("/projectgroups", authForcedHandler(projectsHandler)).Methods("GET")
 	apirouter.Handle("/projectgroups/{projectgroupref}", authForcedHandler(projectGroupHandler)).Methods("GET")
@@ -426,16 +437,10 @@ func (g *Gateway) Run(ctx context.Context) error {
 	apirouter.Handle("/import/{servicename}", authForcedHandler(importHandler)).Methods("POST")
 
 	// TODO(sgotti) add auth to these requests
-	reposRouter.Handle("/repos/{rest:.*}", reposHandler).Methods("GET", "POST")
+	reposRouter.Handle("/{rest:.*}", reposHandler).Methods("GET", "POST")
 
-	router.Handle("/webhooks", webhooksHandler).Methods("POST")
-	router.PathPrefix("/").HandlerFunc(handlers.NewWebBundleHandlerFunc(g.c.APIExposedURL))
-
-	maxBytesHandler := handlers.NewMaxBytesHandler(router, maxRequestSize)
-
-	mainrouter := mux.NewRouter()
-	mainrouter.PathPrefix("/repos/").Handler(corsHandler(reposRouter))
-	mainrouter.PathPrefix("/").Handler(ghandlers.RecoveryHandler(ghandlers.PrintRecoveryStack(true))(corsHandler(maxBytesHandler)))
+	stdRouter.Handle("/webhooks", webhooksHandler).Methods("POST")
+	stdRouter.PathPrefix("/").HandlerFunc(handlers.NewWebBundleHandlerFunc(g.c.APIExposedURL))
 
 	var tlsConfig *tls.Config
 	if g.c.Web.TLS {
@@ -449,7 +454,7 @@ func (g *Gateway) Run(ctx context.Context) error {
 
 	httpServer := http.Server{
 		Addr:      g.c.Web.ListenAddress,
-		Handler:   mainrouter,
+		Handler:   router,
 		TLSConfig: tlsConfig,
 	}
 
