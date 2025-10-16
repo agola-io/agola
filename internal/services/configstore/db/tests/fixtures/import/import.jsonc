@@ -57,3 +57,7 @@
 {"exportMeta":{"kind":"OrgInvitation"},"id":"ccfa97b7-f673-4437-9d5f-8fd11ec05c6f","creationTime":"2023-04-07T12:12:19.048529Z","updateTime":"2023-04-07T12:12:19.048529Z","organization_id":"15bfe438-9844-4024-b493-d137468bf6e9","user_id":"06c3b92a-f544-4eab-a254-a9d0465e16fc","role":"owner"}
 
 {"exportMeta":{"kind":"LinkedAccount"},"id":"4037d8a4-78a2-41dc-8108-faa7f514b5e2","creationTime":"2023-04-07T12:12:19.048529Z","updateTime":"2023-04-07T12:12:19.048529Z","user_id":"06c3b92a-f544-4eab-a254-a9d0465e16fc","remote_user_id":"12345","remote_username":"remoteuser01","remote_source_id":"41e2edca-ed29-4bab-a552-e4720cc2aca9","oauth2_access_token":"accesstoken","oauth_2_access_token_expires_at":"0001-01-01T00:00:00Z"}
+
+{"exportMeta":{"kind":"UserProjectFavorite"},"id":"6db79d0c-6f75-4212-ac28-9b96ac04db34","creationTime":"2023-04-07T12:12:19.048529Z","updateTime":"2023-04-07T12:12:19.048529Z","user_id":"06c3b92a-f544-4eab-a254-a9d0465e16fc","project_id":"a15977f1-2f25-4fb9-a94c-bdfe11cc7292"}
+{"exportMeta":{"kind":"UserProjectFavorite"},"id":"72c862b4-4e0c-4877-a326-ff6b60815d32","creationTime":"2023-04-07T12:12:19.048529Z","updateTime":"2023-04-07T12:12:19.048529Z","user_id":"172f750c-0800-4fd1-9eaa-415935cfb7b0","project_id":"ac31830e-af56-4825-882e-a5dedf30ef96"}
+

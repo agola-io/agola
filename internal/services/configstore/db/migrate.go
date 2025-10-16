@@ -14,6 +14,7 @@ func (d *DB) MigrateFuncs() map[uint]sqlg.MigrateFunc {
 	return map[uint]sqlg.MigrateFunc{
 		2: d.migrateV2,
 		3: d.migrateV3,
+		4: d.migrateV4,
 	}
 }
 
@@ -125,6 +126,32 @@ func (d *DB) migrateV3(tx *sql.Tx) error {
 		"INSERT INTO new_project SELECT *, false AS members_can_perform_run_actions FROM project",
 		"DROP TABLE project",
 		"ALTER TABLE new_project RENAME TO project",
+	}
+
+	var stmts []string
+	switch d.sdb.Type() {
+	case sql.Postgres:
+		stmts = ddlPostgres
+	case sql.Sqlite3:
+		stmts = ddlSqlite3
+	}
+
+	for _, stmt := range stmts {
+		if _, err := tx.Exec(stmt); err != nil {
+			return errors.WithStack(err)
+		}
+	}
+
+	return nil
+}
+
+func (d *DB) migrateV4(tx *sql.Tx) error {
+	var ddlPostgres = []string{
+		"create table if not exists userprojectfavorite (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamptz NOT NULL, update_time timestamptz NOT NULL, user_id varchar NOT NULL, project_id varchar NOT NULL, PRIMARY KEY (id), foreign key (user_id) references user_t(id), foreign key (project_id) references project(id))",
+	}
+
+	var ddlSqlite3 = []string{
+		"create table if not exists userprojectfavorite (id varchar NOT NULL, revision bigint NOT NULL, creation_time timestamp NOT NULL, update_time timestamp NOT NULL, user_id varchar NOT NULL, project_id varchar NOT NULL, PRIMARY KEY (id), foreign key (user_id) references user_t(id), foreign key (project_id) references project(id))",
 	}
 
 	var stmts []string

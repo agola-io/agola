@@ -218,6 +218,10 @@ func (s *Configstore) setupDefaultRouter() http.Handler {
 	deleteOrgInvitationHandler := api.NewDeleteOrgInvitationHandler(s.log, s.ah)
 	orgInvitationHandler := api.NewOrgInvitationHandler(s.log, s.ah)
 
+	userProjectFavorites := api.NewUserProjectFavoritesHandler(s.log, s.ah)
+	createUserProjectFavoriteHandler := api.NewCreateUserProjectFavoriteHandler(s.log, s.ah)
+	deleteUserProjectFavoriteHandler := api.NewDeleteUserProjectFavoriteHandler(s.log, s.ah)
+
 	authHandler := handlers.NewInternalAuthChecker(s.log, s.c.APIToken)
 
 	router := mux.NewRouter()
@@ -294,6 +298,10 @@ func (s *Configstore) setupDefaultRouter() http.Handler {
 	apirouter.Handle("/remotesources/{remotesourceref}", deleteRemoteSourceHandler).Methods("DELETE")
 
 	apirouter.Handle("/linkedaccounts", linkedAccountsHandler).Methods("GET")
+
+	apirouter.Handle("/users/{userref}/projectfavorites", userProjectFavorites).Methods("GET")
+	apirouter.Handle("/users/{userref}/projects/{projectref}/projectfavorites", createUserProjectFavoriteHandler).Methods("POST")
+	apirouter.Handle("/users/{userref}/projects/{projectref}/projectfavorites", deleteUserProjectFavoriteHandler).Methods("DELETE")
 
 	apirouter.Handle("/maintenance", maintenanceStatusHandler).Methods("GET")
 	apirouter.Handle("/maintenance", maintenanceModeHandler).Methods("PUT", "DELETE")
